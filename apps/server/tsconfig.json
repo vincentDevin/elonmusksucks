@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "target": "ES2020", // Modern JavaScript output
+    "module": "CommonJS", // Required for Node.js
+    "rootDir": "./src", // Source directory
+    "outDir": "./dist", // Build output directory
+    "moduleResolution": "node", // Resolves modules using Node logic
+    "resolveJsonModule": true, // Allows importing JSON files
+    "esModuleInterop": true, // Allows `import express from 'express'`
+    "forceConsistentCasingInFileNames": true, // Avoid filename case issues
+    "strict": true, // Enables all strict type checks
+    "skipLibCheck": true, // Speeds up compilation by skipping `.d.ts` checks
+    "allowSyntheticDefaultImports": true, // Allow default import syntax even if module doesn't support it
+    "noImplicitAny": true, // Force explicit types (optional, but good for larger teams)
+    "noUnusedLocals": true, // Warn on unused local variables
+    "noUnusedParameters": true, // Warn on unused parameters
+    "noFallthroughCasesInSwitch": true, // Prevents bugs in switch logic
+    "baseUrl": ".", // Required if you want to use `paths`
+    "paths": {
+      "@controllers/*": ["src/controllers/*"],
+      "@routes/*": ["src/routes/*"],
+      "@models/*": ["src/models/*"],
+      "@services/*": ["src/services/*"],
+      "@utils/*": ["src/utils/*"]
+    }
+  },
+  "include": ["src"], // Include your source directory
+  "exclude": ["node_modules", "dist"] // Exclude build and external files
+}
