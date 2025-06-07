@@ -2,8 +2,8 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: '',            // ← purely relative
-  withCredentials: true,  // ← still send cookies along
+  baseURL: '', // ← purely relative
+  withCredentials: true, // ← still send cookies along
   headers: { 'Content-Type': 'application/json' },
 });
 
@@ -14,7 +14,7 @@ export function setAccessToken(token: string) {
 }
 
 // Attach Authorization header if token is set
-api.interceptors.request.use(config => {
+api.interceptors.request.use((config) => {
   if (accessToken && config.headers) {
     config.headers.Authorization = `Bearer ${accessToken}`;
   }

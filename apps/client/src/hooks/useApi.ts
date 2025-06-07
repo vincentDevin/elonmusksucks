@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 
 export function useApi<T>(
   apiCall: () => Promise<T>,
-  deps: unknown[] = []
+  deps: unknown[] = [],
 ): {
   data: T | null;
   error: unknown;

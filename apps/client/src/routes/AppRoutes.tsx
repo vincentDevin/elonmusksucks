@@ -1,6 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import Home from '../pages/Home';
 import Login from '../pages/Login';
 import Register from '../pages/Register';
 import Dashboard from '../pages/Dashboard';
@@ -13,22 +12,19 @@ export default function AppRoutes() {
 
   return (
     <Routes>
-      {/* Public homepage */}
-      <Route path="/" element={<Home />} />
-
       {/* Public routes */}
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
 
       {/* Protected routes */}
       <Route element={<PrivateRoute />}>
-        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/" element={<Dashboard />} />
         <Route path="/predictions" element={<Predictions />} />
         <Route path="/leaderboard" element={<Leaderboard />} />
       </Route>
 
       {/* Redirect unknown paths */}
-      <Route path="*" element={<Navigate to={accessToken ? "/dashboard" : "/"} replace />} />
+      <Route path="*" element={<Navigate to={accessToken ? '/' : '/login'} replace />} />
     </Routes>
   );
 }

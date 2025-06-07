@@ -29,7 +29,7 @@ export default function Login() {
           <input
             type="email"
             value={email}
-            onChange={e => setEmail(e.target.value)}
+            onChange={(e) => setEmail(e.target.value)}
             placeholder="Email"
             required
             className="w-full p-3 border border-gray-300 rounded focus:outline-none focus:ring focus:border-blue-300"
@@ -37,7 +37,7 @@ export default function Login() {
           <input
             type="password"
             value={password}
-            onChange={e => setPassword(e.target.value)}
+            onChange={(e) => setPassword(e.target.value)}
             placeholder="Password"
             required
             className="w-full p-3 border border-gray-300 rounded focus:outline-none focus:ring focus:border-blue-300"

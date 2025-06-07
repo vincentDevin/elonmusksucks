@@ -6,14 +6,14 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        primary:     'var(--color-primary)',
-        muted:       'var(--color-muted)',
-        tertiary:    'var(--color-tertiary)',
-        surface:     'var(--color-surface)',
-        accent:      'var(--color-accent)',
-        secondary:   'var(--color-secondary)',
-        content:     'var(--color-content)',
-        background:  'var(--color-background)',
+        primary: 'var(--color-primary)',
+        muted: 'var(--color-muted)',
+        tertiary: 'var(--color-tertiary)',
+        surface: 'var(--color-surface)',
+        accent: 'var(--color-accent)',
+        secondary: 'var(--color-secondary)',
+        content: 'var(--color-content)',
+        background: 'var(--color-background)',
       },
     },
   },

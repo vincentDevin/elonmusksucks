@@ -1,9 +1,4 @@
-import React, {
-  createContext,
-  useState,
-  useEffect,
-  useCallback,
-} from 'react';
+import React, { createContext, useState, useEffect, useCallback } from 'react';
 import {
   login as loginApi,
   register as registerApi,
@@ -44,16 +39,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setAccessToken(token);
   }, []);
 
-  const register = useCallback(
-    async (name: string, email: string, password: string) => {
-      await registerApi({ name, email, password });
-      // optionally auto-login after register:
-      const token = await loginApi({ email, password });
-      setToken(token);
-      setAccessToken(token);
-    },
-    []
-  );
+  const register = useCallback(async (name: string, email: string, password: string) => {
+    await registerApi({ name, email, password });
+    // optionally auto-login after register:
+    const token = await loginApi({ email, password });
+    setToken(token);
+    setAccessToken(token);
+  }, []);
 
   const logout = useCallback(async () => {
     await logoutApi();

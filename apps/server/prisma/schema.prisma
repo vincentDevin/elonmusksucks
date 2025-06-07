@@ -79,3 +79,10 @@ model RefreshToken {
   expiresAt DateTime
   createdAt DateTime @default(now())
 }
+
+model LeaderboardEntry {
+  id        Int    @id
+  name      String
+  muskBucks Int
+  @@map("leaderboard_view")
+}

@@ -8,11 +8,11 @@ function App() {
   return (
     <AuthProvider>
       <ThemeProvider>
-      <BrowserRouter>
-        <MainLayout>
-        <AppRoutes />
-        </MainLayout>
-      </BrowserRouter>
+        <BrowserRouter>
+          <MainLayout>
+            <AppRoutes />
+          </MainLayout>
+        </BrowserRouter>
       </ThemeProvider>
     </AuthProvider>
   );

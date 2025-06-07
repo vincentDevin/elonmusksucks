@@ -7,7 +7,7 @@ export interface RegisterPayload {
 }
 export async function register(data: RegisterPayload) {
   const res = await api.post('/api/auth/register', data);
-  return res.data;  // { id, name, email }
+  return res.data; // { id, name, email }
 }
 
 export interface LoginPayload {

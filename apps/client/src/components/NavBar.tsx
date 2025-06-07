@@ -15,11 +15,7 @@ export default function NavBar() {
   };
 
   const linkClasses = (path: string) =>
-    `px-3 py-2 rounded ${
-      loc.pathname === path
-        ? 'bg-blue-600 text-white'
-        : 'hover:bg-muted'
-    }`;
+    `px-3 py-2 rounded ${loc.pathname === path ? 'bg-blue-600 text-white' : 'hover:bg-muted'}`;
 
   return (
     <header className="border-b border-muted">
@@ -60,23 +56,13 @@ export default function NavBar() {
 
           <button
             onClick={toggleTheme}
-            aria-label={
-              theme === 'light' ? 'Activate dark mode' : 'Activate light mode'
-            }
+            aria-label={theme === 'light' ? 'Activate dark mode' : 'Activate light mode'}
             aria-pressed={theme === 'dark'}
-            title={
-              theme === 'light'
-                ? 'Switch to dark mode'
-                : 'Switch to light mode'
-            }
+            title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
             className="ml-4 flex items-center space-x-1 p-2 rounded hover:bg-muted"
           >
-            <span className="text-lg">
-              {theme === 'light' ? <FaMoon /> : <FaSun />}
-            </span>
-            <span className="sr-only">
-              {theme === 'light' ? 'Dark mode' : 'Light mode'}
-            </span>
+            <span className="text-lg">{theme === 'light' ? <FaMoon /> : <FaSun />}</span>
+            <span className="sr-only">{theme === 'light' ? 'Dark mode' : 'Light mode'}</span>
           </button>
         </nav>
       </div>

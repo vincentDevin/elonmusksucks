@@ -24,13 +24,13 @@ export default function Register() {
   return (
     <div className="container mx-auto my-8 px-4 bg-background text-content min-h-screen transition-colors duration-300">
       <div className="bg-surface shadow rounded-lg p-6 max-w-md mx-auto text-content transition-colors duration-300">
-         <h2 className="text-2xl font-bold mb-4">Register</h2>
+        <h2 className="text-2xl font-bold mb-4">Register</h2>
         {error && <p className="text-red-500">{error}</p>}
         <form onSubmit={handleSubmit} className="space-y-4">
           <input
             type="text"
             value={name}
-            onChange={e => setName(e.target.value)}
+            onChange={(e) => setName(e.target.value)}
             placeholder="Name"
             required
             className="w-full p-3 border border-gray-300 rounded focus:outline-none focus:ring focus:border-blue-300"
@@ -38,7 +38,7 @@ export default function Register() {
           <input
             type="email"
             value={email}
-            onChange={e => setEmail(e.target.value)}
+            onChange={(e) => setEmail(e.target.value)}
             placeholder="Email"
             required
             className="w-full p-3 border border-gray-300 rounded focus:outline-none focus:ring focus:border-blue-300"
@@ -46,7 +46,7 @@ export default function Register() {
           <input
             type="password"
             value={password}
-            onChange={e => setPassword(e.target.value)}
+            onChange={(e) => setPassword(e.target.value)}
             placeholder="Password"
             required
             className="w-full p-3 border border-gray-300 rounded focus:outline-none focus:ring focus:border-blue-300"

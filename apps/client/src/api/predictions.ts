@@ -13,7 +13,7 @@ export interface Prediction {
 }
 
 export async function getPredictions(): Promise<Prediction[]> {
-  const { data } = await api.get<Prediction[]>('/predictions');
+  const { data } = await api.get<Prediction[]>('/api/predictions');
   return data;
 }
 
@@ -24,10 +24,10 @@ export interface CreatePredictionPayload {
   expiresAt: Date;
 }
 export async function createPrediction(payload: CreatePredictionPayload): Promise<Prediction> {
-  const { data } = await api.post<Prediction>(
-    '/predictions',
-    { ...payload, expiresAt: payload.expiresAt.toISOString() }
-  );
+  const { data } = await api.post<Prediction>('/api/predictions', {
+    ...payload,
+    expiresAt: payload.expiresAt.toISOString(),
+  });
   return data;
 }
 
@@ -45,9 +45,9 @@ export async function placeBet(
   predictionId: number,
   userId: number,
   amount: number,
-  option: string
+  option: string,
 ): Promise<Bet> {
-  const { data } = await api.post<Bet>(`/predictions/${predictionId}/bet`, {
+  const { data } = await api.post<Bet>(`/api/predictions/${predictionId}/bet`, {
     userId,
     amount,
     option,
@@ -57,9 +57,9 @@ export async function placeBet(
 
 export async function resolvePrediction(
   predictionId: number,
-  outcome: string
+  outcome: string,
 ): Promise<Prediction> {
-  const { data } = await api.post<Prediction>(`/predictions/${predictionId}/resolve`, {
+  const { data } = await api.post<Prediction>(`/api/predictions/${predictionId}/resolve`, {
     outcome,
   });
   return data;
@@ -71,7 +71,9 @@ export interface LeaderboardEntry {
   muskBucks: number;
 }
 export async function getLeaderboard(limit?: number): Promise<LeaderboardEntry[]> {
-  const url = limit ? `/predictions/leaderboard?limit=${limit}` : '/predictions/leaderboard';
+  const url = limit
+    ? `/api/predictions/leaderboard?limit=${limit}`
+    : '/api/predictions/leaderboard';
   const { data } = await api.get<LeaderboardEntry[]>(url);
   return data;
 }
