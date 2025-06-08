@@ -9,17 +9,13 @@ import {
 } from '../services/auth.service';
 import { generateAccessToken, generateRefreshToken } from '../utils/jwtHelpers';
 
-export const registerUser: RequestHandler = async (req, res, next) => {
+export const registerUser: RequestHandler = async (req, res) => {
   try {
     const { name, email, password } = req.body;
     const user = await createUser(name, email, password);
     res.status(201).json({ id: user.id, name: user.name, email: user.email });
   } catch (err: any) {
-    if (err.message === 'EMAIL_IN_USE') {
-      res.status(400).json({ error: 'Email already registered' });
-      return;
-    }
-    next(err);
+    res.status(400).json({ error: 'Registration failed' });
   }
 };
 

@@ -1,23 +1,25 @@
-// apps/server/src/services/auth.service.ts
 import bcrypt from 'bcrypt';
 import prisma from '../db';
 
-export async function createUser(name: string, email: string, password: string) {
-  const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) throw new Error('EMAIL_IN_USE');
+const DUMMY_HASH = '$2b$10$KIXh1g4myh5j9hFSUVjdaeQXG7q3NDy4W8P4Y8XxYQCEhiqbz0R4e';
 
+export async function createUser(name: string, email: string, password: string) {
+  const normalized = email.trim().toLowerCase();
   const passwordHash = await bcrypt.hash(password, 10);
+  const existing = await prisma.user.findUnique({ where: { email: normalized } });
+  if (existing) throw new Error('REGISTRATION_ERROR');
+
   return prisma.user.create({
-    data: { name, email, passwordHash },
+    data: { name, email: normalized, passwordHash },
   });
 }
 
 export async function validateUser(email: string, password: string) {
-  const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) return null;
-
-  const ok = await bcrypt.compare(password, user.passwordHash);
-  return ok ? user : null;
+  const normalized = email.trim().toLowerCase();
+  const user = await prisma.user.findUnique({ where: { email: normalized } });
+  const hash = user?.passwordHash ?? DUMMY_HASH;
+  const ok = await bcrypt.compare(password, hash);
+  return ok && user ? user : null;
 }
 
 export async function saveRefreshToken(userId: number, token: string) {
