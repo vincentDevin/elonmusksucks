@@ -9,24 +9,27 @@ import PrivateRoute from '../components/PrivateRoute';
 import Home from '../pages/Home';
 
 export default function AppRoutes() {
-  const { accessToken } = useAuth();
+  const { accessToken } = useAuth()
 
   return (
     <Routes>
-      {/* Public routes */}
-      <Route path="/" element={<Home />} />
-      <Route path="/login" element={<Login />} />
+      {/* Public */}
+      <Route path="/"       element={<Home />} />
+      <Route path="/login"  element={<Login />} />
       <Route path="/register" element={<Register />} />
 
-      {/* Protected routes */}
+      {/* Protected */}
       <Route element={<PrivateRoute />}>
-        <Route path="/" element={<Dashboard />} />
+        <Route path="/dashboard"   element={<Dashboard />} />
         <Route path="/predictions" element={<Predictions />} />
         <Route path="/leaderboard" element={<Leaderboard />} />
       </Route>
 
-      {/* Redirect unknown paths */}
-      <Route path="*" element={<Navigate to={accessToken ? '/' : '/login'} replace />} />
+      {/* Fallback */}
+      <Route
+        path="*"
+        element={<Navigate to={accessToken ? '/dashboard' : '/login'} replace />}
+      />
     </Routes>
-  );
+  )
 }

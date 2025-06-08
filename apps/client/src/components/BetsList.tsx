@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { Bet } from '../api/predictions';
 
 interface BetsListProps {
-  bets: Bet[];  // assumed sorted newest-first
+  bets: Bet[];
 }
 
 export default function BetsList({ bets }: BetsListProps) {
