@@ -28,7 +28,7 @@ async function main() {
       bio: 'Space enthusiast and Mars colonist-in-training.',
       avatarUrl: 'https://i.pravatar.cc/150?img=1',
       location: 'Austin, TX',
-      timezone: 'America/Chicago'
+      timezone: 'America/Chicago',
     },
   });
   await prisma.user.update({
@@ -37,7 +37,7 @@ async function main() {
       bio: 'Rocket scientist by day, dog stroller by night.',
       avatarUrl: 'https://i.pravatar.cc/150?img=2',
       location: 'Los Angeles, CA',
-      timezone: 'America/Los_Angeles'
+      timezone: 'America/Los_Angeles',
     },
   });
 
@@ -60,35 +60,49 @@ async function main() {
   });
 
   // 3. Place a couple of bets
-  await prisma.bet.create({ data: { userId: alice.id, predictionId: p1.id, amount: 100, option: BetOption.YES } });
-  await prisma.bet.create({ data: { userId: bob.id, predictionId: p1.id, amount: 200, option: BetOption.NO } });
-  await prisma.bet.create({ data: { userId: alice.id, predictionId: p2.id, amount: 150, option: BetOption.YES } });
+  await prisma.bet.create({
+    data: { userId: alice.id, predictionId: p1.id, amount: 100, option: BetOption.YES },
+  });
+  await prisma.bet.create({
+    data: { userId: bob.id, predictionId: p1.id, amount: 200, option: BetOption.NO },
+  });
+  await prisma.bet.create({
+    data: { userId: alice.id, predictionId: p2.id, amount: 150, option: BetOption.YES },
+  });
 
   const badges = await Promise.all([
     prisma.badge.upsert({
       where: { name: 'First Bet' },
       update: {},
-      create: { name: 'First Bet', description: 'Placed your first bet', iconUrl: 'https://example.com/icons/first-bet.png' }
+      create: {
+        name: 'First Bet',
+        description: 'Placed your first bet',
+        iconUrl: 'https://example.com/icons/first-bet.png',
+      },
     }),
     prisma.badge.upsert({
       where: { name: 'Big Spender' },
       update: {},
-      create: { name: 'Big Spender', description: 'Bet over 1000 MuskBucks at once', iconUrl: 'https://example.com/icons/big-spender.png' }
+      create: {
+        name: 'Big Spender',
+        description: 'Bet over 1000 MuskBucks at once',
+        iconUrl: 'https://example.com/icons/big-spender.png',
+      },
     }),
   ]);
 
   await prisma.userBadge.create({
     data: {
       userId: alice.id,
-      badgeId: badges[0].id
-    }
+      badgeId: badges[0].id,
+    },
   });
 
   await prisma.follow.create({
-    data: { followerId: alice.id, followingId: bob.id }
+    data: { followerId: alice.id, followingId: bob.id },
   });
   await prisma.follow.create({
-    data: { followerId: bob.id, followingId: alice.id }
+    data: { followerId: bob.id, followingId: alice.id },
   });
 
   console.log('🌱 Seed data created');

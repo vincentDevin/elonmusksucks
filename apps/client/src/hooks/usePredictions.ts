@@ -1,19 +1,56 @@
-import { useApi } from './useApi';
+// apps/client/src/hooks/usePredictions.ts
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { getPredictions, placeBet, createPrediction } from '../api/predictions';
 import type { Prediction } from '../api/predictions';
 
-export function usePredictions() {
-  const { data, loading, error, refresh } = useApi<Prediction[]>(getPredictions, []);
+// module‐level cache
+let cachedPredictions: Prediction[] | null = null;
 
-  const dataWithOdds = (data ?? []).map((pred) => {
-    const total = pred.bets.reduce((sum, b) => sum + b.amount, 0);
-    const yes = pred.bets.filter((b) => b.option === 'YES').reduce((sum, b) => sum + b.amount, 0);
-    const no = total - yes;
-    return {
-      ...pred,
-      odds: { yes: yes / total, no: no / total },
-    };
-  });
+export function usePredictions() {
+  const [data, setData] = useState<Prediction[] | null>(cachedPredictions);
+  const [loading, setLoading] = useState(!cachedPredictions);
+  const [error, setError] = useState<Error | null>(null);
+
+  const fetchPredictions = useCallback(async () => {
+    // if we already have a cache, don’t re-fetch
+    if (cachedPredictions) {
+      setData(cachedPredictions);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const result = await getPredictions();
+      cachedPredictions = result;        // store in module cache
+      setData(result);
+    } catch (err: any) {
+      setError(err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchPredictions();
+  }, [fetchPredictions]);
+
+  const predictions = useMemo(() => {
+    if (!data) return [];
+    return data.map((pred) => {
+      const total = pred.bets.reduce((sum, b) => sum + b.amount, 0);
+      const yes = pred.bets
+        .filter((b) => b.option === 'YES')
+        .reduce((sum, b) => sum + b.amount, 0);
+      const no = total - yes;
+      return {
+        ...pred,
+        odds: total ? { yes: yes / total, no: no / total } : { yes: 0, no: 0 },
+      };
+    });
+  }, [data]);
 
   const placeBetOnPrediction = async (
     predictionId: number,
@@ -22,7 +59,8 @@ export function usePredictions() {
     option: 'YES' | 'NO',
   ) => {
     await placeBet(predictionId, userId, amount, option);
-    await refresh();
+    cachedPredictions = null;            // invalidate cache
+    await fetchPredictions();
   };
 
   const createNewPrediction = async (input: {
@@ -32,15 +70,15 @@ export function usePredictions() {
     expiresAt: Date;
   }) => {
     await createPrediction(input);
-    await refresh();
+    cachedPredictions = null;            // invalidate cache
+    await fetchPredictions();
   };
 
   return {
-    //predictions: data,
-    predictions: dataWithOdds,
+    predictions,
     loading,
     error,
-    refresh,
+    refresh: fetchPredictions,
     placeBet: placeBetOnPrediction,
     createPrediction: createNewPrediction,
   };

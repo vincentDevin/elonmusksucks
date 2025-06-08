@@ -1,6 +1,6 @@
-import { useState } from 'react'
-import { PredictionsComponent } from '../components/PredictionsComponent'
-import { LeaderboardComponent } from '../components/LeaderboardComponent'
+import { useState } from 'react';
+import { PredictionsComponent } from '../components/PredictionsComponent';
+import { LeaderboardComponent } from '../components/LeaderboardComponent';
 
 export default function Dashboard() {
   const [creating, setCreating] = useState(false);
@@ -35,5 +35,5 @@ export default function Dashboard() {
         </div>
       </section>
     </div>
-  )
+  );
 }

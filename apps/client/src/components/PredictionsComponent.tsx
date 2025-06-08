@@ -1,28 +1,28 @@
-import BetForm from './BetForm'
-import { usePredictions } from '../hooks/usePredictions'
-import { useAuth } from '../contexts/AuthContext'
-import ResolvePrediction from './ResolvePrediction'
-import OddsBar from './OddsBar'
+import BetForm from './BetForm';
+import { usePredictions } from '../hooks/usePredictions';
+import { useAuth } from '../contexts/AuthContext';
+import ResolvePrediction from './ResolvePrediction';
+import OddsBar from './OddsBar';
 
 export function PredictionsComponent() {
-  const { predictions, loading, error, refresh } = usePredictions()
-  const { user } = useAuth()
-  const isAdmin = user?.role === 'ADMIN'
+  const { predictions, loading, error, refresh } = usePredictions();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
 
   if (loading) {
-    return <p className="p-4 text-center">Loading predictions…</p>
+    return <p className="p-4 text-center">Loading predictions…</p>;
   }
   if (error) {
-    return <p className="p-4 text-center text-red-500">Error: {error.toString()}</p>
+    return <p className="p-4 text-center text-red-500">Error: {error.toString()}</p>;
   }
   if (!Array.isArray(predictions) || predictions.length === 0) {
-    return <p className="p-4 text-center">No predictions available.</p>
+    return <p className="p-4 text-center">No predictions available.</p>;
   }
 
   return (
     <div className="space-y-2">
       {predictions.map((pred) => {
-        const isExpired = new Date() > new Date(pred.expiresAt)
+        const isExpired = new Date() > new Date(pred.expiresAt);
         return (
           <div
             key={pred.id}
@@ -37,7 +37,9 @@ export function PredictionsComponent() {
             </div>
             <div className="flex-shrink-0 flex flex-col items-end">
               {pred.odds && <OddsBar yesPct={pred.odds.yes} noPct={pred.odds.no} />}
-              <p className="text-xs text-gray-400 mt-1">{Array.isArray(pred.bets) ? pred.bets.length : 0} total bets</p>
+              <p className="text-xs text-gray-400 mt-1">
+                {Array.isArray(pred.bets) ? pred.bets.length : 0} total bets
+              </p>
             </div>
             <div className="flex-shrink-0 ml-4 flex flex-col gap-2">
               {!pred.resolved && <BetForm predictionId={pred.id} onPlaced={refresh} />}
@@ -46,8 +48,8 @@ export function PredictionsComponent() {
               )}
             </div>
           </div>
-        )
+        );
       })}
     </div>
-  )
+  );
 }

@@ -1,21 +1,21 @@
-import { useApi } from '../hooks/useApi'
-import { getLeaderboard } from '../api/predictions'
-import type { LeaderboardEntry } from '../api/predictions'
+import { useApi } from '../hooks/useApi';
+import { getLeaderboard } from '../api/predictions';
+import type { LeaderboardEntry } from '../api/predictions';
 
 export function LeaderboardComponent() {
   const { data, loading, error } = useApi<LeaderboardEntry[]>(
     () => getLeaderboard(),
     [], // initial data
-  )
+  );
 
   if (loading) {
-    return <p className="p-4 text-center">Loading leaderboard…</p>
+    return <p className="p-4 text-center">Loading leaderboard…</p>;
   }
   if (error) {
-    return <p className="p-4 text-center text-red-500">Error: {error.toString()}</p>
+    return <p className="p-4 text-center text-red-500">Error: {error.toString()}</p>;
   }
   if (!Array.isArray(data) || data.length === 0) {
-    return <p className="p-4 text-center">No leaderboard entries yet.</p>
+    return <p className="p-4 text-center">No leaderboard entries yet.</p>;
   }
 
   return (
@@ -35,5 +35,5 @@ export function LeaderboardComponent() {
         ))}
       </div>
     </div>
-  )
+  );
 }
