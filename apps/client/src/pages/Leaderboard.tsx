@@ -3,31 +3,38 @@ import { getLeaderboard } from '../api/predictions';
 import type { LeaderboardEntry } from '../api/predictions';
 
 export default function Leaderboard() {
-  const { data, loading, error, refresh } = useApi<LeaderboardEntry[]>(() => getLeaderboard(), []);
+  const { data, loading, error } = useApi<LeaderboardEntry[]>(
+    () => getLeaderboard(),
+    [], // initial data
+  );
 
-  if (loading) return <p className="p-4">Loading leaderboard...</p>;
-  if (error) return <p className="p-4 text-red-500">Error: {error.toString()}</p>;
-
-  if (Array.isArray(data) && data.length === 0) {
-    return <p className="p-4">No leaderboard entries yet.</p>;
+  if (loading) {
+    return <p className="p-4 text-center">Loading leaderboard…</p>;
+  }
+  if (error) {
+    return <p className="p-4 text-center text-red-500">Error: {error.toString()}</p>;
+  }
+  // If data is null or not an array
+  if (!Array.isArray(data) || data.length === 0) {
+    return <p className="p-4 text-center">No leaderboard entries yet.</p>;
   }
 
   return (
-    <div className="p-4 max-w-lg mx-auto">
-      <h1 className="text-3xl font-bold mb-4">Leaderboard</h1>
-      <button onClick={refresh} className="mb-4 px-4 py-2 bg-blue-500 text-white rounded">
-        Refresh
-      </button>
-      <ol className="list-decimal list-inside space-y-2">
-        {Array.isArray(data)
-          ? data.map((entry) => (
-              <li key={entry.id} className="flex justify-between">
-                <span>{entry.name}</span>
-                <span>{entry.muskBucks} MuskBucks</span>
-              </li>
-            ))
-          : null}
-      </ol>
+    <div className="p-6 max-w-md mx-auto bg-surface rounded-2xl shadow-lg">
+      <h1 className="text-4xl font-extrabold mb-6 text-center">🏆 Leaderboard</h1>
+      <div className="space-y-3">
+        {data.map((entry, idx) => (
+          <div
+            key={entry.id}
+            className="flex justify-between items-center p-3 bg-background rounded-xl shadow-sm"
+          >
+            <span className="font-medium">
+              {idx + 1}. {entry.name}
+            </span>
+            <span className="text-lg font-bold">{entry.muskBucks} 🪙</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

@@ -17,7 +17,7 @@ router.get('/leaderboard', getLeaderboard);
 router.get('/:id', getPredictionById);
 
 // Authenticated
-router.post('/', requireAuth, requireAdmin, createPrediction);
+router.post('/', requireAuth, createPrediction);
 router.post('/:id/bet', requireAuth, placeBet);
 router.post('/:id/resolve', requireAuth, requireAdmin, resolvePrediction);
 

@@ -32,3 +32,17 @@ export async function logout() {
   await api.post('/api/auth/logout');
   setAccessToken('');
 }
+
+export interface User {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+  muskBucks: number;
+}
+
+/** Fetch the currently authenticated user’s profile */
+export async function me(): Promise<User> {
+  const res = await api.get<User>('/api/auth/me');
+  return res.data;
+}

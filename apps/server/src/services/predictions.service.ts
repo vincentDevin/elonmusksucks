@@ -3,6 +3,11 @@ import { BetOption, Outcome } from '@prisma/client';
 
 export async function listAllPredictions() {
   return prisma.prediction.findMany({
+    include: {
+      bets: {
+        include: { user: { select: { id: true, name: true } } },
+      },
+    },
     orderBy: { createdAt: 'desc' },
   });
 }

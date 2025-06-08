@@ -9,11 +9,13 @@ export interface Prediction {
   expiresAt: string;
   resolved: boolean;
   outcome?: string;
+  bets: Bet[];
   createdAt: string;
 }
 
 export async function getPredictions(): Promise<Prediction[]> {
   const { data } = await api.get<Prediction[]>('/api/predictions');
+  console.log('Predictions fetched:', data);
   return data;
 }
 
@@ -23,6 +25,7 @@ export interface CreatePredictionPayload {
   category: string;
   expiresAt: Date;
 }
+
 export async function createPrediction(payload: CreatePredictionPayload): Promise<Prediction> {
   const { data } = await api.post<Prediction>('/api/predictions', {
     ...payload,
@@ -33,7 +36,7 @@ export async function createPrediction(payload: CreatePredictionPayload): Promis
 
 export interface Bet {
   id: number;
-  userId: number;
+  user: { id: number; name: string };
   predictionId: number;
   amount: number;
   option: string;

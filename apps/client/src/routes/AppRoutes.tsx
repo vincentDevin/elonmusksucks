@@ -6,6 +6,7 @@ import Dashboard from '../pages/Dashboard';
 import Predictions from '../pages/Predictions';
 import Leaderboard from '../pages/Leaderboard';
 import PrivateRoute from '../components/PrivateRoute';
+import Home from '../pages/Home';
 
 export default function AppRoutes() {
   const { accessToken } = useAuth();
@@ -13,6 +14,7 @@ export default function AppRoutes() {
   return (
     <Routes>
       {/* Public routes */}
+      <Route path="/" element={<Home />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
 

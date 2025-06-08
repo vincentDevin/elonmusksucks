@@ -47,6 +47,36 @@ export const loginUser: RequestHandler = async (req, res, next) => {
   }
 };
 
+export const me: RequestHandler = async (req, res, next) => {
+  try {
+    // Grab the user ID that your auth middleware attached:
+    const userId = (req as any).user?.id ?? (req as any).userId;
+    if (!userId) {
+      res.status(500).json({ error: 'User context not found' });
+      return;
+    }
+
+    const user = await getUserById(userId);
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    // Send sanitized user object
+    res.json({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      muskBucks: user.muskBucks,
+    });
+    return;
+  } catch (err) {
+    next(err);
+    return;
+  }
+};
+
 export const refreshToken: RequestHandler = async (req, res, next) => {
   try {
     const token = req.cookies.refreshToken as string;
