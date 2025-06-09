@@ -10,15 +10,16 @@ import {
   requestPasswordReset,
   performPasswordReset,
 } from '../controllers/auth.controller';
+import {apiLimiter} from '../middleware/rateLimiter';
 
 const router = Router();
-router.post('/register', registerUser);
-router.post('/login', loginUser);
-router.post('/refresh', refreshToken);
+router.post('/register', apiLimiter, registerUser);
+router.post('/login', apiLimiter, loginUser);
+router.post('/refresh', apiLimiter, refreshToken);
 router.post('/logout', logoutUser);
 router.get('/me', requireAuth, me);
-router.post('/request-password-reset', requestPasswordReset);
-router.post('/reset-password', performPasswordReset);
-router.get('/verify-email', verifyEmail);
+router.post('/request-password-reset', apiLimiter, requestPasswordReset);
+router.post('/reset-password', apiLimiter, performPasswordReset);
+router.get('/verify-email', apiLimiter, verifyEmail);
 
 export default router;
