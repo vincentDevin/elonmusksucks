@@ -24,7 +24,7 @@ export function usePredictions() {
 
     try {
       const result = await getPredictions();
-      cachedPredictions = result;        // store in module cache
+      cachedPredictions = result; // store in module cache
       setData(result);
     } catch (err: any) {
       setError(err);
@@ -41,9 +41,7 @@ export function usePredictions() {
     if (!data) return [];
     return data.map((pred) => {
       const total = pred.bets.reduce((sum, b) => sum + b.amount, 0);
-      const yes = pred.bets
-        .filter((b) => b.option === 'YES')
-        .reduce((sum, b) => sum + b.amount, 0);
+      const yes = pred.bets.filter((b) => b.option === 'YES').reduce((sum, b) => sum + b.amount, 0);
       const no = total - yes;
       return {
         ...pred,
@@ -59,7 +57,7 @@ export function usePredictions() {
     option: 'YES' | 'NO',
   ) => {
     await placeBet(predictionId, userId, amount, option);
-    cachedPredictions = null;            // invalidate cache
+    cachedPredictions = null; // invalidate cache
     await fetchPredictions();
   };
 
@@ -70,7 +68,7 @@ export function usePredictions() {
     expiresAt: Date;
   }) => {
     await createPrediction(input);
-    cachedPredictions = null;            // invalidate cache
+    cachedPredictions = null; // invalidate cache
     await fetchPredictions();
   };
 

@@ -31,59 +31,80 @@ enum Theme {
 }
 
 model User {
-  id             Int              @id @default(autoincrement())
-  email          String           @unique
-  name           String
-  passwordHash   String
-  role           Role             @default(USER)
-  muskBucks      Int              @default(1000)
-  bets           Bet[]
-  refreshTokens  RefreshToken[]
-  userBadges    UserBadge[]     @relation("UserToUserBadge")
-  followers     Follow[]        @relation("userFollowers")
-  following     Follow[]        @relation("userFollowing")
-  bio            String?          // optional user bio
-  avatarUrl      String?          // URL to profile image
-  location       String?          // user-provided location
-  timezone       String?          // IANA timezone string
+  id                 Int                 @id @default(autoincrement())
+  email              String              @unique
+  name               String
+  passwordHash       String
+  emailVerified      Boolean             @default(false)
+  emailVerifications EmailVerification[]
+  passwordResets PasswordReset[]
+  role               Role                @default(USER)
+  muskBucks          Int                 @default(1000)
+  bets               Bet[]
+  refreshTokens      RefreshToken[]
+  userBadges         UserBadge[]         @relation("UserToUserBadge")
+  followers          Follow[]            @relation("userFollowers")
+  following          Follow[]            @relation("userFollowing")
+  bio                String? // optional user bio
+  avatarUrl          String? // URL to profile image
+  location           String? // user-provided location
+  timezone           String? // IANA timezone string
   // statistics (can be updated via triggers or backend logic)
-  successRate    Float            @default(0.0)
-  totalPredictions Int             @default(0)
-  currentStreak  Int              @default(0)
-  longestStreak  Int              @default(0)
+  successRate        Float               @default(0.0)
+  totalPredictions   Int                 @default(0)
+  currentStreak      Int                 @default(0)
+  longestStreak      Int                 @default(0)
   // user settings
-  notifyOnResolve Boolean          @default(true)
-  theme          Theme            @default(LIGHT)
-  twoFactorEnabled Boolean         @default(false)
-  createdAt      DateTime         @default(now())
+  notifyOnResolve    Boolean             @default(true)
+  theme              Theme               @default(LIGHT)
+  twoFactorEnabled   Boolean             @default(false)
+  createdAt          DateTime            @default(now())
+}
+
+model EmailVerification {
+  id        Int      @id @default(autoincrement())
+  token     String   @unique
+  user      User     @relation(fields: [userId], references: [id])
+  userId    Int
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model PasswordReset {
+  id        Int      @id @default(autoincrement())
+  token     String   @unique
+  user      User     @relation(fields: [userId], references: [id])
+  userId    Int
+  expiresAt DateTime
+  createdAt DateTime @default(now())
 }
 
 model Prediction {
-  id           Int        @id @default(autoincrement())
-  title        String
-  description  String
-  category     String
-  expiresAt    DateTime
-  resolved     Boolean    @default(false)
-  resolvedAt   DateTime?  // when outcome was set
-  outcome      Outcome?   // only populated once resolved
-  bets         Bet[]
-  createdAt    DateTime   @default(now())
+  id          Int       @id @default(autoincrement())
+  title       String
+  description String
+  category    String
+  expiresAt   DateTime
+  resolved    Boolean   @default(false)
+  resolvedAt  DateTime? // when outcome was set
+  outcome     Outcome? // only populated once resolved
+  bets        Bet[]
+  createdAt   DateTime  @default(now())
 
   @@index([expiresAt, resolved])
 }
 
 model Bet {
-  id            Int         @id @default(autoincrement())
-  user          User        @relation(fields: [userId], references: [id])
-  userId        Int
-  prediction    Prediction  @relation(fields: [predictionId], references: [id])
-  predictionId  Int
-  amount        Int
-  option        BetOption   // yes/no or over/under
-  won           Boolean?    // null until resolved
-  payout        Int?        // null until resolved
-  createdAt     DateTime    @default(now())
+  id           Int        @id @default(autoincrement())
+  user         User       @relation(fields: [userId], references: [id])
+  userId       Int
+  prediction   Prediction @relation(fields: [predictionId], references: [id])
+  predictionId Int
+  amount       Int
+  option       BetOption // yes/no or over/under
+  won          Boolean? // null until resolved
+  payout       Int? // null until resolved
+  createdAt    DateTime   @default(now())
 }
 
 model AITweet {
@@ -105,6 +126,7 @@ model LeaderboardEntry {
   id        Int    @id
   name      String
   muskBucks Int
+
   @@map("leaderboard_view")
 }
 
@@ -113,7 +135,7 @@ model Badge {
   name        String      @unique
   description String?
   iconUrl     String?
-  users       UserBadge[]   @relation("BadgeToUserBadge")
+  users       UserBadge[] @relation("BadgeToUserBadge")
   createdAt   DateTime    @default(now())
 }
 
@@ -124,15 +146,17 @@ model UserBadge {
   badge     Badge    @relation("BadgeToUserBadge", fields: [badgeId], references: [id])
   badgeId   Int
   awardedAt DateTime @default(now())
+
   @@unique([userId, badgeId])
 }
 
 model Follow {
-  id           Int   @id @default(autoincrement())
-  follower     User  @relation("userFollowing", fields: [followerId], references: [id])
-  followerId   Int
-  following    User  @relation("userFollowers", fields: [followingId], references: [id])
-  followingId  Int
-  createdAt    DateTime @default(now())
+  id          Int      @id @default(autoincrement())
+  follower    User     @relation("userFollowing", fields: [followerId], references: [id])
+  followerId  Int
+  following   User     @relation("userFollowers", fields: [followingId], references: [id])
+  followingId Int
+  createdAt   DateTime @default(now())
+
   @@unique([followerId, followingId])
 }

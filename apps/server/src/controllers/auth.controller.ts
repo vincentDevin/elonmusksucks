@@ -1,4 +1,4 @@
-import type { RequestHandler } from 'express';
+import type { RequestHandler, NextFunction } from 'express';
 import {
   createUser,
   validateUser,
@@ -6,20 +6,43 @@ import {
   getRefreshToken,
   deleteRefreshToken,
   getUserById,
+  createEmailVerification,
+  verifyEmailToken,
+  getUserByEmail,
+  createPasswordReset,
+  resetPassword
 } from '../services/auth.service';
+import { sendEmail } from '../services/email.service';
 import { generateAccessToken, generateRefreshToken } from '../utils/jwtHelpers';
 
 export const registerUser: RequestHandler = async (req, res) => {
   try {
     const { name, email, password } = req.body;
     const user = await createUser(name, email, password);
-    res.status(201).json({ id: user.id, name: user.name, email: user.email });
+    const verificationToken = await createEmailVerification(user.id);
+
+    // attempt to send the email, but don’t block on failures
+    try {
+      const verifyUrl = `${process.env.APP_URL}/verify-email?token=${verificationToken}`;
+      await sendEmail(
+        user.email,
+        'Please verify your email address',
+        `<p>Hi ${user.name},</p>
+         <p>Click <a href="${verifyUrl}">here</a> to verify your email.</p>`
+      );
+      console.log(`Verification email sent to ${user.email}`);
+    } catch (mailErr) {
+      console.error('Error sending verification email:', mailErr);
+    }
+    // finally, respond successfully even if email failed
+    res.status(201).json({ message: 'Registered! Check your email to verify.' });
   } catch (err: any) {
+    console.error('Registration error:', err);
     res.status(400).json({ error: 'Registration failed' });
   }
 };
 
-export const loginUser: RequestHandler = async (req, res, next) => {
+export const loginUser: RequestHandler = async (req, res, next: NextFunction) => {
   try {
     const { email, password } = req.body;
     const user = await validateUser(email, password);
@@ -112,4 +135,70 @@ export const logoutUser: RequestHandler = async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+};
+
+export const verifyEmail: RequestHandler = async (req, res) => {
+  const { token } = req.query;
+  if (typeof token !== 'string') {
+    res.status(400).json({ error: 'Token required' });
+    return;
+  }
+  const ok = await verifyEmailToken(token);
+  if (!ok) {
+    res.status(400).json({ error: 'Invalid or expired token' });
+    return;
+  }
+  res.json({ message: 'Email verified' });
+  return;
+};
+
+/**
+ * POST /auth/request-password-reset
+ * { email }
+ */
+export const requestPasswordReset: RequestHandler = async (req, res) => {
+  const { email } = req.body;
+  const normalized = email.trim().toLowerCase();
+  const user = await getUserByEmail(normalized);
+
+  // Always respond 200 to avoid user enumeration
+  if (user) {
+    try {
+      const token = await createPasswordReset(user.id);
+      const url = `${process.env.APP_URL}/reset-password?token=${token}`;
+      await sendEmail(
+        user.email,
+        'Your password reset link',
+        `<p>Hi ${user.name},</p>
+         <p>Click <a href="${url}">here</a> to reset your password. This link expires in 1 hour.</p>`
+      );
+      console.log(`Password reset email sent to ${user.email}`);
+    } catch (err) {
+      console.error('Error sending reset email:', err);
+    }
+  }
+
+  // Always respond OK
+  res.json({ message: 'If that email is registered, you’ll receive a reset link.' });
+};
+
+/**
+ * POST /auth/reset-password
+ * { token, newPassword }
+ */
+export const performPasswordReset: RequestHandler = async (req, res) => {
+  const { token, newPassword } = req.body;
+  if (typeof token !== 'string' || typeof newPassword !== 'string') {
+    res.status(400).json({ error: 'Invalid request' });
+    return;
+  }
+
+  const ok = await resetPassword(token, newPassword);
+  if (!ok) {
+    res.status(400).json({ error: 'Invalid or expired token' });
+    return;
+  }
+
+  res.json({ message: 'Password has been reset. You can now log in.' });
+  return;
 };
