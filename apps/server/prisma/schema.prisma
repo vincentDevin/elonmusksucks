@@ -64,7 +64,7 @@ model User {
 model EmailVerification {
   id        Int      @id @default(autoincrement())
   token     String   @unique
-  user      User     @relation(fields: [userId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    Int
   expiresAt DateTime
   createdAt DateTime @default(now())
@@ -73,7 +73,7 @@ model EmailVerification {
 model PasswordReset {
   id        Int      @id @default(autoincrement())
   token     String   @unique
-  user      User     @relation(fields: [userId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    Int
   expiresAt DateTime
   createdAt DateTime @default(now())
@@ -116,10 +116,11 @@ model AITweet {
 model RefreshToken {
   id        Int      @id @default(autoincrement())
   token     String   @unique
-  user      User     @relation(fields: [userId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    Int
-  expiresAt DateTime
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt @default(now())
+  expiresAt DateTime
 }
 
 model LeaderboardEntry {

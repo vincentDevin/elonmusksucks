@@ -1,4 +1,4 @@
-import type { RequestHandler, NextFunction } from 'express';
+import type { RequestHandler, NextFunction, Request, Response } from 'express';
 import {
   createUser,
   validateUser,
@@ -10,12 +10,12 @@ import {
   verifyEmailToken,
   getUserByEmail,
   createPasswordReset,
-  resetPassword
+  resetPassword,
 } from '../services/auth.service';
 import { sendEmail } from '../services/email.service';
 import { generateAccessToken, generateRefreshToken } from '../utils/jwtHelpers';
 
-export const registerUser: RequestHandler = async (req, res) => {
+export const registerUser: RequestHandler = async (req: Request, res: Response) => {
   try {
     const { name, email, password } = req.body;
     const user = await createUser(name, email, password);
@@ -23,12 +23,14 @@ export const registerUser: RequestHandler = async (req, res) => {
 
     // attempt to send the email, but don’t block on failures
     try {
-      const verifyUrl = `${process.env.APP_URL}/verify-email?token=${verificationToken}`;
+      // Build a direct API verification link so clicking the email updates the database immediately
+      const host = process.env.SERVER_URL || `${req.protocol}://${req.get('host')}`;
+      const verifyUrl = `${host}/api/auth/verify-email?token=${verificationToken}`;
       await sendEmail(
         user.email,
         'Please verify your email address',
         `<p>Hi ${user.name},</p>
-         <p>Click <a href="${verifyUrl}">here</a> to verify your email.</p>`
+         <p>Click <a href="${verifyUrl}">here</a> to verify your email.</p>`,
       );
       console.log(`Verification email sent to ${user.email}`);
     } catch (mailErr) {
@@ -48,6 +50,10 @@ export const loginUser: RequestHandler = async (req, res, next: NextFunction) =>
     const user = await validateUser(email, password);
     if (!user) {
       res.status(401).json({ error: 'Invalid credentials' });
+      return;
+    }
+    if (!user.emailVerified) {
+      res.status(403).json({ error: 'Please verify your email before logging in.' });
       return;
     }
     const accessToken = generateAccessToken(user);
@@ -137,7 +143,8 @@ export const logoutUser: RequestHandler = async (req, res, next) => {
   }
 };
 
-export const verifyEmail: RequestHandler = async (req, res) => {
+// This handler should be mounted at /api/auth/verify-email
+export const verifyEmail: RequestHandler = async (req: Request, res: Response) => {
   const { token } = req.query;
   if (typeof token !== 'string') {
     res.status(400).json({ error: 'Token required' });
@@ -148,8 +155,8 @@ export const verifyEmail: RequestHandler = async (req, res) => {
     res.status(400).json({ error: 'Invalid or expired token' });
     return;
   }
-  res.json({ message: 'Email verified' });
-  return;
+  const front = process.env.CLIENT_URL || 'http://localhost:3000';
+  return res.redirect(`${front}/login?verified=true`);
 };
 
 /**
@@ -165,12 +172,12 @@ export const requestPasswordReset: RequestHandler = async (req, res) => {
   if (user) {
     try {
       const token = await createPasswordReset(user.id);
-      const url = `${process.env.APP_URL}/reset-password?token=${token}`;
+      const url = `${process.env.CLIENT_URL}/reset-password?token=${token}`;
       await sendEmail(
         user.email,
         'Your password reset link',
         `<p>Hi ${user.name},</p>
-         <p>Click <a href="${url}">here</a> to reset your password. This link expires in 1 hour.</p>`
+         <p>Click <a href="${url}">here</a> to reset your password. This link expires in 1 hour.</p>`,
       );
       console.log(`Password reset email sent to ${user.email}`);
     } catch (err) {

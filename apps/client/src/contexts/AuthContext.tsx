@@ -53,13 +53,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   const register = useCallback(async (name: string, email: string, password: string) => {
+    // register the user but do not auto-login; user must verify email first
     await registerApi({ name, email, password });
-    // optionally auto-login after register:
-    const token = await loginApi({ email, password });
-    setToken(token);
-    setAccessToken(token);
-    const currentUser = await me();
-    setUser(currentUser);
+    // clear any existing auth state
+    setToken(null);
+    setAccessToken('');
+    setUser(null);
   }, []);
 
   const logout = useCallback(async () => {

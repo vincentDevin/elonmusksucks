@@ -10,9 +10,16 @@ sgMail.setApiKey(process.env.SENDGRID_API_KEY!);
 export async function sendEmail(to: string, subject: string, html: string) {
   const msg = {
     to,
-    from: process.env.EMAIL_FROM!,
+    from: { email: process.env.EMAIL_FROM! }, // now an object
     subject,
+    text: html.replace(/<[^>]+>/g, ''),
     html,
   };
-  await sgMail.send(msg);
+  try {
+    await sgMail.send(msg);
+  } catch (err: any) {
+    console.error('🔴 SendGrid error status:', err.code);
+    console.error('🔴 SendGrid error response body:', err.response?.body);
+    throw err;
+  }
 }

@@ -16,7 +16,8 @@ export default function Register() {
   const isPasswordValid = password === '' ? true : password.length >= 8;
   const isConfirmValid = confirm === '' ? true : password === confirm;
 
-  const isFormValid = email && isEmailValid && password && isPasswordValid && confirm && isConfirmValid;
+  const isFormValid =
+    email && isEmailValid && password && isPasswordValid && confirm && isConfirmValid;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,8 +48,16 @@ export default function Register() {
       <div className="container mx-auto my-8 px-4 bg-background text-content min-h-screen transition-colors duration-300">
         <div className="bg-surface shadow rounded-lg p-6 max-w-md mx-auto text-content transition-colors duration-300">
           <h2 className="text-2xl font-bold mb-4">Verify Your Email</h2>
-          <p>Please check <strong>{email}</strong> for a verification link.</p>
-          <p>Once verified, you can <Link to="/login" className="text-blue-600 hover:underline">log in here</Link>.</p>
+          <p>
+            Please check <strong>{email}</strong> for a verification link.
+          </p>
+          <p>
+            Once verified, you can{' '}
+            <Link to="/login" className="text-blue-600 hover:underline">
+              log in here
+            </Link>
+            .
+          </p>
         </div>
       </div>
     );
@@ -78,8 +87,11 @@ export default function Register() {
               onChange={(e) => setEmail(e.target.value)}
               required
               className={`mt-1 w-full p-3 rounded focus:outline-none focus:ring ${
-                email === '' ? 'border border-gray-300' :
-                isEmailValid ? 'border border-green-500' : 'border border-red-500'
+                email === ''
+                  ? 'border border-gray-300'
+                  : isEmailValid
+                    ? 'border border-green-500'
+                    : 'border border-red-500'
               }`}
             />
           </label>
@@ -92,12 +104,17 @@ export default function Register() {
               onChange={(e) => setPassword(e.target.value)}
               required
               className={`mt-1 w-full p-3 rounded focus:outline-none focus:ring ${
-                password === '' ? 'border border-gray-300' :
-                isPasswordValid ? 'border border-green-500' : 'border border-red-500'
+                password === ''
+                  ? 'border border-gray-300'
+                  : isPasswordValid
+                    ? 'border border-green-500'
+                    : 'border border-red-500'
               }`}
             />
           </label>
-          {!isPasswordValid && <p className="text-red-500 text-xs mt-1">Password must be at least 8 characters.</p>}
+          {!isPasswordValid && (
+            <p className="text-red-500 text-xs mt-1">Password must be at least 8 characters.</p>
+          )}
           <label className="block">
             <span className="text-sm font-medium">Confirm Password</span>
             <input
@@ -106,8 +123,11 @@ export default function Register() {
               onChange={(e) => setConfirm(e.target.value)}
               required
               className={`mt-1 w-full p-3 rounded focus:outline-none focus:ring ${
-                confirm === '' ? 'border border-gray-300' :
-                isConfirmValid ? 'border border-green-500' : 'border border-red-500'
+                confirm === ''
+                  ? 'border border-gray-300'
+                  : isConfirmValid
+                    ? 'border border-green-500'
+                    : 'border border-red-500'
               }`}
             />
           </label>
@@ -116,10 +136,7 @@ export default function Register() {
             type="submit"
             disabled={!isFormValid}
             className={`w-full py-2 px-4 rounded text-white 
-              ${isFormValid 
-                ? 'bg-blue-600 hover:bg-blue-700' 
-                : 'bg-gray-400 cursor-not-allowed'}`
-            }
+              ${isFormValid ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed'}`}
           >
             {isFormValid ? 'Register' : 'Complete form to register'}
           </button>

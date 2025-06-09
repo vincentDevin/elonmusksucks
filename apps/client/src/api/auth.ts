@@ -47,8 +47,8 @@ export async function me(): Promise<User> {
   return res.data;
 }
 
-/** 
- * Verify an email confirmation token 
+/**
+ * Verify an email confirmation token
  */
 export async function verifyEmail(token: string): Promise<{ message: string }> {
   const res = await api.get<{ message: string }>(`/api/auth/verify-email?token=${token}`);
@@ -70,7 +70,9 @@ export interface PasswordResetPayload {
   token: string;
   newPassword: string;
 }
-export async function performPasswordReset(data: PasswordResetPayload): Promise<{ message: string }> {
+export async function performPasswordReset(
+  data: PasswordResetPayload,
+): Promise<{ message: string }> {
   const res = await api.post<{ message: string }>('/api/auth/reset-password', data);
   return res.data;
 }

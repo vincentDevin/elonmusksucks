@@ -89,10 +89,7 @@ export async function createPasswordReset(userId: number): Promise<string> {
  * Given a token + new password, reset the user’s password.
  * Returns true on success, false if token invalid/expired.
  */
-export async function resetPassword(
-  token: string,
-  newPassword: string
-): Promise<boolean> {
+export async function resetPassword(token: string, newPassword: string): Promise<boolean> {
   const record = await prisma.passwordReset.findUnique({
     where: { token },
   });
