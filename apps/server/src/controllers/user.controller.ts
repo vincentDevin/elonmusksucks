@@ -42,3 +42,28 @@ export async function unfollowUserHandler(req: ReqWithUser, res: Response, next:
     next(err);
   }
 }
+
+/**
+ * PUT /api/users/:userId
+ * Update profile for the authenticated user
+ */
+export async function updateProfileHandler(req: ReqWithUser, res: Response, next: NextFunction) {
+  try {
+    const targetUserId = Number(req.params.userId);
+    console.log(
+      'Updating profile for userId param:',
+      targetUserId,
+      'authenticated userId:',
+      req.user?.id,
+    );
+    if (req.user?.id !== targetUserId) {
+      res.status(403).json({ error: 'Forbidden' });
+      return;
+    }
+    const updated = await userService.updateUserProfile(targetUserId, req.body);
+    res.json(updated);
+    return;
+  } catch (err) {
+    next(err);
+  }
+}

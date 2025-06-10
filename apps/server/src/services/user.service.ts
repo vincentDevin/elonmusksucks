@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Theme } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -147,4 +147,50 @@ export async function unfollowUser(followerId: number, followingId: number): Pro
       followerId_followingId: { followerId, followingId },
     },
   });
+}
+
+/**
+ * Update user profile fields.
+ */
+export async function updateUserProfile(
+  userId: number,
+  data: {
+    bio?: string | null;
+    avatarUrl?: string | null;
+    location?: string | null;
+    timezone?: string | null;
+    notifyOnResolve?: boolean;
+    theme?: Theme;
+    twoFactorEnabled?: boolean;
+    profileComplete?: boolean;
+    // note: no `role` here!
+  },
+): Promise<UserProfileDTO> {
+  // Whitelist only the fields we allow to be written
+  const {
+    bio,
+    avatarUrl,
+    location,
+    timezone,
+    notifyOnResolve,
+    theme,
+    twoFactorEnabled,
+    profileComplete,
+  } = data;
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      bio,
+      avatarUrl,
+      location,
+      timezone,
+      notifyOnResolve,
+      ...(theme !== undefined ? { theme } : {}),
+      twoFactorEnabled,
+      profileComplete,
+    },
+  });
+
+  return getUserProfile(userId, userId);
 }

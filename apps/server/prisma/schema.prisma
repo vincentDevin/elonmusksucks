@@ -38,6 +38,7 @@ model User {
   emailVerified      Boolean             @default(false)
   emailVerifications EmailVerification[]
   passwordResets PasswordReset[]
+  profileComplete Boolean             @default(false)
   role               Role                @default(USER)
   muskBucks          Int                 @default(1000)
   bets               Bet[]

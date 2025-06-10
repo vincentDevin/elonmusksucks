@@ -10,6 +10,7 @@ import Leaderboard from '../pages/Leaderboard';
 import PrivateRoute from '../components/PrivateRoute';
 import Home from '../pages/Home';
 import Profile from '../pages/Profile';
+import ProfileSetup from '../pages/ProfileSetup';
 
 export default function AppRoutes() {
   const { accessToken } = useAuth();
@@ -22,6 +23,7 @@ export default function AppRoutes() {
       <Route path="/register" element={<Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/setup-profile" element={<ProfileSetup />} />
 
       {/* Protected */}
       <Route element={<PrivateRoute />}>

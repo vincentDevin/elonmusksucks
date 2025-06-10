@@ -94,6 +94,7 @@ export const me: RequestHandler = async (req, res, next) => {
       email: user.email,
       role: user.role,
       muskBucks: user.muskBucks,
+      profileComplete: user.profileComplete,
     });
     return;
   } catch (err) {

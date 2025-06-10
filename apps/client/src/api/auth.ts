@@ -39,6 +39,7 @@ export interface User {
   email: string;
   role: string;
   muskBucks: number;
+  profileComplete: boolean;
 }
 
 /** Fetch the currently authenticated user’s profile */
