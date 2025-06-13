@@ -46,11 +46,117 @@ npm run lint        # Runs ESLint across all apps
 npm run format      # Formats codebase with Prettier
 ```
 
+
 From within `apps/client` or `apps/server`:
 
 ```bash
 npm run dev         # Run frontend or backend separately
 ```
+
+## 🚀 Local Development Setup
+
+### 🛠 Prerequisites
+
+- **Node.js** ≥ 18.x & **npm** ≥ 8.x (with workspace support)  
+- **PostgreSQL** installed & running locally (e.g., via Homebrew or Postgres.app)  
+- (Optional) Any other services you use (Redis, Mailhog, etc.)
+
+### 1. Clone & cd in
+
+```bash
+git clone https://github.com/vincentDevin/elonmusksucks.git
+cd elonmusksucks
+```
+
+### 2. Environment Variables
+
+1. Copy the example file:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Open `.env` and fill in your local Postgres credentials:
+
+   ```dotenv
+   # ─── DATABASE ──────────────────────────────
+   PGHOST=localhost
+   PGPORT=5432
+   PGUSER=<your_db_user>
+   PGPASSWORD=<your_db_pass>
+   PGDATABASE=<your_db_name>
+
+   # Prisma connection string (auto-built, but overrideable):
+   DATABASE_URL="postgresql://${PGUSER}:${PGPASSWORD}@${PGHOST}:${PGPORT}/${PGDATABASE}?schema=public"
+
+   # ─── APP / AUTH ────────────────────────────
+   CLIENT_URL="http://localhost:3000"
+   ACCESS_TOKEN_SECRET=local-dev-key
+   REFRESH_TOKEN_SECRET=local-dev-key-refresh
+   EMAIL_FROM="no-reply@example.com"
+
+   # ─── DEV-ONLY FLAGS ────────────────────────
+   SKIP_EMAIL_FLOW=true   # bypasses email verification & resets
+   ```
+
+### 3. Install Dependencies
+
+From the **project root**:
+
+```bash
+npm install
+```
+
+This uses workspaces to install both client and server dependencies.
+
+### 4. Database Setup & Migrations
+
+1. (If needed) Create your database:
+
+   ```bash
+   createdb <your_db_name>
+   ```
+
+2. Apply migrations and generate Prisma client:
+
+   ```bash
+   cd apps/server
+   npx prisma migrate reset --force --skip-generate
+   npx prisma generate
+   ```
+
+### 5. (Optional) Seed Dev Data
+
+To seed a pre-verified developer user (e.g. `dev@local` / `password123`):
+
+```bash
+npx ts-node --transpile-only prisma/seed.ts
+```
+
+### 6. Start Development Servers
+
+Back at the repo root:
+
+```bash
+cd ../..
+npm run dev
+```
+
+- **Client**: http://localhost:5173  
+- **API**:    http://localhost:3000  
+
+### 🐞 Troubleshooting
+
+- **CORS Errors**  
+  Ensure `FRONTEND_URL` in your `.env` matches your client port (e.g., `http://localhost:5173`).
+
+- **Database Connection Issues**  
+  Verify Postgres is running on the port in your `.env` and that your user/db exist.
+
+- **Migration Failures**  
+  Try dropping the DB manually (`dropdb <your_db_name>`) and rerun `npx prisma migrate reset`.
+
+---
 
 ---
 

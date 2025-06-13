@@ -1,3 +1,27 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Define your light-mode tokens */
+@theme {
+  --color-primary: #166534; /* forest green */
+  --color-muted: #e5e5e5; /* light gray */
+  --color-tertiary: #94a3b8; /* slate blue-gray */
+  --color-surface: #ffffff; /* pure white */
+  --color-accent: #64748b; /* bluish tint */
+  --color-secondary: #dcfce7; /* light green highlight */
+  --color-content: #0f172a; /* almost black text */
+  --color-background: #f8fafc; /* off-white bg */
+}
+
+/* Override for dark mode when .dark is on any ancestor */
+.dark {
+  --color-primary: #4ade80;
+  --color-muted: #334155;
+  --color-tertiary: #64748b;
+  --color-surface: #1e293b;
+  --color-accent: #94a3b8;
+  --color-secondary: #064e3b;
+  --color-content: #f1f5f9;
+  --color-background: #0f172a;
+}

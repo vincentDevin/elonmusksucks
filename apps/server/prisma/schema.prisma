@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -13,41 +7,158 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Role {
+  ADMIN
+  USER
+}
+
+enum Outcome {
+  YES
+  NO
+  CANCELLED
+}
+
+enum BetOption {
+  YES
+  NO
+  OVER
+  UNDER
+}
+
+enum Theme {
+  LIGHT
+  DARK
+}
+
 model User {
+  id                 Int                 @id @default(autoincrement())
+  email              String              @unique
+  name               String
+  passwordHash       String
+  emailVerified      Boolean             @default(false)
+  emailVerifications EmailVerification[]
+  passwordResets PasswordReset[]
+  profileComplete Boolean             @default(false)
+  role               Role                @default(USER)
+  muskBucks          Int                 @default(1000)
+  bets               Bet[]
+  refreshTokens      RefreshToken[]
+  userBadges         UserBadge[]         @relation("UserToUserBadge")
+  followers          Follow[]            @relation("userFollowers")
+  following          Follow[]            @relation("userFollowing")
+  bio                String? // optional user bio
+  avatarUrl          String? // URL to profile image
+  location           String? // user-provided location
+  timezone           String? // IANA timezone string
+  // statistics (can be updated via triggers or backend logic)
+  successRate        Float               @default(0.0)
+  totalPredictions   Int                 @default(0)
+  currentStreak      Int                 @default(0)
+  longestStreak      Int                 @default(0)
+  // user settings
+  notifyOnResolve    Boolean             @default(true)
+  theme              Theme               @default(LIGHT)
+  twoFactorEnabled   Boolean             @default(false)
+  createdAt          DateTime            @default(now())
+}
+
+model EmailVerification {
   id        Int      @id @default(autoincrement())
-  email     String   @unique
-  name      String
-  muskBucks Int      @default(1000)
-  bets      Bet[]
+  token     String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model PasswordReset {
+  id        Int      @id @default(autoincrement())
+  token     String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int
+  expiresAt DateTime
   createdAt DateTime @default(now())
 }
 
 model Prediction {
-  id          Int      @id @default(autoincrement())
+  id          Int       @id @default(autoincrement())
   title       String
   description String
   category    String
   expiresAt   DateTime
-  resolved    Boolean  @default(false)
-  outcome     String?  // 'yes', 'no', 'over', 'under', etc.
+  resolved    Boolean   @default(false)
+  resolvedAt  DateTime? // when outcome was set
+  outcome     Outcome? // only populated once resolved
   bets        Bet[]
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
+
+  @@index([expiresAt, resolved])
 }
 
 model Bet {
-  id           Int       @id @default(autoincrement())
-  user         User      @relation(fields: [userId], references: [id])
+  id           Int        @id @default(autoincrement())
+  user         User       @relation(fields: [userId], references: [id])
   userId       Int
   prediction   Prediction @relation(fields: [predictionId], references: [id])
   predictionId Int
   amount       Int
-  option       String    // 'yes', 'no', 'over', 'under'
-  won          Boolean?  // null = not resolved yet
-  createdAt    DateTime  @default(now())
+  option       BetOption // yes/no or over/under
+  won          Boolean? // null until resolved
+  payout       Int? // null until resolved
+  createdAt    DateTime   @default(now())
 }
 
 model AITweet {
   id        Int      @id @default(autoincrement())
   content   String
   createdAt DateTime @default(now())
+}
+
+model RefreshToken {
+  id        Int      @id @default(autoincrement())
+  token     String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt @default(now())
+  expiresAt DateTime
+}
+
+model LeaderboardEntry {
+  id        Int    @id
+  name      String
+  muskBucks Int
+
+  @@map("leaderboard_view")
+}
+
+model Badge {
+  id          Int         @id @default(autoincrement())
+  name        String      @unique
+  description String?
+  iconUrl     String?
+  users       UserBadge[] @relation("BadgeToUserBadge")
+  createdAt   DateTime    @default(now())
+}
+
+model UserBadge {
+  id        Int      @id @default(autoincrement())
+  user      User     @relation("UserToUserBadge", fields: [userId], references: [id])
+  userId    Int
+  badge     Badge    @relation("BadgeToUserBadge", fields: [badgeId], references: [id])
+  badgeId   Int
+  awardedAt DateTime @default(now())
+
+  @@unique([userId, badgeId])
+}
+
+model Follow {
+  id          Int      @id @default(autoincrement())
+  follower    User     @relation("userFollowing", fields: [followerId], references: [id])
+  followerId  Int
+  following   User     @relation("userFollowers", fields: [followingId], references: [id])
+  followingId Int
+  createdAt   DateTime @default(now())
+
+  @@unique([followerId, followingId])
 }
