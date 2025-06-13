@@ -142,8 +142,8 @@ cd ../..
 npm run dev
 ```
 
-- **Client**: http://localhost:5173  
-- **API**:    http://localhost:3000  
+- **Client**: http://localhost:3000  
+- **API**:    http://localhost:5000  
 
 ### 🐞 Troubleshooting
 
