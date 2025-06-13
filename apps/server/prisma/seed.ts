@@ -1,8 +1,14 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import { PrismaClient, BetOption } from '@prisma/client';
 const prisma = new PrismaClient();
 
+// Read the SKIP_EMAIL_FLOW flag to bypass email verification if needed
+const skipEmailFlow = process.env.SKIP_EMAIL_FLOW === 'true';
+
 async function main() {
-  // 1. Create a couple users
+  // 1. Create a couple users (with optional emailVerified flag)
   const alice = await prisma.user.upsert({
     where: { email: 'alice@example.com' },
     update: {},
@@ -10,6 +16,7 @@ async function main() {
       email: 'alice@example.com',
       name: 'Alice',
       passwordHash: 'not_a_real_hash',
+      emailVerified: skipEmailFlow,
     },
   });
   const bob = await prisma.user.upsert({
@@ -19,9 +26,11 @@ async function main() {
       email: 'bob@example.com',
       name: 'Bob',
       passwordHash: 'not_a_real_hash',
+      emailVerified: skipEmailFlow,
     },
   });
 
+  // 2. Add profile details
   await prisma.user.update({
     where: { id: alice.id },
     data: {
@@ -41,36 +50,31 @@ async function main() {
     },
   });
 
-  // 2. Create some predictions
+  // 3. Create some predictions
   const p1 = await prisma.prediction.create({
     data: {
       title: 'Elon tweets in Klingon',
       description: 'Will Elon Musk tweet something in Klingon by end of month?',
       category: 'Twitter',
-      expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7), // one week from now
+      expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7), // one week
     },
   });
   const p2 = await prisma.prediction.create({
     data: {
       title: 'Tesla stock hits $1,000',
-      description: 'Will TSLA close at or above $1,000 on any trading day this quarter?',
+      description: 'Will TSLA close ≥ $1,000 on any trading day this quarter?',
       category: 'Stocks',
-      expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30), // 30 days out
+      expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30), // 30 days
     },
   });
 
-  // 3. Place a couple of bets
-  await prisma.bet.create({
-    data: { userId: alice.id, predictionId: p1.id, amount: 100, option: BetOption.YES },
-  });
-  await prisma.bet.create({
-    data: { userId: bob.id, predictionId: p1.id, amount: 200, option: BetOption.NO },
-  });
-  await prisma.bet.create({
-    data: { userId: alice.id, predictionId: p2.id, amount: 150, option: BetOption.YES },
-  });
+  // 4. Place a few bets
+  await prisma.bet.create({ data: { userId: alice.id, predictionId: p1.id, amount: 100, option: BetOption.YES } });
+  await prisma.bet.create({ data: { userId: bob.id,   predictionId: p1.id, amount: 200, option: BetOption.NO  } });
+  await prisma.bet.create({ data: { userId: alice.id, predictionId: p2.id, amount: 150, option: BetOption.YES } });
 
-  const badges = await Promise.all([
+  // 5. Create badges and assign one
+  const [firstBet, bigSpender] = await Promise.all([
     prisma.badge.upsert({
       where: { name: 'First Bet' },
       update: {},
@@ -92,21 +96,15 @@ async function main() {
   ]);
 
   await prisma.userBadge.create({
-    data: {
-      userId: alice.id,
-      badgeId: badges[0].id,
-    },
+    data: { userId: alice.id, badgeId: firstBet.id },
   });
 
-  await prisma.follow.create({
-    data: { followerId: alice.id, followingId: bob.id },
-  });
-  await prisma.follow.create({
-    data: { followerId: bob.id, followingId: alice.id },
-  });
+  // 6. Follow relationships
+  await prisma.follow.create({ data: { followerId: alice.id, followingId: bob.id } });
+  await prisma.follow.create({ data: { followerId: bob.id,   followingId: alice.id } });
 
   console.log('🌱 Seed data created');
-  console.log('Seed completed');
+  console.log('Skip email flow:', skipEmailFlow);
 }
 
 main()
