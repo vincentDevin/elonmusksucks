@@ -1,4 +1,5 @@
 import type { RequestHandler } from 'express';
+import { PayoutService } from '../services/payout.service';
 import * as predictionService from '../services/predictions.service';
 
 export const getAllPredictions: RequestHandler = async (_req, res, next) => {
@@ -39,36 +40,12 @@ export const createPrediction: RequestHandler = async (req, res, next) => {
   }
 };
 
-export const placeBet: RequestHandler = async (req, res, next) => {
-  try {
-    const userId = Number(req.body.userId);
-    const predictionId = Number(req.params.id);
-    const amount = Number(req.body.amount);
-    const option = req.body.option;
-    const bet = await predictionService.placeBet(userId, predictionId, amount, option);
-    res.status(201).json(bet);
-  } catch (err: any) {
-    if (err.message === 'INSUFFICIENT_FUNDS') {
-      res.status(400).json({ error: 'Insufficient MuskBucks' });
-      return;
-    }
-    if (err.message === 'PREDICTION_NOT_FOUND' || err.message === 'USER_NOT_FOUND') {
-      res.status(404).json({ error: err.message });
-      return;
-    }
-    if (err.message === 'PREDICTION_CLOSED') {
-      res.status(400).json({ error: 'Prediction has expired' });
-      return;
-    }
-    next(err);
-  }
-};
 
 export const resolvePrediction: RequestHandler = async (req, res, next) => {
   try {
     const predictionId = Number(req.params.id);
-    const outcome = req.body.outcome;
-    const prediction = await predictionService.resolvePrediction(predictionId, outcome);
+    const { winningOptionId } = req.body as { winningOptionId: number };
+    const prediction = await PayoutService.resolvePrediction(predictionId, winningOptionId);
     res.json(prediction);
   } catch (err) {
     next(err);

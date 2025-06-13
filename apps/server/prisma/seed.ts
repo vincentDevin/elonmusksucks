@@ -1,7 +1,7 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-import { PrismaClient, BetOption } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 // Read the SKIP_EMAIL_FLOW flag to bypass email verification if needed
@@ -68,10 +68,57 @@ async function main() {
     },
   });
 
+  // 3a. Create options for p1
+  const [p1Yes, p1No] = await Promise.all([
+    prisma.predictionOption.create({
+      data: { predictionId: p1.id, label: 'Yes', odds: 2.0 },
+    }),
+    prisma.predictionOption.create({
+      data: { predictionId: p1.id, label: 'No', odds: 1.5 },
+    }),
+  ]);
+
+  // 3b. Create options for p2
+  const [p2Yes, p2No] = await Promise.all([
+    prisma.predictionOption.create({
+      data: { predictionId: p2.id, label: 'Yes', odds: 3.0 },
+    }),
+    prisma.predictionOption.create({
+      data: { predictionId: p2.id, label: 'No', odds: 1.2 },
+    }),
+  ]);
+
   // 4. Place a few bets
-  await prisma.bet.create({ data: { userId: alice.id, predictionId: p1.id, amount: 100, option: BetOption.YES } });
-  await prisma.bet.create({ data: { userId: bob.id,   predictionId: p1.id, amount: 200, option: BetOption.NO  } });
-  await prisma.bet.create({ data: { userId: alice.id, predictionId: p2.id, amount: 150, option: BetOption.YES } });
+  await prisma.bet.create({
+    data: {
+      userId: alice.id,
+      predictionId: p1.id,
+      optionId: p1Yes.id,
+      amount: 100,
+      oddsAtPlacement: p1Yes.odds,
+      potentialPayout: Math.floor(100 * p1Yes.odds),
+    },
+  });
+  await prisma.bet.create({
+    data: {
+      userId: bob.id,
+      predictionId: p1.id,
+      optionId: p1No.id,
+      amount: 200,
+      oddsAtPlacement: p1No.odds,
+      potentialPayout: Math.floor(200 * p1No.odds),
+    },
+  });
+  await prisma.bet.create({
+    data: {
+      userId: alice.id,
+      predictionId: p2.id,
+      optionId: p2Yes.id,
+      amount: 150,
+      oddsAtPlacement: p2Yes.odds,
+      potentialPayout: Math.floor(150 * p2Yes.odds),
+    },
+  });
 
   // 5. Create badges and assign one
   const [firstBet, bigSpender] = await Promise.all([
@@ -95,13 +142,19 @@ async function main() {
     }),
   ]);
 
-  await prisma.userBadge.create({
-    data: { userId: alice.id, badgeId: firstBet.id },
+  await prisma.userBadge.createMany({
+    data: [{ userId: alice.id, badgeId: firstBet.id }],
+    skipDuplicates: true,
   });
 
   // 6. Follow relationships
-  await prisma.follow.create({ data: { followerId: alice.id, followingId: bob.id } });
-  await prisma.follow.create({ data: { followerId: bob.id,   followingId: alice.id } });
+  await prisma.follow.createMany({
+    data: [
+      { followerId: alice.id, followingId: bob.id },
+      { followerId: bob.id,   followingId: alice.id },
+    ],
+    skipDuplicates: true,
+  });
 
   console.log('🌱 Seed data created');
   console.log('Skip email flow:', skipEmailFlow);

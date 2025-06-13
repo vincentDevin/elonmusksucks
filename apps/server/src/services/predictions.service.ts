@@ -1,5 +1,4 @@
 import prisma from '../db';
-import { BetOption, Outcome } from '@prisma/client';
 
 export async function listAllPredictions() {
   return prisma.prediction.findMany({
@@ -36,7 +35,7 @@ export async function placeBet(
   userId: number,
   predictionId: number,
   amount: number,
-  option: BetOption,
+  option: number,
 ) {
   const prediction = await prisma.prediction.findUnique({ where: { id: predictionId } });
   if (!prediction) throw new Error('PREDICTION_NOT_FOUND');
@@ -56,17 +55,16 @@ export async function placeBet(
       userId,
       predictionId,
       amount,
-      option,
+      optionId: option,
     },
   });
 }
 
-export async function resolvePrediction(predictionId: number, outcome: Outcome) {
+export async function resolvePrediction(predictionId: number, winningOptionId: number) {
   const prediction = await prisma.prediction.update({
     where: { id: predictionId },
     data: {
       resolved: true,
-      outcome,
       resolvedAt: new Date(),
     },
   });
@@ -74,7 +72,7 @@ export async function resolvePrediction(predictionId: number, outcome: Outcome) 
   const bets = await prisma.bet.findMany({ where: { predictionId } });
 
   for (const bet of bets) {
-    const won = bet.option === outcome;
+    const won = bet.optionId === winningOptionId;
     const payout = won ? bet.amount * 2 : 0;
 
     await prisma.bet.update({
@@ -90,6 +88,7 @@ export async function resolvePrediction(predictionId: number, outcome: Outcome) 
     }
   }
 
+  // Returns the updated prediction object
   return prediction;
 }
 

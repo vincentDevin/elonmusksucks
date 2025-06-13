@@ -25,6 +25,18 @@ enum BetOption {
   UNDER
 }
 
+enum BetStatus {
+  PENDING
+  WON
+  LOST
+  REFUNDED
+}
+
+enum TransactionType {
+  DEBIT
+  CREDIT
+}
+
 enum Theme {
   LIGHT
   DARK
@@ -37,8 +49,8 @@ model User {
   passwordHash       String
   emailVerified      Boolean             @default(false)
   emailVerifications EmailVerification[]
-  passwordResets PasswordReset[]
-  profileComplete Boolean             @default(false)
+  passwordResets     PasswordReset[]
+  profileComplete    Boolean             @default(false)
   role               Role                @default(USER)
   muskBucks          Int                 @default(1000)
   bets               Bet[]
@@ -60,6 +72,8 @@ model User {
   theme              Theme               @default(LIGHT)
   twoFactorEnabled   Boolean             @default(false)
   createdAt          DateTime            @default(now())
+  parlayes           Parlay[]
+  transactions       Transaction[]
 }
 
 model EmailVerification {
@@ -81,31 +95,47 @@ model PasswordReset {
 }
 
 model Prediction {
-  id          Int       @id @default(autoincrement())
+  id          Int                @id @default(autoincrement())
   title       String
   description String
   category    String
   expiresAt   DateTime
-  resolved    Boolean   @default(false)
+  resolved    Boolean            @default(false)
   resolvedAt  DateTime? // when outcome was set
   outcome     Outcome? // only populated once resolved
   bets        Bet[]
-  createdAt   DateTime  @default(now())
+  options     PredictionOption[]
+  createdAt   DateTime           @default(now())
 
   @@index([expiresAt, resolved])
 }
 
-model Bet {
-  id           Int        @id @default(autoincrement())
-  user         User       @relation(fields: [userId], references: [id])
-  userId       Int
-  prediction   Prediction @relation(fields: [predictionId], references: [id])
+model PredictionOption {
+  id           Int         @id @default(autoincrement())
+  label        String
+  odds         Float // decimal odds for this option
+  prediction   Prediction  @relation(fields: [predictionId], references: [id], onDelete: Cascade)
   predictionId Int
-  amount       Int
-  option       BetOption // yes/no or over/under
-  won          Boolean? // null until resolved
-  payout       Int? // null until resolved
-  createdAt    DateTime   @default(now())
+  bets         Bet[]       @relation("OptionToBet")
+  createdAt    DateTime    @default(now())
+  parlayLegs   ParlayLeg[]
+}
+
+model Bet {
+  id              Int              @id @default(autoincrement())
+  user            User             @relation(fields: [userId], references: [id])
+  userId          Int
+  prediction      Prediction       @relation(fields: [predictionId], references: [id])
+  predictionId    Int
+  amount          Int
+  oddsAtPlacement Float? // snapshot of odds when placing the bet
+  potentialPayout Int? // computed at placement: amount * oddsAtPlacement
+  status          BetStatus        @default(PENDING)
+  optionOption    PredictionOption? @relation("OptionToBet", fields: [optionId], references: [id])
+  optionId        Int?
+  won             Boolean? // null until resolved
+  payout          Int? // null until resolved
+  createdAt       DateTime         @default(now())
 }
 
 model AITweet {
@@ -120,7 +150,7 @@ model RefreshToken {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    Int
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
   expiresAt DateTime
 }
 
@@ -161,4 +191,37 @@ model Follow {
   createdAt   DateTime @default(now())
 
   @@unique([followerId, followingId])
+}
+
+model Parlay {
+  id              Int         @id @default(autoincrement())
+  user            User        @relation(fields: [userId], references: [id])
+  userId          Int
+  amount          Int
+  combinedOdds    Float
+  potentialPayout Int
+  status          BetStatus   @default(PENDING)
+  legs            ParlayLeg[]
+  createdAt       DateTime    @default(now())
+}
+
+model ParlayLeg {
+  id              Int              @id @default(autoincrement())
+  parlay          Parlay           @relation(fields: [parlayId], references: [id], onDelete: Cascade)
+  parlayId        Int
+  option          PredictionOption @relation(fields: [optionId], references: [id])
+  optionId        Int
+  oddsAtPlacement Float
+}
+
+model Transaction {
+  id              Int             @id @default(autoincrement())
+  user            User            @relation(fields: [userId], references: [id])
+  userId          Int
+  type            TransactionType
+  amount          Int
+  balanceAfter    Int
+  relatedBetId    Int? // single bet
+  relatedParlayId Int? // parlay bet
+  createdAt       DateTime        @default(now())
 }

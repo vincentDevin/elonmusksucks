@@ -3,7 +3,6 @@ import {
   getAllPredictions,
   getPredictionById,
   createPrediction,
-  placeBet,
   resolvePrediction,
   getLeaderboard,
 } from '../controllers/predictions.controller';
@@ -18,7 +17,6 @@ router.get('/:id', getPredictionById);
 
 // Authenticated
 router.post('/', requireAuth, createPrediction);
-router.post('/:id/bet', requireAuth, placeBet);
 router.post('/:id/resolve', requireAuth, requireAdmin, resolvePrediction);
 
 export default router;
