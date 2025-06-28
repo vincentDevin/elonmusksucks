@@ -1,20 +1,42 @@
 // apps/client/src/api/predictions.ts
 import api from './axios';
-import type { PublicPrediction, PublicLeaderboardEntry } from '@ems/types';
+import type {
+  PublicPrediction,
+  PublicLeaderboardEntry,
+  PublicBet,
+} from '@ems/types';
 
 /**
- * Fetch all predictions
+ * A bet with its user’s id+name, as returned by the API.
  */
-export async function getPredictions(): Promise<PublicPrediction[]> {
-  const { data } = await api.get<PublicPrediction[]>('/api/predictions');
+export interface BetWithUser extends PublicBet {
+  user: { id: number; name: string };
+}
+
+/**
+ * A prediction plus its list of bets.
+ */
+export type PredictionWithBets = PublicPrediction & {
+  bets: BetWithUser[];
+};
+
+/**
+ * Fetch all predictions, each with its bets.
+ */
+export async function getPredictions(): Promise<PredictionWithBets[]> {
+  const { data } = await api.get<PredictionWithBets[]>('/api/predictions');
   return data;
 }
 
 /**
- * Fetch a single prediction by ID
+ * Fetch a single prediction by ID (with its bets).
  */
-export async function getPredictionById(id: number): Promise<PublicPrediction> {
-  const { data } = await api.get<PublicPrediction>(`/api/predictions/${id}`);
+export async function getPredictionById(
+  id: number
+): Promise<PredictionWithBets> {
+  const { data } = await api.get<PredictionWithBets>(
+    `/api/predictions/${id}`
+  );
   return data;
 }
 
@@ -29,12 +51,12 @@ export interface CreatePredictionPayload {
 }
 
 /**
- * Create a new prediction
+ * Create a new prediction (returns it with an empty bets[]).
  */
 export async function createPrediction(
-  payload: CreatePredictionPayload,
-): Promise<PublicPrediction> {
-  const { data } = await api.post<PublicPrediction>('/api/predictions', {
+  payload: CreatePredictionPayload
+): Promise<PredictionWithBets> {
+  const { data } = await api.post<PredictionWithBets>('/api/predictions', {
     ...payload,
     expiresAt: payload.expiresAt.toISOString(),
   });
@@ -42,22 +64,25 @@ export async function createPrediction(
 }
 
 /**
- * Resolve a prediction
+ * Resolve a prediction (returns the updated prediction with bets[]).
  */
 export async function resolvePrediction(
   predictionId: number,
-  winningOptionId: number,
-): Promise<PublicPrediction> {
-  const { data } = await api.post<PublicPrediction>(`/api/predictions/${predictionId}/resolve`, {
-    winningOptionId,
-  });
+  winningOptionId: number
+): Promise<PredictionWithBets> {
+  const { data } = await api.post<PredictionWithBets>(
+    `/api/predictions/${predictionId}/resolve`,
+    { winningOptionId }
+  );
   return data;
 }
 
 /**
  * Fetch the leaderboard
  */
-export async function getLeaderboard(limit?: number): Promise<PublicLeaderboardEntry[]> {
+export async function getLeaderboard(
+  limit?: number
+): Promise<PublicLeaderboardEntry[]> {
   const url = limit
     ? `/api/predictions/leaderboard?limit=${limit}`
     : '/api/predictions/leaderboard';

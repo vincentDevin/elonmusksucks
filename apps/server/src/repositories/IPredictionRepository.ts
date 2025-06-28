@@ -1,15 +1,16 @@
 // apps/server/src/repositories/IPredictionRepository.ts
-import type { DbPrediction, DbLeaderboardEntry } from '@ems/types';
+import type { DbPrediction, DbBet, DbUser, DbLeaderboardEntry  } from '@ems/types';
 
 /**
  * Defines the contract for prediction data operations.
  */
 export interface IPredictionRepository {
   /**
-   * List all predictions, including nested options and counts if desired.
+   * List all predictions, including their bets and betting users.
    */
-  listAllPredictions(): Promise<DbPrediction[]>;
-
+  listAllPredictions(): Promise<
+    Array<DbPrediction & { bets: Array<DbBet & { user: Pick<DbUser, 'id' | 'name'> }> }>
+  >;
   /**
    * Create a new prediction event.
    */
@@ -21,10 +22,12 @@ export interface IPredictionRepository {
   }): Promise<DbPrediction>;
 
   /**
-   * Find a prediction by its ID.
+   * Find a single prediction by ID, including its bets and users.
    */
-  findPredictionById(id: number): Promise<DbPrediction | null>;
-
+  findPredictionById(id: number): Promise<
+    (DbPrediction & { bets: Array<DbBet & { user: Pick<DbUser, 'id' | 'name'> }> })
+    | null
+  >;
   /**
    * Retrieve the top users by MuskBucks balance (leaderboard).
    */

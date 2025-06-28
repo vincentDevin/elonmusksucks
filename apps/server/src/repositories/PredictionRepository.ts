@@ -1,14 +1,28 @@
 // apps/server/src/repositories/PredictionRepository.ts
 import prisma from '../db';
 import type { IPredictionRepository } from './IPredictionRepository';
-import type { DbPrediction, DbLeaderboardEntry } from '@ems/types';
+import type { 
+  DbPrediction, 
+  DbBet, 
+  DbUser, 
+  DbLeaderboardEntry 
+} from '@ems/types';
 
 export class PredictionRepository implements IPredictionRepository {
   /** List all predictions */
-  async listAllPredictions(): Promise<DbPrediction[]> {
+  async listAllPredictions(): Promise<
+    Array<DbPrediction & { bets: Array<DbBet & { user: Pick<DbUser, 'id' | 'name'> }> }>
+  > {
     return prisma.prediction.findMany({
+      include: {
+        bets: {
+          include: {
+            user: { select: { id: true, name: true } },
+          },
+        },
+      },
       orderBy: { createdAt: 'desc' },
-    }) as Promise<DbPrediction[]>;
+    }) as any;
   }
 
   /** Create a new prediction */
@@ -22,8 +36,18 @@ export class PredictionRepository implements IPredictionRepository {
   }
 
   /** Find a prediction by ID */
-  async findPredictionById(id: number): Promise<DbPrediction | null> {
-    return prisma.prediction.findUnique({ where: { id } }) as Promise<DbPrediction | null>;
+  async findPredictionById(id: number): Promise<
+    (DbPrediction & { bets: Array<DbBet & { user: Pick<DbUser, 'id' | 'name'> }> })
+    | null
+  > {
+    return prisma.prediction.findUnique({
+      where: { id },
+      include: {
+        bets: {
+          include: { user: { select: { id: true, name: true } } },
+        },
+      },
+    }) as any;
   }
 
   /** Get leaderboard of top users */
