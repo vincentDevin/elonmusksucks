@@ -49,13 +49,22 @@ export const createPrediction = async (
   next: NextFunction,
 ): Promise<void> => {
   try {
-    const { title, description, category, expiresAt } = req.body;
+    const { title, description, category, expiresAt, options } = req.body as {
+      title: string;
+      description: string;
+      category: string;
+      expiresAt: string;
+      options: Array<{ label: string }>;
+    };
+
     const prediction = await predictionService.createPrediction({
       title,
       description,
       category,
       expiresAt: new Date(expiresAt),
+      options,
     });
+
     res.status(201).json(prediction);
   } catch (err) {
     next(err);

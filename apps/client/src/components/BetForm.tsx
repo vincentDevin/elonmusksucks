@@ -1,20 +1,29 @@
 // apps/client/src/components/BetForm.tsx
+
+// apps/client/src/components/BetForm.tsx
 import { useState } from 'react';
 import { useBetting } from '../hooks/useBetting';
 import { useAuth } from '../contexts/AuthContext';
+import type { PublicPredictionOption } from '@ems/types';
 
 interface BetFormProps {
+  // now we just need the prediction so we can read its options[]
+  prediction: {
+    options: PublicPredictionOption[];
+  };
   onPlaced: () => void;
 }
 
-export default function BetForm({ onPlaced }: BetFormProps) {
+export default function BetForm({ prediction, onPlaced }: BetFormProps) {
+  const { options } = prediction;
   const { placeBet, loading: placing, error } = useBetting();
   const { user } = useAuth();
   const balance = user?.muskBucks ?? 0;
 
   const [expanded, setExpanded] = useState(false);
   const [amount, setAmount] = useState(0);
-  const [optionId, setOptionId] = useState<number>(1); // default YES
+  // default to first option’s id (whatever that may be)
+  const [optionId, setOptionId] = useState<number>(options.length > 0 ? options[0].id : 0);
 
   const submit = async () => {
     if (amount <= 0 || amount > balance) return;
@@ -29,11 +38,7 @@ export default function BetForm({ onPlaced }: BetFormProps) {
   };
 
   if (balance === 0) {
-    return (
-      <p className="mt-2 text-sm text-gray-500 italic">
-        You have no MuskBucks to bet.
-      </p>
-    );
+    return <p className="mt-2 text-sm text-gray-500 italic">You have no MuskBucks to bet.</p>;
   }
 
   return expanded ? (
@@ -65,8 +70,11 @@ export default function BetForm({ onPlaced }: BetFormProps) {
           onChange={(e) => setOptionId(Number(e.target.value))}
           className="w-full border p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
         >
-          <option value={1}>YES</option>
-          <option value={2}>NO</option>
+          {options.map((opt) => (
+            <option key={opt.id} value={opt.id}>
+              {opt.label}
+            </option>
+          ))}
         </select>
       </div>
 

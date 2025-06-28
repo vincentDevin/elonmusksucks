@@ -1,26 +1,25 @@
 // apps/server/src/services/prediction.service.ts
-import type {
-  IPredictionRepository,
-} from '../repositories/IPredictionRepository';
-import { PredictionRepository } from '../repositories/PredictionRepository';
+
 import type {
   DbPrediction,
+  DbPredictionOption,
   DbBet,
   DbUser,
   DbLeaderboardEntry,
 } from '@ems/types';
+import type { IPredictionRepository } from '../repositories/IPredictionRepository';
+import { PredictionRepository } from '../repositories/PredictionRepository';
 
 export class PredictionService {
-  constructor(
-    private repo: IPredictionRepository = new PredictionRepository(),
-  ) {}
+  constructor(private repo: IPredictionRepository = new PredictionRepository()) {}
 
   /**
-   * List all predictions (including nested bets with their users).
+   * List all predictions, each with its dynamic options and bets (with user info).
    */
   async listAllPredictions(): Promise<
     Array<
       DbPrediction & {
+        options: DbPredictionOption[];
         bets: Array<DbBet & { user: Pick<DbUser, 'id' | 'name'> }>;
       }
     >
@@ -29,24 +28,30 @@ export class PredictionService {
   }
 
   /**
-   * Create a new prediction event.
+   * Create a new prediction with an arbitrary set of options.
    */
   async createPrediction(data: {
     title: string;
     description: string;
     category: string;
     expiresAt: Date;
-  }): Promise<DbPrediction> {
+    options: Array<{ label: string }>;
+  }): Promise<
+    DbPrediction & {
+      options: DbPredictionOption[];
+      bets: Array<DbBet & { user: Pick<DbUser, 'id' | 'name'> }>;
+    }
+  > {
+    // repo.createPrediction knows how to create both the prediction and its options
     return this.repo.createPrediction(data);
   }
 
   /**
-   * Fetch a single prediction by ID (with its bets).
+   * Fetch one prediction by ID, including its options and bets (with user info).
    */
-  async getPrediction(
-    id: number,
-  ): Promise<
+  async getPrediction(id: number): Promise<
     | (DbPrediction & {
+        options: DbPredictionOption[];
         bets: Array<DbBet & { user: Pick<DbUser, 'id' | 'name'> }>;
       })
     | null

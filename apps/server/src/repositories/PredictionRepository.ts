@@ -1,53 +1,108 @@
 // apps/server/src/repositories/PredictionRepository.ts
 import prisma from '../db';
 import type { IPredictionRepository } from './IPredictionRepository';
-import type { 
-  DbPrediction, 
-  DbBet, 
-  DbUser, 
-  DbLeaderboardEntry 
+import type {
+  DbPrediction,
+  DbPredictionOption,
+  DbBet,
+  DbUser,
+  DbLeaderboardEntry,
 } from '@ems/types';
 
 export class PredictionRepository implements IPredictionRepository {
-  /** List all predictions */
-  async listAllPredictions(): Promise<
-    Array<DbPrediction & { bets: Array<DbBet & { user: Pick<DbUser, 'id' | 'name'> }> }>
-  > {
-    return prisma.prediction.findMany({
-      include: {
-        bets: {
-          include: {
-            user: { select: { id: true, name: true } },
-          },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    }) as any;
-  }
-
-  /** Create a new prediction */
   async createPrediction(data: {
     title: string;
     description: string;
     category: string;
     expiresAt: Date;
-  }): Promise<DbPrediction> {
-    return prisma.prediction.create({ data }) as Promise<DbPrediction>;
+    options: Array<{ label: string }>;
+  }): Promise<
+    DbPrediction & {
+      options: DbPredictionOption[];
+      bets: Array<DbBet & { user: Pick<DbUser, 'id' | 'name'> }>;
+    }
+  > {
+    return prisma.prediction.create({
+      data: {
+        title: data.title,
+        description: data.description,
+        category: data.category,
+        expiresAt: data.expiresAt,
+        options: {
+          create: data.options.map((o) => ({
+            label: o.label,
+            odds: 1.0,
+          })),
+        },
+      },
+      include: {
+        options: {
+          select: {
+            id: true,
+            label: true,
+            odds: true,
+            predictionId: true,
+            createdAt: true,
+          },
+        },
+        bets: {
+          include: { user: { select: { id: true, name: true } } },
+        },
+      },
+    });
   }
 
-  /** Find a prediction by ID */
+  async listAllPredictions(): Promise<
+    Array<
+      DbPrediction & {
+        options: DbPredictionOption[];
+        bets: Array<DbBet & { user: Pick<DbUser, 'id' | 'name'> }>;
+      }
+    >
+  > {
+    return prisma.prediction.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: {
+        options: {
+          select: {
+            id: true,
+            label: true,
+            odds: true,
+            predictionId: true,
+            createdAt: true,
+          },
+        },
+        bets: {
+          include: { user: { select: { id: true, name: true } } },
+        },
+      },
+    });
+  }
+
   async findPredictionById(id: number): Promise<
-    (DbPrediction & { bets: Array<DbBet & { user: Pick<DbUser, 'id' | 'name'> }> })
+    | (DbPrediction & {
+        options: DbPredictionOption[];
+        bets: Array<DbBet & { user: Pick<DbUser, 'id' | 'name'> }>;
+      })
     | null
   > {
     return prisma.prediction.findUnique({
       where: { id },
       include: {
+        options: {
+          select: {
+            id: true,
+            label: true,
+            odds: true,
+            predictionId: true,
+            createdAt: true,
+          },
+        },
         bets: {
           include: { user: { select: { id: true, name: true } } },
         },
       },
-    }) as any;
+    });
   }
 
   /** Get leaderboard of top users */

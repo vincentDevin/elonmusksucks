@@ -3,65 +3,85 @@ import { usePredictions } from '../hooks/usePredictions';
 
 export default function CreatePredictionForm({ onCreated }: { onCreated: () => void }) {
   const { createPrediction } = usePredictions();
+
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('');
   const [expiresAt, setExpiresAt] = useState<Date | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [options, setOptions] = useState<string[]>(['']); // start with one
+
+  const addOption = () => setOptions((prev) => [...prev, '']);
+  const updateOption = (idx: number, value: string) =>
+    setOptions((prev) => prev.map((v, i) => (i === idx ? value : v)));
+  const removeOption = (idx: number) => setOptions((prev) => prev.filter((_, i) => i !== idx));
+
+  const canSubmit =
+    title && description && category && expiresAt && options.every((o) => o.trim().length > 0);
 
   const submit = async () => {
-    setLoading(true);
-    try {
-      if (!expiresAt) {
-        alert('Please select an expiration date');
-        setLoading(false);
-        return;
-      }
-      await createPrediction({ title, description, category, expiresAt: expiresAt });
-      onCreated();
-    } catch (err) {
-      console.error(err);
-      alert('Failed to create prediction');
-    } finally {
-      setLoading(false);
-    }
+    if (!canSubmit || !expiresAt) return;
+    await createPrediction({
+      title,
+      description,
+      category,
+      expiresAt,
+      options: options.map((label) => ({ label })),
+    });
+    onCreated();
   };
 
   return (
-    <div className="mb-4 p-4 border rounded space-y-2 bg-surface">
-      <h2 className="text-xl font-semibold">New Prediction</h2>
+    <div className="p-4 bg-surface rounded space-y-4">
+      <h2>New Prediction</h2>
       <input
-        type="text"
+        placeholder="Title"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
-        placeholder="Title"
-        className="w-full border p-2 rounded"
+        className="w-full border p-1"
       />
       <textarea
+        placeholder="Description"
         value={description}
         onChange={(e) => setDescription(e.target.value)}
-        placeholder="Description"
-        className="w-full border p-2 rounded"
+        className="w-full border p-1"
       />
       <input
-        type="text"
+        placeholder="Category"
         value={category}
         onChange={(e) => setCategory(e.target.value)}
-        placeholder="Category"
-        className="w-full border p-2 rounded"
+        className="w-full border p-1"
       />
       <input
         type="date"
-        value={expiresAt ? expiresAt.toISOString().substr(0, 10) : ''}
+        value={expiresAt ? expiresAt.toISOString().slice(0, 10) : ''}
         onChange={(e) => setExpiresAt(e.target.value ? new Date(e.target.value) : null)}
-        className="w-full border p-2 rounded"
+        className="w-full border p-1"
       />
+
+      <div>
+        <label className="font-medium">Options</label>
+        {options.map((opt, i) => (
+          <div key={i} className="flex space-x-2 mb-2">
+            <input
+              placeholder={`Option #${i + 1}`}
+              value={opt}
+              onChange={(e) => updateOption(i, e.target.value)}
+              className="flex-1 border p-1"
+            />
+            {options.length > 1 && <button onClick={() => removeOption(i)}>✕</button>}
+          </div>
+        ))}
+        <button onClick={addOption} className="text-blue-600">
+          + Add another option
+        </button>
+      </div>
+
       <button
-        disabled={loading}
+        disabled={!canSubmit}
         onClick={submit}
         className="px-4 py-2 bg-blue-600 text-white rounded"
       >
-        {loading ? 'Creating…' : 'Create'}
+        Create Prediction
       </button>
     </div>
   );

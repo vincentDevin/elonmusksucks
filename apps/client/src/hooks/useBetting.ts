@@ -11,22 +11,19 @@ export function useBetting() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
-  const placeBetAsync = useCallback(
-    async (payload: PlaceBetPayload): Promise<PublicBet> => {
-      setLoading(true);
-      setError(null);
-      try {
-        const result = await placeBet(payload);
-        return result;
-      } catch (err: any) {
-        setError(err);
-        throw err;
-      } finally {
-        setLoading(false);
-      }
-    },
-    []
-  );
+  const placeBetAsync = useCallback(async (payload: PlaceBetPayload): Promise<PublicBet> => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await placeBet(payload);
+      return result;
+    } catch (err: any) {
+      setError(err);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   const placeParlayAsync = useCallback(
     async (payload: PlaceParlayPayload): Promise<PublicParlay> => {
@@ -42,7 +39,7 @@ export function useBetting() {
         setLoading(false);
       }
     },
-    []
+    [],
   );
 
   return {

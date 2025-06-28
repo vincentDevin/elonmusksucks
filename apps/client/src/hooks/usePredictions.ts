@@ -1,33 +1,25 @@
-// apps/client/src/hooks/usePredictions.ts
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { getPredictions, createPrediction } from '../api/predictions';
-import type { PublicPrediction } from '@ems/types';
+import type { PredictionFull } from '../api/predictions';
 
-// module‐level cache of fetched predictions
-let cachedPredictions: PublicPrediction[] | null = null;
+let cache: PredictionFull[] | null = null;
 
-/**
- * Hook for fetching and managing the list of predictions
- */
 export function usePredictions() {
-  const [data, setData] = useState<PublicPrediction[] | null>(
-    cachedPredictions
-  );
-  const [loading, setLoading] = useState(!cachedPredictions);
+  const [data, setData] = useState<PredictionFull[] | null>(cache);
+  const [loading, setLoading] = useState(!cache);
   const [error, setError] = useState<Error | null>(null);
 
   const fetchPredictions = useCallback(async () => {
-    if (cachedPredictions) {
-      setData(cachedPredictions);
+    if (cache) {
+      setData(cache);
       setLoading(false);
       return;
     }
     setLoading(true);
-    setError(null);
     try {
-      const result = await getPredictions();
-      cachedPredictions = result;
-      setData(result);
+      const preds = await getPredictions();
+      cache = preds;
+      setData(preds);
     } catch (err: any) {
       setError(err);
     } finally {
@@ -41,18 +33,18 @@ export function usePredictions() {
 
   const predictions = useMemo(() => data ?? [], [data]);
 
-  const createNewPrediction = useCallback(
+  const createNew = useCallback(
     async (input: {
       title: string;
       description: string;
       category: string;
       expiresAt: Date;
+      options: Array<{ label: string }>;
     }) => {
       setLoading(true);
-      setError(null);
       try {
         await createPrediction(input);
-        cachedPredictions = null; // invalidate cache
+        cache = null;
         await fetchPredictions();
       } catch (err: any) {
         setError(err);
@@ -61,7 +53,7 @@ export function usePredictions() {
         setLoading(false);
       }
     },
-    [fetchPredictions]
+    [fetchPredictions],
   );
 
   return {
@@ -69,6 +61,6 @@ export function usePredictions() {
     loading,
     error,
     refresh: fetchPredictions,
-    createPrediction: createNewPrediction,
+    createPrediction: createNew,
   };
 }
