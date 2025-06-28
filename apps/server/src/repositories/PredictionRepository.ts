@@ -46,7 +46,9 @@ export class PredictionRepository implements IPredictionRepository {
           },
         },
         bets: {
-          include: { user: { select: { id: true, name: true } } },
+          include: {
+            user: { select: { id: true, name: true } },
+          },
         },
       },
     });
@@ -70,10 +72,25 @@ export class PredictionRepository implements IPredictionRepository {
             odds: true,
             predictionId: true,
             createdAt: true,
+            parlayLegs: {
+              include: {
+                parlay: {
+                  select: {
+                    id: true,
+                    user: { select: { id: true, name: true } },
+                    amount: true,
+                    combinedOdds: true,
+                    createdAt: true,
+                  },
+                },
+              },
+            },
           },
         },
         bets: {
-          include: { user: { select: { id: true, name: true } } },
+          include: {
+            user: { select: { id: true, name: true } },
+          },
         },
       },
     });
@@ -96,10 +113,25 @@ export class PredictionRepository implements IPredictionRepository {
             odds: true,
             predictionId: true,
             createdAt: true,
+            parlayLegs: {
+              include: {
+                parlay: {
+                  select: {
+                    id: true,
+                    user: { select: { id: true, name: true } },
+                    amount: true,
+                    combinedOdds: true,
+                    createdAt: true,
+                  },
+                },
+              },
+            },
           },
         },
         bets: {
-          include: { user: { select: { id: true, name: true } } },
+          include: {
+            user: { select: { id: true, name: true } },
+          },
         },
       },
     });
@@ -111,6 +143,6 @@ export class PredictionRepository implements IPredictionRepository {
       orderBy: { muskBucks: 'desc' },
       take: limit,
       select: { id: true, name: true, muskBucks: true },
-    }) as Promise<DbLeaderboardEntry[]>;
+    });
   }
 }

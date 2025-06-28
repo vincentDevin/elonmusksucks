@@ -5,6 +5,10 @@ import { payoutService } from '../services/payout.service';
 
 /**
  * GET /api/predictions
+ * List all predictions, each including:
+ *   - options[]
+ *   - bets[] (single bets with user info)
+ *   - parlayLegs[] (all parlay legs with user & stake)
  */
 export const getAllPredictions = async (
   _req: Request,
@@ -12,8 +16,8 @@ export const getAllPredictions = async (
   next: NextFunction,
 ): Promise<void> => {
   try {
-    const predictions = await predictionService.listAllPredictions();
-    res.json(predictions);
+    const all = await predictionService.listAllPredictions();
+    res.json(all);
   } catch (err) {
     next(err);
   }
@@ -21,6 +25,7 @@ export const getAllPredictions = async (
 
 /**
  * GET /api/predictions/:id
+ * Fetch one prediction by ID, including its options, bets, and parlay legs.
  */
 export const getPredictionById = async (
   req: Request,
@@ -42,6 +47,7 @@ export const getPredictionById = async (
 
 /**
  * POST /api/predictions
+ * Create a new prediction with a dynamic set of options.
  */
 export const createPrediction = async (
   req: Request,
@@ -73,6 +79,7 @@ export const createPrediction = async (
 
 /**
  * POST /api/predictions/:id/resolve
+ * Resolve a prediction, payout all bets & parlays, then return the updated record.
  */
 export const resolvePredictionHandler = async (
   req: Request,
@@ -82,14 +89,17 @@ export const resolvePredictionHandler = async (
   try {
     const predictionId = Number(req.params.id);
     const { winningOptionId } = req.body as { winningOptionId: number };
-    // Delegate to PayoutService
+
+    // 1) Mark resolved & settle payouts
     await payoutService.resolvePrediction(predictionId, winningOptionId);
-    // refetch the now-resolved prediction for the client
+
+    // 2) Re-fetch the now-resolved prediction (with options, bets, parlayLegs)
     const updated = await predictionService.getPrediction(predictionId);
     if (!updated) {
       res.status(404).json({ error: 'Prediction not found after resolve' });
       return;
     }
+
     res.json(updated);
   } catch (err) {
     next(err);
@@ -98,6 +108,7 @@ export const resolvePredictionHandler = async (
 
 /**
  * GET /api/predictions/leaderboard
+ * Return the top users by MuskBucks balance.
  */
 export const getLeaderboard = async (
   _req: Request,
@@ -105,8 +116,8 @@ export const getLeaderboard = async (
   next: NextFunction,
 ): Promise<void> => {
   try {
-    const leaderboard = await predictionService.getLeaderboard();
-    res.json(leaderboard);
+    const board = await predictionService.getLeaderboard();
+    res.json(board);
   } catch (err) {
     next(err);
   }

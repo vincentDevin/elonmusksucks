@@ -212,6 +212,7 @@ model ParlayLeg {
   option          PredictionOption @relation(fields: [optionId], references: [id])
   optionId        Int
   oddsAtPlacement Float
+  createdAt       DateTime         @default(now())
 }
 
 model Transaction {

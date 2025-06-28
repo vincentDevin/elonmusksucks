@@ -135,7 +135,6 @@ export type PublicParlay = Pick<
   | 'status'
   | 'createdAt'
 >;
-export type DbParlayLeg = PrismaParlayLeg;
 
 // ----- Transaction -----
 export type DbTransaction = PrismaTransaction;
@@ -150,6 +149,22 @@ export type PublicTransaction = Pick<
   | 'relatedParlayId'
   | 'createdAt'
 >;
+
+// Now explicitly define the shape of each leg as returned on GET /api/predictions:
+export type DbParlayLeg = PrismaParlayLeg;
+export interface PublicParlayLeg {
+  id: number;
+  parlayId: number;
+  optionId: number;
+  oddsAtPlacement: number;
+  createdAt: string;          // ISO timestamp from the backend
+  parlay: {
+    id: number;
+    user: { id: number; name: string };
+    amount: number;
+    combinedOdds: number;
+  };
+}
 
 /**
  * The shape returned by GET /api/users/:userId
@@ -184,3 +199,4 @@ export interface PublicUserProfile {
 export interface PublicUserBadge extends PublicBadge {
   awardedAt: string;  // ISO timestamp string from the backend
 }
+

@@ -1,9 +1,11 @@
+// apps/client/src/api/predictions.ts
 import api from './axios';
 import type {
   PublicPrediction,
   PublicPredictionOption,
   PublicLeaderboardEntry,
   PublicBet,
+  PublicParlayLeg,
 } from '@ems/types';
 
 /** A bet with its user’s id+name */
@@ -11,14 +13,20 @@ export interface BetWithUser extends PublicBet {
   user: { id: number; name: string };
 }
 
-/** A prediction plus its bets and its dynamic options */
+/** A parlay-leg with its user info, exactly as returned by the backend */
+export type ParlayLegWithUser = PublicParlayLeg;
+
+/**
+ * A prediction plus its dynamic options, single bets, and parlay legs.
+ */
 export type PredictionFull = PublicPrediction & {
   options: PublicPredictionOption[];
   bets: BetWithUser[];
+  parlayLegs: ParlayLegWithUser[];
 };
 
 /**
- * Fetch all predictions (with their options & bets).
+ * Fetch all predictions (with their options, bets & parlay legs).
  */
 export async function getPredictions(): Promise<PredictionFull[]> {
   const { data } = await api.get<PredictionFull[]>('/api/predictions');
@@ -26,7 +34,7 @@ export async function getPredictions(): Promise<PredictionFull[]> {
 }
 
 /**
- * Fetch one prediction (with its options & bets).
+ * Fetch one prediction (with its options, bets & parlay legs).
  */
 export async function getPredictionById(id: number): Promise<PredictionFull> {
   const { data } = await api.get<PredictionFull>(`/api/predictions/${id}`);
@@ -38,11 +46,11 @@ export interface CreatePredictionPayload {
   description: string;
   category: string;
   expiresAt: Date;
-  options: Array<{ label: string }>; // ← new
+  options: Array<{ label: string }>;
 }
 
 /**
- * Create a new prediction (returns it with options & empty bets).
+ * Create a new prediction (returns it with options & empty bets/parlays).
  */
 export async function createPrediction(payload: CreatePredictionPayload): Promise<PredictionFull> {
   const { data } = await api.post<PredictionFull>('/api/predictions', {
@@ -54,7 +62,7 @@ export async function createPrediction(payload: CreatePredictionPayload): Promis
 }
 
 /**
- * Resolve a prediction (returns fresh options & bets).
+ * Resolve a prediction (returns fresh options, bets & parlays).
  */
 export async function resolvePrediction(
   predictionId: number,
@@ -66,6 +74,9 @@ export async function resolvePrediction(
   return data;
 }
 
+/**
+ * Fetch the leaderboard
+ */
 export async function getLeaderboard(limit?: number): Promise<PublicLeaderboardEntry[]> {
   const url = limit
     ? `/api/predictions/leaderboard?limit=${limit}`
