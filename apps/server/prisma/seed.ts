@@ -1,4 +1,4 @@
-import dotenv from "dotenv";
+import dotenv from 'dotenv';
 dotenv.config();
 
 import { PrismaClient } from '@prisma/client';
@@ -151,7 +151,7 @@ async function main() {
   await prisma.follow.createMany({
     data: [
       { followerId: alice.id, followingId: bob.id },
-      { followerId: bob.id,   followingId: alice.id },
+      { followerId: bob.id, followingId: alice.id },
     ],
     skipDuplicates: true,
   });

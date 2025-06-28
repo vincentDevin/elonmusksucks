@@ -1,58 +1,72 @@
-import { useState, useEffect } from 'react';
+// apps/client/src/pages/Profile.tsx
+import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
-import { getUserProfile, followUser, unfollowUser, updateUserProfile } from '../api/users';
-import type { UpdateProfilePayload, UserProfile } from '../api/users';
-import { useAuth } from '../hooks/useAuth';
+import { followUser, unfollowUser, updateUserProfile } from '../api/users';
+import { useAuth } from '../contexts/AuthContext';
+import { useUserProfile } from '../hooks/useUserProfile';
+import type { UpdateProfilePayload } from '../api/users';
 
 export default function Profile() {
   const { user: currentUser } = useAuth();
   const { userId } = useParams<{ userId: string }>();
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [following, setFollowing] = useState(false);
+  const numericId = Number(userId);
+
+  // pull everything from the hook
+  const {
+    profile,
+    loading,
+    error,
+    formData,
+    setFormData,
+    refresh: reloadProfile,
+  } = useUserProfile(numericId);
+
+  const isOwn = currentUser?.id === profile?.id;
   const [editing, setEditing] = useState(false);
-  const [formData, setFormData] = useState<UpdateProfilePayload | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [following, setFollowing] = useState(profile?.isFollowing ?? false);
 
+  // Keep `following` in sync when profile changes
   useEffect(() => {
-    if (!userId) return;
-    setLoading(true);
-    getUserProfile(Number(userId))
-      .then((data) => {
-        setProfile(data);
-        setFollowing(data.isFollowing);
-        const isOwn = currentUser?.id === data.id;
-        if (data && isOwn) {
-          setFormData({
-            bio: data.bio || null,
-            avatarUrl: data.avatarUrl || null,
-            location: data.location || null,
-            timezone: data.timezone || null,
-            notifyOnResolve: data.notifyOnResolve,
-            theme: data.theme,
-            twoFactorEnabled: data.twoFactorEnabled,
-            profileComplete: true,
-          });
-        }
-      })
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
-  }, [userId]);
+    setFollowing(profile?.isFollowing ?? false);
+  }, [profile?.isFollowing]);
 
-  const toggleFollow = async () => {
+  const toggleFollow = useCallback(async () => {
     if (!profile) return;
     try {
       if (following) {
         await unfollowUser(profile.id);
+        setFollowing(false);
       } else {
         await followUser(profile.id);
+        setFollowing(true);
       }
-      setFollowing(!following);
-      setProfile({ ...profile, followersCount: profile.followersCount + (following ? -1 : 1) });
+      // Optimistically update count
+      reloadProfile();
     } catch (e: any) {
       console.error(e);
+      alert('Action failed: ' + e.toString());
     }
-  };
+  }, [profile, following, reloadProfile]);
+
+  const handleSave = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!profile || !formData) return;
+      setSaving(true);
+      try {
+        await updateUserProfile(profile.id, formData as UpdateProfilePayload);
+        setEditing(false);
+        await reloadProfile();
+      } catch (e: any) {
+        console.error(e);
+        alert('Save failed: ' + e.toString());
+      } finally {
+        setSaving(false);
+      }
+    },
+    [profile, formData, reloadProfile],
+  );
 
   if (loading) {
     return <p className="text-center py-8">Loading profile…</p>;
@@ -61,31 +75,28 @@ export default function Profile() {
     return <p className="text-center py-8 text-red-500">Error: {error}</p>;
   }
 
-  const isOwn = currentUser?.id === profile.id;
-
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-center sm:items-start space-y-4 sm:space-y-0 sm:space-x-6">
         <img
           src={profile.avatarUrl || '/default-avatar.png'}
-          alt={profile.username}
+          alt={profile.name}
           className="w-32 h-32 rounded-full object-cover border-2 border-muted"
         />
         <div className="flex-1">
-          <h1 className="text-3xl font-bold">{profile.username}</h1>
-          <p className="text-gray-500">@{profile.username}</p>
+          <h1 className="text-3xl font-bold">{profile.name}</h1>
+          <p className="text-gray-500">@{profile.name}</p>
           {profile.bio && <p className="mt-2 text-base">{profile.bio}</p>}
         </div>
-        {isOwn && (
+        {isOwn ? (
           <button
-            onClick={() => setEditing(!editing)}
+            onClick={() => setEditing((e) => !e)}
             className="px-4 py-2 bg-green-500 text-white rounded"
           >
             {editing ? 'Cancel' : 'Edit Profile'}
           </button>
-        )}
-        {!isOwn && (
+        ) : (
           <button
             onClick={toggleFollow}
             className={`px-4 py-2 rounded-full font-medium shadow ${
@@ -102,20 +113,10 @@ export default function Profile() {
       {/* Edit Form */}
       {editing && formData && (
         <div className="bg-surface p-6 rounded-lg shadow space-y-4">
-          <form
-            onSubmit={async (e) => {
-              e.preventDefault();
-              await updateUserProfile(profile!.id, formData!);
-              setEditing(false);
-              const updated = await getUserProfile(profile!.id);
-              setProfile(updated);
-            }}
-            className="space-y-4"
-          >
+          <form onSubmit={handleSave} className="space-y-4">
             <label className="block">
               <span className="text-sm font-medium">Bio</span>
               <textarea
-                name="bio"
                 value={formData.bio ?? ''}
                 onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
                 className="mt-1 w-full p-2 border rounded"
@@ -124,7 +125,6 @@ export default function Profile() {
             <label className="block">
               <span className="text-sm font-medium">Avatar URL</span>
               <input
-                name="avatarUrl"
                 value={formData.avatarUrl ?? ''}
                 onChange={(e) => setFormData({ ...formData, avatarUrl: e.target.value })}
                 className="mt-1 w-full p-2 border rounded"
@@ -133,7 +133,6 @@ export default function Profile() {
             <label className="block">
               <span className="text-sm font-medium">Location</span>
               <input
-                name="location"
                 value={formData.location ?? ''}
                 onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                 className="mt-1 w-full p-2 border rounded"
@@ -142,20 +141,23 @@ export default function Profile() {
             <label className="block">
               <span className="text-sm font-medium">Timezone</span>
               <input
-                name="timezone"
                 value={formData.timezone ?? ''}
                 onChange={(e) => setFormData({ ...formData, timezone: e.target.value })}
                 className="mt-1 w-full p-2 border rounded"
               />
             </label>
-            <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded">
-              Save
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-50"
+            >
+              {saving ? 'Saving…' : 'Save Changes'}
             </button>
           </form>
         </div>
       )}
 
-      {/* Only show below content when not editing */}
+      {/* Stats & Content */}
       {!editing && (
         <>
           {/* Balance & Stats */}
@@ -184,7 +186,7 @@ export default function Profile() {
             </div>
           </div>
 
-          {/* Social Counts */}
+          {/* Followers/Following */}
           <div className="flex space-x-6">
             <div>
               <span className="font-semibold">{profile.followersCount}</span>{' '}

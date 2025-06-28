@@ -1,30 +1,51 @@
-import { Request, Response} from 'express';
-import { BettingService } from '../services/betting.service';
+// apps/server/src/controllers/betting.controller.ts
+import type { Request, Response, NextFunction } from 'express';
+import { bettingService } from '../services/betting.service';
 
-export class BettingController {
-  static async placeBet(req: Request, res: Response) {
-    try {
-      const userId = res.locals.user.id;
-      const { optionId, amount } = req.body as { optionId: number; amount: number };
-      const bet = await BettingService.placeBet(userId, optionId, amount);
-      res.status(201).json(bet);
-      return;
-    } catch (err: any) {
-      res.status(400).json({ error: err.message });
+type ReqWithUser = Request & { user?: { id: number } };
+
+/**
+ * POST /api/bet
+ * Place a single bet for the authenticated user
+ */
+export const placeBetHandler = async (
+  req: ReqWithUser,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      res.status(401).json({ error: 'Not authenticated' });
       return;
     }
+    const { optionId, amount } = req.body as { optionId: number; amount: number };
+    const bet = await bettingService.placeBet(userId, optionId, amount);
+    res.status(201).json(bet);
+  } catch (err: any) {
+    next(err);
   }
+};
 
-  static async placeParlay(req: Request, res: Response) {
-    try {
-      const userId = res.locals.user.id;
-      const { legs, amount } = req.body as { legs: { optionId: number }[]; amount: number };
-      const parlay = await BettingService.placeParlay(userId, legs, amount);
-      res.status(201).json(parlay);
-      return;
-    } catch (err: any) {
-      res.status(400).json({ error: err.message });
+/**
+ * POST /api/parlay
+ * Place a parlay (multi-leg bet) for the authenticated user
+ */
+export const placeParlayHandler = async (
+  req: ReqWithUser,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      res.status(401).json({ error: 'Not authenticated' });
       return;
     }
+    const { legs, amount } = req.body as { legs: Array<{ optionId: number }>; amount: number };
+    const parlay = await bettingService.placeParlay(userId, legs, amount);
+    res.status(201).json(parlay);
+  } catch (err: any) {
+    next(err);
   }
-}
+};

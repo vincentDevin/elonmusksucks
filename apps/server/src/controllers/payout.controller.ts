@@ -1,5 +1,4 @@
-
-import { Request, Response} from 'express';
+import { Request, Response } from 'express';
 import { PayoutService } from '../services/payout.service';
 
 export class PayoutController {

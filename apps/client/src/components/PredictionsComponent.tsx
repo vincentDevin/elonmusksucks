@@ -1,11 +1,13 @@
+// apps/client/src/components/PredictionsComponent.tsx
 import BetForm from './BetForm';
 import { usePredictions } from '../hooks/usePredictions';
 import { useAuth } from '../contexts/AuthContext';
 import ResolvePrediction from './ResolvePrediction';
 import OddsBar from './OddsBar';
+import type { PublicBet } from '@ems/types';
 
 export function PredictionsComponent() {
-  const { predictions, loading, error, refresh } = usePredictions();
+  const { predictions: raw, loading, error, refresh } = usePredictions();
   const { user } = useAuth();
   const isAdmin = user?.role === 'ADMIN';
 
@@ -15,9 +17,21 @@ export function PredictionsComponent() {
   if (error) {
     return <p className="p-4 text-center text-red-500">Error: {error.toString()}</p>;
   }
-  if (!Array.isArray(predictions) || predictions.length === 0) {
+  if (!raw.length) {
     return <p className="p-4 text-center">No predictions available.</p>;
   }
+
+  // Combine bets and compute odds
+  const predictions = raw.map((pred) => {
+    const bets = ((pred as any).bets as PublicBet[]) || [];
+    const total = bets.reduce((sum, b) => sum + b.amount, 0);
+    const yesAmount = bets.filter((b) => b.optionId === 1).reduce((sum, b) => sum + b.amount, 0);
+    const noAmount = total - yesAmount;
+    const yesPct = total ? yesAmount / total : 0;
+    const noPct = total ? noAmount / total : 0;
+
+    return { ...pred, bets, odds: { yes: yesPct, no: noPct } };
+  });
 
   return (
     <div className="space-y-2">
@@ -36,10 +50,8 @@ export function PredictionsComponent() {
               </p>
             </div>
             <div className="flex-shrink-0 flex flex-col items-end">
-              {pred.odds && <OddsBar yesPct={pred.odds.yes} noPct={pred.odds.no} />}
-              <p className="text-xs text-gray-400 mt-1">
-                {Array.isArray(pred.bets) ? pred.bets.length : 0} total bets
-              </p>
+              <OddsBar yesPct={pred.odds.yes} noPct={pred.odds.no} />
+              <p className="text-xs text-gray-400 mt-1">{pred.bets.length} total bets</p>
             </div>
             <div className="flex-shrink-0 ml-4 flex flex-col gap-2">
               {!pred.resolved && <BetForm predictionId={pred.id} onPlaced={refresh} />}

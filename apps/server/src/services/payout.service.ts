@@ -25,7 +25,7 @@ export class PayoutService {
   private static async processSingleBets(
     tx: Prisma.TransactionClient,
     predictionId: number,
-    winningOptionId: number
+    winningOptionId: number,
   ) {
     const bets = await tx.bet.findMany({ where: { predictionId } });
     for (const b of bets) {
@@ -65,7 +65,7 @@ export class PayoutService {
   private static async processParlays(
     tx: Prisma.TransactionClient,
     predictionId: number,
-    winningOptionId: number
+    winningOptionId: number,
   ) {
     // find parlays with any leg on this prediction
     const legs = await tx.parlayLeg.findMany({
@@ -74,7 +74,7 @@ export class PayoutService {
     });
 
     // group legs by parlay
-    const parlaysMap = new Map<number, typeof legs[0][]>();
+    const parlaysMap = new Map<number, (typeof legs)[0][]>();
     for (const leg of legs) {
       if (!parlaysMap.has(leg.parlayId)) parlaysMap.set(leg.parlayId, []);
       parlaysMap.get(leg.parlayId)!.push(leg);

@@ -1,7 +1,16 @@
-import { PrismaClient, Theme } from '@prisma/client';
+// apps/server/src/services/user.service.ts
+// Service layer for user-related operations, using a repository for data access
+
+import { PrismaClient } from '@prisma/client';
+import type { IUserRepository } from '../repositories/IUserRepository';
+import { UserRepository } from '../repositories/UserRepository';
+import type { DbUser, DbUserBadge, DbBadge } from '@ems/types';
 
 const prisma = new PrismaClient();
 
+/**
+ * Data Transfer Object for returning user profile data
+ */
 export type UserProfileDTO = {
   id: number;
   name: string;
@@ -32,165 +41,105 @@ export type UserProfileDTO = {
   isFollowing: boolean;
 };
 
-export async function getUserProfile(userId: number, viewerId?: number): Promise<UserProfileDTO> {
-  // fetch the core user + counts + badges + follow info
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: {
-      id: true,
-      name: true,
-      bio: true,
-      avatarUrl: true,
-      location: true,
-      timezone: true,
-      muskBucks: true,
-      notifyOnResolve: true,
-      theme: true,
-      twoFactorEnabled: true,
-      successRate: true,
-      totalPredictions: true,
-      currentStreak: true,
-      longestStreak: true,
-      userBadges: {
-        select: {
-          badge: {
-            select: { id: true, name: true, description: true, iconUrl: true },
-          },
-          awardedAt: true,
-        },
-      },
-      _count: {
-        select: { followers: true, following: true },
-      },
-    },
-  });
+export class UserService {
+  constructor(private repo: IUserRepository = new UserRepository()) {}
 
-  if (!user) throw new Error('User not found');
+  /**
+   * Fetch profile data for a given user, including follow counts and badges
+   */
+  async getUserProfile(userId: number, viewerId?: number): Promise<UserProfileDTO> {
+    const user = await this.repo.findById(userId);
+    if (!user) throw new Error('User not found');
 
-  // optional: compute rank by comparing muskBucks to others
-  // (you might do this in SQL with a window function)
-  const rawRank = (await prisma.$queryRawUnsafe(
-    `SELECT rank FROM (
-     SELECT id, RANK() OVER (ORDER BY "muskBucks" DESC) AS rank
-     FROM "User"
-   ) u WHERE u.id = $1;`,
-    userId,
-  )) as { rank: bigint }[];
-  let rank: number | undefined;
-  if (Array.isArray(rawRank) && rawRank.length > 0) {
-    const r = rawRank[0].rank;
-    rank = typeof r === 'bigint' ? Number(r) : r;
-  } else {
-    rank = undefined;
+    // Parallel fetch of counts and badges
+    const [followersCount, followingCount, userBadges] = await Promise.all([
+      this.repo.getFollowersCount(userId),
+      this.repo.getFollowingCount(userId),
+      this.repo.findUserBadges(userId),
+    ]);
+
+    // Compute rank via raw SQL window function
+    const rawRank = (await prisma.$queryRawUnsafe(
+      `SELECT rank FROM (
+         SELECT id, RANK() OVER (ORDER BY "muskBucks" DESC) AS rank
+         FROM "User"
+       ) u WHERE u.id = $1;`,
+      userId,
+    )) as { rank: bigint }[];
+    let rank: number | undefined;
+    if (Array.isArray(rawRank) && rawRank.length > 0) {
+      const r = rawRank[0].rank;
+      rank = typeof r === 'bigint' ? Number(r) : r;
+    }
+
+    // Check if viewer is following this user
+    const isFollowing = viewerId ? await this.repo.existsFollow(viewerId, userId) : false;
+
+    return {
+      id: user.id,
+      name: user.name,
+      muskBucks: user.muskBucks,
+      rank,
+      bio: user.bio,
+      avatarUrl: user.avatarUrl,
+      location: user.location,
+      timezone: user.timezone,
+      notifyOnResolve: user.notifyOnResolve,
+      theme: user.theme,
+      twoFactorEnabled: user.twoFactorEnabled,
+      stats: {
+        successRate: user.successRate,
+        totalPredictions: user.totalPredictions,
+        currentStreak: user.currentStreak,
+        longestStreak: user.longestStreak,
+      },
+      badges: userBadges.map((ub: DbUserBadge & { badge: DbBadge }) => ({
+        id: ub.badge.id,
+        name: ub.badge.name,
+        description: ub.badge.description,
+        iconUrl: ub.badge.iconUrl,
+        awardedAt: ub.awardedAt,
+      })),
+      followersCount,
+      followingCount,
+      isFollowing,
+    };
   }
 
-  // optional: check if the viewer is following
-  let isFollowing = false;
-  if (viewerId) {
-    const follow = await prisma.follow.findUnique({
-      where: {
-        followerId_followingId: {
-          followerId: viewerId,
-          followingId: userId,
-        },
-      },
-    });
-    isFollowing = Boolean(follow);
+  /**
+   * Follow another user
+   */
+  followUser(followerId: number, followingId: number): Promise<void> {
+    return this.repo.createFollow(followerId, followingId);
   }
 
-  return {
-    id: user.id,
-    name: user.name,
-    muskBucks: user.muskBucks,
-    rank,
-    bio: user.bio,
-    avatarUrl: user.avatarUrl,
-    location: user.location,
-    timezone: user.timezone,
-    notifyOnResolve: user.notifyOnResolve,
-    theme: user.theme,
-    twoFactorEnabled: user.twoFactorEnabled,
-    stats: {
-      successRate: user.successRate,
-      totalPredictions: user.totalPredictions,
-      currentStreak: user.currentStreak,
-      longestStreak: user.longestStreak,
-    },
-    badges: user.userBadges.map((ub) => ({
-      id: ub.badge.id,
-      name: ub.badge.name,
-      description: ub.badge.description,
-      iconUrl: ub.badge.iconUrl,
-      awardedAt: ub.awardedAt,
-    })),
-    followersCount: user._count.followers,
-    followingCount: user._count.following,
-    isFollowing,
-  };
-}
+  /**
+   * Unfollow a user
+   */
+  unfollowUser(followerId: number, followingId: number): Promise<void> {
+    return this.repo.deleteFollow(followerId, followingId);
+  }
 
-/**
- * Follow a user.
- */
-export async function followUser(followerId: number, followingId: number): Promise<void> {
-  await prisma.follow.create({
-    data: { followerId, followingId },
-  });
-}
-
-/**
- * Unfollow a user.
- */
-export async function unfollowUser(followerId: number, followingId: number): Promise<void> {
-  await prisma.follow.delete({
-    where: {
-      followerId_followingId: { followerId, followingId },
-    },
-  });
-}
-
-/**
- * Update user profile fields.
- */
-export async function updateUserProfile(
-  userId: number,
-  data: {
-    bio?: string | null;
-    avatarUrl?: string | null;
-    location?: string | null;
-    timezone?: string | null;
-    notifyOnResolve?: boolean;
-    theme?: Theme;
-    twoFactorEnabled?: boolean;
-    profileComplete?: boolean;
-    // note: no `role` here!
-  },
-): Promise<UserProfileDTO> {
-  // Whitelist only the fields we allow to be written
-  const {
-    bio,
-    avatarUrl,
-    location,
-    timezone,
-    notifyOnResolve,
-    theme,
-    twoFactorEnabled,
-    profileComplete,
-  } = data;
-
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      bio,
-      avatarUrl,
-      location,
-      timezone,
-      notifyOnResolve,
-      ...(theme !== undefined ? { theme } : {}),
-      twoFactorEnabled,
-      profileComplete,
-    },
-  });
-
-  return getUserProfile(userId, userId);
+  /**
+   * Update profile fields for a user and return updated profile
+   */
+  async updateUserProfile(
+    userId: number,
+    data: Partial<
+      Pick<
+        DbUser,
+        | 'bio'
+        | 'avatarUrl'
+        | 'location'
+        | 'timezone'
+        | 'notifyOnResolve'
+        | 'theme'
+        | 'twoFactorEnabled'
+        | 'profileComplete'
+      >
+    >,
+  ): Promise<UserProfileDTO> {
+    await this.repo.updateProfile(userId, data);
+    return this.getUserProfile(userId, userId);
+  }
 }

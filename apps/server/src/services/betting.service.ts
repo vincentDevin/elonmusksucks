@@ -1,148 +1,124 @@
 // apps/server/src/services/betting.service.ts
-import prisma from '../db';
+// Service layer for betting operations, using a repository for data access
+
+import type { IBettingRepository } from '../repositories/IBettingRepository';
+import { BettingRepository } from '../repositories/BettingRepository';
+import type { DbBet, DbParlay } from '@ems/types';
 
 export class BettingService {
+  constructor(private repo: IBettingRepository = new BettingRepository()) {}
+
   /**
-   * Place a single bet.
-   * Deducts from user balance, creates Bet record, and recalculates odds.
+   * Place a single bet: deduct balance, record transaction and bet, then recalculate odds
    */
-  static async placeBet(userId: number, optionId: number, amount: number) {
-    // 1) Load the option and check predict is open
-    const option = await prisma.predictionOption.findUnique({
-      where: { id: optionId! },
-      include: { prediction: true },
-    });
+  async placeBet(userId: number, optionId: number, amount: number): Promise<DbBet> {
+    // Load option with parent prediction
+    const option = await this.repo.findOptionWithPrediction(optionId);
     if (!option) throw new Error('Option not found');
-    if (option.prediction.resolved || option.prediction.expiresAt < new Date()) {
+    const { prediction } = option;
+    if (prediction.resolved || prediction.expiresAt < new Date()) {
       throw new Error('Prediction is closed');
     }
 
-    // 2) Deduct user balance
-    const user = await prisma.user.findUnique({ where: { id: userId } });
+    // Check and deduct user balance
+    const user = await this.repo.findUserById(userId);
     if (!user || user.muskBucks < amount) {
       throw new Error('Insufficient funds');
     }
     const newBalance = user.muskBucks - amount;
-    await prisma.user.update({
-      where: { id: userId },
-      data: { muskBucks: newBalance },
-    });
-    await prisma.transaction.create({
-      data: {
-        userId,
-        type: 'DEBIT',
-        amount,
-        balanceAfter: newBalance,
-        relatedBetId: null,
-        relatedParlayId: null,
-      },
+    await this.repo.updateUserMuskBucks(userId, newBalance);
+    await this.repo.createTransaction({
+      userId,
+      type: 'DEBIT',
+      amount,
+      balanceAfter: newBalance,
+      relatedBetId: null,
+      relatedParlayId: null,
     });
 
-    // 3) Create the bet (middleware will set potentialPayout)
-    const bet = await prisma.bet.create({
-      data: {
-        userId,
-        predictionId: option.predictionId,
-        optionId: parseInt(optionId as any, 10),
-        amount,
-      },
+    // Record the bet
+    const bet = await this.repo.createBet({
+      userId,
+      predictionId: prediction.id,
+      optionId,
+      amount,
     });
 
-    // 4) Recalculate odds across all options for this prediction
-    await BettingService.recalculateOdds(option.predictionId);
-
+    // Recalculate odds
+    await this.recalculateOdds(prediction.id);
     return bet;
   }
 
   /**
-   * Place a parlay (multi-leg bet).
-   * Deducts from user, creates Parlay + ParlayLegs via nested create.
+   * Place a parlay (multi-leg bet): deduct balance, record transaction and parlay + legs
    */
-  static async placeParlay(
+  async placeParlay(
     userId: number,
     legs: Array<{ optionId: number }>,
-    amount: number
-  ) {
-    // 1) Validate user balance
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user || user.muskBucks < amount) throw new Error('Insufficient funds');
+    amount: number,
+  ): Promise<DbParlay> {
+    // Validate user balance
+    const user = await this.repo.findUserById(userId);
+    if (!user || user.muskBucks < amount) {
+      throw new Error('Insufficient funds');
+    }
 
-    // 2) Load each option to snapshot odds and check open
+    // Validate each leg and snapshot odds
     const detailedLegs = await Promise.all(
-      legs.map(async (leg) => {
-        const opt = await prisma.predictionOption.findUnique({
-          where: { id: leg.optionId! },
-          include: { prediction: true },
-        });
-        if (!opt) throw new Error(`Option ${leg.optionId} missing`);
-        if (opt.prediction.resolved || opt.prediction.expiresAt < new Date()) {
-          throw new Error(`Prediction ${opt.predictionId} is closed`);
+      legs.map(async ({ optionId }) => {
+        const opt = await this.repo.findOptionWithPrediction(optionId);
+        if (!opt) throw new Error(`Option ${optionId} missing`);
+        const { prediction } = opt;
+        if (prediction.resolved || prediction.expiresAt < new Date()) {
+          throw new Error(`Prediction ${prediction.id} is closed`);
         }
         return { optionId: opt.id, oddsAtPlacement: opt.odds };
-      })
+      }),
     );
 
     const combinedOdds = detailedLegs.reduce((prod, leg) => prod * leg.oddsAtPlacement, 1);
     const potentialPayout = Math.floor(amount * combinedOdds);
 
-    // 3) Deduct balance + transaction
+    // Deduct balance and record transaction
     const newBalance = user.muskBucks - amount;
-    await prisma.user.update({ where: { id: userId }, data: { muskBucks: newBalance } });
-    await prisma.transaction.create({
-      data: {
-        userId,
-        type: 'DEBIT',
-        amount,
-        balanceAfter: newBalance,
-        relatedBetId: null,
-        relatedParlayId: null,
-      },
+    await this.repo.updateUserMuskBucks(userId, newBalance);
+    await this.repo.createTransaction({
+      userId,
+      type: 'DEBIT',
+      amount,
+      balanceAfter: newBalance,
+      relatedBetId: null,
+      relatedParlayId: null,
     });
 
-    // 4) Create parlay + nested legs
-    const parlay = await prisma.parlay.create({
-      data: {
-        userId,
-        amount,
-        combinedOdds,
-        potentialPayout,
-        legs: {
-          create: detailedLegs.map((leg) => ({
-            optionId: leg.optionId,
-            oddsAtPlacement: leg.oddsAtPlacement,
-          })),
-        },
-      },
+    // Create parlay with legs
+    const parlay = await this.repo.createParlay({
+      userId,
+      amount,
+      combinedOdds,
+      potentialPayout,
+      legs: detailedLegs,
     });
-
     return parlay;
   }
 
   /**
-   * Recalculate decimal odds for every option on this prediction
-   * based on total pool vs option pool (pari-mutuel style).
+   * Recalculate odds for a prediction by pari-mutuel pool
    */
-  static async recalculateOdds(predictionId: number) {
-    // 1) Sum total wagers by option
-    const pools = await prisma.bet.groupBy({
-      by: ['optionId'],
-      where: { predictionId },
-      _sum: { amount: true },
-    });
-    const totalPool = pools.reduce((sum, p) => sum + (p._sum.amount || 0), 0);
-    // 2) For each option, update odds = totalPool / optionPool
+  async recalculateOdds(predictionId: number): Promise<void> {
+    const pools = await this.repo.groupBetsByPrediction(predictionId);
+    const totalPool = pools.reduce((sum, p) => sum + p.totalAmount, 0);
+
     await Promise.all(
-      pools.map((p) =>
-        prisma.predictionOption.update({
-          where: { id: p.optionId! },
-          data: {
-            odds:
-              p._sum.amount && totalPool
-                ? totalPool / p._sum.amount
-                : 1.0,
-          },
-        })
-      )
+      pools.map(({ optionId, totalAmount }) =>
+        this.repo.updatePredictionOptionOdds(
+          optionId,
+          totalPool && totalAmount ? totalPool / totalAmount : 1.0,
+        ),
+      ),
     );
   }
 }
+
+// Singleton for controllers
+export const bettingService = new BettingService();

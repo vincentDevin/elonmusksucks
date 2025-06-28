@@ -1,101 +1,89 @@
-import prisma from '../db';
+// apps/server/src/services/prediction.service.ts
+// Service layer for prediction-related operations, using a repository for data access
 
-export async function listAllPredictions() {
-  return prisma.prediction.findMany({
-    include: {
-      bets: {
-        include: { user: { select: { id: true, name: true } } },
-      },
-    },
-    orderBy: { createdAt: 'desc' },
-  });
-}
+import type { IPredictionRepository } from '../repositories/IPredictionRepository';
+import { PredictionRepository } from '../repositories/PredictionRepository';
+import type { DbPrediction, DbBet, DbLeaderboardEntry, DbUser } from '@ems/types';
 
-export async function createPrediction(data: {
-  title: string;
-  description: string;
-  category: string;
-  expiresAt: Date;
-}) {
-  return prisma.prediction.create({
-    data: {
-      title: data.title,
-      description: data.description,
-      category: data.category,
-      expiresAt: data.expiresAt,
-    },
-  });
-}
+export class PredictionService {
+  constructor(private repo: IPredictionRepository = new PredictionRepository()) {}
 
-export async function getPrediction(id: number) {
-  return prisma.prediction.findUnique({ where: { id } });
-}
-
-export async function placeBet(
-  userId: number,
-  predictionId: number,
-  amount: number,
-  option: number,
-) {
-  const prediction = await prisma.prediction.findUnique({ where: { id: predictionId } });
-  if (!prediction) throw new Error('PREDICTION_NOT_FOUND');
-  if (prediction.expiresAt <= new Date()) throw new Error('PREDICTION_CLOSED');
-
-  const user = await prisma.user.findUnique({ where: { id: userId } });
-  if (!user) throw new Error('USER_NOT_FOUND');
-  if (user.muskBucks < amount) throw new Error('INSUFFICIENT_FUNDS');
-
-  await prisma.user.update({
-    where: { id: userId },
-    data: { muskBucks: { decrement: amount } },
-  });
-
-  return prisma.bet.create({
-    data: {
-      userId,
-      predictionId,
-      amount,
-      optionId: option,
-    },
-  });
-}
-
-export async function resolvePrediction(predictionId: number, winningOptionId: number) {
-  const prediction = await prisma.prediction.update({
-    where: { id: predictionId },
-    data: {
-      resolved: true,
-      resolvedAt: new Date(),
-    },
-  });
-
-  const bets = await prisma.bet.findMany({ where: { predictionId } });
-
-  for (const bet of bets) {
-    const won = bet.optionId === winningOptionId;
-    const payout = won ? bet.amount * 2 : 0;
-
-    await prisma.bet.update({
-      where: { id: bet.id },
-      data: { won, payout },
-    });
-
-    if (won) {
-      await prisma.user.update({
-        where: { id: bet.userId },
-        data: { muskBucks: { increment: payout } },
-      });
-    }
+  /**
+   * List all predictions with their bets and betting users
+   */
+  async listAllPredictions(): Promise<
+    Array<DbPrediction & { bets: Array<DbBet & { user: Pick<DbUser, 'id' | 'name'> }> }>
+  > {
+    return this.repo.listAllPredictions();
   }
 
-  // Returns the updated prediction object
-  return prediction;
+  /**
+   * Create a new prediction event
+   */
+  createPrediction(data: {
+    title: string;
+    description: string;
+    category: string;
+    expiresAt: Date;
+  }): Promise<DbPrediction> {
+    return this.repo.createPrediction(data);
+  }
+
+  /**
+   * Fetch a single prediction by ID
+   */
+  getPrediction(id: number): Promise<DbPrediction | null> {
+    return this.repo.findPredictionById(id);
+  }
+
+  /**
+   * Place a bet for a user on a given prediction
+   */
+  async placeBet(
+    userId: number,
+    predictionId: number,
+    amount: number,
+    optionId: number,
+  ): Promise<DbBet> {
+    const prediction = await this.repo.findPredictionById(predictionId);
+    if (!prediction) throw new Error('PREDICTION_NOT_FOUND');
+    if (prediction.expiresAt <= new Date()) throw new Error('PREDICTION_CLOSED');
+
+    const user = await this.repo.findUserById(userId);
+    if (!user) throw new Error('USER_NOT_FOUND');
+    if (user.muskBucks < amount) throw new Error('INSUFFICIENT_FUNDS');
+
+    await this.repo.decrementUserMuskBucks(userId, amount);
+    return this.repo.createBet(userId, predictionId, amount, optionId);
+  }
+
+  /**
+   * Resolve a prediction and settle all bets
+   */
+  async resolvePrediction(predictionId: number, winningOptionId: number): Promise<DbPrediction> {
+    const updatedPrediction = await this.repo.markPredictionResolved(predictionId, new Date());
+
+    const bets = await this.repo.findBetsByPrediction(predictionId);
+    for (const bet of bets) {
+      const won = bet.optionId === winningOptionId;
+      const payout = won ? bet.amount * 2 : 0;
+
+      await this.repo.updateBet(bet.id, { won, payout });
+      if (won) {
+        await this.repo.incrementUserMuskBucks(bet.userId, payout);
+      }
+    }
+
+    return updatedPrediction;
+  }
+
+  /**
+   * Retrieve the top users by MuskBucks balance
+   */
+  getLeaderboard(limit = 10): Promise<DbLeaderboardEntry[]> {
+    return this.repo.getLeaderboard(limit);
+  }
 }
 
-export async function getLeaderboard(limit = 10) {
-  return prisma.user.findMany({
-    orderBy: { muskBucks: 'desc' },
-    take: limit,
-    select: { id: true, name: true, muskBucks: true },
-  });
-}
+// Singleton instance for use in controllers
+export const predictionService = new PredictionService();
