@@ -3,7 +3,7 @@ import api from './axios';
 import type { PublicBet, PublicParlay } from '@ems/types';
 
 /**
- * Payload for placing a bet
+ * Payload for placing a single bet
  */
 export interface PlaceBetPayload {
   optionId: number;
@@ -11,10 +11,10 @@ export interface PlaceBetPayload {
 }
 
 /**
- * Place a single bet on a prediction
+ * Place a single bet
  */
-export async function placeBet(predictionId: number, payload: PlaceBetPayload): Promise<PublicBet> {
-  const { data } = await api.post<PublicBet>(`/api/predictions/${predictionId}/bets`, payload);
+export async function placeBet(payload: PlaceBetPayload): Promise<PublicBet> {
+  const { data } = await api.post<PublicBet>('/api/betting/bet', payload);
   return data;
 }
 

@@ -4,23 +4,22 @@ import { useBetting } from '../hooks/useBetting';
 import { useAuth } from '../contexts/AuthContext';
 
 interface BetFormProps {
-  predictionId: number;
   onPlaced: () => void;
 }
 
-export default function BetForm({ predictionId, onPlaced }: BetFormProps) {
+export default function BetForm({ onPlaced }: BetFormProps) {
   const { placeBet, loading: placing, error } = useBetting();
   const { user } = useAuth();
   const balance = user?.muskBucks ?? 0;
 
   const [expanded, setExpanded] = useState(false);
   const [amount, setAmount] = useState(0);
-  const [optionId, setOptionId] = useState<number>(1); // default to YES option id
+  const [optionId, setOptionId] = useState<number>(1); // default YES
 
   const submit = async () => {
     if (amount <= 0 || amount > balance) return;
     try {
-      await placeBet(predictionId, { optionId, amount });
+      await placeBet({ optionId, amount });
       onPlaced();
       setExpanded(false);
     } catch (err: any) {
@@ -30,7 +29,11 @@ export default function BetForm({ predictionId, onPlaced }: BetFormProps) {
   };
 
   if (balance === 0) {
-    return <p className="mt-2 text-sm text-gray-500 italic">You have no MuskBucks to bet.</p>;
+    return (
+      <p className="mt-2 text-sm text-gray-500 italic">
+        You have no MuskBucks to bet.
+      </p>
+    );
   }
 
   return expanded ? (

@@ -1,13 +1,10 @@
 // apps/server/src/controllers/predictions.controller.ts
 import type { Request, Response, NextFunction } from 'express';
-
-type ReqWithUser = Request & { user?: { id: number } };
-
 import { predictionService } from '../services/predictions.service';
+import { payoutService } from '../services/payout.service';
 
 /**
  * GET /api/predictions
- * List all predictions
  */
 export const getAllPredictions = async (
   _req: Request,
@@ -24,7 +21,6 @@ export const getAllPredictions = async (
 
 /**
  * GET /api/predictions/:id
- * Get a single prediction by ID
  */
 export const getPredictionById = async (
   req: Request,
@@ -46,7 +42,6 @@ export const getPredictionById = async (
 
 /**
  * POST /api/predictions
- * Create a new prediction
  */
 export const createPrediction = async (
   req: Request,
@@ -68,32 +63,7 @@ export const createPrediction = async (
 };
 
 /**
- * POST /api/predictions/:id/bets
- * Place a bet on a prediction
- */
-export const placeBetHandler = async (
-  req: ReqWithUser,
-  res: Response,
-  next: NextFunction,
-): Promise<void> => {
-  try {
-    const userId = req.user?.id;
-    const predictionId = Number(req.params.id);
-    const { amount, optionId } = req.body as { amount: number; optionId: number };
-    if (!userId) {
-      res.status(401).json({ error: 'Not authenticated' });
-      return;
-    }
-    const bet = await predictionService.placeBet(userId, predictionId, amount, optionId);
-    res.status(201).json(bet);
-  } catch (err) {
-    next(err);
-  }
-};
-
-/**
  * POST /api/predictions/:id/resolve
- * Resolve a prediction and settle bets
  */
 export const resolvePredictionHandler = async (
   req: Request,
@@ -103,7 +73,14 @@ export const resolvePredictionHandler = async (
   try {
     const predictionId = Number(req.params.id);
     const { winningOptionId } = req.body as { winningOptionId: number };
-    const updated = await predictionService.resolvePrediction(predictionId, winningOptionId);
+    // Delegate to PayoutService
+    await payoutService.resolvePrediction(predictionId, winningOptionId);
+    // refetch the now-resolved prediction for the client
+    const updated = await predictionService.getPrediction(predictionId);
+    if (!updated) {
+      res.status(404).json({ error: 'Prediction not found after resolve' });
+      return;
+    }
     res.json(updated);
   } catch (err) {
     next(err);
@@ -112,7 +89,6 @@ export const resolvePredictionHandler = async (
 
 /**
  * GET /api/predictions/leaderboard
- * Get the leaderboard of top users
  */
 export const getLeaderboard = async (
   _req: Request,

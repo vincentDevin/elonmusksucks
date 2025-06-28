@@ -57,6 +57,8 @@ export interface IBettingRepository {
     predictionId: number;
     optionId: number;
     amount: number;
+    oddsAtPlacement: number;
+    potentialPayout: number;
   }): Promise<DbBet>;
 
   /**

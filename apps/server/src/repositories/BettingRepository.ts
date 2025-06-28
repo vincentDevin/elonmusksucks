@@ -71,8 +71,10 @@ export class BettingRepository implements IBettingRepository {
     predictionId: number;
     optionId: number;
     amount: number;
+    oddsAtPlacement: number;
+    potentialPayout: number;
   }): Promise<DbBet> {
-    return prisma.bet.create({ data }) as Promise<DbBet>;
+    return prisma.bet.create({ data });
   }
 
   /**

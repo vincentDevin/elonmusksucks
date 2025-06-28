@@ -1,6 +1,4 @@
 // apps/server/src/services/betting.service.ts
-// Service layer for betting operations, using a repository for data access
-
 import type { IBettingRepository } from '../repositories/IBettingRepository';
 import { BettingRepository } from '../repositories/BettingRepository';
 import type { DbBet, DbParlay } from '@ems/types';
@@ -9,22 +7,28 @@ export class BettingService {
   constructor(private repo: IBettingRepository = new BettingRepository()) {}
 
   /**
-   * Place a single bet: deduct balance, record transaction and bet, then recalculate odds
+   * Place a single bet:
+   *  - load & validate option/prediction
+   *  - snapshot odds, compute payout
+   *  - deduct balance + record transaction
+   *  - persist bet
+   *  - recalculate odds
    */
   async placeBet(userId: number, optionId: number, amount: number): Promise<DbBet> {
-    // Load option with parent prediction
+    // 1) Load option + ensure open
     const option = await this.repo.findOptionWithPrediction(optionId);
-    if (!option) throw new Error('Option not found');
-    const { prediction } = option;
-    if (prediction.resolved || prediction.expiresAt < new Date()) {
-      throw new Error('Prediction is closed');
+    if (!option) throw new Error('OPTION_NOT_FOUND');
+    if (option.prediction.resolved || option.prediction.expiresAt < new Date()) {
+      throw new Error('PREDICTION_CLOSED');
     }
 
-    // Check and deduct user balance
+    // 2) Snapshot odds & compute payout
+    const oddsAtPlacement = option.odds;
+    const potentialPayout = Math.floor(amount * oddsAtPlacement);
+
+    // 3) Deduct balance + record transaction
     const user = await this.repo.findUserById(userId);
-    if (!user || user.muskBucks < amount) {
-      throw new Error('Insufficient funds');
-    }
+    if (!user || user.muskBucks < amount) throw new Error('INSUFFICIENT_FUNDS');
     const newBalance = user.muskBucks - amount;
     await this.repo.updateUserMuskBucks(userId, newBalance);
     await this.repo.createTransaction({
@@ -36,41 +40,44 @@ export class BettingService {
       relatedParlayId: null,
     });
 
-    // Record the bet
+    // 4) Persist the bet
     const bet = await this.repo.createBet({
       userId,
-      predictionId: prediction.id,
+      predictionId: option.predictionId,
       optionId,
       amount,
+      oddsAtPlacement,
+      potentialPayout,
     });
 
-    // Recalculate odds
-    await this.recalculateOdds(prediction.id);
+    // 5) Recalculate odds
+    await this.recalculateOdds(option.predictionId);
+
     return bet;
   }
 
   /**
-   * Place a parlay (multi-leg bet): deduct balance, record transaction and parlay + legs
+   * Place a parlay:
+   *  - validate & snapshot each leg
+   *  - compute combined odds + payout
+   *  - deduct balance + transaction
+   *  - create parlay + legs
    */
   async placeParlay(
     userId: number,
     legs: Array<{ optionId: number }>,
     amount: number,
   ): Promise<DbParlay> {
-    // Validate user balance
     const user = await this.repo.findUserById(userId);
-    if (!user || user.muskBucks < amount) {
-      throw new Error('Insufficient funds');
-    }
+    if (!user || user.muskBucks < amount) throw new Error('INSUFFICIENT_FUNDS');
 
-    // Validate each leg and snapshot odds
+    // snapshot odds & validate
     const detailedLegs = await Promise.all(
       legs.map(async ({ optionId }) => {
         const opt = await this.repo.findOptionWithPrediction(optionId);
-        if (!opt) throw new Error(`Option ${optionId} missing`);
-        const { prediction } = opt;
-        if (prediction.resolved || prediction.expiresAt < new Date()) {
-          throw new Error(`Prediction ${prediction.id} is closed`);
+        if (!opt) throw new Error(`OPTION_${optionId}_NOT_FOUND`);
+        if (opt.prediction.resolved || opt.prediction.expiresAt < new Date()) {
+          throw new Error(`PREDICTION_${opt.predictionId}_CLOSED`);
         }
         return { optionId: opt.id, oddsAtPlacement: opt.odds };
       }),
@@ -79,7 +86,7 @@ export class BettingService {
     const combinedOdds = detailedLegs.reduce((prod, leg) => prod * leg.oddsAtPlacement, 1);
     const potentialPayout = Math.floor(amount * combinedOdds);
 
-    // Deduct balance and record transaction
+    // deduct + transaction
     const newBalance = user.muskBucks - amount;
     await this.repo.updateUserMuskBucks(userId, newBalance);
     await this.repo.createTransaction({
@@ -91,19 +98,18 @@ export class BettingService {
       relatedParlayId: null,
     });
 
-    // Create parlay with legs
-    const parlay = await this.repo.createParlay({
+    // create parlay
+    return this.repo.createParlay({
       userId,
       amount,
       combinedOdds,
       potentialPayout,
       legs: detailedLegs,
     });
-    return parlay;
   }
 
   /**
-   * Recalculate odds for a prediction by pari-mutuel pool
+   * Odds recalculation (pari-mutuel style)
    */
   async recalculateOdds(predictionId: number): Promise<void> {
     const pools = await this.repo.groupBetsByPrediction(predictionId);
@@ -120,5 +126,4 @@ export class BettingService {
   }
 }
 
-// Singleton for controllers
 export const bettingService = new BettingService();

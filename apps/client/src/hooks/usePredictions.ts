@@ -3,14 +3,16 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { getPredictions, createPrediction } from '../api/predictions';
 import type { PublicPrediction } from '@ems/types';
 
-// module-level cache of fetched predictions
+// module‐level cache of fetched predictions
 let cachedPredictions: PublicPrediction[] | null = null;
 
 /**
- * Hook for fetching and managing predictions list
+ * Hook for fetching and managing the list of predictions
  */
 export function usePredictions() {
-  const [data, setData] = useState<PublicPrediction[] | null>(cachedPredictions);
+  const [data, setData] = useState<PublicPrediction[] | null>(
+    cachedPredictions
+  );
   const [loading, setLoading] = useState(!cachedPredictions);
   const [error, setError] = useState<Error | null>(null);
 
@@ -40,7 +42,12 @@ export function usePredictions() {
   const predictions = useMemo(() => data ?? [], [data]);
 
   const createNewPrediction = useCallback(
-    async (input: { title: string; description: string; category: string; expiresAt: Date }) => {
+    async (input: {
+      title: string;
+      description: string;
+      category: string;
+      expiresAt: Date;
+    }) => {
       setLoading(true);
       setError(null);
       try {
@@ -54,7 +61,7 @@ export function usePredictions() {
         setLoading(false);
       }
     },
-    [fetchPredictions],
+    [fetchPredictions]
   );
 
   return {

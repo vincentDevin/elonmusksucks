@@ -4,10 +4,6 @@ import { bettingService } from '../services/betting.service';
 
 type ReqWithUser = Request & { user?: { id: number } };
 
-/**
- * POST /api/bet
- * Place a single bet for the authenticated user
- */
 export const placeBetHandler = async (
   req: ReqWithUser,
   res: Response,
@@ -22,15 +18,11 @@ export const placeBetHandler = async (
     const { optionId, amount } = req.body as { optionId: number; amount: number };
     const bet = await bettingService.placeBet(userId, optionId, amount);
     res.status(201).json(bet);
-  } catch (err: any) {
+  } catch (err) {
     next(err);
   }
 };
 
-/**
- * POST /api/parlay
- * Place a parlay (multi-leg bet) for the authenticated user
- */
 export const placeParlayHandler = async (
   req: ReqWithUser,
   res: Response,
@@ -45,7 +37,7 @@ export const placeParlayHandler = async (
     const { legs, amount } = req.body as { legs: Array<{ optionId: number }>; amount: number };
     const parlay = await bettingService.placeParlay(userId, legs, amount);
     res.status(201).json(parlay);
-  } catch (err: any) {
+  } catch (err) {
     next(err);
   }
 };

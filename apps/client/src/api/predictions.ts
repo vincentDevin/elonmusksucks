@@ -13,7 +13,7 @@ export async function getPredictions(): Promise<PublicPrediction[]> {
 /**
  * Fetch a single prediction by ID
  */
-export async function getPredictionById(id: number): Promise<PublicPrediction | null> {
+export async function getPredictionById(id: number): Promise<PublicPrediction> {
   const { data } = await api.get<PublicPrediction>(`/api/predictions/${id}`);
   return data;
 }
