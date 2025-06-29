@@ -11,9 +11,10 @@ import PrivateRoute from '../components/PrivateRoute';
 import Home from '../pages/Home';
 import Profile from '../pages/Profile';
 import ProfileSetup from '../pages/ProfileSetup';
+import AdminDashboard from '../pages/AdminDashboard';
 
 export default function AppRoutes() {
-  const { accessToken } = useAuth();
+  const { accessToken, user } = useAuth();
 
   return (
     <Routes>
@@ -26,15 +27,31 @@ export default function AppRoutes() {
       <Route path="/setup-profile" element={<ProfileSetup />} />
 
       {/* Protected */}
-      <Route element={<PrivateRoute />}>
+      <Route element={<PrivateRoute />}>  
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/predictions" element={<Predictions />} />
         <Route path="/leaderboard" element={<Leaderboard />} />
         <Route path="/profile/:userId" element={<Profile />} />
+        {/* Admin-only route */}
+        <Route
+          path="/admin"
+          element={
+            user?.role === 'ADMIN' ? (
+              <AdminDashboard />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
       </Route>
 
       {/* Fallback */}
-      <Route path="*" element={<Navigate to={accessToken ? '/dashboard' : '/login'} replace />} />
+      <Route
+        path="*"
+        element={
+          <Navigate to={accessToken ? '/dashboard' : '/login'} replace />
+        }
+      />
     </Routes>
   );
 }

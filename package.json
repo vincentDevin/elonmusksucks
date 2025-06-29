@@ -9,18 +9,19 @@
   ],
   "scripts": {
     "dev": "concurrently \"npm run dev --workspace=apps/client\" \"npm run dev --workspace=apps/server\"",
-    "build": "npm run build --workspace=apps/client && npm run build --workspace=apps/server",
+    "build": "npm run prisma:generate && cd packages/types && npm run build && cd ../../ && npm run build --workspace=apps/client && npm run build --workspace=apps/server",
     "lint": "eslint apps/**/*.{ts,tsx} --max-warnings=0",
     "format": "prettier --write \"apps/**/*.{ts,tsx,js,jsx,json,css,md}\"",
-    "setup": "npm install && cd apps/server && npm install && npm run prisma:migrate:dev && npm run seed:dev",
-    "prisma:migrate:dev": "prisma migrate reset --force --skip-generate",
-    "prisma:generate": "prisma generate",
+    "setup": "npm install && npm run prisma:generate && cd packages/types && npm run build && cd ../../apps/server && npm install && npm run prisma:migrate:dev && npm run seed:dev",
+    "prisma:generate": "dotenv -e .env -- prisma generate --schema prisma/schema.prisma",
+    "prisma:migrate:dev": "dotenv -e .env -- prisma migrate reset --force --skip-generate --schema prisma/schema.prisma",
     "seed:dev": "ts-node --transpile-only prisma/seed.ts"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^8.33.1",
     "@typescript-eslint/parser": "^8.33.1",
     "concurrently": "^8.2.2",
+    "dotenv-cli": "^8.0.0",
     "eslint": "^9.28.0",
     "eslint-config-prettier": "^10.1.5",
     "eslint-plugin-import": "^2.31.0",
