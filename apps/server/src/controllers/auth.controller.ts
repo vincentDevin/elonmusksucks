@@ -1,4 +1,5 @@
-import type { RequestHandler, NextFunction, Request, Response } from 'express';
+// apps/server/src/controllers/auth.controller.ts
+import type { RequestHandler } from 'express';
 import {
   createUser,
   validateUser,
@@ -13,53 +14,86 @@ import {
   resetPassword,
 } from '../services/auth.service';
 import { sendEmail } from '../services/email.service';
-import { generateAccessToken, generateRefreshToken } from '../utils/jwtHelpers';
+import {
+  generateAccessToken,
+  generateRefreshToken,
+  verifyRefreshToken,
+} from '../utils/jwtHelpers';
 
-export const registerUser: RequestHandler = async (req: Request, res: Response) => {
+// Standardize error payloads
+function sendError(res: any, status: number, message: string) {
+  return res.status(status).json({ error: message });
+}
+
+/**
+ * POST /api/auth/register
+ */
+export const registerUser: RequestHandler = async (req, res) => {
+  const { name, email, password } = req.body as {
+    name?: string;
+    email?: string;
+    password?: string;
+  };
+  if (!name || !email || !password) {
+    return sendError(res, 400, 'Name, email, and password are required');
+  }
+
   try {
-    const { name, email, password } = req.body;
     const user = await createUser(name, email, password);
     const verificationToken = await createEmailVerification(user.id);
 
-    // attempt to send the email, but don’t block on failures
-    try {
-      // Build a direct API verification link so clicking the email updates the database immediately
-      const host = process.env.SERVER_URL || `${req.protocol}://${req.get('host')}`;
-      const verifyUrl = `${host}/api/auth/verify-email?token=${verificationToken}`;
-      await sendEmail(
-        user.email,
-        'Please verify your email address',
-        `<p>Hi ${user.name},</p>
-         <p>Click <a href="${verifyUrl}">here</a> to verify your email.</p>`,
-      );
-      console.log(`Verification email sent to ${user.email}`);
-    } catch (mailErr) {
-      console.error('Error sending verification email:', mailErr);
-    }
-    // finally, respond successfully even if email failed
-    res.status(201).json({ message: 'Registered! Check your email to verify.' });
+    // Fire-and-forget email
+    void (async () => {
+      try {
+        const host =
+          process.env.SERVER_URL ?? `${req.protocol}://${req.get('host')}`;
+        const verifyUrl = `${host}/api/auth/verify-email?token=${verificationToken}`;
+        await sendEmail(
+          user.email,
+          'Please verify your email address',
+          `<p>Hi ${user.name},</p>
+           <p>Click <a href="${verifyUrl}">here</a> to verify your email.</p>`
+        );
+      } catch (mailErr) {
+        console.error('Verification email error:', mailErr);
+      }
+    })();
+
+    return res
+      .status(201)
+      .json({ message: 'Registered. Please check your email.' });
   } catch (err: any) {
     console.error('Registration error:', err);
-    res.status(400).json({ error: 'Registration failed' });
+    return sendError(res, 400, 'Registration failed');
   }
 };
 
-export const loginUser: RequestHandler = async (req, res, next: NextFunction) => {
+/**
+ * POST /api/auth/login
+ */
+export const loginUser: RequestHandler = async (req, res, next) => {
+  const { email, password } = req.body as {
+    email?: string;
+    password?: string;
+  };
+  if (!email || !password) {
+    return sendError(res, 400, 'Email and password required');
+  }
+
   try {
-    const { email, password } = req.body;
     const user = await validateUser(email, password);
     if (!user) {
-      res.status(401).json({ error: 'Invalid credentials' });
-      return;
+      return sendError(res, 401, 'Invalid credentials');
     }
     if (!user.emailVerified) {
-      res.status(403).json({ error: 'Please verify your email before logging in.' });
-      return;
+      return sendError(res, 403, 'Email not verified');
     }
+
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
     await saveRefreshToken(user.id, refreshToken);
-    res
+
+    return res
       .cookie('refreshToken', refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
@@ -72,23 +106,22 @@ export const loginUser: RequestHandler = async (req, res, next: NextFunction) =>
   }
 };
 
+/**
+ * GET /api/auth/me
+ */
 export const me: RequestHandler = async (req, res, next) => {
   try {
-    // Grab the user ID that your auth middleware attached:
-    const userId = (req as any).user?.id ?? (req as any).userId;
+    const userId = (req as any).user?.id;
     if (!userId) {
-      res.status(500).json({ error: 'User context not found' });
-      return;
+      return sendError(res, 401, 'Authentication required');
     }
 
     const user = await getUserById(userId);
     if (!user) {
-      res.status(404).json({ error: 'User not found' });
-      return;
+      return sendError(res, 404, 'User not found');
     }
 
-    // Send sanitized user object
-    res.json({
+    return res.json({
       id: user.id,
       name: user.name,
       email: user.email,
@@ -96,117 +129,125 @@ export const me: RequestHandler = async (req, res, next) => {
       muskBucks: user.muskBucks,
       profileComplete: user.profileComplete,
     });
-    return;
   } catch (err) {
     next(err);
-    return;
   }
 };
 
-export const refreshToken: RequestHandler = async (req, res, next) => {
+/**
+ * POST /api/auth/refresh-token
+ */
+export const refreshToken: RequestHandler = async (req, res) => {
+  const token = req.cookies.refreshToken as string | undefined;
+  if (!token) {
+    return sendError(res, 401, 'Refresh token required');
+  }
+
   try {
-    const token = req.cookies.refreshToken as string;
-    if (!token) {
-      res.status(401).json({ error: 'Refresh token required' });
-      return;
-    }
-    const payload = require('jsonwebtoken').verify(
-      token,
-      process.env.REFRESH_TOKEN_SECRET as string,
-    ) as { userId: number };
+    const payload = verifyRefreshToken(token);
     const stored = await getRefreshToken(token);
     if (!stored) {
-      res.status(403).json({ error: 'Invalid refresh token' });
-      return;
+      return sendError(res, 403, 'Invalid refresh token');
     }
+
     const user = await getUserById(payload.userId);
     if (!user) {
-      res.status(404).json({ error: 'User not found' });
-      return;
+      return sendError(res, 404, 'User not found');
     }
+
     const newAccessToken = generateAccessToken(user);
-    res.json({ accessToken: newAccessToken });
+    return res.json({ accessToken: newAccessToken });
   } catch (err) {
-    next(err);
+    return sendError(res, 403, 'Invalid or expired refresh token');
   }
 };
 
+/**
+ * POST /api/auth/logout
+ */
 export const logoutUser: RequestHandler = async (req, res, next) => {
   try {
-    const token = req.cookies.refreshToken as string;
+    const token = req.cookies.refreshToken as string | undefined;
     if (token) {
       await deleteRefreshToken(token);
-      res.clearCookie('refreshToken');
+      res.clearCookie('refreshToken', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+      });
     }
+    // note: no `return` here
     res.sendStatus(204);
   } catch (err) {
     next(err);
   }
 };
 
-// This handler should be mounted at /api/auth/verify-email
-export const verifyEmail: RequestHandler = async (req: Request, res: Response) => {
-  const { token } = req.query;
+/**
+ * GET /api/auth/verify-email
+ */
+export const verifyEmail: RequestHandler = async (req, res) => {
+  const token = req.query.token;
   if (typeof token !== 'string') {
-    res.status(400).json({ error: 'Token required' });
-    return;
+    return sendError(res, 400, 'Token required');
   }
   const ok = await verifyEmailToken(token);
   if (!ok) {
-    res.status(400).json({ error: 'Invalid or expired token' });
-    return;
+    return sendError(res, 400, 'Invalid or expired token');
   }
-  const front = process.env.CLIENT_URL || 'http://localhost:3000';
-  return res.redirect(`${front}/login?verified=true`);
+  const redirectUrl =
+    (process.env.CLIENT_URL ?? 'http://localhost:3000') + '/login?verified=true';
+  return res.redirect(redirectUrl);
 };
 
 /**
- * POST /auth/request-password-reset
- * { email }
+ * POST /api/auth/request-password-reset
  */
 export const requestPasswordReset: RequestHandler = async (req, res) => {
-  const { email } = req.body;
+  const { email } = req.body as { email?: string };
+  if (!email) {
+    return sendError(res, 400, 'Email required');
+  }
   const normalized = email.trim().toLowerCase();
   const user = await getUserByEmail(normalized);
 
-  // Always respond 200 to avoid user enumeration
   if (user) {
-    try {
-      const token = await createPasswordReset(user.id);
-      const url = `${process.env.CLIENT_URL}/reset-password?token=${token}`;
-      await sendEmail(
-        user.email,
-        'Your password reset link',
-        `<p>Hi ${user.name},</p>
-         <p>Click <a href="${url}">here</a> to reset your password. This link expires in 1 hour.</p>`,
-      );
-      console.log(`Password reset email sent to ${user.email}`);
-    } catch (err) {
-      console.error('Error sending reset email:', err);
-    }
+    void (async () => {
+      try {
+        const token = await createPasswordReset(user.id);
+        const url = `${process.env.CLIENT_URL}/reset-password?token=${token}`;
+        await sendEmail(
+          user.email,
+          'Password Reset',
+          `<p>Hi ${user.name},</p>
+           <p>Click <a href="${url}">here</a> to reset password (1h expiry).</p>`
+        );
+      } catch (mailErr) {
+        console.error('Reset email error:', mailErr);
+      }
+    })();
   }
 
-  // Always respond OK
-  res.json({ message: 'If that email is registered, you’ll receive a reset link.' });
+  // Always 200 to prevent enumeration
+  return res.json({
+    message: 'If that email is registered, you’ll receive a reset link.',
+  });
 };
 
 /**
- * POST /auth/reset-password
- * { token, newPassword }
+ * POST /api/auth/reset-password
  */
 export const performPasswordReset: RequestHandler = async (req, res) => {
-  const { token, newPassword } = req.body;
+  const { token, newPassword } = req.body as {
+    token?: string;
+    newPassword?: string;
+  };
   if (typeof token !== 'string' || typeof newPassword !== 'string') {
-    res.status(400).json({ error: 'Invalid request' });
-    return;
+    return sendError(res, 400, 'Token and newPassword required');
   }
-
   const ok = await resetPassword(token, newPassword);
   if (!ok) {
-    res.status(400).json({ error: 'Invalid or expired token' });
-    return;
+    return sendError(res, 400, 'Invalid or expired token');
   }
-
-  res.json({ message: 'Password has been reset. You can now log in.' });
-  return;
+  return res.json({ message: 'Password has been reset. You may now log in.' });
 };
