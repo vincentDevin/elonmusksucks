@@ -126,7 +126,11 @@ export default function Predictions() {
               )}
 
               {/* Odds bar */}
-              <OddsBar options={pred.pools} />
+              <OddsBar
+                options={pred.options as PublicPredictionOption[]}
+                bets={pred.bets}
+                parlayLegs={flatParlays}
+              />
 
               {/* Activity: single bets + parlay legs */}
               {(pred.bets.length > 0 || flatParlays.length > 0) && (

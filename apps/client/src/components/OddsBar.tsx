@@ -1,49 +1,74 @@
-interface OddsBarProps {
-  options: Array<{ label: string; pct: number }>;
+// apps/client/src/components/OddsBar.tsx
+import type { PublicPredictionOption, PublicBet } from '@ems/types';
+
+// match your flattened shape
+interface FlattenedParlayLeg {
+  parlayId: number;
+  user: { id: number; name: string };
+  stake: number;
+  optionId: number;
+  createdAt: string;
 }
 
-export default function OddsBar({ options }: OddsBarProps) {
-  // fixed palette for up to 4 options
+interface OddsBarProps {
+  options: PublicPredictionOption[];
+  bets?: PublicBet[];
+  parlayLegs?: FlattenedParlayLeg[];
+}
+
+export default function OddsBar({ options, bets = [], parlayLegs = [] }: OddsBarProps) {
   const palette = ['bg-blue-500', 'bg-green-500', 'bg-yellow-500', 'bg-red-500'];
 
-  // total should approach 1.0
-  const totalPct = options.reduce((sum, o) => sum + o.pct, 0);
-  if (totalPct === 0 || options.length === 0) {
+  // total staked across single bets + parlays
+  const totalStaked =
+    bets.reduce((sum, b) => sum + b.amount, 0) + parlayLegs.reduce((sum, l) => sum + l.stake, 0);
+
+  if (totalStaked === 0 || options.length === 0) {
     return <p className="mt-3 text-sm italic text-gray-500">No bets placed!</p>;
   }
 
+  // compute each option's share
   let cumPct = 0;
+  const pools = options.slice(0, 4).map((opt) => {
+    const singles = bets.filter((b) => b.optionId === opt.id).reduce((sum, b) => sum + b.amount, 0);
+    const parlays = parlayLegs
+      .filter((l) => l.optionId === opt.id)
+      .reduce((sum, l) => sum + l.stake, 0);
+    const stake = singles + parlays;
+    const pct = stake / totalStaked;
+    const left = cumPct;
+    cumPct += pct;
+    return { label: opt.label, pct, left };
+  });
+
   return (
     <div className="mt-3">
-      {/* Bar */}
+      {/* bar */}
       <div className="relative w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-        {options.slice(0, 4).map((opt, i) => {
-          const left = cumPct;
-          const width = opt.pct;
-          cumPct += width;
+        {pools.map((p, i) => {
           const color = palette[i] ?? palette[palette.length - 1];
           return (
             <div
-              key={opt.label}
+              key={p.label}
               className={`absolute top-0 h-full ${color}`}
               style={{
-                left: `${left * 100}%`,
-                width: `${width * 100}%`,
+                left: `${p.left * 100}%`,
+                width: `${p.pct * 100}%`,
               }}
             />
           );
         })}
       </div>
 
-      {/* Legend */}
+      {/* legend */}
       <div className="flex flex-wrap mt-2 text-sm space-x-4">
-        {options.slice(0, 4).map((opt, i) => {
+        {pools.map((p, i) => {
           const color = palette[i] ?? palette[palette.length - 1];
           return (
-            <div key={opt.label} className="flex items-center space-x-1">
+            <div key={p.label} className="flex items-center space-x-1">
               <span className={`inline-block w-3 h-3 ${color} rounded-full`} />
               <span>
-                {opt.label} {(opt.pct * 100).toFixed(1)}%
+                {p.label} {(p.pct * 100).toFixed(1)}%
               </span>
             </div>
           );

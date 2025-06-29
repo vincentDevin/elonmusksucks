@@ -8,9 +8,7 @@ export interface RegisterPayload {
 /**
  * Register a new user. Returns a simple message; no user object is returned.
  */
-export async function register(
-  data: RegisterPayload
-): Promise<{ message: string }> {
+export async function register(data: RegisterPayload): Promise<{ message: string }> {
   const res = await api.post<{ message: string }>('/api/auth/register', data);
   return res.data;
 }
@@ -70,11 +68,9 @@ export async function me(): Promise<User> {
  * Verify an email confirmation token. The backend will redirect the browser,
  * but we also return the JSON `{ message }` if someone calls this endpoint directly.
  */
-export async function verifyEmail(
-  token: string
-): Promise<{ message?: string }> {
+export async function verifyEmail(token: string): Promise<{ message?: string }> {
   const res = await api.get<{ message?: string }>(
-    `/api/auth/verify-email?token=${encodeURIComponent(token)}`
+    `/api/auth/verify-email?token=${encodeURIComponent(token)}`,
   );
   return res.data;
 }
@@ -82,13 +78,8 @@ export async function verifyEmail(
 /**
  * Request a password reset email. Always returns `{ message }` to avoid enumeration.
  */
-export async function requestPasswordReset(
-  email: string
-): Promise<{ message: string }> {
-  const res = await api.post<{ message: string }>(
-    '/api/auth/request-password-reset',
-    { email }
-  );
+export async function requestPasswordReset(email: string): Promise<{ message: string }> {
+  const res = await api.post<{ message: string }>('/api/auth/request-password-reset', { email });
   return res.data;
 }
 
@@ -100,11 +91,8 @@ export interface PasswordResetPayload {
  * Actually perform the password reset.
  */
 export async function performPasswordReset(
-  data: PasswordResetPayload
+  data: PasswordResetPayload,
 ): Promise<{ message: string }> {
-  const res = await api.post<{ message: string }>(
-    '/api/auth/reset-password',
-    data
-  );
+  const res = await api.post<{ message: string }>('/api/auth/reset-password', data);
   return res.data;
 }

@@ -14,11 +14,7 @@ import {
   resetPassword,
 } from '../services/auth.service';
 import { sendEmail } from '../services/email.service';
-import {
-  generateAccessToken,
-  generateRefreshToken,
-  verifyRefreshToken,
-} from '../utils/jwtHelpers';
+import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '../utils/jwtHelpers';
 
 // Standardize error payloads
 function sendError(res: any, status: number, message: string) {
@@ -45,23 +41,20 @@ export const registerUser: RequestHandler = async (req, res) => {
     // Fire-and-forget email
     void (async () => {
       try {
-        const host =
-          process.env.SERVER_URL ?? `${req.protocol}://${req.get('host')}`;
+        const host = process.env.SERVER_URL ?? `${req.protocol}://${req.get('host')}`;
         const verifyUrl = `${host}/api/auth/verify-email?token=${verificationToken}`;
         await sendEmail(
           user.email,
           'Please verify your email address',
           `<p>Hi ${user.name},</p>
-           <p>Click <a href="${verifyUrl}">here</a> to verify your email.</p>`
+           <p>Click <a href="${verifyUrl}">here</a> to verify your email.</p>`,
         );
       } catch (mailErr) {
         console.error('Verification email error:', mailErr);
       }
     })();
 
-    return res
-      .status(201)
-      .json({ message: 'Registered. Please check your email.' });
+    return res.status(201).json({ message: 'Registered. Please check your email.' });
   } catch (err: any) {
     console.error('Registration error:', err);
     return sendError(res, 400, 'Registration failed');
@@ -195,8 +188,7 @@ export const verifyEmail: RequestHandler = async (req, res) => {
   if (!ok) {
     return sendError(res, 400, 'Invalid or expired token');
   }
-  const redirectUrl =
-    (process.env.CLIENT_URL ?? 'http://localhost:3000') + '/login?verified=true';
+  const redirectUrl = (process.env.CLIENT_URL ?? 'http://localhost:3000') + '/login?verified=true';
   return res.redirect(redirectUrl);
 };
 
@@ -220,7 +212,7 @@ export const requestPasswordReset: RequestHandler = async (req, res) => {
           user.email,
           'Password Reset',
           `<p>Hi ${user.name},</p>
-           <p>Click <a href="${url}">here</a> to reset password (1h expiry).</p>`
+           <p>Click <a href="${url}">here</a> to reset password (1h expiry).</p>`,
         );
       } catch (mailErr) {
         console.error('Reset email error:', mailErr);

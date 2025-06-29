@@ -19,11 +19,7 @@ const repo: IAuthRepository = new PrismaAuthRepository();
  * Create a new user (hashing & salting their password).
  * Throws 'REGISTRATION_ERROR' if email is already taken.
  */
-export async function createUser(
-  name: string,
-  email: string,
-  password: string,
-): Promise<User> {
+export async function createUser(name: string, email: string, password: string): Promise<User> {
   const normalized = email.trim().toLowerCase();
 
   // check for existing account
@@ -47,10 +43,7 @@ export async function createUser(
  * Validate an email+password combo.
  * Returns the user if ok, or null.
  */
-export async function validateUser(
-  email: string,
-  password: string,
-): Promise<User | null> {
+export async function validateUser(email: string, password: string): Promise<User | null> {
   const normalized = email.trim().toLowerCase();
 
   // find by email (or dummy)

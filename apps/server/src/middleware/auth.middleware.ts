@@ -13,7 +13,7 @@ export interface AuthRequest extends Request {
 export const requireAuth = async (
   req: AuthRequest,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): Promise<void> => {
   const auth = req.headers.authorization;
   if (!auth?.startsWith('Bearer ')) {
@@ -23,10 +23,7 @@ export const requireAuth = async (
 
   try {
     const token = auth.split(' ')[1];
-    const payload = jwt.verify(
-      token,
-      process.env.ACCESS_TOKEN_SECRET!
-    ) as { userId: number };
+    const payload = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET!) as { userId: number };
 
     const user = await getUserById(payload.userId);
     if (!user) {
@@ -48,7 +45,7 @@ export const requireAuth = async (
 export const requireAdmin = async (
   req: AuthRequest,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): Promise<void> => {
   // first, make sure they passed requireAuth
   if (!req.user) {

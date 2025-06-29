@@ -1,16 +1,15 @@
 // apps/server/src/utils/jwtHelpers.ts
+import dotenv from 'dotenv';
+dotenv.config();
+
 import jwt from 'jsonwebtoken';
 import { User } from '@prisma/client';
 
-const {
-  ACCESS_TOKEN_SECRET = '',
-  REFRESH_TOKEN_SECRET = '',
-} = process.env;
+// Pull in your secrets now that dotenv has run
+const { ACCESS_TOKEN_SECRET = '', REFRESH_TOKEN_SECRET = '' } = process.env;
 
 if (!ACCESS_TOKEN_SECRET || !REFRESH_TOKEN_SECRET) {
-  throw new Error(
-    'Missing ACCESS_TOKEN_SECRET or REFRESH_TOKEN_SECRET in environment'
-  );
+  throw new Error('Missing ACCESS_TOKEN_SECRET or REFRESH_TOKEN_SECRET in environment');
 }
 
 /**
