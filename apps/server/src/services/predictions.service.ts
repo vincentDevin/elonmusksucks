@@ -1,102 +1,124 @@
-import prisma from '../db';
-import { BetOption, Outcome } from '@prisma/client';
+// apps/server/src/services/prediction.service.ts
+import type {
+  DbPrediction,
+  DbPredictionOption,
+  DbBet,
+  DbUser,
+  DbLeaderboardEntry,
+} from '@ems/types';
+import type { IPredictionRepository } from '../repositories/IPredictionRepository';
+import { PredictionRepository } from '../repositories/PredictionRepository';
 
-export async function listAllPredictions() {
-  return prisma.prediction.findMany({
-    include: {
-      bets: {
-        include: { user: { select: { id: true, name: true } } },
-      },
-    },
-    orderBy: { createdAt: 'desc' },
-  });
-}
+// Shape for a parlay leg, including the timestamp it was created
+export type ParlayLegWithUser = {
+  parlayId: number;
+  user: Pick<DbUser, 'id' | 'name'>;
+  stake: number;
+  optionId: number;
+  createdAt: Date; // keep as Date
+};
 
-export async function createPrediction(data: {
-  title: string;
-  description: string;
-  category: string;
-  expiresAt: Date;
-}) {
-  return prisma.prediction.create({
-    data: {
-      title: data.title,
-      description: data.description,
-      category: data.category,
-      expiresAt: data.expiresAt,
-    },
-  });
-}
+export class PredictionService {
+  constructor(private repo: IPredictionRepository = new PredictionRepository()) {}
 
-export async function getPrediction(id: number) {
-  return prisma.prediction.findUnique({ where: { id } });
-}
+  /**
+   * List all predictions, each with:
+   *  - options[]
+   *  - bets[] (single bets with user info)
+   *  - parlayLegs[] (flattened from each option’s embedded parlayLegs)
+   */
+  async listAllPredictions(): Promise<
+    Array<
+      DbPrediction & {
+        options: DbPredictionOption[];
+        bets: Array<DbBet & { user: Pick<DbUser, 'id' | 'name'> }>;
+        parlayLegs: ParlayLegWithUser[];
+      }
+    >
+  > {
+    const preds = await this.repo.listAllPredictions();
+    return preds.map((pred) => {
+      const bets = pred.bets;
+      const parlayLegs: ParlayLegWithUser[] = [];
 
-export async function placeBet(
-  userId: number,
-  predictionId: number,
-  amount: number,
-  option: BetOption,
-) {
-  const prediction = await prisma.prediction.findUnique({ where: { id: predictionId } });
-  if (!prediction) throw new Error('PREDICTION_NOT_FOUND');
-  if (prediction.expiresAt <= new Date()) throw new Error('PREDICTION_CLOSED');
+      // flatten all the parlayLegs attached to each option
+      for (const opt of pred.options as any) {
+        if (Array.isArray(opt.parlayLegs)) {
+          for (const leg of opt.parlayLegs) {
+            parlayLegs.push({
+              parlayId: leg.parlay.id,
+              user: leg.parlay.user,
+              stake: leg.parlay.amount,
+              optionId: opt.id,
+              createdAt: leg.createdAt,
+            });
+          }
+        }
+      }
 
-  const user = await prisma.user.findUnique({ where: { id: userId } });
-  if (!user) throw new Error('USER_NOT_FOUND');
-  if (user.muskBucks < amount) throw new Error('INSUFFICIENT_FUNDS');
-
-  await prisma.user.update({
-    where: { id: userId },
-    data: { muskBucks: { decrement: amount } },
-  });
-
-  return prisma.bet.create({
-    data: {
-      userId,
-      predictionId,
-      amount,
-      option,
-    },
-  });
-}
-
-export async function resolvePrediction(predictionId: number, outcome: Outcome) {
-  const prediction = await prisma.prediction.update({
-    where: { id: predictionId },
-    data: {
-      resolved: true,
-      outcome,
-      resolvedAt: new Date(),
-    },
-  });
-
-  const bets = await prisma.bet.findMany({ where: { predictionId } });
-
-  for (const bet of bets) {
-    const won = bet.option === outcome;
-    const payout = won ? bet.amount * 2 : 0;
-
-    await prisma.bet.update({
-      where: { id: bet.id },
-      data: { won, payout },
+      return { ...pred, bets, parlayLegs };
     });
-
-    if (won) {
-      await prisma.user.update({
-        where: { id: bet.userId },
-        data: { muskBucks: { increment: payout } },
-      });
-    }
   }
 
-  return prediction;
+  /**
+   * Create a new prediction with a dynamic set of options.
+   */
+  async createPrediction(data: {
+    title: string;
+    description: string;
+    category: string;
+    expiresAt: Date;
+    creatorId: number;
+    options: Array<{ label: string }>;
+  }): Promise<
+    DbPrediction & {
+      options: DbPredictionOption[];
+      bets: Array<DbBet & { user: Pick<DbUser, 'id' | 'name'> }>;
+      parlayLegs: ParlayLegWithUser[];
+    }
+  > {
+    const pred = await this.repo.createPrediction(data);
+    return { ...pred, bets: [], parlayLegs: [] };
+  }
+
+  /**
+   * Fetch a single prediction by ID, including options, bets, and parlayLegs.
+   */
+  async getPrediction(id: number): Promise<
+    | (DbPrediction & {
+        options: DbPredictionOption[];
+        bets: Array<DbBet & { user: Pick<DbUser, 'id' | 'name'> }>;
+        parlayLegs: ParlayLegWithUser[];
+      })
+    | null
+  > {
+    const pred = await this.repo.findPredictionById(id);
+    if (!pred) return null;
+
+    const parlayLegs: ParlayLegWithUser[] = [];
+    for (const opt of pred.options as any) {
+      if (Array.isArray(opt.parlayLegs)) {
+        for (const leg of opt.parlayLegs) {
+          parlayLegs.push({
+            parlayId: leg.parlay.id,
+            user: leg.parlay.user,
+            stake: leg.parlay.amount,
+            optionId: opt.id,
+            createdAt: leg.createdAt,
+          });
+        }
+      }
+    }
+
+    return { ...pred, bets: pred.bets, parlayLegs };
+  }
+
+  /**
+   * Retrieve the top users by MuskBucks balance.
+   */
+  async getLeaderboard(limit = 10): Promise<DbLeaderboardEntry[]> {
+    return this.repo.getLeaderboard(limit);
+  }
 }
 
-export async function getLeaderboard(limit = 10) {
-  return prisma.user.findMany({
-    orderBy: { muskBucks: 'desc' },
-    take: limit,
-    select: { id: true, name: true, muskBucks: true },
-  });
-}
+export const predictionService = new PredictionService();

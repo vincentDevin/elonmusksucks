@@ -1,36 +1,39 @@
+// apps/client/src/components/BetForm.tsx
+
+// apps/client/src/components/BetForm.tsx
 import { useState } from 'react';
-import { usePredictions } from '../hooks/usePredictions';
+import { useBetting } from '../hooks/useBetting';
 import { useAuth } from '../contexts/AuthContext';
+import type { PublicPredictionOption } from '@ems/types';
 
 interface BetFormProps {
-  predictionId: number;
+  // now we just need the prediction so we can read its options[]
+  prediction: {
+    options: PublicPredictionOption[];
+  };
   onPlaced: () => void;
 }
 
-export default function BetForm({ predictionId, onPlaced }: BetFormProps) {
-  const { placeBet } = usePredictions();
+export default function BetForm({ prediction, onPlaced }: BetFormProps) {
+  const { options } = prediction;
+  const { placeBet, loading: placing, error } = useBetting();
   const { user } = useAuth();
   const balance = user?.muskBucks ?? 0;
 
   const [expanded, setExpanded] = useState(false);
   const [amount, setAmount] = useState(0);
-  const [option, setOption] = useState<'YES' | 'NO'>('YES');
-  const [loading, setLoading] = useState(false);
-  const baseBtn =
-    'px-4 py-2 rounded-full text-white font-semibold shadow transform transition hover:scale-105 disabled:opacity-50';
+  // default to first option’s id (whatever that may be)
+  const [optionId, setOptionId] = useState<number>(options.length > 0 ? options[0].id : 0);
 
   const submit = async () => {
     if (amount <= 0 || amount > balance) return;
-    setLoading(true);
     try {
-      await placeBet(predictionId, user!.id, amount, option);
+      await placeBet({ optionId, amount });
       onPlaced();
       setExpanded(false);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('Bet failed');
-    } finally {
-      setLoading(false);
+      alert('Bet failed: ' + (error?.message || err.message));
     }
   };
 
@@ -61,14 +64,17 @@ export default function BetForm({ predictionId, onPlaced }: BetFormProps) {
 
       {/* Option dropdown */}
       <div>
-        <label className="block text-sm font-medium mb-1">Choose Option</label>
+        <label className="block text-sm font-medium mb-1">Option</label>
         <select
-          value={option}
-          onChange={(e) => setOption(e.target.value as 'YES' | 'NO')}
+          value={optionId}
+          onChange={(e) => setOptionId(Number(e.target.value))}
           className="w-full border p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
         >
-          <option value="YES">YES</option>
-          <option value="NO">NO</option>
+          {options.map((opt) => (
+            <option key={opt.id} value={opt.id}>
+              {opt.label}
+            </option>
+          ))}
         </select>
       </div>
 
@@ -77,7 +83,7 @@ export default function BetForm({ predictionId, onPlaced }: BetFormProps) {
         <button
           type="button"
           onClick={() => setExpanded(false)}
-          disabled={loading}
+          disabled={placing}
           className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition"
         >
           Cancel
@@ -85,21 +91,18 @@ export default function BetForm({ predictionId, onPlaced }: BetFormProps) {
         <button
           type="button"
           onClick={submit}
-          disabled={loading || amount <= 0 || amount > balance}
+          disabled={placing || amount <= 0 || amount > balance}
           className="px-4 py-2 bg-blue-500 text-white rounded-lg shadow hover:bg-blue-600 transition disabled:opacity-50"
         >
-          {loading ? 'Placing…' : 'Place Bet'}
+          {placing ? 'Placing…' : 'Place Bet'}
         </button>
       </div>
     </div>
   ) : (
     <button
       onClick={() => setExpanded(true)}
-      className={`
-    ${baseBtn}
-    bg-blue-500 hover:bg-blue-600
-    mt-2 w-full sm:w-auto
-  `}
+      disabled={placing}
+      className="px-4 py-2 bg-blue-500 text-white rounded-full font-semibold shadow transform hover:scale-105 transition disabled:opacity-50 w-full sm:w-auto"
     >
       Place Bet
     </button>

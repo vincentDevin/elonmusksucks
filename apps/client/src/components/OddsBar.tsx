@@ -1,32 +1,79 @@
-interface OddsBarProps {
-  yesPct: number; // fraction 0–1
-  noPct: number;
+// apps/client/src/components/OddsBar.tsx
+import type { PublicPredictionOption, PublicBet } from '@ems/types';
+
+// match your flattened shape
+interface FlattenedParlayLeg {
+  parlayId: number;
+  user: { id: number; name: string };
+  stake: number;
+  optionId: number;
+  createdAt: string;
 }
 
-export default function OddsBar({ yesPct, noPct }: OddsBarProps) {
-  // If neither side has any bets, both percentages will be zero
-  if (yesPct + noPct === 0 || isNaN(yesPct) || isNaN(noPct)) {
+interface OddsBarProps {
+  options: PublicPredictionOption[];
+  bets?: PublicBet[];
+  parlayLegs?: FlattenedParlayLeg[];
+}
+
+export default function OddsBar({ options, bets = [], parlayLegs = [] }: OddsBarProps) {
+  const palette = ['bg-blue-500', 'bg-green-500', 'bg-yellow-500', 'bg-red-500'];
+
+  // total staked across single bets + parlays
+  const totalStaked =
+    bets.reduce((sum, b) => sum + b.amount, 0) + parlayLegs.reduce((sum, l) => sum + l.stake, 0);
+
+  if (totalStaked === 0 || options.length === 0) {
     return <p className="mt-3 text-sm italic text-gray-500">No bets placed!</p>;
   }
 
-  return (
-    <div className="flex items-center mt-3 space-x-3 text-sm">
-      <span className="font-semibold text-green-600">YES {(yesPct * 100).toFixed(0)}%</span>
+  // compute each option's share
+  let cumPct = 0;
+  const pools = options.slice(0, 4).map((opt) => {
+    const singles = bets.filter((b) => b.optionId === opt.id).reduce((sum, b) => sum + b.amount, 0);
+    const parlays = parlayLegs
+      .filter((l) => l.optionId === opt.id)
+      .reduce((sum, l) => sum + l.stake, 0);
+    const stake = singles + parlays;
+    const pct = stake / totalStaked;
+    const left = cumPct;
+    cumPct += pct;
+    return { label: opt.label, pct, left };
+  });
 
-      <div className="relative flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-        {/* YES segment from left */}
-        <div
-          className="absolute left-0 top-0 h-full bg-green-500"
-          style={{ width: `${yesPct * 100}%` }}
-        />
-        {/* NO segment from right */}
-        <div
-          className="absolute right-0 top-0 h-full bg-red-500"
-          style={{ width: `${noPct * 100}%` }}
-        />
+  return (
+    <div className="mt-3">
+      {/* bar */}
+      <div className="relative w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+        {pools.map((p, i) => {
+          const color = palette[i] ?? palette[palette.length - 1];
+          return (
+            <div
+              key={p.label}
+              className={`absolute top-0 h-full ${color}`}
+              style={{
+                left: `${p.left * 100}%`,
+                width: `${p.pct * 100}%`,
+              }}
+            />
+          );
+        })}
       </div>
 
-      <span className="font-semibold text-red-500">NO {(noPct * 100).toFixed(0)}%</span>
+      {/* legend */}
+      <div className="flex flex-wrap mt-2 text-sm space-x-4">
+        {pools.map((p, i) => {
+          const color = palette[i] ?? palette[palette.length - 1];
+          return (
+            <div key={p.label} className="flex items-center space-x-1">
+              <span className={`inline-block w-3 h-3 ${color} rounded-full`} />
+              <span>
+                {p.label} {(p.pct * 100).toFixed(1)}%
+              </span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

@@ -1,196 +1,239 @@
-import { PrismaClient, Theme } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
+import type { IUserRepository } from '../repositories/IUserRepository';
+import { UserRepository } from '../repositories/UserRepository';
+import type {
+  DbUser,
+  DbUserBadge,
+  DbBadge,
+  DbUserStats,
+  DbUserPost,
+  DbUserActivity,
+  UserFeedPost,
+  UserStatsDTO,
+  UserActivity,
+  PublicUserProfile,
+} from '@ems/types';
 
 const prisma = new PrismaClient();
 
-export type UserProfileDTO = {
-  id: number;
-  name: string;
-  muskBucks: number;
-  rank?: number;
-  bio?: string | null;
-  avatarUrl?: string | null;
-  location?: string | null;
-  timezone?: string | null;
-  notifyOnResolve: boolean;
-  theme: string;
-  twoFactorEnabled: boolean;
-  stats: {
-    successRate: number;
-    totalPredictions: number;
-    currentStreak: number;
-    longestStreak: number;
-  };
-  badges: {
-    id: number;
-    name: string;
-    description?: string | null;
-    iconUrl?: string | null;
-    awardedAt: Date;
-  }[];
-  followersCount: number;
-  followingCount: number;
-  isFollowing: boolean;
-};
+export class UserService {
+  constructor(private repo: IUserRepository = new UserRepository()) {}
 
-export async function getUserProfile(userId: number, viewerId?: number): Promise<UserProfileDTO> {
-  // fetch the core user + counts + badges + follow info
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: {
-      id: true,
-      name: true,
-      bio: true,
-      avatarUrl: true,
-      location: true,
-      timezone: true,
-      muskBucks: true,
-      notifyOnResolve: true,
-      theme: true,
-      twoFactorEnabled: true,
-      successRate: true,
-      totalPredictions: true,
-      currentStreak: true,
-      longestStreak: true,
-      userBadges: {
-        select: {
-          badge: {
-            select: { id: true, name: true, description: true, iconUrl: true },
-          },
-          awardedAt: true,
-        },
+  // --- PROFILE ---
+
+  async getUserProfile(userId: number, viewerId?: number): Promise<PublicUserProfile> {
+    const user = await this.repo.findById(userId);
+    if (!user) throw new Error('User not found');
+
+    const [followersCount, followingCount, userBadges] = await Promise.all([
+      this.repo.getFollowersCount(userId),
+      this.repo.getFollowingCount(userId),
+      this.repo.findUserBadges(userId),
+    ]);
+
+    // Compute rank via SQL (window function)
+    const rawRank = (await prisma.$queryRawUnsafe(
+      `SELECT rank FROM (
+         SELECT id, RANK() OVER (ORDER BY "muskBucks" DESC) AS rank
+         FROM "User"
+       ) u WHERE u.id = $1;`,
+      userId,
+    )) as { rank: bigint }[];
+    let rank: number | undefined;
+    if (Array.isArray(rawRank) && rawRank.length > 0) {
+      const r = rawRank[0].rank;
+      rank = typeof r === 'bigint' ? Number(r) : r;
+    }
+
+    const isFollowing = viewerId ? await this.repo.existsFollow(viewerId, userId) : false;
+
+    return {
+      id: user.id,
+      name: user.name,
+      muskBucks: user.muskBucks,
+      profileComplete: user.profileComplete,
+      rank,
+      bio: user.bio,
+      avatarUrl: user.avatarUrl,
+      location: user.location,
+      timezone: user.timezone,
+      notifyOnResolve: user.notifyOnResolve,
+      theme: user.theme,
+      twoFactorEnabled: user.twoFactorEnabled,
+      stats: {
+        successRate: user.successRate,
+        totalPredictions: user.totalPredictions,
+        currentStreak: user.currentStreak,
+        longestStreak: user.longestStreak,
       },
-      _count: {
-        select: { followers: true, following: true },
-      },
-    },
-  });
-
-  if (!user) throw new Error('User not found');
-
-  // optional: compute rank by comparing muskBucks to others
-  // (you might do this in SQL with a window function)
-  const rawRank = (await prisma.$queryRawUnsafe(
-    `SELECT rank FROM (
-     SELECT id, RANK() OVER (ORDER BY "muskBucks" DESC) AS rank
-     FROM "User"
-   ) u WHERE u.id = $1;`,
-    userId,
-  )) as { rank: bigint }[];
-  let rank: number | undefined;
-  if (Array.isArray(rawRank) && rawRank.length > 0) {
-    const r = rawRank[0].rank;
-    rank = typeof r === 'bigint' ? Number(r) : r;
-  } else {
-    rank = undefined;
+      badges: userBadges.map((ub: DbUserBadge & { badge: DbBadge }) => ({
+        id: ub.badge.id,
+        name: ub.badge.name,
+        description: ub.badge.description,
+        iconUrl: ub.badge.iconUrl,
+        createdAt:
+          typeof ub.badge.createdAt === 'string'
+            ? ub.badge.createdAt
+            : ub.badge.createdAt.toISOString(),
+        awardedAt: typeof ub.awardedAt === 'string' ? ub.awardedAt : ub.awardedAt.toISOString(),
+      })),
+      followersCount,
+      followingCount,
+      isFollowing,
+    };
   }
 
-  // optional: check if the viewer is following
-  let isFollowing = false;
-  if (viewerId) {
-    const follow = await prisma.follow.findUnique({
-      where: {
-        followerId_followingId: {
-          followerId: viewerId,
-          followingId: userId,
-        },
-      },
+  async followUser(followerId: number, followingId: number): Promise<void> {
+    return this.repo.createFollow(followerId, followingId);
+  }
+
+  async unfollowUser(followerId: number, followingId: number): Promise<void> {
+    return this.repo.deleteFollow(followerId, followingId);
+  }
+
+  async updateUserProfile(
+    userId: number,
+    data: Partial<
+      Pick<
+        DbUser,
+        | 'bio'
+        | 'avatarUrl'
+        | 'location'
+        | 'timezone'
+        | 'notifyOnResolve'
+        | 'theme'
+        | 'twoFactorEnabled'
+        | 'profileComplete'
+      >
+    >,
+  ): Promise<PublicUserProfile> {
+    await this.repo.updateProfile(userId, data);
+    return this.getUserProfile(userId, userId);
+  }
+
+  // --- FEED ---
+
+  async getUserFeed(userId: number, viewerId?: number): Promise<UserFeedPost[]> {
+    const user = await this.repo.findById(userId);
+    if (!user) throw new Error('User not found');
+    if (user.feedPrivate && user.id !== viewerId) throw new Error('Feed is private');
+    const posts: DbUserPost[] = await this.repo.getUserFeed(userId); // no { parentId: null }
+    return posts.map(toFeedPostDTO);
+  }
+
+  async createUserPost(
+    authorId: number,
+    content: string,
+    parentId?: number | null,
+    ownerId?: number,
+  ): Promise<UserFeedPost> {
+    const feedOwnerId = ownerId ?? authorId;
+    const post: DbUserPost = await this.repo.createUserPost({
+      authorId,
+      ownerId: feedOwnerId,
+      content,
+      parentId: typeof parentId === 'undefined' ? null : parentId,
     });
-    isFollowing = Boolean(follow);
+    await this.repo.createUserActivity({
+      userId: authorId,
+      type: parentId ? 'COMMENT_CREATED' : 'POST_CREATED',
+      details: { postId: post.id },
+    });
+    return toFeedPostDTO(post);
   }
 
+  async getUserPostThread(
+    postId: number,
+  ): Promise<(UserFeedPost & { children: UserFeedPost[] }) | null> {
+    const thread = await this.repo.getUserPostThread(postId);
+    if (!thread) return null;
+    return {
+      ...toFeedPostDTO(thread),
+      children: (thread.children ?? []).map(toFeedPostDTO),
+    };
+  }
+
+  // --- ACTIVITY ---
+
+  async getUserActivity(userId: number, viewerId?: number): Promise<UserActivity[]> {
+    const user = await this.repo.findById(userId);
+    if (!user) throw new Error('User not found');
+    if (user.feedPrivate && user.id !== viewerId) throw new Error('Activity feed is private');
+
+    const activity: DbUserActivity[] = await this.repo.getUserActivity(userId);
+    return activity.map(toActivityDTO);
+  }
+
+  async createUserActivity(userId: number, type: string, details?: any): Promise<UserActivity> {
+    const activity: DbUserActivity = await this.repo.createUserActivity({
+      userId,
+      type,
+      details,
+    });
+    return toActivityDTO(activity);
+  }
+
+  // --- STATS ---
+
+  async getUserStats(userId: number): Promise<UserStatsDTO | null> {
+    const stats = await this.repo.getUserStats(userId);
+    if (!stats) return null;
+    return {
+      totalBets: stats.totalBets,
+      betsWon: stats.betsWon,
+      betsLost: stats.betsLost,
+      parlaysStarted: stats.parlaysStarted,
+      parlaysWon: stats.parlaysWon,
+      totalWagered: stats.totalWagered,
+      totalWon: stats.totalWon,
+      streak: stats.streak,
+      maxStreak: stats.maxStreak,
+      profit: stats.profit,
+      roi: stats.roi,
+      mostCommonBet: stats.mostCommonBet ?? null,
+      biggestWin: stats.biggestWin,
+      updatedAt: stats.updatedAt instanceof Date ? stats.updatedAt.toISOString() : stats.updatedAt,
+    };
+  }
+
+  async updateUserStats(
+    userId: number,
+    data: Partial<Omit<DbUserStats, 'id' | 'userId'>>,
+  ): Promise<void> {
+    await this.repo.updateUserStats(userId, data);
+  }
+
+  // --- PRIVACY ---
+
+  async setFeedPrivacy(userId: number, feedPrivate: boolean): Promise<void> {
+    await this.repo.setFeedPrivacy(userId, feedPrivate);
+  }
+}
+
+// --- Helpers: always map DB types to DTOs used on frontend ---
+
+function toFeedPostDTO(
+  post: DbUserPost & { children?: DbUserPost[]; authorName?: string },
+): UserFeedPost {
   return {
-    id: user.id,
-    name: user.name,
-    muskBucks: user.muskBucks,
-    rank,
-    bio: user.bio,
-    avatarUrl: user.avatarUrl,
-    location: user.location,
-    timezone: user.timezone,
-    notifyOnResolve: user.notifyOnResolve,
-    theme: user.theme,
-    twoFactorEnabled: user.twoFactorEnabled,
-    stats: {
-      successRate: user.successRate,
-      totalPredictions: user.totalPredictions,
-      currentStreak: user.currentStreak,
-      longestStreak: user.longestStreak,
-    },
-    badges: user.userBadges.map((ub) => ({
-      id: ub.badge.id,
-      name: ub.badge.name,
-      description: ub.badge.description,
-      iconUrl: ub.badge.iconUrl,
-      awardedAt: ub.awardedAt,
-    })),
-    followersCount: user._count.followers,
-    followingCount: user._count.following,
-    isFollowing,
+    id: post.id,
+    authorId: post.authorId,
+    ownerId: post.ownerId,
+    content: post.content,
+    parentId: post.parentId,
+    createdAt: post.createdAt instanceof Date ? post.createdAt.toISOString() : post.createdAt,
+    updatedAt: post.updatedAt instanceof Date ? post.updatedAt.toISOString() : post.updatedAt,
+    children: post.children ? post.children.map(toFeedPostDTO) : undefined,
+    authorName: post.authorName,
   };
 }
 
-/**
- * Follow a user.
- */
-export async function followUser(followerId: number, followingId: number): Promise<void> {
-  await prisma.follow.create({
-    data: { followerId, followingId },
-  });
-}
-
-/**
- * Unfollow a user.
- */
-export async function unfollowUser(followerId: number, followingId: number): Promise<void> {
-  await prisma.follow.delete({
-    where: {
-      followerId_followingId: { followerId, followingId },
-    },
-  });
-}
-
-/**
- * Update user profile fields.
- */
-export async function updateUserProfile(
-  userId: number,
-  data: {
-    bio?: string | null;
-    avatarUrl?: string | null;
-    location?: string | null;
-    timezone?: string | null;
-    notifyOnResolve?: boolean;
-    theme?: Theme;
-    twoFactorEnabled?: boolean;
-    profileComplete?: boolean;
-    // note: no `role` here!
-  },
-): Promise<UserProfileDTO> {
-  // Whitelist only the fields we allow to be written
-  const {
-    bio,
-    avatarUrl,
-    location,
-    timezone,
-    notifyOnResolve,
-    theme,
-    twoFactorEnabled,
-    profileComplete,
-  } = data;
-
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      bio,
-      avatarUrl,
-      location,
-      timezone,
-      notifyOnResolve,
-      ...(theme !== undefined ? { theme } : {}),
-      twoFactorEnabled,
-      profileComplete,
-    },
-  });
-
-  return getUserProfile(userId, userId);
+function toActivityDTO(a: DbUserActivity): UserActivity {
+  return {
+    id: a.id,
+    userId: a.userId,
+    type: a.type,
+    details: a.details,
+    createdAt: a.createdAt instanceof Date ? a.createdAt.toISOString() : a.createdAt,
+  };
 }

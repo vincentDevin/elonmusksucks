@@ -1,13 +1,17 @@
+// apps/client/src/pages/Leaderboard.tsx
+import { useMemo } from 'react';
 import { useApi } from '../hooks/useApi';
 import { getLeaderboard } from '../api/predictions';
-import type { LeaderboardEntry } from '../api/predictions';
 import { Link } from 'react-router-dom';
+import type { PublicLeaderboardEntry } from '@ems/types';
 
 export default function Leaderboard() {
-  const { data, loading, error } = useApi<LeaderboardEntry[]>(
+  const { data, loading, error } = useApi<PublicLeaderboardEntry[]>(
     () => getLeaderboard(),
     [], // initial data
   );
+
+  const leaderboard = useMemo(() => data ?? [], [data]);
 
   if (loading) {
     return <p className="p-4 text-center">Loading leaderboard…</p>;
@@ -15,8 +19,7 @@ export default function Leaderboard() {
   if (error) {
     return <p className="p-4 text-center text-red-500">Error: {error.toString()}</p>;
   }
-  // If data is null or not an array
-  if (!Array.isArray(data) || data.length === 0) {
+  if (leaderboard.length === 0) {
     return <p className="p-4 text-center">No leaderboard entries yet.</p>;
   }
 
@@ -24,7 +27,7 @@ export default function Leaderboard() {
     <div className="p-6 max-w-md mx-auto bg-surface rounded-2xl shadow-lg">
       <h1 className="text-4xl font-extrabold mb-6 text-center">🏆 Leaderboard</h1>
       <div className="space-y-3">
-        {data.map((entry, idx) => (
+        {leaderboard.map((entry, idx) => (
           <Link
             key={entry.id}
             to={`/profile/${entry.id}`}

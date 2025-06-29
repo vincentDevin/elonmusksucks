@@ -1,3 +1,4 @@
+// apps/client/src/components/NavBar.tsx
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { FaSun, FaMoon } from 'react-icons/fa';
@@ -17,10 +18,12 @@ export default function NavBar() {
   };
 
   const linkClasses = (path: string) =>
-    `px-3 py-2 rounded ${loc.pathname === path ? 'bg-blue-600 text-white' : 'hover:bg-muted'}`;
+    `px-3 py-2 rounded ${
+      loc.pathname === path ? 'bg-blue-600 text-white' : 'hover:bg-muted transition-colors'
+    }`;
 
   return (
-    <header className="border-b border-muted">
+    <header className="relative z-50 border-b border-muted bg-surface text-content">
       <div className="container mx-auto flex items-center justify-between p-4">
         <Link to="/" className="text-xl font-bold">
           🚀 ElonMuskSucks
@@ -42,16 +45,24 @@ export default function NavBar() {
                 <div className="relative">
                   <button
                     onClick={() => setDropdownOpen(!dropdownOpen)}
-                    className="px-3 py-2 rounded hover:bg-muted"
+                    className="px-3 py-2 rounded hover:bg-muted transition-colors"
                   >
                     {user.name} ({user.muskBucks}🪙)
                   </button>
                   {dropdownOpen && (
-                    <ul className="absolute right-0 mt-2 bg-white border rounded shadow space-y-1 p-2 w-40 dark:bg-gray-800 dark:border-gray-700">
+                    <ul
+                      className="
+                        absolute right-0 mt-2
+                        bg-surface text-content
+                        border border-muted rounded shadow
+                        space-y-1 p-2 w-40
+                        transition-colors
+                      "
+                    >
                       <li>
                         <Link
                           to={`/profile/${user.id}`}
-                          className="block px-3 py-2 rounded hover:bg-muted text-gray-900 hover:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-700"
+                          className="block px-3 py-2 rounded hover:bg-muted transition-colors"
                           onClick={() => setDropdownOpen(false)}
                         >
                           Profile
@@ -60,7 +71,11 @@ export default function NavBar() {
                       <li>
                         <button
                           onClick={handleLogout}
-                          className="w-full text-left px-3 py-2 rounded hover:bg-red-600 hover:text-white text-gray-900 hover:bg-gray-100 dark:text-gray-100 dark:hover:bg-red-700"
+                          className="
+                            w-full text-left px-3 py-2 rounded
+                            hover:bg-red-600 hover:text-white
+                            transition-colors
+                          "
                         >
                           Logout
                         </button>
@@ -70,7 +85,6 @@ export default function NavBar() {
                 </div>
               </>
             ) : (
-              // while user is loading, show nothing or a placeholder
               <div className="px-3 py-2">Loading...</div>
             )
           ) : (
@@ -89,7 +103,7 @@ export default function NavBar() {
             aria-label={theme === 'light' ? 'Activate dark mode' : 'Activate light mode'}
             aria-pressed={theme === 'dark'}
             title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
-            className="ml-4 flex items-center space-x-1 p-2 rounded hover:bg-muted"
+            className="ml-4 flex items-center space-x-1 p-2 rounded hover:bg-muted transition-colors"
           >
             <span className="text-lg">{theme === 'light' ? <FaMoon /> : <FaSun />}</span>
             <span className="sr-only">{theme === 'light' ? 'Dark mode' : 'Light mode'}</span>

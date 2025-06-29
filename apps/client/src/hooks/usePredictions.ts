@@ -1,31 +1,25 @@
-// apps/client/src/hooks/usePredictions.ts
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { getPredictions, placeBet, createPrediction } from '../api/predictions';
-import type { Prediction } from '../api/predictions';
+import { getPredictions, createPrediction } from '../api/predictions';
+import type { PredictionFull } from '../api/predictions';
 
-// module‐level cache
-let cachedPredictions: Prediction[] | null = null;
+let cache: PredictionFull[] | null = null;
 
 export function usePredictions() {
-  const [data, setData] = useState<Prediction[] | null>(cachedPredictions);
-  const [loading, setLoading] = useState(!cachedPredictions);
+  const [data, setData] = useState<PredictionFull[] | null>(cache);
+  const [loading, setLoading] = useState(!cache);
   const [error, setError] = useState<Error | null>(null);
 
   const fetchPredictions = useCallback(async () => {
-    // if we already have a cache, don’t re-fetch
-    if (cachedPredictions) {
-      setData(cachedPredictions);
+    if (cache) {
+      setData(cache);
       setLoading(false);
       return;
     }
-
     setLoading(true);
-    setError(null);
-
     try {
-      const result = await getPredictions();
-      cachedPredictions = result; // store in module cache
-      setData(result);
+      const preds = await getPredictions();
+      cache = preds;
+      setData(preds);
     } catch (err: any) {
       setError(err);
     } finally {
@@ -37,47 +31,36 @@ export function usePredictions() {
     fetchPredictions();
   }, [fetchPredictions]);
 
-  const predictions = useMemo(() => {
-    if (!data) return [];
-    return data.map((pred) => {
-      const total = pred.bets.reduce((sum, b) => sum + b.amount, 0);
-      const yes = pred.bets.filter((b) => b.option === 'YES').reduce((sum, b) => sum + b.amount, 0);
-      const no = total - yes;
-      return {
-        ...pred,
-        odds: total ? { yes: yes / total, no: no / total } : { yes: 0, no: 0 },
-      };
-    });
-  }, [data]);
+  const predictions = useMemo(() => data ?? [], [data]);
 
-  const placeBetOnPrediction = async (
-    predictionId: number,
-    userId: number,
-    amount: number,
-    option: 'YES' | 'NO',
-  ) => {
-    await placeBet(predictionId, userId, amount, option);
-    cachedPredictions = null; // invalidate cache
-    await fetchPredictions();
-  };
-
-  const createNewPrediction = async (input: {
-    title: string;
-    description: string;
-    category: string;
-    expiresAt: Date;
-  }) => {
-    await createPrediction(input);
-    cachedPredictions = null; // invalidate cache
-    await fetchPredictions();
-  };
+  const createNew = useCallback(
+    async (input: {
+      title: string;
+      description: string;
+      category: string;
+      expiresAt: Date;
+      options: Array<{ label: string }>;
+    }) => {
+      setLoading(true);
+      try {
+        await createPrediction(input);
+        cache = null;
+        await fetchPredictions();
+      } catch (err: any) {
+        setError(err);
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [fetchPredictions],
+  );
 
   return {
     predictions,
     loading,
     error,
     refresh: fetchPredictions,
-    placeBet: placeBetOnPrediction,
-    createPrediction: createNewPrediction,
+    createPrediction: createNew,
   };
 }
