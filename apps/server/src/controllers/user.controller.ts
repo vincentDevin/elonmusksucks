@@ -43,6 +43,10 @@ export async function followUserHandler(
       return;
     }
     await userService.followUser(followerId, followingId);
+
+    // Record activity
+    await userService.createUserActivity(followerId, 'USER_FOLLOWED', { followingId });
+
     res.sendStatus(204);
   } catch (err) {
     next(err);
@@ -66,6 +70,10 @@ export async function unfollowUserHandler(
       return;
     }
     await userService.unfollowUser(followerId, followingId);
+
+    // Record activity
+    await userService.createUserActivity(followerId, 'USER_UNFOLLOWED', { followingId });
+
     res.sendStatus(204);
   } catch (err) {
     next(err);

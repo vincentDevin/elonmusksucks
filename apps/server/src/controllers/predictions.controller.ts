@@ -2,6 +2,8 @@
 import type { Request, Response, NextFunction } from 'express';
 import { predictionService } from '../services/predictions.service';
 import { payoutService } from '../services/payout.service';
+import { UserService } from '../services/user.service';
+const userService = new UserService();
 
 /**
  * GET /api/predictions
@@ -62,6 +64,13 @@ export const createPrediction = async (
       expiresAt: string;
       options: Array<{ label: string }>;
     };
+    // Auth middleware should set req.user
+    const creatorId = (req as any).user?.id;
+
+    if (!creatorId) {
+      res.status(401).json({ error: 'Not authenticated' });
+      return;
+    }
 
     const prediction = await predictionService.createPrediction({
       title,
@@ -69,6 +78,13 @@ export const createPrediction = async (
       category,
       expiresAt: new Date(expiresAt),
       options,
+      creatorId, // <-- correct field name!
+    });
+
+    // Log user activity
+    await userService.createUserActivity(creatorId, 'PREDICTION_CREATED', {
+      predictionId: prediction.id,
+      title: prediction.title,
     });
 
     res.status(201).json(prediction);
@@ -89,15 +105,22 @@ export const resolvePredictionHandler = async (
   try {
     const predictionId = Number(req.params.id);
     const { winningOptionId } = req.body as { winningOptionId: number };
+    const userId = (req as any).user?.id;
 
-    // 1) Mark resolved & settle payouts
     await payoutService.resolvePrediction(predictionId, winningOptionId);
 
-    // 2) Re-fetch the now-resolved prediction (with options, bets, parlayLegs)
     const updated = await predictionService.getPrediction(predictionId);
     if (!updated) {
       res.status(404).json({ error: 'Prediction not found after resolve' });
       return;
+    }
+
+    // Log user activity
+    if (userId) {
+      await userService.createUserActivity(userId, 'PREDICTION_RESOLVED', {
+        predictionId,
+        winningOptionId,
+      });
     }
 
     res.json(updated);

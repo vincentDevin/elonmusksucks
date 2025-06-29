@@ -74,11 +74,12 @@ model User {
   createdAt          DateTime            @default(now())
   parlayes           Parlay[]
   transactions       Transaction[]
-  feedPrivate       Boolean   @default(false)
-  posts      UserPost[]    @relation("OwnerToPost")
-  comments   UserPost[]    @relation("AuthorToPost")
-  activities UserActivity[]
-  stats      UserStats?
+  feedPrivate        Boolean             @default(false)
+  posts              UserPost[]          @relation("OwnerToPost")
+  comments           UserPost[]          @relation("AuthorToPost")
+  activities         UserActivity[]
+  stats              UserStats?
+  Prediction         Prediction[]
 }
 
 model EmailVerification {
@@ -106,11 +107,13 @@ model Prediction {
   category    String
   expiresAt   DateTime
   resolved    Boolean            @default(false)
-  resolvedAt  DateTime? // when outcome was set
-  outcome     Outcome? // only populated once resolved
+  resolvedAt  DateTime?
+  outcome     Outcome?
   bets        Bet[]
   options     PredictionOption[]
   createdAt   DateTime           @default(now())
+  creatorId   Int
+  creator     User               @relation(fields: [creatorId], references: [id])
 
   @@index([expiresAt, resolved])
 }
@@ -127,20 +130,20 @@ model PredictionOption {
 }
 
 model Bet {
-  id              Int              @id @default(autoincrement())
-  user            User             @relation(fields: [userId], references: [id])
+  id              Int               @id @default(autoincrement())
+  user            User              @relation(fields: [userId], references: [id])
   userId          Int
-  prediction      Prediction       @relation(fields: [predictionId], references: [id])
+  prediction      Prediction        @relation(fields: [predictionId], references: [id])
   predictionId    Int
   amount          Int
   oddsAtPlacement Float? // snapshot of odds when placing the bet
   potentialPayout Int? // computed at placement: amount * oddsAtPlacement
-  status          BetStatus        @default(PENDING)
+  status          BetStatus         @default(PENDING)
   optionOption    PredictionOption? @relation("OptionToBet", fields: [optionId], references: [id])
   optionId        Int?
   won             Boolean? // null until resolved
   payout          Int? // null until resolved
-  createdAt       DateTime         @default(now())
+  createdAt       DateTime          @default(now())
 }
 
 model AITweet {
@@ -234,44 +237,44 @@ model Transaction {
 }
 
 model UserPost {
-  id        Int       @id @default(autoincrement())
-  author    User      @relation("AuthorToPost", fields: [authorId], references: [id])
+  id        Int        @id @default(autoincrement())
+  author    User       @relation("AuthorToPost", fields: [authorId], references: [id])
   authorId  Int
-  owner     User      @relation("OwnerToPost", fields: [ownerId], references: [id])
+  owner     User       @relation("OwnerToPost", fields: [ownerId], references: [id])
   ownerId   Int
   content   String
-  parent    UserPost? @relation("PostParent", fields: [parentId], references: [id])
+  parent    UserPost?  @relation("PostParent", fields: [parentId], references: [id])
   parentId  Int?
   children  UserPost[] @relation("PostParent")
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @default(now()) @updatedAt
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @default(now()) @updatedAt
 }
 
 model UserActivity {
   id        Int      @id @default(autoincrement())
   user      User     @relation(fields: [userId], references: [id])
   userId    Int
-  type      String   // e.g. "BET_PLACED", "BET_WON", "POST_CREATED", etc.
-  details   Json?    // Store event metadata (e.g., betId, predictionId, badgeId, postId)
+  type      String // e.g. "BET_PLACED", "BET_WON", "POST_CREATED", etc.
+  details   Json? // Store event metadata (e.g., betId, predictionId, badgeId, postId)
   createdAt DateTime @default(now())
 }
 
 model UserStats {
-  id               Int      @id @default(autoincrement())
-  user             User     @relation(fields: [userId], references: [id])
-  userId           Int      @unique
-  totalBets        Int      @default(0)
-  betsWon          Int      @default(0)
-  betsLost         Int      @default(0)
-  parlaysStarted   Int      @default(0)
-  parlaysWon       Int      @default(0)
-  totalWagered     Int      @default(0)
-  totalWon         Int      @default(0)
-  streak           Int      @default(0)
-  maxStreak        Int      @default(0)
-  profit           Int      @default(0)
-  roi              Float    @default(0)
-  mostCommonBet    String?  // Optionally store e.g. "OVER", "YES", etc.
-  biggestWin       Int      @default(0)
-  updatedAt        DateTime @default(now()) @updatedAt
+  id             Int      @id @default(autoincrement())
+  user           User     @relation(fields: [userId], references: [id])
+  userId         Int      @unique
+  totalBets      Int      @default(0)
+  betsWon        Int      @default(0)
+  betsLost       Int      @default(0)
+  parlaysStarted Int      @default(0)
+  parlaysWon     Int      @default(0)
+  totalWagered   Int      @default(0)
+  totalWon       Int      @default(0)
+  streak         Int      @default(0)
+  maxStreak      Int      @default(0)
+  profit         Int      @default(0)
+  roi            Float    @default(0)
+  mostCommonBet  String? // Optionally store e.g. "OVER", "YES", etc.
+  biggestWin     Int      @default(0)
+  updatedAt      DateTime @default(now()) @updatedAt
 }

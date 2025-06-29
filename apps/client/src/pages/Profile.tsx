@@ -13,6 +13,7 @@ import { ProfileStats } from '../components/profile/ProfileStats';
 import { ProfileBadges } from '../components/profile/ProfileBadges';
 import { CreatePostForm } from '../components/profile/CreatePostForm';
 import { ProfileFeed } from '../components/profile/ProfileFeed';
+import { ProfileActivity } from '../components/profile/ProfileActivity';
 
 export default function Profile() {
   const { user: currentUser } = useAuth();
@@ -28,6 +29,7 @@ export default function Profile() {
     refresh: reloadProfile,
     feed,
     postToFeed,
+    activity,
   } = useUserProfile(numericId);
 
   const isOwn = currentUser?.id === profile?.id;
@@ -123,6 +125,9 @@ export default function Profile() {
             followingCount={profile.followingCount}
           />
           <ProfileBadges badges={profile.badges} />
+
+          {/* --- User Activity --- */}
+          <ProfileActivity activity={activity ?? []} />
 
           {/* --- Feed & Post Box --- */}
           {isOwn ? (

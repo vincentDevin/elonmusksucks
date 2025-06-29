@@ -14,6 +14,7 @@ export interface IPredictionRepository {
     description: string;
     category: string;
     expiresAt: Date;
+    creatorId: number; // <--- add creatorId
     options: Array<{ label: string }>;
   }): Promise<
     DbPrediction & {

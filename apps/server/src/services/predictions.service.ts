@@ -68,6 +68,7 @@ export class PredictionService {
     description: string;
     category: string;
     expiresAt: Date;
+    creatorId: number;
     options: Array<{ label: string }>;
   }): Promise<
     DbPrediction & {
@@ -76,9 +77,7 @@ export class PredictionService {
       parlayLegs: ParlayLegWithUser[];
     }
   > {
-    // createPrediction in the repo already handles options creation
     const pred = await this.repo.createPrediction(data);
-    // initially no bets or parlay legs
     return { ...pred, bets: [], parlayLegs: [] };
   }
 

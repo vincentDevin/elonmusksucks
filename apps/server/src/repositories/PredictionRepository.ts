@@ -15,6 +15,7 @@ export class PredictionRepository implements IPredictionRepository {
     description: string;
     category: string;
     expiresAt: Date;
+    creatorId: number; // <--- add here
     options: Array<{ label: string }>;
   }): Promise<
     DbPrediction & {
@@ -28,6 +29,7 @@ export class PredictionRepository implements IPredictionRepository {
         description: data.description,
         category: data.category,
         expiresAt: data.expiresAt,
+        creatorId: data.creatorId, // <--- persist creatorId
         options: {
           create: data.options.map((o) => ({
             label: o.label,

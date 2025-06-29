@@ -89,12 +89,14 @@ async function main() {
   });
 
   console.log('📝 Seeding predictions + options...');
+  // Add creatorId to predictions!
   const p1 = await prisma.prediction.create({
     data: {
       title: 'Elon tweets in Klingon',
       description: 'Will Elon Musk tweet something in Klingon by end of month?',
       category: 'Twitter',
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      creatorId: alice.id, // <--- set creator
       options: {
         create: [
           { label: 'Yes', odds: 2.0 },
@@ -110,6 +112,7 @@ async function main() {
       description: 'Will TSLA close ≥ $1,000 on any trading day this quarter?',
       category: 'Stocks',
       expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      creatorId: bob.id, // <--- set creator
       options: {
         create: [
           { label: 'Yes', odds: 3.0 },
