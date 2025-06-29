@@ -1,68 +1,35 @@
 // apps/server/src/repositories/IUserRepository.ts
-// Interface for user-related data access operations
 
-import type { DbUser, DbUserBadge, DbBadge } from '@ems/types';
+import type {
+  DbUser,
+  DbUserBadge,
+  DbBadge,
+  DbUserStats,
+  DbUserActivity,
+  DbUserPost,
+} from '@ems/types';
+// Optionally import Prisma type for JSON fields
+import type { Prisma } from '@prisma/client';
 
 /**
  * Defines the contract for user data operations.
  * Implementations (e.g. PrismaUserRepository) should fulfill these methods.
  */
 export interface IUserRepository {
-  /**
-   * Find a user by their unique ID.
-   * @param id - The user's ID
-   * @returns The full database user record or null if not found
-   */
   findById(id: number): Promise<DbUser | null>;
 
-  /**
-   * Count how many users are following the given user.
-   * @param userId - The target user's ID
-   * @returns Number of followers
-   */
   getFollowersCount(userId: number): Promise<number>;
 
-  /**
-   * Count how many users the given user is following.
-   * @param userId - The user's ID
-   * @returns Number of followings
-   */
   getFollowingCount(userId: number): Promise<number>;
 
-  /**
-   * Retrieve badges awarded to a user, including badge metadata.
-   * @param userId - The user's ID
-   * @returns Array of user badge records with badge details
-   */
   findUserBadges(userId: number): Promise<Array<DbUserBadge & { badge: DbBadge }>>;
 
-  /**
-   * Check if followerId is following followingId.
-   * @param followerId - The ID of the follower
-   * @param followingId - The ID of the user being followed
-   * @returns True if follow exists, false otherwise
-   */
   existsFollow(followerId: number, followingId: number): Promise<boolean>;
 
-  /**
-   * Create a follow relationship.
-   * @param followerId - The ID of the follower
-   * @param followingId - The ID of the user to follow
-   */
   createFollow(followerId: number, followingId: number): Promise<void>;
 
-  /**
-   * Delete a follow relationship.
-   * @param followerId - The ID of the follower
-   * @param followingId - The ID of the user being unfollowed
-   */
   deleteFollow(followerId: number, followingId: number): Promise<void>;
 
-  /**
-   * Update profile fields for a user.
-   * @param userId - The user's ID
-   * @param data - Partial profile fields to update
-   */
   updateProfile(
     userId: number,
     data: Partial<
@@ -79,4 +46,55 @@ export interface IUserRepository {
       >
     >,
   ): Promise<void>;
+
+  /**
+   * Get user feed posts (wall, with optional parentId for comments)
+   */
+  getUserFeed(userId: number, options?: { parentId: number | null }): Promise<DbUserPost[]>;
+
+  /**
+   * Create a new feed post (or comment)
+   * Only accept the fields required for creation
+   */
+  createUserPost(data: {
+    authorId: number;
+    ownerId: number;
+    content: string;
+    parentId: number | null;
+  }): Promise<DbUserPost>;
+
+  /**
+   * Get a single post with comments (threaded)
+   */
+  getUserPostThread(postId: number): Promise<(DbUserPost & { children: DbUserPost[] }) | null>;
+
+  /**
+   * Get user activity events
+   */
+  getUserActivity(userId: number): Promise<DbUserActivity[]>;
+
+  /**
+   * Create a new user activity event
+   * Accepts details as JSON (type safe with Prisma.InputJsonValue if desired)
+   */
+  createUserActivity(data: {
+    userId: number;
+    type: string;
+    details?: Prisma.InputJsonValue | null;
+  }): Promise<DbUserActivity>;
+
+  /**
+   * Get stats for a user
+   */
+  getUserStats(userId: number): Promise<DbUserStats | null>;
+
+  /**
+   * Update stats for a user (partial)
+   */
+  updateUserStats(userId: number, data: Partial<Omit<DbUserStats, 'id' | 'userId'>>): Promise<void>;
+
+  /**
+   * Set feed privacy
+   */
+  setFeedPrivacy(userId: number, feedPrivate: boolean): Promise<void>;
 }

@@ -1,8 +1,5 @@
 // packages/types/index.ts
-// Shared TypeScript types derived from Prisma schema
-// ----------------------------------------------
 
-// Import Prisma-generated types
 import type {
   User as PrismaUser,
   EmailVerification as PrismaEmailVerification,
@@ -27,7 +24,7 @@ import type {
   Theme as PrismaTheme,
 } from '@prisma/client';
 
-// Re-export Prisma enums
+// Enums
 export type Role = PrismaRole;
 export type Outcome = PrismaOutcome;
 export type BetOption = PrismaBetOption;
@@ -103,14 +100,13 @@ export type PublicLeaderboardEntry = PrismaLeaderboardEntry;
 
 // ----- Badge & UserBadge -----
 export type DbBadge = PrismaBadge;
-export type PublicBadge = Pick<
-  PrismaBadge,
-  | 'id'
-  | 'name'
-  | 'description'
-  | 'iconUrl'
-  | 'createdAt'
->;
+export type PublicBadge = {
+  id: number;
+  name: string;
+  description: string | null;
+  iconUrl: string | null;
+  createdAt: string; // string, not Date!
+};
 export type DbUserBadge = PrismaUserBadge;
 
 // ----- Follow -----
@@ -150,7 +146,7 @@ export type PublicTransaction = Pick<
   | 'createdAt'
 >;
 
-// Now explicitly define the shape of each leg as returned on GET /api/predictions:
+// For GET /api/predictions:
 export type DbParlayLeg = PrismaParlayLeg;
 export interface PublicParlayLeg {
   id: number;
@@ -197,6 +193,92 @@ export interface PublicUserProfile {
 
 // A badge as returned on a user profile, including when it was awarded
 export interface PublicUserBadge extends PublicBadge {
-  awardedAt: string;  // ISO timestamp string from the backend
+  awardedAt: string;   // ISO string for frontend
 }
 
+// -------------------
+// CORRECTED FOR PRISMA: Dates are Date, not string.
+// parentId: number | null (not optional, not undefined)
+// -------------------
+
+// DbUserPost (what you get from the DB)
+export type DbUserPost = {
+  id: number;
+  authorId: number;
+  ownerId: number;
+  content: string;
+  parentId: number | null;
+  createdAt: Date;
+  updatedAt: Date;
+  children?: DbUserPost[];
+  authorName?: string; // if you ever join author data
+};
+
+// DbUserActivity (what you get from the DB)
+export type DbUserActivity = {
+  id: number;
+  userId: number;
+  type: string;
+  details?: unknown;
+  createdAt: Date;
+};
+
+// DbUserStats (what you get from the DB)
+export type DbUserStats = {
+  id: number;
+  userId: number;
+  totalBets: number;
+  betsWon: number;
+  betsLost: number;
+  parlaysStarted: number;
+  parlaysWon: number;
+  totalWagered: number;
+  totalWon: number;
+  streak: number;
+  maxStreak: number;
+  profit: number;
+  roi: number;
+  mostCommonBet: string | null;
+  biggestWin: number;
+  updatedAt: Date;
+};
+
+// DTO for public user stats (used in API responses)
+export type UserStatsDTO = {
+  totalBets: number;
+  betsWon: number;
+  betsLost: number;
+  parlaysStarted: number;
+  parlaysWon: number;
+  totalWagered: number;
+  totalWon: number;
+  streak: number;
+  maxStreak: number;
+  profit: number;
+  roi: number;
+  mostCommonBet: string | null;
+  biggestWin: number;
+  updatedAt: string;
+};
+
+// --- User Feed Post DTO ---
+export type UserFeedPost = {
+  id: number;
+  authorId: number;
+  ownerId: number;
+  content: string;
+  parentId: number | null;
+  createdAt: string;
+  updatedAt: string;
+  children?: UserFeedPost[];
+  authorName?: string;
+};
+
+// --- User Activity DTO ---
+export type UserActivity = {
+  id: number;
+  userId: number;
+  type: string;
+  details?: unknown;
+  createdAt: string;
+};

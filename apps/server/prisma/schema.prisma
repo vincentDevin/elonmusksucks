@@ -74,6 +74,11 @@ model User {
   createdAt          DateTime            @default(now())
   parlayes           Parlay[]
   transactions       Transaction[]
+  feedPrivate       Boolean   @default(false)
+  posts      UserPost[]    @relation("OwnerToPost")
+  comments   UserPost[]    @relation("AuthorToPost")
+  activities UserActivity[]
+  stats      UserStats?
 }
 
 model EmailVerification {
@@ -178,6 +183,7 @@ model UserBadge {
   badge     Badge    @relation("BadgeToUserBadge", fields: [badgeId], references: [id])
   badgeId   Int
   awardedAt DateTime @default(now())
+  reason    String?
 
   @@unique([userId, badgeId])
 }
@@ -225,4 +231,47 @@ model Transaction {
   relatedBetId    Int? // single bet
   relatedParlayId Int? // parlay bet
   createdAt       DateTime        @default(now())
+}
+
+model UserPost {
+  id        Int       @id @default(autoincrement())
+  author    User      @relation("AuthorToPost", fields: [authorId], references: [id])
+  authorId  Int
+  owner     User      @relation("OwnerToPost", fields: [ownerId], references: [id])
+  ownerId   Int
+  content   String
+  parent    UserPost? @relation("PostParent", fields: [parentId], references: [id])
+  parentId  Int?
+  children  UserPost[] @relation("PostParent")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now()) @updatedAt
+}
+
+model UserActivity {
+  id        Int      @id @default(autoincrement())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    Int
+  type      String   // e.g. "BET_PLACED", "BET_WON", "POST_CREATED", etc.
+  details   Json?    // Store event metadata (e.g., betId, predictionId, badgeId, postId)
+  createdAt DateTime @default(now())
+}
+
+model UserStats {
+  id               Int      @id @default(autoincrement())
+  user             User     @relation(fields: [userId], references: [id])
+  userId           Int      @unique
+  totalBets        Int      @default(0)
+  betsWon          Int      @default(0)
+  betsLost         Int      @default(0)
+  parlaysStarted   Int      @default(0)
+  parlaysWon       Int      @default(0)
+  totalWagered     Int      @default(0)
+  totalWon         Int      @default(0)
+  streak           Int      @default(0)
+  maxStreak        Int      @default(0)
+  profit           Int      @default(0)
+  roi              Float    @default(0)
+  mostCommonBet    String?  // Optionally store e.g. "OVER", "YES", etc.
+  biggestWin       Int      @default(0)
+  updatedAt        DateTime @default(now()) @updatedAt
 }
