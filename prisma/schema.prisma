@@ -1,6 +1,5 @@
 generator client {
   provider = "prisma-client-js"
-  output   = "../packages/types/node_modules/.prisma/client"
 }
 
 datasource db {
@@ -53,6 +52,7 @@ model User {
   passwordResets     PasswordReset[]
   profileComplete    Boolean             @default(false)
   role               Role                @default(USER)
+  active             Boolean             @default(true)
   muskBucks          Int                 @default(1000)
   bets               Bet[]
   refreshTokens      RefreshToken[]
@@ -108,6 +108,7 @@ model Prediction {
   category    String
   expiresAt   DateTime
   resolved    Boolean            @default(false)
+  approved    Boolean            @default(false)
   resolvedAt  DateTime?
   outcome     Outcome?
   bets        Bet[]

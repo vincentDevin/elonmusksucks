@@ -10,6 +10,7 @@ import predictionRoutes from './routes/predictions.routes';
 import userRoutes from './routes/user.routes';
 import bettingRoutes from './routes/betting.routes';
 import payoutRoutes from './routes/payout.routes';
+import adminRoutes from './routes/admin.routes';
 
 const app = express();
 
@@ -37,6 +38,7 @@ app.use(express.json());
 app.use(cookieParser());
 
 app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api/predictions', predictionRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/betting', bettingRoutes);
