@@ -9,13 +9,22 @@ import type {
   DbLeaderboardEntry,
 } from '@ems/types';
 
+// Shape for a parlay leg, including the timestamp it was created
+type ParlayLegWithUser = {
+  parlayId: number;
+  user: Pick<DbUser, 'id' | 'name'>;
+  stake: number;
+  optionId: number;
+  createdAt: Date;
+};
+
 export class PredictionRepository implements IPredictionRepository {
   async createPrediction(data: {
     title: string;
     description: string;
     category: string;
     expiresAt: Date;
-    creatorId: number; // <--- add here
+    creatorId: number;
     options: Array<{ label: string }>;
   }): Promise<
     DbPrediction & {
@@ -29,7 +38,7 @@ export class PredictionRepository implements IPredictionRepository {
         description: data.description,
         category: data.category,
         expiresAt: data.expiresAt,
-        creatorId: data.creatorId, // <--- persist creatorId
+        creatorId: data.creatorId,
         options: {
           create: data.options.map((o) => ({
             label: o.label,
@@ -61,31 +70,17 @@ export class PredictionRepository implements IPredictionRepository {
       DbPrediction & {
         options: DbPredictionOption[];
         bets: Array<DbBet & { user: Pick<DbUser, 'id' | 'name'> }>;
+        parlayLegs: ParlayLegWithUser[];
       }
     >
   > {
-    return prisma.prediction.findMany({
+    const preds = await prisma.prediction.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
         options: {
-          select: {
-            id: true,
-            label: true,
-            odds: true,
-            predictionId: true,
-            createdAt: true,
+          include: {
             parlayLegs: {
-              include: {
-                parlay: {
-                  select: {
-                    id: true,
-                    user: { select: { id: true, name: true } },
-                    amount: true,
-                    combinedOdds: true,
-                    createdAt: true,
-                  },
-                },
-              },
+              include: { parlay: { include: { user: true } } },
             },
           },
         },
@@ -95,6 +90,32 @@ export class PredictionRepository implements IPredictionRepository {
           },
         },
       },
+    });
+
+    return preds.map((pred) => {
+      // extract all scalar fields (including id, title, resolved, approved, etc.)
+      const { bets, options, ...rest } = pred;
+
+      // flatten nested parlay legs
+      const parlayLegs: ParlayLegWithUser[] = [];
+      for (const opt of options) {
+        for (const leg of opt.parlayLegs) {
+          parlayLegs.push({
+            parlayId: leg.parlay.id,
+            user: { id: leg.parlay.user.id, name: leg.parlay.user.name },
+            stake: leg.parlay.amount,
+            optionId: opt.id,
+            createdAt: leg.createdAt,
+          });
+        }
+      }
+
+      return {
+        ...rest,
+        bets,
+        options,
+        parlayLegs,
+      };
     });
   }
 
@@ -102,31 +123,17 @@ export class PredictionRepository implements IPredictionRepository {
     | (DbPrediction & {
         options: DbPredictionOption[];
         bets: Array<DbBet & { user: Pick<DbUser, 'id' | 'name'> }>;
+        parlayLegs: ParlayLegWithUser[];
       })
     | null
   > {
-    return prisma.prediction.findUnique({
+    const pred = await prisma.prediction.findUnique({
       where: { id },
       include: {
         options: {
-          select: {
-            id: true,
-            label: true,
-            odds: true,
-            predictionId: true,
-            createdAt: true,
+          include: {
             parlayLegs: {
-              include: {
-                parlay: {
-                  select: {
-                    id: true,
-                    user: { select: { id: true, name: true } },
-                    amount: true,
-                    combinedOdds: true,
-                    createdAt: true,
-                  },
-                },
-              },
+              include: { parlay: { include: { user: true } } },
             },
           },
         },
@@ -137,9 +144,31 @@ export class PredictionRepository implements IPredictionRepository {
         },
       },
     });
+    if (!pred) return null;
+
+    const { bets, options, ...rest } = pred;
+
+    const parlayLegs: ParlayLegWithUser[] = [];
+    for (const opt of options) {
+      for (const leg of opt.parlayLegs) {
+        parlayLegs.push({
+          parlayId: leg.parlay.id,
+          user: { id: leg.parlay.user.id, name: leg.parlay.user.name },
+          stake: leg.parlay.amount,
+          optionId: opt.id,
+          createdAt: leg.createdAt,
+        });
+      }
+    }
+
+    return {
+      ...rest,
+      bets,
+      options,
+      parlayLegs,
+    };
   }
 
-  /** Get leaderboard of top users */
   async getLeaderboard(limit: number): Promise<DbLeaderboardEntry[]> {
     return prisma.user.findMany({
       orderBy: { muskBucks: 'desc' },

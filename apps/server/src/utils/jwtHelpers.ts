@@ -1,12 +1,12 @@
 // apps/server/src/utils/jwtHelpers.ts
-import dotenv from 'dotenv';
-dotenv.config();
 
-import jwt from 'jsonwebtoken';
+import jwt, { JwtPayload } from 'jsonwebtoken';
 import { User } from '@prisma/client';
 
-// Pull in your secrets now that dotenv has run
-const { ACCESS_TOKEN_SECRET = '', REFRESH_TOKEN_SECRET = '' } = process.env;
+// We assume dotenv.config() has already run in index.ts,
+// so these exist—assert non‐null to convince TypeScript.
+const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET!;
+const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET!;
 
 if (!ACCESS_TOKEN_SECRET || !REFRESH_TOKEN_SECRET) {
   throw new Error('Missing ACCESS_TOKEN_SECRET or REFRESH_TOKEN_SECRET in environment');
@@ -35,5 +35,9 @@ export function generateRefreshToken(user: User): string {
  * returning its payload ({ userId }) or throwing.
  */
 export function verifyRefreshToken(token: string): { userId: number } {
-  return jwt.verify(token, REFRESH_TOKEN_SECRET) as { userId: number };
+  const payload = jwt.verify(token, REFRESH_TOKEN_SECRET) as JwtPayload;
+  if (!payload || typeof payload !== 'object' || typeof payload.userId !== 'number') {
+    throw new Error('Invalid refresh token payload');
+  }
+  return { userId: payload.userId };
 }

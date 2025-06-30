@@ -1,14 +1,17 @@
+import path from 'path';
+import dotenv from 'dotenv';
+dotenv.config({ path: path.resolve(__dirname, '../../..', '.env') });
+
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
 import authRoutes from './routes/auth.routes';
 import predictionRoutes from './routes/predictions.routes';
 import userRoutes from './routes/user.routes';
 import bettingRoutes from './routes/betting.routes';
 import payoutRoutes from './routes/payout.routes';
+import adminRoutes from './routes/admin.routes';
 
-dotenv.config();
 const app = express();
 
 // Dynamically reflect request origin for development
@@ -35,6 +38,7 @@ app.use(express.json());
 app.use(cookieParser());
 
 app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api/predictions', predictionRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/betting', bettingRoutes);

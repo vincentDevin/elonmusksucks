@@ -45,9 +45,8 @@ export type PublicUser = Omit<PrismaUser,
 export type DbEmailVerification = PrismaEmailVerification;
 export type DbPasswordReset = PrismaPasswordReset;
 
-// ----- Prediction -----
-export type DbPrediction = PrismaPrediction;
-export type PublicPrediction = Pick<
+export type DbPrediction       = PrismaPrediction;
+export type PublicPrediction   = Pick<
   PrismaPrediction,
   | 'id'
   | 'title'
@@ -57,6 +56,7 @@ export type PublicPrediction = Pick<
   | 'resolved'
   | 'resolvedAt'
   | 'outcome'
+  | 'approved'      // ← newly added
 >;
 
 // ----- PredictionOption -----

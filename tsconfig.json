@@ -1,0 +1,15 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/types" },
+    { "path": "apps/server" },
+    { "path": "apps/client" }
+  ],
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@ems/types": ["packages/types/src/index.ts"],
+      "@ems/types/*": ["packages/types/src/*"]
+    }
+  }
+}

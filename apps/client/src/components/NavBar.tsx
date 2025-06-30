@@ -59,6 +59,17 @@ export default function NavBar() {
                         transition-colors
                       "
                     >
+                      {user.role === 'ADMIN' && (
+                        <li>
+                          <Link
+                            to="/admin"
+                            className="block px-3 py-2 rounded hover:bg-muted transition-colors"
+                            onClick={() => setDropdownOpen(false)}
+                          >
+                            Admin
+                          </Link>
+                        </li>
+                      )}
                       <li>
                         <Link
                           to={`/profile/${user.id}`}
