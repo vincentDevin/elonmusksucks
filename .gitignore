@@ -30,7 +30,6 @@ apps/**/.env.local
 # Prisma
 prisma/dev.db
 prisma/*.sqlite
-prisma/migrations/
 
 # VS Code
 .vscode/
