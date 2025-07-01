@@ -12,7 +12,7 @@
     "schema": "prisma/schema.prisma"
   },
   "dependencies": {
-    "@prisma/client": "^4.0.0"
+    "@prisma/client": "^6.10.1"
   },
   "devDependencies": {
     "prisma": "^4.0.0",

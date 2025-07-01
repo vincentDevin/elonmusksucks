@@ -5,24 +5,35 @@ dotenv.config();
 import { PrismaClient, TransactionType, BetStatus } from '@prisma/client';
 const prisma = new PrismaClient();
 
+// Helper to clear a model if its table exists
+async function clear<Model>(name: string, fn: () => Promise<Model>) {
+  try {
+    await fn();
+    console.log(`🧹 Cleared ${name}`);
+  } catch (err: any) {
+    console.warn(`⚠️  Could not clear ${name}: ${err.message.split('\n')[0]}`);
+  }
+}
+
 const skipEmailFlow = process.env.SKIP_EMAIL_FLOW === 'true';
 
 async function main() {
   console.log('🧹 Clearing out old data...');
-  // Order matters for FK constraints!
-  await prisma.transaction.deleteMany();
-  await prisma.parlayLeg.deleteMany();
-  await prisma.parlay.deleteMany();
-  await prisma.bet.deleteMany();
-  await prisma.userActivity.deleteMany();
-  await prisma.userPost.deleteMany();
-  await prisma.userBadge.deleteMany();
-  await prisma.follow.deleteMany();
-  await prisma.userStats.deleteMany();
-  await prisma.predictionOption.deleteMany();
-  await prisma.prediction.deleteMany();
-  await prisma.badge.deleteMany();
-  await prisma.user.deleteMany();
+
+  // Order matters for FKs
+  await clear('Transaction',     () => prisma.transaction.deleteMany());
+  await clear('ParlayLeg',       () => prisma.parlayLeg.deleteMany());
+  await clear('Parlay',          () => prisma.parlay.deleteMany());
+  await clear('Bet',             () => prisma.bet.deleteMany());
+  await clear('UserActivity',    () => prisma.userActivity.deleteMany());
+  await clear('UserPost',        () => prisma.userPost.deleteMany());
+  await clear('UserBadge',       () => prisma.userBadge.deleteMany());
+  await clear('Follow',          () => prisma.follow.deleteMany());
+  await clear('UserStats',       () => prisma.userStats.deleteMany());
+  await clear('PredictionOption',() => prisma.predictionOption.deleteMany());
+  await clear('Prediction',      () => prisma.prediction.deleteMany());
+  await clear('Badge',           () => prisma.badge.deleteMany());
+  await clear('User',            () => prisma.user.deleteMany());
 
   console.log('👥 Creating users Alice & Bob…');
   // Upsert, but since we cleared, just create
@@ -74,7 +85,7 @@ async function main() {
   await prisma.userBadge.createMany({
     data: [
       { userId: alice.id, badgeId: firstBet.id, awardedAt: new Date() },
-      { userId: bob.id, badgeId: firstBet.id, awardedAt: new Date() },
+      { userId: bob.id,   badgeId: firstBet.id, awardedAt: new Date() },
     ],
     skipDuplicates: true,
   });
@@ -83,24 +94,23 @@ async function main() {
   await prisma.follow.createMany({
     data: [
       { followerId: alice.id, followingId: bob.id },
-      { followerId: bob.id, followingId: alice.id },
+      { followerId: bob.id,   followingId: alice.id },
     ],
     skipDuplicates: true,
   });
 
   console.log('📝 Seeding predictions + options...');
-  // Add creatorId to predictions!
   const p1 = await prisma.prediction.create({
     data: {
       title: 'Elon tweets in Klingon',
       description: 'Will Elon Musk tweet something in Klingon by end of month?',
       category: 'Twitter',
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      creatorId: alice.id, // <--- set creator
+      creatorId: alice.id,
       options: {
         create: [
           { label: 'Yes', odds: 2.0 },
-          { label: 'No', odds: 1.5 },
+          { label: 'No',  odds: 1.5 },
         ],
       },
     },
@@ -112,11 +122,11 @@ async function main() {
       description: 'Will TSLA close ≥ $1,000 on any trading day this quarter?',
       category: 'Stocks',
       expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-      creatorId: bob.id, // <--- set creator
+      creatorId: bob.id,
       options: {
         create: [
           { label: 'Yes', odds: 3.0 },
-          { label: 'No', odds: 1.2 },
+          { label: 'No',  odds: 1.2 },
         ],
       },
     },
@@ -129,22 +139,22 @@ async function main() {
       data: {
         userId: alice.id,
         predictionId: p1.id,
-        optionId: p1.options[0]!.id,
-        amount: 100,
+        optionId:      p1.options[0]!.id,
+        amount:        100,
         oddsAtPlacement: p1.options[0]!.odds,
         potentialPayout: Math.floor(100 * p1.options[0]!.odds),
-        status: BetStatus.PENDING,
+        status:        BetStatus.PENDING,
       },
     }),
     prisma.bet.create({
       data: {
         userId: bob.id,
         predictionId: p1.id,
-        optionId: p1.options[1]!.id,
-        amount: 200,
+        optionId:      p1.options[1]!.id,
+        amount:        200,
         oddsAtPlacement: p1.options[1]!.odds,
         potentialPayout: Math.floor(200 * p1.options[1]!.odds),
-        status: BetStatus.PENDING,
+        status:        BetStatus.PENDING,
       },
     }),
   ]);
@@ -156,7 +166,9 @@ async function main() {
       userId: alice.id,
       amount: parlayAmount,
       combinedOdds: p1.options[0]!.odds * p2.options[1]!.odds,
-      potentialPayout: Math.floor(parlayAmount * p1.options[0]!.odds * p2.options[1]!.odds),
+      potentialPayout: Math.floor(
+        parlayAmount * p1.options[0]!.odds * p2.options[1]!.odds
+      ),
       legs: {
         create: [
           { optionId: p1.options[0]!.id, oddsAtPlacement: p1.options[0]!.odds },
