@@ -1,10 +1,10 @@
 // apps/client/src/pages/AdminDashboard.tsx
-import React, { useEffect, useState } from 'react'
-import { useAuth } from '../hooks/useAuth'
-import { useAdmin } from '../contexts/AdminContext'
+import React, { useEffect, useState } from 'react';
+import { useAuth } from '../hooks/useAuth';
+import { useAdmin } from '../contexts/AdminContext';
 
 const AdminDashboard: React.FC = () => {
-  const { user } = useAuth()
+  const { user } = useAuth();
   const {
     users,
     pendingPredictions,
@@ -27,37 +27,37 @@ const AdminDashboard: React.FC = () => {
     createBadge,
     assignBadge,
     revokeBadge,
-  } = useAdmin()
+  } = useAdmin();
 
-  const [balances, setBalances] = useState<Record<number, number>>({})
-  const [selectedAssign, setSelectedAssign] = useState<Record<number, number>>({})
-  const [selectedRevoke, setSelectedRevoke] = useState<Record<number, number>>({})
-  const [newBadge, setNewBadge] = useState({ name: '', description: '', iconUrl: '' })
+  const [balances, setBalances] = useState<Record<number, number>>({});
+  const [selectedAssign, setSelectedAssign] = useState<Record<number, number>>({});
+  const [selectedRevoke, setSelectedRevoke] = useState<Record<number, number>>({});
+  const [newBadge, setNewBadge] = useState({ name: '', description: '', iconUrl: '' });
 
   useEffect(() => {
     if (user?.role === 'ADMIN') {
-      loadUsers()
-      loadPendingPredictions()
-      loadBets()
-      loadTransactions()
-      loadBadges()
+      loadUsers();
+      loadPendingPredictions();
+      loadBets();
+      loadTransactions();
+      loadBadges();
     }
-  }, [user, loadUsers, loadPendingPredictions, loadBets, loadTransactions, loadBadges])
+  }, [user, loadUsers, loadPendingPredictions, loadBets, loadTransactions, loadBadges]);
 
   useEffect(() => {
-    const map: Record<number, number> = {}
+    const map: Record<number, number> = {};
     for (const u of users) {
-      map[u.id] = u.muskBucks
+      map[u.id] = u.muskBucks;
     }
-    setBalances(map)
-  }, [users])
+    setBalances(map);
+  }, [users]);
 
   useEffect(() => {
-    users.forEach((u) => loadUserStats(u.id))
-  }, [users, loadUserStats])
+    users.forEach((u) => loadUserStats(u.id));
+  }, [users, loadUserStats]);
 
   if (user?.role !== 'ADMIN') {
-    return <div className="p-4 text-[var(--color-accent)]">Access denied. Admins only.</div>
+    return <div className="p-4 text-[var(--color-accent)]">Access denied. Admins only.</div>;
   }
 
   return (
@@ -70,7 +70,7 @@ const AdminDashboard: React.FC = () => {
         <table className="w-full bg-[var(--color-surface)] border border-[var(--color-muted)]">
           <thead className="bg-[var(--color-secondary)]">
             <tr>
-              {['ID','Name','Email','Role','Active','Balance','Badges'].map((h) => (
+              {['ID', 'Name', 'Email', 'Role', 'Active', 'Balance', 'Badges'].map((h) => (
                 <th key={h} className="border border-[var(--color-muted)] px-2 py-1">
                   {h}
                 </th>
@@ -140,15 +140,17 @@ const AdminDashboard: React.FC = () => {
                       >
                         <option value="">— assign badge —</option>
                         {badges.map((b) => (
-                          <option key={b.id} value={b.id}>{b.name}</option>
+                          <option key={b.id} value={b.id}>
+                            {b.name}
+                          </option>
                         ))}
                       </select>
                       <button
                         className="px-2 py-1 bg-[var(--color-primary)] text-[var(--color-surface)] rounded disabled:opacity-50 cursor-pointer hover:opacity-90 transition"
                         disabled={!selectedAssign[u.id]}
                         onClick={() => {
-                          assignBadge(u.id, selectedAssign[u.id])
-                          setSelectedAssign((p) => ({ ...p, [u.id]: 0 }))
+                          assignBadge(u.id, selectedAssign[u.id]);
+                          setSelectedAssign((p) => ({ ...p, [u.id]: 0 }));
                         }}
                       >
                         Assign
@@ -165,15 +167,17 @@ const AdminDashboard: React.FC = () => {
                       >
                         <option value="">— revoke badge —</option>
                         {badges.map((b) => (
-                          <option key={b.id} value={b.id}>{b.name}</option>
+                          <option key={b.id} value={b.id}>
+                            {b.name}
+                          </option>
                         ))}
                       </select>
                       <button
                         className="px-2 py-1 bg-red-600 text-[var(--color-surface)] rounded disabled:opacity-50 cursor-pointer hover:opacity-90 transition"
                         disabled={!selectedRevoke[u.id]}
                         onClick={() => {
-                          revokeBadge(u.id, selectedRevoke[u.id])
-                          setSelectedRevoke((p) => ({ ...p, [u.id]: 0 }))
+                          revokeBadge(u.id, selectedRevoke[u.id]);
+                          setSelectedRevoke((p) => ({ ...p, [u.id]: 0 }));
                         }}
                       >
                         Revoke
@@ -290,7 +294,7 @@ const AdminDashboard: React.FC = () => {
         <h2 className="text-xl font-semibold mb-2">User Stats</h2>
         <ul className="space-y-1">
           {users.map((u) => {
-            const s = statsFor[u.id]
+            const s = statsFor[u.id];
             return (
               <li key={u.id} className="flex justify-between">
                 <span>{u.name}</span>
@@ -307,12 +311,12 @@ const AdminDashboard: React.FC = () => {
                   </button>
                 )}
               </li>
-            )
+            );
           })}
         </ul>
       </section>
     </div>
-  )
-}
+  );
+};
 
-export default AdminDashboard
+export default AdminDashboard;
