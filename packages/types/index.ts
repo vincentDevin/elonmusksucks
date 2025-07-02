@@ -282,3 +282,13 @@ export type UserActivity = {
   details?: unknown;
   createdAt: string;
 };
+
+/** Includes the extra fields your admin endpoints now return */
+export interface AdminBet extends PublicBet {
+  userName: string;
+  prediction: PublicPrediction;
+}
+
+export interface AdminTransaction extends PublicTransaction {
+  userName: string;
+}

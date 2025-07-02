@@ -10,6 +10,8 @@ import type {
   PublicUserBadge,
   UserStatsDTO,
   PublicAITweet,
+  AdminBet,
+  AdminTransaction
 } from '@ems/types';
 import type { Role, Outcome } from '@prisma/client';
 import type { QueryParams } from '../repositories/IAdminRepository';
@@ -124,15 +126,43 @@ export async function resolvePrediction(
 }
 
 // -- Bet & Transaction Oversight --
-export async function getBets(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function getBets(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
   try {
     const filters = req.query as unknown as QueryParams;
     const bets: PublicBet[] = await adminService.listBets(filters);
-    res.json(bets);
+
+    const [users, preds] = await Promise.all([
+      adminService.listUsers(),
+      adminService.listPredictions(),
+    ]);
+
+    const detailed: AdminBet[] = bets.map((b) => ({
+      ...b,
+      userName: users.find((u) => u.id === b.userId)?.name ?? 'Unknown',
+      prediction:
+        preds.find((p) => p.id === b.predictionId) ?? {
+          id: b.predictionId,
+          title: 'Unknown prediction',
+          description: '',
+          category: '',
+          expiresAt: new Date(),
+          approved: false,
+          resolved: false,
+          outcome: null,
+          resolvedAt: null,
+        },
+    }));
+
+    res.json(detailed);
   } catch (err) {
     next(err);
   }
 }
+
 
 export async function refundBet(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -147,12 +177,22 @@ export async function refundBet(req: Request, res: Response, next: NextFunction)
 export async function getTransactions(
   req: Request,
   res: Response,
-  next: NextFunction,
+  next: NextFunction
 ): Promise<void> {
   try {
     const filters = req.query as unknown as QueryParams;
     const txns: PublicTransaction[] = await adminService.listTransactions(filters);
-    res.json(txns);
+
+    // fetch related users
+    const users: PublicUser[] = await adminService.listUsers();
+
+    // enrich each transaction with userName
+    const detailedTxns: AdminTransaction[] = txns.map((t) => ({
+      ...t,
+      userName: users.find((u) => u.id === t.userId)?.name ?? 'Unknown',
+    }));
+
+    res.json(detailedTxns);
   } catch (err) {
     next(err);
   }
