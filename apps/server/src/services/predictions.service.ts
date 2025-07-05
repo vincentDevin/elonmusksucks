@@ -1,5 +1,5 @@
 // apps/server/src/services/predictions.service.ts
-import type { DbPrediction, DbPredictionOption, DbBet, DbLeaderboardEntry } from '@ems/types';
+import type { DbPrediction, DbPredictionOption, DbBet } from '@ems/types';
 import type { IPredictionRepository } from '../repositories/IPredictionRepository';
 import { PredictionRepository } from '../repositories/PredictionRepository';
 import { PredictionType } from '@prisma/client';
@@ -117,13 +117,6 @@ export class PredictionService {
         createdAt: leg.createdAt,
       })),
     };
-  }
-
-  /**
-   * Leaderboard unchanged.
-   */
-  async getLeaderboard(limit = 10): Promise<DbLeaderboardEntry[]> {
-    return this.repo.getLeaderboard(limit);
   }
 }
 

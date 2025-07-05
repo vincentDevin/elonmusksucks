@@ -1,7 +1,6 @@
 // apps/server/src/controllers/predictions.controller.ts
 import type { Request, Response, NextFunction } from 'express';
 import { predictionService } from '../services/predictions.service';
-import { payoutService } from '../services/payout.service';
 import { UserService } from '../services/user.service';
 import { PredictionType } from '@ems/types';
 
@@ -106,58 +105,6 @@ export const createPrediction = async (
     });
 
     res.status(201).json(pred);
-  } catch (err) {
-    next(err);
-  }
-};
-
-/**
- * POST /api/predictions/:id/resolve
- * Resolve a prediction, payout all bets & parlays, then return the updated record.
- */
-export const resolvePredictionHandler = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> => {
-  try {
-    const predictionId = Number(req.params.id);
-    const { winningOptionId } = req.body as { winningOptionId: number };
-    const userId = (req as any).user?.id;
-
-    await payoutService.resolvePrediction(predictionId, winningOptionId);
-
-    const updated = await predictionService.getPrediction(predictionId);
-    if (!updated) {
-      res.status(404).json({ error: 'Prediction not found after resolve' });
-      return;
-    }
-
-    if (userId) {
-      await userService.createUserActivity(userId, 'PREDICTION_RESOLVED', {
-        predictionId,
-        winningOptionId,
-      });
-    }
-
-    res.json(updated);
-  } catch (err) {
-    next(err);
-  }
-};
-
-/**
- * GET /api/predictions/leaderboard
- * Return the top users by MuskBucks balance.
- */
-export const getLeaderboard = async (
-  _req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> => {
-  try {
-    const board = await predictionService.getLeaderboard();
-    res.json(board);
   } catch (err) {
     next(err);
   }

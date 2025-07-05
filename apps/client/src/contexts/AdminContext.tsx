@@ -10,7 +10,6 @@ import type {
   PublicBadge,
   UserStatsDTO,
   Role,
-  Outcome,
 } from '@ems/types';
 
 interface AdminContextType {
@@ -33,7 +32,7 @@ interface AdminContextType {
   loadUserStats(userId: number): Promise<void>;
   approvePrediction(id: number): Promise<void>;
   rejectPrediction(id: number): Promise<void>;
-  resolvePrediction(id: number, outcome: Outcome): Promise<void>;
+  resolvePrediction(id: number, winningOptionId: number): Promise<void>;
   refundBet(id: number): Promise<void>;
   createBadge(data: { name: string; description?: string; iconUrl?: string }): Promise<void>;
   assignBadge(userId: number, badgeId: number): Promise<void>;
@@ -86,8 +85,8 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setPendingPredictions((ps) => ps.filter((p) => p.id !== id));
   }, []);
 
-  const resolvePrediction = useCallback(async (id: number, outcome: Outcome) => {
-    await adminApi.resolvePrediction(id, outcome);
+  const resolvePrediction = useCallback(async (id: number, winningOptionId: number) => {
+    await adminApi.resolvePrediction(id, winningOptionId);
     setPendingPredictions((ps) => ps.filter((p) => p.id !== id));
   }, []);
 

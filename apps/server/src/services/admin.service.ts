@@ -1,5 +1,5 @@
 // apps/server/src/services/admin.service.ts
-import type { Role, Outcome } from '@prisma/client';
+import type { Role } from '@prisma/client';
 import type { IAdminRepository, QueryParams } from '../repositories/IAdminRepository';
 import { PrismaAdminRepository } from '../repositories/AdminRepository';
 
@@ -34,8 +34,11 @@ export const setPredictionStatus = async (
   return repo.updatePredictionStatus(predictionId, status);
 };
 
-export const resolvePrediction = async (predictionId: number, outcome: Outcome) => {
-  return repo.resolvePrediction(predictionId, outcome);
+/**
+ * Resolve a prediction by providing the winning option’s ID.
+ */
+export const resolvePrediction = async (predictionId: number, winningOptionId: number) => {
+  return repo.resolvePrediction(predictionId, winningOptionId);
 };
 
 // -- Bet & Transaction Oversight --

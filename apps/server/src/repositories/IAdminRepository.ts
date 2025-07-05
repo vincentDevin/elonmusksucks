@@ -1,6 +1,7 @@
+// apps/server/src/repositories/IAdminRepository.ts
+
 import type {
   Role,
-  Outcome,
   User,
   Prediction,
   Bet,
@@ -28,7 +29,8 @@ export interface IAdminRepository {
     predictionId: number,
     status: 'approved' | 'rejected',
   ): Promise<Prediction>;
-  resolvePrediction(predictionId: number, outcome: Outcome): Promise<Prediction>;
+  /** Now takes the winning option’s ID rather than an Outcome enum */
+  resolvePrediction(predictionId: number, winningOptionId: number): Promise<Prediction>;
 
   // -- Bet & Transaction Oversight --
   findBets(filters?: QueryParams): Promise<Bet[]>;

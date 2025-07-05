@@ -20,20 +20,17 @@ const skipEmailFlow = process.env.SKIP_EMAIL_FLOW === 'true';
 async function main() {
   console.log('🧹 Clearing out old data...');
 
-  // Order matters for FKs. We clear everything except User, Posts, Activity.
-  await clear('Transaction',     () => prisma.transaction.deleteMany());
-  await clear('ParlayLeg',       () => prisma.parlayLeg.deleteMany());
-  await clear('Parlay',          () => prisma.parlay.deleteMany());
-  await clear('Bet',             () => prisma.bet.deleteMany());
-  await clear('UserBadge',       () => prisma.userBadge.deleteMany());
-  await clear('Follow',          () => prisma.follow.deleteMany());
-  await clear('UserStats',       () => prisma.userStats.deleteMany());
-  await clear('PredictionOption',() => prisma.predictionOption.deleteMany());
-  await clear('Prediction',      () => prisma.prediction.deleteMany());
-  await clear('Badge',           () => prisma.badge.deleteMany());
-  // ← do NOT clear 'User'
-  // ← do NOT clear 'UserPost'
-  // ← do NOT clear 'UserActivity'
+  // Order matters for FKs. We clear everything except User, UserPost, UserActivity
+  await clear('Transaction',      () => prisma.transaction.deleteMany());
+  await clear('ParlayLeg',        () => prisma.parlayLeg.deleteMany());
+  await clear('Parlay',           () => prisma.parlay.deleteMany());
+  await clear('Bet',              () => prisma.bet.deleteMany());
+  await clear('UserStats',        () => prisma.userStats.deleteMany());
+  await clear('UserBadge',        () => prisma.userBadge.deleteMany());
+  await clear('Follow',           () => prisma.follow.deleteMany());
+  await clear('PredictionOption', () => prisma.predictionOption.deleteMany());
+  await clear('Prediction',       () => prisma.prediction.deleteMany());
+  await clear('Badge',            () => prisma.badge.deleteMany());
 
   console.log('👥 Ensuring users Alice & Bob exist…');
   const alice = await prisma.user.upsert({
@@ -69,26 +66,14 @@ async function main() {
 
   console.log('🏅 Creating badges…');
   const [firstBet, bigSpender] = await Promise.all([
-    prisma.badge.create({
-      data: {
-        name: 'First Bet',
-        description: 'Placed your first bet',
-        iconUrl: 'https://example.com/icons/first-bet.png',
-      },
-    }),
-    prisma.badge.create({
-      data: {
-        name: 'Big Spender',
-        description: 'Bet over 1000 MuskBucks at once',
-        iconUrl: 'https://example.com/icons/big-spender.png',
-      },
-    }),
+    prisma.badge.create({ data: { name: 'First Bet',    description: 'Placed your first bet',          iconUrl: 'https://example.com/icons/first-bet.png' } }),
+    prisma.badge.create({ data: { name: 'Big Spender',  description: 'Bet over 1000 MuskBucks at once', iconUrl: 'https://example.com/icons/big-spender.png' } }),
   ]);
 
   await prisma.userBadge.createMany({
     data: [
-      { userId: alice.id, badgeId: firstBet.id, awardedAt: new Date() },
-      { userId: bob.id,   badgeId: firstBet.id, awardedAt: new Date() },
+      { userId: alice.id, badgeId: firstBet.id,  awardedAt: new Date() },
+      { userId: bob.id,   badgeId: firstBet.id,  awardedAt: new Date() },
     ],
     skipDuplicates: true,
   });
@@ -103,7 +88,7 @@ async function main() {
   });
 
   console.log('📝 Seeding predictions + options…');
-  // MULTIPLE choice with 4 options
+  // 1) MULTIPLE choice with 4 options
   const pMultiple = await prisma.prediction.create({
     data: {
       title: 'Which SpaceX mission will launch next?',
@@ -125,7 +110,7 @@ async function main() {
     include: { options: true },
   });
 
-  // BINARY yes/no
+  // 2) BINARY yes/no
   const pBinary = await prisma.prediction.create({
     data: {
       title: 'Elon goes to Mars in 2025',
@@ -145,12 +130,12 @@ async function main() {
     include: { options: true },
   });
 
-  // OVER_UNDER
+  // 3) OVER_UNDER
   const threshold = 100;
   const pOU = await prisma.prediction.create({
     data: {
       title: 'Tesla stock over/under $100',
-      description: 'Will TSLA close above or below $100 on next trading day?',
+      description: 'Will TSLA close above or below $100 next trading day?',
       category: 'Stocks',
       type: 'OVER_UNDER',
       threshold,
@@ -172,8 +157,8 @@ async function main() {
       data: {
         userId: alice.id,
         predictionId: pMultiple.id,
-        optionId: pMultiple.options[0]!.id,
-        amount: 100,
+        optionId:      pMultiple.options[0]!.id,
+        amount:        100,
         oddsAtPlacement: pMultiple.options[0]!.odds,
         potentialPayout: Math.floor(100 * pMultiple.options[0]!.odds),
         status: BetStatus.PENDING,
@@ -183,8 +168,8 @@ async function main() {
       data: {
         userId: bob.id,
         predictionId: pMultiple.id,
-        optionId: pMultiple.options[1]!.id,
-        amount: 200,
+        optionId:      pMultiple.options[1]!.id,
+        amount:        200,
         oddsAtPlacement: pMultiple.options[1]!.odds,
         potentialPayout: Math.floor(200 * pMultiple.options[1]!.odds),
         status: BetStatus.PENDING,
@@ -224,71 +209,34 @@ async function main() {
   console.log('📝 Seeding user feed posts…');
   const alicePost = await (
     (await prisma.userPost.findFirst({
-      where: {
-        authorId: alice.id,
-        ownerId: alice.id,
-        content: 'Hello world! This is Alice’s first post.',
-      },
+      where: { authorId: alice.id, ownerId: alice.id, content: 'Hello world! This is Alice’s first post.' },
     })) ||
     prisma.userPost.create({
-      data: {
-        authorId: alice.id,
-        ownerId: alice.id,
-        content: 'Hello world! This is Alice’s first post.',
-      },
+      data: { authorId: alice.id, ownerId: alice.id, content: 'Hello world! This is Alice’s first post.' },
     })
   );
-
   const bobCommentOnAlice = await (
     (await prisma.userPost.findFirst({
-      where: {
-        authorId: bob.id,
-        ownerId: alice.id,
-        content: 'Nice post, Alice! 🚀',
-      },
+      where: { authorId: bob.id, ownerId: alice.id, content: 'Nice post, Alice! 🚀' },
     })) ||
     prisma.userPost.create({
-      data: {
-        authorId: bob.id,
-        ownerId: alice.id,
-        content: 'Nice post, Alice! 🚀',
-        parentId: alicePost.id,
-      },
+      data: { authorId: bob.id, ownerId: alice.id, content: 'Nice post, Alice! 🚀', parentId: alicePost.id },
     })
   );
-
   const bobPost = await (
     (await prisma.userPost.findFirst({
-      where: {
-        authorId: bob.id,
-        ownerId: bob.id,
-        content: 'First post on my profile!',
-      },
+      where: { authorId: bob.id, ownerId: bob.id, content: 'First post on my profile!' },
     })) ||
     prisma.userPost.create({
-      data: {
-        authorId: bob.id,
-        ownerId: bob.id,
-        content: 'First post on my profile!',
-      },
+      data: { authorId: bob.id, ownerId: bob.id, content: 'First post on my profile!' },
     })
   );
-
   const aliceCommentOnBob = await (
     (await prisma.userPost.findFirst({
-      where: {
-        authorId: alice.id,
-        ownerId: bob.id,
-        content: 'Hi Bob!',
-      },
+      where: { authorId: alice.id, ownerId: bob.id, content: 'Hi Bob!' },
     })) ||
     prisma.userPost.create({
-      data: {
-        authorId: alice.id,
-        ownerId: bob.id,
-        content: 'Hi Bob!',
-        parentId: bobPost.id,
-      },
+      data: { authorId: alice.id, ownerId: bob.id, content: 'Hi Bob!', parentId: bobPost.id },
     })
   );
 
@@ -303,14 +251,9 @@ async function main() {
       },
     })) ||
     prisma.userActivity.create({
-      data: {
-        userId: alice.id,
-        type: 'POST_CREATED',
-        details: { postId: alicePost.id },
-      },
+      data: { userId: alice.id, type: 'POST_CREATED', details: { postId: alicePost.id } },
     })
   );
-
   await (
     (await prisma.userActivity.findFirst({
       where: {
@@ -320,14 +263,86 @@ async function main() {
       },
     })) ||
     prisma.userActivity.create({
-      data: {
-        userId: bob.id,
-        type: 'COMMENT_CREATED',
-        details: { postId: bobPost.id },
-      },
+      data: { userId: bob.id, type: 'COMMENT_CREATED', details: { postId: bobPost.id } },
     })
   );
 
+  // Upsert user stats for leaderboard
+  console.log('📈 Seeding user stats…');
+  await prisma.userStats.upsert({
+    where: { userId: alice.id },
+    update: {
+      totalBets:      1,
+      betsWon:        0,
+      betsLost:       0,
+      parlaysStarted: 1,
+      parlaysWon:     0,
+      totalWagered:   150, // 100 bet + 50 parlay
+      totalWon:       0,
+      streak:         0,
+      maxStreak:      0,
+      profit:         -150,
+      roi:            -150 / 150,
+      mostCommonBet:  'Starlink',
+      biggestWin:     0,
+      updatedAt:      new Date(),
+    },
+    create: {
+      userId:         alice.id,
+      totalBets:      1,
+      betsWon:        0,
+      betsLost:       0,
+      parlaysStarted: 1,
+      parlaysWon:     0,
+      totalWagered:   150,
+      totalWon:       0,
+      streak:         0,
+      maxStreak:      0,
+      profit:         -150,
+      roi:            -1,
+      mostCommonBet:  'Starlink',
+      biggestWin:     0,
+    },
+  });
+  await prisma.userStats.upsert({
+    where: { userId: bob.id },
+    update: {
+      totalBets:      1,
+      betsWon:        0,
+      betsLost:       0,
+      parlaysStarted: 0,
+      parlaysWon:     0,
+      totalWagered:   200,
+      totalWon:       0,
+      streak:         0,
+      maxStreak:      0,
+      profit:         -200,
+      roi:            -1,
+      mostCommonBet:  'Crew Dragon',
+      biggestWin:     0,
+      updatedAt:      new Date(),
+    },
+    create: {
+      userId:         bob.id,
+      totalBets:      1,
+      betsWon:        0,
+      betsLost:       0,
+      parlaysStarted: 0,
+      parlaysWon:     0,
+      totalWagered:   200,
+      totalWon:       0,
+      streak:         0,
+      maxStreak:      0,
+      profit:         -200,
+      roi:            -1,
+      mostCommonBet:  'Crew Dragon',
+      biggestWin:     0,
+    },
+  });
+
+  // after you've seeded everything…
+  console.log('🔄 Refreshing leaderboard view…');
+  await prisma.$executeRaw`REFRESH MATERIALIZED VIEW leaderboard_view;`;
   console.log('✅ Done seeding!');
 }
 

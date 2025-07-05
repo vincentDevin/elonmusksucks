@@ -11,6 +11,7 @@ import userRoutes from './routes/user.routes';
 import bettingRoutes from './routes/betting.routes';
 import payoutRoutes from './routes/payout.routes';
 import adminRoutes from './routes/admin.routes';
+import leaderboardRoutes from './routes/leaderboard.routes';
 
 const app = express();
 
@@ -43,6 +44,7 @@ app.use('/api/predictions', predictionRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/betting', bettingRoutes);
 app.use('/api/payout', payoutRoutes);
+app.use('/api/leaderboard', leaderboardRoutes);
 
 const PORT = parseInt(process.env.PORT ?? '5000', 10);
 app.listen(PORT, '127.0.0.1', () => {

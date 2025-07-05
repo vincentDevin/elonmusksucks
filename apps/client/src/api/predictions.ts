@@ -2,7 +2,6 @@ import api from './axios';
 import type {
   PublicPrediction,
   PublicPredictionOption,
-  PublicLeaderboardEntry,
   PublicBet,
   PredictionType,
 } from '@ems/types';
@@ -65,29 +64,5 @@ export async function createPrediction(payload: CreatePredictionPayload): Promis
     expiresAt: payload.expiresAt.toISOString(),
     options: payload.options,
   });
-  return data;
-}
-
-/**
- * Resolve a prediction (returns fresh options, bets & parlays).
- */
-export async function resolvePrediction(
-  predictionId: number,
-  winningOptionId: number,
-): Promise<PredictionFull> {
-  const { data } = await api.post<PredictionFull>(`/api/predictions/${predictionId}/resolve`, {
-    winningOptionId,
-  });
-  return data;
-}
-
-/**
- * Fetch the leaderboard
- */
-export async function getLeaderboard(limit?: number): Promise<PublicLeaderboardEntry[]> {
-  const url = limit
-    ? `/api/predictions/leaderboard?limit=${limit}`
-    : '/api/predictions/leaderboard';
-  const { data } = await api.get<PublicLeaderboardEntry[]>(url);
   return data;
 }

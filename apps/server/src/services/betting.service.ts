@@ -1,18 +1,23 @@
 // apps/server/src/services/betting.service.ts
 import type { IBettingRepository } from '../repositories/IBettingRepository';
 import { BettingRepository } from '../repositories/BettingRepository';
+import { UserService } from './user.service';
 import type { DbBet, DbParlay } from '@ems/types';
 
 export class BettingService {
-  constructor(private repo: IBettingRepository = new BettingRepository()) {}
+  constructor(
+    private repo: IBettingRepository = new BettingRepository(),
+    private userService = new UserService(),
+  ) {}
 
   /**
    * Place a single bet:
-   *  - load & validate option/prediction
-   *  - snapshot odds, compute payout
-   *  - deduct balance + record transaction
-   *  - persist bet
-   *  - recalculate odds
+   *  1) Load & validate option/prediction
+   *  2) Snapshot odds, compute payout
+   *  3) Deduct balance + record transaction
+   *  4) Persist bet
+   *  5) Recalculate odds
+   *  6) Increment userStats.totalBets
    */
   async placeBet(userId: number, optionId: number, amount: number): Promise<DbBet> {
     // 1) Load option + ensure open
@@ -53,15 +58,21 @@ export class BettingService {
     // 5) Recalculate odds
     await this.recalculateOdds(option.predictionId);
 
+    // 6) Increment userStats.totalBets
+    await this.userService.incrementUserStats(userId, {
+      totalBets: { increment: 1 },
+    });
+
     return bet;
   }
 
   /**
    * Place a parlay:
-   *  - validate & snapshot each leg
-   *  - compute combined odds + payout
-   *  - deduct balance + transaction
-   *  - create parlay + legs
+   *  1) validate & snapshot each leg
+   *  2) compute combined odds + payout
+   *  3) deduct balance + record transaction
+   *  4) create parlay + legs
+   *  5) Increment userStats.parlaysStarted
    */
   async placeParlay(
     userId: number,
@@ -71,7 +82,7 @@ export class BettingService {
     const user = await this.repo.findUserById(userId);
     if (!user || user.muskBucks < amount) throw new Error('INSUFFICIENT_FUNDS');
 
-    // snapshot odds & validate
+    // 1) snapshot odds & validate
     const detailedLegs = await Promise.all(
       legs.map(async ({ optionId }) => {
         const opt = await this.repo.findOptionWithPrediction(optionId);
@@ -83,10 +94,11 @@ export class BettingService {
       }),
     );
 
+    // 2) compute combined odds + payout
     const combinedOdds = detailedLegs.reduce((prod, leg) => prod * leg.oddsAtPlacement, 1);
     const potentialPayout = Math.floor(amount * combinedOdds);
 
-    // deduct + transaction
+    // 3) deduct + transaction
     const newBalance = user.muskBucks - amount;
     await this.repo.updateUserMuskBucks(userId, newBalance);
     await this.repo.createTransaction({
@@ -98,14 +110,21 @@ export class BettingService {
       relatedParlayId: null,
     });
 
-    // create parlay
-    return this.repo.createParlay({
+    // 4) create parlay
+    const parlay = await this.repo.createParlay({
       userId,
       amount,
       combinedOdds,
       potentialPayout,
       legs: detailedLegs,
     });
+
+    // 5) Increment userStats.parlaysStarted
+    await this.userService.incrementUserStats(userId, {
+      parlaysStarted: { increment: 1 },
+    });
+
+    return parlay;
   }
 
   /**

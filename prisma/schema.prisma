@@ -12,12 +12,6 @@ enum Role {
   USER
 }
 
-enum Outcome {
-  YES
-  NO
-  CANCELLED
-}
-
 enum PredictionType {
   MULTIPLE
   BINARY
@@ -118,7 +112,7 @@ model Prediction {
   resolved    Boolean            @default(false)
   approved    Boolean            @default(false)
   resolvedAt  DateTime?
-  outcome     Outcome?
+  winningOptionId Int?
   bets        Bet[]
   options     PredictionOption[]
   createdAt   DateTime           @default(now())
@@ -173,9 +167,19 @@ model RefreshToken {
 }
 
 model LeaderboardEntry {
-  id        Int    @id
-  name      String
-  muskBucks Int
+  userId         Int     @id     @map("user_id")
+  userName       String  @map("user_name")
+  avatarUrl      String? @map("avatar_url")
+  balance        Int     @map("balance")
+  totalBets      Int     @map("total_bets")
+  winRate        Float   @map("win_rate")
+  profitAll      Int     @map("profit_all")
+  profitPeriod   Int     @map("profit_period")
+  roi            Float   @map("roi")
+  longestStreak  Int     @map("longest_streak")
+  parlaysStarted Int     @map("parlays_started")
+  parlaysWon     Int     @map("parlays_won")
+  rankChange     Int?    @map("rank_change")
 
   @@map("leaderboard_view")
 }

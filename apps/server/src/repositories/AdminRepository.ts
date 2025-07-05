@@ -1,7 +1,7 @@
+// apps/server/src/repositories/PrismaAdminRepository.ts
 import {
   PrismaClient,
   Role,
-  Outcome,
   User,
   Prediction,
   Bet,
@@ -45,8 +45,11 @@ export class PrismaAdminRepository implements IAdminRepository {
 
   // -- Prediction Management --
   async findPredictions(_filters?: QueryParams): Promise<Prediction[]> {
-    // TODO: actually apply _filters when you’re ready
-    return this.prisma.prediction.findMany();
+    // include the options so the admin UI can render them
+    return this.prisma.prediction.findMany({
+      include: { options: true },
+      orderBy: { createdAt: 'desc' },
+    });
   }
 
   async updatePredictionStatus(
@@ -55,19 +58,17 @@ export class PrismaAdminRepository implements IAdminRepository {
   ): Promise<Prediction> {
     return this.prisma.prediction.update({
       where: { id: predictionId },
-      data: {
-        // assuming you have an `approved` boolean in your schema
-        approved: status === 'approved',
-      },
+      data: { approved: status === 'approved' },
     });
   }
 
-  async resolvePrediction(predictionId: number, outcome: Outcome): Promise<Prediction> {
+  async resolvePrediction(predictionId: number, winningOptionId: number): Promise<Prediction> {
+    // store winningOptionId and mark resolved
     return this.prisma.prediction.update({
       where: { id: predictionId },
       data: {
         resolved: true,
-        outcome,
+        winningOptionId,
         resolvedAt: new Date(),
       },
     });
@@ -95,9 +96,7 @@ export class PrismaAdminRepository implements IAdminRepository {
   }
 
   async deletePost(postId: number): Promise<void> {
-    await this.prisma.userPost.delete({
-      where: { id: postId },
-    });
+    await this.prisma.userPost.delete({ where: { id: postId } });
   }
 
   async findAllBadges(): Promise<Badge[]> {
@@ -109,18 +108,12 @@ export class PrismaAdminRepository implements IAdminRepository {
     description?: string;
     iconUrl?: string;
   }): Promise<Badge> {
-    return this.prisma.badge.create({
-      data,
-    });
+    return this.prisma.badge.create({ data });
   }
 
   async addBadgeToUser(userId: number, badgeId: number): Promise<UserBadge> {
     return this.prisma.userBadge.create({
-      data: {
-        userId,
-        badgeId,
-        awardedAt: new Date(),
-      },
+      data: { userId, badgeId, awardedAt: new Date() },
     });
   }
 
@@ -132,13 +125,12 @@ export class PrismaAdminRepository implements IAdminRepository {
 
   // -- Leaderboard & Stats --
   async recalculateLeaderboard(): Promise<void> {
-    await this.prisma.$executeRawUnsafe('REFRESH MATERIALIZED VIEW leaderboard_view;');
+    // refresh the materialized view
+    await this.prisma.$executeRawUnsafe('REFRESH MATERIALIZED VIEW CONCURRENTLY leaderboard_view;');
   }
 
   async findUserStats(userId: number): Promise<UserStats | null> {
-    return this.prisma.userStats.findUnique({
-      where: { userId },
-    });
+    return this.prisma.userStats.findUnique({ where: { userId } });
   }
 
   // -- Miscellaneous --
@@ -146,7 +138,6 @@ export class PrismaAdminRepository implements IAdminRepository {
     return this.prisma.aITweet.create({
       data: {
         content: 'Placeholder AI tweet',
-        createdAt: new Date(),
       },
     });
   }

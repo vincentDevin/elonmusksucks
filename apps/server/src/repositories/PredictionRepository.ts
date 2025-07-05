@@ -1,13 +1,7 @@
 // apps/server/src/repositories/PredictionRepository.ts
 import prisma from '../db';
 import type { IPredictionRepository } from './IPredictionRepository';
-import type {
-  DbPrediction,
-  DbPredictionOption,
-  DbBet,
-  DbUser,
-  DbLeaderboardEntry,
-} from '@ems/types';
+import type { DbPrediction, DbPredictionOption, DbBet, DbUser } from '@ems/types';
 import type { PredictionType } from '@ems/types';
 
 // Shape for a parlay leg, including the timestamp it was created
@@ -168,13 +162,5 @@ export class PredictionRepository implements IPredictionRepository {
       options,
       parlayLegs,
     };
-  }
-
-  async getLeaderboard(limit: number): Promise<DbLeaderboardEntry[]> {
-    return prisma.user.findMany({
-      orderBy: { muskBucks: 'desc' },
-      take: limit,
-      select: { id: true, name: true, muskBucks: true },
-    });
   }
 }

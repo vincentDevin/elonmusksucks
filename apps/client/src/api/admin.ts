@@ -10,7 +10,6 @@ import type {
   UserStatsDTO,
   PublicAITweet,
   Role,
-  Outcome,
 } from '@ems/types';
 
 /** — User Management — **/
@@ -50,9 +49,15 @@ export async function rejectPrediction(id: number): Promise<PublicPrediction> {
   return res.data;
 }
 
-export async function resolvePrediction(id: number, outcome: Outcome): Promise<PublicPrediction> {
+/**
+ * Resolve a prediction by supplying the winning option ID.
+ */
+export async function resolvePrediction(
+  id: number,
+  winningOptionId: number,
+): Promise<PublicPrediction> {
   const res = await api.patch<PublicPrediction>(`/api/admin/predictions/${id}/resolve`, {
-    outcome,
+    winningOptionId,
   });
   return res.data;
 }
@@ -99,7 +104,9 @@ export async function createBadge(data: {
 }
 
 export async function assignBadge(userId: number, badgeId: number): Promise<PublicUserBadge> {
-  const res = await api.patch<PublicUserBadge>(`/api/admin/users/${userId}/badges`, { badgeId });
+  const res = await api.patch<PublicUserBadge>(`/api/admin/users/${userId}/badges`, {
+    badgeId,
+  });
   return res.data;
 }
 

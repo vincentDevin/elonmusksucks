@@ -6,7 +6,6 @@ import BetForm from '../components/BetForm';
 import CreatePredictionForm from '../components/CreatePredictionForm';
 import { usePredictions } from '../hooks/usePredictions';
 import { useAuth } from '../contexts/AuthContext';
-import ResolvePrediction from '../components/ResolvePrediction';
 import OddsBar from '../components/OddsBar';
 import BetsList from '../components/BetsList';
 import { useParlay } from '../contexts/ParlayContext';
@@ -27,7 +26,6 @@ interface PredictionWithPools extends PredictionFull {
 export default function Predictions() {
   const { predictions: raw, loading, error, refresh } = usePredictions();
   const { user } = useAuth();
-  const isAdmin = user?.role === 'ADMIN';
   const { dispatch } = useParlay();
   const [creating, setCreating] = useState(false);
   const [selOptions, setSelOptions] = useState<Record<number, number>>({});
@@ -213,10 +211,6 @@ export default function Predictions() {
                       Add to Parlay
                     </button>
                   </>
-                )}
-
-                {isAdmin && pred.approved && !pred.resolved && (
-                  <ResolvePrediction predictionId={pred.id} onResolved={refresh} />
                 )}
 
                 {!pred.approved && (

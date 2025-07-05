@@ -14,7 +14,7 @@ import type {
   AdminTransaction,
 } from '@ems/types';
 import { PredictionType } from '@ems/types';
-import type { Role, Outcome } from '@prisma/client';
+import type { Role } from '@prisma/client';
 import type { QueryParams } from '../repositories/IAdminRepository';
 
 // -- User Management --
@@ -118,8 +118,8 @@ export async function resolvePrediction(
 ): Promise<void> {
   try {
     const id = Number(req.params.id);
-    const { outcome } = req.body as { outcome: Outcome };
-    const updated: PublicPrediction = await adminService.resolvePrediction(id, outcome);
+    const { winningOptionId } = req.body as { winningOptionId: number };
+    const updated: PublicPrediction = await adminService.resolvePrediction(id, winningOptionId);
     res.json(updated);
   } catch (err) {
     next(err);
@@ -130,14 +130,8 @@ export async function resolvePrediction(
 export async function getBets(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const filters = req.query as unknown as QueryParams;
-
-    // Fetch bets according to whatever filters (e.g. by user, by status)
     const bets: PublicBet[] = await adminService.listBets(filters);
-
-    // As an admin, we want *all* predictions (no implicit approval filter)
     const preds: PublicPrediction[] = await adminService.listPredictions(filters);
-
-    // And all users for enrichment
     const users: PublicUser[] = await adminService.listUsers();
 
     const detailed: AdminBet[] = bets.map((b) => {
@@ -155,9 +149,6 @@ export async function getBets(req: Request, res: Response, next: NextFunction): 
             expiresAt: new Date(),
             approved: false,
             resolved: false,
-            outcome: null,
-            resolvedAt: null,
-            // new fields from PublicPrediction
             type: PredictionType.MULTIPLE,
             threshold: null,
             creatorId: 0,
@@ -189,11 +180,8 @@ export async function getTransactions(
   try {
     const filters = req.query as unknown as QueryParams;
     const txns: PublicTransaction[] = await adminService.listTransactions(filters);
-
-    // fetch related users
     const users: PublicUser[] = await adminService.listUsers();
 
-    // enrich each transaction with userName
     const detailedTxns: AdminTransaction[] = txns.map((t) => ({
       ...t,
       userName: users.find((u) => u.id === t.userId)?.name ?? 'Unknown',
