@@ -41,3 +41,15 @@ export function verifyRefreshToken(token: string): { userId: number } {
   }
   return { userId: payload.userId };
 }
+
+/**
+ * Verifies an access token’s signature & expiration,
+ * returning its payload ({ userId }) or throwing.
+ */
+export function verifyAccessToken(token: string): { userId: number } {
+  const payload = jwt.verify(token, ACCESS_TOKEN_SECRET) as JwtPayload;
+  if (!payload || typeof payload !== 'object' || typeof payload.userId !== 'number') {
+    throw new Error('Invalid access token payload');
+  }
+  return { userId: payload.userId };
+}

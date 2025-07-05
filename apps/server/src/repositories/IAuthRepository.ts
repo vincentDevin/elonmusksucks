@@ -1,6 +1,4 @@
-// apps/server/src/repositories/IAuthRepository.ts
-
-import type { User } from '@prisma/client';
+import type { User, RefreshToken, EmailVerification, PasswordReset } from '@prisma/client';
 
 export interface IAuthRepository {
   // --- Users ---
@@ -16,21 +14,17 @@ export interface IAuthRepository {
 
   // --- Refresh tokens ---
   saveRefreshToken(userId: number, token: string, expiresAt: Date): Promise<void>;
-  getRefreshToken(
-    token: string,
-  ): Promise<{ token: string; userId: number; expiresAt: Date } | null>;
+  getRefreshToken(token: string): Promise<RefreshToken | null>;
   deleteRefreshToken(token: string): Promise<void>;
 
   // --- Email verification ---
   createEmailVerification(data: { userId: number; token: string; expiresAt: Date }): Promise<void>;
-  findEmailVerification(
-    token: string,
-  ): Promise<{ id: number; userId: number; expiresAt: Date } | null>;
+  findEmailVerification(token: string): Promise<EmailVerification | null>;
   deleteEmailVerification(id: number): Promise<void>;
   markEmailVerified(userId: number): Promise<User>;
 
   // --- Password reset ---
   createPasswordReset(data: { userId: number; token: string; expiresAt: Date }): Promise<void>;
-  findPasswordReset(token: string): Promise<{ id: number; userId: number; expiresAt: Date } | null>;
+  findPasswordReset(token: string): Promise<PasswordReset | null>;
   deletePasswordReset(id: number): Promise<void>;
 }
