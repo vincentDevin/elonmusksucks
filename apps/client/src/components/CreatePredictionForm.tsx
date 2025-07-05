@@ -3,11 +3,7 @@ import React, { useState } from 'react';
 import { usePredictions } from '../hooks/usePredictions';
 import { PredictionType } from '@ems/types';
 
-export default function CreatePredictionForm({
-  onCreated,
-}: {
-  onCreated: () => void;
-}) {
+export default function CreatePredictionForm({ onCreated }: { onCreated: () => void }) {
   const { createPrediction } = usePredictions();
 
   const [title, setTitle] = useState('');
@@ -15,19 +11,14 @@ export default function CreatePredictionForm({
   const [category, setCategory] = useState('');
   const [expiresAt, setExpiresAt] = useState<string>('');
 
-  const [type, setType] = useState<PredictionType>(
-    PredictionType.MULTIPLE
-  );
+  const [type, setType] = useState<PredictionType>(PredictionType.MULTIPLE);
   const [threshold, setThreshold] = useState<number | ''>('');
   const [options, setOptions] = useState<string[]>(['']);
 
   const addOption = () => setOptions((prev) => [...prev, '']);
   const updateOption = (idx: number, value: string) =>
-    setOptions((prev) =>
-      prev.map((v, i) => (i === idx ? value : v))
-    );
-  const removeOption = (idx: number) =>
-    setOptions((prev) => prev.filter((_, i) => i !== idx));
+    setOptions((prev) => prev.map((v, i) => (i === idx ? value : v)));
+  const removeOption = (idx: number) => setOptions((prev) => prev.filter((_, i) => i !== idx));
 
   const isBinary = type === PredictionType.BINARY;
   const isOU = type === PredictionType.OVER_UNDER;
@@ -42,9 +33,7 @@ export default function CreatePredictionForm({
       isBinary ||
       (isOU && threshold !== ''));
 
-  const submit = async (
-    e: React.FormEvent<HTMLFormElement>
-  ) => {
+  const submit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!canSubmit) return;
     await createPrediction({
@@ -54,9 +43,7 @@ export default function CreatePredictionForm({
       expiresAt: new Date(expiresAt),
       type,
       threshold: isOU ? Number(threshold) : undefined,
-      options: isMultiple
-        ? options.map((label) => ({ label }))
-        : undefined,
+      options: isMultiple ? options.map((label) => ({ label })) : undefined,
     });
     onCreated();
   };
@@ -71,9 +58,7 @@ export default function CreatePredictionForm({
       onSubmit={submit}
       className="bg-[var(--color-surface)] shadow-lg rounded-lg p-6 space-y-6 text-[var(--color-content)]"
     >
-      <h2 className="text-2xl font-bold text-[var(--color-content)]">
-        New Prediction
-      </h2>
+      <h2 className="text-2xl font-bold text-[var(--color-content)]">New Prediction</h2>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Title */}
@@ -155,20 +140,12 @@ export default function CreatePredictionForm({
           <select
             id="type"
             value={type}
-            onChange={(e) =>
-              setType(e.target.value as PredictionType)
-            }
+            onChange={(e) => setType(e.target.value as PredictionType)}
             className={inputBase}
           >
-            <option value={PredictionType.MULTIPLE}>
-              Multiple choice
-            </option>
-            <option value={PredictionType.BINARY}>
-              Yes / No
-            </option>
-            <option value={PredictionType.OVER_UNDER}>
-              Over / Under
-            </option>
+            <option value={PredictionType.MULTIPLE}>Multiple choice</option>
+            <option value={PredictionType.BINARY}>Yes / No</option>
+            <option value={PredictionType.OVER_UNDER}>Over / Under</option>
           </select>
         </div>
 
@@ -186,13 +163,7 @@ export default function CreatePredictionForm({
               type="number"
               placeholder="e.g. 100"
               value={threshold}
-              onChange={(e) =>
-                setThreshold(
-                  e.target.value === ''
-                    ? ''
-                    : Number(e.target.value)
-                )
-              }
+              onChange={(e) => setThreshold(e.target.value === '' ? '' : Number(e.target.value))}
               className={inputBase}
             />
           </div>
