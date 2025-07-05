@@ -3,11 +3,7 @@ import { useAdmin } from '../../contexts/AdminContext';
 import type { AdminBet, AdminTransaction } from '@ems/types';
 
 const BetsTransactions: React.FC = () => {
-  const {
-    bets: rawBets,
-    transactions: rawTransactions,
-    refundBet,
-  } = useAdmin();
+  const { bets: rawBets, transactions: rawTransactions, refundBet } = useAdmin();
 
   // Cast to the admin‐extended types so TS knows about userName & prediction
   const bets = rawBets as AdminBet[];
@@ -22,13 +18,9 @@ const BetsTransactions: React.FC = () => {
           <h3 className="font-semibold mb-2">Bets</h3>
           <ul className="space-y-2">
             {bets.map((b: AdminBet) => (
-              <li
-                key={b.id}
-                className="flex justify-between items-center border-b py-2"
-              >
+              <li key={b.id} className="flex justify-between items-center border-b py-2">
                 <div>
-                  <span className="font-medium">{b.userName}</span>{' '}
-                  wagered{' '}
+                  <span className="font-medium">{b.userName}</span> wagered{' '}
                   <span className="font-semibold">{b.amount}</span> on{' '}
                   <span className="italic">{b.prediction.title}</span>
                 </div>
@@ -41,9 +33,7 @@ const BetsTransactions: React.FC = () => {
               </li>
             ))}
             {bets.length === 0 && (
-              <li className="text-[var(--color-tertiary)]">
-                No bets to display.
-              </li>
+              <li className="text-[var(--color-tertiary)]">No bets to display.</li>
             )}
           </ul>
         </div>
@@ -54,16 +44,13 @@ const BetsTransactions: React.FC = () => {
           <ul className="space-y-2">
             {transactions.map((t: AdminTransaction) => (
               <li key={t.id} className="border-b py-2">
-                <span className="font-medium">{t.userName}</span>{' '}
-                {t.type.toLowerCase()} of{' '}
-                <span className="font-semibold">{t.amount}</span>{' '}
-                (balance: <span className="font-semibold">{t.balanceAfter}</span>)
+                <span className="font-medium">{t.userName}</span> {t.type.toLowerCase()} of{' '}
+                <span className="font-semibold">{t.amount}</span> (balance:{' '}
+                <span className="font-semibold">{t.balanceAfter}</span>)
               </li>
             ))}
             {transactions.length === 0 && (
-              <li className="text-[var(--color-tertiary)]">
-                No transactions to display.
-              </li>
+              <li className="text-[var(--color-tertiary)]">No transactions to display.</li>
             )}
           </ul>
         </div>

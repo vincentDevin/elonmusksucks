@@ -1,11 +1,10 @@
-// apps/client/src/api/predictions.ts
 import api from './axios';
 import type {
   PublicPrediction,
   PublicPredictionOption,
   PublicLeaderboardEntry,
   PublicBet,
-  PublicParlayLeg,
+  PredictionType,
 } from '@ems/types';
 
 /** A bet with its user’s id+name */
@@ -13,8 +12,14 @@ export interface BetWithUser extends PublicBet {
   user: { id: number; name: string };
 }
 
-/** A parlay-leg with its user info, exactly as returned by the backend */
-export type ParlayLegWithUser = PublicParlayLeg;
+/** A parlay‐leg with exactly the fields your API now returns */
+export type ParlayLegWithUser = {
+  parlayId: number;
+  user: { id: number; name: string };
+  stake: number;
+  optionId: number;
+  createdAt: string;
+};
 
 /**
  * A prediction plus its dynamic options, single bets, and parlay legs.
@@ -46,7 +51,9 @@ export interface CreatePredictionPayload {
   description: string;
   category: string;
   expiresAt: Date;
-  options: Array<{ label: string }>;
+  options?: Array<{ label: string }>;
+  type: PredictionType;
+  threshold?: number;
 }
 
 /**

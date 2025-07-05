@@ -23,8 +23,8 @@
       "@models/*": ["src/models/*"],
       "@services/*": ["src/services/*"],
       "@utils/*": ["src/utils/*"],
-      "@ems/types": ["../../packages/types/src"],
-      "@ems/types/*": ["../../packages/types/src/*"]
+      "@ems/types": ["../../packages/types/dist"],
+      "@ems/types/*": ["../../packages/types/dist/*"]
     }
   },
   "include": ["src"],

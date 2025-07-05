@@ -3,6 +3,8 @@ import type { Request, Response, NextFunction } from 'express';
 import { predictionService } from '../services/predictions.service';
 import { payoutService } from '../services/payout.service';
 import { UserService } from '../services/user.service';
+import { PredictionType } from '@ems/types';
+
 const userService = new UserService();
 
 /**
@@ -49,7 +51,7 @@ export const getPredictionById = async (
 
 /**
  * POST /api/predictions
- * Create a new prediction with a dynamic set of options.
+ * Create a new prediction with dynamic options or auto-generated for BINARY / OVER_UNDER
  */
 export const createPrediction = async (
   req: Request,
@@ -57,37 +59,53 @@ export const createPrediction = async (
   next: NextFunction,
 ): Promise<void> => {
   try {
-    const { title, description, category, expiresAt, options } = req.body as {
+    const { title, description, category, expiresAt, options, type, threshold } = req.body as {
       title: string;
       description: string;
       category: string;
       expiresAt: string;
-      options: Array<{ label: string }>;
+      options?: Array<{ label: string }>;
+      type: PredictionType;
+      threshold?: number;
     };
-    // Auth middleware should set req.user
-    const creatorId = (req as any).user?.id;
 
+    const creatorId = (req as any).user?.id;
     if (!creatorId) {
       res.status(401).json({ error: 'Not authenticated' });
       return;
     }
 
-    const prediction = await predictionService.createPrediction({
+    // Determine final options
+    let finalOptions: Array<{ label: string }> = [];
+    if (type === PredictionType.BINARY) {
+      finalOptions = [{ label: 'Yes' }, { label: 'No' }];
+    } else if (type === PredictionType.OVER_UNDER) {
+      if (threshold == null) {
+        res.status(400).json({ error: 'threshold required for over/under' });
+        return;
+      }
+      finalOptions = [{ label: `Over ${threshold}` }, { label: `Under ${threshold}` }];
+    } else {
+      finalOptions = options ?? [];
+    }
+
+    const pred = await predictionService.createPrediction({
       title,
       description,
       category,
       expiresAt: new Date(expiresAt),
-      options,
-      creatorId, // <-- correct field name!
+      creatorId,
+      options: finalOptions,
+      type,
+      threshold,
     });
 
-    // Log user activity
     await userService.createUserActivity(creatorId, 'PREDICTION_CREATED', {
-      predictionId: prediction.id,
-      title: prediction.title,
+      predictionId: pred.id,
+      title: pred.title,
     });
 
-    res.status(201).json(prediction);
+    res.status(201).json(pred);
   } catch (err) {
     next(err);
   }
@@ -115,7 +133,6 @@ export const resolvePredictionHandler = async (
       return;
     }
 
-    // Log user activity
     if (userId) {
       await userService.createUserActivity(userId, 'PREDICTION_RESOLVED', {
         predictionId,

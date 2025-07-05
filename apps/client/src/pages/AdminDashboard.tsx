@@ -9,13 +9,7 @@ import UserStats from '../components/admin/UserStats';
 
 const AdminDashboard: React.FC = () => {
   const { user } = useAuth();
-  const {
-    loadUsers,
-    loadPendingPredictions,
-    loadBets,
-    loadTransactions,
-    loadBadges,
-  } = useAdmin();
+  const { loadUsers, loadPendingPredictions, loadBets, loadTransactions, loadBadges } = useAdmin();
 
   const tabs = [
     { key: 'users', label: 'User Management', component: <UserManagement /> },
@@ -59,9 +53,7 @@ const AdminDashboard: React.FC = () => {
           </button>
         ))}
       </nav>
-      <div className="mt-6">
-        {tabs.find((t) => t.key === activeTab)?.component}
-      </div>
+      <div className="mt-6">{tabs.find((t) => t.key === activeTab)?.component}</div>
     </div>
   );
 };

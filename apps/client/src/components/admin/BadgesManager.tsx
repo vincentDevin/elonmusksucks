@@ -23,19 +23,11 @@ const BadgesManager: React.FC = () => {
               key={b.id}
               className="flex items-center space-x-2 border p-2 rounded bg-[var(--color-surface)]"
             >
-              {b.iconUrl && (
-                <img
-                  src={b.iconUrl}
-                  alt={b.name}
-                  className="h-6 w-6 rounded-full"
-                />
-              )}
+              {b.iconUrl && <img src={b.iconUrl} alt={b.name} className="h-6 w-6 rounded-full" />}
               <div>
                 <span className="font-medium">{b.name}</span>
                 {b.description && (
-                  <p className="text-sm text-[var(--color-tertiary)]">
-                    {b.description}
-                  </p>
+                  <p className="text-sm text-[var(--color-tertiary)]">{b.description}</p>
                 )}
               </div>
             </li>
@@ -51,25 +43,19 @@ const BadgesManager: React.FC = () => {
           className="border border-[var(--color-muted)] px-2 py-1 flex-1 bg-[var(--color-surface)]"
           placeholder="Name"
           value={newBadge.name}
-          onChange={(e) =>
-            setNewBadge((p) => ({ ...p, name: e.target.value }))
-          }
+          onChange={(e) => setNewBadge((p) => ({ ...p, name: e.target.value }))}
         />
         <input
           className="border border-[var(--color-muted)] px-2 py-1 flex-1 bg-[var(--color-surface)]"
           placeholder="Description"
           value={newBadge.description}
-          onChange={(e) =>
-            setNewBadge((p) => ({ ...p, description: e.target.value }))
-          }
+          onChange={(e) => setNewBadge((p) => ({ ...p, description: e.target.value }))}
         />
         <input
           className="border border-[var(--color-muted)] px-2 py-1 flex-1 bg-[var(--color-surface)]"
           placeholder="Icon URL"
           value={newBadge.iconUrl}
-          onChange={(e) =>
-            setNewBadge((p) => ({ ...p, iconUrl: e.target.value }))
-          }
+          onChange={(e) => setNewBadge((p) => ({ ...p, iconUrl: e.target.value }))}
         />
         <button
           className="px-3 py-1 bg-[var(--color-primary)] text-[var(--color-surface)] rounded cursor-pointer hover:opacity-90 transition"

@@ -1,93 +1,94 @@
-// apps/server/src/services/prediction.service.ts
-import type {
-  DbPrediction,
-  DbPredictionOption,
-  DbBet,
-  DbUser,
-  DbLeaderboardEntry,
-} from '@ems/types';
+// apps/server/src/services/predictions.service.ts
+import type { DbPrediction, DbPredictionOption, DbBet, DbLeaderboardEntry } from '@ems/types';
 import type { IPredictionRepository } from '../repositories/IPredictionRepository';
 import { PredictionRepository } from '../repositories/PredictionRepository';
+import { PredictionType } from '@prisma/client';
 
-// Shape for a parlay leg, including the timestamp it was created
+/** Matches what the client expects for a parlay leg’s user info */
 export type ParlayLegWithUser = {
   parlayId: number;
-  user: Pick<DbUser, 'id' | 'name'>;
+  user: { id: number; name: string };
   stake: number;
   optionId: number;
-  createdAt: Date; // keep as Date
+  createdAt: Date;
 };
 
 export class PredictionService {
   constructor(private repo: IPredictionRepository = new PredictionRepository()) {}
 
   /**
-   * List all predictions, each with:
-   *  - options[]
-   *  - bets[] (single bets with user info)
-   *  - parlayLegs[] (flattened from each option’s embedded parlayLegs)
+   * List all predictions, but sanitize:
+   *  - options only include id,label,odds,predictionId,createdAt
+   *  - bets only include their user’s id/name
+   *  - parlayLegs only include their user’s id/name
    */
   async listAllPredictions(): Promise<
     Array<
       DbPrediction & {
         options: DbPredictionOption[];
-        bets: Array<DbBet & { user: Pick<DbUser, 'id' | 'name'> }>;
+        bets: Array<DbBet & { user: { id: number; name: string } }>;
         parlayLegs: ParlayLegWithUser[];
       }
     >
   > {
-    const preds = await this.repo.listAllPredictions();
-    return preds.map((pred) => {
-      const bets = pred.bets;
-      const parlayLegs: ParlayLegWithUser[] = [];
-
-      // flatten all the parlayLegs attached to each option
-      for (const opt of pred.options as any) {
-        if (Array.isArray(opt.parlayLegs)) {
-          for (const leg of opt.parlayLegs) {
-            parlayLegs.push({
-              parlayId: leg.parlay.id,
-              user: leg.parlay.user,
-              stake: leg.parlay.amount,
-              optionId: opt.id,
-              createdAt: leg.createdAt,
-            });
-          }
-        }
-      }
-
-      return { ...pred, bets, parlayLegs };
-    });
+    const raw = await this.repo.listAllPredictions();
+    return raw.map((pred) => ({
+      // copy all the base prediction fields
+      ...pred,
+      // sanitize options: strip any nested parlayLegs
+      options: pred.options.map(({ id, label, odds, predictionId, createdAt }) => ({
+        id,
+        label,
+        odds,
+        predictionId,
+        createdAt,
+      })),
+      // sanitize bets’ user
+      bets: pred.bets.map((b) => ({
+        ...b,
+        user: { id: b.user.id, name: b.user.name },
+      })),
+      // sanitize parlayLegs’ user
+      parlayLegs: pred.parlayLegs.map((leg) => ({
+        parlayId: leg.parlayId,
+        user: { id: leg.user.id, name: leg.user.name },
+        stake: leg.stake,
+        optionId: leg.optionId,
+        createdAt: leg.createdAt,
+      })),
+    }));
   }
 
   /**
-   * Create a new prediction with a dynamic set of options.
+   * Create a new prediction (unchanged).
    */
-  async createPrediction(data: {
+  async createPrediction(params: {
     title: string;
     description: string;
     category: string;
     expiresAt: Date;
     creatorId: number;
     options: Array<{ label: string }>;
+    type: PredictionType;
+    threshold?: number;
   }): Promise<
     DbPrediction & {
       options: DbPredictionOption[];
-      bets: Array<DbBet & { user: Pick<DbUser, 'id' | 'name'> }>;
+      bets: Array<DbBet & { user: { id: number; name: string } }>;
       parlayLegs: ParlayLegWithUser[];
     }
   > {
-    const pred = await this.repo.createPrediction(data);
+    const pred = await this.repo.createPrediction(params);
     return { ...pred, bets: [], parlayLegs: [] };
   }
 
   /**
-   * Fetch a single prediction by ID, including options, bets, and parlayLegs.
+   * Fetch one prediction, sanitized just like listAllPredictions.
    */
   async getPrediction(id: number): Promise<
     | (DbPrediction & {
         options: DbPredictionOption[];
-        bets: Array<DbBet & { user: Pick<DbUser, 'id' | 'name'> }>;
+        bets: Array<DbBet & { user: { id: number; name: string } }>;
         parlayLegs: ParlayLegWithUser[];
       })
     | null
@@ -95,26 +96,31 @@ export class PredictionService {
     const pred = await this.repo.findPredictionById(id);
     if (!pred) return null;
 
-    const parlayLegs: ParlayLegWithUser[] = [];
-    for (const opt of pred.options as any) {
-      if (Array.isArray(opt.parlayLegs)) {
-        for (const leg of opt.parlayLegs) {
-          parlayLegs.push({
-            parlayId: leg.parlay.id,
-            user: leg.parlay.user,
-            stake: leg.parlay.amount,
-            optionId: opt.id,
-            createdAt: leg.createdAt,
-          });
-        }
-      }
-    }
-
-    return { ...pred, bets: pred.bets, parlayLegs };
+    return {
+      ...pred,
+      options: pred.options.map(({ id, label, odds, predictionId, createdAt }) => ({
+        id,
+        label,
+        odds,
+        predictionId,
+        createdAt,
+      })),
+      bets: pred.bets.map((b) => ({
+        ...b,
+        user: { id: b.user.id, name: b.user.name },
+      })),
+      parlayLegs: pred.parlayLegs.map((leg) => ({
+        parlayId: leg.parlayId,
+        user: { id: leg.user.id, name: leg.user.name },
+        stake: leg.stake,
+        optionId: leg.optionId,
+        createdAt: leg.createdAt,
+      })),
+    };
   }
 
   /**
-   * Retrieve the top users by MuskBucks balance.
+   * Leaderboard unchanged.
    */
   async getLeaderboard(limit = 10): Promise<DbLeaderboardEntry[]> {
     return this.repo.getLeaderboard(limit);

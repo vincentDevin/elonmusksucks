@@ -11,8 +11,9 @@ import type {
   UserStatsDTO,
   PublicAITweet,
   AdminBet,
-  AdminTransaction
+  AdminTransaction,
 } from '@ems/types';
+import { PredictionType } from '@ems/types';
 import type { Role, Outcome } from '@prisma/client';
 import type { QueryParams } from '../repositories/IAdminRepository';
 
@@ -126,43 +127,49 @@ export async function resolvePrediction(
 }
 
 // -- Bet & Transaction Oversight --
-export async function getBets(
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> {
+export async function getBets(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const filters = req.query as unknown as QueryParams;
+
+    // Fetch bets according to whatever filters (e.g. by user, by status)
     const bets: PublicBet[] = await adminService.listBets(filters);
 
-    const [users, preds] = await Promise.all([
-      adminService.listUsers(),
-      adminService.listPredictions(),
-    ]);
+    // As an admin, we want *all* predictions (no implicit approval filter)
+    const preds: PublicPrediction[] = await adminService.listPredictions(filters);
 
-    const detailed: AdminBet[] = bets.map((b) => ({
-      ...b,
-      userName: users.find((u) => u.id === b.userId)?.name ?? 'Unknown',
-      prediction:
-        preds.find((p) => p.id === b.predictionId) ?? {
-          id: b.predictionId,
-          title: 'Unknown prediction',
-          description: '',
-          category: '',
-          expiresAt: new Date(),
-          approved: false,
-          resolved: false,
-          outcome: null,
-          resolvedAt: null,
-        },
-    }));
+    // And all users for enrichment
+    const users: PublicUser[] = await adminService.listUsers();
+
+    const detailed: AdminBet[] = bets.map((b) => {
+      const matching = preds.find((p) => p.id === b.predictionId);
+      return {
+        ...b,
+        userName: users.find((u) => u.id === b.userId)?.name ?? 'Unknown',
+        prediction:
+          matching ??
+          ({
+            id: b.predictionId,
+            title: 'Unknown prediction',
+            description: '',
+            category: '',
+            expiresAt: new Date(),
+            approved: false,
+            resolved: false,
+            outcome: null,
+            resolvedAt: null,
+            // new fields from PublicPrediction
+            type: PredictionType.MULTIPLE,
+            threshold: null,
+            creatorId: 0,
+          } as PublicPrediction),
+      };
+    });
 
     res.json(detailed);
   } catch (err) {
     next(err);
   }
 }
-
 
 export async function refundBet(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -177,7 +184,7 @@ export async function refundBet(req: Request, res: Response, next: NextFunction)
 export async function getTransactions(
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): Promise<void> {
   try {
     const filters = req.query as unknown as QueryParams;
@@ -256,9 +263,7 @@ export async function assignBadge(req: Request, res: Response, next: NextFunctio
   try {
     const userId = Number(req.params.id);
     const { badgeId } = req.body as { badgeId: number };
-    // create the UserBadge record
     const rawUB = await adminService.assignBadge(userId, badgeId);
-    // pull badge metadata from listBadges
     const allBadges = await adminService.listBadges();
     const b = allBadges.find((x) => x.id === badgeId)!;
 

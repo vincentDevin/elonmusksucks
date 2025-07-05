@@ -34,7 +34,7 @@ export type Theme = PrismaTheme;
 
 // ----- User -----
 export type DbUser = PrismaUser;
-export type PublicUser = Omit<PrismaUser, 
+export type PublicUser = Omit<PrismaUser,
   | 'passwordHash'
   | 'emailVerifications'
   | 'passwordResets'
@@ -56,7 +56,10 @@ export type PublicPrediction   = Pick<
   | 'resolved'
   | 'resolvedAt'
   | 'outcome'
-  | 'approved'      // ← newly added
+  | 'approved'
+  | 'type'
+  | 'threshold'
+  | 'creatorId'
 >;
 
 // ----- PredictionOption -----
@@ -69,6 +72,17 @@ export type PublicPredictionOption = Pick<
   | 'predictionId'
   | 'createdAt'
 >;
+
+export const PredictionType = {
+  MULTIPLE: 'MULTIPLE',
+  BINARY: 'BINARY',
+  OVER_UNDER: 'OVER_UNDER',
+} as const;
+
+/**
+ * TS union type 'MULTIPLE' | 'BINARY' | 'OVER_UNDER'
+ */
+export type PredictionType = (typeof PredictionType)[keyof typeof PredictionType];
 
 // ----- Bet -----
 export type DbBet = PrismaBet;

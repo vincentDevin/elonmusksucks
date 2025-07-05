@@ -138,7 +138,7 @@ const UserManagement: React.FC = () => {
         </tbody>
       </table>
     </section>
-);
+  );
 };
 
 export default UserManagement;

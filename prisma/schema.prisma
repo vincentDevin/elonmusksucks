@@ -18,6 +18,12 @@ enum Outcome {
   CANCELLED
 }
 
+enum PredictionType {
+  MULTIPLE
+  BINARY
+  OVER_UNDER
+}
+
 enum BetOption {
   YES
   NO
@@ -106,6 +112,8 @@ model Prediction {
   title       String
   description String
   category    String
+  type        PredictionType     @default(MULTIPLE)
+  threshold   Float?
   expiresAt   DateTime
   resolved    Boolean            @default(false)
   approved    Boolean            @default(false)
