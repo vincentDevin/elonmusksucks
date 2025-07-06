@@ -101,7 +101,7 @@ export default function CreatePredictionForm({ onCreated }: { onCreated: () => v
             htmlFor="description"
             className="block mb-1 text-sm font-medium text-[var(--color-content)]"
           >
-            Description
+            Terms of Prediction
           </label>
           <textarea
             id="description"

@@ -155,9 +155,47 @@ export class UserRepository implements IUserRepository {
     await prisma.userStats.update({ where: { userId }, data });
   }
 
-  async incrementUserStats(userId: number, data: Prisma.UserStatsUpdateInput): Promise<void> {
-    await prisma.userStats.update({ where: { userId }, data });
+ /**
+   * Atomically increments one or more stats fields;
+   * if no UserStats row exists yet, create it.
+   */
+ async incrementUserStats(
+    userId: number,
+    data: Prisma.UserStatsUpdateInput
+  ): Promise<void> {
+    try {
+      await prisma.userStats.update({
+        where: { userId },
+        data,
+      });
+    } catch (e: any) {
+      if (
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        e.code === 'P2025'
+      ) {
+        // extract just the 'increment' values into an unchecked create payload
+        const createData: Prisma.UserStatsUncheckedCreateInput = { userId };
+        for (const [key, val] of Object.entries(data)) {
+          if (
+            val &&
+            typeof val === 'object' &&
+            'increment' in val &&
+            typeof (val as any).increment === 'number'
+          ) {
+            // @ts-ignore – this is fine because we're building an unchecked payload
+            createData[key] = (val as any).increment;
+          }
+        }
+        await prisma.userStats.create({
+          // cast to the unchecked type so TS knows 'user' nested field isn't required
+          data: createData as Prisma.UserStatsUncheckedCreateInput,
+        });
+        return;
+      }
+      throw e;
+    }
   }
+
 
   async setFeedPrivacy(userId: number, feedPrivate: boolean): Promise<void> {
     await prisma.user.update({ where: { id: userId }, data: { feedPrivate } });
