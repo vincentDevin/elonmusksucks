@@ -103,27 +103,44 @@ export default function PredictionQueue() {
                   </div>
                   <p className="text-sm text-[var(--color-tertiary)] mb-3">{p.description}</p>
                   {/* Options */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {p.options.map((opt) => (
-                      <label key={opt.id} className="flex items-center space-x-2 cursor-pointer">
-                        <input
-                          type="radio"
-                          name={`winner-${p.id}`}
-                          value={opt.id}
-                          checked={selectedOption[p.id] === opt.id}
-                          onChange={() =>
-                            setSelectedOption((m) => ({
-                              ...m,
-                              [p.id]: opt.id,
-                            }))
-                          }
-                          className="form-radio"
-                        />
-                        <span className="flex-1">{opt.label}</span>
-                        <span className="font-medium">{opt.odds.toFixed(2)}</span>
-                      </label>
-                    ))}
+                  {/* Options */}
+                  <div className="flex space-x-3 overflow-x-auto py-2">
+                    {p.options.map((opt: PublicPredictionOption) => {
+                      const isSelected = selectedOption[p.id] === opt.id;
+                      return (
+                        <label
+                          key={opt.id}
+                          className={`flex-shrink-0 cursor-pointer select-none
+                            flex flex-col items-center px-4 py-2 border rounded-lg transition
+                            ${
+                              isSelected
+                                ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-[var(--color-surface)]'
+                                : 'border-[var(--color-muted)] bg-background text-content hover:shadow-md'
+                            }
+                          `}
+                        >
+                          {/* visually-hidden native input for form semantics */}
+                          <input
+                            type="radio"
+                            name={`winner-${p.id}`}
+                            value={opt.id}
+                            checked={isSelected}
+                            onChange={() =>
+                              setSelectedOption((m) => ({
+                                ...m,
+                                [p.id]: opt.id,
+                              }))
+                            }
+                            className="sr-only"
+                          />
+                          <span className="font-medium">{opt.label}</span>
+                          <span className="text-sm text-tertiary">{opt.odds.toFixed(2)}</span>
+                        </label>
+                      );
+                    })}
                   </div>
+
+                  {/* Resolve button */}
                   <button
                     onClick={async () => {
                       const win = selectedOption[p.id];
@@ -137,11 +154,13 @@ export default function PredictionQueue() {
                       }
                     }}
                     disabled={resolvingId === p.id || !selectedOption[p.id]}
-                    className={`mt-3 w-full py-2 rounded ${
-                      selectedOption[p.id]
-                        ? 'bg-[var(--color-primary)] text-[var(--color-surface)] hover:opacity-90'
-                        : 'bg-[var(--color-muted)] text-[var(--color-tertiary)] cursor-not-allowed'
-                    } transition`}
+                    className={`mt-3 w-full py-2 rounded font-medium transition
+                      ${
+                        selectedOption[p.id]
+                          ? 'bg-[var(--color-primary)] text-[var(--color-surface)] hover:opacity-90'
+                          : 'bg-[var(--color-muted)] text-[var(--color-tertiary)] cursor-not-allowed'
+                      }
+                    `}
                   >
                     {resolvingId === p.id ? 'Resolving…' : 'Resolve Prediction'}
                   </button>

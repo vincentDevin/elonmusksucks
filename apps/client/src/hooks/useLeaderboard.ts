@@ -6,11 +6,11 @@ import { getTopAllTime, getTopDaily } from '../api/leaderboard';
 export type LeaderboardPeriod = 'all-time' | 'daily';
 
 export function useLeaderboard(period: LeaderboardPeriod = 'all-time', limit: number = 25) {
-  const [data, setData] = useState<PublicLeaderboardEntry[] | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<PublicLeaderboardEntry[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<Error | null>(null);
 
-  const fetch = useCallback(async () => {
+  const fetchLeaderboard = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -23,9 +23,16 @@ export function useLeaderboard(period: LeaderboardPeriod = 'all-time', limit: nu
     }
   }, [period, limit]);
 
+  // Fetch on mount and whenever `period` or `limit` changes
   useEffect(() => {
-    fetch();
-  }, [fetch]);
+    fetchLeaderboard();
+  }, [fetchLeaderboard]);
 
-  return { data, loading, error, refresh: fetch };
+  return {
+    data,
+    loading,
+    error,
+    /** call this to manually re-fetch the leaderboard */
+    refresh: fetchLeaderboard,
+  };
 }

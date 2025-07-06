@@ -119,7 +119,11 @@ export default function Profile() {
         />
       ) : (
         <>
-          <ProfileStats profile={profile} stats={stats} isOwn={isOwn} />
+          <ProfileStats
+            profile={{ muskBucks: profile.muskBucks, rank: profile.rank }}
+            stats={stats}
+            isOwn={isOwn}
+          />
           <ProfileFollowers
             followersCount={profile.followersCount}
             followingCount={profile.followingCount}

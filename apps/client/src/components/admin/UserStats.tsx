@@ -1,36 +1,102 @@
-import React from 'react';
+// apps/client/src/components/admin/UserStats.tsx
+import { useState, useCallback } from 'react';
 import { useAdmin } from '../../contexts/AdminContext';
+import type { UserStatsDTO, PublicUser } from '@ems/types';
 
-const UserStats: React.FC = () => {
+export default function UserStats() {
   const { users, statsFor, loadUserStats } = useAdmin();
+  const [loadingAll, setLoadingAll] = useState(false);
+
+  const handleLoadAll = useCallback(async () => {
+    setLoadingAll(true);
+    try {
+      await Promise.all(users.map((u) => loadUserStats(u.id)));
+    } finally {
+      setLoadingAll(false);
+    }
+  }, [users, loadUserStats]);
 
   return (
-    <section>
-      <h2 className="text-xl font-semibold mb-2">User Stats</h2>
-      <ul className="space-y-1">
-        {users.map((u) => {
-          const s = statsFor[u.id];
-          return (
-            <li key={u.id} className="flex justify-between">
-              <span>{u.name}</span>
-              {s ? (
-                <span>
-                  Bets: {s.totalBets}, Wins: {s.betsWon}, Profit: {s.profit}
-                </span>
-              ) : (
-                <button
-                  className="px-2 py-0.5 bg-[var(--color-tertiary)] text-[var(--color-surface)] rounded cursor-pointer hover:opacity-90 transition"
-                  onClick={() => loadUserStats(u.id)}
+    <section className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold">User Stats</h2>
+        <button
+          onClick={handleLoadAll}
+          disabled={loadingAll}
+          className="px-3 py-1 bg-accent hover:bg-accent-dark text-surface rounded transition"
+        >
+          {loadingAll ? 'Loading…' : 'Load All'}
+        </button>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full table-auto text-left border-collapse">
+          <thead>
+            <tr className="bg-muted text-sm uppercase">
+              <th className="px-2 py-1">User</th>
+              <th className="px-2 py-1">Total Bets</th>
+              <th className="px-2 py-1">Wins</th>
+              <th className="px-2 py-1">Losses</th>
+              <th className="px-2 py-1">Parlays Started</th>
+              <th className="px-2 py-1">Parlays Won</th>
+              <th className="px-2 py-1">Wagered</th>
+              <th className="px-2 py-1">Won</th>
+              <th className="px-2 py-1">Streak</th>
+              <th className="px-2 py-1">Max Streak</th>
+              <th className="px-2 py-1">Profit</th>
+              <th className="px-2 py-1">ROI</th>
+              <th className="px-2 py-1">Last Updated</th>
+              <th className="px-2 py-1">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {users.map((u: PublicUser) => {
+              const s: UserStatsDTO | null = statsFor[u.id] ?? null;
+              return (
+                <tr
+                  key={u.id}
+                  className="even:bg-surface odd:bg-background hover:bg-surface transition"
                 >
-                  Load
-                </button>
-              )}
-            </li>
-          );
-        })}
-      </ul>
+                  <td className="px-2 py-1">{u.name}</td>
+                  {s ? (
+                    <>
+                      <td className="px-2 py-1">{s.totalBets}</td>
+                      <td className="px-2 py-1">{s.betsWon}</td>
+                      <td className="px-2 py-1">{s.betsLost}</td>
+                      <td className="px-2 py-1">{s.parlaysStarted}</td>
+                      <td className="px-2 py-1">{s.parlaysWon}</td>
+                      <td className="px-2 py-1">{s.totalWagered}</td>
+                      <td className="px-2 py-1">{s.totalWon}</td>
+                      <td className="px-2 py-1">{s.streak}</td>
+                      <td className="px-2 py-1">{s.maxStreak}</td>
+                      <td className="px-2 py-1">{s.profit}</td>
+                      <td className="px-2 py-1">{(s.roi * 100).toFixed(1)}%</td>
+                      <td className="px-2 py-1">{new Date(s.updatedAt).toLocaleString()}</td>
+                      <td className="px-2 py-1">
+                        <button
+                          onClick={() => loadUserStats(u.id)}
+                          className="px-2 py-0.5 bg-primary text-surface rounded hover:opacity-90 transition"
+                        >
+                          Refresh
+                        </button>
+                      </td>
+                    </>
+                  ) : (
+                    <td className="px-2 py-1 text-center" colSpan={13}>
+                      <button
+                        onClick={() => loadUserStats(u.id)}
+                        className="px-2 py-0.5 bg-tertiary text-surface rounded hover:opacity-90 transition"
+                      >
+                        Load
+                      </button>
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
-};
-
-export default UserStats;
+}

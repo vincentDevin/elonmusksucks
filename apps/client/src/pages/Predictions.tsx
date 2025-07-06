@@ -1,5 +1,5 @@
 // apps/client/src/pages/Predictions.tsx
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import type { PredictionFull, BetWithUser } from '../api/predictions';
 import type { PublicPredictionOption } from '@ems/types';
 import BetForm from '../components/BetForm';
@@ -31,17 +31,20 @@ export default function Predictions() {
   const [selOptions, setSelOptions] = useState<Record<number, number>>({});
   const [tab, setTab] = useState<'ALL' | 'PENDING'>('ALL');
 
+  // re-fetch on mount
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
   // build percentage pools per prediction
   const predictions = useMemo<PredictionWithPools[]>(() => {
     return raw.map((pred) => {
       const bets = pred.bets as BetWithUser[];
       const total = bets.reduce((sum, b) => sum + b.amount, 0);
-
-      const pools = (pred.options as PublicPredictionOption[]).slice(0, 4).map((opt) => {
+      const pools = (pred.options as PublicPredictionOption[]).map((opt) => {
         const optSum = bets.filter((b) => b.optionId === opt.id).reduce((s, b) => s + b.amount, 0);
         return { label: opt.label, pct: total > 0 ? optSum / total : 0 };
       });
-
       return { ...pred, bets, pools };
     });
   }, [raw]);
@@ -68,7 +71,12 @@ export default function Predictions() {
       </div>
       {creating && (
         <div className="mb-6">
-          <CreatePredictionForm onCreated={() => setCreating(false)} />
+          <CreatePredictionForm
+            onCreated={() => {
+              setCreating(false);
+              refresh();
+            }}
+          />
         </div>
       )}
 
@@ -103,8 +111,6 @@ export default function Predictions() {
         {filtered.map((pred) => {
           const now = Date.now();
           const expires = new Date(pred.expiresAt).getTime();
-
-          // status badge
           let badgeColor: string;
           let badgeText: string;
           if (!pred.approved) {
@@ -121,16 +127,12 @@ export default function Predictions() {
             badgeText = 'Open';
           }
 
-          // selected option for Add to Parlay
           const defaultOpt = pred.options[0]?.id;
           const sel = selOptions[pred.id] ?? defaultOpt;
-
-          // flatten parlay legs
-          // Use the service‐flattened parlayLegs directly
           const flatParlays: FlattenedParlayLeg[] = pred.parlayLegs.map((leg) => ({
             parlayId: leg.parlayId,
-            user: leg.user, // already { id, name }
-            stake: leg.stake, // already the numeric stake
+            user: leg.user,
+            stake: leg.stake,
             optionId: leg.optionId,
             createdAt: leg.createdAt,
           }));
