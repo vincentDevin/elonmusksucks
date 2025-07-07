@@ -62,18 +62,6 @@ export class PrismaAdminRepository implements IAdminRepository {
     });
   }
 
-  async resolvePrediction(predictionId: number, winningOptionId: number): Promise<Prediction> {
-    // store winningOptionId and mark resolved
-    return this.prisma.prediction.update({
-      where: { id: predictionId },
-      data: {
-        resolved: true,
-        winningOptionId,
-        resolvedAt: new Date(),
-      },
-    });
-  }
-
   // -- Bet & Transaction Oversight --
   async findBets(_filters?: QueryParams): Promise<Bet[]> {
     return this.prisma.bet.findMany();

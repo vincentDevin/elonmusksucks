@@ -110,19 +110,22 @@ export type DbRefreshToken = PrismaRefreshToken;
 // ——— LeaderboardEntry —————————————————————————————————————————
 export type DbLeaderboardEntry = PrismaLeaderboardEntry;
 export interface PublicLeaderboardEntry {
-  userId:        number;
-  userName:      string;
-  avatarUrl:     string | null;
-  balance:       number;
-  totalBets:     number;
-  winRate:       number;
-  profitAll:     number;
-  profitPeriod:  number;
-  roi:           number;
-  longestStreak: number;
-  parlaysStarted:number;
-  parlaysWon:    number;
-  rankChange:    number | null;
+  userId:           number;
+  userName:         string;
+  avatarUrl:        string | null;
+  balance:          number;
+  totalBets:        number;
+  winRate:          number;
+  profitAll:        number;
+  profitPeriod:     number;
+  roi:              number;
+  longestStreak:    number;
+  currentStreak:    number;
+  parlaysStarted:   number;
+  parlaysWon:       number;
+  totalParlayLegs:  number;
+  parlayLegsWon:    number;
+  rankChange:       number | null;
 }
 
 // ——— Badge & UserBadge ————————————————————————————————————————
@@ -191,22 +194,32 @@ export type PublicTransaction = Pick<
 
 // ——— UserStats (internal) ——————————————————————————————————————
 export type DbUserStats = {
-  id:             number;
-  userId:         number;
-  totalBets:      number;
-  betsWon:        number;
-  betsLost:       number;
-  parlaysStarted: number;
-  parlaysWon:     number;
-  totalWagered:   number;
-  totalWon:       number;
-  streak:         number;
-  maxStreak:      number;
-  profit:         number;
-  roi:            number;
-  mostCommonBet:  string | null;
-  biggestWin:     number;
-  updatedAt:      Date;
+  id:               number;
+  userId:           number;
+  // single-bet metrics
+  totalBets:        number;
+  betsWon:          number;
+  betsLost:         number;
+  // parlay metrics
+  totalParlays:     number;
+  parlaysWon:       number;
+  parlaysLost:      number;
+  totalParlayLegs:  number;
+  parlayLegsWon:    number;
+  parlayLegsLost:   number;
+  // combined metrics
+  totalWagered:     number;
+  totalWon:         number;
+  profit:           number;
+  roi:              number;
+  // streak tracking
+  currentStreak:    number;
+  longestStreak:    number;
+  // extras
+  mostCommonBet:    string | null;
+  biggestWin:       number;
+
+  updatedAt:        Date;
 };
 
 // ——— User Profile & Stats DTOs ————————————————————————————————————
@@ -236,19 +249,27 @@ export interface PublicUserProfile {
 }
 
 export type UserStatsDTO = {
-  totalBets:      number;
-  betsWon:        number;
-  betsLost:       number;
-  parlaysStarted: number;
-  parlaysWon:     number;
-  totalWagered:   number;
-  totalWon:       number;
-  streak:         number;
-  maxStreak:      number;
-  profit:         number;
-  roi:            number;
-  mostCommonBet:  string | null;
-  biggestWin:     number;
+totalBets:        number;
+  betsWon:          number;
+  betsLost:         number;
+  // parlay metrics
+  totalParlays:     number;
+  parlaysWon:       number;
+  parlaysLost:      number;
+  totalParlayLegs:  number;
+  parlayLegsWon:    number;
+  parlayLegsLost:   number;
+  // combined metrics
+  totalWagered:     number;
+  totalWon:         number;
+  profit:           number;
+  roi:              number;
+  // streak tracking
+  currentStreak:    number;
+  longestStreak:    number;
+  // extras
+  mostCommonBet:    string | null;
+  biggestWin:       number;
   updatedAt:      string;
 };
 

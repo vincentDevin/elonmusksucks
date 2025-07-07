@@ -1,6 +1,7 @@
 // apps/server/src/controllers/admin.controller.ts
 import { Request, Response, NextFunction } from 'express';
 import * as adminService from '../services/admin.service';
+import { payoutService } from '../services/payout.service';
 import type {
   PublicUser,
   PublicPrediction,
@@ -8,7 +9,6 @@ import type {
   PublicTransaction,
   PublicBadge,
   PublicUserBadge,
-  UserStatsDTO,
   PublicAITweet,
   AdminBet,
   AdminTransaction,
@@ -119,7 +119,7 @@ export async function resolvePrediction(
   try {
     const id = Number(req.params.id);
     const { winningOptionId } = req.body as { winningOptionId: number };
-    const updated: PublicPrediction = await adminService.resolvePrediction(id, winningOptionId);
+    const updated: PublicPrediction = await payoutService.resolvePrediction(id, winningOptionId);
     res.json(updated);
   } catch (err) {
     next(err);
@@ -294,21 +294,21 @@ export async function refreshLeaderboard(
   }
 }
 
-export async function getUserStats(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function getUserStats(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const userId = Number(req.params.userId);
-    const raw = await adminService.getUserStats(userId);
-    const stats: UserStatsDTO | null = raw
-      ? {
-          ...raw,
-          updatedAt: raw.updatedAt.toISOString(),
-        }
-      : null;
+    // Call the service, not the controller itself
+    const stats = await adminService.getUserStats(userId);
     res.json(stats);
   } catch (err) {
     next(err);
   }
 }
+
 
 // -- Miscellaneous --
 export async function triggerAITweet(

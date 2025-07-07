@@ -29,8 +29,6 @@ export interface IAdminRepository {
     predictionId: number,
     status: 'approved' | 'rejected',
   ): Promise<Prediction>;
-  /** Now takes the winning option’s ID rather than an Outcome enum */
-  resolvePrediction(predictionId: number, winningOptionId: number): Promise<Prediction>;
 
   // -- Bet & Transaction Oversight --
   findBets(filters?: QueryParams): Promise<Bet[]>;

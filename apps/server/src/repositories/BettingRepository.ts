@@ -1,131 +1,196 @@
 // apps/server/src/repositories/BettingRepository.ts
-// Prisma implementation of IBettingRepository
-
-import prisma from '../db';
+import { PrismaClient } from '@prisma/client';
 import type { IBettingRepository } from './IBettingRepository';
-import type {
-  DbPredictionOption,
-  DbPrediction,
-  DbUser,
-  DbBet,
-  DbTransaction,
-  DbParlay,
-  TransactionType,
-} from '@ems/types';
+import type { DbBet, DbParlay } from '@ems/types';
+
+const prisma = new PrismaClient();
 
 export class BettingRepository implements IBettingRepository {
-  /**
-   * Fetch a prediction option along with its parent prediction.
-   */
-  async findOptionWithPrediction(
-    optionId: number,
-  ): Promise<
-    | (DbPredictionOption & { prediction: Pick<DbPrediction, 'id' | 'resolved' | 'expiresAt'> })
-    | null
-  > {
+  findOptionWithPrediction(optionId: number) {
     return prisma.predictionOption.findUnique({
       where: { id: optionId },
       include: { prediction: { select: { id: true, resolved: true, expiresAt: true } } },
-    }) as Promise<
-      | (DbPredictionOption & { prediction: Pick<DbPrediction, 'id' | 'resolved' | 'expiresAt'> })
-      | null
-    >;
+    });
   }
 
-  /**
-   * Fetch minimal user info for betting (id and current balance).
-   */
-  async findUserById(userId: number): Promise<Pick<DbUser, 'id' | 'muskBucks'> | null> {
+  findUserById(userId: number) {
     return prisma.user.findUnique({
       where: { id: userId },
       select: { id: true, muskBucks: true },
-    }) as Promise<Pick<DbUser, 'id' | 'muskBucks'> | null>;
+    });
   }
 
-  /**
-   * Update a user's MuskBucks balance.
-   */
-  async updateUserMuskBucks(userId: number, muskBucks: number): Promise<void> {
-    await prisma.user.update({ where: { id: userId }, data: { muskBucks } });
-  }
-
-  /**
-   * Record a transaction for a user.
-   */
-  async createTransaction(data: {
-    userId: number;
-    type: TransactionType;
-    amount: number;
-    balanceAfter: number;
-    relatedBetId?: number | null;
-    relatedParlayId?: number | null;
-  }): Promise<DbTransaction> {
-    return prisma.transaction.create({ data }) as Promise<DbTransaction>;
-  }
-
-  /**
-   * Create a single bet record.
-   */
-  async createBet(data: {
-    userId: number;
-    predictionId: number;
-    optionId: number;
-    amount: number;
-    oddsAtPlacement: number;
-    potentialPayout: number;
-  }): Promise<DbBet> {
-    return prisma.bet.create({ data });
-  }
-
-  /**
-   * Group bets by option for a given prediction and sum amounts.
-   */
-  async groupBetsByPrediction(
+  async placeBet(
+    userId: number,
     predictionId: number,
-  ): Promise<Array<{ optionId: number; totalAmount: number }>> {
-    const pools = await prisma.bet.groupBy({
+    optionId: number,
+    amount: number,
+    oddsAtPlacement: number,
+    potentialPayout: number,
+  ): Promise<DbBet> {
+    return await prisma.$transaction(async (tx) => {
+      const user = await tx.user.update({
+        where: { id: userId },
+        data: { muskBucks: { decrement: amount } },
+      });
+
+      await tx.transaction.create({
+        data: {
+          userId,
+          type: 'DEBIT',
+          amount,
+          balanceAfter: user.muskBucks,
+          relatedBetId: null,
+          relatedParlayId: null,
+        },
+      });
+
+      const bet = await tx.bet.create({
+        data: { userId, predictionId, optionId, amount, oddsAtPlacement, potentialPayout },
+      });
+
+      // recalc odds
+      const pools = await tx.bet.groupBy({
+        by: ['optionId'],
+        where: { predictionId },
+        _sum: { amount: true },
+      });
+      const total = pools.reduce((s, p) => s + (p._sum.amount ?? 0), 0);
+      await Promise.all(
+        pools.map((p) =>
+          tx.predictionOption.update({
+            where: { id: p.optionId! },
+            data: { odds: total && p._sum.amount ? total / p._sum.amount : 1 },
+          }),
+        ),
+      );
+
+      // upsert stats for single bet
+      await tx.userStats.upsert({
+        where: { userId },
+        create: {
+          userId,
+          totalBets: 1,
+          betsWon: 0,
+          betsLost: 0,
+          totalParlays: 0,
+          parlaysWon: 0,
+          parlaysLost: 0,
+          totalParlayLegs: 0,
+          parlayLegsWon: 0,
+          parlayLegsLost: 0,
+          totalWagered: amount,
+          totalWon: 0,
+          profit: -amount,
+          roi: 0,
+          currentStreak: 0,
+          longestStreak: 0,
+          mostCommonBet: null,
+          biggestWin: 0,
+          updatedAt: new Date(),
+        },
+        update: {
+          totalBets: { increment: 1 },
+          totalWagered: { increment: amount },
+          profit: { decrement: amount },
+        },
+      });
+
+      return bet;
+    });
+  }
+
+  async placeParlay(
+    userId: number,
+    legs: Array<{ predictionId: number; optionId: number; oddsAtPlacement: number }>,
+    amount: number,
+    potentialPayout: number,
+  ): Promise<DbParlay> {
+    const legCount = legs.length;
+
+    return await prisma.$transaction(async (tx) => {
+      const user = await tx.user.update({
+        where: { id: userId },
+        data: { muskBucks: { decrement: amount } },
+      });
+
+      await tx.transaction.create({
+        data: {
+          userId,
+          type: 'DEBIT',
+          amount,
+          balanceAfter: user.muskBucks,
+          relatedBetId: null,
+          relatedParlayId: null,
+        },
+      });
+
+      const parlay = await tx.parlay.create({
+        data: {
+          userId,
+          amount,
+          combinedOdds: legs.reduce((a, l) => a * l.oddsAtPlacement, 1),
+          potentialPayout,
+          legs: {
+            create: legs.map((l) => ({
+              optionId: l.optionId,
+              oddsAtPlacement: l.oddsAtPlacement,
+            })),
+          },
+        },
+      });
+
+      // upsert stats for parlay
+      await tx.userStats.upsert({
+        where: { userId },
+        create: {
+          userId,
+          totalBets: 0,
+          betsWon: 0,
+          betsLost: 0,
+          totalParlays: 1,
+          parlaysWon: 0,
+          parlaysLost: 0,
+          totalParlayLegs: legCount,
+          parlayLegsWon: 0,
+          parlayLegsLost: legCount,
+          totalWagered: amount,
+          totalWon: 0,
+          profit: -amount,
+          roi: 0,
+          currentStreak: 0,
+          longestStreak: 0,
+          mostCommonBet: null,
+          biggestWin: 0,
+          updatedAt: new Date(),
+        },
+        update: {
+          totalParlays:    { increment: 1 },
+          totalParlayLegs: { increment: legCount },
+          totalWagered:    { increment: amount },
+          profit:          { decrement: amount },
+        },
+      });
+
+      return parlay;
+    });
+  }
+
+  recalculateOdds(predictionId: number): Promise<void> {
+    return prisma.bet.groupBy({
       by: ['optionId'],
       where: { predictionId },
       _sum: { amount: true },
+    }).then((pools) => {
+      const total = pools.reduce((s, p) => s + (p._sum.amount ?? 0), 0);
+      return Promise.all(
+        pools.map((p) =>
+          prisma.predictionOption.update({
+            where: { id: p.optionId! },
+            data: { odds: total && p._sum.amount ? total / p._sum.amount : 1 },
+          }),
+        ),
+      ).then(() => undefined);
     });
-    return pools
-      .filter((p) => p.optionId !== null)
-      .map((p) => ({ optionId: p.optionId as number, totalAmount: p._sum.amount ?? 0 }));
-  }
-
-  /**
-   * Update odds on a prediction option.
-   */
-  async updatePredictionOptionOdds(optionId: number, odds: number): Promise<void> {
-    await prisma.predictionOption.update({
-      where: { id: optionId },
-      data: { odds },
-    });
-  }
-
-  /**
-   * Create a parlay bet with nested legs.
-   */
-  async createParlay(data: {
-    userId: number;
-    amount: number;
-    combinedOdds: number;
-    potentialPayout: number;
-    legs: Array<{ optionId: number; oddsAtPlacement: number }>;
-  }): Promise<DbParlay> {
-    return prisma.parlay.create({
-      data: {
-        userId: data.userId,
-        amount: data.amount,
-        combinedOdds: data.combinedOdds,
-        potentialPayout: data.potentialPayout,
-        legs: {
-          create: data.legs.map((leg) => ({
-            optionId: leg.optionId,
-            oddsAtPlacement: leg.oddsAtPlacement,
-          })),
-        },
-      },
-    }) as Promise<DbParlay>;
   }
 }

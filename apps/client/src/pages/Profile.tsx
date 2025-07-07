@@ -1,6 +1,7 @@
+// apps/client/src/pages/Profile.tsx
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
-import { followUser, unfollowUser, updateUserProfile } from '../api/users';
+import { followUser, unfollowUser } from '../api/users';
 import { useAuth } from '../contexts/AuthContext';
 import { useUserProfile } from '../hooks/useUserProfile';
 import type { UpdateProfilePayload } from '../api/users';
@@ -28,8 +29,10 @@ export default function Profile() {
     setFormData,
     refresh: reloadProfile,
     feed,
-    postToFeed,
     activity,
+    stats,
+    saveProfile,      // from hook
+    postToFeed,
   } = useUserProfile(numericId);
 
   const isOwn = currentUser?.id === profile?.id;
@@ -38,7 +41,7 @@ export default function Profile() {
   const [following, setFollowing] = useState(profile?.isFollowing ?? false);
   const [replyParentId, setReplyParentId] = useState<number | null>(null);
 
-  // Keep `following` in sync when profile changes
+  // Sync the follow‐button state
   useEffect(() => {
     setFollowing(profile?.isFollowing ?? false);
   }, [profile?.isFollowing]);
@@ -48,12 +51,11 @@ export default function Profile() {
     try {
       if (following) {
         await unfollowUser(profile.id);
-        setFollowing(false);
       } else {
         await followUser(profile.id);
-        setFollowing(true);
       }
-      reloadProfile();
+      setFollowing(!following);
+      await reloadProfile();
     } catch (e: any) {
       console.error(e);
       alert('Action failed: ' + (e?.message || e.toString()));
@@ -63,12 +65,12 @@ export default function Profile() {
   const handleSave = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
-      if (!profile || !formData) return;
+      if (!profile) return;
       setSaving(true);
       try {
-        await updateUserProfile(profile.id, formData as UpdateProfilePayload);
+        // saveProfile comes from the hook
+        await saveProfile(formData as UpdateProfilePayload);
         setEditing(false);
-        await reloadProfile();
       } catch (e: any) {
         console.error(e);
         alert('Save failed: ' + (e?.message || e.toString()));
@@ -76,10 +78,9 @@ export default function Profile() {
         setSaving(false);
       }
     },
-    [profile, formData, reloadProfile],
+    [profile, formData, saveProfile]
   );
 
-  // Handle new posts and replies
   const handlePost = async (content: string, parentId?: number | null) => {
     await postToFeed({ content, parentId });
     setReplyParentId(null);
@@ -92,11 +93,26 @@ export default function Profile() {
     return <p className="text-center py-8 text-red-500">Error: {error}</p>;
   }
 
-  const stats = profile.stats || {
-    successRate: 0,
-    totalPredictions: 0,
+  // Full stats object (new fields) with a fallback
+  const statsData = stats ?? {
+    totalBets: 0,
+    betsWon: 0,
+    betsLost: 0,
+    totalParlays: 0,
+    parlaysWon: 0,
+    parlaysLost: 0,
+    totalParlayLegs: 0,
+    parlayLegsWon: 0,
+    parlayLegsLost: 0,
+    totalWagered: 0,
+    totalWon: 0,
+    profit: 0,
+    roi: 0,
     currentStreak: 0,
     longestStreak: 0,
+    mostCommonBet: null,
+    biggestWin: 0,
+    updatedAt: new Date().toISOString(),
   };
 
   return (
@@ -121,7 +137,7 @@ export default function Profile() {
         <>
           <ProfileStats
             profile={{ muskBucks: profile.muskBucks, rank: profile.rank }}
-            stats={stats}
+            stats={statsData}
             isOwn={isOwn}
           />
           <ProfileFollowers
@@ -130,10 +146,8 @@ export default function Profile() {
           />
           <ProfileBadges badges={profile.badges} />
 
-          {/* --- User Activity --- */}
           <ProfileActivity activity={activity ?? []} />
 
-          {/* --- Feed & Post Box --- */}
           {isOwn ? (
             <CreatePostForm onSubmit={handlePost} disabled={loading} />
           ) : (
@@ -144,9 +158,12 @@ export default function Profile() {
 
           <ProfileFeed feed={feed} loading={loading} onReply={setReplyParentId} />
 
-          {/* Reply Box (shows up when replying) */}
           {replyParentId !== null && currentUser && (
-            <CreatePostForm onSubmit={handlePost} parentId={replyParentId} disabled={loading} />
+            <CreatePostForm
+              onSubmit={handlePost}
+              parentId={replyParentId}
+              disabled={loading}
+            />
           )}
         </>
       )}

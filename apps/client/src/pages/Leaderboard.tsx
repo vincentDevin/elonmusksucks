@@ -79,10 +79,12 @@ export default function Leaderboard() {
                   />
                   <Stat label="ROI" value={`${(entry.roi * 100).toFixed(1)}%`} />
                   <Stat label="Longest Streak" value={`${entry.longestStreak}`} />
+                  <Stat label="Current Streak" value={`${entry.currentStreak}`} />
                   <Stat
                     label="Parlays (W/S)"
                     value={`${entry.parlaysWon}/${entry.parlaysStarted}`}
                   />
+                  <Stat label="Parlay Legs (W/T)" value={`${entry.parlayLegsWon}/${entry.totalParlayLegs}`} />
                 </div>
               </Link>
             </li>
