@@ -294,11 +294,7 @@ export async function refreshLeaderboard(
   }
 }
 
-export async function getUserStats(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> {
+export async function getUserStats(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const userId = Number(req.params.userId);
     // Call the service, not the controller itself
@@ -308,7 +304,6 @@ export async function getUserStats(
     next(err);
   }
 }
-
 
 // -- Miscellaneous --
 export async function triggerAITweet(

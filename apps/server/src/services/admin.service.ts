@@ -85,34 +85,31 @@ export const refreshLeaderboard = async () => {
 /**
  * Fetches raw stats, then maps Date→ISO and returns the DTO.
  */
-export const getUserStats = async (
-  userId: number,
-): Promise<UserStatsDTO | null> => {
+export const getUserStats = async (userId: number): Promise<UserStatsDTO | null> => {
   const raw = await repo.findUserStats(userId);
   if (!raw) return null;
 
   return {
-    totalBets:       raw.totalBets,
-    betsWon:         raw.betsWon,
-    betsLost:        raw.betsLost,
-    totalParlays:    raw.totalParlays,
-    parlaysWon:      raw.parlaysWon,
-    parlaysLost:     raw.parlaysLost,
+    totalBets: raw.totalBets,
+    betsWon: raw.betsWon,
+    betsLost: raw.betsLost,
+    totalParlays: raw.totalParlays,
+    parlaysWon: raw.parlaysWon,
+    parlaysLost: raw.parlaysLost,
     totalParlayLegs: raw.totalParlayLegs,
-    parlayLegsWon:   raw.parlayLegsWon,
-    parlayLegsLost:  raw.parlayLegsLost,
-    totalWagered:    raw.totalWagered,
-    totalWon:        raw.totalWon,
-    profit:          raw.profit,
-    roi:             raw.roi,
-    currentStreak:   raw.currentStreak,
-    longestStreak:   raw.longestStreak,
-    mostCommonBet:   raw.mostCommonBet,
-    biggestWin:      raw.biggestWin,
-    updatedAt:       raw.updatedAt.toISOString(),
+    parlayLegsWon: raw.parlayLegsWon,
+    parlayLegsLost: raw.parlayLegsLost,
+    totalWagered: raw.totalWagered,
+    totalWon: raw.totalWon,
+    profit: raw.profit,
+    roi: raw.roi,
+    currentStreak: raw.currentStreak,
+    longestStreak: raw.longestStreak,
+    mostCommonBet: raw.mostCommonBet,
+    biggestWin: raw.biggestWin,
+    updatedAt: raw.updatedAt.toISOString(),
   };
 };
-
 
 // -- Miscellaneous --
 export const generateAITweet = async () => {

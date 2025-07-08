@@ -31,7 +31,7 @@ export default function Profile() {
     feed,
     activity,
     stats,
-    saveProfile,      // from hook
+    saveProfile, // from hook
     postToFeed,
   } = useUserProfile(numericId);
 
@@ -78,7 +78,7 @@ export default function Profile() {
         setSaving(false);
       }
     },
-    [profile, formData, saveProfile]
+    [profile, formData, saveProfile],
   );
 
   const handlePost = async (content: string, parentId?: number | null) => {
@@ -159,11 +159,7 @@ export default function Profile() {
           <ProfileFeed feed={feed} loading={loading} onReply={setReplyParentId} />
 
           {replyParentId !== null && currentUser && (
-            <CreatePostForm
-              onSubmit={handlePost}
-              parentId={replyParentId}
-              disabled={loading}
-            />
+            <CreatePostForm onSubmit={handlePost} parentId={replyParentId} disabled={loading} />
           )}
         </>
       )}

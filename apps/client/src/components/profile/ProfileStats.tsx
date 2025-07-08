@@ -48,9 +48,7 @@ export function ProfileStats({
 
   return (
     <div>
-      <div
-        className={`grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-${expanded ? 6 : 4}`}
-      >
+      <div className={`grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-${expanded ? 6 : 4}`}>
         {displayedTiles.map(({ label, value }) => (
           <div
             key={label}

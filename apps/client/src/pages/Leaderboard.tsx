@@ -84,7 +84,10 @@ export default function Leaderboard() {
                     label="Parlays (W/S)"
                     value={`${entry.parlaysWon}/${entry.parlaysStarted}`}
                   />
-                  <Stat label="Parlay Legs (W/T)" value={`${entry.parlayLegsWon}/${entry.totalParlayLegs}`} />
+                  <Stat
+                    label="Parlay Legs (W/T)"
+                    value={`${entry.parlayLegsWon}/${entry.totalParlayLegs}`}
+                  />
                 </div>
               </Link>
             </li>

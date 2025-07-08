@@ -165,10 +165,10 @@ export class BettingRepository implements IBettingRepository {
           updatedAt: new Date(),
         },
         update: {
-          totalParlays:    { increment: 1 },
+          totalParlays: { increment: 1 },
           totalParlayLegs: { increment: legCount },
-          totalWagered:    { increment: amount },
-          profit:          { decrement: amount },
+          totalWagered: { increment: amount },
+          profit: { decrement: amount },
         },
       });
 
@@ -177,20 +177,22 @@ export class BettingRepository implements IBettingRepository {
   }
 
   recalculateOdds(predictionId: number): Promise<void> {
-    return prisma.bet.groupBy({
-      by: ['optionId'],
-      where: { predictionId },
-      _sum: { amount: true },
-    }).then((pools) => {
-      const total = pools.reduce((s, p) => s + (p._sum.amount ?? 0), 0);
-      return Promise.all(
-        pools.map((p) =>
-          prisma.predictionOption.update({
-            where: { id: p.optionId! },
-            data: { odds: total && p._sum.amount ? total / p._sum.amount : 1 },
-          }),
-        ),
-      ).then(() => undefined);
-    });
+    return prisma.bet
+      .groupBy({
+        by: ['optionId'],
+        where: { predictionId },
+        _sum: { amount: true },
+      })
+      .then((pools) => {
+        const total = pools.reduce((s, p) => s + (p._sum.amount ?? 0), 0);
+        return Promise.all(
+          pools.map((p) =>
+            prisma.predictionOption.update({
+              where: { id: p.optionId! },
+              data: { odds: total && p._sum.amount ? total / p._sum.amount : 1 },
+            }),
+          ),
+        ).then(() => undefined);
+      });
   }
 }

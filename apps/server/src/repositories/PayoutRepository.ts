@@ -27,11 +27,15 @@ export class PayoutRepository implements IPayoutRepository {
         const bets = await tx.bet.findMany({ where: { predictionId } });
         for (const b of bets) {
           const isWinner = b.optionId === winningOptionId;
-          const payoutAmount = isWinner ? b.potentialPayout ?? 0 : 0;
+          const payoutAmount = isWinner ? (b.potentialPayout ?? 0) : 0;
 
           await tx.bet.update({
             where: { id: b.id },
-            data: { status: isWinner ? 'WON' : 'LOST', won: isWinner, payout: isWinner ? b.potentialPayout : undefined },
+            data: {
+              status: isWinner ? 'WON' : 'LOST',
+              won: isWinner,
+              payout: isWinner ? b.potentialPayout : undefined,
+            },
           });
 
           if (isWinner) {
@@ -40,7 +44,14 @@ export class PayoutRepository implements IPayoutRepository {
               const newBal = user.muskBucks + payoutAmount;
               await tx.user.update({ where: { id: user.id }, data: { muskBucks: newBal } });
               await tx.transaction.create({
-                data: { userId: user.id, type: 'CREDIT', amount: payoutAmount, balanceAfter: newBal, relatedBetId: b.id, relatedParlayId: null }
+                data: {
+                  userId: user.id,
+                  type: 'CREDIT',
+                  amount: payoutAmount,
+                  balanceAfter: newBal,
+                  relatedBetId: b.id,
+                  relatedParlayId: null,
+                },
               });
             }
           }
@@ -67,7 +78,7 @@ export class PayoutRepository implements IPayoutRepository {
               currentStreak: isWinner ? (statsBefore?.currentStreak ?? 0) + 1 : 0,
               longestStreak: isWinner
                 ? Math.max(statsBefore?.longestStreak ?? 0, (statsBefore?.currentStreak ?? 0) + 1)
-                : statsBefore?.longestStreak ?? 0,
+                : (statsBefore?.longestStreak ?? 0),
               mostCommonBet: null,
               biggestWin: payoutAmount,
             },
@@ -81,7 +92,12 @@ export class PayoutRepository implements IPayoutRepository {
               biggestWin: { set: Math.max(statsBefore?.biggestWin ?? 0, payoutAmount) },
               currentStreak: isWinner ? { set: (statsBefore?.currentStreak ?? 0) + 1 } : { set: 0 },
               longestStreak: isWinner
-                ? { set: Math.max(statsBefore?.longestStreak ?? 0, (statsBefore?.currentStreak ?? 0) + 1) }
+                ? {
+                    set: Math.max(
+                      statsBefore?.longestStreak ?? 0,
+                      (statsBefore?.currentStreak ?? 0) + 1,
+                    ),
+                  }
                 : undefined,
             },
           });
@@ -90,34 +106,56 @@ export class PayoutRepository implements IPayoutRepository {
           await tx.userStats.update({
             where: { userId: b.userId },
             data: {
-              roi: (prevStats.profit + (payoutAmount - b.amount)) / (prevStats.totalWagered + b.amount),
+              roi:
+                (prevStats.profit + (payoutAmount - b.amount)) /
+                (prevStats.totalWagered + b.amount),
             },
           });
         }
 
         // --- STEP 3: process parlays ---
-        const affected = await tx.parlayLeg.findMany({ where: { option: { predictionId } }, select: { parlayId: true } });
+        const affected = await tx.parlayLeg.findMany({
+          where: { option: { predictionId } },
+          select: { parlayId: true },
+        });
         const parlayIds = Array.from(new Set(affected.map((l) => l.parlayId)));
 
         for (const parlayId of parlayIds) {
           const legs = await tx.parlayLeg.findMany({
             where: { parlayId },
-            include: { option: { include: { prediction: true } }, parlay: { include: { user: true } } },
+            include: {
+              option: { include: { prediction: true } },
+              parlay: { include: { user: true } },
+            },
           });
           if (!legs.every((l) => l.option.prediction.resolved)) continue;
 
           const parlay = legs[0].parlay;
           const legCount = legs.length;
-          const legsWon = legs.filter((l) => l.optionId === l.option.prediction.winningOptionId).length;
+          const legsWon = legs.filter(
+            (l) => l.optionId === l.option.prediction.winningOptionId,
+          ).length;
           const lost = legsWon < legCount;
           const payoutAmount = lost ? 0 : parlay.potentialPayout;
 
-          await tx.parlay.update({ where: { id: parlayId }, data: { status: lost ? 'LOST' : 'WON' } });
+          await tx.parlay.update({
+            where: { id: parlayId },
+            data: { status: lost ? 'LOST' : 'WON' },
+          });
 
           if (!lost) {
             const newBal = parlay.user.muskBucks + payoutAmount;
             await tx.user.update({ where: { id: parlay.userId }, data: { muskBucks: newBal } });
-            await tx.transaction.create({ data: { userId: parlay.userId, type: 'CREDIT', amount: payoutAmount, balanceAfter: newBal, relatedBetId: null, relatedParlayId: parlay.id } });
+            await tx.transaction.create({
+              data: {
+                userId: parlay.userId,
+                type: 'CREDIT',
+                amount: payoutAmount,
+                balanceAfter: newBal,
+                relatedBetId: null,
+                relatedParlayId: parlay.id,
+              },
+            });
           }
 
           // fetch existing stats
@@ -141,7 +179,7 @@ export class PayoutRepository implements IPayoutRepository {
               roi: 0,
               currentStreak: lost ? 0 : (statsBefore?.currentStreak ?? 0) + 1,
               longestStreak: lost
-                ? statsBefore?.longestStreak ?? 0
+                ? (statsBefore?.longestStreak ?? 0)
                 : Math.max(statsBefore?.longestStreak ?? 0, (statsBefore?.currentStreak ?? 0) + 1),
               mostCommonBet: null,
               biggestWin: payoutAmount,
@@ -160,14 +198,21 @@ export class PayoutRepository implements IPayoutRepository {
               currentStreak: lost ? { set: 0 } : { set: (statsBefore?.currentStreak ?? 0) + 1 },
               longestStreak: lost
                 ? undefined
-                : { set: Math.max(statsBefore?.longestStreak ?? 0, (statsBefore?.currentStreak ?? 0) + 1) },
+                : {
+                    set: Math.max(
+                      statsBefore?.longestStreak ?? 0,
+                      (statsBefore?.currentStreak ?? 0) + 1,
+                    ),
+                  },
             },
           });
 
           await tx.userStats.update({
             where: { userId: parlay.userId },
             data: {
-              roi: (prevP.profit + (payoutAmount - parlay.amount)) / (prevP.totalWagered + parlay.amount),
+              roi:
+                (prevP.profit + (payoutAmount - parlay.amount)) /
+                (prevP.totalWagered + parlay.amount),
             },
           });
         }

@@ -179,26 +179,24 @@ export class UserService {
     const stats = await this.repo.getUserStats(userId);
     if (!stats) return null;
     return {
-      totalBets:        stats.totalBets,
-      betsWon:          stats.betsWon,
-      betsLost:         stats.betsLost,
-      totalParlays:     stats.totalParlays,
-      parlaysWon:       stats.parlaysWon,
-      parlaysLost:      stats.parlaysLost,
-      totalParlayLegs:  stats.totalParlayLegs,
-      parlayLegsWon:    stats.parlayLegsWon,
-      parlayLegsLost:   stats.parlayLegsLost,
-      totalWagered:     stats.totalWagered,
-      totalWon:         stats.totalWon,
-      profit:           stats.profit,
-      roi:              stats.roi,
-      currentStreak:    stats.currentStreak,
-      longestStreak:    stats.longestStreak,
-      mostCommonBet:    stats.mostCommonBet ?? null,
-      biggestWin:       stats.biggestWin,
-      updatedAt:        stats.updatedAt instanceof Date
-                          ? stats.updatedAt.toISOString()
-                          : stats.updatedAt,
+      totalBets: stats.totalBets,
+      betsWon: stats.betsWon,
+      betsLost: stats.betsLost,
+      totalParlays: stats.totalParlays,
+      parlaysWon: stats.parlaysWon,
+      parlaysLost: stats.parlaysLost,
+      totalParlayLegs: stats.totalParlayLegs,
+      parlayLegsWon: stats.parlayLegsWon,
+      parlayLegsLost: stats.parlayLegsLost,
+      totalWagered: stats.totalWagered,
+      totalWon: stats.totalWon,
+      profit: stats.profit,
+      roi: stats.roi,
+      currentStreak: stats.currentStreak,
+      longestStreak: stats.longestStreak,
+      mostCommonBet: stats.mostCommonBet ?? null,
+      biggestWin: stats.biggestWin,
+      updatedAt: stats.updatedAt instanceof Date ? stats.updatedAt.toISOString() : stats.updatedAt,
     };
   }
 
