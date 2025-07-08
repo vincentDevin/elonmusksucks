@@ -1,3 +1,5 @@
+// apps/server/src/repositories/UserRepository.ts
+
 import { PrismaClient, Prisma } from '@prisma/client';
 import type { IUserRepository } from './IUserRepository';
 import type {
@@ -33,9 +35,7 @@ export class UserRepository implements IUserRepository {
 
   async existsFollow(followerId: number, followingId: number): Promise<boolean> {
     const follow = await prisma.follow.findUnique({
-      where: {
-        followerId_followingId: { followerId, followingId },
-      },
+      where: { followerId_followingId: { followerId, followingId } },
     });
     return Boolean(follow);
   }
@@ -46,9 +46,7 @@ export class UserRepository implements IUserRepository {
 
   async deleteFollow(followerId: number, followingId: number): Promise<void> {
     await prisma.follow.delete({
-      where: {
-        followerId_followingId: { followerId, followingId },
-      },
+      where: { followerId_followingId: { followerId, followingId } },
     });
   }
 
@@ -71,37 +69,30 @@ export class UserRepository implements IUserRepository {
     await prisma.user.update({ where: { id: userId }, data });
   }
 
-  async getUserFeed(userId: number): Promise<DbUserPost[]> {
-    // 1. Fetch all posts for this user's wall, with author data
+  async getUserFeed(userId: number, options?: { parentId: number | null }): Promise<DbUserPost[]> {
+    const where: any = { ownerId: userId };
+    if (options && 'parentId' in options) {
+      where.parentId = options.parentId;
+    }
+
     const posts = await prisma.userPost.findMany({
-      where: { ownerId: userId },
+      where,
       orderBy: { createdAt: 'desc' },
       include: { author: true },
     });
 
-    // 2. Map authorName for each
+    // Nest into a tree
     const flat = posts.map((post) => ({
       ...mapUserPost(post),
-      authorName: post.author?.name || `User #${post.authorId}`,
+      authorName: post.author?.name ?? `User #${post.authorId}`,
     }));
-
-    // 3. Build an id -> post map for O(1) lookup
-    const byId: Record<number, DbUserPost & { authorName: string; children?: any[] }> = {};
-    flat.forEach((p) => {
-      byId[p.id] = { ...p, children: [] };
-    });
-
-    // 4. Nest children under parents
+    const byId: Record<number, any> = {};
+    flat.forEach((p) => (byId[p.id] = { ...p, children: [] }));
     const tree: typeof flat = [];
     flat.forEach((p) => {
-      if (p.parentId) {
-        byId[p.parentId]?.children?.push(byId[p.id]);
-      } else {
-        tree.push(byId[p.id]);
-      }
+      if (p.parentId != null) byId[p.parentId]?.children.push(byId[p.id]);
+      else tree.push(byId[p.id]);
     });
-
-    // 5. Return only top-level posts, now with children attached
     return tree;
   }
 
@@ -111,16 +102,7 @@ export class UserRepository implements IUserRepository {
     content: string;
     parentId: number | null;
   }): Promise<DbUserPost> {
-    const post = await prisma.userPost.create({
-      data: {
-        authorId: data.authorId,
-        ownerId: data.ownerId,
-        content: data.content,
-        parentId: data.parentId,
-      },
-    });
-    // No mapping to string—keep as Date!
-    return post;
+    return prisma.userPost.create({ data }) as Promise<DbUserPost>;
   }
 
   async getUserPostThread(
@@ -131,19 +113,14 @@ export class UserRepository implements IUserRepository {
       include: { children: true },
     });
     if (!post) return null;
-    // children will be DbUserPost[], createdAt/updatedAt are Date
-    return {
-      ...post,
-      children: post.children ?? [],
-    };
+    return { ...post, children: post.children ?? [] };
   }
 
   async getUserActivity(userId: number): Promise<DbUserActivity[]> {
-    const activity = await prisma.userActivity.findMany({
+    return prisma.userActivity.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
     });
-    return activity;
   }
 
   async createUserActivity(data: {
@@ -151,19 +128,24 @@ export class UserRepository implements IUserRepository {
     type: string;
     details?: Prisma.InputJsonValue | null;
   }): Promise<DbUserActivity> {
-    const activity = await prisma.userActivity.create({
-      data: {
-        userId: data.userId,
-        type: data.type,
-        details: data.details ?? undefined,
-      },
-    });
-    return activity;
+    // Build up the `data` payload, translating null -> Prisma.JsonNull
+    const payload: Prisma.UserActivityUncheckedCreateInput = {
+      userId: data.userId,
+      type: data.type,
+      // If details is exactly null, use Prisma.JsonNull. If undefined, omit entirely.
+      ...(data.details === null
+        ? { details: Prisma.JsonNull }
+        : data.details !== undefined
+          ? { details: data.details }
+          : {}),
+    };
+
+    const activity = await prisma.userActivity.create({ data: payload });
+    return activity as DbUserActivity;
   }
 
   async getUserStats(userId: number): Promise<DbUserStats | null> {
-    const stats = await prisma.userStats.findUnique({ where: { userId } });
-    return stats;
+    return prisma.userStats.findUnique({ where: { userId } }) as Promise<DbUserStats | null>;
   }
 
   async updateUserStats(
@@ -173,15 +155,51 @@ export class UserRepository implements IUserRepository {
     await prisma.userStats.update({ where: { userId }, data });
   }
 
+  /**
+   * Atomically increments one or more stats fields;
+   * if no UserStats row exists yet, create it.
+   */
+  async incrementUserStats(userId: number, data: Prisma.UserStatsUpdateInput): Promise<void> {
+    try {
+      await prisma.userStats.update({
+        where: { userId },
+        data,
+      });
+    } catch (e: any) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2025') {
+        // extract just the 'increment' values into an unchecked create payload
+        const createData: Prisma.UserStatsUncheckedCreateInput = { userId };
+        for (const [key, val] of Object.entries(data)) {
+          if (
+            val &&
+            typeof val === 'object' &&
+            'increment' in val &&
+            typeof (val as any).increment === 'number'
+          ) {
+            // @ts-ignore – this is fine because we're building an unchecked payload
+            createData[key] = (val as any).increment;
+          }
+        }
+        await prisma.userStats.create({
+          // cast to the unchecked type so TS knows 'user' nested field isn't required
+          data: createData as Prisma.UserStatsUncheckedCreateInput,
+        });
+        return;
+      }
+      throw e;
+    }
+  }
+
   async setFeedPrivacy(userId: number, feedPrivate: boolean): Promise<void> {
     await prisma.user.update({ where: { id: userId }, data: { feedPrivate } });
   }
 }
+
 function mapUserPost(post: any): DbUserPost {
   return {
     ...post,
     createdAt: post.createdAt.toISOString(),
     updatedAt: post.updatedAt.toISOString(),
-    authorName: post.author?.name || undefined,
+    authorName: post.author?.name,
   };
 }

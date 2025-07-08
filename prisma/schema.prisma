@@ -3,8 +3,8 @@ generator client {
 }
 
 datasource db {
-provider = "postgresql"
-url      = env("DATABASE_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 enum Role {
@@ -12,10 +12,10 @@ enum Role {
   USER
 }
 
-enum Outcome {
-  YES
-  NO
-  CANCELLED
+enum PredictionType {
+  MULTIPLE
+  BINARY
+  OVER_UNDER
 }
 
 enum BetOption {
@@ -102,20 +102,22 @@ model PasswordReset {
 }
 
 model Prediction {
-  id          Int                @id @default(autoincrement())
-  title       String
-  description String
-  category    String
-  expiresAt   DateTime
-  resolved    Boolean            @default(false)
-  approved    Boolean            @default(false)
-  resolvedAt  DateTime?
-  outcome     Outcome?
-  bets        Bet[]
-  options     PredictionOption[]
-  createdAt   DateTime           @default(now())
-  creatorId   Int
-  creator     User               @relation(fields: [creatorId], references: [id])
+  id              Int                @id @default(autoincrement())
+  title           String
+  description     String
+  category        String
+  type            PredictionType     @default(MULTIPLE)
+  threshold       Float?
+  expiresAt       DateTime
+  resolved        Boolean            @default(false)
+  approved        Boolean            @default(false)
+  resolvedAt      DateTime?
+  winningOptionId Int?
+  bets            Bet[]
+  options         PredictionOption[]
+  createdAt       DateTime           @default(now())
+  creatorId       Int
+  creator         User               @relation(fields: [creatorId], references: [id])
 
   @@index([expiresAt, resolved])
 }
@@ -165,9 +167,27 @@ model RefreshToken {
 }
 
 model LeaderboardEntry {
-  id        Int    @id
-  name      String
-  muskBucks Int
+  userId    Int     @id @map("user_id")
+  userName  String  @map("user_name")
+  avatarUrl String? @map("avatar_url")
+  balance   Int     @map("balance")
+
+  totalBets    Int   @map("total_bets")
+  winRate      Float @map("win_rate")
+  profitAll    Int   @map("profit_all")
+  profitPeriod Int   @map("profit_period")
+  roi          Float @map("roi")
+
+  longestStreak Int @map("longest_streak")
+  currentStreak Int @map("current_streak")
+
+  parlaysStarted Int @map("parlays_started")
+  parlaysWon     Int @map("parlays_won")
+
+  totalParlayLegs Int @map("total_parlay_legs")
+  parlayLegsWon   Int @map("parlay_legs_won")
+
+  rankChange Int? @map("rank_change")
 
   @@map("leaderboard_view")
 }
@@ -262,21 +282,36 @@ model UserActivity {
 }
 
 model UserStats {
-  id             Int      @id @default(autoincrement())
-  user           User     @relation(fields: [userId], references: [id])
-  userId         Int      @unique
-  totalBets      Int      @default(0)
-  betsWon        Int      @default(0)
-  betsLost       Int      @default(0)
-  parlaysStarted Int      @default(0)
-  parlaysWon     Int      @default(0)
-  totalWagered   Int      @default(0)
-  totalWon       Int      @default(0)
-  streak         Int      @default(0)
-  maxStreak      Int      @default(0)
-  profit         Int      @default(0)
-  roi            Float    @default(0)
-  mostCommonBet  String? // Optionally store e.g. "OVER", "YES", etc.
-  biggestWin     Int      @default(0)
-  updatedAt      DateTime @default(now()) @updatedAt
+  id     Int  @id @default(autoincrement())
+  user   User @relation(fields: [userId], references: [id])
+  userId Int  @unique
+
+  // single-bet metrics
+  totalBets Int @default(0)
+  betsWon   Int @default(0)
+  betsLost  Int @default(0)
+
+  // parlay metrics
+  totalParlays    Int @default(0)
+  parlaysWon      Int @default(0)
+  parlaysLost     Int @default(0)
+  totalParlayLegs Int @default(0)
+  parlayLegsWon   Int @default(0)
+  parlayLegsLost  Int @default(0)
+
+  // combined‐order metrics
+  totalWagered Int   @default(0) // bets+parlays
+  totalWon     Int   @default(0) // sum of payouts
+  profit       Int   @default(0) // totalWon – totalWagered
+  roi          Float @default(0) // profit / totalWagered
+
+  // streak tracking
+  currentStreak Int @default(0)
+  longestStreak Int @default(0)
+
+  // extras
+  mostCommonBet String?
+  biggestWin    Int     @default(0)
+
+  updatedAt DateTime @default(now()) @updatedAt
 }

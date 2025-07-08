@@ -182,14 +182,18 @@ export class UserService {
       totalBets: stats.totalBets,
       betsWon: stats.betsWon,
       betsLost: stats.betsLost,
-      parlaysStarted: stats.parlaysStarted,
+      totalParlays: stats.totalParlays,
       parlaysWon: stats.parlaysWon,
+      parlaysLost: stats.parlaysLost,
+      totalParlayLegs: stats.totalParlayLegs,
+      parlayLegsWon: stats.parlayLegsWon,
+      parlayLegsLost: stats.parlayLegsLost,
       totalWagered: stats.totalWagered,
       totalWon: stats.totalWon,
-      streak: stats.streak,
-      maxStreak: stats.maxStreak,
       profit: stats.profit,
       roi: stats.roi,
+      currentStreak: stats.currentStreak,
+      longestStreak: stats.longestStreak,
       mostCommonBet: stats.mostCommonBet ?? null,
       biggestWin: stats.biggestWin,
       updatedAt: stats.updatedAt instanceof Date ? stats.updatedAt.toISOString() : stats.updatedAt,
@@ -201,6 +205,21 @@ export class UserService {
     data: Partial<Omit<DbUserStats, 'id' | 'userId'>>,
   ): Promise<void> {
     await this.repo.updateUserStats(userId, data);
+  }
+
+  /**
+   * Increment one or more stats fields atomically.
+   *
+   * @param userId
+   * @param fields   e.g. { totalBets: { increment: 1 }, parlaysStarted: { increment: 1 } }
+   */
+  async incrementUserStats(
+    userId: number,
+    fields: Partial<Record<keyof Omit<DbUserStats, 'id' | 'userId'>, { increment: number }>>,
+  ): Promise<void> {
+    // Delegate directly to the repository, which should call
+    // prisma.userStats.update({ data: fields })
+    await this.repo.incrementUserStats(userId, fields as any);
   }
 
   // --- PRIVACY ---

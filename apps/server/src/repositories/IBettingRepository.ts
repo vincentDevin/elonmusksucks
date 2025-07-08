@@ -1,86 +1,45 @@
 // apps/server/src/repositories/IBettingRepository.ts
-// Interface for betting-related data access operations
-
-import type {
-  DbPredictionOption,
-  DbPrediction,
-  DbUser,
-  DbBet,
-  DbTransaction,
-  DbParlay,
-  TransactionType,
-} from '@ems/types';
+import type { DbBet, DbParlay } from '@ems/types';
 
 /**
- * Defines the contract for betting and parlay operations.
+ * Betting data access contract: service validates inputs,
+ * repository methods perform raw DB writes inside transactions.
  */
 export interface IBettingRepository {
-  /**
-   * Fetch a prediction option along with its parent prediction.
-   */
   findOptionWithPrediction(optionId: number): Promise<
-    | (DbPredictionOption & {
-        prediction: Pick<DbPrediction, 'id' | 'resolved' | 'expiresAt'>;
+    | (ReturnType<() => import('@prisma/client').PredictionOption> & {
+        prediction: { id: number; resolved: boolean; expiresAt: Date };
       })
     | null
   >;
+  findUserById(
+    userId: number,
+  ): Promise<Pick<import('@prisma/client').User, 'id' | 'muskBucks'> | null>;
 
   /**
-   * Fetch minimal user info for betting (id and current balance).
+   * Persist a single bet and all related updates in one transaction.
    */
-  findUserById(userId: number): Promise<Pick<DbUser, 'id' | 'muskBucks'> | null>;
-
-  /**
-   * Update a user's MuskBucks balance.
-   * @param userId - The user to update
-   * @param muskBucks - New balance amount
-   */
-  updateUserMuskBucks(userId: number, muskBucks: number): Promise<void>;
-
-  /**
-   * Record a transaction for a user.
-   */
-  createTransaction(data: {
-    userId: number;
-    type: TransactionType;
-    amount: number;
-    balanceAfter: number;
-    relatedBetId?: number | null;
-    relatedParlayId?: number | null;
-  }): Promise<DbTransaction>;
-
-  /**
-   * Create a single bet record.
-   */
-  createBet(data: {
-    userId: number;
-    predictionId: number;
-    optionId: number;
-    amount: number;
-    oddsAtPlacement: number;
-    potentialPayout: number;
-  }): Promise<DbBet>;
-
-  /**
-   * Group bets by option for a given prediction and sum amounts.
-   */
-  groupBetsByPrediction(
+  placeBet(
+    userId: number,
     predictionId: number,
-  ): Promise<Array<{ optionId: number; totalAmount: number }>>;
+    optionId: number,
+    amount: number,
+    oddsAtPlacement: number,
+    potentialPayout: number,
+  ): Promise<DbBet>;
 
   /**
-   * Update odds on a prediction option.
+   * Persist a parlay and all related updates in one transaction.
    */
-  updatePredictionOptionOdds(optionId: number, odds: number): Promise<void>;
+  placeParlay(
+    userId: number,
+    legs: Array<{ predictionId: number; optionId: number; oddsAtPlacement: number }>,
+    amount: number,
+    potentialPayout: number,
+  ): Promise<DbParlay>;
 
   /**
-   * Create a parlay bet with nested legs.
+   * Recalculate odds for a resolved prediction.
    */
-  createParlay(data: {
-    userId: number;
-    amount: number;
-    combinedOdds: number;
-    potentialPayout: number;
-    legs: Array<{ optionId: number; oddsAtPlacement: number }>;
-  }): Promise<DbParlay>;
+  recalculateOdds(predictionId: number): Promise<void>;
 }

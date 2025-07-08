@@ -1,7 +1,8 @@
 // apps/server/src/services/admin.service.ts
-import type { Role, Outcome } from '@prisma/client';
+import type { Role } from '@prisma/client';
 import type { IAdminRepository, QueryParams } from '../repositories/IAdminRepository';
 import { PrismaAdminRepository } from '../repositories/AdminRepository';
+import type { UserStatsDTO } from '@ems/types';
 
 const repo: IAdminRepository = new PrismaAdminRepository();
 
@@ -32,10 +33,6 @@ export const setPredictionStatus = async (
   status: 'approved' | 'rejected',
 ) => {
   return repo.updatePredictionStatus(predictionId, status);
-};
-
-export const resolvePrediction = async (predictionId: number, outcome: Outcome) => {
-  return repo.resolvePrediction(predictionId, outcome);
 };
 
 // -- Bet & Transaction Oversight --
@@ -85,8 +82,33 @@ export const refreshLeaderboard = async () => {
   return repo.recalculateLeaderboard();
 };
 
-export const getUserStats = async (userId: number) => {
-  return repo.findUserStats(userId);
+/**
+ * Fetches raw stats, then maps Date→ISO and returns the DTO.
+ */
+export const getUserStats = async (userId: number): Promise<UserStatsDTO | null> => {
+  const raw = await repo.findUserStats(userId);
+  if (!raw) return null;
+
+  return {
+    totalBets: raw.totalBets,
+    betsWon: raw.betsWon,
+    betsLost: raw.betsLost,
+    totalParlays: raw.totalParlays,
+    parlaysWon: raw.parlaysWon,
+    parlaysLost: raw.parlaysLost,
+    totalParlayLegs: raw.totalParlayLegs,
+    parlayLegsWon: raw.parlayLegsWon,
+    parlayLegsLost: raw.parlayLegsLost,
+    totalWagered: raw.totalWagered,
+    totalWon: raw.totalWon,
+    profit: raw.profit,
+    roi: raw.roi,
+    currentStreak: raw.currentStreak,
+    longestStreak: raw.longestStreak,
+    mostCommonBet: raw.mostCommonBet,
+    biggestWin: raw.biggestWin,
+    updatedAt: raw.updatedAt.toISOString(),
+  };
 };
 
 // -- Miscellaneous --

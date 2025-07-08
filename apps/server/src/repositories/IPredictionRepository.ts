@@ -1,11 +1,6 @@
 // apps/server/src/repositories/IPredictionRepository.ts
-import type {
-  DbPrediction,
-  DbPredictionOption,
-  DbBet,
-  DbUser,
-  DbLeaderboardEntry,
-} from '@ems/types';
+import type { DbPrediction, DbPredictionOption, DbBet, DbUser } from '@ems/types';
+import type { PredictionType } from '@ems/types';
 
 /** A single leg in a parlay, with its user and stake info */
 export type ParlayLegWithUser = {
@@ -25,6 +20,8 @@ export interface IPredictionRepository {
     expiresAt: Date;
     creatorId: number;
     options: Array<{ label: string }>;
+    type: PredictionType;
+    threshold?: number;
   }): Promise<
     DbPrediction & {
       options: DbPredictionOption[];
@@ -52,7 +49,4 @@ export interface IPredictionRepository {
       })
     | null
   >;
-
-  /** Retrieve the top users by MuskBucks balance (leaderboard) */
-  getLeaderboard(limit: number): Promise<DbLeaderboardEntry[]>;
 }

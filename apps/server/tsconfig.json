@@ -3,7 +3,7 @@
   "compilerOptions": {
     "target": "ES2020",
     "module": "CommonJS",
-    "rootDir": "src",
+    "rootDir": ".",
     "outDir": "dist",
     "moduleResolution": "node",
     "resolveJsonModule": true,
@@ -23,10 +23,11 @@
       "@models/*": ["src/models/*"],
       "@services/*": ["src/services/*"],
       "@utils/*": ["src/utils/*"],
-      "@ems/types": ["../../packages/types/src"],
-      "@ems/types/*": ["../../packages/types/src/*"]
-    }
+      "@ems/types": ["../../packages/types/dist"],
+      "@ems/types/*": ["../../packages/types/dist/*"]
+    },
+    "types": ["node", "jest"]
   },
-  "include": ["src"],
+  "include": ["src/**/*.ts", "jest.setup.ts", "src/**/*.test.ts", "src/**/*.spec.ts"],
   "exclude": ["node_modules", "dist"]
 }

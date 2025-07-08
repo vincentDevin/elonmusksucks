@@ -1,5 +1,3 @@
-// apps/server/src/repositories/PrismaAuthRepository.ts
-
 import prisma from '../db';
 import type { User, EmailVerification, PasswordReset, RefreshToken } from '@prisma/client';
 import type { IAuthRepository } from './IAuthRepository';
@@ -20,32 +18,42 @@ export class PrismaAuthRepository implements IAuthRepository {
     passwordHash: string;
     emailVerified: boolean;
   }): Promise<User> {
-    return prisma.user.create({
-      data: {
-        name: data.name,
-        email: data.email,
-        passwordHash: data.passwordHash,
-        emailVerified: data.emailVerified,
-      },
-    });
+    try {
+      return await prisma.user.create({
+        data: {
+          name: data.name,
+          email: data.email,
+          passwordHash: data.passwordHash,
+          emailVerified: data.emailVerified,
+        },
+      });
+    } catch (err: any) {
+      if (err.code === 'P2002' && err.meta?.target?.includes('email')) {
+        throw new Error('REGISTRATION_ERROR');
+      }
+      throw err;
+    }
   }
 
   async updatePassword(userId: number, passwordHash: string): Promise<User> {
-    return prisma.user.update({
-      where: { id: userId },
-      data: { passwordHash },
-    });
+    return prisma.user.update({ where: { id: userId }, data: { passwordHash } });
   }
 
   // --- Refresh tokens ---
   async saveRefreshToken(userId: number, token: string, expiresAt: Date): Promise<void> {
-    await prisma.refreshToken.create({
-      data: { userId, token, expiresAt },
-    });
+    // Remove any existing tokens for this user
+    await prisma.refreshToken.deleteMany({ where: { userId } });
+    // Create the new token
+    await prisma.refreshToken.create({ data: { userId, token, expiresAt } });
   }
 
   async getRefreshToken(token: string): Promise<RefreshToken | null> {
-    return prisma.refreshToken.findUnique({ where: { token } });
+    const record = await prisma.refreshToken.findUnique({ where: { token } });
+    if (record && record.expiresAt < new Date()) {
+      await this.deleteRefreshToken(record.token);
+      return null;
+    }
+    return record;
   }
 
   async deleteRefreshToken(token: string): Promise<void> {
@@ -68,7 +76,12 @@ export class PrismaAuthRepository implements IAuthRepository {
   }
 
   async findEmailVerification(token: string): Promise<EmailVerification | null> {
-    return prisma.emailVerification.findUnique({ where: { token } });
+    const record = await prisma.emailVerification.findUnique({ where: { token } });
+    if (record && record.expiresAt < new Date()) {
+      await this.deleteEmailVerification(record.id);
+      return null;
+    }
+    return record;
   }
 
   async deleteEmailVerification(id: number): Promise<void> {
@@ -76,10 +89,7 @@ export class PrismaAuthRepository implements IAuthRepository {
   }
 
   async markEmailVerified(userId: number): Promise<User> {
-    return prisma.user.update({
-      where: { id: userId },
-      data: { emailVerified: true },
-    });
+    return prisma.user.update({ where: { id: userId }, data: { emailVerified: true } });
   }
 
   // --- Password reset ---
@@ -98,7 +108,12 @@ export class PrismaAuthRepository implements IAuthRepository {
   }
 
   async findPasswordReset(token: string): Promise<PasswordReset | null> {
-    return prisma.passwordReset.findUnique({ where: { token } });
+    const record = await prisma.passwordReset.findUnique({ where: { token } });
+    if (record && record.expiresAt < new Date()) {
+      await this.deletePasswordReset(record.id);
+      return null;
+    }
+    return record;
   }
 
   async deletePasswordReset(id: number): Promise<void> {

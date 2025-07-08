@@ -1,3 +1,4 @@
+// apps/client/src/hooks/useUserProfile.ts
 import { useState, useEffect, useCallback } from 'react';
 import {
   getUserProfile,
@@ -77,19 +78,23 @@ export function useUserProfile(userId?: number | null): UseUserProfileResult {
         getUserActivity(userId),
         getUserStats(userId).catch((err) => {
           if (err?.response?.status === 404) {
-            // Fallback object if desired:
+            // Provide empty stats fallback
             return {
               totalBets: 0,
               betsWon: 0,
               betsLost: 0,
-              parlaysStarted: 0,
+              totalParlays: 0,
               parlaysWon: 0,
+              parlaysLost: 0,
+              totalParlayLegs: 0,
+              parlayLegsWon: 0,
+              parlayLegsLost: 0,
               totalWagered: 0,
               totalWon: 0,
-              streak: 0,
-              maxStreak: 0,
               profit: 0,
               roi: 0,
+              currentStreak: 0,
+              longestStreak: 0,
               mostCommonBet: null,
               biggestWin: 0,
               updatedAt: new Date().toISOString(),
@@ -98,6 +103,7 @@ export function useUserProfile(userId?: number | null): UseUserProfileResult {
           throw err;
         }),
       ]);
+
       setProfile(profileData);
       setFeed(feedData);
       setActivity(activityData);

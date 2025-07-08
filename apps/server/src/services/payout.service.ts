@@ -1,5 +1,6 @@
 // apps/server/src/services/payout.service.ts
 import type { IPayoutRepository } from '../repositories/IPayoutRepository';
+import type { PublicPrediction } from '@ems/types';
 import { PayoutRepository } from '../repositories/PayoutRepository';
 
 export class PayoutService {
@@ -7,10 +8,14 @@ export class PayoutService {
 
   /**
    * Delegates to repository to atomically resolve
-   * and payout all bets & parlays.
+   * and payout all bets & parlays, then returns
+   * the updated PublicPrediction.
    */
-  async resolvePrediction(predictionId: number, winningOptionId: number): Promise<void> {
-    await this.repo.resolvePrediction(predictionId, winningOptionId);
+  async resolvePrediction(
+    predictionId: number,
+    winningOptionId: number,
+  ): Promise<PublicPrediction> {
+    return this.repo.resolvePrediction(predictionId, winningOptionId);
   }
 }
 

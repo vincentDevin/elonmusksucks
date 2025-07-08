@@ -1,6 +1,7 @@
 // apps/server/src/controllers/admin.controller.ts
 import { Request, Response, NextFunction } from 'express';
 import * as adminService from '../services/admin.service';
+import { payoutService } from '../services/payout.service';
 import type {
   PublicUser,
   PublicPrediction,
@@ -8,10 +9,12 @@ import type {
   PublicTransaction,
   PublicBadge,
   PublicUserBadge,
-  UserStatsDTO,
   PublicAITweet,
+  AdminBet,
+  AdminTransaction,
 } from '@ems/types';
-import type { Role, Outcome } from '@prisma/client';
+import { PredictionType } from '@ems/types';
+import type { Role } from '@prisma/client';
 import type { QueryParams } from '../repositories/IAdminRepository';
 
 // -- User Management --
@@ -115,8 +118,8 @@ export async function resolvePrediction(
 ): Promise<void> {
   try {
     const id = Number(req.params.id);
-    const { outcome } = req.body as { outcome: Outcome };
-    const updated: PublicPrediction = await adminService.resolvePrediction(id, outcome);
+    const { winningOptionId } = req.body as { winningOptionId: number };
+    const updated: PublicPrediction = await payoutService.resolvePrediction(id, winningOptionId);
     res.json(updated);
   } catch (err) {
     next(err);
@@ -128,7 +131,32 @@ export async function getBets(req: Request, res: Response, next: NextFunction): 
   try {
     const filters = req.query as unknown as QueryParams;
     const bets: PublicBet[] = await adminService.listBets(filters);
-    res.json(bets);
+    const preds: PublicPrediction[] = await adminService.listPredictions(filters);
+    const users: PublicUser[] = await adminService.listUsers();
+
+    const detailed: AdminBet[] = bets.map((b) => {
+      const matching = preds.find((p) => p.id === b.predictionId);
+      return {
+        ...b,
+        userName: users.find((u) => u.id === b.userId)?.name ?? 'Unknown',
+        prediction:
+          matching ??
+          ({
+            id: b.predictionId,
+            title: 'Unknown prediction',
+            description: '',
+            category: '',
+            expiresAt: new Date(),
+            approved: false,
+            resolved: false,
+            type: PredictionType.MULTIPLE,
+            threshold: null,
+            creatorId: 0,
+          } as PublicPrediction),
+      };
+    });
+
+    res.json(detailed);
   } catch (err) {
     next(err);
   }
@@ -152,7 +180,14 @@ export async function getTransactions(
   try {
     const filters = req.query as unknown as QueryParams;
     const txns: PublicTransaction[] = await adminService.listTransactions(filters);
-    res.json(txns);
+    const users: PublicUser[] = await adminService.listUsers();
+
+    const detailedTxns: AdminTransaction[] = txns.map((t) => ({
+      ...t,
+      userName: users.find((u) => u.id === t.userId)?.name ?? 'Unknown',
+    }));
+
+    res.json(detailedTxns);
   } catch (err) {
     next(err);
   }
@@ -216,9 +251,7 @@ export async function assignBadge(req: Request, res: Response, next: NextFunctio
   try {
     const userId = Number(req.params.id);
     const { badgeId } = req.body as { badgeId: number };
-    // create the UserBadge record
     const rawUB = await adminService.assignBadge(userId, badgeId);
-    // pull badge metadata from listBadges
     const allBadges = await adminService.listBadges();
     const b = allBadges.find((x) => x.id === badgeId)!;
 
@@ -264,13 +297,8 @@ export async function refreshLeaderboard(
 export async function getUserStats(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const userId = Number(req.params.userId);
-    const raw = await adminService.getUserStats(userId);
-    const stats: UserStatsDTO | null = raw
-      ? {
-          ...raw,
-          updatedAt: raw.updatedAt.toISOString(),
-        }
-      : null;
+    // Call the service, not the controller itself
+    const stats = await adminService.getUserStats(userId);
     res.json(stats);
   } catch (err) {
     next(err);

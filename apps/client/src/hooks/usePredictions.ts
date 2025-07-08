@@ -1,6 +1,10 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { getPredictions, createPrediction } from '../api/predictions';
-import type { PredictionFull } from '../api/predictions';
+import {
+  getPredictions,
+  createPrediction as apiCreatePrediction,
+  type PredictionFull,
+  type CreatePredictionPayload,
+} from '../api/predictions';
 
 let cache: PredictionFull[] | null = null;
 
@@ -33,17 +37,11 @@ export function usePredictions() {
 
   const predictions = useMemo(() => data ?? [], [data]);
 
-  const createNew = useCallback(
-    async (input: {
-      title: string;
-      description: string;
-      category: string;
-      expiresAt: Date;
-      options: Array<{ label: string }>;
-    }) => {
+  const createPrediction = useCallback(
+    async (input: CreatePredictionPayload) => {
       setLoading(true);
       try {
-        await createPrediction(input);
+        await apiCreatePrediction(input);
         cache = null;
         await fetchPredictions();
       } catch (err: any) {
@@ -61,6 +59,6 @@ export function usePredictions() {
     loading,
     error,
     refresh: fetchPredictions,
-    createPrediction: createNew,
+    createPrediction,
   };
 }

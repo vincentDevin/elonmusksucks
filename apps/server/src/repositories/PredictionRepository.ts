@@ -1,16 +1,11 @@
 // apps/server/src/repositories/PredictionRepository.ts
 import prisma from '../db';
 import type { IPredictionRepository } from './IPredictionRepository';
-import type {
-  DbPrediction,
-  DbPredictionOption,
-  DbBet,
-  DbUser,
-  DbLeaderboardEntry,
-} from '@ems/types';
+import type { DbPrediction, DbPredictionOption, DbBet, DbUser } from '@ems/types';
+import type { PredictionType } from '@ems/types';
 
 // Shape for a parlay leg, including the timestamp it was created
-type ParlayLegWithUser = {
+export type ParlayLegWithUser = {
   parlayId: number;
   user: Pick<DbUser, 'id' | 'name'>;
   stake: number;
@@ -26,6 +21,8 @@ export class PredictionRepository implements IPredictionRepository {
     expiresAt: Date;
     creatorId: number;
     options: Array<{ label: string }>;
+    type: PredictionType;
+    threshold?: number;
   }): Promise<
     DbPrediction & {
       options: DbPredictionOption[];
@@ -39,6 +36,8 @@ export class PredictionRepository implements IPredictionRepository {
         category: data.category,
         expiresAt: data.expiresAt,
         creatorId: data.creatorId,
+        type: data.type,
+        threshold: data.threshold,
         options: {
           create: data.options.map((o) => ({
             label: o.label,
@@ -93,10 +92,7 @@ export class PredictionRepository implements IPredictionRepository {
     });
 
     return preds.map((pred) => {
-      // extract all scalar fields (including id, title, resolved, approved, etc.)
       const { bets, options, ...rest } = pred;
-
-      // flatten nested parlay legs
       const parlayLegs: ParlayLegWithUser[] = [];
       for (const opt of options) {
         for (const leg of opt.parlayLegs) {
@@ -147,7 +143,6 @@ export class PredictionRepository implements IPredictionRepository {
     if (!pred) return null;
 
     const { bets, options, ...rest } = pred;
-
     const parlayLegs: ParlayLegWithUser[] = [];
     for (const opt of options) {
       for (const leg of opt.parlayLegs) {
@@ -167,13 +162,5 @@ export class PredictionRepository implements IPredictionRepository {
       options,
       parlayLegs,
     };
-  }
-
-  async getLeaderboard(limit: number): Promise<DbLeaderboardEntry[]> {
-    return prisma.user.findMany({
-      orderBy: { muskBucks: 'desc' },
-      take: limit,
-      select: { id: true, name: true, muskBucks: true },
-    });
   }
 }

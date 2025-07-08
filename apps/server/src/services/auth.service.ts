@@ -1,7 +1,3 @@
-// apps/server/src/services/auth.service.ts
-import dotenv from 'dotenv';
-dotenv.config();
-
 import bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
 
@@ -30,7 +26,6 @@ export async function createUser(name: string, email: string, password: string):
   const salt = await bcrypt.genSalt(SALT_ROUNDS);
   const passwordHash = await bcrypt.hash(password, salt);
 
-  // create
   return repo.createUser({
     name,
     email: normalized,
@@ -46,33 +41,33 @@ export async function createUser(name: string, email: string, password: string):
 export async function validateUser(email: string, password: string): Promise<User | null> {
   const normalized = email.trim().toLowerCase();
 
-  // find by email (or dummy)
   const user = await repo.findByEmail(normalized);
   const hash = user?.passwordHash ?? DUMMY_HASH;
 
-  // compare
   const match = await bcrypt.compare(password, hash);
   return match && user ? user : null;
 }
 
 // --- Refresh tokens ---
 
-export async function saveRefreshToken(userId: number, token: string) {
+export async function saveRefreshToken(userId: number, token: string): Promise<void> {
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
   await repo.saveRefreshToken(userId, token, expiresAt);
 }
 
-export async function getRefreshToken(token: string) {
+export async function getRefreshToken(
+  token: string,
+): Promise<import('@prisma/client').RefreshToken | null> {
   return repo.getRefreshToken(token);
 }
 
-export async function deleteRefreshToken(token: string) {
+export async function deleteRefreshToken(token: string): Promise<void> {
   await repo.deleteRefreshToken(token);
 }
 
 // --- User lookup ---
 
-export async function getUserById(userId: number) {
+export async function getUserById(userId: number): Promise<User | null> {
   return repo.findById(userId);
 }
 
@@ -95,7 +90,7 @@ export async function verifyEmailToken(token: string): Promise<boolean> {
   if (skipEmailFlow) return true;
 
   const record = await repo.findEmailVerification(token);
-  if (!record || record.expiresAt < new Date()) return false;
+  if (!record) return false;
 
   await repo.markEmailVerified(record.userId);
   await repo.deleteEmailVerification(record.id);
@@ -116,7 +111,6 @@ export async function createPasswordReset(userId: number): Promise<string> {
 
 export async function resetPassword(token: string, newPassword: string): Promise<boolean> {
   if (skipEmailFlow) {
-    // treat token as email for dev convenience
     const devUser = await repo.findByEmail(token);
     if (!devUser) return false;
     const salt = await bcrypt.genSalt(SALT_ROUNDS);
@@ -126,7 +120,7 @@ export async function resetPassword(token: string, newPassword: string): Promise
   }
 
   const record = await repo.findPasswordReset(token);
-  if (!record || record.expiresAt < new Date()) return false;
+  if (!record) return false;
 
   const salt = await bcrypt.genSalt(SALT_ROUNDS);
   const passwordHash = await bcrypt.hash(newPassword, salt);

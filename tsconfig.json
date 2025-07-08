@@ -10,6 +10,13 @@
     "paths": {
       "@ems/types": ["packages/types/src/index.ts"],
       "@ems/types/*": ["packages/types/src/*"]
-    }
-  }
+    },
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true,
+    "types": ["node", "jest"]
+  },
+  "exclude": ["node_modules", "dist"]
 }

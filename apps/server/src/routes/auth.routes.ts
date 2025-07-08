@@ -17,7 +17,7 @@ const router = Router();
 
 // Public routes with rate limiting
 router.post('/register', apiLimiter, registerUser);
-router.post('/login', apiLimiter, loginUser);
+router.post('/login', loginUser);
 router.post('/refresh', apiLimiter, refreshToken);
 router.get('/verify-email', apiLimiter, verifyEmail);
 
