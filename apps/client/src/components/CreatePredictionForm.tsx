@@ -1,24 +1,23 @@
 // apps/client/src/components/CreatePredictionForm.tsx
 import React, { useState } from 'react';
-import { usePredictions } from '../hooks/usePredictions';
+import type { CreatePredictionPayload } from '../api/predictions';
 import { PredictionType } from '@ems/types';
 
-export default function CreatePredictionForm({ onCreated }: { onCreated: () => void }) {
-  const { createPrediction } = usePredictions();
+interface CreatePredictionFormProps {
+  /** Called with the new-prediction payload when the user submits */
+  onCreated: (input: CreatePredictionPayload) => Promise<void> | void;
+  /** Called when the user cancels creating */
+  onCancel: () => void;
+}
 
+export default function CreatePredictionForm({ onCreated, onCancel }: CreatePredictionFormProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('');
   const [expiresAt, setExpiresAt] = useState<string>('');
-
   const [type, setType] = useState<PredictionType>(PredictionType.MULTIPLE);
   const [threshold, setThreshold] = useState<number | ''>('');
   const [options, setOptions] = useState<string[]>(['']);
-
-  const addOption = () => setOptions((prev) => [...prev, '']);
-  const updateOption = (idx: number, value: string) =>
-    setOptions((prev) => prev.map((v, i) => (i === idx ? value : v)));
-  const removeOption = (idx: number) => setOptions((prev) => prev.filter((_, i) => i !== idx));
 
   const isBinary = type === PredictionType.BINARY;
   const isOU = type === PredictionType.OVER_UNDER;
@@ -33,10 +32,16 @@ export default function CreatePredictionForm({ onCreated }: { onCreated: () => v
       isBinary ||
       (isOU && threshold !== ''));
 
-  const submit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const addOption = () => setOptions((prev) => [...prev, '']);
+  const updateOption = (idx: number, value: string) =>
+    setOptions((prev) => prev.map((v, i) => (i === idx ? value : v)));
+  const removeOption = (idx: number) => setOptions((prev) => prev.filter((_, i) => i !== idx));
+
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canSubmit) return;
-    await createPrediction({
+
+    const payload: CreatePredictionPayload = {
       title,
       description,
       category,
@@ -44,29 +49,29 @@ export default function CreatePredictionForm({ onCreated }: { onCreated: () => v
       type,
       threshold: isOU ? Number(threshold) : undefined,
       options: isMultiple ? options.map((label) => ({ label })) : undefined,
-    });
-    onCreated();
+    };
+
+    await onCreated(payload);
   };
 
-  // shared input classes
   const inputBase =
-    'w-full border rounded-lg px-3 py-2 bg-[var(--color-surface)] text-[var(--color-content)] placeholder:text-[var(--color-tertiary)] ' +
-    'focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] border-[var(--color-muted)]';
+    'w-full border rounded-lg px-3 py-2 bg-[var(--color-surface)] ' +
+    'text-[var(--color-content)] placeholder:text-[var(--color-tertiary)] ' +
+    'focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] ' +
+    'border-[var(--color-muted)]';
 
   return (
     <form
       onSubmit={submit}
-      className="bg-[var(--color-surface)] shadow-lg rounded-lg p-6 space-y-6 text-[var(--color-content)]"
+      className="bg-[var(--color-surface)] shadow-lg rounded-lg p-6 space-y-6"
     >
-      <h2 className="text-2xl font-bold text-[var(--color-content)]">New Prediction</h2>
+      <h2 className="text-2xl font-bold">New Prediction</h2>
 
+      {/* Title / Category / Description / Expires At / Type / Threshold */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Title */}
         <div>
-          <label
-            htmlFor="title"
-            className="block mb-1 text-sm font-medium text-[var(--color-content)]"
-          >
+          <label htmlFor="title" className="block mb-1 text-sm">
             Title
           </label>
           <input
@@ -80,10 +85,7 @@ export default function CreatePredictionForm({ onCreated }: { onCreated: () => v
 
         {/* Category */}
         <div>
-          <label
-            htmlFor="category"
-            className="block mb-1 text-sm font-medium text-[var(--color-content)]"
-          >
+          <label htmlFor="category" className="block mb-1 text-sm">
             Category
           </label>
           <input
@@ -97,10 +99,7 @@ export default function CreatePredictionForm({ onCreated }: { onCreated: () => v
 
         {/* Description */}
         <div className="md:col-span-2">
-          <label
-            htmlFor="description"
-            className="block mb-1 text-sm font-medium text-[var(--color-content)]"
-          >
+          <label htmlFor="description" className="block mb-1 text-sm">
             Terms of Prediction
           </label>
           <textarea
@@ -114,10 +113,7 @@ export default function CreatePredictionForm({ onCreated }: { onCreated: () => v
 
         {/* Expires At */}
         <div>
-          <label
-            htmlFor="expiresAt"
-            className="block mb-1 text-sm font-medium text-[var(--color-content)]"
-          >
+          <label htmlFor="expiresAt" className="block mb-1 text-sm">
             Expires At
           </label>
           <input
@@ -131,10 +127,7 @@ export default function CreatePredictionForm({ onCreated }: { onCreated: () => v
 
         {/* Prediction Type */}
         <div>
-          <label
-            htmlFor="type"
-            className="block mb-1 text-sm font-medium text-[var(--color-content)]"
-          >
+          <label htmlFor="type" className="block mb-1 text-sm">
             Prediction Type
           </label>
           <select
@@ -149,13 +142,10 @@ export default function CreatePredictionForm({ onCreated }: { onCreated: () => v
           </select>
         </div>
 
-        {/* Threshold */}
+        {/* Threshold for Over/Under */}
         {isOU && (
           <div>
-            <label
-              htmlFor="threshold"
-              className="block mb-1 text-sm font-medium text-[var(--color-content)]"
-            >
+            <label htmlFor="threshold" className="block mb-1 text-sm">
               Threshold
             </label>
             <input
@@ -170,12 +160,10 @@ export default function CreatePredictionForm({ onCreated }: { onCreated: () => v
         )}
       </div>
 
-      {/* Options list */}
+      {/* Options list for Multiple */}
       {isMultiple && (
         <div className="space-y-3">
-          <label className="block mb-1 text-sm font-medium text-[var(--color-content)]">
-            Options
-          </label>
+          <label className="block mb-1 text-sm">Options</label>
           {options.map((opt, i) => (
             <div key={i} className="flex items-center space-x-2">
               <input
@@ -189,7 +177,7 @@ export default function CreatePredictionForm({ onCreated }: { onCreated: () => v
                 <button
                   type="button"
                   onClick={() => removeOption(i)}
-                  className="text-red-500 hover:text-red-700 transition"
+                  className="text-red-500 hover:text-red-700"
                 >
                   ✕
                 </button>
@@ -199,19 +187,19 @@ export default function CreatePredictionForm({ onCreated }: { onCreated: () => v
           <button
             type="button"
             onClick={addOption}
-            className="text-[var(--color-primary)] hover:text-[var(--color-secondary)] text-sm font-medium"
+            className="text-[var(--color-primary)] text-sm font-medium"
           >
             + Add another option
           </button>
         </div>
       )}
 
-      {/* Action bar */}
-      <div className="pt-4 border-t border-[var(--color-muted)] flex justify-end space-x-4">
+      {/* Actions */}
+      <div className="pt-4 border-t flex justify-end space-x-4">
         <button
           type="button"
-          onClick={onCreated}
-          className="px-4 py-2 rounded-lg bg-[var(--color-muted)] text-[var(--color-content)] hover:bg-[var(--color-tertiary)] transition"
+          onClick={onCancel}
+          className="px-4 py-2 rounded-lg bg-[var(--color-muted)] hover:bg-[var(--color-tertiary)]"
         >
           Cancel
         </button>
@@ -220,7 +208,7 @@ export default function CreatePredictionForm({ onCreated }: { onCreated: () => v
           disabled={!canSubmit}
           className={`px-6 py-2 rounded-lg font-medium transition ${
             canSubmit
-              ? 'bg-[var(--color-primary)] text-[var(--color-surface)] hover:bg-[var(--color-secondary)]'
+              ? 'bg-[var(--color-primary)] text-white hover:bg-[var(--color-secondary)]'
               : 'bg-[var(--color-muted)] text-[var(--color-tertiary)] cursor-not-allowed'
           }`}
         >

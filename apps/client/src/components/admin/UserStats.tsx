@@ -1,11 +1,14 @@
+// apps/client/src/components/admin/UserStats.tsx
 import { useState, useCallback } from 'react';
 import { useAdmin } from '../../contexts/AdminContext';
 import type { UserStatsDTO, PublicUser } from '@ems/types';
 
 export default function UserStats() {
-  const { users, statsFor, loadUserStats } = useAdmin();
+  const { users, statsFor, loadUserStats, refreshLeaderboard } = useAdmin();
   const [loadingAll, setLoadingAll] = useState(false);
+  const [loadingLB, setLoadingLB] = useState(false);
 
+  // Load stats for every user
   const handleLoadAll = useCallback(async () => {
     setLoadingAll(true);
     try {
@@ -15,17 +18,40 @@ export default function UserStats() {
     }
   }, [users, loadUserStats]);
 
+  // Enqueue the leaderboard‐refresh worker
+  const handleRefreshLeaderboard = useCallback(async () => {
+    setLoadingLB(true);
+    try {
+      await refreshLeaderboard();
+      // you can toast success here if you have one
+    } catch (err: any) {
+      console.error('Leaderboard refresh failed', err);
+      alert('Failed to refresh leaderboard: ' + err.message);
+    } finally {
+      setLoadingLB(false);
+    }
+  }, [refreshLeaderboard]);
+
   return (
     <section className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold">User Stats</h2>
-        <button
-          onClick={handleLoadAll}
-          disabled={loadingAll}
-          className="px-3 py-1 bg-accent hover:bg-accent-dark text-surface rounded transition"
-        >
-          {loadingAll ? 'Loading…' : 'Load All'}
-        </button>
+        <div className="space-x-2">
+          <button
+            onClick={handleLoadAll}
+            disabled={loadingAll}
+            className="px-3 py-1 bg-accent hover:bg-accent-dark text-surface rounded transition disabled:opacity-50"
+          >
+            {loadingAll ? 'Loading…' : 'Load All'}
+          </button>
+          <button
+            onClick={handleRefreshLeaderboard}
+            disabled={loadingLB}
+            className="px-3 py-1 bg-primary hover:bg-primary-dark text-surface rounded transition disabled:opacity-50"
+          >
+            {loadingLB ? 'Updating…' : 'Refresh Leaderboard'}
+          </button>
+        </div>
       </div>
 
       <div className="overflow-x-auto">
@@ -91,7 +117,7 @@ export default function UserStats() {
                       </td>
                     </>
                   ) : (
-                    <td className="px-2 py-1 text-center" colSpan={20}>
+                    <td className="px-2 py-1 text-center" colSpan={19}>
                       <button
                         onClick={() => loadUserStats(u.id)}
                         className="px-2 py-0.5 bg-tertiary text-surface rounded hover:opacity-90 transition"
