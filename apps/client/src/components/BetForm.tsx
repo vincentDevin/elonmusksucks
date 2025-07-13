@@ -1,19 +1,18 @@
 // apps/client/src/components/BetForm.tsx
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useBetting } from '../hooks/useBetting';
 import { useAuth } from '../contexts/AuthContext';
-import type { PublicPredictionOption, PublicBet } from '@ems/types';
+import type { PublicPredictionOption, PublicBet, BetWithUser } from '@ems/types';
 
 interface BetFormProps {
-  /** prediction.id is used to match incoming socket events */
   prediction: { id: number; options: PublicPredictionOption[] };
-  /** called once the bet has truly landed (via socket) */
+  addOptimisticBet: (bet: BetWithUser) => void;
   onPlaced?: (bet: PublicBet) => void;
 }
 
-export default function BetForm({ prediction, onPlaced }: BetFormProps) {
-  const { id: predictionId, options } = prediction;
-  const { placeBet, loading: placing, error, latestBet } = useBetting();
+export default function BetForm({ prediction, addOptimisticBet, onPlaced }: BetFormProps) {
+  const { options } = prediction;
+  const { placeBet, loading: placing, error } = useBetting();
   const { user } = useAuth();
   const balance = user?.muskBucks ?? 0;
 
@@ -21,41 +20,41 @@ export default function BetForm({ prediction, onPlaced }: BetFormProps) {
   const [amount, setAmount] = useState(0);
   const [optionId, setOptionId] = useState(options.length > 0 ? options[0].id : 0);
 
-  // When a new bet comes in over the socket and it belongs to *this* prediction,
-  // collapse the form and notify the parent.
-  useEffect(() => {
-    if (latestBet && latestBet.predictionId === predictionId) {
-      setExpanded(false);
-      onPlaced?.(latestBet);
-    }
-  }, [latestBet, predictionId, onPlaced]);
-
   const submit = async () => {
-    if (amount <= 0 || amount > balance) return;
+    if (amount <= 0 || amount > balance || placing) return;
     try {
-      await placeBet({ optionId, amount });
-      // we no longer collapse here — wait for socket round-trip
+      const bet = await placeBet({ optionId, amount });
+      if (user) {
+        const optimistic: BetWithUser = {
+          ...bet,
+          predictionId: prediction.id,
+          user: {
+            id: user.id,
+            name: user.name,
+            avatarUrl: user.avatarUrl ?? null,
+          },
+        };
+        addOptimisticBet(optimistic);
+        // console.log('Added optimistic bet', optimistic);
+      }
+      setExpanded(false);
+      setAmount(0);
+      onPlaced?.(bet);
     } catch (err: any) {
-      console.error(err);
-      alert('Bet failed: ' + (error?.message || err.message));
+      // Error handled below
     }
   };
 
-  // no funds → just show a notice
   if (balance === 0) {
     return <p className="mt-2 text-sm text-gray-500 italic">You have no MuskBucks to bet.</p>;
   }
 
-  // expanded form
   if (expanded) {
     return (
       <div className="mt-2 p-4 bg-surface border border-muted rounded-lg shadow-md space-y-4">
-        {/* Balance */}
         <p className="text-sm">
           Balance: <span className="font-semibold">{balance} 🪙</span>
         </p>
-
-        {/* Amount */}
         <div>
           <label className="block text-sm font-medium mb-1">Bet Amount</label>
           <input
@@ -66,16 +65,16 @@ export default function BetForm({ prediction, onPlaced }: BetFormProps) {
             onChange={(e) => setAmount(Number(e.target.value))}
             placeholder="Enter amount"
             className="w-full border p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+            disabled={placing}
           />
         </div>
-
-        {/* Option */}
         <div>
           <label className="block text-sm font-medium mb-1">Option</label>
           <select
             value={optionId}
             onChange={(e) => setOptionId(Number(e.target.value))}
             className="w-full border p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+            disabled={placing}
           >
             {options.map((opt) => (
               <option key={opt.id} value={opt.id}>
@@ -84,8 +83,6 @@ export default function BetForm({ prediction, onPlaced }: BetFormProps) {
             ))}
           </select>
         </div>
-
-        {/* Actions */}
         <div className="flex justify-end space-x-3">
           <button
             type="button"
@@ -104,11 +101,12 @@ export default function BetForm({ prediction, onPlaced }: BetFormProps) {
             {placing ? 'Placing…' : 'Place Bet'}
           </button>
         </div>
+        {placing && <p className="text-xs text-gray-500 mt-2">Placing your bet…</p>}
+        {error && <p className="text-xs text-red-500 mt-2">{error.message || String(error)}</p>}
       </div>
     );
   }
 
-  // collapsed button
   return (
     <button
       onClick={() => setExpanded(true)}

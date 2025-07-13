@@ -1,4 +1,6 @@
 import { PrismaClient } from '@prisma/client';
+import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { IUserRepository } from '../repositories/IUserRepository';
 import { UserRepository } from '../repositories/UserRepository';
 import type {
@@ -8,19 +10,60 @@ import type {
   DbUserStats,
   DbUserPost,
   DbUserActivity,
-  UserFeedPost,
-  UserStatsDTO,
-  UserActivity,
-  PublicUserProfile,
 } from '@ems/types';
+import type { PublicUserProfile, UserFeedPost, UserActivity, UserStatsDTO } from '@ems/types';
+
+// Define a minimal file interface matching Multer's in-memory buffer
+export type UploadedFile = {
+  originalname: string;
+  buffer: Buffer;
+  mimetype: string;
+};
 
 const prisma = new PrismaClient();
 
 export class UserService {
-  constructor(private repo: IUserRepository = new UserRepository()) {}
+  private repo: IUserRepository;
+  private s3: S3Client;
+  private bucket: string;
 
-  // --- PROFILE ---
+  constructor(repo: IUserRepository = new UserRepository()) {
+    this.repo = repo;
+    this.s3 = new S3Client({
+      region: 'auto',
+      endpoint: process.env.TIGRIS_S3_ENDPOINT,
+      forcePathStyle: false,
+      credentials: {
+        accessKeyId: process.env.TIGRIS_ACCESS_KEY_ID as string,
+        secretAccessKey: process.env.TIGRIS_SECRET_ACCESS_KEY as string,
+      },
+    });
+    this.bucket = process.env.TIGRIS_S3_BUCKET as string;
+  }
 
+  // --- NEW: Upload profile image ---
+  async uploadUserProfileImage(userId: number, file: UploadedFile): Promise<string> {
+    const key = `${userId}/${Date.now()}-${file.originalname}`;
+    // Upload to S3-compatible storage
+    await this.s3.send(
+      new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+        Body: file.buffer,
+        ContentType: file.mimetype,
+      }),
+    );
+
+    // Persist the key so we can re-generate a URL later
+    await this.repo.updateProfile(userId, { profilePictureKey: key });
+
+    // Return a signed URL (valid 7 days)
+    return getSignedUrl(this.s3, new GetObjectCommand({ Bucket: this.bucket, Key: key }), {
+      expiresIn: 60 * 60 * 24 * 7,
+    });
+  }
+
+  // --- PROFILE (with signed URL fallback) ---
   async getUserProfile(userId: number, viewerId?: number): Promise<PublicUserProfile> {
     const user = await this.repo.findById(userId);
     if (!user) throw new Error('User not found');
@@ -31,7 +74,6 @@ export class UserService {
       this.repo.findUserBadges(userId),
     ]);
 
-    // Compute rank via SQL (window function)
     const rawRank = (await prisma.$queryRawUnsafe(
       `SELECT rank FROM (
          SELECT id, RANK() OVER (ORDER BY "muskBucks" DESC) AS rank
@@ -39,13 +81,17 @@ export class UserService {
        ) u WHERE u.id = $1;`,
       userId,
     )) as { rank: bigint }[];
-    let rank: number | undefined;
-    if (Array.isArray(rawRank) && rawRank.length > 0) {
-      const r = rawRank[0].rank;
-      rank = typeof r === 'bigint' ? Number(r) : r;
-    }
-
+    const rank = Array.isArray(rawRank) && rawRank.length > 0 ? Number(rawRank[0].rank) : undefined;
     const isFollowing = viewerId ? await this.repo.existsFollow(viewerId, userId) : false;
+
+    // Generate signed avatar URL if we have a storage key
+    const avatarUrl = user.profilePictureKey
+      ? await getSignedUrl(
+          this.s3,
+          new GetObjectCommand({ Bucket: this.bucket, Key: user.profilePictureKey }),
+          { expiresIn: 60 * 60 },
+        )
+      : user.avatarUrl;
 
     return {
       id: user.id,
@@ -54,7 +100,7 @@ export class UserService {
       profileComplete: user.profileComplete,
       rank,
       bio: user.bio,
-      avatarUrl: user.avatarUrl,
+      avatarUrl,
       location: user.location,
       timezone: user.timezone,
       notifyOnResolve: user.notifyOnResolve,
@@ -82,7 +128,6 @@ export class UserService {
       isFollowing,
     };
   }
-
   async followUser(followerId: number, followingId: number): Promise<void> {
     return this.repo.createFollow(followerId, followingId);
   }

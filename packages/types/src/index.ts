@@ -1,5 +1,3 @@
-// packages/types/src/index.ts
-
 import type {
   User as PrismaUser,
   EmailVerification as PrismaEmailVerification,
@@ -46,7 +44,6 @@ export type DbPasswordReset      = PrismaPasswordReset;
 
 // ——— Prediction & Options ————————————————————————————————————————
 export type DbPrediction   = PrismaPrediction;
-// Public payload for a Prediction now uses winningOptionId instead of outcome
 export type PublicPrediction = Pick<
   PrismaPrediction,
   | 'id'
@@ -100,6 +97,55 @@ export type PublicBet = Pick<
   | 'createdAt'
 >;
 
+export interface BetWithUser extends PublicBet {
+  user: {
+    id: number;
+    name: string;
+    avatarUrl: string | null;
+  };
+}
+
+// ——— Parlay & ParlayLeg ——————————————————————————————————————
+// NEW: Unified parlay leg with user details for client/server
+export type ParlayLegWithUser = {
+  parlayId: number;
+  user: {
+    id: number;
+    name: string;
+    avatarUrl: string | null;
+  };
+  stake: number;
+  optionId: number;
+  createdAt: string;
+};
+
+export type DbParlay     = PrismaParlay;
+export type PublicParlay = Pick<
+  PrismaParlay,
+  | 'id'
+  | 'userId'
+  | 'amount'
+  | 'combinedOdds'
+  | 'potentialPayout'
+  | 'status'
+  | 'createdAt'
+>;
+
+export type DbParlayLeg     = PrismaParlayLeg;
+export interface PublicParlayLeg {
+  id:            number;
+  parlayId:      number;
+  optionId:      number;
+  oddsAtPlacement:number;
+  createdAt:     string;
+  parlay: {
+    id:            number;
+    user:          { id: number; name: string };
+    amount:        number;
+    combinedOdds:  number;
+  };
+}
+
 // ——— AITweet ——————————————————————————————————————————————
 export type DbAITweet    = PrismaAITweet;
 export type PublicAITweet = PrismaAITweet;
@@ -150,34 +196,6 @@ export type PublicFollow = Pick<
   | 'createdAt'
 >;
 
-// ——— Parlay & ParlayLeg ——————————————————————————————————————
-export type DbParlay     = PrismaParlay;
-export type PublicParlay = Pick<
-  PrismaParlay,
-  | 'id'
-  | 'userId'
-  | 'amount'
-  | 'combinedOdds'
-  | 'potentialPayout'
-  | 'status'
-  | 'createdAt'
->;
-
-export type DbParlayLeg     = PrismaParlayLeg;
-export interface PublicParlayLeg {
-  id:            number;
-  parlayId:      number;
-  optionId:      number;
-  oddsAtPlacement:number;
-  createdAt:     string;
-  parlay: {
-    id:            number;
-    user:          { id: number; name: string };
-    amount:        number;
-    combinedOdds:  number;
-  };
-}
-
 // ——— Transaction ————————————————————————————————————————————
 export type DbTransaction   = PrismaTransaction;
 export type PublicTransaction = Pick<
@@ -218,7 +236,6 @@ export type DbUserStats = {
   // extras
   mostCommonBet:    string | null;
   biggestWin:       number;
-
   updatedAt:        Date;
 };
 
@@ -238,7 +255,7 @@ export interface PublicUserProfile {
   twoFactorEnabled: boolean;
   stats: {
     successRate:     number;
-    totalPredictions:number;  // from DbUser.totalPredictions
+    totalPredictions:number;
     currentStreak:   number;
     longestStreak:   number;
   };
@@ -249,28 +266,24 @@ export interface PublicUserProfile {
 }
 
 export type UserStatsDTO = {
-totalBets:        number;
+  totalBets:        number;
   betsWon:          number;
   betsLost:         number;
-  // parlay metrics
   totalParlays:     number;
   parlaysWon:       number;
   parlaysLost:      number;
   totalParlayLegs:  number;
   parlayLegsWon:    number;
   parlayLegsLost:   number;
-  // combined metrics
   totalWagered:     number;
   totalWon:         number;
   profit:           number;
   roi:              number;
-  // streak tracking
   currentStreak:    number;
   longestStreak:    number;
-  // extras
   mostCommonBet:    string | null;
   biggestWin:       number;
-  updatedAt:      string;
+  updatedAt:        string;
 };
 
 // ——— Feed Posts & Activity ————————————————————————————————————

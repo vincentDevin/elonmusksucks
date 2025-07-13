@@ -1,7 +1,7 @@
 // apps/client/src/pages/Predictions.tsx
 import { useState, useMemo } from 'react';
-import type { PredictionFull, BetWithUser } from '../api/predictions';
-import type { PublicPredictionOption } from '@ems/types';
+import type { PredictionFull } from '../api/predictions';
+import type { PublicPredictionOption, BetWithUser, ParlayLegWithUser } from '@ems/types';
 import BetForm from '../components/BetForm';
 import CreatePredictionForm from '../components/CreatePredictionForm';
 import { usePredictions } from '../hooks/usePredictions';
@@ -10,29 +10,26 @@ import OddsBar from '../components/OddsBar';
 import BetsList from '../components/BetsList';
 import { useParlay } from '../contexts/ParlayContext';
 
-interface FlattenedParlayLeg {
-  parlayId: number;
-  user: { id: number; name: string };
-  stake: number;
-  optionId: number;
-  createdAt: string;
-}
-
 interface PredictionWithPools extends PredictionFull {
   bets: BetWithUser[];
   pools: Array<{ label: string; pct: number }>;
 }
 
 export default function Predictions() {
-  const { predictions: raw, loading, error, createPrediction } = usePredictions();
+  const {
+    predictions: raw,
+    loading,
+    error,
+    createPrediction,
+    addOptimisticBet, // ← get from parent hook
+  } = usePredictions();
   const { user } = useAuth();
   const { dispatch } = useParlay();
 
   const [creating, setCreating] = useState(false);
-  const [selOptions, setSelOptions] = useState<Record<number, number>>({});
+  const [parlayOptions, setParlayOptions] = useState<Record<number, number>>({});
   const [tab, setTab] = useState<'ALL' | 'PENDING'>('ALL');
 
-  // build percentage pools per prediction
   const predictions = useMemo<PredictionWithPools[]>(() => {
     return raw.map((pred) => {
       const bets = pred.bets as BetWithUser[];
@@ -45,7 +42,6 @@ export default function Predictions() {
     });
   }, [raw]);
 
-  // filter by tab
   const filtered = useMemo(
     () => predictions.filter((pred) => (tab === 'ALL' ? pred.approved : !pred.approved)),
     [predictions, tab],
@@ -56,7 +52,6 @@ export default function Predictions() {
 
   return (
     <div className="p-6 max-w-3xl mx-auto bg-background rounded-lg">
-      {/* Make Prediction */}
       <div className="flex justify-center mb-6">
         <button
           onClick={() => setCreating((c) => !c)}
@@ -77,7 +72,6 @@ export default function Predictions() {
         </div>
       )}
 
-      {/* Tabs */}
       <div className="flex justify-center mb-6 space-x-4">
         <button
           className={`px-4 py-2 rounded ${
@@ -97,7 +91,6 @@ export default function Predictions() {
         </button>
       </div>
 
-      {/* Empty state / List */}
       {filtered.length === 0 ? (
         <p className="p-4 text-center">
           {tab === 'ALL' ? 'No predictions available.' : 'No pending predictions.'}
@@ -107,7 +100,6 @@ export default function Predictions() {
           {filtered.map((pred) => {
             const now = Date.now();
             const expires = new Date(pred.expiresAt).getTime();
-
             let badgeColor: string;
             let badgeText: string;
             if (!pred.approved) {
@@ -123,16 +115,9 @@ export default function Predictions() {
               badgeColor = 'bg-blue-500';
               badgeText = 'Open';
             }
-
             const defaultOpt = pred.options[0]?.id;
-            const sel = selOptions[pred.id] ?? defaultOpt;
-            const flatParlays: FlattenedParlayLeg[] = pred.parlayLegs.map((leg) => ({
-              parlayId: leg.parlayId,
-              user: leg.user,
-              stake: leg.stake,
-              optionId: leg.optionId,
-              createdAt: leg.createdAt,
-            }));
+            const parlaySel = parlayOptions[pred.id] ?? defaultOpt;
+            const flatParlays: ParlayLegWithUser[] = pred.parlayLegs ?? [];
 
             return (
               <li
@@ -144,10 +129,8 @@ export default function Predictions() {
                 >
                   {badgeText}
                 </span>
-
                 <h2 className="text-2xl font-semibold mb-2">{pred.title}</h2>
                 <p className="mb-3 text-base">{pred.description}</p>
-
                 {!pred.resolved && (
                   <p
                     className={`text-sm font-medium mb-4 ${
@@ -159,14 +142,12 @@ export default function Predictions() {
                       : `Expires at: ${new Date(pred.expiresAt).toLocaleString()}`}
                   </p>
                 )}
-
                 <OddsBar
                   type={pred.type}
                   options={pred.options as PublicPredictionOption[]}
                   bets={pred.bets}
                   parlayLegs={flatParlays}
                 />
-
                 {(pred.bets.length > 0 || flatParlays.length > 0) && (
                   <BetsList
                     type={pred.type}
@@ -175,16 +156,15 @@ export default function Predictions() {
                     options={pred.options as PublicPredictionOption[]}
                   />
                 )}
-
                 <div className="mt-6 flex flex-wrap gap-3 items-center">
                   {pred.approved && !pred.resolved && (
                     <>
-                      <BetForm prediction={pred} />
-
+                      {/* Pass addOptimisticBet as a prop */}
+                      <BetForm prediction={pred} addOptimisticBet={addOptimisticBet} />
                       <select
-                        value={sel}
+                        value={parlaySel}
                         onChange={(e) =>
-                          setSelOptions((prev) => ({
+                          setParlayOptions((prev) => ({
                             ...prev,
                             [pred.id]: Number(e.target.value),
                           }))
@@ -197,14 +177,13 @@ export default function Predictions() {
                           </option>
                         ))}
                       </select>
-
                       <button
                         onClick={() =>
                           dispatch({
                             type: 'ADD_LEG',
                             leg: {
                               predictionId: pred.id,
-                              optionId: sel!,
+                              optionId: parlaySel!,
                             },
                           })
                         }
@@ -214,7 +193,6 @@ export default function Predictions() {
                       </button>
                     </>
                   )}
-
                   {!pred.approved && (
                     <p className="text-sm italic text-yellow-700">
                       {pred.creatorId === user?.id

@@ -4,7 +4,7 @@ import {
   register as registerApi,
   refresh as refreshApi,
   logout as logoutApi,
-  me,
+  me as meApi,
 } from '../api/auth';
 import type { User } from '../api/auth';
 import type { ReactNode } from 'react';
@@ -27,41 +27,43 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // attempt token refresh on mount
+  // Refresh token and load current user on mount
   useEffect(() => {
-    refreshApi()
-      .then(async (token) => {
+    (async () => {
+      try {
+        const token = await refreshApi();
         setToken(token);
         setAccessToken(token);
-        const currentUser = await me();
+        const currentUser = await meApi();
         setUser(currentUser);
-        setLoading(false);
-      })
-      .catch(() => {
+      } catch (err) {
         setToken(null);
         setAccessToken('');
         setUser(null);
+      } finally {
         setLoading(false);
-      });
+      }
+    })();
   }, []);
 
+  // Login user and load profile
   const login = useCallback(async (email: string, password: string) => {
     const token = await loginApi({ email, password });
     setToken(token);
     setAccessToken(token);
-    const currentUser = await me();
+    const currentUser = await meApi();
     setUser(currentUser);
   }, []);
 
+  // Register user (does not auto-login)
   const register = useCallback(async (name: string, email: string, password: string) => {
-    // register the user but do not auto-login; user must verify email first
     await registerApi({ name, email, password });
-    // clear any existing auth state
     setToken(null);
     setAccessToken('');
     setUser(null);
   }, []);
 
+  // Logout and clear all user/auth state
   const logout = useCallback(async () => {
     await logoutApi();
     setToken(null);
@@ -69,8 +71,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setUser(null);
   }, []);
 
+  // Manually refresh user profile
   const refreshUser = useCallback(async () => {
-    const currentUser = await me();
+    const currentUser = await meApi();
     setUser(currentUser);
   }, []);
 

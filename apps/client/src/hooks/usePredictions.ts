@@ -1,27 +1,23 @@
-// apps/client/src/hooks/usePredictions.ts
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   getPredictions,
   createPrediction as apiCreatePrediction,
   type PredictionFull,
   type CreatePredictionPayload,
-  type BetWithUser,
 } from '../api/predictions';
+import type { BetWithUser, ParlayLegWithUser } from '@ems/types';
 import { useSocket } from '../contexts/SocketContext';
-
-let cache: PredictionFull[] | null = null;
 
 export function usePredictions() {
   const socket = useSocket();
-  const [data, setData] = useState<PredictionFull[] | null>(cache);
-  const [loading, setLoading] = useState(!cache);
+  const [data, setData] = useState<PredictionFull[] | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
   const fetchPredictions = useCallback(async () => {
     setLoading(true);
     try {
       const preds = await getPredictions();
-      cache = preds;
       setData(preds);
     } catch (err: any) {
       setError(err);
@@ -32,43 +28,36 @@ export function usePredictions() {
 
   // Initial load
   useEffect(() => {
-    if (!cache) {
-      fetchPredictions();
-    }
+    fetchPredictions();
   }, [fetchPredictions]);
 
-  // Real-time updates
+  // Real-time socket updates
   useEffect(() => {
-    // New prediction
     function onCreated(newPred: PredictionFull) {
-      cache = cache ? [newPred, ...cache] : [newPred];
-      setData(cache);
+      setData((prev) => (prev ? [newPred, ...prev] : [newPred]));
     }
-
-    // Prediction resolved
     function onResolved(updatedPred: PredictionFull) {
-      if (!cache) return;
-      cache = cache.map((p) => (p.id === updatedPred.id ? updatedPred : p));
-      setData(cache);
-    }
-
-    // Single bet placed (must include `user` field)
-    function onBetPlaced(bet: BetWithUser) {
-      if (!cache) return;
-      cache = cache.map((p) => (p.id === bet.predictionId ? { ...p, bets: [...p.bets, bet] } : p));
-      setData(cache);
-    }
-
-    // Parlay leg placed: same shape as PredictionFull.parlayLegs[number] plus predictionId
-    type ParlayLegEvent = PredictionFull['parlayLegs'][number] & {
-      predictionId: number;
-    };
-    function onParlayPlaced(evt: ParlayLegEvent) {
-      if (!cache) return;
-      cache = cache.map((p) =>
-        p.id === evt.predictionId ? { ...p, parlayLegs: [...p.parlayLegs, evt] } : p,
+      setData((prev) =>
+        prev ? prev.map((p) => (p.id === updatedPred.id ? updatedPred : p)) : prev,
       );
-      setData(cache);
+    }
+    function onBetPlaced(bet: BetWithUser) {
+      setData((prev) =>
+        prev
+          ? prev.map((p) =>
+              p.id === bet.predictionId ? { ...p, bets: [...(p.bets ?? []), bet] } : p,
+            )
+          : prev,
+      );
+    }
+    function onParlayPlaced(evt: ParlayLegWithUser & { predictionId: number }) {
+      setData((prev) =>
+        prev
+          ? prev.map((p) =>
+              p.id === evt.predictionId ? { ...p, parlayLegs: [...(p.parlayLegs ?? []), evt] } : p,
+            )
+          : prev,
+      );
     }
 
     socket.on('predictionCreated', onCreated);
@@ -91,7 +80,6 @@ export function usePredictions() {
       setLoading(true);
       try {
         await apiCreatePrediction(input);
-        cache = null;
         await fetchPredictions();
       } catch (err: any) {
         setError(err);
@@ -103,11 +91,22 @@ export function usePredictions() {
     [fetchPredictions],
   );
 
+  const addOptimisticBet = useCallback((bet: BetWithUser) => {
+    setData((prev) =>
+      prev
+        ? prev.map((p) =>
+            p.id === bet.predictionId ? { ...p, bets: [...(p.bets ?? []), bet] } : p,
+          )
+        : prev,
+    );
+  }, []);
+
   return {
     predictions,
     loading,
     error,
     refresh: fetchPredictions,
     createPrediction,
+    addOptimisticBet,
   };
 }

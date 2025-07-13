@@ -12,6 +12,7 @@ ALTER TABLE "UserStats" ADD COLUMN IF NOT EXISTS "biggestWin"       Int     DEFA
 
 -- 2) Re-create the leaderboard view with all the expected fields
 DROP MATERIALIZED VIEW IF EXISTS leaderboard_view CASCADE;
+DROP VIEW IF EXISTS leaderboard_view CASCADE;
 
 CREATE MATERIALIZED VIEW leaderboard_view AS
 SELECT

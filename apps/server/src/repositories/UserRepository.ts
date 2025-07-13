@@ -63,6 +63,7 @@ export class UserRepository implements IUserRepository {
         | 'theme'
         | 'twoFactorEnabled'
         | 'profileComplete'
+        | 'profilePictureKey'
       >
     >,
   ): Promise<void> {
@@ -128,11 +129,9 @@ export class UserRepository implements IUserRepository {
     type: string;
     details?: Prisma.InputJsonValue | null;
   }): Promise<DbUserActivity> {
-    // Build up the `data` payload, translating null -> Prisma.JsonNull
     const payload: Prisma.UserActivityUncheckedCreateInput = {
       userId: data.userId,
       type: data.type,
-      // If details is exactly null, use Prisma.JsonNull. If undefined, omit entirely.
       ...(data.details === null
         ? { details: Prisma.JsonNull }
         : data.details !== undefined
@@ -155,19 +154,11 @@ export class UserRepository implements IUserRepository {
     await prisma.userStats.update({ where: { userId }, data });
   }
 
-  /**
-   * Atomically increments one or more stats fields;
-   * if no UserStats row exists yet, create it.
-   */
   async incrementUserStats(userId: number, data: Prisma.UserStatsUpdateInput): Promise<void> {
     try {
-      await prisma.userStats.update({
-        where: { userId },
-        data,
-      });
+      await prisma.userStats.update({ where: { userId }, data });
     } catch (e: any) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2025') {
-        // extract just the 'increment' values into an unchecked create payload
         const createData: Prisma.UserStatsUncheckedCreateInput = { userId };
         for (const [key, val] of Object.entries(data)) {
           if (
@@ -176,14 +167,11 @@ export class UserRepository implements IUserRepository {
             'increment' in val &&
             typeof (val as any).increment === 'number'
           ) {
-            // @ts-ignore – this is fine because we're building an unchecked payload
+            // @ts-ignore
             createData[key] = (val as any).increment;
           }
         }
-        await prisma.userStats.create({
-          // cast to the unchecked type so TS knows 'user' nested field isn't required
-          data: createData as Prisma.UserStatsUncheckedCreateInput,
-        });
+        await prisma.userStats.create({ data: createData as Prisma.UserStatsUncheckedCreateInput });
         return;
       }
       throw e;

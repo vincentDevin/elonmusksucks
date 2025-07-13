@@ -40,8 +40,25 @@ export async function updateUserProfile(
   return res.data;
 }
 
-/** ----------- FEED/POSTS ----------- */
+/** Upload a new profile image */
+export async function uploadProfileImage(userId: number, file: File): Promise<string> {
+  const formData = new FormData();
+  formData.append('image', file);
 
+  const res = await api.post<{ imageUrl: string }>(
+    `/api/users/${userId}/profile-picture`,
+    formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    },
+  );
+
+  return res.data.imageUrl;
+}
+
+/** ----------- FEED/POSTS ----------- */
 export type CreateUserPostPayload = {
   content: string;
   parentId?: number | null;
@@ -61,14 +78,12 @@ export async function createUserPost(
 }
 
 /** ----------- ACTIVITY ----------- */
-
 export async function getUserActivity(userId: number): Promise<UserActivity[]> {
   const res = await api.get<UserActivity[]>(`/api/users/${userId}/activity`);
   return res.data;
 }
 
 /** ----------- STATS (OPTIONAL) ----------- */
-
 export async function getUserStats(userId: number): Promise<UserStatsDTO> {
   const res = await api.get<UserStatsDTO>(`/api/users/${userId}/stats`);
   return res.data;

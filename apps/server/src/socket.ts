@@ -17,7 +17,7 @@ export async function initSocket(httpServer: HTTPServer) {
     },
   });
 
-  // --- Redis adapter setup (duplicates auto-connect) ---
+  // --- Redis adapter setup ---
   const pubClient = redisClient.duplicate();
   const subClient = redisClient.duplicate();
   io.adapter(createAdapter(pubClient, subClient));
@@ -25,7 +25,6 @@ export async function initSocket(httpServer: HTTPServer) {
 
   // --- Subscribe to event channels ---
   const eventSub = redisClient.duplicate();
-  // no explicit connect(); subscribe will queue and auto-connect under the hood
   await eventSub.subscribe(
     'prediction:resolved',
     'bet:placed',
@@ -34,7 +33,16 @@ export async function initSocket(httpServer: HTTPServer) {
     'leaderboard:daily',
   );
   eventSub.on('message', (channel, message) => {
-    const payload = JSON.parse(message);
+    let payload: any;
+    try {
+      payload = JSON.parse(message);
+    } catch (e) {
+      console.error(`[socket] Failed to parse message for channel "${channel}":`, message);
+      return;
+    }
+    // Debug log every event and payload
+    console.log(`[socket] Redis event: ${channel}`, payload);
+
     switch (channel) {
       case 'prediction:resolved':
         io.emit('predictionResolved', payload);
@@ -52,6 +60,7 @@ export async function initSocket(httpServer: HTTPServer) {
         io.emit('leaderboardDaily', payload);
         break;
       default:
+        console.warn(`[socket] Unknown Redis event: ${channel}`);
         break;
     }
   });

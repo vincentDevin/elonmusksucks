@@ -1,6 +1,6 @@
-// apps/server/src/services/betting.service.ts
 import type { IBettingRepository } from '../repositories/IBettingRepository';
-import type { DbBet, DbParlay, PublicBet } from '@ems/types';
+import type { DbBet, DbParlay } from '@ems/types';
+import type { BetWithUser } from '@ems/types';
 import { BettingRepository } from '../repositories/BettingRepository';
 import redisClient from '../lib/redis';
 
@@ -8,11 +8,7 @@ export class BettingService {
   constructor(private repo: IBettingRepository = new BettingRepository()) {}
 
   /**
-   * Place a single bet:
-   * 1) Validate option/prediction is open
-   * 2) Validate user funds
-   * 3) Compute payout
-   * 4) Persist and emit real-time event
+   * Place a single bet and publish real-time event with user info.
    */
   async placeBet(userId: number, optionId: number, amount: number): Promise<DbBet> {
     // 1) Load option + prediction
@@ -22,7 +18,7 @@ export class BettingService {
       throw new Error('PREDICTION_CLOSED');
     }
 
-    // 2) Check user balance
+    // 2) Check user balance and get user info
     const user = await this.repo.findUserById(userId);
     if (!user || user.muskBucks < amount) throw new Error('INSUFFICIENT_FUNDS');
 
@@ -40,38 +36,31 @@ export class BettingService {
       potentialPayout,
     );
 
-    // 5) Publish real-time event to clients
-    const payload: PublicBet = {
-      id: bet.id,
-      userId: bet.userId,
-      predictionId: bet.predictionId,
-      optionId: bet.optionId,
-      amount: bet.amount,
-      oddsAtPlacement: bet.oddsAtPlacement,
-      potentialPayout: bet.potentialPayout,
-      status: bet.status,
-      won: bet.won,
-      payout: bet.payout,
-      createdAt: bet.createdAt,
+    // 5) Compose full bet event payload including user info
+    const betWithUser: BetWithUser = {
+      ...bet,
+      user: {
+        id: user.id,
+        name: user.name,
+        avatarUrl: user.avatarUrl,
+      },
     };
-    await redisClient.publish('bet:placed', JSON.stringify(payload));
+
+    // 6) Publish real-time event to clients
+    await redisClient.publish('bet:placed', JSON.stringify(betWithUser));
 
     return bet;
   }
 
   /**
-   * Place a parlay:
-   * 1) Validate each leg is open
-   * 2) Validate user funds
-   * 3) Compute combined payout
-   * 4) Persist and emit real-time event
+   * Place a parlay bet and emit event (can expand parlay payload as needed).
    */
   async placeParlay(
     userId: number,
     legs: Array<{ optionId: number }>,
     amount: number,
   ): Promise<DbParlay> {
-    // 1) Snapshot & filter valid legs
+    // 1) Get all leg details
     const detailed = await Promise.all(
       legs.map(({ optionId }) => this.repo.findOptionWithPrediction(optionId)),
     );
@@ -85,7 +74,7 @@ export class BettingService {
       }
     }
 
-    // 3) Check funds
+    // 3) Check user balance
     const user = await this.repo.findUserById(userId);
     if (!user || user.muskBucks < amount) throw new Error('INSUFFICIENT_FUNDS');
 
@@ -105,14 +94,14 @@ export class BettingService {
       potentialPayout,
     );
 
-    // 6) Publish real-time event to clients
+    // 6) Publish real-time event to clients (add user if desired for frontend consistency)
     await redisClient.publish('parlay:placed', JSON.stringify(parlay));
 
     return parlay;
   }
 
   /**
-   * Recalculate odds is db-only; delegate directly
+   * Recalculate odds for a prediction.
    */
   async recalculateOdds(predictionId: number): Promise<void> {
     return this.repo.recalculateOdds(predictionId);
