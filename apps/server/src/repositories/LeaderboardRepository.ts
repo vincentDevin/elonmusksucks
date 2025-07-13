@@ -5,20 +5,27 @@ import type { ILeaderboardRepository } from './ILeaderboardRepository';
 
 export class LeaderboardRepository implements ILeaderboardRepository {
   async getTopAllTime(limit: number): Promise<PublicLeaderboardEntry[]> {
-    const rows = await prisma.leaderboardEntry.findMany({
-      orderBy: { profitAll: 'desc' },
-      take: limit,
-    });
-    return rows as PublicLeaderboardEntry[];
+    const rows = await prisma.$queryRaw<PublicLeaderboardEntry[]>`
+      SELECT * FROM leaderboard_view
+      ORDER BY profit_all DESC
+      LIMIT ${limit};
+    `;
+    return rows;
   }
 
   async getTopDaily(limit: number): Promise<PublicLeaderboardEntry[]> {
-    const rows = await prisma.leaderboardEntry.findMany({
-      orderBy: { profitPeriod: 'desc' },
-      take: limit,
-    });
-    return rows as PublicLeaderboardEntry[];
+    const rows = await prisma.$queryRaw<PublicLeaderboardEntry[]>`
+      SELECT * FROM leaderboard_view
+      ORDER BY profit_period DESC
+      LIMIT ${limit};
+    `;
+    return rows;
   }
 
-  // Future: getTopWeekly, getTopMonthly, etc.
+  /**
+   * Refreshes the Postgres materialized view
+   */
+  async refreshMaterializedView(): Promise<void> {
+    await prisma.$executeRaw`REFRESH MATERIALIZED VIEW CONCURRENTLY leaderboard_view;`;
+  }
 }

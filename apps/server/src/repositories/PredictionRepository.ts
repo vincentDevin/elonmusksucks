@@ -4,7 +4,7 @@ import type { IPredictionRepository } from './IPredictionRepository';
 import type { DbPrediction, DbPredictionOption, DbBet, DbUser } from '@ems/types';
 import type { PredictionType } from '@ems/types';
 
-// Shape for a parlay leg, including the timestamp it was created
+/** Shape for a parlay leg with user info */
 export type ParlayLegWithUser = {
   parlayId: number;
   user: Pick<DbUser, 'id' | 'name'>;
@@ -38,28 +38,13 @@ export class PredictionRepository implements IPredictionRepository {
         creatorId: data.creatorId,
         type: data.type,
         threshold: data.threshold,
-        options: {
-          create: data.options.map((o) => ({
-            label: o.label,
-            odds: 1.0,
-          })),
-        },
+        options: { create: data.options.map((o) => ({ label: o.label, odds: 1.0 })) },
       },
       include: {
         options: {
-          select: {
-            id: true,
-            label: true,
-            odds: true,
-            predictionId: true,
-            createdAt: true,
-          },
+          select: { id: true, label: true, odds: true, predictionId: true, createdAt: true },
         },
-        bets: {
-          include: {
-            user: { select: { id: true, name: true } },
-          },
-        },
+        bets: { include: { user: { select: { id: true, name: true } } } },
       },
     });
   }
@@ -76,26 +61,17 @@ export class PredictionRepository implements IPredictionRepository {
     const preds = await prisma.prediction.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
-        options: {
-          include: {
-            parlayLegs: {
-              include: { parlay: { include: { user: true } } },
-            },
-          },
-        },
-        bets: {
-          include: {
-            user: { select: { id: true, name: true } },
-          },
-        },
+        options: { include: { parlayLegs: { include: { parlay: { include: { user: true } } } } } },
+        bets: { include: { user: { select: { id: true, name: true } } } },
       },
     });
 
+    // flatten parlayLegs
     return preds.map((pred) => {
-      const { bets, options, ...rest } = pred;
+      const { options, bets, ...rest } = pred;
       const parlayLegs: ParlayLegWithUser[] = [];
-      for (const opt of options) {
-        for (const leg of opt.parlayLegs) {
+      options.forEach((opt) =>
+        opt.parlayLegs.forEach((leg) => {
           parlayLegs.push({
             parlayId: leg.parlay.id,
             user: { id: leg.parlay.user.id, name: leg.parlay.user.name },
@@ -103,15 +79,9 @@ export class PredictionRepository implements IPredictionRepository {
             optionId: opt.id,
             createdAt: leg.createdAt,
           });
-        }
-      }
-
-      return {
-        ...rest,
-        bets,
-        options,
-        parlayLegs,
-      };
+        }),
+      );
+      return { ...rest, options, bets, parlayLegs };
     });
   }
 
@@ -126,26 +96,15 @@ export class PredictionRepository implements IPredictionRepository {
     const pred = await prisma.prediction.findUnique({
       where: { id },
       include: {
-        options: {
-          include: {
-            parlayLegs: {
-              include: { parlay: { include: { user: true } } },
-            },
-          },
-        },
-        bets: {
-          include: {
-            user: { select: { id: true, name: true } },
-          },
-        },
+        options: { include: { parlayLegs: { include: { parlay: { include: { user: true } } } } } },
+        bets: { include: { user: { select: { id: true, name: true } } } },
       },
     });
     if (!pred) return null;
-
-    const { bets, options, ...rest } = pred;
+    const { options, bets, ...rest } = pred;
     const parlayLegs: ParlayLegWithUser[] = [];
-    for (const opt of options) {
-      for (const leg of opt.parlayLegs) {
+    options.forEach((opt) =>
+      opt.parlayLegs.forEach((leg) => {
         parlayLegs.push({
           parlayId: leg.parlay.id,
           user: { id: leg.parlay.user.id, name: leg.parlay.user.name },
@@ -153,14 +112,8 @@ export class PredictionRepository implements IPredictionRepository {
           optionId: opt.id,
           createdAt: leg.createdAt,
         });
-      }
-    }
-
-    return {
-      ...rest,
-      bets,
-      options,
-      parlayLegs,
-    };
+      }),
+    );
+    return { ...rest, options, bets, parlayLegs };
   }
 }

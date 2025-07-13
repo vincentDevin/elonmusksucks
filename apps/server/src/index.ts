@@ -8,6 +8,8 @@ dotenv.config({ path: path.resolve(__dirname, '../../..', envFile) });
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import http from 'http';
+import { initSocket } from './socket';
 import authRoutes from './routes/auth.routes';
 import predictionRoutes from './routes/predictions.routes';
 import userRoutes from './routes/user.routes';
@@ -63,8 +65,16 @@ app.use((err: any, _req: any, res: any, _next: any) => {
 // Start server only if this file is run directly
 if (require.main === module) {
   const PORT = parseInt(process.env.PORT ?? '5000', 10);
-  app.listen(PORT, '127.0.0.1', () => {
-    console.log(`Server running on http://127.0.0.1:${PORT}`);
+  // Create HTTP server and bind Express app
+  const server = http.createServer(app);
+
+  // Initialize Socket.IO
+  initSocket(server).catch((err) => {
+    console.error('[socket] failed to initialize:', err);
+  });
+
+  server.listen(PORT, '127.0.0.1', () => {
+    console.log(`Server & socket running on http://127.0.0.1:${PORT}`);
   });
 }
 

@@ -1,8 +1,9 @@
 // apps/server/src/services/predictions.service.ts
-import type { DbPrediction, DbPredictionOption, DbBet } from '@ems/types';
+import type { DbPrediction, DbPredictionOption, DbBet, PublicPrediction } from '@ems/types';
 import type { IPredictionRepository } from '../repositories/IPredictionRepository';
 import { PredictionRepository } from '../repositories/PredictionRepository';
 import { PredictionType } from '@prisma/client';
+import redisClient from '../lib/redis';
 
 /** Matches what the client expects for a parlay leg’s user info */
 export type ParlayLegWithUser = {
@@ -17,10 +18,7 @@ export class PredictionService {
   constructor(private repo: IPredictionRepository = new PredictionRepository()) {}
 
   /**
-   * List all predictions, but sanitize:
-   *  - options only include id,label,odds,predictionId,createdAt
-   *  - bets only include their user’s id/name
-   *  - parlayLegs only include their user’s id/name
+   * List all predictions, sanitized.
    */
   async listAllPredictions(): Promise<
     Array<
@@ -32,35 +30,11 @@ export class PredictionService {
     >
   > {
     const raw = await this.repo.listAllPredictions();
-    return raw.map((pred) => ({
-      // copy all the base prediction fields
-      ...pred,
-      // sanitize options: strip any nested parlayLegs
-      options: pred.options.map(({ id, label, odds, predictionId, createdAt }) => ({
-        id,
-        label,
-        odds,
-        predictionId,
-        createdAt,
-      })),
-      // sanitize bets’ user
-      bets: pred.bets.map((b) => ({
-        ...b,
-        user: { id: b.user.id, name: b.user.name },
-      })),
-      // sanitize parlayLegs’ user
-      parlayLegs: pred.parlayLegs.map((leg) => ({
-        parlayId: leg.parlayId,
-        user: { id: leg.user.id, name: leg.user.name },
-        stake: leg.stake,
-        optionId: leg.optionId,
-        createdAt: leg.createdAt,
-      })),
-    }));
+    return raw.map((pred) => this.sanitize(pred));
   }
 
   /**
-   * Create a new prediction (unchanged).
+   * Create a new prediction, then publish real‐time event.
    */
   async createPrediction(params: {
     title: string;
@@ -71,19 +45,38 @@ export class PredictionService {
     options: Array<{ label: string }>;
     type: PredictionType;
     threshold?: number;
-  }): Promise<
-    DbPrediction & {
-      options: DbPredictionOption[];
-      bets: Array<DbBet & { user: { id: number; name: string } }>;
-      parlayLegs: ParlayLegWithUser[];
-    }
-  > {
+  }): Promise<PublicPrediction & { bets: DbBet[]; parlayLegs: ParlayLegWithUser[] }> {
     const pred = await this.repo.createPrediction(params);
-    return { ...pred, bets: [], parlayLegs: [] };
+
+    const publicPred: PublicPrediction & {
+      bets: DbBet[];
+      parlayLegs: ParlayLegWithUser[];
+    } = {
+      id: pred.id,
+      title: pred.title,
+      description: pred.description,
+      category: pred.category,
+      expiresAt: pred.expiresAt,
+      type: pred.type,
+      threshold: pred.threshold ?? null,
+      resolved: pred.resolved,
+      approved: pred.approved,
+      resolvedAt: pred.resolvedAt,
+      winningOptionId: pred.winningOptionId,
+      creatorId: pred.creatorId,
+
+      // **test expectations**
+      bets: [],
+      parlayLegs: [],
+    };
+
+    await redisClient.publish('prediction:created', JSON.stringify(publicPred));
+
+    return publicPred;
   }
 
   /**
-   * Fetch one prediction, sanitized just like listAllPredictions.
+   * Fetch one prediction, sanitized.
    */
   async getPrediction(id: number): Promise<
     | (DbPrediction & {
@@ -95,7 +88,17 @@ export class PredictionService {
   > {
     const pred = await this.repo.findPredictionById(id);
     if (!pred) return null;
+    return this.sanitize(pred);
+  }
 
+  /** Utility to sanitize DB return into public shape */
+  private sanitize(
+    pred: DbPrediction & {
+      options: DbPredictionOption[];
+      bets: Array<DbBet & { user: { id: number; name: string } }>;
+      parlayLegs: ParlayLegWithUser[];
+    },
+  ) {
     return {
       ...pred,
       options: pred.options.map(({ id, label, odds, predictionId, createdAt }) => ({

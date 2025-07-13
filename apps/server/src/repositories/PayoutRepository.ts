@@ -6,6 +6,23 @@ import type { PublicPrediction, DbUserStats } from '@ems/types';
 const prisma = new PrismaClient();
 
 export class PayoutRepository implements IPayoutRepository {
+  /**
+   * Quickly set the winning option so the worker can process payouts.
+   * Does not mark the prediction fully resolved.
+   */
+  async markResolving(predictionId: number, winningOptionId: number): Promise<void> {
+    await prisma.prediction.update({
+      where: { id: predictionId },
+      data: {
+        // store chosen winningOptionId; leave 'resolved' until worker
+        winningOptionId,
+      },
+    });
+  }
+
+  /**
+   * Full resolution logic; intended for background worker.
+   */
   async resolvePrediction(
     predictionId: number,
     winningOptionId: number,
@@ -56,7 +73,6 @@ export class PayoutRepository implements IPayoutRepository {
             }
           }
 
-          // fetch existing stats before upsert
           const statsBefore = await tx.userStats.findUnique({ where: { userId: b.userId } });
           const prevStats: DbUserStats = await tx.userStats.upsert({
             where: { userId: b.userId },
@@ -102,7 +118,6 @@ export class PayoutRepository implements IPayoutRepository {
             },
           });
 
-          // recalc ROI
           await tx.userStats.update({
             where: { userId: b.userId },
             data: {
@@ -158,7 +173,6 @@ export class PayoutRepository implements IPayoutRepository {
             });
           }
 
-          // fetch existing stats
           const statsBefore = await tx.userStats.findUnique({ where: { userId: parlay.userId } });
           const prevP: DbUserStats = await tx.userStats.upsert({
             where: { userId: parlay.userId },

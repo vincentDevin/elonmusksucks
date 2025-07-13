@@ -12,7 +12,7 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "concurrently \"npm run dev --workspace=apps/client\" \"npm run dev --workspace=apps/server\"",
+    "dev": "concurrently \"npm run dev --workspace=apps/client\" \"npm run dev --workspace=apps/server\" \"npm run worker\"",
     "build": "npm run prisma:generate && cd packages/types && npm run build && cd ../../ && npm run build --workspace=apps/client && npm run build --workspace=apps/server",
     "lint": "eslint apps/**/*.{ts,tsx} --max-warnings=0",
     "format": "prettier --write \"apps/**/*.{ts,tsx,js,jsx,json,css,md}\"",
@@ -21,7 +21,8 @@
     "prisma:migrate:dev": "dotenv -e .env -- prisma migrate reset --force --skip-generate --schema prisma/schema.prisma",
     "seed:dev": "ts-node --transpile-only prisma/seed.ts",
     "test": "jest",
-    "test:server": "dotenv -e .env.test jest --selectProjects=server"
+    "test:server": "dotenv -e .env.test jest --selectProjects=server",
+    "worker": "npm run worker --workspace=apps/server"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
