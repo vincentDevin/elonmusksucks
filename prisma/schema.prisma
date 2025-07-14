@@ -82,6 +82,24 @@ model User {
   activities         UserActivity[]
   stats              UserStats?
   Prediction         Prediction[]
+  messages           Message[]
+}
+
+model ChatRoom {
+  id       Int       @id @default(autoincrement())
+  name     String    @unique
+  messages Message[]
+}
+
+model Message {
+  id         Int      @id @default(autoincrement())
+  roomId     Int
+  userId     Int
+  content    String
+  timestamp  DateTime @default(now())
+  // Relations
+  user       User     @relation(fields: [userId], references: [id])
+  room       ChatRoom @relation(fields: [roomId], references: [id])
 }
 
 model EmailVerification {

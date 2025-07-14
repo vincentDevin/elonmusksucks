@@ -3,15 +3,30 @@ import { type Server as HTTPServer } from 'http';
 import { Server as IOServer } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
 import redisClient from './lib/redis';
+import { socketAuthMiddleware } from './middleware/socketAuthMiddleware';
+import { registerRoomHandlers } from './handlers/roomHandlers';
+import { registerChatHandlers } from './handlers/chatHandlers';
+import { registerRedisEventHandlers } from './handlers/redisEventHandlers';
+import { registerRedisChatHandlers } from './handlers/redisChatEventHandlers';
 
-/**
- * Initializes Socket.IO on the given HTTP server.
- * Sets up Redis adapter for pub/sub and hooks various real-time events.
- */
+// Utility to make allowed origins robust for both dev and prod
+function getAllowedOrigins(): string[] {
+  const envOrigin = process.env.CLIENT_URL;
+  // Default to both localhost and 127.0.0.1 for developer convenience
+  const devOrigins = ['http://localhost:3000', 'http://127.0.0.1:3000'];
+  if (envOrigin && !devOrigins.includes(envOrigin)) {
+    return [envOrigin, ...devOrigins];
+  }
+  return devOrigins;
+}
+
 export async function initSocket(httpServer: HTTPServer) {
+  const allowedOrigins = getAllowedOrigins();
+  console.log('[socket] Allowed origins for CORS:', allowedOrigins);
+
   const io = new IOServer(httpServer, {
     cors: {
-      origin: process.env.CLIENT_ORIGIN || '*',
+      origin: allowedOrigins,
       methods: ['GET', 'POST'],
       credentials: true,
     },
@@ -23,7 +38,7 @@ export async function initSocket(httpServer: HTTPServer) {
   io.adapter(createAdapter(pubClient, subClient));
   console.log('[socket] Redis adapter attached');
 
-  // --- Subscribe to event channels ---
+  // --- Redis event subscription/handler ---
   const eventSub = redisClient.duplicate();
   await eventSub.subscribe(
     'prediction:resolved',
@@ -32,56 +47,34 @@ export async function initSocket(httpServer: HTTPServer) {
     'leaderboard:allTime',
     'leaderboard:daily',
   );
-  eventSub.on('message', (channel, message) => {
-    let payload: any;
-    try {
-      payload = JSON.parse(message);
-    } catch (e) {
-      console.error(`[socket] Failed to parse message for channel "${channel}":`, message);
-      return;
-    }
-    // Debug log every event and payload
-    console.log(`[socket] Redis event: ${channel}`, payload);
+  registerRedisEventHandlers(io, eventSub);
 
-    switch (channel) {
-      case 'prediction:resolved':
-        io.emit('predictionResolved', payload);
-        break;
-      case 'bet:placed':
-        io.emit('betPlaced', payload);
-        break;
-      case 'parlay:placed':
-        io.emit('parlayPlaced', payload);
-        break;
-      case 'leaderboard:allTime':
-        io.emit('leaderboardAllTime', payload);
-        break;
-      case 'leaderboard:daily':
-        io.emit('leaderboardDaily', payload);
-        break;
-      default:
-        console.warn(`[socket] Unknown Redis event: ${channel}`);
-        break;
-    }
-  });
+  // --- Chat Redis subscription ---
+  const chatEventSub = redisClient.duplicate();
+  await registerRedisChatHandlers(io, chatEventSub);
 
-  // --- Connection & room handlers ---
+  // --- Auth middleware BEFORE connection handlers ---
+  io.use(socketAuthMiddleware);
+
+  // --- Socket.IO connection ---
   io.on('connection', (socket) => {
     console.log('[socket] client connected:', socket.id);
 
-    socket.on('joinRoom', (room: string) => {
-      socket.join(room);
-      console.log(`[socket] ${socket.id} joined ${room}`);
-    });
-
-    socket.on('leaveRoom', (room: string) => {
-      socket.leave(room);
-      console.log(`[socket] ${socket.id} left ${room}`);
-    });
+    try {
+      registerRoomHandlers(io, socket);
+      registerChatHandlers(socket);
+    } catch (err) {
+      console.error('[socket] handler error:', err);
+    }
 
     socket.on('disconnect', () => {
       console.log('[socket] client disconnected:', socket.id);
     });
+  });
+
+  // Top-level error handler for the socket server (optional, but nice)
+  io.on('error', (err) => {
+    console.error('[socket.io] SERVER ERROR:', err);
   });
 
   return io;

@@ -243,6 +243,7 @@ export type DbUserStats = {
 export interface PublicUserProfile {
   id:               number;
   name:             string;
+  role: string;
   muskBucks:        number;
   profileComplete:  boolean;
   rank?:            number;

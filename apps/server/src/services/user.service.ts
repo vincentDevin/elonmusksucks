@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import redisClient from '../lib/redis';
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { IUserRepository } from '../repositories/IUserRepository';
@@ -43,6 +44,7 @@ export class UserService {
 
   // --- NEW: Upload profile image ---
   async uploadUserProfileImage(userId: number, file: UploadedFile): Promise<string> {
+    await redisClient.del(`profileImageUrl:userId:${userId}`);
     const key = `${userId}/${Date.now()}-${file.originalname}`;
     // Upload to S3-compatible storage
     await this.s3.send(
@@ -61,6 +63,59 @@ export class UserService {
     return getSignedUrl(this.s3, new GetObjectCommand({ Bucket: this.bucket, Key: key }), {
       expiresIn: 60 * 60 * 24 * 7,
     });
+  }
+
+  /**
+   * Get a short-lived (1 hour) signed URL for a user's avatar/profile picture.
+   * Accepts a storage key (from user.profilePictureKey).
+   */
+  async getSignedAvatarUrl(key: string, expiresInSeconds = 3600): Promise<string> {
+    return getSignedUrl(this.s3, new GetObjectCommand({ Bucket: this.bucket, Key: key }), {
+      expiresIn: expiresInSeconds,
+    });
+  }
+
+  /**
+   * Returns a signed avatar URL, caching it in Redis until expiry.
+   * Use this in leaderboard/chat for fast avatar lookups!
+   */
+  async getCachedProfileImageUrl(
+    userId: number,
+    profilePictureKey: string,
+    expiresInSeconds = 3600,
+  ): Promise<string> {
+    const redisKey = `profileImageUrl:userId:${userId}`;
+    // Try Redis first
+    const cached = await redisClient.get(redisKey);
+    if (cached) return cached;
+
+    // Not cached: generate signed URL
+    const url = await this.getSignedAvatarUrl(profilePictureKey, expiresInSeconds);
+
+    // Store in Redis, TTL matches URL expiry
+    await redisClient.set(redisKey, url, 'EX', expiresInSeconds);
+
+    return url;
+  }
+
+  /**
+   * Fetch a basic public user profile with signed avatar URL.
+   * Used for socket auth and chat events.
+   */
+  async getPublicSocketUser(userId: number): Promise<{
+    id: number;
+    name: string;
+    role: string;
+    avatarUrl: string | null;
+  } | null> {
+    const user = await this.getUserProfile(userId); // uses your existing function!
+    if (!user) return null;
+    return {
+      id: user.id,
+      name: user.name,
+      role: user.role === 'ADMIN' ? 'ADMIN' : user.role, // fallback if needed
+      avatarUrl: user.avatarUrl ?? null,
+    };
   }
 
   // --- PROFILE (with signed URL fallback) ---
@@ -96,6 +151,7 @@ export class UserService {
     return {
       id: user.id,
       name: user.name,
+      role: user.role,
       muskBucks: user.muskBucks,
       profileComplete: user.profileComplete,
       rank,

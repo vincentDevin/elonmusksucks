@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useLeaderboard } from '../hooks/useLeaderboard';
 import type { LeaderboardPeriod } from '../hooks/useLeaderboard';
+import { UserCircleIcon } from '@heroicons/react/24/outline';
 
 export default function Leaderboard() {
   const [period, setPeriod] = useState<LeaderboardPeriod>('all-time');
@@ -64,7 +65,9 @@ export default function Leaderboard() {
                       className="w-12 h-12 rounded-full object-cover border-2 border-muted"
                     />
                   ) : (
-                    <div className="w-12 h-12 rounded-full bg-tertiary border-2 border-muted" />
+                    <span className="w-12 h-12 flex items-center justify-center rounded-full bg-tertiary border-2 border-muted text-tertiary">
+                      <UserCircleIcon className="w-10 h-10 text-gray-400" aria-hidden="true" />
+                    </span>
                   )}
                   <span className="font-semibold text-lg">{entry.userName}</span>
                   <span className={`ml-auto font-medium ${changeColor} text-sm`}>
