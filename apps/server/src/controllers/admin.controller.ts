@@ -119,8 +119,10 @@ export async function resolvePrediction(
   try {
     const id = Number(req.params.id);
     const { winningOptionId } = req.body as { winningOptionId: number };
-    const updated: PublicPrediction = await payoutService.resolvePrediction(id, winningOptionId);
-    res.json(updated);
+    // enqueue the payout job (no return value)
+    await payoutService.resolvePrediction(id, winningOptionId);
+    // 202 Accepted indicates “we got it, working in background”
+    res.status(202).json({ message: 'Payout job enqueued' });
   } catch (err) {
     next(err);
   }

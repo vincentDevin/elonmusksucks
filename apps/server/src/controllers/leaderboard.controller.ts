@@ -1,13 +1,10 @@
 // apps/server/src/controllers/leaderboard.controller.ts
-
 import type { Request, Response, NextFunction } from 'express';
 import { leaderboardService } from '../services/leaderboard.service';
 import type { PublicLeaderboardEntry } from '@ems/types';
 
 /**
- * GET /api/leaderboard/all-time
- * Query params:
- *   - limit? number of entries to return (default: 25)
+ * GET /api/leaderboard/all-time?limit=N
  */
 export const getTopAllTime = async (
   req: Request,
@@ -24,9 +21,7 @@ export const getTopAllTime = async (
 };
 
 /**
- * GET /api/leaderboard/daily
- * Query params:
- *   - limit? number of entries to return (default: 25)
+ * GET /api/leaderboard/daily?limit=N
  */
 export const getTopDaily = async (
   req: Request,
@@ -42,6 +37,19 @@ export const getTopDaily = async (
   }
 };
 
-// Future endpoints for weekly/monthly leaderboards could be added similarly:
-// export const getTopWeekly = async ( ... ) => { ... };
-// export const getTopMonthly = async ( ... ) => { ... };
+/**
+ * POST /api/leaderboard/refresh
+ * Enqueues a background job to refresh the materialized view and emit updates
+ */
+export const refreshLeaderboard = async (
+  _req: Request,
+  res: Response<{ message: string }>,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    await leaderboardService.enqueueRefresh();
+    res.status(202).json({ message: 'Leaderboard refresh enqueued' });
+  } catch (err) {
+    next(err);
+  }
+};

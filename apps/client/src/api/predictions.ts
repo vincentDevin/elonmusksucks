@@ -2,23 +2,10 @@ import api from './axios';
 import type {
   PublicPrediction,
   PublicPredictionOption,
-  PublicBet,
   PredictionType,
+  BetWithUser,
+  ParlayLegWithUser, // <-- use from @ems/types!
 } from '@ems/types';
-
-/** A bet with its user’s id+name */
-export interface BetWithUser extends PublicBet {
-  user: { id: number; name: string };
-}
-
-/** A parlay‐leg with exactly the fields your API now returns */
-export type ParlayLegWithUser = {
-  parlayId: number;
-  user: { id: number; name: string };
-  stake: number;
-  optionId: number;
-  createdAt: string;
-};
 
 /**
  * A prediction plus its dynamic options, single bets, and parlay legs.

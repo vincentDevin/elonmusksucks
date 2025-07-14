@@ -2,7 +2,21 @@ import { Request, Response, NextFunction } from 'express';
 import { UserService } from '../services/user.service';
 import type { PublicUserProfile, UserFeedPost, UserActivity, UserStatsDTO } from '@ems/types';
 
-type ReqWithUser = Request & { user?: { id: number } };
+// Define MulterFile type explicitly to avoid mismatched declarations
+export type MulterFile = {
+  fieldname: string;
+  originalname: string;
+  encoding: string;
+  mimetype: string;
+  buffer: Buffer;
+  size: number;
+};
+
+// Extend Request to include authenticated user and optionally an uploaded file
+export type ReqWithUser = Request & {
+  user?: { id: number };
+  file?: MulterFile;
+};
 
 // Instantiate the service (uses Prisma-backed repository by default)
 const userService = new UserService();
@@ -21,6 +35,37 @@ export async function getProfile(
     const viewerId = req.user?.id;
     const profileDTO: PublicUserProfile = await userService.getUserProfile(targetUserId, viewerId);
     res.json(profileDTO);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * POST /api/users/:userId/profile-picture
+ * Upload & store a new profile image, return a signed URL
+ */
+export async function uploadProfileImageHandler(
+  req: ReqWithUser,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const targetUserId = Number(req.params.userId);
+    const authUserId = req.user?.id;
+
+    if (authUserId !== targetUserId) {
+      res.status(403).json({ error: 'Forbidden' });
+      return;
+    }
+
+    const file = req.file;
+    if (!file) {
+      res.status(400).json({ error: 'No file uploaded' });
+      return;
+    }
+
+    const imageUrl = await userService.uploadUserProfileImage(targetUserId, file);
+    res.json({ imageUrl });
   } catch (err) {
     next(err);
   }

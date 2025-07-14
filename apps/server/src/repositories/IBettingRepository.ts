@@ -14,7 +14,7 @@ export interface IBettingRepository {
   >;
   findUserById(
     userId: number,
-  ): Promise<Pick<import('@prisma/client').User, 'id' | 'muskBucks'> | null>;
+  ): Promise<Pick<import('@prisma/client').User, 'id' | 'muskBucks' | 'name' | 'avatarUrl'> | null>;
 
   /**
    * Persist a single bet and all related updates in one transaction.

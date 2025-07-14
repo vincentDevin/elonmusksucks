@@ -1,7 +1,8 @@
 // apps/client/src/components/admin/PredictionQueue.tsx
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useAdmin } from '../../contexts/AdminContext';
 import * as adminApi from '../../api/admin';
+import { useSocket } from '../../contexts/SocketContext';
 import type { PublicPrediction, PublicPredictionOption } from '@ems/types';
 import { format } from 'date-fns';
 
@@ -11,27 +12,42 @@ interface AdminPrediction extends PublicPrediction {
 
 export default function PredictionQueue() {
   const { approvePrediction, rejectPrediction, resolvePrediction } = useAdmin();
+  const socket = useSocket();
 
   const [allPredictions, setAllPredictions] = useState<AdminPrediction[]>([]);
   const [loading, setLoading] = useState(false);
   const [resolvingId, setResolvingId] = useState<number | null>(null);
   const [selectedOption, setSelectedOption] = useState<Record<number, number>>({});
 
-  // fetch all predictions
-  const load = async () => {
+  // reload from server
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const preds = await adminApi.listPredictions();
-      // cast into AdminPrediction locally
       setAllPredictions(preds as AdminPrediction[]);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
+
+  // listen for the queue-worker’s “prediction:resolved” broadcast
+  useEffect(() => {
+    function onResolved(payload: { id: number }) {
+      if (payload.id === resolvingId) {
+        // the job finished!
+        load();
+        setResolvingId(null);
+      }
+    }
+    socket.on('predictionResolved', onResolved);
+    return () => {
+      socket.off('predictionResolved', onResolved);
+    };
+  }, [socket, resolvingId, load]);
 
   const pending = allPredictions.filter((p) => !p.approved);
   const resolvable = allPredictions.filter((p) => p.approved && !p.resolved);
@@ -50,7 +66,7 @@ export default function PredictionQueue() {
             pending.map((p) => (
               <li
                 key={p.id}
-                className="flex items-center justify-between border border-[var(--color-muted)] p-2 rounded bg-[var(--color-surface)]"
+                className="flex items-center justify-between border border-muted p-2 rounded bg-surface"
               >
                 <span>{p.title}</span>
                 <div className="space-x-2">
@@ -59,7 +75,7 @@ export default function PredictionQueue() {
                       await approvePrediction(p.id);
                       await load();
                     }}
-                    className="px-3 py-1 bg-green-500 text-[var(--color-surface)] rounded hover:opacity-90 transition"
+                    className="px-3 py-1 bg-green-500 text-surface rounded hover:opacity-90 transition"
                   >
                     Approve
                   </button>
@@ -68,7 +84,7 @@ export default function PredictionQueue() {
                       await rejectPrediction(p.id);
                       await load();
                     }}
-                    className="px-3 py-1 bg-red-500 text-[var(--color-surface)] rounded hover:opacity-90 transition"
+                    className="px-3 py-1 bg-red-500 text-surface rounded hover:opacity-90 transition"
                   >
                     Reject
                   </button>
@@ -76,7 +92,7 @@ export default function PredictionQueue() {
               </li>
             ))
           ) : (
-            <li className="text-[var(--color-tertiary)]">No pending predictions.</li>
+            <li className="text-tertiary">No pending predictions.</li>
           )}
         </ul>
       </div>
@@ -89,7 +105,7 @@ export default function PredictionQueue() {
             {resolvable.map((p) => {
               const isExpired = new Date(p.expiresAt) < new Date();
               return (
-                <li key={p.id} className="bg-[var(--color-surface)] rounded-lg shadow p-4">
+                <li key={p.id} className="bg-surface rounded-lg shadow p-4">
                   <div className="flex justify-between items-center mb-2">
                     <h3 className="font-semibold">{p.title}</h3>
                     <span
@@ -101,11 +117,11 @@ export default function PredictionQueue() {
                       {format(new Date(p.expiresAt), 'yyyy-MM-dd')}
                     </span>
                   </div>
-                  <p className="text-sm text-[var(--color-tertiary)] mb-3">{p.description}</p>
-                  {/* Options */}
+                  <p className="text-sm text-tertiary mb-3">{p.description}</p>
+
                   {/* Options */}
                   <div className="flex space-x-3 overflow-x-auto py-2">
-                    {p.options.map((opt: PublicPredictionOption) => {
+                    {p.options.map((opt) => {
                       const isSelected = selectedOption[p.id] === opt.id;
                       return (
                         <label
@@ -114,12 +130,11 @@ export default function PredictionQueue() {
                             flex flex-col items-center px-4 py-2 border rounded-lg transition
                             ${
                               isSelected
-                                ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-[var(--color-surface)]'
-                                : 'border-[var(--color-muted)] bg-background text-content hover:shadow-md'
+                                ? 'border-primary bg-primary text-surface'
+                                : 'border-muted bg-background text-content hover:shadow-md'
                             }
                           `}
                         >
-                          {/* visually-hidden native input for form semantics */}
                           <input
                             type="radio"
                             name={`winner-${p.id}`}
@@ -142,25 +157,18 @@ export default function PredictionQueue() {
 
                   {/* Resolve button */}
                   <button
-                    onClick={async () => {
+                    onClick={() => {
                       const win = selectedOption[p.id];
                       if (!win) return;
                       setResolvingId(p.id);
-                      try {
-                        await resolvePrediction(p.id, win);
-                        await load();
-                      } finally {
-                        setResolvingId(null);
-                      }
+                      resolvePrediction(p.id, win);
                     }}
                     disabled={resolvingId === p.id || !selectedOption[p.id]}
-                    className={`mt-3 w-full py-2 rounded font-medium transition
-                      ${
-                        selectedOption[p.id]
-                          ? 'bg-[var(--color-primary)] text-[var(--color-surface)] hover:opacity-90'
-                          : 'bg-[var(--color-muted)] text-[var(--color-tertiary)] cursor-not-allowed'
-                      }
-                    `}
+                    className={`mt-3 w-full py-2 rounded font-medium transition ${
+                      selectedOption[p.id]
+                        ? 'bg-primary text-surface hover:opacity-90'
+                        : 'bg-muted text-tertiary cursor-not-allowed'
+                    }`}
                   >
                     {resolvingId === p.id ? 'Resolving…' : 'Resolve Prediction'}
                   </button>
@@ -169,9 +177,7 @@ export default function PredictionQueue() {
             })}
           </ul>
         ) : (
-          <p className="text-[var(--color-tertiary)]">
-            No approved predictions awaiting resolution.
-          </p>
+          <p className="text-tertiary">No approved predictions awaiting resolution.</p>
         )}
       </div>
     </section>

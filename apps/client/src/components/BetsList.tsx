@@ -1,11 +1,7 @@
 // apps/client/src/components/BetsList.tsx
 import { useState } from 'react';
-import type { PublicBet, PublicPredictionOption } from '@ems/types';
+import type { PublicPredictionOption, BetWithUser } from '@ems/types';
 import { PredictionType } from '@ems/types';
-
-interface BetWithUser extends PublicBet {
-  user: { id: number; name: string };
-}
 
 interface FlattenedParlayLeg {
   parlayId: number;
@@ -37,12 +33,22 @@ export default function BetsList({ type, bets, parlayLegs = [], options }: BetsL
   > = [
     ...bets.map((b) => ({ kind: 'bet' as const, data: b })),
     ...parlayLegs.map((l) => ({ kind: 'parlay' as const, data: l })),
-  ];
+  ].sort((a, b) => {
+    // sort newest first
+    const aDate =
+      a.kind === 'bet'
+        ? new Date(a.data.createdAt).getTime()
+        : new Date(a.data.createdAt).getTime();
+    const bDate =
+      b.kind === 'bet'
+        ? new Date(b.data.createdAt).getTime()
+        : new Date(b.data.createdAt).getTime();
+    return bDate - aDate;
+  });
 
   if (combined.length === 0) return null;
   const shown = expanded ? combined : combined.slice(0, 3);
 
-  // pick palette for this prediction type
   const bgPalette = PALETTES[type] ?? PALETTES[PredictionType.MULTIPLE];
   const textPalette = bgPalette.map((cls) => cls.replace(/^bg-/, 'text-'));
 
@@ -51,8 +57,7 @@ export default function BetsList({ type, bets, parlayLegs = [], options }: BetsL
       <h3 className="text-sm font-medium mb-2">Activity</h3>
       <ul className="space-y-2 text-sm">
         {shown.map((item) => {
-          // determine option index & color
-          const optId = item.kind === 'bet' ? item.data.optionId : item.data.optionId;
+          const optId = item.data.optionId;
           const optIndex = options.findIndex((o) => o.id === optId);
           const colorClass = textPalette[optIndex] ?? textPalette[0];
 
@@ -64,7 +69,14 @@ export default function BetsList({ type, bets, parlayLegs = [], options }: BetsL
                 key={`bet-${b.id}`}
                 className="flex justify-between bg-[var(--color-surface)] border border-[var(--color-muted)] rounded-lg px-3 py-2 shadow-sm"
               >
-                <span>
+                <span className="flex items-center gap-2">
+                  {b.user.avatarUrl && (
+                    <img
+                      src={b.user.avatarUrl}
+                      alt={b.user.name}
+                      className="inline-block w-7 h-7 rounded-full border border-gray-300"
+                    />
+                  )}
                   <strong>{b.user.name}</strong> bet <em>{b.amount}</em> on{' '}
                   <strong className={colorClass}>{label}</strong>
                 </span>

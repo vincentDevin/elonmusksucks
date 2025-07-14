@@ -33,6 +33,7 @@ export interface IUserRepository {
         | 'theme'
         | 'twoFactorEnabled'
         | 'profileComplete'
+        | 'profilePictureKey'
       >
     >,
   ): Promise<void>;

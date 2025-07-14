@@ -1,39 +1,38 @@
 // apps/server/src/services/leaderboard.service.ts
-
+import { Queue } from 'bullmq';
+import redisClient from '../lib/redis';
 import type { PublicLeaderboardEntry } from '@ems/types';
 import type { ILeaderboardRepository } from '../repositories/ILeaderboardRepository';
 import { LeaderboardRepository } from '../repositories/LeaderboardRepository';
 
 /**
- * Exposes leaderboard queries at the service level.
+ * Offloads leaderboard refresh to a background worker
  */
 export class LeaderboardService {
-  constructor(private readonly repo: ILeaderboardRepository = new LeaderboardRepository()) {}
+  private refreshQueue = new Queue('leaderboard-refresh', { connection: redisClient });
+  private repo: ILeaderboardRepository;
+
+  constructor(repo: ILeaderboardRepository = new LeaderboardRepository()) {
+    this.repo = repo;
+  }
 
   /**
-   * Get the all-time top N users by profit.
-   * @param limit how many entries to return (defaults to 25)
+   * Enqueue a full leaderboard refresh job
+   */
+  async enqueueRefresh(): Promise<void> {
+    await this.refreshQueue.add('refreshAll', {});
+  }
+
+  /**
+   * Synchronous fetch (from materialized view) by limit
    */
   async getTopAllTime(limit = 25): Promise<PublicLeaderboardEntry[]> {
     return this.repo.getTopAllTime(limit);
   }
 
-  /**
-   * Get the top N users by profit in the last day.
-   * @param limit how many entries to return (defaults to 25)
-   */
   async getTopDaily(limit = 25): Promise<PublicLeaderboardEntry[]> {
     return this.repo.getTopDaily(limit);
   }
-
-  // Future: you can add methods for weekly/monthly, e.g.
-  // async getTopWeekly(limit = 25): Promise<PublicLeaderboardEntry[]> {
-  //   return this.repo.getTopWeekly(limit);
-  // }
-  //
-  // async getTopMonthly(limit = 25): Promise<PublicLeaderboardEntry[]> {
-  //   return this.repo.getTopMonthly(limit);
-  // }
 }
 
 export const leaderboardService = new LeaderboardService();

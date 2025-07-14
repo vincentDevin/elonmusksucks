@@ -54,6 +54,7 @@ export interface User {
   role: string;
   muskBucks: number;
   profileComplete: boolean;
+  avatarUrl: string | null;
 }
 
 /**

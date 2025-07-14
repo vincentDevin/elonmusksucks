@@ -121,6 +121,7 @@ export const me: RequestHandler = async (req, res, next) => {
       role: user.role,
       muskBucks: user.muskBucks,
       profileComplete: user.profileComplete,
+      avatarUrl: user.avatarUrl,
     });
   } catch (err) {
     next(err);

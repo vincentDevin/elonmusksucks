@@ -1,18 +1,23 @@
 // apps/client/src/pages/Leaderboard.tsx
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useLeaderboard } from '../hooks/useLeaderboard';
 import type { LeaderboardPeriod } from '../hooks/useLeaderboard';
+import { UserCircleIcon } from '@heroicons/react/24/outline';
 
 export default function Leaderboard() {
   const [period, setPeriod] = useState<LeaderboardPeriod>('all-time');
-  const { data, loading, error } = useLeaderboard(period, 25);
-  const leaderboard = useMemo(() => data, [data]);
+  const { data: leaderboard, loading, error } = useLeaderboard(period, 25);
 
-  if (loading) return <p className="p-4 text-center text-tertiary">Loading leaderboard…</p>;
-  if (error) return <p className="p-4 text-center text-red-500">Error: {error.message}</p>;
-  if (!leaderboard?.length)
+  if (loading) {
+    return <p className="p-4 text-center text-tertiary">Loading leaderboard…</p>;
+  }
+  if (error) {
+    return <p className="p-4 text-center text-red-500">Error: {error.message}</p>;
+  }
+  if (!leaderboard.length) {
     return <p className="p-4 text-center text-tertiary">No leaderboard entries yet.</p>;
+  }
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
@@ -35,7 +40,7 @@ export default function Leaderboard() {
 
       {/* Entries */}
       <ul className="space-y-4">
-        {leaderboard!.map((entry, idx) => {
+        {leaderboard.map((entry, idx) => {
           const change = entry.rankChange ?? 0;
           const changeColor =
             change > 0 ? 'text-green-400' : change < 0 ? 'text-red-400' : 'text-tertiary';
@@ -60,7 +65,9 @@ export default function Leaderboard() {
                       className="w-12 h-12 rounded-full object-cover border-2 border-muted"
                     />
                   ) : (
-                    <div className="w-12 h-12 rounded-full bg-tertiary border-2 border-muted" />
+                    <span className="w-12 h-12 flex items-center justify-center rounded-full bg-tertiary border-2 border-muted text-tertiary">
+                      <UserCircleIcon className="w-10 h-10 text-gray-400" aria-hidden="true" />
+                    </span>
                   )}
                   <span className="font-semibold text-lg">{entry.userName}</span>
                   <span className={`ml-auto font-medium ${changeColor} text-sm`}>

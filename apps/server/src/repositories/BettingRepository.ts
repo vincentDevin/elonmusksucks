@@ -16,7 +16,7 @@ export class BettingRepository implements IBettingRepository {
   findUserById(userId: number) {
     return prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, muskBucks: true },
+      select: { id: true, muskBucks: true, name: true, avatarUrl: true },
     });
   }
 

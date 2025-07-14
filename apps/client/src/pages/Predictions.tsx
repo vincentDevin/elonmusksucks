@@ -1,7 +1,7 @@
 // apps/client/src/pages/Predictions.tsx
-import { useState, useMemo, useEffect } from 'react';
-import type { PredictionFull, BetWithUser } from '../api/predictions';
-import type { PublicPredictionOption } from '@ems/types';
+import { useState, useMemo } from 'react';
+import type { PredictionFull } from '../api/predictions';
+import type { PublicPredictionOption, BetWithUser, ParlayLegWithUser } from '@ems/types';
 import BetForm from '../components/BetForm';
 import CreatePredictionForm from '../components/CreatePredictionForm';
 import { usePredictions } from '../hooks/usePredictions';
@@ -10,33 +10,26 @@ import OddsBar from '../components/OddsBar';
 import BetsList from '../components/BetsList';
 import { useParlay } from '../contexts/ParlayContext';
 
-interface FlattenedParlayLeg {
-  parlayId: number;
-  user: { id: number; name: string };
-  stake: number;
-  optionId: number;
-  createdAt: string;
-}
-
 interface PredictionWithPools extends PredictionFull {
   bets: BetWithUser[];
   pools: Array<{ label: string; pct: number }>;
 }
 
 export default function Predictions() {
-  const { predictions: raw, loading, error, refresh } = usePredictions();
+  const {
+    predictions: raw,
+    loading,
+    error,
+    createPrediction,
+    addOptimisticBet, // ← get from parent hook
+  } = usePredictions();
   const { user } = useAuth();
   const { dispatch } = useParlay();
+
   const [creating, setCreating] = useState(false);
-  const [selOptions, setSelOptions] = useState<Record<number, number>>({});
+  const [parlayOptions, setParlayOptions] = useState<Record<number, number>>({});
   const [tab, setTab] = useState<'ALL' | 'PENDING'>('ALL');
 
-  // re-fetch on mount
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
-
-  // build percentage pools per prediction
   const predictions = useMemo<PredictionWithPools[]>(() => {
     return raw.map((pred) => {
       const bets = pred.bets as BetWithUser[];
@@ -49,7 +42,6 @@ export default function Predictions() {
     });
   }, [raw]);
 
-  // filter by tab
   const filtered = useMemo(
     () => predictions.filter((pred) => (tab === 'ALL' ? pred.approved : !pred.approved)),
     [predictions, tab],
@@ -60,7 +52,6 @@ export default function Predictions() {
 
   return (
     <div className="p-6 max-w-3xl mx-auto bg-background rounded-lg">
-      {/* Make Prediction */}
       <div className="flex justify-center mb-6">
         <button
           onClick={() => setCreating((c) => !c)}
@@ -72,15 +63,15 @@ export default function Predictions() {
       {creating && (
         <div className="mb-6">
           <CreatePredictionForm
-            onCreated={() => {
+            onCreated={async (input) => {
+              await createPrediction(input);
               setCreating(false);
-              refresh();
             }}
+            onCancel={() => setCreating(false)}
           />
         </div>
       )}
 
-      {/* Tabs */}
       <div className="flex justify-center mb-6 space-x-4">
         <button
           className={`px-4 py-2 rounded ${
@@ -100,133 +91,121 @@ export default function Predictions() {
         </button>
       </div>
 
-      {/* Empty state */}
-      {!filtered.length && (
+      {filtered.length === 0 ? (
         <p className="p-4 text-center">
           {tab === 'ALL' ? 'No predictions available.' : 'No pending predictions.'}
         </p>
-      )}
+      ) : (
+        <ul className="space-y-6">
+          {filtered.map((pred) => {
+            const now = Date.now();
+            const expires = new Date(pred.expiresAt).getTime();
+            let badgeColor: string;
+            let badgeText: string;
+            if (!pred.approved) {
+              badgeColor = 'bg-yellow-500';
+              badgeText = 'Pending';
+            } else if (pred.resolved) {
+              badgeColor = 'bg-gray-400';
+              badgeText = 'Resolved';
+            } else if (now > expires) {
+              badgeColor = 'bg-red-500';
+              badgeText = 'Expired';
+            } else {
+              badgeColor = 'bg-blue-500';
+              badgeText = 'Open';
+            }
+            const defaultOpt = pred.options[0]?.id;
+            const parlaySel = parlayOptions[pred.id] ?? defaultOpt;
+            const flatParlays: ParlayLegWithUser[] = pred.parlayLegs ?? [];
 
-      <ul className="space-y-6">
-        {filtered.map((pred) => {
-          const now = Date.now();
-          const expires = new Date(pred.expiresAt).getTime();
-          let badgeColor: string;
-          let badgeText: string;
-          if (!pred.approved) {
-            badgeColor = 'bg-yellow-500';
-            badgeText = 'Pending';
-          } else if (pred.resolved) {
-            badgeColor = 'bg-gray-400';
-            badgeText = 'Resolved';
-          } else if (now > expires) {
-            badgeColor = 'bg-red-500';
-            badgeText = 'Expired';
-          } else {
-            badgeColor = 'bg-blue-500';
-            badgeText = 'Open';
-          }
-
-          const defaultOpt = pred.options[0]?.id;
-          const sel = selOptions[pred.id] ?? defaultOpt;
-          const flatParlays: FlattenedParlayLeg[] = pred.parlayLegs.map((leg) => ({
-            parlayId: leg.parlayId,
-            user: leg.user,
-            stake: leg.stake,
-            optionId: leg.optionId,
-            createdAt: leg.createdAt,
-          }));
-
-          return (
-            <li
-              key={pred.id}
-              className="relative bg-surface border border-muted p-6 rounded-2xl shadow hover:shadow-lg transition"
-            >
-              <span
-                className={`absolute top-4 right-4 px-3 py-1 rounded-full text-xs font-medium ${badgeColor} text-white`}
+            return (
+              <li
+                key={pred.id}
+                className="relative bg-surface border border-muted p-6 rounded-2xl shadow hover:shadow-lg transition"
               >
-                {badgeText}
-              </span>
-
-              <h2 className="text-2xl font-semibold mb-2">{pred.title}</h2>
-              <p className="mb-3 text-base">{pred.description}</p>
-
-              {!pred.resolved && (
-                <p
-                  className={`text-sm font-medium mb-4 ${
-                    now > expires ? 'text-red-600' : 'text-green-500'
-                  }`}
+                <span
+                  className={`absolute top-4 right-4 px-3 py-1 rounded-full text-xs font-medium ${badgeColor} text-white`}
                 >
-                  {now > expires
-                    ? `Expired at: ${new Date(pred.expiresAt).toLocaleString()}`
-                    : `Expires at: ${new Date(pred.expiresAt).toLocaleString()}`}
-                </p>
-              )}
-
-              <OddsBar
-                type={pred.type}
-                options={pred.options as PublicPredictionOption[]}
-                bets={pred.bets}
-                parlayLegs={flatParlays}
-              />
-
-              {(pred.bets.length > 0 || flatParlays.length > 0) && (
-                <BetsList
-                  type={pred.type}
-                  bets={pred.bets}
-                  parlayLegs={flatParlays}
-                  options={pred.options as PublicPredictionOption[]}
-                />
-              )}
-
-              <div className="mt-6 flex flex-wrap gap-3 items-center">
-                {pred.approved && !pred.resolved && (
-                  <>
-                    <BetForm prediction={pred} onPlaced={refresh} />
-
-                    <select
-                      value={sel}
-                      onChange={(e) =>
-                        setSelOptions((prev) => ({
-                          ...prev,
-                          [pred.id]: Number(e.target.value),
-                        }))
-                      }
-                      className="border p-2 rounded"
-                    >
-                      {pred.options.map((opt) => (
-                        <option key={opt.id} value={opt.id}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
-
-                    <button
-                      onClick={() =>
-                        dispatch({
-                          type: 'ADD_LEG',
-                          leg: { predictionId: pred.id, optionId: sel! },
-                        })
-                      }
-                      className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg shadow transition"
-                    >
-                      Add to Parlay
-                    </button>
-                  </>
-                )}
-
-                {!pred.approved && (
-                  <p className="text-sm italic text-yellow-700">
-                    {pred.creatorId === user?.id
-                      ? 'Your prediction is awaiting admin approval.'
-                      : 'This prediction is awaiting admin approval.'}
+                  {badgeText}
+                </span>
+                <h2 className="text-2xl font-semibold mb-2">{pred.title}</h2>
+                <p className="mb-3 text-base">{pred.description}</p>
+                {!pred.resolved && (
+                  <p
+                    className={`text-sm font-medium mb-4 ${
+                      now > expires ? 'text-red-600' : 'text-green-500'
+                    }`}
+                  >
+                    {now > expires
+                      ? `Expired at: ${new Date(pred.expiresAt).toLocaleString()}`
+                      : `Expires at: ${new Date(pred.expiresAt).toLocaleString()}`}
                   </p>
                 )}
-              </div>
-            </li>
-          );
-        })}
-      </ul>
+                <OddsBar
+                  type={pred.type}
+                  options={pred.options as PublicPredictionOption[]}
+                  bets={pred.bets}
+                  parlayLegs={flatParlays}
+                />
+                {(pred.bets.length > 0 || flatParlays.length > 0) && (
+                  <BetsList
+                    type={pred.type}
+                    bets={pred.bets}
+                    parlayLegs={flatParlays}
+                    options={pred.options as PublicPredictionOption[]}
+                  />
+                )}
+                <div className="mt-6 flex flex-wrap gap-3 items-center">
+                  {pred.approved && !pred.resolved && (
+                    <>
+                      {/* Pass addOptimisticBet as a prop */}
+                      <BetForm prediction={pred} addOptimisticBet={addOptimisticBet} />
+                      <select
+                        value={parlaySel}
+                        onChange={(e) =>
+                          setParlayOptions((prev) => ({
+                            ...prev,
+                            [pred.id]: Number(e.target.value),
+                          }))
+                        }
+                        className="border p-2 rounded"
+                      >
+                        {pred.options.map((opt) => (
+                          <option key={opt.id} value={opt.id}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() =>
+                          dispatch({
+                            type: 'ADD_LEG',
+                            leg: {
+                              predictionId: pred.id,
+                              optionId: parlaySel!,
+                            },
+                          })
+                        }
+                        className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg shadow transition"
+                      >
+                        Add to Parlay
+                      </button>
+                    </>
+                  )}
+                  {!pred.approved && (
+                    <p className="text-sm italic text-yellow-700">
+                      {pred.creatorId === user?.id
+                        ? 'Your prediction is awaiting admin approval.'
+                        : 'This prediction is awaiting admin approval.'}
+                    </p>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }

@@ -1,31 +1,33 @@
 # elonmusksucks.net 🐍
 
-A satirical, community-driven prediction market where users bet fake currency on what Elon Musk will do next.
+A satirical, community-driven prediction market where users bet MuskBucks (fake currency) on what Elon Musk will do next.
 
-Built as an NPM workspaces monorepo with:
-
-* **Frontend:** Vite + React + TypeScript + TailwindCSS
-* **Backend:** Express + TypeScript + Prisma ORM
-* **Database:** PostgreSQL
-* **Shared Types:** `@ems/types` package (auto-generated from Prisma schema)
-* **AI/ML:** GPT-powered “Elon AI” tweet generator (planned)
+**Tech stack:**  
+- **Frontend:** Vite + React + TypeScript + TailwindCSS  
+- **Backend:** Express + TypeScript + Prisma ORM  
+- **Database:** PostgreSQL  
+- **WebSockets:** Socket.IO (live updates for bets, predictions, etc.)  
+- **Background Jobs:** Redis (payouts, leaderboards)  
+- **User Uploads:** Tigris (profile images)  
+- **Shared Types:** `@ems/types` (auto-generated from Prisma schema)  
+- **AI/ML:** GPT-powered “Elon AI” tweet generator (planned)
 
 ---
 
-## 📂 Repository Layout
+## 📂 Monorepo Layout
 
 ```
 elonmusksucks/
 ├── apps/
 │   ├── client/     # Vite + React frontend
-│   └── server/     # Express + TypeScript backend
+│   └── server/     # Express + TS backend, Socket.IO, Redis
 ├── packages/
 │   └── types/      # Shared TS types & Prisma client
 ├── prisma/         # Prisma schema & migrations
-├── .env            # ← single env for whole monorepo
-├── .env.test       # ← test environment variables
-├── package.json    # root—workspaces & top-level scripts
-├── tsconfig.json   # root—shared compilerOptions & path mappings
+├── .env            # ← all env vars, root of repo
+├── .env.test       # ← test env vars
+├── package.json    # root—workspaces & scripts
+├── tsconfig.json   # root—shared config & paths
 └── README.md       # ← you are here
 ```
 
@@ -33,9 +35,10 @@ elonmusksucks/
 
 ## ⚙️ Prerequisites
 
-* **Node.js** ≥ 24.x & **npm** ≥ 8.x (workspaces support)
-* **PostgreSQL** installed & running locally
-* **dotenv-cli** (for loading .env files)
+- **Node.js** ≥ 24.x & **npm** ≥ 8.x (for workspaces)
+- **PostgreSQL** (running locally)
+- **Redis** (running locally for jobs & events)
+- **dotenv-cli** (`npm i -g dotenv-cli`)
 
 ---
 
@@ -48,30 +51,27 @@ elonmusksucks/
    cd elonmusksucks
    ```
 
-2. **Environment**
-   Copy and populate your env files at the repo root:
+2. **Environment**  
+   Copy example files and fill in your values:
 
    ```bash
    cp .env.example .env
    cp .env.test.example .env.test
    ```
 
-   Edit **.env** with your dev credentials and **.env.test** with your test database URL.
+   Edit `.env` and `.env.test` as needed.
 
 3. **Install & Bootstrap**
-   All in one:
 
    ```bash
    npm run setup
    ```
 
    This will:
-
-   * Install dependencies in all workspaces
-   * Apply & reset Prisma migrations
-   * Generate Prisma Client into `packages/types`
-   * Build shared types
-   * Seed dev data
+   - Install dependencies in all workspaces
+   - Apply/reset Prisma migrations
+   - Generate Prisma client/types in `packages/types`
+   - Build types, seed dev data
 
 4. **Run Locally**
 
@@ -79,117 +79,93 @@ elonmusksucks/
    npm run dev
    ```
 
-   * **Frontend:** [http://localhost:3000](http://localhost:3000)
-   * **Backend:**  [http://localhost:5000](http://localhost:5000)
+   - **Frontend:** [http://localhost:3000](http://localhost:3000)
+   - **Backend:**  [http://localhost:5000](http://localhost:5000)
 
-   Both servers restart on file changes.
+   *Note: You must have PostgreSQL and Redis running locally, and access to Tigris for file uploads.*
 
 ---
 
 ## 🧪 Testing
 
-### Unit Tests
-
-Run all Jest tests across the monorepo:
+Run all Jest tests in the monorepo:
 
 ```bash
 npm test
 ```
 
-Run **only backend** tests:
+Run backend-only tests:
 
 ```bash
 npm run test:server
 ```
 
-* **Unit** tests live under `apps/server/tests/unit/` and cover business logic in services and controllers.
-
-### Integration Tests
-
-Integration tests spin up the test database defined in `.env.test` and exercise HTTP endpoints.
-
-```bash
-npm run test:server
-```
-
-Ensure **.env.test** contains:
-
-```dotenv
-DATABASE_URL="postgresql://<user>:<pass>@localhost:5432/ems_test_db?schema=public"
-```
+- Unit tests live in `apps/server/tests/unit/`
+- Integration tests require `.env.test` and spin up a separate DB
 
 ---
 
-## 📦 Available Scripts
+## 💥 Real-time/Refactor Notes
 
-### At the **root**:
+- **Websockets:** Live predictions, bets, and parlays update instantly across all clients via Socket.IO
+- **Redis:** Used for offloading long-running payouts, leaderboard processing, and event fanout
+- **Tigris:** Used for scalable profile image uploads
+- **All bets and state changes are now event-driven** (no more manual refresh hell)
+- **No more cache hell:** The client always uses up-to-date event data, not stale local state
 
-| Command               | What it does                                |
+**IMPORTANT:**  
+A full end-to-end sanity check of the recent refactor is still pending. If you hit a bug or edge case, please open an issue!
+
+---
+
+## 📦 Scripts
+
+| Command               | Description                                 |
 | --------------------- | ------------------------------------------- |
 | `npm run dev`         | Starts client & server concurrently         |
-| `npm run setup`       | Installs, migrates, generates types & seeds |
-| `npm run build`       | Builds shared types, then client & server   |
-| `npm run lint`        | Runs ESLint across all code                 |
-| `npm run format`      | Runs Prettier across all code               |
-| `npm test`            | Runs all Jest tests                         |
-| `npm run test:server` | Runs server Jest tests                      |
+| `npm run setup`       | Installs deps, migrates DB, seeds, builds   |
+| `npm run build`       | Builds types, client, and server            |
+| `npm run lint`        | Lints all code                              |
+| `npm run format`      | Prettier across all code                    |
+| `npm test`            | All Jest tests                              |
+| `npm run test:server` | Server-only Jest tests                      |
 
-### In **apps/client**:
+See each workspace for more:
 
-```bash
-npm run dev     # Vite dev server
-npm run build   # Output to client/dist
-npm run preview # Preview the production build
-```
+- **apps/client:**  
+  - `npm run dev`, `npm run build`, `npm run preview`
 
-### In **apps/server**:
-
-```bash
-npm run dev              # nodemon + ts-node
-npm run build            # tsc → dist/
-npm run start            # node dist/index.js
-npm run prisma:generate  # Generate Prisma client
-npm run prisma:migrate:dev  # Reset & migrate DB
-npm run seed:dev         # Seed dev data
-```
+- **apps/server:**  
+  - `npm run dev`, `npm run build`, `npm run start`, `npm run prisma:generate`, `npm run prisma:migrate:dev`, `npm run seed:dev`
 
 ---
 
 ## 🐞 Troubleshooting
 
-* **Env vars not loading?**
-  Ensure **.env** and **.env.test** are at the monorepo root.
+- **Env vars not loading?**  
+  Make sure `.env` and `.env.test` are at the repo root.
 
-* **Database errors?**
-  Verify Postgres is running and `ems_test_db` exists for tests:
+- **Database errors?**  
+  Check that Postgres is running and your DB is created.
 
-  ```bash
-  psql -h localhost -U <user> -d ems_test_db
-  ```
+- **Redis not connecting?**  
+  Make sure Redis is running locally (`redis-server`), or update your connection string in `.env`.
 
-  Then re-run migrations:
+- **Tigris upload errors?**  
+  Verify Tigris credentials in your `.env` are correct.
 
-  ```bash
-  npm run prisma:migrate:dev
-  ```
-
-* **Node version warnings?**
-  Use Node ≥24. You can pin via an `.nvmrc` containing `24.x` or add:
-
-  ```json
-  "engines": {"node": ">=24.0.0"},
-  "engineStrict": true
-  ```
+- **Node version?**  
+  Use Node ≥24. You can enforce this with `.nvmrc` or in `package.json`.
 
 ---
 
 ## 🚀 Roadmap & Contributing
 
-See our project board for upcoming features and “good first issues.” We welcome PRs, bug reports, and all the meme-driven chaos you can bring!
+See our [project board](https://github.com/vincentDevin/elonmusksucks/projects/1) for features & issues. PRs, memes, and bug reports welcome.
 
 ---
 
 ## 📜 License
 
-MIT — see [LICENSE](./LICENSE).
-Fork it, have fun, don’t sue us if Elon buys the site.
+MIT — see [LICENSE](./LICENSE).  
+No liability if Elon tries to buy, short, or DDoS the site.

@@ -128,6 +128,7 @@ export default function Profile() {
 
       {editing ? (
         <ProfileEditForm
+          userId={profile.id}
           formData={formData}
           setFormData={setFormData}
           handleSave={handleSave}

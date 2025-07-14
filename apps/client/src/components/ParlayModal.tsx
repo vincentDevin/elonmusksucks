@@ -1,28 +1,30 @@
 // apps/client/src/components/ParlayModal.tsx
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { useParlay } from '../contexts/ParlayContext';
 import { usePredictions } from '../hooks/usePredictions';
+import { useBetting } from '../hooks/useBetting';
+import type { PlaceParlayPayload } from '../api/betting';
+import type { PublicPredictionOption } from '@ems/types';
 
 interface ParlayModalProps {
   isOpen: boolean;
   onClose: () => void;
-  combinedOdds: number;
-  potentialPayout: number;
-  placeParlay: () => Promise<any>;
 }
 
-export default function ParlayModal({
-  isOpen,
-  onClose,
-  combinedOdds,
-  potentialPayout,
-  placeParlay,
-}: ParlayModalProps) {
+export default function ParlayModal({ isOpen, onClose }: ParlayModalProps) {
   const { state, dispatch } = useParlay();
   const { predictions } = usePredictions();
-  const [placing, setPlacing] = React.useState(false);
+  const { placeParlay, latestParlay, loading: placing, error } = useBetting();
 
-  // close on ESC
+  // When the socket tells us a parlay has landed, clear and close
+  useEffect(() => {
+    if (latestParlay) {
+      dispatch({ type: 'CLEAR' });
+      onClose();
+    }
+  }, [latestParlay, dispatch, onClose]);
+
+  // Close on Escape
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose();
@@ -33,17 +35,20 @@ export default function ParlayModal({
 
   if (!isOpen) return null;
 
-  async function handlePlace() {
+  const handlePlace = async () => {
     if (!state.legs.length || state.amount <= 0) return;
-    setPlacing(true);
+    const payload: PlaceParlayPayload = {
+      legs: state.legs,
+      amount: state.amount,
+    };
     try {
-      await placeParlay();
-      dispatch({ type: 'CLEAR' });
-      onClose();
-    } finally {
-      setPlacing(false);
+      await placeParlay(payload);
+      // we now wait for latestParlay via socket to clear & close
+    } catch (err: any) {
+      console.error(err);
+      alert('Parlay failed: ' + (error?.message || err.message));
     }
-  }
+  };
 
   return (
     <div
@@ -60,7 +65,7 @@ export default function ParlayModal({
           {state.legs.length ? (
             state.legs.map((leg, i) => {
               const pred = predictions.find((p) => p.id === leg.predictionId);
-              const opt = pred?.options.find((o) => o.id === leg.optionId);
+              const opt = pred?.options.find((o: PublicPredictionOption) => o.id === leg.optionId);
               return (
                 <li
                   key={`${leg.predictionId}-${leg.optionId}-${i}`}
@@ -71,7 +76,12 @@ export default function ParlayModal({
                     {opt && <div className="text-sm text-tertiary">{opt.label}</div>}
                   </div>
                   <button
-                    onClick={() => dispatch({ type: 'REMOVE_LEG', optionId: leg.optionId })}
+                    onClick={() =>
+                      dispatch({
+                        type: 'REMOVE_LEG',
+                        optionId: leg.optionId,
+                      })
+                    }
                     aria-label="Remove leg"
                     className="
                       text-red-600 
@@ -99,17 +109,17 @@ export default function ParlayModal({
             type="number"
             min={1}
             value={state.amount}
-            onChange={(e) => dispatch({ type: 'SET_AMOUNT', amount: Number(e.target.value) })}
+            onChange={(e) =>
+              dispatch({
+                type: 'SET_AMOUNT',
+                amount: Number(e.target.value),
+              })
+            }
             className="mt-1 w-full border border-muted p-2 rounded bg-background text-content"
           />
         </div>
 
-        <p className="text-sm">
-          Combined odds: <strong>{combinedOdds.toFixed(2)}</strong>
-        </p>
-        <p className="text-sm">
-          Potential payout: <strong>{potentialPayout.toLocaleString()} 🪙</strong>
-        </p>
+        {error && <p className="text-sm text-red-500">Error: {error.message}</p>}
 
         <div className="flex justify-end space-x-3">
           <button
@@ -117,7 +127,7 @@ export default function ParlayModal({
               dispatch({ type: 'CLEAR' });
               onClose();
             }}
-            className="px-4 py-2 bg-muted text-content rounded hover:bg-tertiary transition cursor-pointer"
+            className="px-4 py-2 bg-muted text-content rounded hover:bg-tertiary transition"
           >
             Clear
           </button>
