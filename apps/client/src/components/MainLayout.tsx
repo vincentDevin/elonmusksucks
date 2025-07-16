@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useLocation } from 'react-router-dom';
 import NavBar from './NavBar';
 import ParlayWidget from './ParlayWidget';
 import ChatBar from './ChatBar';
@@ -8,6 +9,9 @@ interface MainLayoutProps {
 }
 
 export default function MainLayout({ children }: MainLayoutProps) {
+  const { pathname } = useLocation();
+  const inDashboard = pathname.startsWith('/dashboard');
+
   return (
     <div className="flex flex-col min-h-screen bg-background text-content transition-colors duration-300">
       <NavBar />
@@ -21,13 +25,13 @@ export default function MainLayout({ children }: MainLayoutProps) {
         <main className="container mx-auto px-4 py-6 pb-32">{children}</main>
       </div>
 
-      {/* Fixed ChatBar at bottom center */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 pointer-events-none">
-        {/* pointer-events-none on parent, pointer-events-auto on ChatBar so only ChatBar can interact */}
-        <div className="flex justify-center pointer-events-auto">
-          <ChatBar />
+      {!inDashboard && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 pointer-events-none">
+          <div className="flex justify-center pointer-events-auto">
+            <ChatBar />
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
