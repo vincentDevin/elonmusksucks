@@ -2,6 +2,7 @@
 import { Server } from 'socket.io';
 
 type RedisChannel =
+  | 'prediction:created'
   | 'prediction:resolved'
   | 'bet:placed'
   | 'parlay:placed'
@@ -21,6 +22,9 @@ export function registerRedisEventHandlers(io: Server, eventSub: any) {
     console.log(`[socket] Redis event: ${channel}`, payload);
 
     switch (channel) {
+      case 'prediction:created':
+        io.emit('predictionCreated', payload);
+        break;
       case 'prediction:resolved':
         io.emit('predictionResolved', payload);
         break;
