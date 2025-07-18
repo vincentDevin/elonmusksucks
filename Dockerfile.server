@@ -1,0 +1,48 @@
+# apps/server/Dockerfile.server
+FROM node:24-alpine AS builder
+WORKDIR /app
+
+# Copy root manifests and all code
+COPY package.json package-lock.json tsconfig.json ./
+# If you have a private registry or auth, add a .npmrc here manually
+# COPY .npmrc ./
+COPY prisma ./prisma
+COPY packages ./packages
+COPY apps/server ./apps/server
+
+# Install dependencies, generate Prisma client, build types and server
+RUN npm ci \
+  && npm run prisma:generate \
+  && npm run build --workspace=packages/types \
+  && npm run build --workspace=apps/server
+
+# Production image
+FROM node:24-alpine
+WORKDIR /app
+ENV NODE_ENV=production
+
+# Install Postgres client and ts-node runtime
+RUN apk add --no-cache postgresql-client shadow \
+  && npm install -g ts-node typescript
+
+# Copy prod dependencies and build outputs
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/apps/server/dist ./apps/server/dist
+COPY --from=builder /app/apps/server/src ./apps/server/src
+COPY --from=builder /app/prisma ./prisma
+
+# Inject compiled @ems/types package into node_modules
+COPY --from=builder /app/packages/types/dist node_modules/@ems/types/dist
+COPY --from=builder /app/packages/types/package.json node_modules/@ems/types/package.json
+
+# Copy tsconfig for ts-node
+COPY --from=builder /app/tsconfig.json ./tsconfig.json
+
+# Expose server port
+EXPOSE 4000
+
+# Entrypoint: wait for DB, apply migrations, seed, then start server
+CMD ["sh", "-c","until pg_isready -h db -U ${POSTGRES_USER:-postgres}; do echo 'Waiting for Postgres…'; sleep 2; done && \
+   npx prisma migrate deploy --schema prisma/schema.prisma && \
+   ts-node --project tsconfig.json --transpile-only --compiler-options '{\"moduleResolution\":\"NodeNext\",\"module\":\"NodeNext\"}' prisma/seed.ts && \
+   node apps/server/dist/index.js"]

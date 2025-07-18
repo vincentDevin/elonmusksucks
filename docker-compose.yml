@@ -1,15 +1,69 @@
-version: "3.8"
 services:
   db:
     image: postgres:15-alpine
     restart: always
-    ports:
-      - "5432:5432"
     environment:
-      POSTGRES_USER: ${PGUSER}
-      POSTGRES_PASSWORD: ${PGPASSWORD}
-      POSTGRES_DB:   ${PGDATABASE}
+      POSTGRES_USER:  ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB:      ${POSTGRES_DB:-elonbets_dev}
     volumes:
       - db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER:-postgres}", "-d", "${POSTGRES_DB:-elonbets_dev}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    environment:
+      # no password by default
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+    ports:
+      - "6379:6379"
+
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    environment:
+      # point at our internal services
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/elonbets_dev?schema=public
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      CLIENT_URL: ${CLIENT_URL:-http://localhost:3000}
+      ACCESS_TOKEN_SECRET: ${ACCESS_TOKEN_SECRET:-changeme}
+      REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET:-changeme}
+      SKIP_EMAIL_FLOW: true
+      BCRYPT_SALT_ROUNDS: ${BCRYPT_SALT_ROUNDS:-12}
+      PORT: 4000                 # for backward-compatibility
+      SERVER_PORT: 4000          # used by index.ts
+      HOST: 0.0.0.0
+      # (Tigris vars omitted for brevity)
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    ports:
+      - "4000:4000"
+
+  client:
+    build:
+      context: .
+      dockerfile: Dockerfile.client
+    environment:
+      API_HOST: server
+      SERVER_PORT: 4000
+      VITE_API_URL: "http://server:4000"
+    depends_on:
+      - server
+    ports:
+      - "3000:3000"
+
 volumes:
   db_data:

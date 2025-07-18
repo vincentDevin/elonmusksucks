@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import NavBar from './NavBar';
-import ParlayWidget from './ParlayWidget';
 import ChatBar from './ChatBar';
 
 interface MainLayoutProps {
@@ -18,8 +17,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
       {/* Main content is below NavBar, but above fixed ChatBar */}
       <div className="relative flex-1">
-        {/* If you want ParlayWidget to float over content, absolutely position it here */}
-        <ParlayWidget />
 
         {/* Main page content; add padding-bottom for chatbar space */}
         <main className="container mx-auto px-4 py-6 pb-32">{children}</main>

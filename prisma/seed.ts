@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import { PrismaClient, TransactionType, BetStatus } from '@prisma/client';
-import { PayoutRepository } from '../apps/server/src/repositories/PayoutRepository.ts';
+import { PayoutRepository } from '../apps/server/src/repositories/PayoutRepository';
 
 const prisma = new PrismaClient();
 const payoutRepo = new PayoutRepository();
