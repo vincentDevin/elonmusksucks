@@ -1,12 +1,12 @@
 // apps/client/src/components/dashboard/ParlayPanel.tsx
 import { useState, useMemo } from 'react';
 import { useParlay } from '../../contexts/ParlayContext';
-import { usePredictions } from '../../hooks/usePredictions';
+import { usePredictionMarket } from '../../contexts/PredictionMarketContext';
 import ParlayModal from '../ParlayModal';
 
 export default function ParlayPanel() {
   const { state } = useParlay();
-  const { predictions } = usePredictions();
+  const { predictions } = usePredictionMarket();
   const [open, setOpen] = useState(false);
 
   /* ---------- Helpers ---------- */

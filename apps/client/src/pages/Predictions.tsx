@@ -4,7 +4,7 @@ import type { PredictionFull } from '../api/predictions';
 import type { PublicPredictionOption, BetWithUser, ParlayLegWithUser } from '@ems/types';
 import BetForm from '../components/BetForm';
 import CreatePredictionForm from '../components/CreatePredictionForm';
-import { usePredictions } from '../hooks/usePredictions';
+import { usePredictionMarket } from '../contexts/PredictionMarketContext';
 import { useAuth } from '../contexts/AuthContext';
 import OddsBar from '../components/OddsBar';
 import BetsList from '../components/BetsList';
@@ -18,11 +18,11 @@ interface PredictionWithPools extends PredictionFull {
 export default function Predictions() {
   const {
     predictions: raw,
-    loading,
-    error,
+    predictionsLoading: loading,
+    predictionsError: error,
     createPrediction,
-    addOptimisticBet, // ← get from parent hook
-  } = usePredictions();
+    addOptimisticBet,
+  } = usePredictionMarket();
   const { user } = useAuth();
   const { dispatch } = useParlay();
 

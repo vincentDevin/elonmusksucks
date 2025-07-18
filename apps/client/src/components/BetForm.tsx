@@ -1,6 +1,6 @@
 // apps/client/src/components/BetForm.tsx
 import { useState } from 'react';
-import { useBetting } from '../hooks/useBetting';
+import { usePredictionMarket } from '../contexts/PredictionMarketContext';
 import { useAuth } from '../contexts/AuthContext';
 import type { PublicPredictionOption, PublicBet, BetWithUser } from '@ems/types';
 
@@ -12,7 +12,8 @@ interface BetFormProps {
 
 export default function BetForm({ prediction, addOptimisticBet, onPlaced }: BetFormProps) {
   const { options } = prediction;
-  const { placeBet, loading: placing, error } = useBetting();
+  const { placeBet, bettingLoading: placing, bettingError: error } =
+    usePredictionMarket();
   const { user } = useAuth();
   const balance = user?.muskBucks ?? 0;
 
