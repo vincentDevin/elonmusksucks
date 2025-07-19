@@ -1,8 +1,7 @@
 // apps/client/src/components/ParlayModal.tsx
 import { useEffect } from 'react';
 import { useParlay } from '../contexts/ParlayContext';
-import { usePredictions } from '../hooks/usePredictions';
-import { useBetting } from '../hooks/useBetting';
+import { usePredictionMarket } from '../contexts/PredictionMarketContext';
 import type { PlaceParlayPayload } from '../api/betting';
 import type { PublicPredictionOption } from '@ems/types';
 
@@ -13,8 +12,13 @@ interface ParlayModalProps {
 
 export default function ParlayModal({ isOpen, onClose }: ParlayModalProps) {
   const { state, dispatch } = useParlay();
-  const { predictions } = usePredictions();
-  const { placeParlay, latestParlay, loading: placing, error } = useBetting();
+  const {
+    predictions,
+    placeParlay,
+    latestParlay,
+    bettingLoading: placing,
+    bettingError: error,
+  } = usePredictionMarket();
 
   // When the socket tells us a parlay has landed, clear and close
   useEffect(() => {

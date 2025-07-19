@@ -2,6 +2,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { SocketProvider } from './contexts/SocketContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { ParlayProvider } from './contexts/ParlayContext';
+import { PredictionMarketProvider } from './contexts/PredictionMarketContext';
 import AppRoutes from './routes/AppRoutes';
 import MainLayout from './components/MainLayout';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -14,11 +15,13 @@ function App() {
         <ThemeProvider>
           <ChatProvider>
             <BrowserRouter>
-              <ParlayProvider>
-                <MainLayout>
-                  <AppRoutes />
-                </MainLayout>
-              </ParlayProvider>
+              <PredictionMarketProvider>
+                <ParlayProvider>
+                  <MainLayout>
+                    <AppRoutes />
+                  </MainLayout>
+                </ParlayProvider>
+              </PredictionMarketProvider>
             </BrowserRouter>
           </ChatProvider>
         </ThemeProvider>

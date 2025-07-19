@@ -41,6 +41,7 @@ export async function initSocket(httpServer: HTTPServer) {
   // --- Redis event subscription/handler ---
   const eventSub = redisClient.duplicate();
   await eventSub.subscribe(
+    'prediction:created',
     'prediction:resolved',
     'bet:placed',
     'parlay:placed',
