@@ -19,6 +19,7 @@ const GLOBAL_ROOM_ID = 1;
 
 // Redis keys for online tracking
 const ONLINE_USERS_SET_KEY = 'global:chat:onlineUsers';
+const CONNECTIONS = 'global:chat:connections';
 const USER_INFO_HASH_KEY = 'global:chat:userInfo';
 
 // Per‑process typing debounce maps
@@ -48,17 +49,19 @@ export async function registerChatHandlers(socket: Socket) {
   // ────────────────────────────────────────────────────────────────────────────
   if (authSock.user) {
     const uid = String(authSock.user.id);
-    await redisClient.sadd(ONLINE_USERS_SET_KEY, uid);
-    await redisClient.hset(
-      USER_INFO_HASH_KEY,
-      uid,
-      JSON.stringify({
-        name: authSock.user.name,
-        avatarUrl: authSock.user.avatarUrl ?? null,
-        role: authSock.user.role ?? 'USER',
-      }),
-    );
-
+    const after = await redisClient.incr(CONNECTIONS + uid);
+    if (after === 1) {
+      await redisClient.sadd(ONLINE_USERS_SET_KEY, uid);
+      await redisClient.hset(
+        USER_INFO_HASH_KEY,
+        uid,
+        JSON.stringify({
+          name: authSock.user.name,
+          avatarUrl: authSock.user.avatarUrl ?? null,
+          role: authSock.user.role ?? 'USER',
+        }),
+      );
+    }
     await publishOnlineUsers();
 
     await redisClient.publish(
@@ -198,9 +201,12 @@ export async function registerChatHandlers(socket: Socket) {
   socket.on('disconnect', async () => {
     if (!authSock.user) return;
     const uidStr = String(authSock.user.id);
-
-    await redisClient.srem(ONLINE_USERS_SET_KEY, uidStr);
-    await redisClient.hdel(USER_INFO_HASH_KEY, uidStr);
+    const after = await redisClient.decr(CONNECTIONS + uidStr);
+    if (after <= 0) {
+      await redisClient.del(CONNECTIONS + uidStr);
+      await redisClient.srem(ONLINE_USERS_SET_KEY, uidStr);
+      await redisClient.hdel(USER_INFO_HASH_KEY, uidStr);
+    }
 
     await publishOnlineUsers();
     await redisClient.publish(

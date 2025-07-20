@@ -1,5 +1,8 @@
 // apps/client/src/contexts/ChatContext.tsx
 // -----------------------------------------------------------------------------
+// React context for real-time chat, aligned with server event names.
+// -----------------------------------------------------------------------------
+
 import {
   createContext,
   useContext,
@@ -13,7 +16,7 @@ import {
 import { useSocket } from './SocketContext';
 import { useAuth } from './AuthContext';
 
-// ---------- Types ----------
+/* ---------- Types ---------- */
 export interface ChatMessage {
   user: { id: number; name: string; role: string; avatarUrl: string | null };
   message: string;
@@ -47,7 +50,7 @@ interface ChatCtx {
 
 const ChatContext = createContext<ChatCtx | undefined>(undefined);
 
-// ---------- Provider ----------
+/* ---------- Provider ---------- */
 export function ChatProvider({ children }: { children: ReactNode }) {
   const socket = useSocket();
   const { user } = useAuth();
@@ -63,7 +66,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   const localStopTimer = useRef<NodeJS.Timeout | null>(null);
 
-  /* -------------------- history boot-strap -------------------- */
+  /* ---------------------------------------------------------------------- */
+  /* 1. History bootstrap                                                   */
+  /* ---------------------------------------------------------------------- */
   useEffect(() => {
     const fetchHistory = () => socket.emit('chat:history');
     socket.on('connect', fetchHistory);
@@ -81,7 +86,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     };
   }, [socket]);
 
-  /* -------------------- live message stream ------------------- */
+  /* ---------------------------------------------------------------------- */
+  /* 2. Live message stream                                                 */
+  /* ---------------------------------------------------------------------- */
   useEffect(() => {
     const onMsg = (m: ChatMessage) => setMessages((prev) => [...prev, m]);
     socket.on('chatMessage', onMsg);
@@ -92,7 +99,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     };
   }, [socket]);
 
-  /* -------------------- typing indicators --------------------- */
+  /* ---------------------------------------------------------------------- */
+  /* 3. Typing indicators                                                   */
+  /* ---------------------------------------------------------------------- */
   useEffect(() => {
     const addTyper = ({ id, name }: TypingUser) =>
       setTypingUsers((prev) => (prev.some((u) => u.id === id) ? prev : [...prev, { id, name }]));
@@ -106,7 +115,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     };
   }, [socket]);
 
-  /* -------------------- online users list --------------------- */
+  /* ---------------------------------------------------------------------- */
+  /* 4. Online-users list                                                   */
+  /* ---------------------------------------------------------------------- */
   useEffect(() => {
     const update = (users: OnlineUser[]) => setOnlineUsers(users);
     socket.on('chatUsersOnline', update);
@@ -115,16 +126,27 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     };
   }, [socket]);
 
-  /* -------------------- join / leave toasts ------------------- */
+  /* ---------------------------------------------------------------------- */
+  /* 5. Join / leave toast events                                           */
+  /*      – deduplicated with seenEventsRef                                 */
+  /* ---------------------------------------------------------------------- */
+  const seenEventsRef = useRef<Set<string>>(new Set());
+
   useEffect(() => {
-    const joined = ({ id, name }: { id: number; name: string }) => {
-      if (!user || id !== user.id)
-        setUserEvents((prev) => [...prev, { type: 'joined', id, name, timestamp: Date.now() }]);
+    const maybePush = (ev: { type: 'joined' | 'left'; id: number; name: string }) => {
+      const key = `${ev.type}-${ev.id}`;
+      if (seenEventsRef.current.has(key)) return;
+      seenEventsRef.current.add(key);
+      if (!user || ev.id !== user.id) {
+        setUserEvents((prev) => [...prev, { ...ev, timestamp: Date.now() }]);
+      }
     };
-    const left = ({ id, name }: { id: number; name: string }) => {
-      if (!user || id !== user.id)
-        setUserEvents((prev) => [...prev, { type: 'left', id, name, timestamp: Date.now() }]);
-    };
+
+    const joined = ({ id, name }: { id: number; name: string }) =>
+      maybePush({ type: 'joined', id, name });
+    const left = ({ id, name }: { id: number; name: string }) =>
+      maybePush({ type: 'left', id, name });
+
     socket.on('chatUserJoined', joined);
     socket.on('chatUserLeft', left);
     return () => {
@@ -133,7 +155,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     };
   }, [socket, user?.id]);
 
-  /* -------------------- emit helpers -------------------------- */
+  /* ---------------------------------------------------------------------- */
+  /* 6. Emit helpers                                                        */
+  /* ---------------------------------------------------------------------- */
   const sendTyping = useCallback(() => {
     socket.emit('chat:typing');
     if (localStopTimer.current) clearTimeout(localStopTimer.current);
@@ -149,12 +173,14 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     (msg: string) => {
       if (!msg.trim()) return;
       socket.emit('chat:message', { message: msg });
-      sendStopTyping(); // immediately stop indicator for myself
+      sendStopTyping(); // stop indicator for myself immediately
     },
     [socket, sendStopTyping],
   );
 
-  /* -------------------- context memo -------------------------- */
+  /* ---------------------------------------------------------------------- */
+  /* 7. Context value                                                       */
+  /* ---------------------------------------------------------------------- */
   const value = useMemo<ChatCtx>(
     () => ({
       messages,
@@ -183,7 +209,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
 }
 
-/* ---------- hook ---------- */
+/* ---------- Hook ---------- */
 export function useChat() {
   const ctx = useContext(ChatContext);
   if (!ctx) throw new Error('useChat must be used within ChatProvider');
