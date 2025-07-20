@@ -1,7 +1,7 @@
 // apps/client/src/components/dashboard/ParlayPanel.tsx
 import { useState, useMemo } from 'react';
 import { useParlay } from '../../contexts/ParlayContext';
-import { usePredictionMarket } from '../../contexts/PredictionMarketContext';
+import { usePredictionMarket } from '../../contexts/PredictionContext';
 import ParlayModal from '../ParlayModal';
 
 export default function ParlayPanel() {

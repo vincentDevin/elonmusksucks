@@ -266,11 +266,29 @@ export class UserService {
   }
 
   async createUserActivity(userId: number, type: string, details?: any): Promise<UserActivity> {
-    const activity: DbUserActivity = await this.repo.createUserActivity({
-      userId,
-      type,
-      details,
-    });
+    const activity = await this.repo.createUserActivity({ userId, type, details });
+
+    // Decide if this activity is ticker-worthy
+    if (
+      [
+        'PREDICTION_CREATED',
+        'PREDICTION_RESOLVED',
+        'BET_PLACED',
+        'PARLAY_PLACED',
+        'POST_CREATED',
+        'COMMENT_CREATED',
+        'BADGE_EARNED',
+      ].includes(type)
+    ) {
+      publishTicker({
+        id: activity.id,
+        userId,
+        type,
+        details,
+        createdAt: new Date().toISOString(),
+      });
+    }
+
     return toActivityDTO(activity);
   }
 
@@ -356,4 +374,23 @@ function toActivityDTO(a: DbUserActivity): UserActivity {
     details: a.details,
     createdAt: a.createdAt instanceof Date ? a.createdAt.toISOString() : a.createdAt,
   };
+}
+
+const TICKER_CHANNEL = 'activity:newsflash';
+const TICKER_LIST = 'activity:ticker';
+const TICKER_MAX = 100; // keep the 100 most-recent items
+
+function publishTicker(item: {
+  id: number; // activity id
+  userId: number;
+  type: string;
+  details?: any;
+  createdAt: string; // ISO
+}) {
+  const json = JSON.stringify(item);
+  // 1) realtime broadcast
+  redisClient.publish(TICKER_CHANNEL, json);
+  // 2) bootstrap list for new connections
+  redisClient.lpush(TICKER_LIST, json);
+  redisClient.ltrim(TICKER_LIST, 0, TICKER_MAX - 1);
 }

@@ -1,82 +1,78 @@
 // apps/server/src/socket.ts
+// -----------------------------------------------------------------------------
+// Main Socket.IO server bootstrap with Redis adapter + event subscriptions.
+// Updated to use **present‑tense** Redis channels and drops unused
+// RoomHandlers for now.
+// -----------------------------------------------------------------------------
+
 import { type Server as HTTPServer } from 'http';
 import { Server as IOServer } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
 import redisClient from './lib/redis';
 import { socketAuthMiddleware } from './middleware/socketAuthMiddleware';
-import { registerRoomHandlers } from './handlers/roomHandlers';
 import { registerChatHandlers } from './handlers/chatHandlers';
+import { registerBetHandlers } from './handlers/betSocketHandlers';
 import { registerRedisEventHandlers } from './handlers/redisEventHandlers';
 import { registerRedisChatHandlers } from './handlers/redisChatEventHandlers';
+// import { registerRoomHandlers } from './handlers/roomHandlers'; // future rooms
 
-// Utility to make allowed origins robust for both dev and prod
+// ──────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ──────────────────────────────────────────────────────────────────────────────
 function getAllowedOrigins(): string[] {
-  const envOrigin = process.env.CLIENT_URL;
-  // Default to both localhost and 127.0.0.1 for developer convenience
-  const devOrigins = ['http://localhost:3000', 'http://127.0.0.1:3000'];
-  if (envOrigin && !devOrigins.includes(envOrigin)) {
-    return [envOrigin, ...devOrigins];
-  }
-  return devOrigins;
+  const env = process.env.CLIENT_URL;
+  const dev = ['http://localhost:3000', 'http://127.0.0.1:3000'];
+  return env && !dev.includes(env) ? [env, ...dev] : dev;
 }
 
 export async function initSocket(httpServer: HTTPServer) {
-  const allowedOrigins = getAllowedOrigins();
-  console.log('[socket] Allowed origins for CORS:', allowedOrigins);
-
   const io = new IOServer(httpServer, {
     cors: {
-      origin: allowedOrigins,
+      origin: getAllowedOrigins(),
       methods: ['GET', 'POST'],
       credentials: true,
     },
   });
 
-  // --- Redis adapter setup ---
+  // Adapter with Redis
   const pubClient = redisClient.duplicate();
   const subClient = redisClient.duplicate();
   io.adapter(createAdapter(pubClient, subClient));
   console.log('[socket] Redis adapter attached');
 
-  // --- Redis event subscription/handler ---
+  // ── Domain event subscriptions ────────────────────────────────────────────
   const eventSub = redisClient.duplicate();
   await eventSub.subscribe(
-    'prediction:created',
-    'prediction:resolved',
-    'bet:placed',
-    'parlay:placed',
+    'prediction:create',
+    'prediction:resolve',
+    'bet:place',
+    'parlay:place',
     'leaderboard:allTime',
     'leaderboard:daily',
+    'activity:newsflash',
   );
   registerRedisEventHandlers(io, eventSub);
 
-  // --- Chat Redis subscription ---
-  const chatEventSub = redisClient.duplicate();
-  await registerRedisChatHandlers(io, chatEventSub);
+  // ── Chat event subscriptions ──────────────────────────────────────────────
+  const chatSub = redisClient.duplicate();
+  await registerRedisChatHandlers(io, chatSub);
 
-  // --- Auth middleware BEFORE connection handlers ---
+  // ── Auth middleware must run before per‑socket handlers ───────────────────
   io.use(socketAuthMiddleware);
 
-  // --- Socket.IO connection ---
+  // ── Connection handler ────────────────────────────────────────────────────
   io.on('connection', (socket) => {
     console.log('[socket] client connected:', socket.id);
-
     try {
-      registerRoomHandlers(io, socket);
+      // registerRoomHandlers(io, socket); // Uncomment when multi‑room is live
       registerChatHandlers(socket);
+      registerBetHandlers(socket);
     } catch (err) {
       console.error('[socket] handler error:', err);
     }
-
-    socket.on('disconnect', () => {
-      console.log('[socket] client disconnected:', socket.id);
-    });
   });
 
-  // Top-level error handler for the socket server (optional, but nice)
-  io.on('error', (err) => {
-    console.error('[socket.io] SERVER ERROR:', err);
-  });
+  io.on('error', (err) => console.error('[socket.io] SERVER ERROR:', err));
 
   return io;
 }

@@ -1,222 +1,198 @@
-import React, { useRef, useEffect, useState } from 'react';
+// apps/client/src/components/ChatWidget.tsx
+// -----------------------------------------------------------------------------
+// Compact live-chat widget that consumes ChatContext.
+// -----------------------------------------------------------------------------
+
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useChat } from '../contexts/ChatContext';
-import { Link } from 'react-router-dom';
 
-const fallbackAvatar =
+const FALLBACK_AVATAR =
   'https://ui-avatars.com/api/?name=Unknown&background=64748b&color=fff&size=48';
-const AVATAR_SIZE = 48;
 
-// Optional: For animating system notifications
+/* ───────────────────────── helpers ───────────────────────── */
+
 function useTimedQueue<T>(ttlMs: number) {
   const [items, setItems] = useState<T[]>([]);
-  function push(item: T) {
+  const push = (item: T) => {
     setItems((curr) => [...curr, item]);
     setTimeout(() => setItems((curr) => curr.slice(1)), ttlMs);
-  }
+  };
   return [items, push] as const;
 }
 
-const ChatWidget: React.FC = () => {
-  const { user } = useAuth();
-  const { messages, sendMessage, loading, error, typingUsers, userEvents } = useChat();
-  const [input, setInput] = useState('');
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+/* ───────────────────────── component ───────────────────────── */
 
-  // --- System events as ephemeral popups above the input ---
-  const [recentEvents, pushRecentEvent] = useTimedQueue<{
+export default function ChatWidget() {
+  const { user } = useAuth();
+  const {
+    messages,
+    loading,
+    error,
+    typingUsers,
+    userEvents,
+    sendMessage,
+    sendTyping,
+    sendStopTyping,
+  } = useChat();
+
+  /* local state ------------------------------------------------------------ */
+  const [input, setInput] = useState('');
+  const messagesEnd = useRef<HTMLDivElement>(null);
+  const [recentEvents, pushEvent] = useTimedQueue<{
     type: 'joined' | 'left';
     name: string;
     timestamp: number;
   }>(3800);
 
-  // Listen for new userEvents and show as popups
+  /* scroll to bottom whenever messages grow ------------------------------- */
   useEffect(() => {
-    if (!userEvents.length) return;
-    const latest = userEvents[userEvents.length - 1];
-    pushRecentEvent({
-      type: latest.type,
-      name: latest.name,
-      timestamp: latest.timestamp,
-    });
-    // eslint-disable-next-line
-  }, [userEvents.length]);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEnd.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSend = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (input.trim()) {
-      sendMessage(input);
-      setInput('');
-    }
+  /* fade-in join / leave toasts ------------------------------------------- */
+  useEffect(() => {
+    if (!userEvents.length) return;
+    pushEvent(userEvents[userEvents.length - 1]);
+    //  deliberately omit pushEvent from deps (it’s stable enough)
+    //  eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userEvents]);
+
+  /* grouped messages for compact render ----------------------------------- */
+  const grouped = useMemo(() => {
+    const out: {
+      avatar: string;
+      userName: string;
+      userRole: string;
+      userId: number;
+      msgs: { text: string; ts: string | number; id?: number }[];
+    }[] = [];
+
+    let last = -1;
+    messages.forEach((m) => {
+      if (m.user.id !== last) {
+        out.push({
+          avatar: m.user.avatarUrl ?? FALLBACK_AVATAR,
+          userName: m.user.name ?? `User ${m.user.id}`,
+          userRole: m.user.role,
+          userId: m.user.id,
+          msgs: [{ text: m.message, ts: m.timestamp, id: m.id }],
+        });
+        last = m.user.id;
+      } else {
+        out[out.length - 1].msgs.push({ text: m.message, ts: m.timestamp, id: m.id });
+      }
+    });
+    return out;
+  }, [messages]);
+
+  /* input handlers -------------------------------------------------------- */
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setInput(val);
+    val.trim() ? sendTyping() : sendStopTyping();
   };
 
-  // Group consecutive messages by user
-  const grouped: {
-    avatarUrl: string | null;
-    userName: string;
-    userRole: string;
-    userId: number;
-    messages: { message: string; timestamp: string | number; id?: number }[];
-  }[] = [];
-  let lastUserId: number | null = null;
-  messages.forEach((msg) => {
-    if (msg.user.id !== lastUserId) {
-      grouped.push({
-        avatarUrl: msg.user.avatarUrl ?? fallbackAvatar,
-        userName: msg.user.name ?? `User ${msg.user.id}`,
-        userRole: msg.user.role,
-        userId: msg.user.id,
-        messages: [{ message: msg.message, timestamp: msg.timestamp, id: msg.id }],
-      });
-      lastUserId = msg.user.id;
-    } else {
-      grouped[grouped.length - 1].messages.push({
-        message: msg.message,
-        timestamp: msg.timestamp,
-        id: msg.id,
-      });
-    }
-  });
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim()) return;
+    sendMessage(input.trim());
+    setInput('');
+    sendStopTyping();
+  };
 
+  /* ----------------------------------------------------------------------- */
   return (
-    <div className="flex flex-col h-[28rem] bg-transparent w-full relative">
-      {/* --- System join/leave notifications above input --- */}
-      <div className="absolute left-0 right-0 bottom-20 z-20 flex flex-col items-center pointer-events-none">
-        {recentEvents.map((ev, idx) => (
+    <div className="flex flex-col h-[28rem] relative bg-transparent">
+      {/* join / leave toasts */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-20 flex flex-col items-center z-20">
+        {recentEvents.map((ev) => (
           <div
-            key={ev.timestamp + idx}
-            className={`px-3 py-1 mb-2 rounded shadow-md bg-neutral-200 dark:bg-neutral-700 text-xs font-semibold
-              ${ev.type === 'joined' ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}
-            `}
-            style={{
-              animation: 'fadeInOut 3.2s ease',
-              maxWidth: 240,
-              textAlign: 'center',
-            }}
+            key={ev.timestamp}
+            className={`mb-2 px-3 py-1 rounded text-xs font-semibold shadow-md
+              ${
+                ev.type === 'joined'
+                  ? 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300'
+                  : 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300'
+              }`}
+            style={{ animation: 'fadeInOut 3.2s ease', maxWidth: 240, textAlign: 'center' }}
           >
-            {ev.type === 'joined' ? `${ev.name} joined the chat` : `${ev.name} left the chat`}
+            {ev.name} {ev.type === 'joined' ? 'joined' : 'left'} the chat
           </div>
         ))}
       </div>
 
-      {/* --- Chat Messages --- */}
-      <div className="flex-1 overflow-y-auto py-3 px-4">
-        {loading && <div className="text-center text-xs text-gray-400">Loading…</div>}
-        {error && <div className="text-center text-xs text-red-500">{error}</div>}
+      {/* message list */}
+      <div className="flex-1 overflow-y-auto px-4 py-3">
+        {loading && <p className="text-center text-xs text-gray-400">Loading…</p>}
+        {error && <p className="text-center text-xs text-red-500">{error}</p>}
 
-        {/* --- Typing notification above the message box, below the messages --- */}
         {typingUsers.length > 0 && (
-          <div className="mb-2 text-xs text-tertiary flex items-center gap-1 pl-2">
-            <span>
-              {typingUsers.map((u) => u.name).join(', ')} {typingUsers.length === 1 ? 'is' : 'are'}{' '}
-              typing…
-            </span>
-            <span className="animate-bounce text-[18px] pb-1">…</span>
-          </div>
+          <p className="mb-2 text-xs text-tertiary pl-2">
+            {typingUsers.map((u) => u.name).join(', ')} {typingUsers.length === 1 ? 'is' : 'are'}{' '}
+            typing…
+            <span className="animate-bounce ml-1">…</span>
+          </p>
         )}
 
-        {grouped.map((group, idx) => (
-          <div key={group.messages[0].id ?? `${group.userId}-${idx}`} className="mb-5">
-            <div className="flex items-start gap-3" style={{ minHeight: AVATAR_SIZE }}>
-              <div className="flex flex-col items-start flex-shrink-0">
-                <img
-                  src={group.avatarUrl || fallbackAvatar}
-                  alt={group.userName}
-                  className="w-12 h-12 rounded-full object-cover border border-accent"
-                  style={{
-                    background: 'var(--color-muted)',
-                    borderColor: 'var(--color-accent)',
-                    marginBottom: 0,
-                  }}
-                />
-              </div>
-              <div className="flex flex-col flex-1">
-                <div style={{ marginBottom: 0 }}>
-                  <Link
-                    to={`/profile/${group.userId}`}
-                    className="font-bold text-base flex items-center gap-1 hover:underline focus:outline-none"
-                    style={{
-                      color: group.userRole === 'ADMIN' ? '#dc2626' : 'var(--color-primary)',
-                    }}
-                  >
-                    {group.userName}
-                    {group.userRole === 'ADMIN' && (
-                      <span
-                        className="ml-1 px-2 py-0.5 rounded text-xs font-bold"
-                        style={{
-                          background: '#b34a4aff',
-                          color: '#000',
-                          border: '1px solid #dc2626',
-                        }}
-                      >
-                        admin
-                      </span>
-                    )}
-                  </Link>
-                </div>
-                <div className="flex flex-col gap-1">
-                  {group.messages.map((m, i) => (
-                    <div key={m.id ?? i} className="flex items-end" style={{ minHeight: 22 }}>
-                      <span
-                        className="flex-1 text-[15px] leading-snug"
-                        style={{
-                          color: 'var(--color-content)',
-                          wordBreak: 'break-word',
-                        }}
-                      >
-                        {m.message}
-                      </span>
-                      <span
-                        className="ml-3 text-xs font-normal"
-                        style={{
-                          color: 'var(--color-tertiary)',
-                          minWidth: 70,
-                          textAlign: 'right',
-                        }}
-                      >
-                        {new Date(m.timestamp).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+        {grouped.map((g) => (
+          <div key={g.msgs[0].id ?? `${g.userId}-${g.msgs.length}`} className="mb-5">
+            <div className="flex items-start gap-3">
+              <img
+                src={g.avatar}
+                alt={g.userName}
+                className="w-12 h-12 rounded-full object-cover flex-shrink-0 border border-accent"
+              />
+              <div className="flex-1">
+                <Link
+                  to={`/profile/${g.userId}`}
+                  className="font-bold hover:underline"
+                  style={{ color: g.userRole === 'ADMIN' ? '#dc2626' : 'var(--color-primary)' }}
+                >
+                  {g.userName}
+                  {g.userRole === 'ADMIN' && (
+                    <span className="ml-1 rounded px-1.5 py-0.5 text-xs font-bold uppercase bg-red-100 text-red-700 border border-red-600">
+                      admin
+                    </span>
+                  )}
+                </Link>
+                {g.msgs.map((m) => (
+                  <div key={m.id ?? m.ts} className="flex justify-between">
+                    <span className="break-words">{m.text}</span>
+                    <span className="ml-3 min-w-[70px] text-right text-xs text-tertiary">
+                      {new Date(m.ts).toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
         ))}
-        <div ref={messagesEndRef} />
+        <div ref={messagesEnd} />
       </div>
+
       <div className="border-t border-muted" />
-      {/* --- Only show the input if logged in --- */}
+
+      {/* input (only when logged in) */}
       {user && (
-        <form onSubmit={handleSend} className="flex items-center gap-2 px-3 py-2">
+        <form onSubmit={handleSubmit} className="flex items-center gap-2 px-3 py-2">
           <input
-            className="flex-1 rounded-lg px-3 py-2 text-base focus:outline-none bg-background border border-muted"
-            style={{
-              color: 'var(--color-content)',
-            }}
-            type="text"
             value={input}
+            onChange={handleChange}
+            onBlur={sendStopTyping}
+            className="flex-1 rounded-lg border border-muted bg-background px-3 py-2 focus:outline-none"
             placeholder="Type your message…"
             maxLength={1000}
-            onChange={(e) => setInput(e.target.value)}
             autoComplete="off"
-            // Optionally: onKeyDown={() => sendTyping()}
           />
           <button
             type="submit"
-            className="px-4 py-2 rounded-lg font-semibold bg-primary text-surface transition disabled:opacity-60"
-            style={{
-              background: 'var(--color-primary)',
-              color: 'var(--color-surface)',
-            }}
             disabled={!input.trim()}
+            className="rounded-lg bg-primary px-4 py-2 font-semibold text-surface disabled:opacity-60"
           >
             Send
           </button>
@@ -224,6 +200,4 @@ const ChatWidget: React.FC = () => {
       )}
     </div>
   );
-};
-
-export default ChatWidget;
+}

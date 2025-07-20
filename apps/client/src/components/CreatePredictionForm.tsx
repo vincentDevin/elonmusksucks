@@ -1,12 +1,17 @@
 // apps/client/src/components/CreatePredictionForm.tsx
-import React, { useState } from 'react';
+// -----------------------------------------------------------------------------
+// Form component used by admins/moderators to create a new prediction.
+// Relies on shared @ems/types enum + DTO from '@/api/predictions'.
+// -----------------------------------------------------------------------------
+
+import { useState } from 'react';
 import type { CreatePredictionPayload } from '../api/predictions';
 import { PredictionType } from '@ems/types';
 
 interface CreatePredictionFormProps {
-  /** Called with the new-prediction payload when the user submits */
+  /** Called with the payload when the user submits. */
   onCreated: (input: CreatePredictionPayload) => Promise<void> | void;
-  /** Called when the user cancels creating */
+  /** Called when the user cancels creating. */
   onCancel: () => void;
 }
 
@@ -55,21 +60,15 @@ export default function CreatePredictionForm({ onCreated, onCancel }: CreatePred
   };
 
   const inputBase =
-    'w-full border rounded-lg px-3 py-2 bg-[var(--color-surface)] ' +
-    'text-[var(--color-content)] placeholder:text-[var(--color-tertiary)] ' +
-    'focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] ' +
-    'border-[var(--color-muted)]';
+    'w-full border rounded-lg px-3 py-2 bg-surface text-content placeholder:text-tertiary ' +
+    'focus:outline-none focus:ring-2 focus:ring-primary border-muted';
 
   return (
-    <form
-      onSubmit={submit}
-      className="bg-[var(--color-surface)] shadow-lg rounded-lg p-6 space-y-6"
-    >
+    <form onSubmit={submit} className="bg-surface shadow-lg rounded-lg p-6 space-y-6">
       <h2 className="text-2xl font-bold">New Prediction</h2>
 
       {/* Title / Category / Description / Expires At / Type / Threshold */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Title */}
         <div>
           <label htmlFor="title" className="block mb-1 text-sm">
             Title
@@ -83,7 +82,6 @@ export default function CreatePredictionForm({ onCreated, onCancel }: CreatePred
           />
         </div>
 
-        {/* Category */}
         <div>
           <label htmlFor="category" className="block mb-1 text-sm">
             Category
@@ -97,7 +95,6 @@ export default function CreatePredictionForm({ onCreated, onCancel }: CreatePred
           />
         </div>
 
-        {/* Description */}
         <div className="md:col-span-2">
           <label htmlFor="description" className="block mb-1 text-sm">
             Terms of Prediction
@@ -111,7 +108,6 @@ export default function CreatePredictionForm({ onCreated, onCancel }: CreatePred
           />
         </div>
 
-        {/* Expires At */}
         <div>
           <label htmlFor="expiresAt" className="block mb-1 text-sm">
             Expires At
@@ -125,7 +121,6 @@ export default function CreatePredictionForm({ onCreated, onCancel }: CreatePred
           />
         </div>
 
-        {/* Prediction Type */}
         <div>
           <label htmlFor="type" className="block mb-1 text-sm">
             Prediction Type
@@ -142,7 +137,6 @@ export default function CreatePredictionForm({ onCreated, onCancel }: CreatePred
           </select>
         </div>
 
-        {/* Threshold for Over/Under */}
         {isOU && (
           <div>
             <label htmlFor="threshold" className="block mb-1 text-sm">
@@ -160,7 +154,6 @@ export default function CreatePredictionForm({ onCreated, onCancel }: CreatePred
         )}
       </div>
 
-      {/* Options list for Multiple */}
       {isMultiple && (
         <div className="space-y-3">
           <label className="block mb-1 text-sm">Options</label>
@@ -184,33 +177,24 @@ export default function CreatePredictionForm({ onCreated, onCancel }: CreatePred
               )}
             </div>
           ))}
-          <button
-            type="button"
-            onClick={addOption}
-            className="text-[var(--color-primary)] text-sm font-medium"
-          >
+          <button type="button" onClick={addOption} className="text-primary text-sm font-medium">
             + Add another option
           </button>
         </div>
       )}
 
-      {/* Actions */}
       <div className="pt-4 border-t flex justify-end space-x-4">
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2 rounded-lg bg-[var(--color-muted)] hover:bg-[var(--color-tertiary)]"
+          className="px-4 py-2 rounded-lg bg-muted hover:bg-tertiary"
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={!canSubmit}
-          className={`px-6 py-2 rounded-lg font-medium transition ${
-            canSubmit
-              ? 'bg-[var(--color-primary)] text-white hover:bg-[var(--color-secondary)]'
-              : 'bg-[var(--color-muted)] text-[var(--color-tertiary)] cursor-not-allowed'
-          }`}
+          className={`px-6 py-2 rounded-lg font-medium transition ${canSubmit ? 'bg-primary text-white hover:bg-secondary' : 'bg-muted text-tertiary cursor-not-allowed'}`}
         >
           Create Prediction
         </button>

@@ -1,6 +1,12 @@
+// apps/server/src/services/betting.service.ts
+// -----------------------------------------------------------------------------
+// • Publishes **present‑tense** Redis channels (`bet:place`, `parlay:place`) to
+//   align with the command‑naming convention.
+// • No direct io.emit — real‑time fan‑out handled by redisEventHandlers.ts.
+// -----------------------------------------------------------------------------
+
 import type { IBettingRepository } from '../repositories/IBettingRepository';
-import type { DbBet, DbParlay } from '@ems/types';
-import type { BetWithUser } from '@ems/types';
+import type { DbBet, DbParlay, BetWithUser } from '@ems/types';
 import { BettingRepository } from '../repositories/BettingRepository';
 import redisClient from '../lib/redis';
 
@@ -8,7 +14,7 @@ export class BettingService {
   constructor(private repo: IBettingRepository = new BettingRepository()) {}
 
   /**
-   * Place a single bet and publish real-time event with user info.
+   * Place a single bet and publish real‑time event with user info.
    */
   async placeBet(userId: number, optionId: number, amount: number): Promise<DbBet> {
     // 1) Load option + prediction
@@ -46,14 +52,14 @@ export class BettingService {
       },
     };
 
-    // 6) Publish real-time event to clients
-    await redisClient.publish('bet:placed', JSON.stringify(betWithUser));
+    // 6) Publish real‑time event (present‑tense channel)
+    await redisClient.publish('bet:place', JSON.stringify(betWithUser));
 
     return bet;
   }
 
   /**
-   * Place a parlay bet and emit event (can expand parlay payload as needed).
+   * Place a parlay bet and publish real‑time event.
    */
   async placeParlay(
     userId: number,
@@ -94,14 +100,14 @@ export class BettingService {
       potentialPayout,
     );
 
-    // 6) Publish real-time event to clients (add user if desired for frontend consistency)
-    await redisClient.publish('parlay:placed', JSON.stringify(parlay));
+    // 6) Publish real‑time event (present‑tense channel)
+    await redisClient.publish('parlay:place', JSON.stringify(parlay));
 
     return parlay;
   }
 
   /**
-   * Recalculate odds for a prediction.
+   * Trigger odds recalculation (no real‑time event needed here yet).
    */
   async recalculateOdds(predictionId: number): Promise<void> {
     return this.repo.recalculateOdds(predictionId);

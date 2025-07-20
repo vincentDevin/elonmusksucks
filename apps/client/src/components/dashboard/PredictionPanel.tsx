@@ -1,10 +1,9 @@
 // apps/client/src/components/dashboard/PredictionsPanel.tsx
-import { usePredictionMarket } from '../../contexts/PredictionMarketContext';
+import { usePredictionMarket } from '../../contexts/PredictionContext';
 import PredictionCard from '../PredictionCard'; // thin wrapper around your existing <li> markup
 
 export default function PredictionsPanel() {
-  const { predictions, predictionsLoading: loading, predictionsError: error } =
-    usePredictionMarket();
+  const { predictions, loading, error } = usePredictionMarket();
 
   if (loading) return <p>Loading…</p>;
   if (error) return <p className="text-red-500">Error: {String(error)}</p>;

@@ -1,8 +1,12 @@
 // apps/client/src/components/ParlayModal.tsx
-import { useEffect } from 'react';
+// -----------------------------------------------------------------------------
+// Modal to review and place a parlay built in ParlayContext.
+// Relies on the unified PredictionContext + ParlayContext.
+// -----------------------------------------------------------------------------
+
+import { useState, useEffect } from 'react';
 import { useParlay } from '../contexts/ParlayContext';
-import { usePredictionMarket } from '../contexts/PredictionMarketContext';
-import type { PlaceParlayPayload } from '../api/betting';
+import { usePredictionMarket } from '../contexts/PredictionContext';
 import type { PublicPredictionOption } from '@ems/types';
 
 interface ParlayModalProps {
@@ -12,23 +16,13 @@ interface ParlayModalProps {
 
 export default function ParlayModal({ isOpen, onClose }: ParlayModalProps) {
   const { state, dispatch } = useParlay();
-  const {
-    predictions,
-    placeParlay,
-    latestParlay,
-    bettingLoading: placing,
-    bettingError: error,
-  } = usePredictionMarket();
+  const { predictions, placeParlay } = usePredictionMarket();
 
-  // When the socket tells us a parlay has landed, clear and close
-  useEffect(() => {
-    if (latestParlay) {
-      dispatch({ type: 'CLEAR' });
-      onClose();
-    }
-  }, [latestParlay, dispatch, onClose]);
+  // Local UI state for request cycle
+  const [placing, setPlacing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Close on Escape
+  // Close on Escape key
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose();
@@ -39,21 +33,29 @@ export default function ParlayModal({ isOpen, onClose }: ParlayModalProps) {
 
   if (!isOpen) return null;
 
+  /* ---------- Handlers ---------- */
   const handlePlace = async () => {
     if (!state.legs.length || state.amount <= 0) return;
-    const payload: PlaceParlayPayload = {
-      legs: state.legs,
-      amount: state.amount,
-    };
+    setPlacing(true);
+    setError(null);
     try {
-      await placeParlay(payload);
-      // we now wait for latestParlay via socket to clear & close
+      await placeParlay({ legs: state.legs, amount: state.amount });
+      // builder will auto-clear via ParlayContext on parlayPlaced
+      onClose();
     } catch (err: any) {
-      console.error(err);
-      alert('Parlay failed: ' + (error?.message || err.message));
+      setError(err.message || 'Parlay failed');
+    } finally {
+      setPlacing(false);
     }
   };
 
+  /* ---------- Helpers ---------- */
+  const findOpt = (predId: number, optId: number) => {
+    const pred = predictions.find((p) => p.id === predId);
+    return pred?.options.find((o: PublicPredictionOption) => o.id === optId);
+  };
+
+  /* ---------- UI ---------- */
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40"
@@ -65,37 +67,24 @@ export default function ParlayModal({ isOpen, onClose }: ParlayModalProps) {
       >
         <h2 className="text-lg font-medium">Your Parlay</h2>
 
-        <ul className="divide-y divide-muted">
+        {/* Legs list */}
+        <ul className="divide-y divide-muted max-h-60 overflow-y-auto">
           {state.legs.length ? (
             state.legs.map((leg, i) => {
-              const pred = predictions.find((p) => p.id === leg.predictionId);
-              const opt = pred?.options.find((o: PublicPredictionOption) => o.id === leg.optionId);
+              const opt = findOpt(leg.predictionId, leg.optionId);
               return (
                 <li
                   key={`${leg.predictionId}-${leg.optionId}-${i}`}
                   className="py-2 flex justify-between items-start space-x-2"
                 >
                   <div className="flex-1">
-                    <div className="font-semibold">{pred?.title || `#${leg.predictionId}`}</div>
+                    <div className="font-semibold">Prediction #{leg.predictionId}</div>
                     {opt && <div className="text-sm text-tertiary">{opt.label}</div>}
                   </div>
                   <button
-                    onClick={() =>
-                      dispatch({
-                        type: 'REMOVE_LEG',
-                        optionId: leg.optionId,
-                      })
-                    }
+                    onClick={() => dispatch({ type: 'REMOVE_LEG', optionId: leg.optionId })}
                     aria-label="Remove leg"
-                    className="
-                      text-red-600 
-                      hover:text-red-800 
-                      px-2 py-1 
-                      rounded 
-                      hover:bg-red-100 
-                      cursor-pointer
-                      transition
-                    "
+                    className="text-red-600 hover:text-red-800 px-2 py-1 rounded hover:bg-red-100 transition"
                   >
                     Remove
                   </button>
@@ -107,24 +96,21 @@ export default function ParlayModal({ isOpen, onClose }: ParlayModalProps) {
           )}
         </ul>
 
+        {/* Stake input */}
         <div>
           <label className="block text-sm font-medium">Stake (🪙)</label>
           <input
             type="number"
             min={1}
             value={state.amount}
-            onChange={(e) =>
-              dispatch({
-                type: 'SET_AMOUNT',
-                amount: Number(e.target.value),
-              })
-            }
+            onChange={(e) => dispatch({ type: 'SET_AMOUNT', amount: Number(e.target.value) })}
             className="mt-1 w-full border border-muted p-2 rounded bg-background text-content"
           />
         </div>
 
-        {error && <p className="text-sm text-red-500">Error: {error.message}</p>}
+        {error && <p className="text-sm text-red-500">Error: {error}</p>}
 
+        {/* Actions */}
         <div className="flex justify-end space-x-3">
           <button
             onClick={() => {
@@ -138,15 +124,7 @@ export default function ParlayModal({ isOpen, onClose }: ParlayModalProps) {
           <button
             onClick={handlePlace}
             disabled={placing || !state.legs.length || state.amount <= 0}
-            className="
-              px-4 py-2 
-              bg-primary text-surface 
-              rounded 
-              hover:opacity-90 
-              disabled:opacity-50 
-              transition
-              cursor-pointer
-            "
+            className="px-4 py-2 bg-primary text-surface rounded hover:opacity-90 disabled:opacity-50 transition"
           >
             {placing ? 'Placing…' : 'Place Parlay'}
           </button>

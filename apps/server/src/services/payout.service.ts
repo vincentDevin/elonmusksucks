@@ -1,4 +1,9 @@
 // apps/server/src/services/payout.service.ts
+// -----------------------------------------------------------------------------
+// Resolves predictions and ensures a `prediction:resolve` Redis event is
+// published when the resolution happens synchronously (tests / dev mode).
+// -----------------------------------------------------------------------------
+
 import type { IPayoutRepository } from '../repositories/IPayoutRepository';
 import type { PublicPrediction } from '@ems/types';
 import { PayoutRepository } from '../repositories/PayoutRepository';
@@ -11,22 +16,30 @@ export class PayoutService {
   constructor(private repo: IPayoutRepository = new PayoutRepository()) {}
 
   /**
-   * If the repository implements `markResolving`, enqueue a background job;
-   * otherwise (e.g. in tests) run `resolvePrediction` immediately and return its result.
+   * Trigger prediction resolution. If `markResolving` exists we off‑load heavy
+   * work to a worker; otherwise we resolve immediately (used in tests / local).
+   * In the immediate path we also publish a `prediction:resolve` event so
+   * connected clients update right away.
    */
   async resolvePrediction(
     predictionId: number,
     winningOptionId: number,
   ): Promise<PublicPrediction | void> {
-    // No markResolving? We're in test/dev mode—just run and return.
+    // ── TEST / SYNC PATH ────────────────────────────────────────────────────
     if (typeof this.repo.markResolving !== 'function') {
-      return this.repo.resolvePrediction(predictionId, winningOptionId);
+      const resolved = await this.repo.resolvePrediction(predictionId, winningOptionId);
+
+      // Publish real‑time update so front‑end sees result instantly
+      await redis.publish('prediction:resolve', JSON.stringify(resolved));
+
+      return resolved;
     }
 
-    // 1) quick flip in DB
+    // ── ASYNC PATH ──────────────────────────────────────────────────────────
+    // 1) flip DB flag so UI can show "resolving" state
     await this.repo.markResolving(predictionId, winningOptionId);
 
-    // 2) enqueue the heavy work for the worker
+    // 2) enqueue heavy payout calc for background worker
     await this.payoutQueue.add('processPayout', {
       predictionId,
       winningOptionId,
@@ -34,5 +47,4 @@ export class PayoutService {
   }
 }
 
-// singleton for controllers
 export const payoutService = new PayoutService();

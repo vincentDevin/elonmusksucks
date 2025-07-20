@@ -1,37 +1,40 @@
 // apps/server/src/handlers/redisEventHandlers.ts
+// -----------------------------------------------------------------------------
+// Redis → Socket fan‑out for core domain events (present‑tense only).
+// -----------------------------------------------------------------------------
+
 import { Server } from 'socket.io';
 
-type RedisChannel =
-  | 'prediction:created'
-  | 'prediction:resolved'
-  | 'bet:placed'
-  | 'parlay:placed'
+export type RedisChannel =
+  | 'prediction:create'
+  | 'prediction:resolve'
+  | 'bet:place'
+  | 'parlay:place'
   | 'leaderboard:allTime'
-  | 'leaderboard:daily';
+  | 'leaderboard:daily'
+  | 'activity:newsflash';
 
 export function registerRedisEventHandlers(io: Server, eventSub: any) {
   eventSub.on('message', (channel: RedisChannel, message: string) => {
-    let payload: any;
+    let payload: unknown;
     try {
       payload = JSON.parse(message);
-    } catch (e) {
-      console.error(`[socket] Failed to parse message for channel "${channel}":`, message);
+    } catch {
+      console.error(`[socket] Failed to parse payload for ${channel}`);
       return;
     }
-    // Debug log every event and payload
-    console.log(`[socket] Redis event: ${channel}`, payload);
 
     switch (channel) {
-      case 'prediction:created':
+      case 'prediction:create':
         io.emit('predictionCreated', payload);
         break;
-      case 'prediction:resolved':
+      case 'prediction:resolve':
         io.emit('predictionResolved', payload);
         break;
-      case 'bet:placed':
+      case 'bet:place':
         io.emit('betPlaced', payload);
         break;
-      case 'parlay:placed':
+      case 'parlay:place':
         io.emit('parlayPlaced', payload);
         break;
       case 'leaderboard:allTime':
@@ -40,9 +43,11 @@ export function registerRedisEventHandlers(io: Server, eventSub: any) {
       case 'leaderboard:daily':
         io.emit('leaderboardDaily', payload);
         break;
-      default:
-        console.warn(`[socket] Unknown Redis event: ${channel}`);
+      case 'activity:newsflash':
+        io.emit('activityNewsflash', payload);
         break;
+      default:
+        console.warn('[socket] Unhandled Redis channel', channel);
     }
   });
 }

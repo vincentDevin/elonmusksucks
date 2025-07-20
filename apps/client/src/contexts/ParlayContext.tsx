@@ -1,7 +1,14 @@
 // apps/client/src/contexts/ParlayContext.tsx
+// -----------------------------------------------------------------------------
+// Holds local state for the parlay bet builder (legs + amount).
+// Clears itself when a parlay is successfully placed by the current user,
+// using the live `parlayPlaced` broadcast.
+// -----------------------------------------------------------------------------
+
 import { createContext, useContext, useReducer, useEffect, useCallback } from 'react';
-import { useSocket } from '../contexts/SocketContext';
 import type { ReactNode } from 'react';
+import { useSocket } from './SocketContext';
+import { useAuth } from './AuthContext';
 
 /* ---------- Types ---------- */
 export interface Leg {
@@ -17,7 +24,7 @@ type Action =
   | { type: 'ADD_LEG'; leg: Leg }
   | { type: 'REMOVE_LEG'; optionId: number }
   | { type: 'SET_AMOUNT'; amount: number }
-  | { type: 'SET_PARLAY'; state: State } // replace wholesale (sync)
+  | { type: 'SET_PARLAY'; state: State }
   | { type: 'CLEAR' };
 
 /* ---------- Reducer ---------- */
@@ -26,7 +33,6 @@ const initial: State = { legs: [], amount: 0 };
 function reducer(state: State, action: Action): State {
   switch (action.type) {
     case 'ADD_LEG': {
-      // Replace leg for same prediction if it already exists
       const filtered = state.legs.filter((l) => l.predictionId !== action.leg.predictionId);
       return { ...state, legs: [...filtered, action.leg] };
     }
@@ -65,7 +71,6 @@ const ParlayCtx = createContext<Ctx>({
 /* ---------- Provider ---------- */
 export function ParlayProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initial, () => {
-    // hydrate from localStorage if present
     const raw = localStorage.getItem('parlay-builder');
     return raw ? (JSON.parse(raw) as State) : initial;
   });
@@ -75,19 +80,20 @@ export function ParlayProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('parlay-builder', JSON.stringify(state));
   }, [state]);
 
-  /* ---------- Socket auto-clear on confirmed ---------- */
-  const socket = useSocket(); // assumes your hook gives connected socket.io client
+  /* ---------- Clear builder when *our* parlay is placed ---------- */
+  const socket = useSocket();
+  const { user } = useAuth();
 
   useEffect(() => {
-    if (!socket) return;
-    function handleConfirmed() {
-      dispatch({ type: 'CLEAR' });
-    }
-    socket.on('parlay:confirmed', handleConfirmed);
-    return () => {
-      socket.off('parlay:confirmed', handleConfirmed);
+    if (!socket || !user) return;
+    const handlePlaced = (parlay: { userId: number }) => {
+      if (parlay.userId === user.id) dispatch({ type: 'CLEAR' });
     };
-  }, [socket]);
+    socket.on('parlayPlaced', handlePlaced);
+    return () => {
+      socket.off('parlayPlaced', handlePlaced);
+    };
+  }, [socket, user?.id]);
 
   /* ---------- Convenience callbacks ---------- */
   const addLeg = useCallback((leg: Leg) => dispatch({ type: 'ADD_LEG', leg }), []);
@@ -105,7 +111,6 @@ export function ParlayProvider({ children }: { children: ReactNode }) {
   );
 }
 
-/* ---------- Hook ---------- */
 export function useParlay() {
   return useContext(ParlayCtx);
 }

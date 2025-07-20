@@ -1,33 +1,33 @@
+// apps/client/src/App.tsx
 import { BrowserRouter } from 'react-router-dom';
 import { SocketProvider } from './contexts/SocketContext';
 import { AuthProvider } from './contexts/AuthContext';
-import { ParlayProvider } from './contexts/ParlayContext';
-import { PredictionMarketProvider } from './contexts/PredictionMarketContext';
-import AppRoutes from './routes/AppRoutes';
-import MainLayout from './components/MainLayout';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { PredictionProvider } from './contexts/PredictionContext';
+import { ParlayProvider } from './contexts/ParlayContext';
 import { ChatProvider } from './contexts/ChatContext';
+import MainLayout from './components/MainLayout';
+import AppRoutes from './routes/AppRoutes';
 
-function App() {
+export default function App() {
   return (
-    <AuthProvider>
-      <SocketProvider>
-        <ThemeProvider>
-          <ChatProvider>
-            <BrowserRouter>
-              <PredictionMarketProvider>
-                <ParlayProvider>
+    <BrowserRouter>
+      <AuthProvider>
+        <SocketProvider>
+          <ThemeProvider>
+            {/* domain state that depends on socket/auth */}
+            <PredictionProvider>
+              <ParlayProvider>
+                <ChatProvider>
                   <MainLayout>
                     <AppRoutes />
                   </MainLayout>
-                </ParlayProvider>
-              </PredictionMarketProvider>
-            </BrowserRouter>
-          </ChatProvider>
-        </ThemeProvider>
-      </SocketProvider>
-    </AuthProvider>
+                </ChatProvider>
+              </ParlayProvider>
+            </PredictionProvider>
+          </ThemeProvider>
+        </SocketProvider>
+      </AuthProvider>
+    </BrowserRouter>
   );
 }
-
-export default App;

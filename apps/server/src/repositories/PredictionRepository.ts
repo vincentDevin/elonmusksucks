@@ -1,10 +1,16 @@
 // apps/server/src/repositories/PredictionRepository.ts
+// -----------------------------------------------------------------------------
+// Prisma access helpers for predictions. In addition to the historical fields
+// we now ALSO return `avatarUrl` & `profilePictureKey` for bet‑side users so the
+// service layer can generate signed avatars.
+// -----------------------------------------------------------------------------
+
 import prisma from '../db';
 import type { IPredictionRepository } from './IPredictionRepository';
 import type { DbPrediction, DbPredictionOption, DbBet, DbUser } from '@ems/types';
 import type { PredictionType } from '@ems/types';
 
-/** Shape for a parlay leg with user info */
+/** Shape for a parlay leg that already contains user meta (no avatar needed) */
 export type ParlayLegWithUser = {
   parlayId: number;
   user: Pick<DbUser, 'id' | 'name'>;
@@ -26,7 +32,11 @@ export class PredictionRepository implements IPredictionRepository {
   }): Promise<
     DbPrediction & {
       options: DbPredictionOption[];
-      bets: Array<DbBet & { user: Pick<DbUser, 'id' | 'name'> }>;
+      bets: Array<
+        DbBet & {
+          user: Pick<DbUser, 'id' | 'name' | 'avatarUrl' | 'profilePictureKey'>;
+        }
+      >;
     }
   > {
     return prisma.prediction.create({
@@ -42,9 +52,26 @@ export class PredictionRepository implements IPredictionRepository {
       },
       include: {
         options: {
-          select: { id: true, label: true, odds: true, predictionId: true, createdAt: true },
+          select: {
+            id: true,
+            label: true,
+            odds: true,
+            predictionId: true,
+            createdAt: true,
+          },
         },
-        bets: { include: { user: { select: { id: true, name: true } } } },
+        bets: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                avatarUrl: true,
+                profilePictureKey: true,
+              },
+            },
+          },
+        },
       },
     });
   }
@@ -53,7 +80,11 @@ export class PredictionRepository implements IPredictionRepository {
     Array<
       DbPrediction & {
         options: DbPredictionOption[];
-        bets: Array<DbBet & { user: Pick<DbUser, 'id' | 'name'> }>;
+        bets: Array<
+          DbBet & {
+            user: Pick<DbUser, 'id' | 'name' | 'avatarUrl' | 'profilePictureKey'>;
+          }
+        >;
         parlayLegs: ParlayLegWithUser[];
       }
     >
@@ -61,14 +92,32 @@ export class PredictionRepository implements IPredictionRepository {
     const preds = await prisma.prediction.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
-        options: { include: { parlayLegs: { include: { parlay: { include: { user: true } } } } } },
-        bets: { include: { user: { select: { id: true, name: true } } } },
+        options: {
+          include: {
+            parlayLegs: {
+              include: { parlay: { include: { user: true } } },
+            },
+          },
+        },
+        bets: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                avatarUrl: true,
+                profilePictureKey: true,
+              },
+            },
+          },
+        },
       },
     });
 
-    // flatten parlayLegs
     return preds.map((pred) => {
       const { options, bets, ...rest } = pred;
+
+      // --- flatten parlay legs ---
       const parlayLegs: ParlayLegWithUser[] = [];
       options.forEach((opt) =>
         opt.parlayLegs.forEach((leg) => {
@@ -81,14 +130,19 @@ export class PredictionRepository implements IPredictionRepository {
           });
         }),
       );
-      return { ...rest, options, bets, parlayLegs };
+
+      return { ...rest, options, bets, parlayLegs } as any;
     });
   }
 
   async findPredictionById(id: number): Promise<
     | (DbPrediction & {
         options: DbPredictionOption[];
-        bets: Array<DbBet & { user: Pick<DbUser, 'id' | 'name'> }>;
+        bets: Array<
+          DbBet & {
+            user: Pick<DbUser, 'id' | 'name' | 'avatarUrl' | 'profilePictureKey'>;
+          }
+        >;
         parlayLegs: ParlayLegWithUser[];
       })
     | null
@@ -96,11 +150,30 @@ export class PredictionRepository implements IPredictionRepository {
     const pred = await prisma.prediction.findUnique({
       where: { id },
       include: {
-        options: { include: { parlayLegs: { include: { parlay: { include: { user: true } } } } } },
-        bets: { include: { user: { select: { id: true, name: true } } } },
+        options: {
+          include: {
+            parlayLegs: {
+              include: { parlay: { include: { user: true } } },
+            },
+          },
+        },
+        bets: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                avatarUrl: true,
+                profilePictureKey: true,
+              },
+            },
+          },
+        },
       },
     });
+
     if (!pred) return null;
+
     const { options, bets, ...rest } = pred;
     const parlayLegs: ParlayLegWithUser[] = [];
     options.forEach((opt) =>
@@ -114,6 +187,7 @@ export class PredictionRepository implements IPredictionRepository {
         });
       }),
     );
-    return { ...rest, options, bets, parlayLegs };
+
+    return { ...rest, options, bets, parlayLegs } as any;
   }
 }

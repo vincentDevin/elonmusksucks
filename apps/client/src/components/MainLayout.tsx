@@ -17,7 +17,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
       {/* Main content is below NavBar, but above fixed ChatBar */}
       <div className="relative flex-1">
-
         {/* Main page content; add padding-bottom for chatbar space */}
         <main className="container mx-auto px-4 py-6 pb-32">{children}</main>
       </div>
