@@ -9,7 +9,9 @@ export class BettingRepository implements IBettingRepository {
   findOptionWithPrediction(optionId: number): Promise<OptionWithPrediction | null> {
     return prisma.predictionOption.findUnique({
       where: { id: optionId },
-      include: { prediction: { select: { id: true, title: true, resolved: true, expiresAt: true } } },
+      include: {
+        prediction: { select: { id: true, title: true, resolved: true, expiresAt: true } },
+      },
     }) as any;
   }
 

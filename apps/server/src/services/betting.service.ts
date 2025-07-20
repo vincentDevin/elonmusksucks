@@ -115,9 +115,7 @@ export class BettingService {
     }));
 
     await Promise.all(
-      legsPayload.map((leg) =>
-        redisClient.publish('parlay:place', JSON.stringify(leg)),
-      ),
+      legsPayload.map((leg) => redisClient.publish('parlay:place', JSON.stringify(leg))),
     );
 
     return parlay;

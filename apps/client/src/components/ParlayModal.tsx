@@ -15,14 +15,15 @@ interface ParlayModalProps {
 }
 
 export default function ParlayModal({ isOpen, onClose }: ParlayModalProps) {
-  const { state, dispatch } = useParlay();
+  // ⬇️ pull in clear() as well
+  const { state, dispatch, clear } = useParlay();
   const { predictions, placeParlay } = usePredictionMarket();
 
-  // Local UI state for request cycle
+  /* ---------- Local UI state ---------- */
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Close on Escape key
+  /* ---------- Close on Escape ---------- */
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose();
@@ -33,14 +34,15 @@ export default function ParlayModal({ isOpen, onClose }: ParlayModalProps) {
 
   if (!isOpen) return null;
 
-  /* ---------- Handlers ---------- */
+  /* ---------- Submission handler ---------- */
   const handlePlace = async () => {
     if (!state.legs.length || state.amount <= 0) return;
     setPlacing(true);
     setError(null);
     try {
       await placeParlay({ legs: state.legs, amount: state.amount });
-      // builder will auto-clear via ParlayContext on parlayPlaced
+      /** instant feedback – clear locally (idempotent even if socket event fires later) */
+      clear();
       onClose();
     } catch (err: any) {
       setError(err.message || 'Parlay failed');
@@ -50,81 +52,86 @@ export default function ParlayModal({ isOpen, onClose }: ParlayModalProps) {
   };
 
   /* ---------- Helpers ---------- */
-  const findOpt = (predId: number, optId: number) => {
-    const pred = predictions.find((p) => p.id === predId);
-    return pred?.options.find((o: PublicPredictionOption) => o.id === optId);
-  };
+  const findPrediction = (predId: number) => predictions.find((p) => p.id === predId);
+
+  const findOption = (predId: number, optId: number): PublicPredictionOption | undefined =>
+    findPrediction(predId)?.options.find((o) => o.id === optId);
 
   /* ---------- UI ---------- */
   return (
-    <div
-      className="fixed bottom-4 right-4 z-50 w-96 p-6 bg-surface text-content rounded-2xl shadow-xl space-y-4"
-      onMouseLeave={onClose}
-    >
-        <h2 className="text-lg font-medium">Your Parlay</h2>
+    <div className="fixed bottom-4 right-4 z-50 w-96 p-6 bg-surface text-content rounded-2xl shadow-xl space-y-4">
+      <h2 className="text-lg font-medium">Your Parlay</h2>
 
-        {/* Legs list */}
-        <ul className="divide-y divide-muted max-h-60 overflow-y-auto">
-          {state.legs.length ? (
-            state.legs.map((leg, i) => {
-              const opt = findOpt(leg.predictionId, leg.optionId);
-              return (
-                <li
-                  key={`${leg.predictionId}-${leg.optionId}-${i}`}
-                  className="py-2 flex justify-between items-start space-x-2"
-                >
-                  <div className="flex-1">
-                    <div className="font-semibold">Prediction #{leg.predictionId}</div>
-                    {opt && <div className="text-sm text-tertiary">{opt.label}</div>}
+      {/* Legs list */}
+      <ul className="divide-y divide-muted max-h-60 overflow-y-auto">
+        {state.legs.length ? (
+          state.legs.map((leg, i) => {
+            const pred = findPrediction(leg.predictionId);
+            const opt = findOption(leg.predictionId, leg.optionId);
+            return (
+              <li
+                key={`${leg.predictionId}-${leg.optionId}-${i}`}
+                className="py-2 flex justify-between items-start space-x-2"
+              >
+                <div className="flex-1">
+                  <div className="font-semibold">
+                    {pred ? pred.title : `Prediction #${leg.predictionId}`}
                   </div>
-                  <button
-                    onClick={() => dispatch({ type: 'REMOVE_LEG', optionId: leg.optionId })}
-                    aria-label="Remove leg"
-                    className="text-red-600 hover:text-red-800 px-2 py-1 rounded hover:bg-red-100 transition"
-                  >
-                    Remove
-                  </button>
-                </li>
-              );
+                  <div className="text-sm text-tertiary">{opt?.label ?? leg.label}</div>
+                </div>
+                <button
+                  onClick={() => dispatch({ type: 'REMOVE_LEG', optionId: leg.optionId })}
+                  aria-label="Remove leg"
+                  className="text-red-600 hover:text-red-800 px-2 py-1 rounded hover:bg-red-100 transition"
+                >
+                  Remove
+                </button>
+              </li>
+            );
+          })
+        ) : (
+          <li className="py-2 text-center italic text-tertiary">No legs added.</li>
+        )}
+      </ul>
+
+      {/* Stake input */}
+      <div>
+        <label className="block text-sm font-medium">Stake (🪙)</label>
+        <input
+          type="number"
+          min={1}
+          value={state.amount}
+          onChange={(e) =>
+            dispatch({
+              type: 'SET_AMOUNT',
+              amount: Number(e.target.value),
             })
-          ) : (
-            <li className="py-2 text-center italic text-tertiary">No legs added.</li>
-          )}
-        </ul>
+          }
+          className="mt-1 w-full border border-muted p-2 rounded bg-background text-content"
+        />
+      </div>
 
-        {/* Stake input */}
-        <div>
-          <label className="block text-sm font-medium">Stake (🪙)</label>
-          <input
-            type="number"
-            min={1}
-            value={state.amount}
-            onChange={(e) => dispatch({ type: 'SET_AMOUNT', amount: Number(e.target.value) })}
-            className="mt-1 w-full border border-muted p-2 rounded bg-background text-content"
-          />
-        </div>
+      {error && <p className="text-sm text-red-500">Error: {error}</p>}
 
-        {error && <p className="text-sm text-red-500">Error: {error}</p>}
-
-        {/* Actions */}
-        <div className="flex justify-end space-x-3">
-          <button
-            onClick={() => {
-              dispatch({ type: 'CLEAR' });
-              onClose();
-            }}
-            className="px-4 py-2 bg-muted text-content rounded hover:bg-tertiary transition"
-          >
-            Clear
-          </button>
-          <button
-            onClick={handlePlace}
-            disabled={placing || !state.legs.length || state.amount <= 0}
-            className="px-4 py-2 bg-primary text-surface rounded hover:opacity-90 disabled:opacity-50 transition"
-          >
-            {placing ? 'Placing…' : 'Place Parlay'}
-          </button>
-        </div>
+      {/* Actions */}
+      <div className="flex justify-end space-x-3">
+        <button
+          onClick={() => {
+            clear();
+            onClose();
+          }}
+          className="px-4 py-2 bg-muted text-content rounded hover:bg-tertiary transition"
+        >
+          Clear
+        </button>
+        <button
+          onClick={handlePlace}
+          disabled={placing || !state.legs.length || state.amount <= 0}
+          className="px-4 py-2 bg-primary text-surface rounded hover:opacity-90 disabled:opacity-50 transition"
+        >
+          {placing ? 'Placing…' : 'Place Parlay'}
+        </button>
+      </div>
     </div>
   );
 }

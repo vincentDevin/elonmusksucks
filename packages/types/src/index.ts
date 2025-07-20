@@ -119,7 +119,7 @@ export type ParlayLegWithUser = {
   };
   stake: number;
   optionId: number;
-  createdAt: string;
+  createdAt: Date;
   /** parent prediction id for context */
   predictionId?: number;
   optionLabel?: string;

@@ -14,6 +14,7 @@ import { useAuth } from './AuthContext';
 export interface Leg {
   optionId: number;
   predictionId: number;
+  label: string;
 }
 interface State {
   legs: Leg[];

@@ -10,11 +10,18 @@ export default function ParlayPanel() {
   const [open, setOpen] = useState(false);
 
   /* ---------- Helpers ---------- */
+  /** Return current odds for the given leg (falls back to 1). */
   const getLegOdds = (leg: { predictionId: number; optionId: number }) => {
     const pred = predictions.find((p) => p.id === leg.predictionId);
     const opt = pred?.options.find((o) => o.id === leg.optionId);
     return opt?.odds ?? 1;
   };
+
+  /* ---------- Lookup helpers ---------- */
+  const findPrediction = (predId: number) => predictions.find((p) => p.id === predId);
+
+  const findOption = (predId: number, optId: number) =>
+    findPrediction(predId)?.options.find((o) => o.id === optId);
 
   /* ---------- Derived numbers ---------- */
   const { combinedOdds, payout } = useMemo(() => {
@@ -38,10 +45,20 @@ export default function ParlayPanel() {
             <ul className="text-sm space-y-1 max-h-40 overflow-y-auto">
               {state.legs.map((leg, i) => {
                 const odds = getLegOdds(leg);
+                const pred = findPrediction(leg.predictionId);
+                const opt = findOption(leg.predictionId, leg.optionId);
+
                 return (
                   <li key={i} className="flex justify-between">
-                    <span>#{leg.predictionId}</span>
-                    <span>@ {odds.toFixed(2)}×</span>
+                    <div className="flex flex-col pr-2">
+                      <span className="font-medium truncate">
+                        {pred ? pred.title : `Prediction #${leg.predictionId}`}
+                      </span>
+                      <span className="text-xs text-tertiary truncate">
+                        {opt?.label ?? leg.label}
+                      </span>
+                    </div>
+                    <span>@&nbsp;{odds.toFixed(2)}×</span>
                   </li>
                 );
               })}
