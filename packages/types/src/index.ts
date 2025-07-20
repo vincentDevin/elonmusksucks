@@ -103,6 +103,9 @@ export interface BetWithUser extends PublicBet {
     name: string;
     avatarUrl: string | null;
   };
+  /** optional contextual info */
+  optionLabel?: string;
+  predictionTitle?: string;
 }
 
 // ——— Parlay & ParlayLeg ——————————————————————————————————————
@@ -117,6 +120,10 @@ export type ParlayLegWithUser = {
   stake: number;
   optionId: number;
   createdAt: string;
+  /** parent prediction id for context */
+  predictionId?: number;
+  optionLabel?: string;
+  predictionTitle?: string;
 };
 
 export type DbParlay     = PrismaParlay;

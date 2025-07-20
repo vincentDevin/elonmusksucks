@@ -1,16 +1,16 @@
 // apps/server/src/repositories/BettingRepository.ts
 import { PrismaClient } from '@prisma/client';
-import type { IBettingRepository } from './IBettingRepository';
+import type { IBettingRepository, OptionWithPrediction } from './IBettingRepository';
 import type { DbBet, DbParlay } from '@ems/types';
 
 const prisma = new PrismaClient();
 
 export class BettingRepository implements IBettingRepository {
-  findOptionWithPrediction(optionId: number) {
+  findOptionWithPrediction(optionId: number): Promise<OptionWithPrediction | null> {
     return prisma.predictionOption.findUnique({
       where: { id: optionId },
-      include: { prediction: { select: { id: true, resolved: true, expiresAt: true } } },
-    });
+      include: { prediction: { select: { id: true, title: true, resolved: true, expiresAt: true } } },
+    }) as any;
   }
 
   findUserById(userId: number) {
