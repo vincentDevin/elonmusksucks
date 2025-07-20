@@ -5,7 +5,7 @@
 // `betPlaced` broadcast to update the UI.
 // -----------------------------------------------------------------------------
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { usePredictionMarket } from '../contexts/PredictionContext';
 import { useAuth } from '../contexts/AuthContext';
 import type { PublicPredictionOption, BetWithUser } from '@ems/types';
@@ -21,12 +21,20 @@ export default function BetForm({ prediction, addOptimisticBet, onPlaced }: BetF
   const { user } = useAuth();
 
   const balance = user?.muskBucks ?? 0;
-  const [expanded, setExpanded] = useState(false);
+  const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState(0);
   const [optionId, setOptionId] = useState(prediction.options[0]?.id ?? 0);
 
   const [placing, setPlacing] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpen(false);
+    }
+    if (open) window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open]);
 
   const submit = async () => {
     if (amount <= 0 || amount > balance || placing) return;
@@ -58,7 +66,7 @@ export default function BetForm({ prediction, addOptimisticBet, onPlaced }: BetF
         addOptimisticBet(optimistic);
       }
 
-      setExpanded(false);
+      setOpen(false);
       setAmount(0);
       onPlaced?.();
     } catch (e: any) {
@@ -72,9 +80,12 @@ export default function BetForm({ prediction, addOptimisticBet, onPlaced }: BetF
     return <p className="mt-2 text-sm text-tertiary italic">You have no MuskBucks to bet.</p>;
   }
 
-  if (expanded) {
+  if (open) {
     return (
-      <div className="mt-2 p-4 bg-surface border border-muted rounded-lg shadow-md space-y-4">
+      <div
+        className="fixed bottom-4 right-4 z-50 w-80 p-4 bg-surface border border-muted rounded-lg shadow-lg space-y-4"
+        onMouseLeave={() => setOpen(false)}
+      >
         <p className="text-sm">
           Balance: <span className="font-semibold">{balance} 🪙</span>
         </p>
@@ -113,7 +124,7 @@ export default function BetForm({ prediction, addOptimisticBet, onPlaced }: BetF
         <div className="flex justify-end space-x-3">
           <button
             type="button"
-            onClick={() => setExpanded(false)}
+            onClick={() => setOpen(false)}
             disabled={placing}
             className="px-4 py-2 bg-muted text-content rounded hover:bg-tertiary transition"
           >
@@ -134,7 +145,7 @@ export default function BetForm({ prediction, addOptimisticBet, onPlaced }: BetF
 
   return (
     <button
-      onClick={() => setExpanded(true)}
+      onClick={() => setOpen(true)}
       disabled={placing}
       className="px-4 py-2 bg-primary text-surface rounded-full font-semibold shadow transform hover:scale-105 transition disabled:opacity-50 w-full sm:w-auto"
     >

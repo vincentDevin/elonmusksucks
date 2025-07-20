@@ -5,13 +5,16 @@ import type { DbBet, DbParlay } from '@ems/types';
  * Betting data access contract: service validates inputs,
  * repository methods perform raw DB writes inside transactions.
  */
+export type OptionWithPrediction = {
+  id: number;
+  label: string;
+  odds: number;
+  predictionId: number;
+  prediction: { id: number; title: string; resolved: boolean; expiresAt: Date };
+};
+
 export interface IBettingRepository {
-  findOptionWithPrediction(optionId: number): Promise<
-    | (ReturnType<() => import('@prisma/client').PredictionOption> & {
-        prediction: { id: number; resolved: boolean; expiresAt: Date };
-      })
-    | null
-  >;
+  findOptionWithPrediction(optionId: number): Promise<OptionWithPrediction | null>;
   findUserById(
     userId: number,
   ): Promise<Pick<import('@prisma/client').User, 'id' | 'muskBucks' | 'name' | 'avatarUrl'> | null>;

@@ -5,8 +5,8 @@
 // • No direct io.emit — real‑time fan‑out handled by redisEventHandlers.ts.
 // -----------------------------------------------------------------------------
 
-import type { IBettingRepository } from '../repositories/IBettingRepository';
-import type { DbBet, DbParlay, BetWithUser } from '@ems/types';
+import type { IBettingRepository, OptionWithPrediction } from '../repositories/IBettingRepository';
+import type { DbBet, DbParlay, BetWithUser, ParlayLegWithUser } from '@ems/types';
 import { BettingRepository } from '../repositories/BettingRepository';
 import redisClient from '../lib/redis';
 
@@ -50,6 +50,8 @@ export class BettingService {
         name: user.name,
         avatarUrl: user.avatarUrl,
       },
+      optionLabel: opt.label,
+      predictionTitle: opt.prediction.title,
     };
 
     // 6) Publish real‑time event (present‑tense channel)
@@ -70,7 +72,7 @@ export class BettingService {
     const detailed = await Promise.all(
       legs.map(({ optionId }) => this.repo.findOptionWithPrediction(optionId)),
     );
-    const validLegs = detailed.filter((opt): opt is NonNullable<typeof opt> => opt !== null);
+    const validLegs = detailed.filter((opt): opt is OptionWithPrediction => opt !== null);
     if (validLegs.length !== legs.length) throw new Error('OPTION_NOT_FOUND');
 
     // 2) Ensure none closed
@@ -100,8 +102,23 @@ export class BettingService {
       potentialPayout,
     );
 
-    // 6) Publish real‑time event (present‑tense channel)
-    await redisClient.publish('parlay:place', JSON.stringify(parlay));
+    // 6) Publish a leg event for each leg with extra info
+    const legsPayload: ParlayLegWithUser[] = validLegs.map((o) => ({
+      parlayId: parlay.id,
+      user: { id: user.id, name: user.name, avatarUrl: user.avatarUrl },
+      stake: amount,
+      optionId: o.id,
+      createdAt: parlay.createdAt,
+      predictionId: o.prediction.id,
+      optionLabel: o.label,
+      predictionTitle: o.prediction.title,
+    }));
+
+    await Promise.all(
+      legsPayload.map((leg) =>
+        redisClient.publish('parlay:place', JSON.stringify(leg)),
+      ),
+    );
 
     return parlay;
   }

@@ -58,13 +58,9 @@ export default function ParlayModal({ isOpen, onClose }: ParlayModalProps) {
   /* ---------- UI ---------- */
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40"
-      onClick={onClose}
+      className="fixed bottom-4 right-4 z-50 w-96 p-6 bg-surface text-content rounded-2xl shadow-xl space-y-4"
+      onMouseLeave={onClose}
     >
-      <div
-        className="bg-surface text-content rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4"
-        onClick={(e) => e.stopPropagation()}
-      >
         <h2 className="text-lg font-medium">Your Parlay</h2>
 
         {/* Legs list */}
@@ -129,7 +125,6 @@ export default function ParlayModal({ isOpen, onClose }: ParlayModalProps) {
             {placing ? 'Placing…' : 'Place Parlay'}
           </button>
         </div>
-      </div>
     </div>
   );
 }
