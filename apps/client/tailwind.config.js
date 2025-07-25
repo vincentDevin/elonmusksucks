@@ -15,6 +15,15 @@ module.exports = {
         content: 'var(--color-content)',
         background: 'var(--color-background)',
       },
+      keyframes: {
+        marquee: {
+          from: { transform: 'translateX(100%)' },
+          to: { transform: 'translateX(-100%)' },
+        },
+      },
+      animation: {
+        marquee: 'marquee 20s linear infinite',
+      },
     },
   },
   plugins: [],

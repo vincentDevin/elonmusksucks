@@ -12,6 +12,7 @@ import redisClient from './lib/redis';
 import { socketAuthMiddleware } from './middleware/socketAuthMiddleware';
 import { registerChatHandlers } from './handlers/chatHandlers';
 import { registerBetHandlers } from './handlers/betSocketHandlers';
+import { registerActivityTickerHandlers } from './handlers/activityTickerHandlers';
 import { registerRedisEventHandlers } from './handlers/redisEventHandlers';
 import { registerRedisChatHandlers } from './handlers/redisChatEventHandlers';
 // import { registerRoomHandlers } from './handlers/roomHandlers'; // future rooms
@@ -67,6 +68,7 @@ export async function initSocket(httpServer: HTTPServer) {
       // registerRoomHandlers(io, socket); // Uncomment when multi‑room is live
       registerChatHandlers(socket);
       registerBetHandlers(socket);
+      registerActivityTickerHandlers(socket);
     } catch (err) {
       console.error('[socket] handler error:', err);
     }
