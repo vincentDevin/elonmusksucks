@@ -10,6 +10,7 @@ import { PredictionRepository } from '../repositories/PredictionRepository';
 import { PredictionType } from '@prisma/client';
 import redisClient from '../lib/redis';
 import { UserService } from '../services/user.service';
+import { normalizedActivityService } from './normalizedActivity.service';
 
 /** Final shape the **client** expects for each parlay leg */
 export type ParlayLegWithUser = {
@@ -57,6 +58,7 @@ export class PredictionService {
     threshold?: number;
   }): Promise<
     PublicPrediction & {
+      options: DbPredictionOption[];
       bets: DbBet[];
       parlayLegs: ParlayLegWithUser[];
     }
@@ -64,6 +66,7 @@ export class PredictionService {
     const pred = await this.repo.createPrediction(params);
 
     const dto: PublicPrediction & {
+      options: DbPredictionOption[];
       bets: DbBet[];
       parlayLegs: ParlayLegWithUser[];
     } = {
@@ -79,11 +82,31 @@ export class PredictionService {
       resolvedAt: pred.resolvedAt,
       winningOptionId: pred.winningOptionId,
       creatorId: pred.creatorId,
+      options: pred.options || [],
       bets: [],
       parlayLegs: [],
     };
 
+    // Publish legacy format
     await redisClient.publish('prediction:create', JSON.stringify(dto));
+    
+    // Publish normalized activity event
+    const creator = await this.userService.getPublicSocketUser(params.creatorId);
+    if (creator) {
+      await normalizedActivityService.createPredictionCreatedEvent(
+        {
+          id: creator.id,
+          name: creator.name,
+          avatarUrl: creator.avatarUrl,
+        },
+        {
+          id: pred.id,
+          title: pred.title,
+          category: pred.category,
+        }
+      );
+    }
+    
     return dto;
   }
 

@@ -12,7 +12,8 @@ export type RedisChannel =
   | 'parlay:place'
   | 'leaderboard:allTime'
   | 'leaderboard:daily'
-  | 'activity:newsflash';
+  | 'activity:newsflash'
+  | 'activity:newsflash:normalized';
 
 export function registerRedisEventHandlers(io: Server, eventSub: any) {
   eventSub.on('message', (channel: RedisChannel, message: string) => {
@@ -45,6 +46,9 @@ export function registerRedisEventHandlers(io: Server, eventSub: any) {
         break;
       case 'activity:newsflash':
         io.emit('activityNewsflash', payload);
+        break;
+      case 'activity:newsflash:normalized':
+        io.emit('activityNewsflash:normalized', payload);
         break;
       default:
         console.warn('[socket] Unhandled Redis channel', channel);

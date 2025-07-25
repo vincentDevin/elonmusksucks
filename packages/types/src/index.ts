@@ -318,6 +318,7 @@ export type UserFeedPost = {
   authorName?:string;
 };
 
+// ——— Legacy Activity (for backwards compatibility) ————————————————————
 export type DbUserActivity = {
   id:        number;
   userId:    number;
@@ -331,6 +332,66 @@ export type UserActivity = {
   type:      string;
   details?:  unknown;
   createdAt: string;
+};
+
+// ——— Normalized Activity Events ————————————————————————————————————
+export const ActivityEventType = {
+  BET_PLACED: 'bet_placed',
+  PARLAY_STARTED: 'parlay_started',
+  PREDICTION_CREATED: 'prediction_created',
+  PREDICTION_RESOLVED: 'prediction_resolved',
+  POST_CREATED: 'post_created',
+  COMMENT_CREATED: 'comment_created',
+  BADGE_EARNED: 'badge_earned',
+  BIG_WIN: 'big_win',
+  LEADERBOARD_UPDATE: 'leaderboard_update',
+} as const;
+export type ActivityEventType = (typeof ActivityEventType)[keyof typeof ActivityEventType];
+
+export const ActivityPriority = {
+  LOW: 'low',
+  MEDIUM: 'medium',
+  HIGH: 'high',
+} as const;
+export type ActivityPriority = (typeof ActivityPriority)[keyof typeof ActivityPriority];
+
+export type ActivityEventMeta = {
+  // Display context
+  title?: string;                // prediction title, post content preview  
+  amount?: number;               // bet amount, payout amount, prize value
+  option?: string;               // chosen option label
+  category?: string;             // prediction category
+  streak?: number;               // winning/losing streak context
+  odds?: number;                 // odds at placement for context
+  
+  // Rich context for navigation/actions
+  predictionId?: number;
+  postId?: number;
+  badgeId?: number;
+  parlayId?: number;
+  
+  // Additional display hints
+  isWin?: boolean;               // for styling win/loss events
+  isHighValue?: boolean;         // for highlighting big bets/wins
+};
+
+export type NormalizedActivityEvent = {
+  id: string;                    // unique event ID (string for better uniqueness)
+  type: ActivityEventType;       // strongly-typed event types
+  timestamp: string;             // ISO timestamp
+  user: {
+    id: number;
+    name: string;
+    avatarUrl?: string | null;
+  };
+  meta: ActivityEventMeta;       // event-specific normalized metadata
+  priority: ActivityPriority;    // for filtering/sorting in UI
+};
+
+// Helper type for creating events (optional fields)
+export type CreateActivityEvent = Omit<NormalizedActivityEvent, 'id' | 'timestamp'> & {
+  id?: string;
+  timestamp?: string;
 };
 
 // ——— Admin DTOs ——————————————————————————————————————————————

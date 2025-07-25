@@ -9,8 +9,12 @@ import type { IBettingRepository, OptionWithPrediction } from '../repositories/I
 import type { DbBet, DbParlay, BetWithUser, ParlayLegWithUser } from '@ems/types';
 import { BettingRepository } from '../repositories/BettingRepository';
 import redisClient from '../lib/redis';
+import { normalizedActivityService } from './normalizedActivity.service';
+import { UserService } from './user.service';
 
 export class BettingService {
+  private userService = new UserService();
+  
   constructor(private repo: IBettingRepository = new BettingRepository()) {}
 
   /**
@@ -42,20 +46,42 @@ export class BettingService {
       potentialPayout,
     );
 
-    // 5) Compose full bet event payload including user info
+    // 5) Generate proper signed avatar URL
+    const avatarUrl = user.profilePictureKey
+      ? await this.userService.getCachedProfileImageUrl(user.id, user.profilePictureKey, 3600)
+      : user.avatarUrl;
+
+    // 6) Compose full bet event payload including user info
     const betWithUser: BetWithUser = {
       ...bet,
       user: {
         id: user.id,
         name: user.name,
-        avatarUrl: user.avatarUrl,
+        avatarUrl,
       },
       optionLabel: opt.label,
       predictionTitle: opt.prediction.title,
     };
 
-    // 6) Publish real‑time event (present‑tense channel)
+    // 7) Publish real‑time event (present‑tense channel) - legacy format
     await redisClient.publish('bet:place', JSON.stringify(betWithUser));
+
+    // 8) Publish normalized activity event
+    await normalizedActivityService.createBetPlacedEvent(
+      {
+        id: user.id,
+        name: user.name,
+        avatarUrl,
+      },
+      {
+        amount,
+        predictionId: opt.prediction.id,
+        predictionTitle: opt.prediction.title,
+        optionLabel: opt.label,
+        category: opt.prediction.category,
+        odds: oddsAtPlacement,
+      }
+    );
 
     return bet;
   }
@@ -102,10 +128,15 @@ export class BettingService {
       potentialPayout,
     );
 
-    // 6) Publish a leg event for each leg with extra info
+    // 6) Generate proper signed avatar URL
+    const avatarUrl = user.profilePictureKey
+      ? await this.userService.getCachedProfileImageUrl(user.id, user.profilePictureKey, 3600)
+      : user.avatarUrl;
+
+    // 7) Publish a leg event for each leg with extra info
     const legsPayload: ParlayLegWithUser[] = validLegs.map((o) => ({
       parlayId: parlay.id,
-      user: { id: user.id, name: user.name, avatarUrl: user.avatarUrl },
+      user: { id: user.id, name: user.name, avatarUrl },
       stake: amount,
       optionId: o.id,
       createdAt: parlay.createdAt,
@@ -114,8 +145,24 @@ export class BettingService {
       predictionTitle: o.prediction.title,
     }));
 
+    // 7) Publish legacy leg events
     await Promise.all(
       legsPayload.map((leg) => redisClient.publish('parlay:place', JSON.stringify(leg))),
+    );
+
+    // 8) Publish normalized parlay activity event
+    await normalizedActivityService.createParlayStartedEvent(
+      {
+        id: user.id,
+        name: user.name,
+        avatarUrl,
+      },
+      {
+        amount,
+        parlayId: parlay.id,
+        legCount: validLegs.length,
+        combinedOdds,
+      }
     );
 
     return parlay;

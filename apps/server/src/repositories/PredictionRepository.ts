@@ -10,10 +10,10 @@ import type { IPredictionRepository } from './IPredictionRepository';
 import type { DbPrediction, DbPredictionOption, DbBet, DbUser } from '@ems/types';
 import type { PredictionType } from '@ems/types';
 
-/** Shape for a parlay leg that already contains user meta (no avatar needed) */
+/** Shape for a parlay leg that already contains user meta (with avatar support) */
 export type ParlayLegWithUser = {
   parlayId: number;
-  user: Pick<DbUser, 'id' | 'name'>;
+  user: Pick<DbUser, 'id' | 'name' | 'avatarUrl' | 'profilePictureKey'>;
   stake: number;
   optionId: number;
   createdAt: Date;
@@ -95,7 +95,20 @@ export class PredictionRepository implements IPredictionRepository {
         options: {
           include: {
             parlayLegs: {
-              include: { parlay: { include: { user: true } } },
+              include: { 
+                parlay: { 
+                  include: { 
+                    user: {
+                      select: {
+                        id: true,
+                        name: true,
+                        avatarUrl: true,
+                        profilePictureKey: true,
+                      },
+                    },
+                  },
+                },
+              },
             },
           },
         },
@@ -123,7 +136,12 @@ export class PredictionRepository implements IPredictionRepository {
         opt.parlayLegs.forEach((leg) => {
           parlayLegs.push({
             parlayId: leg.parlay.id,
-            user: { id: leg.parlay.user.id, name: leg.parlay.user.name },
+            user: { 
+              id: leg.parlay.user.id, 
+              name: leg.parlay.user.name,
+              avatarUrl: leg.parlay.user.avatarUrl,
+              profilePictureKey: leg.parlay.user.profilePictureKey,
+            },
             stake: leg.parlay.amount,
             optionId: opt.id,
             createdAt: leg.createdAt,
@@ -153,7 +171,20 @@ export class PredictionRepository implements IPredictionRepository {
         options: {
           include: {
             parlayLegs: {
-              include: { parlay: { include: { user: true } } },
+              include: { 
+                parlay: { 
+                  include: { 
+                    user: {
+                      select: {
+                        id: true,
+                        name: true,
+                        avatarUrl: true,
+                        profilePictureKey: true,
+                      },
+                    },
+                  },
+                },
+              },
             },
           },
         },
@@ -180,7 +211,12 @@ export class PredictionRepository implements IPredictionRepository {
       opt.parlayLegs.forEach((leg) => {
         parlayLegs.push({
           parlayId: leg.parlay.id,
-          user: { id: leg.parlay.user.id, name: leg.parlay.user.name },
+          user: { 
+            id: leg.parlay.user.id, 
+            name: leg.parlay.user.name,
+            avatarUrl: leg.parlay.user.avatarUrl,
+            profilePictureKey: leg.parlay.user.profilePictureKey,
+          },
           stake: leg.parlay.amount,
           optionId: opt.id,
           createdAt: leg.createdAt,

@@ -25,3 +25,23 @@
   --color-content: #f1f5f9;
   --color-background: #0f172a;
 }
+
+/* Enhanced Activity Ticker Animations */
+.pause-animation {
+  animation-play-state: paused;
+}
+
+/* Smooth transitions for priority-based styling */
+.activity-item {
+  transition: all 0.3s ease-in-out;
+}
+
+/* High-priority item pulse effect */
+@keyframes priority-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.05); }
+}
+
+.high-priority-pulse {
+  animation: priority-pulse 2s ease-in-out infinite;
+}

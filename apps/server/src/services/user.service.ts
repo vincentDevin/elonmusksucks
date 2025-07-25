@@ -13,6 +13,7 @@ import type {
   DbUserActivity,
 } from '@ems/types';
 import type { PublicUserProfile, UserFeedPost, UserActivity, UserStatsDTO } from '@ems/types';
+import { normalizedActivityService } from './normalizedActivity.service';
 
 // Define a minimal file interface matching Multer's in-memory buffer
 export type UploadedFile = {
@@ -235,11 +236,30 @@ export class UserService {
       content,
       parentId: typeof parentId === 'undefined' ? null : parentId,
     });
+    // Create legacy activity record
     await this.repo.createUserActivity({
       userId: authorId,
       type: parentId ? 'COMMENT_CREATED' : 'POST_CREATED',
       details: { postId: post.id },
     });
+    
+    // Create normalized activity event
+    const author = await this.getPublicSocketUser(authorId);
+    if (author) {
+      await normalizedActivityService.createPostEvent(
+        {
+          id: author.id,
+          name: author.name,
+          avatarUrl: author.avatarUrl,
+        },
+        {
+          id: post.id,
+          content,
+          isComment: Boolean(parentId),
+        }
+      );
+    }
+    
     return toFeedPostDTO(post);
   }
 

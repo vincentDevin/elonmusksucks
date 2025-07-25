@@ -15,6 +15,7 @@ import { registerBetHandlers } from './handlers/betSocketHandlers';
 import { registerActivityTickerHandlers } from './handlers/activityTickerHandlers';
 import { registerRedisEventHandlers } from './handlers/redisEventHandlers';
 import { registerRedisChatHandlers } from './handlers/redisChatEventHandlers';
+import { registerNormalizedActivityHandlers } from './handlers/normalizedActivityHandlers';
 // import { registerRoomHandlers } from './handlers/roomHandlers'; // future rooms
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -51,8 +52,10 @@ export async function initSocket(httpServer: HTTPServer) {
     'leaderboard:allTime',
     'leaderboard:daily',
     'activity:newsflash',
+    'activity:newsflash:normalized', // New normalized events
   );
   registerRedisEventHandlers(io, eventSub);
+  // registerNormalizedActivityRedisHandlers(io, eventSub); // Now handled by main handler
 
   // ── Chat event subscriptions ──────────────────────────────────────────────
   const chatSub = redisClient.duplicate();
@@ -69,6 +72,7 @@ export async function initSocket(httpServer: HTTPServer) {
       registerChatHandlers(socket);
       registerBetHandlers(socket);
       registerActivityTickerHandlers(socket);
+      registerNormalizedActivityHandlers(socket);
     } catch (err) {
       console.error('[socket] handler error:', err);
     }

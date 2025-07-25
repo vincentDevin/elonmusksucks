@@ -36,7 +36,8 @@ export default function Predictions() {
     return raw.map((pred) => {
       const bets = pred.bets as BetWithUser[];
       const total = bets.reduce((sum, b) => sum + b.amount, 0);
-      const pools = (pred.options as PublicPredictionOption[]).map((opt) => {
+      const options = pred.options as PublicPredictionOption[] || [];
+      const pools = options.map((opt) => {
         const optSum = bets.filter((b) => b.optionId === opt.id).reduce((s, b) => s + b.amount, 0);
         return { label: opt.label, pct: total > 0 ? optSum / total : 0 };
       });

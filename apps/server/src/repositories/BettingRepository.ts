@@ -10,7 +10,7 @@ export class BettingRepository implements IBettingRepository {
     return prisma.predictionOption.findUnique({
       where: { id: optionId },
       include: {
-        prediction: { select: { id: true, title: true, resolved: true, expiresAt: true } },
+        prediction: { select: { id: true, title: true, category: true, resolved: true, expiresAt: true } },
       },
     }) as any;
   }
@@ -18,7 +18,7 @@ export class BettingRepository implements IBettingRepository {
   findUserById(userId: number) {
     return prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, muskBucks: true, name: true, avatarUrl: true },
+      select: { id: true, muskBucks: true, name: true, avatarUrl: true, profilePictureKey: true },
     });
   }
 

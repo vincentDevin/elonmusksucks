@@ -44,5 +44,8 @@
     "testcontainers": "^11.2.1",
     "ts-jest": "^29.4.0",
     "ts-node": "^10.9.2"
+  },
+  "dependencies": {
+    "recharts": "^3.1.0"
   }
 }

@@ -5,7 +5,7 @@
 // `betPlaced` broadcast to update the UI.
 // -----------------------------------------------------------------------------
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { usePredictionMarket } from '../contexts/PredictionContext';
 import { useAuth } from '../contexts/AuthContext';
 import type { PublicPredictionOption, BetWithUser } from '@ems/types';
@@ -28,20 +28,18 @@ export default function BetForm({ prediction, addOptimisticBet, onPlaced }: BetF
   const [placing, setPlacing] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setOpen(false);
-    }
-    if (open) window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open]);
-
   const submit = async () => {
-    if (amount <= 0 || amount > balance || placing) return;
+    console.log('BetForm submit called', { amount, balance, optionId, placing });
+    if (amount <= 0 || amount > balance || placing) {
+      console.log('BetForm submit blocked', { amount, balance, placing });
+      return;
+    }
+    console.log('BetForm calling placeBet');
     setPlacing(true);
     setErr(null);
     try {
       await placeBet({ optionId, amount });
+      console.log('BetForm placeBet success');
 
       // optimistic UI update (optional)
       if (user && addOptimisticBet) {
@@ -70,6 +68,7 @@ export default function BetForm({ prediction, addOptimisticBet, onPlaced }: BetF
       setAmount(0);
       onPlaced?.();
     } catch (e: any) {
+      console.error('BetForm placeBet error', e);
       setErr(e.message || 'Bet failed');
     } finally {
       setPlacing(false);
@@ -83,73 +82,96 @@ export default function BetForm({ prediction, addOptimisticBet, onPlaced }: BetF
   if (open) {
     return (
       <div
-        className="fixed bottom-4 right-4 z-50 w-80 p-4 bg-surface border border-muted rounded-lg shadow-lg space-y-4"
-        onMouseLeave={() => setOpen(false)}
+        className="absolute top-4 right-4 z-50 w-80 p-4 bg-surface border border-muted rounded-lg shadow-xl space-y-4"
+        style={{
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+        }}
       >
-        <p className="text-sm">
-          Balance: <span className="font-semibold">{balance} 🪙</span>
-        </p>
+          <p className="text-sm">
+            Balance: <span className="font-semibold">{balance} 🪙</span>
+          </p>
 
-        <div>
-          <label className="block text-sm font-medium mb-1">Bet Amount</label>
-          <input
-            type="number"
-            min={1}
-            max={balance}
-            value={amount}
-            onChange={(e) => setAmount(Number(e.target.value))}
-            className="w-full border p-2 rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary border-muted"
-            disabled={placing}
-          />
+          <div>
+            <label className="block text-sm font-medium mb-1">Bet Amount</label>
+            <input
+              type="number"
+              min={1}
+              max={balance}
+              value={amount}
+              onChange={(e) => setAmount(Number(e.target.value))}
+              className="w-full border p-2 rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary border-muted"
+              disabled={placing}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Option</label>
+            <select
+              value={optionId}
+              onChange={(e) => setOptionId(Number(e.target.value))}
+              className="w-full border p-2 rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary border-muted"
+              disabled={placing}
+            >
+              {prediction.options.map((opt) => (
+                <option key={opt.id} value={opt.id}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {err && <p className="text-xs text-red-500">{err}</p>}
+
+          <div className="flex justify-end space-x-3">
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              disabled={placing}
+              className="px-4 py-2 bg-muted text-content rounded hover:bg-tertiary transition"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={submit}
+              disabled={placing || amount <= 0 || amount > balance}
+              className="px-4 py-2 bg-primary text-surface rounded shadow hover:opacity-90 transition disabled:opacity-50"
+            >
+              {placing ? 'Placing…' : 'Place Bet'}
+            </button>
+          </div>
         </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-1">Option</label>
-          <select
-            value={optionId}
-            onChange={(e) => setOptionId(Number(e.target.value))}
-            className="w-full border p-2 rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary border-muted"
-            disabled={placing}
-          >
-            {prediction.options.map((opt) => (
-              <option key={opt.id} value={opt.id}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {err && <p className="text-xs text-red-500">{err}</p>}
-
-        <div className="flex justify-end space-x-3">
-          <button
-            type="button"
-            onClick={() => setOpen(false)}
-            disabled={placing}
-            className="px-4 py-2 bg-muted text-content rounded hover:bg-tertiary transition"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={submit}
-            disabled={placing || amount <= 0 || amount > balance}
-            className="px-4 py-2 bg-primary text-surface rounded shadow hover:opacity-90 transition disabled:opacity-50"
-          >
-            {placing ? 'Placing…' : 'Place Bet'}
-          </button>
-        </div>
-      </div>
     );
   }
 
   return (
-    <button
-      onClick={() => setOpen(true)}
-      disabled={placing}
-      className="px-4 py-2 bg-primary text-surface rounded-full font-semibold shadow transform hover:scale-105 transition disabled:opacity-50 w-full sm:w-auto"
+    <div
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('Place Bet div clicked');
+        if (!placing) setOpen(true);
+      }}
+      onMouseEnter={() => console.log('Mouse entered bet button')}
+      onMouseLeave={() => console.log('Mouse left bet button')}
+      className={`px-4 py-2 rounded-full font-semibold shadow cursor-pointer transition-all duration-200 inline-block ${
+        placing 
+          ? 'opacity-50 cursor-not-allowed bg-gray-400' 
+          : 'bg-blue-500 hover:bg-blue-600 hover:scale-105'
+      }`}
+      style={{ 
+        pointerEvents: 'auto',
+        zIndex: 10000,
+        position: 'relative',
+        backgroundColor: placing ? '#9ca3af' : '#3b82f6',
+        color: 'white',
+        userSelect: 'none',
+        display: 'inline-block',
+        minWidth: '120px',
+        textAlign: 'center'
+      }}
     >
       {placing ? 'Placing…' : 'Place Bet'}
-    </button>
+    </div>
   );
 }

@@ -121,7 +121,14 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
 
   // ── Bet/parlay helpers via socketRequest ──────────────────────────────────
   const placeBet = useCallback(async (payload: { optionId: number; amount: number }) => {
-    await socketRequest('bet:place', payload);
+    console.log('PredictionContext placeBet called', payload);
+    try {
+      await socketRequest('bet:place', payload);
+      console.log('PredictionContext placeBet success');
+    } catch (error) {
+      console.error('PredictionContext placeBet error', error);
+      throw error;
+    }
   }, []);
 
   const placeParlay = useCallback(
