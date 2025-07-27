@@ -9,7 +9,6 @@ import type { UpdateProfilePayload } from '../api/users';
 // Profile sections
 import { ProfileHeader } from '../components/profile/ProfileHeader';
 import { ProfileEditForm } from '../components/profile/ProfileEditForm';
-import { ProfileFollowers } from '../components/profile/ProfileFollowers';
 import { ProfileStats } from '../components/profile/ProfileStats';
 import { ProfileBadges } from '../components/profile/ProfileBadges';
 import { CreatePostForm } from '../components/profile/CreatePostForm';
@@ -87,10 +86,40 @@ export default function Profile() {
   };
 
   if (loading) {
-    return <p className="text-center py-8">Loading profile…</p>;
+    return (
+      <div className="flex flex-col items-center justify-center py-16">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
+        <p className="text-content">Loading profile…</p>
+      </div>
+    );
   }
+  
   if (error || !profile) {
-    return <p className="text-center py-8 text-red-500">Error: {error}</p>;
+    return (
+      <div className="max-w-2xl mx-auto text-center py-16">
+        <div className="bg-surface border border-muted rounded-2xl p-8 shadow-lg">
+          <div className="text-6xl mb-4">😕</div>
+          <h2 className="text-xl font-semibold text-content mb-2">Profile Error</h2>
+          <p className="text-red-500 mb-4">{error || 'Failed to load profile'}</p>
+          {error?.includes('Authentication required') && (
+            <button
+              onClick={() => window.location.href = '/login'}
+              className="px-4 py-2 bg-primary text-surface rounded-lg hover:bg-primary/90 transition-colors"
+            >
+              Go to Login
+            </button>
+          )}
+          {!error?.includes('Authentication required') && (
+            <button
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-secondary text-content rounded-lg hover:bg-secondary/90 transition-colors"
+            >
+              Try Again
+            </button>
+          )}
+        </div>
+      </div>
+    );
   }
 
   // Full stats object (new fields) with a fallback
@@ -124,6 +153,8 @@ export default function Profile() {
         setEditing={setEditing}
         following={following}
         toggleFollow={toggleFollow}
+        followersCount={profile.followersCount}
+        followingCount={profile.followingCount}
       />
 
       {editing ? (
@@ -136,16 +167,13 @@ export default function Profile() {
         />
       ) : (
         <>
+          <ProfileBadges badges={profile.badges} />
+          
           <ProfileStats
             profile={{ muskBucks: profile.muskBucks, rank: profile.rank }}
             stats={statsData}
             isOwn={isOwn}
           />
-          <ProfileFollowers
-            followersCount={profile.followersCount}
-            followingCount={profile.followingCount}
-          />
-          <ProfileBadges badges={profile.badges} />
 
           <ProfileActivity activity={activity ?? []} />
 

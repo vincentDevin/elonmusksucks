@@ -366,6 +366,159 @@ export class UserService {
   async setFeedPrivacy(userId: number, feedPrivate: boolean): Promise<void> {
     await this.repo.setFeedPrivacy(userId, feedPrivate);
   }
+
+  // --- USER ACTIVITY DATA FOR DASHBOARD ---
+
+  /**
+   * Get user's active bets (pending/open bets only)
+   */
+  async getUserActiveBets(userId: number): Promise<Array<{
+    id: number;
+    predictionId: number;
+    predictionTitle: string;
+    amount: number;
+    odds: number;
+    optionLabel?: string;
+    status: string;
+    createdAt: string;
+  }>> {
+    const bets = await prisma.bet.findMany({
+      where: {
+        userId,
+        status: 'PENDING', // Only active/pending bets
+      },
+      include: {
+        prediction: {
+          select: {
+            id: true,
+            title: true,
+            resolved: true,
+          }
+        },
+        optionOption: {
+          select: {
+            label: true,
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      },
+      take: 10, // Limit to recent bets
+    });
+
+    return bets.map(bet => ({
+      id: bet.id,
+      predictionId: bet.predictionId,
+      predictionTitle: bet.prediction.title,
+      amount: bet.amount,
+      odds: bet.oddsAtPlacement || 1.0,
+      optionLabel: bet.optionOption?.label,
+      status: bet.status,
+      createdAt: bet.createdAt.toISOString(),
+    }));
+  }
+
+  /**
+   * Get user's active parlays (pending parlays only)
+   */
+  async getUserActiveParlays(userId: number): Promise<Array<{
+    id: number;
+    amount: number;
+    combinedOdds: number;
+    potentialPayout: number;
+    legCount: number;
+    status: string;
+    createdAt: string;
+    legs: Array<{
+      predictionTitle: string;
+      optionLabel: string;
+    }>;
+  }>> {
+    const parlays = await prisma.parlay.findMany({
+      where: {
+        userId,
+        status: 'PENDING', // Only active/pending parlays
+      },
+      include: {
+        legs: {
+          include: {
+            option: {
+              include: {
+                prediction: {
+                  select: {
+                    title: true,
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      },
+      take: 10, // Limit to recent parlays
+    });
+
+    return parlays.map(parlay => ({
+      id: parlay.id,
+      amount: parlay.amount,
+      combinedOdds: parlay.combinedOdds,
+      potentialPayout: parlay.potentialPayout,
+      legCount: parlay.legs.length,
+      status: parlay.status,
+      createdAt: parlay.createdAt.toISOString(),
+      legs: parlay.legs.map(leg => ({
+        predictionTitle: leg.option.prediction.title,
+        optionLabel: leg.option.label,
+      })),
+    }));
+  }
+
+  /**
+   * Get user's created predictions (approved and pending)
+   */
+  async getUserPredictions(userId: number): Promise<Array<{
+    id: number;
+    title: string;
+    category: string;
+    type: string;
+    approved: boolean;
+    resolved: boolean;
+    expiresAt: string;
+    createdAt: string;
+    totalBets?: number;
+  }>> {
+    const predictions = await prisma.prediction.findMany({
+      where: {
+        creatorId: userId,
+      },
+      include: {
+        _count: {
+          select: {
+            bets: true,
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      },
+      take: 10, // Limit to recent predictions
+    });
+
+    return predictions.map(prediction => ({
+      id: prediction.id,
+      title: prediction.title,
+      category: prediction.category,
+      type: prediction.type,
+      approved: prediction.approved,
+      resolved: prediction.resolved,
+      expiresAt: prediction.expiresAt.toISOString(),
+      createdAt: prediction.createdAt.toISOString(),
+      totalBets: prediction._count.bets,
+    }));
+  }
 }
 
 // --- Helpers: always map DB types to DTOs used on frontend ---

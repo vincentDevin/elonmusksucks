@@ -29,7 +29,7 @@ export default function Predictions() {
 
   const [creating, setCreating] = useState(false);
   const [parlayOptions, setParlayOptions] = useState<Record<number, number>>({});
-  const [tab, setTab] = useState<'ALL' | 'PENDING'>('ALL');
+  const [tab, setTab] = useState<'OPEN' | 'EXPIRED' | 'RESOLVED' | 'PENDING'>('OPEN');
 
   /* ---------- Compute pools for each prediction ---------- */
   const predictions = useMemo<PredictionWithPools[]>(() => {
@@ -45,10 +45,24 @@ export default function Predictions() {
     });
   }, [raw]);
 
-  const filtered = useMemo(
-    () => predictions.filter((p) => (tab === 'ALL' ? p.approved : !p.approved)),
-    [predictions, tab],
-  );
+  const filtered = useMemo(() => {
+    const now = Date.now();
+    return predictions.filter((p) => {
+      const expires = new Date(p.expiresAt).getTime();
+      
+      switch (tab) {
+        case 'PENDING':
+          return !p.approved;
+        case 'RESOLVED':
+          return p.approved && p.resolved;
+        case 'EXPIRED':
+          return p.approved && !p.resolved && now > expires;
+        case 'OPEN':
+        default:
+          return p.approved && !p.resolved && now <= expires;
+      }
+    });
+  }, [predictions, tab]);
 
   /* ---------- Render ---------- */
   if (loading) return <p className="p-4 text-center">Loading predictions…</p>;
@@ -80,29 +94,48 @@ export default function Predictions() {
       )}
 
       {/* Tabs */}
-      <div className="flex justify-center mb-6 space-x-4">
+      <div className="flex justify-center mb-6 space-x-2 overflow-x-auto">
         <button
-          className={`px-4 py-2 rounded ${
-            tab === 'ALL' ? 'bg-primary text-surface' : 'bg-surface text-content'
+          className={`px-4 py-2 rounded whitespace-nowrap ${
+            tab === 'OPEN' ? 'bg-primary text-surface' : 'bg-surface text-content'
           }`}
-          onClick={() => setTab('ALL')}
+          onClick={() => setTab('OPEN')}
         >
-          All Predictions
+          Open
         </button>
         <button
-          className={`px-4 py-2 rounded ${
+          className={`px-4 py-2 rounded whitespace-nowrap ${
+            tab === 'EXPIRED' ? 'bg-primary text-surface' : 'bg-surface text-content'
+          }`}
+          onClick={() => setTab('EXPIRED')}
+        >
+          Expired
+        </button>
+        <button
+          className={`px-4 py-2 rounded whitespace-nowrap ${
+            tab === 'RESOLVED' ? 'bg-primary text-surface' : 'bg-surface text-content'
+          }`}
+          onClick={() => setTab('RESOLVED')}
+        >
+          Resolved
+        </button>
+        <button
+          className={`px-4 py-2 rounded whitespace-nowrap ${
             tab === 'PENDING' ? 'bg-primary text-surface' : 'bg-surface text-content'
           }`}
           onClick={() => setTab('PENDING')}
         >
-          Pending Approval
+          Pending
         </button>
       </div>
 
       {/* List */}
       {filtered.length === 0 ? (
         <p className="p-4 text-center">
-          {tab === 'ALL' ? 'No predictions available.' : 'No pending predictions.'}
+          {tab === 'OPEN' && 'No open predictions available.'}
+          {tab === 'EXPIRED' && 'No expired predictions.'}
+          {tab === 'RESOLVED' && 'No resolved predictions.'}
+          {tab === 'PENDING' && 'No predictions pending approval.'}
         </p>
       ) : (
         <ul className="space-y-6">
@@ -180,7 +213,7 @@ export default function Predictions() {
 
                 {/* Actions */}
                 <div className="mt-6 flex flex-wrap gap-3 items-center">
-                  {pred.approved && !pred.resolved && (
+                  {pred.approved && !pred.resolved && now <= expires && (
                     <>
                       <BetForm prediction={pred} />
 
@@ -221,6 +254,18 @@ export default function Predictions() {
                       {pred.creatorId === user?.id
                         ? 'Your prediction is awaiting admin approval.'
                         : 'This prediction is awaiting admin approval.'}
+                    </p>
+                  )}
+
+                  {pred.approved && pred.resolved && (
+                    <p className="text-sm italic text-gray-600">
+                      This prediction has been resolved.
+                    </p>
+                  )}
+
+                  {pred.approved && !pred.resolved && now > expires && (
+                    <p className="text-sm italic text-red-600">
+                      This prediction has expired and is no longer accepting bets.
                     </p>
                   )}
                 </div>

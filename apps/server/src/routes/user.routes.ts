@@ -11,6 +11,9 @@ import {
   getUserActivityHandler,
   getUserStatsHandler,
   uploadProfileImageHandler,
+  getUserBetsHandler,
+  getUserParlaysHandler,
+  getUserPredictionsHandler,
 } from '../controllers/user.controller';
 import { requireAuth } from '../middleware/auth.middleware';
 
@@ -46,5 +49,10 @@ router.delete('/:userId/follow', requireAuth, unfollowUserHandler);
 
 // User stats
 router.get('/:userId/stats', requireAuth, getUserStatsHandler);
+
+// User activity data for dashboard
+router.get('/:userId/bets', requireAuth, getUserBetsHandler);
+router.get('/:userId/parlays', requireAuth, getUserParlaysHandler);
+router.get('/:userId/predictions', requireAuth, getUserPredictionsHandler);
 
 export default router;

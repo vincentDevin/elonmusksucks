@@ -5,7 +5,7 @@
 // `betPlaced` broadcast to update the UI.
 // -----------------------------------------------------------------------------
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { usePredictionMarket } from '../contexts/PredictionContext';
 import { useAuth } from '../contexts/AuthContext';
 import type { PublicPredictionOption, BetWithUser } from '@ems/types';
@@ -27,6 +27,40 @@ export default function BetForm({ prediction, addOptimisticBet, onPlaced }: BetF
 
   const [placing, setPlacing] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  // 🚀 Enhanced live calculations with excitement factors
+  const betCalculations = useMemo(() => {
+    const selectedOption = prediction.options.find(opt => opt.id === optionId);
+    if (!selectedOption || amount <= 0) {
+      return {
+        payout: 0,
+        profit: 0,
+        riskLevel: 'Conservative',
+        marketImpact: false,
+        oddsDisplay: selectedOption?.odds?.toFixed(2) || '0.00'
+      };
+    }
+
+    const payout = Math.floor(amount * selectedOption.odds);
+    const profit = payout - amount;
+    
+    // Risk level calculation
+    let riskLevel = 'Conservative';
+    if (amount > balance * 0.5) riskLevel = 'YOLO 🚀';
+    else if (amount > balance * 0.3) riskLevel = 'Aggressive';
+    else if (amount > balance * 0.1) riskLevel = 'Moderate';
+
+    // Market impact (rough estimate)
+    const marketImpact = amount > 100; // Big bets move markets
+
+    return {
+      payout,
+      profit,
+      riskLevel,
+      marketImpact,
+      oddsDisplay: selectedOption.odds.toFixed(2)
+    };
+  }, [amount, optionId, balance, prediction.options]);
 
   const submit = async () => {
     console.log('BetForm submit called', { amount, balance, optionId, placing });
@@ -81,16 +115,23 @@ export default function BetForm({ prediction, addOptimisticBet, onPlaced }: BetF
 
   if (open) {
     return (
-      <div
-        className="absolute top-4 right-4 z-50 w-80 p-4 bg-surface border border-muted rounded-lg shadow-xl space-y-4"
-        style={{
-          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
-        }}
-      >
+      <div className="mt-4 p-4 bg-surface border border-muted rounded-lg space-y-4 transition-all duration-300">
+        {/* Balance and Risk Level */}
+        <div className="flex justify-between items-center">
           <p className="text-sm">
-            Balance: <span className="font-semibold">{balance} 🪙</span>
+            Balance: <span className="font-semibold">{balance.toLocaleString()} 🪙</span>
           </p>
+          <div className={`px-2 py-1 rounded-full text-xs font-semibold ${
+            betCalculations.riskLevel === 'YOLO 🚀' ? 'bg-red-100 text-red-800' :
+            betCalculations.riskLevel === 'Aggressive' ? 'bg-orange-100 text-orange-800' :
+            betCalculations.riskLevel === 'Moderate' ? 'bg-yellow-100 text-yellow-800' :
+            'bg-green-100 text-green-800'
+          }`}>
+            {betCalculations.riskLevel}
+          </div>
+        </div>
 
+        <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium mb-1">Bet Amount</label>
             <input
@@ -99,8 +140,9 @@ export default function BetForm({ prediction, addOptimisticBet, onPlaced }: BetF
               max={balance}
               value={amount}
               onChange={(e) => setAmount(Number(e.target.value))}
-              className="w-full border p-2 rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary border-muted"
+              className="w-full border p-3 rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary border-muted transition-all"
               disabled={placing}
+              placeholder="Enter amount..."
             />
           </div>
 
@@ -109,69 +151,98 @@ export default function BetForm({ prediction, addOptimisticBet, onPlaced }: BetF
             <select
               value={optionId}
               onChange={(e) => setOptionId(Number(e.target.value))}
-              className="w-full border p-2 rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary border-muted"
+              className="w-full border p-3 rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary border-muted transition-all"
               disabled={placing}
             >
               {prediction.options.map((opt) => (
                 <option key={opt.id} value={opt.id}>
-                  {opt.label}
+                  {opt.label} @ {opt.odds.toFixed(2)}×
                 </option>
               ))}
             </select>
           </div>
-
-          {err && <p className="text-xs text-red-500">{err}</p>}
-
-          <div className="flex justify-end space-x-3">
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              disabled={placing}
-              className="px-4 py-2 bg-muted text-content rounded hover:bg-tertiary transition"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={submit}
-              disabled={placing || amount <= 0 || amount > balance}
-              className="px-4 py-2 bg-primary text-surface rounded shadow hover:opacity-90 transition disabled:opacity-50"
-            >
-              {placing ? 'Placing…' : 'Place Bet'}
-            </button>
-          </div>
         </div>
+
+        {/* Live Calculations Display */}
+        {amount > 0 && (
+          <div className="bg-muted rounded-lg p-3 space-y-2">
+            <div className="flex justify-between text-sm">
+              <span>Odds:</span>
+              <span className="font-semibold">{betCalculations.oddsDisplay}×</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span>Potential Payout:</span>
+              <span className="font-bold text-green-600">{betCalculations.payout.toLocaleString()} 🪙</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span>Profit:</span>
+              <span className={`font-semibold ${betCalculations.profit > 0 ? 'text-green-600' : 'text-gray-500'}`}>
+                +{betCalculations.profit.toLocaleString()} 🪙
+              </span>
+            </div>
+            {betCalculations.marketImpact && (
+              <p className="text-xs text-blue-600 font-medium">
+                🔥 Your bet will move the market!
+              </p>
+            )}
+          </div>
+        )}
+
+        {err && <p className="text-xs text-red-500 bg-red-50 p-2 rounded">{err}</p>}
+
+        <div className="flex justify-end space-x-3">
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            disabled={placing}
+            className="px-4 py-2 bg-muted text-content rounded-lg hover:bg-tertiary transition-all"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={submit}
+            disabled={placing || amount <= 0 || amount > balance}
+            className={`px-6 py-2 rounded-lg font-bold transition-all duration-200 disabled:opacity-50 ${
+              betCalculations.riskLevel === 'YOLO 🚀' 
+                ? 'bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg hover:shadow-xl'
+                : betCalculations.riskLevel === 'Aggressive'
+                ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg hover:shadow-xl'
+                : 'bg-primary text-surface hover:opacity-90'
+            }`}
+          >
+            {placing ? (
+              <span className="flex items-center space-x-2">
+                <span className="animate-spin">⏳</span>
+                <span>Placing...</span>
+              </span>
+            ) : (
+              `Place ${betCalculations.riskLevel === 'YOLO 🚀' ? '🚀' : ''} Bet`
+            )}
+          </button>
+        </div>
+      </div>
     );
   }
 
   return (
-    <div
+    <button
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        console.log('Place Bet div clicked');
         if (!placing) setOpen(true);
       }}
-      onMouseEnter={() => console.log('Mouse entered bet button')}
-      onMouseLeave={() => console.log('Mouse left bet button')}
-      className={`px-4 py-2 rounded-full font-semibold shadow cursor-pointer transition-all duration-200 inline-block ${
+      disabled={placing}
+      className={`px-6 py-2 rounded-lg font-bold shadow cursor-pointer transition-all duration-200 inline-block ${
         placing 
           ? 'opacity-50 cursor-not-allowed bg-gray-400' 
-          : 'bg-blue-500 hover:bg-blue-600 hover:scale-105'
+          : 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 hover:scale-105 text-white shadow-lg hover:shadow-xl'
       }`}
-      style={{ 
-        pointerEvents: 'auto',
-        zIndex: 10000,
-        position: 'relative',
-        backgroundColor: placing ? '#9ca3af' : '#3b82f6',
-        color: 'white',
-        userSelect: 'none',
-        display: 'inline-block',
-        minWidth: '120px',
-        textAlign: 'center'
-      }}
     >
-      {placing ? 'Placing…' : 'Place Bet'}
-    </div>
+      <span className="flex items-center space-x-2">
+        <span>💰</span>
+        <span>{placing ? 'Placing…' : 'Place Bet'}</span>
+      </span>
+    </button>
   );
 }

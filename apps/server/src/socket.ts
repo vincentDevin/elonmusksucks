@@ -16,6 +16,7 @@ import { registerActivityTickerHandlers } from './handlers/activityTickerHandler
 import { registerRedisEventHandlers } from './handlers/redisEventHandlers';
 import { registerRedisChatHandlers } from './handlers/redisChatEventHandlers';
 import { registerNormalizedActivityHandlers } from './handlers/normalizedActivityHandlers';
+import { registerModerationHandlers } from './handlers/moderationHandlers';
 // import { registerRoomHandlers } from './handlers/roomHandlers'; // future rooms
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -53,6 +54,14 @@ export async function initSocket(httpServer: HTTPServer) {
     'leaderboard:daily',
     'activity:newsflash',
     'activity:newsflash:normalized', // New normalized events
+    // Moderation events
+    'moderation:userBan',
+    'moderation:userUnban',
+    'moderation:userMute',
+    'moderation:userKick',
+    'moderation:messageDelete',
+    'moderation:postDelete',
+    'user:activity',
   );
   registerRedisEventHandlers(io, eventSub);
   // registerNormalizedActivityRedisHandlers(io, eventSub); // Now handled by main handler
@@ -68,11 +77,18 @@ export async function initSocket(httpServer: HTTPServer) {
   io.on('connection', (socket) => {
     console.log('[socket] client connected:', socket.id);
     try {
+      // Join admin room if user is admin
+      if ((socket as any).user?.role === 'ADMIN') {
+        socket.join('admin');
+        console.log(`[socket] Admin user ${(socket as any).user.id} joined admin room`);
+      }
+      
       // registerRoomHandlers(io, socket); // Uncomment when multi‑room is live
       registerChatHandlers(socket);
       registerBetHandlers(socket);
       registerActivityTickerHandlers(socket);
       registerNormalizedActivityHandlers(socket);
+      registerModerationHandlers(socket);
     } catch (err) {
       console.error('[socket] handler error:', err);
     }

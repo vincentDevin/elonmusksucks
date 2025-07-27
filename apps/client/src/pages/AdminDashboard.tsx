@@ -6,6 +6,8 @@ import PredictionQueue from '../components/admin/PredictionQueue';
 import BetsTransactions from '../components/admin/BetsTransactions';
 import BadgesManager from '../components/admin/BadgesManager';
 import UserStats from '../components/admin/UserStats';
+import ModerationPanel from '../components/admin/ModerationPanel';
+import BannedUsersWall from '../components/admin/BannedUsersWall';
 
 const AdminDashboard: React.FC = () => {
   const { user } = useAuth();
@@ -13,6 +15,8 @@ const AdminDashboard: React.FC = () => {
 
   const tabs = [
     { key: 'users', label: 'User Management', component: <UserManagement /> },
+    { key: 'moderation', label: 'Moderation', component: <ModerationPanel /> },
+    { key: 'banned', label: 'Banned Users', component: <BannedUsersWall /> },
     { key: 'predictions', label: 'Prediction Queue', component: <PredictionQueue /> },
     { key: 'bets', label: 'Bets & Transactions', component: <BetsTransactions /> },
     { key: 'badges', label: 'Badges', component: <BadgesManager /> },

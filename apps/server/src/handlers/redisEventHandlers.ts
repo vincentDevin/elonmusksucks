@@ -10,10 +10,18 @@ export type RedisChannel =
   | 'prediction:resolve'
   | 'bet:place'
   | 'parlay:place'
+  | 'odds:update'
   | 'leaderboard:allTime'
   | 'leaderboard:daily'
   | 'activity:newsflash'
-  | 'activity:newsflash:normalized';
+  | 'activity:newsflash:normalized'
+  | 'moderation:userBan'
+  | 'moderation:userUnban'
+  | 'moderation:userMute'
+  | 'moderation:userKick'
+  | 'moderation:messageDelete'
+  | 'moderation:postDelete'
+  | 'user:activity';
 
 export function registerRedisEventHandlers(io: Server, eventSub: any) {
   eventSub.on('message', (channel: RedisChannel, message: string) => {
@@ -38,6 +46,9 @@ export function registerRedisEventHandlers(io: Server, eventSub: any) {
       case 'parlay:place':
         io.emit('parlayPlaced', payload);
         break;
+      case 'odds:update':
+        io.emit('oddsUpdated', payload);
+        break;
       case 'leaderboard:allTime':
         io.emit('leaderboardAllTime', payload);
         break;
@@ -49,6 +60,35 @@ export function registerRedisEventHandlers(io: Server, eventSub: any) {
         break;
       case 'activity:newsflash:normalized':
         io.emit('activityNewsflash:normalized', payload);
+        break;
+      case 'moderation:userBan':
+        io.emit('moderationUserBan', payload);
+        // Emit to admin room specifically
+        io.to('admin').emit('adminModerationUserBan', payload);
+        break;
+      case 'moderation:userUnban':
+        io.emit('moderationUserUnban', payload);
+        io.to('admin').emit('adminModerationUserUnban', payload);
+        break;
+      case 'moderation:userMute':
+        io.emit('moderationUserMute', payload);
+        io.to('admin').emit('adminModerationUserMute', payload);
+        break;
+      case 'moderation:userKick':
+        io.emit('moderationUserKick', payload);
+        io.to('admin').emit('adminModerationUserKick', payload);
+        break;
+      case 'moderation:messageDelete':
+        io.emit('moderationMessageDelete', payload);
+        io.to('admin').emit('adminModerationMessageDelete', payload);
+        break;
+      case 'moderation:postDelete':
+        io.emit('moderationPostDelete', payload);
+        io.to('admin').emit('adminModerationPostDelete', payload);
+        break;
+      case 'user:activity':
+        io.emit('userActivity', payload);
+        io.to('admin').emit('adminUserActivity', payload);
         break;
       default:
         console.warn('[socket] Unhandled Redis channel', channel);

@@ -24,6 +24,7 @@ export default function PredictionCard({ prediction, addOptimisticBet }: Props) 
   const [parlaySel, setParlaySel] = useState(
     prediction.options.length ? prediction.options[0].id : 0,
   );
+  const [addingToParlay, setAddingToParlay] = useState<number | null>(null);
 
   const flatParlays: ParlayLegWithUser[] = prediction.parlayLegs ?? [];
 
@@ -41,6 +42,24 @@ export default function PredictionCard({ prediction, addOptimisticBet }: Props) 
     badgeColor = 'bg-blue-500';
     badgeText = 'Open';
   }
+
+  // 🚀 Enhanced parlay leg addition with feedback
+  const handleAddToParlay = (optionId: number) => {
+    setAddingToParlay(optionId);
+    
+    const selectedOption = prediction.options.find(opt => opt.id === optionId);
+    parlayDispatch({
+      type: 'ADD_LEG',
+      leg: { 
+        predictionId: prediction.id, 
+        optionId, 
+        label: selectedOption?.label || 'Unknown Option'
+      },
+    });
+
+    // Visual feedback
+    setTimeout(() => setAddingToParlay(null), 800);
+  };
 
   return (
     <li className="relative bg-surface border border-muted p-5 rounded-2xl shadow hover:shadow-lg transition">
@@ -104,15 +123,25 @@ export default function PredictionCard({ prediction, addOptimisticBet }: Props) 
           </select>
 
           <button
-            onClick={() =>
-              parlayDispatch({
-                type: 'ADD_LEG',
-                leg: { predictionId: prediction.id, optionId: parlaySel },
-              })
-            }
-            className="px-4 py-2 rounded-lg bg-yellow-500 hover:bg-yellow-600 text-white font-medium transition"
+            onClick={() => handleAddToParlay(parlaySel)}
+            disabled={addingToParlay === parlaySel}
+            className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+              addingToParlay === parlaySel
+                ? 'bg-green-500 text-white scale-110'
+                : 'bg-yellow-500 hover:bg-yellow-600 text-white hover:scale-105'
+            }`}
           >
-            Add&nbsp;to&nbsp;Parlay
+            {addingToParlay === parlaySel ? (
+              <span className="flex items-center space-x-1">
+                <span>✅</span>
+                <span>Added to Parlay!</span>
+              </span>
+            ) : (
+              <span className="flex items-center space-x-1">
+                <span>📈</span>
+                <span>Add to Parlay</span>
+              </span>
+            )}
           </button>
         </div>
       )}

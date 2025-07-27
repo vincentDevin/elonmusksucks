@@ -45,9 +45,13 @@ export default function NavBar() {
                 <div className="relative">
                   <button
                     onClick={() => setDropdownOpen(!dropdownOpen)}
-                    className="px-3 py-2 rounded hover:bg-muted transition-colors"
+                    className="flex items-center space-x-3 px-3 py-2 rounded hover:bg-muted transition-colors"
                   >
-                    {user.name} ({user.muskBucks}🪙)
+                    <span className="font-medium">{user.name}</span>
+                    <div className="flex items-center space-x-1 bg-gradient-to-r from-yellow-400 to-yellow-600 text-black px-2 py-1 rounded-full text-xs font-semibold shadow-sm">
+                      <span>{user.muskBucks.toLocaleString()}</span>
+                      <span>🪙</span>
+                    </div>
                   </button>
                   {dropdownOpen && (
                     <ul

@@ -185,16 +185,43 @@ export class BettingRepository implements IBettingRepository {
         where: { predictionId },
         _sum: { amount: true },
       })
-      .then((pools) => {
+      .then(async (pools) => {
         const total = pools.reduce((s, p) => s + (p._sum.amount ?? 0), 0);
-        return Promise.all(
-          pools.map((p) =>
-            prisma.predictionOption.update({
-              where: { id: p.optionId! },
-              data: { odds: total && p._sum.amount ? total / p._sum.amount : 1 },
-            }),
-          ),
-        ).then(() => undefined);
+        
+        if (total === 0) {
+          // No bets yet, keep default odds
+          return;
+        }
+
+        const updates = pools.map(async (p) => {
+          const optionPool = p._sum.amount ?? 0;
+          
+          // Base market-driven odds
+          const baseOdds = total / Math.max(optionPool, 1);
+          
+          // 🎉 EXCITEMENT FACTORS:
+          // 1. High-stakes bonus (pools over 1000 get 10% boost)
+          const highStakesMultiplier = optionPool > 1000 ? 1.1 : 1.0;
+          
+          // 2. Underdog bonus (options with <20% of pool get 15% boost)
+          const underdogBonus = optionPool < total * 0.2 ? 1.15 : 1.0;
+          
+          // 3. Volume bonus (active markets with >500 total get 5% boost)
+          const volumeBonus = total > 500 ? 1.05 : 1.0;
+          
+          // 4. Minimum odds floor of 1.1 (always some profit potential)
+          const enhancedOdds = Math.max(
+            baseOdds * highStakesMultiplier * underdogBonus * volumeBonus,
+            1.1
+          );
+
+          return prisma.predictionOption.update({
+            where: { id: p.optionId! },
+            data: { odds: enhancedOdds },
+          });
+        });
+
+        await Promise.all(updates);
       });
   }
 }

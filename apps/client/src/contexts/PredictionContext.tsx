@@ -90,16 +90,26 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
       );
     };
 
+    // 🚀 NEW: Live odds updates when markets move!
+    const onOddsUpdate = (data: { predictionId: number; timestamp: string }) => {
+      // Refresh the specific prediction to get latest odds
+      console.log('🔥 Odds updated for prediction:', data.predictionId);
+      // For now, we'll rely on the refresh from bet/parlay events
+      // In future, could fetch just this prediction's latest odds
+    };
+
     socket.on('predictionCreated', onCreated);
     socket.on('predictionResolved', onResolved);
     socket.on('betPlaced', onBet);
     socket.on('parlayPlaced', onParlay);
+    socket.on('oddsUpdated', onOddsUpdate);
 
     return () => {
       socket.off('predictionCreated', onCreated);
       socket.off('predictionResolved', onResolved);
       socket.off('betPlaced', onBet);
       socket.off('parlayPlaced', onParlay);
+      socket.off('oddsUpdated', onOddsUpdate);
     };
   }, [socket]);
 

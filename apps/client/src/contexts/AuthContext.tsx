@@ -8,7 +8,8 @@ import {
 } from '../api/auth';
 import type { User } from '../api/auth';
 import type { ReactNode } from 'react';
-import { setAccessToken } from '../api/axios';
+import { setAccessToken, setAuthFailureCallback, setTokenRefreshCallback } from '../api/axios';
+import { socket } from '../lib/socket';
 
 interface AuthContextType {
   accessToken: string | null;
@@ -18,6 +19,7 @@ interface AuthContextType {
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  clearAuth: () => void; // For use by axios interceptor
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -36,7 +38,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setAccessToken(token);
         const currentUser = await meApi();
         setUser(currentUser);
-      } catch (err) {
+      } catch {
         setToken(null);
         setAccessToken('');
         setUser(null);
@@ -77,9 +79,59 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setUser(currentUser);
   }, []);
 
+  // Clear auth state without making API call (used by axios interceptor)
+  const clearAuth = useCallback(() => {
+    setToken(null);
+    setAccessToken('');
+    setUser(null);
+  }, []);
+
+  // Handle token refresh from axios interceptor
+  const handleTokenRefresh = useCallback((newToken: string) => {
+    setToken(newToken);
+    // Note: setAccessToken is already called by the interceptor
+  }, []);
+
+  // Register callbacks with axios
+  useEffect(() => {
+    setAuthFailureCallback(clearAuth);
+    setTokenRefreshCallback(handleTokenRefresh);
+    return () => {
+      setAuthFailureCallback(null);
+      setTokenRefreshCallback(null);
+    };
+  }, [clearAuth, handleTokenRefresh]);
+
+  // Listen for bet/parlay events to refresh user balance in real-time
+  useEffect(() => {
+    if (!user?.id || !socket) return;
+
+    const handleBetPlaced = (betData: { user?: { id: number } }) => {
+      // Only refresh if this bet belongs to the current user
+      if (betData.user?.id === user.id) {
+        refreshUser();
+      }
+    };
+
+    const handleParlayPlaced = (parlayData: { user?: { id: number } }) => {
+      // Only refresh if this parlay belongs to the current user
+      if (parlayData.user?.id === user.id) {
+        refreshUser();
+      }
+    };
+
+    socket.on('betPlaced', handleBetPlaced);
+    socket.on('parlayPlaced', handleParlayPlaced);
+
+    return () => {
+      socket.off('betPlaced', handleBetPlaced);
+      socket.off('parlayPlaced', handleParlayPlaced);
+    };
+  }, [user?.id, refreshUser]);
+
   return (
     <AuthContext.Provider
-      value={{ accessToken, user, loading, login, register, logout, refreshUser }}
+      value={{ accessToken, user, loading, login, register, logout, refreshUser, clearAuth }}
     >
       {children}
     </AuthContext.Provider>

@@ -248,3 +248,81 @@ export async function getUserStatsHandler(
     next(err);
   }
 }
+
+/**
+ * GET /api/users/:userId/bets
+ * Fetch user's active bets (only for own profile)
+ */
+export async function getUserBetsHandler(
+  req: ReqWithUser,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const targetUserId = Number(req.params.userId);
+    const viewerId = req.user?.id;
+
+    // Only allow users to view their own bets
+    if (targetUserId !== viewerId) {
+      res.status(403).json({ error: 'Cannot view other users\' bets' });
+      return;
+    }
+
+    const bets = await userService.getUserActiveBets(targetUserId);
+    res.json(bets);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * GET /api/users/:userId/parlays  
+ * Fetch user's active parlays (only for own profile)
+ */
+export async function getUserParlaysHandler(
+  req: ReqWithUser,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const targetUserId = Number(req.params.userId);
+    const viewerId = req.user?.id;
+
+    // Only allow users to view their own parlays
+    if (targetUserId !== viewerId) {
+      res.status(403).json({ error: 'Cannot view other users\' parlays' });
+      return;
+    }
+
+    const parlays = await userService.getUserActiveParlays(targetUserId);
+    res.json(parlays);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * GET /api/users/:userId/predictions
+ * Fetch user's created predictions
+ */
+export async function getUserPredictionsHandler(
+  req: ReqWithUser,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const targetUserId = Number(req.params.userId);
+    const viewerId = req.user?.id;
+
+    // Only allow users to view their own predictions
+    if (targetUserId !== viewerId) {
+      res.status(403).json({ error: 'Cannot view other users\' predictions' });
+      return;
+    }
+
+    const predictions = await userService.getUserPredictions(targetUserId);
+    res.json(predictions);
+  } catch (err) {
+    next(err);
+  }
+}

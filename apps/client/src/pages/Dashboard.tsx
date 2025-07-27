@@ -14,24 +14,26 @@ const ChatPanel = lazy(() => import('../components/dashboard/ChatPanel'));
  */
 export default function Dashboard() {
   return (
-    <div
-      className="grid gap-8
-                    lg:grid-cols-[1fr_minmax(22rem,_32rem)]
-                    xl:grid-cols-[1fr_minmax(26rem,_36rem)]"
-    >
+    <div className="min-h-[calc(100vh-6rem)] max-h-[calc(100vh-6rem)] overflow-hidden">
+      <div
+        className="grid gap-8 h-full
+                      lg:grid-cols-[1fr_minmax(22rem,_32rem)]
+                      xl:grid-cols-[1fr_minmax(26rem,_36rem)]"
+      >
       {/* LEFT column – scrollable main feed */}
-      <div className="space-y-8">
+        <div className="space-y-8 overflow-y-auto scrollbar-thin scrollbar-track-secondary/20 scrollbar-thumb-primary/40 hover:scrollbar-thumb-primary/60 pr-2">
         <PredictionsPanel />
         <MyStuffPanel />
-      </div>
+        </div>
 
       {/* RIGHT column – sticky on desktop */}
-      <aside className="lg:sticky lg:top-24 space-y-8">
+        <aside className="lg:sticky lg:top-0 space-y-8 overflow-y-auto scrollbar-thin scrollbar-track-secondary/20 scrollbar-thumb-primary/40 hover:scrollbar-thumb-primary/60 pr-2">
         <ParlayPanel />
         <Suspense fallback={null}>
           <ChatPanel />
         </Suspense>
-      </aside>
+        </aside>
+      </div>
     </div>
   );
 }

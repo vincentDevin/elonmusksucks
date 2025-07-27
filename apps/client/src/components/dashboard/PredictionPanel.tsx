@@ -8,16 +8,32 @@ export default function PredictionsPanel() {
   if (loading) return <p>Loading…</p>;
   if (error) return <p className="text-red-500">Error: {String(error)}</p>;
 
+  // Filter for only open predictions (approved, not resolved, not expired)
+  const openPredictions = predictions.filter((p) => {
+    const now = Date.now();
+    const expires = new Date(p.expiresAt).getTime();
+    return p.approved && !p.resolved && now <= expires;
+  });
+
   return (
-    <section>
-      <h2 className="text-xl font-bold mb-4">Open Predictions</h2>
-      <ul className="space-y-4">
-        {predictions
-          .filter((p) => p.approved && !p.resolved)
-          .map((p) => (
-            <PredictionCard key={p.id} prediction={p} />
-          ))}
-      </ul>
+    <section className="bg-surface border border-muted rounded-2xl p-4 shadow-lg">
+      <h2 className="text-xl font-bold mb-4 text-content">Open Predictions</h2>
+      
+      {/* Scrollable container with max height */}
+      <div className="max-h-96 overflow-y-auto scrollbar-thin scrollbar-track-secondary/20 scrollbar-thumb-primary/40 hover:scrollbar-thumb-primary/60">
+        {openPredictions.length === 0 ? (
+          <div className="text-center py-8 text-tertiary">
+            <div className="text-4xl mb-2">📊</div>
+            <p>No open predictions available</p>
+          </div>
+        ) : (
+          <ul className="space-y-4 pr-2">
+            {openPredictions.map((p) => (
+              <PredictionCard key={p.id} prediction={p} />
+            ))}
+          </ul>
+        )}
+      </div>
     </section>
   );
 }

@@ -42,6 +42,21 @@ enum Theme {
   DARK
 }
 
+enum BanType {
+  TEMPORARY
+  PERMANENT
+}
+
+enum ModerationAction {
+  USER_BAN
+  USER_UNBAN
+  USER_MUTE
+  USER_UNMUTE
+  MESSAGE_DELETE
+  POST_DELETE
+  USER_KICK
+}
+
 model User {
   id                 Int                 @id @default(autoincrement())
   email              String              @unique
@@ -83,6 +98,9 @@ model User {
   stats              UserStats?
   Prediction         Prediction[]
   messages           Message[]
+  bans               UserBan[]
+  moderationActions  ModerationLog[] @relation("ModeratorActions")
+  moderationReceived ModerationLog[] @relation("ModeratedUser")
 }
 
 model ChatRoom {
@@ -333,4 +351,38 @@ model UserStats {
   biggestWin    Int     @default(0)
 
   updatedAt DateTime @default(now()) @updatedAt
+}
+
+model UserBan {
+  id          Int       @id @default(autoincrement())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      Int
+  banType     BanType
+  reason      String
+  expiresAt   DateTime? // null for permanent bans
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
+
+  @@index([userId, isActive])
+  @@index([expiresAt])
+}
+
+model ModerationLog {
+  id            Int              @id @default(autoincrement())
+  moderator     User             @relation("ModeratorActions", fields: [moderatorId], references: [id])
+  moderatorId   Int
+  targetUser    User?            @relation("ModeratedUser", fields: [targetUserId], references: [id])
+  targetUserId  Int?
+  action        ModerationAction
+  reason        String?
+  details       Json? // Additional context (messageId, postId, duration, etc.)
+  ipAddress     String?
+  userAgent     String?
+  createdAt     DateTime         @default(now())
+
+  @@index([moderatorId])
+  @@index([targetUserId])
+  @@index([action])
+  @@index([createdAt])
 }

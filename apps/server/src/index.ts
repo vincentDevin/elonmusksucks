@@ -16,6 +16,7 @@ import userRoutes from './routes/user.routes';
 import payoutRoutes from './routes/payout.routes';
 import adminRoutes from './routes/admin.routes';
 import leaderboardRoutes from './routes/leaderboard.routes';
+import moderationRoutes from './routes/moderation.routes';
 
 const app = express();
 
@@ -53,6 +54,7 @@ app.use('/api/predictions', predictionRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/payout', payoutRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
+app.use('/api/moderation', moderationRoutes);
 
 // Global error handler
 app.use((err: any, _req: any, res: any, _next: any) => {

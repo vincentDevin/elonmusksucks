@@ -3,10 +3,8 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import { PrismaClient, TransactionType, BetStatus } from '@prisma/client';
-import { PayoutRepository } from '../apps/server/src/repositories/PayoutRepository';
 
 const prisma = new PrismaClient();
-const payoutRepo = new PayoutRepository();
 
 async function clear<Model>(name: string, fn: () => Promise<Model>) {
   try {
@@ -31,9 +29,11 @@ async function main() {
   await clear('UserBadge',        () => prisma.userBadge.deleteMany());
   await clear('Badge',            () => prisma.badge.deleteMany());
   await clear('Follow',           () => prisma.follow.deleteMany());
+  await clear('ModerationLog',    () => prisma.moderationLog.deleteMany());
+  await clear('UserBan',          () => prisma.userBan.deleteMany());
 
-  console.log('👥 Creating users Alice, Bob, and Carol…');
-  const [alice, bob, carol] = await Promise.all([
+  console.log('👥 Creating users Alice, Bob, Carol, and Admin…');
+  const [alice, bob, carol, admin] = await Promise.all([
     prisma.user.upsert({ where: { email: 'alice@example.com' }, update: {}, create: {
       email: 'alice@example.com', name: 'Alice', passwordHash: 'hash', emailVerified: true,
       bio: 'Space enthusiast', avatarUrl: 'https://i.pravatar.cc/150?img=1',
@@ -48,6 +48,11 @@ async function main() {
       email: 'carol@example.com', name: 'Carol', passwordHash: 'hash', emailVerified: true,
       bio: 'Crypto trader', avatarUrl: 'https://i.pravatar.cc/150?img=3',
       location: 'New York, NY', timezone: 'America/New_York', muskBucks: 8000,
+    }}),
+    prisma.user.upsert({ where: { email: 'admin@example.com' }, update: {}, create: {
+      email: 'admin@example.com', name: 'Admin', passwordHash: 'hash', emailVerified: true,
+      role: 'ADMIN', bio: 'Site administrator', avatarUrl: 'https://i.pravatar.cc/150?img=4',
+      location: 'Server Room', timezone: 'UTC', muskBucks: 100000,
     }}),
   ]);
 
@@ -130,10 +135,50 @@ async function main() {
   await prisma.userActivity.create({ data: { userId: bob.id,     type: 'COMMENT_CREATED',details: { postId: bobComment.id } }});
   await prisma.userActivity.create({ data: { userId: carol.id,   type: 'COMMENT_CREATED',details: { postId: carolReply.id } }});
 
-  console.log('🔔 Resolving predictions…');
-  await payoutRepo.resolvePrediction(pMultiple.id, pMultiple.options[0].id);
-  await payoutRepo.resolvePrediction(pBinary.id, pBinary.options[1].id);
-  await payoutRepo.resolvePrediction(pOU.id, pOU.options[0].id);
+  console.log('🛡️ Seeding moderation data...');
+  // Create some sample chat room
+  const globalRoom = await prisma.chatRoom.upsert({
+    where: { name: 'global' },
+    update: {},
+    create: { name: 'global' }
+  });
+
+  // Create some sample messages
+  await prisma.message.createMany({
+    data: [
+      { roomId: globalRoom.id, userId: alice.id, content: 'Welcome to the chat!' },
+      { roomId: globalRoom.id, userId: bob.id, content: 'Hello everyone!' },
+      { roomId: globalRoom.id, userId: carol.id, content: 'Great to be here!' },
+    ]
+  });
+
+  // Add some sample moderation logs
+  await prisma.moderationLog.createMany({
+    data: [
+      {
+        moderatorId: admin.id,
+        action: 'MESSAGE_DELETE',
+        reason: 'Spam message removed',
+        details: { messageContent: 'Sample deleted message' },
+        ipAddress: '127.0.0.1',
+        userAgent: 'Test Browser'
+      },
+      {
+        moderatorId: admin.id,
+        action: 'USER_MUTE',
+        reason: 'Temporary mute for testing',
+        details: { duration: 60 },
+        ipAddress: '127.0.0.1',
+        userAgent: 'Test Browser'
+      }
+    ]
+  });
+
+  console.log('🔔 Setting predictions as approved…');
+  await prisma.prediction.updateMany({
+    where: { id: { in: [pMultiple.id, pBinary.id, pOU.id] } },
+    data: { approved: true }
+  });
 
   console.log('🔄 Refreshing leaderboard_view...');
   await prisma.$executeRaw`REFRESH MATERIALIZED VIEW leaderboard_view`;

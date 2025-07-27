@@ -18,6 +18,37 @@ export class BettingService {
   constructor(private repo: IBettingRepository = new BettingRepository()) {}
 
   /**
+   * Calculate enhanced parlay odds with exciting leg bonuses
+   */
+  private calculateEnhancedParlayOdds(individualOdds: number[]): {
+    baseCombinedOdds: number;
+    bonusMultiplier: number;
+    finalOdds: number;
+    legCount: number;
+  } {
+    const legCount = individualOdds.length;
+    const baseCombinedOdds = individualOdds.reduce((prod, odds) => prod * odds, 1);
+    
+    // Exciting bonus multipliers for more legs!
+    // 2 legs: 15% bonus, 3 legs: 32% bonus, 4 legs: 52% bonus, 5+ legs: 75% bonus
+    let bonusMultiplier = 1;
+    if (legCount >= 2) {
+      bonusMultiplier = Math.pow(1.15, legCount - 1);
+      // Cap the bonus at 2.0x for balance (10+ legs would be wild otherwise)
+      bonusMultiplier = Math.min(bonusMultiplier, 2.0);
+    }
+    
+    const finalOdds = baseCombinedOdds * bonusMultiplier;
+    
+    return {
+      baseCombinedOdds,
+      bonusMultiplier,
+      finalOdds,
+      legCount
+    };
+  }
+
+  /**
    * Place a single bet and publish real‑time event with user info.
    */
   async placeBet(userId: number, optionId: number, amount: number): Promise<DbBet> {
@@ -66,7 +97,10 @@ export class BettingService {
     // 7) Publish real‑time event (present‑tense channel) - legacy format
     await redisClient.publish('bet:place', JSON.stringify(betWithUser));
 
-    // 8) Publish normalized activity event
+    // 8) Recalculate odds for this prediction (make market alive!)
+    await this.recalculateOdds(opt.prediction.id);
+
+    // 9) Publish normalized activity event
     await normalizedActivityService.createBetPlacedEvent(
       {
         id: user.id,
@@ -112,9 +146,9 @@ export class BettingService {
     const user = await this.repo.findUserById(userId);
     if (!user || user.muskBucks < amount) throw new Error('INSUFFICIENT_FUNDS');
 
-    // 4) Compute combined odds
-    const combinedOdds = validLegs.reduce((prod, o) => prod * o.odds, 1);
-    const potentialPayout = Math.floor(amount * combinedOdds);
+    // 4) Compute enhanced combined odds with exciting bonuses!
+    const oddsCalculation = this.calculateEnhancedParlayOdds(validLegs.map(o => o.odds));
+    const potentialPayout = Math.floor(amount * oddsCalculation.finalOdds);
 
     // 5) Persist via repository
     const parlay = await this.repo.placeParlay(
@@ -150,7 +184,13 @@ export class BettingService {
       legsPayload.map((leg) => redisClient.publish('parlay:place', JSON.stringify(leg))),
     );
 
-    // 8) Publish normalized parlay activity event
+    // 8) Recalculate odds for all affected predictions (make markets alive!)
+    const affectedPredictions = Array.from(new Set(validLegs.map(leg => leg.prediction.id)));
+    await Promise.all(
+      affectedPredictions.map(predId => this.recalculateOdds(predId))
+    );
+
+    // 9) Publish normalized parlay activity event with final odds
     await normalizedActivityService.createParlayStartedEvent(
       {
         id: user.id,
@@ -160,8 +200,8 @@ export class BettingService {
       {
         amount,
         parlayId: parlay.id,
-        legCount: validLegs.length,
-        combinedOdds,
+        legCount: oddsCalculation.legCount,
+        combinedOdds: oddsCalculation.finalOdds,
       }
     );
 
@@ -169,10 +209,16 @@ export class BettingService {
   }
 
   /**
-   * Trigger odds recalculation (no real‑time event needed here yet).
+   * Trigger odds recalculation and broadcast live updates.
    */
   async recalculateOdds(predictionId: number): Promise<void> {
-    return this.repo.recalculateOdds(predictionId);
+    await this.repo.recalculateOdds(predictionId);
+    
+    // 🚀 Broadcast live odds update to all clients
+    await redisClient.publish('odds:update', JSON.stringify({
+      predictionId,
+      timestamp: new Date().toISOString()
+    }));
   }
 }
 

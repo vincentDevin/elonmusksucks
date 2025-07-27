@@ -28,11 +28,15 @@ export default function CreatePredictionForm({ onCreated, onCancel }: CreatePred
   const isOU = type === PredictionType.OVER_UNDER;
   const isMultiple = type === PredictionType.MULTIPLE;
 
+  // Validate that expiration date is in the future
+  const isExpirationValid = expiresAt && new Date(expiresAt) > new Date();
+  
   const canSubmit =
     Boolean(title) &&
     Boolean(description) &&
     Boolean(category) &&
     Boolean(expiresAt) &&
+    isExpirationValid &&
     ((isMultiple && options.every((o) => o.trim().length > 0)) ||
       isBinary ||
       (isOU && threshold !== ''));
@@ -117,8 +121,11 @@ export default function CreatePredictionForm({ onCreated, onCancel }: CreatePred
             type="date"
             value={expiresAt}
             onChange={(e) => setExpiresAt(e.target.value)}
-            className={inputBase}
+            className={`${inputBase} ${expiresAt && !isExpirationValid ? 'border-red-500 focus:ring-red-500' : ''}`}
           />
+          {expiresAt && !isExpirationValid && (
+            <p className="text-red-500 text-xs mt-1">Expiration date must be in the future</p>
+          )}
         </div>
 
         <div>

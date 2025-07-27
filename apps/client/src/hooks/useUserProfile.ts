@@ -49,7 +49,7 @@ export function useUserProfile(userId?: number | null): UseUserProfileResult {
   const [stats, setStats] = useState<UserStatsDTO | null>(null);
 
   // --- Fetch Handlers ---
-  const fetchProfile = useCallback(async () => {
+  const fetchProfile = useCallback(async (retryCount = 0) => {
     if (userId == null) {
       setProfile(null);
       setFormData({
@@ -71,14 +71,20 @@ export function useUserProfile(userId?: number | null): UseUserProfileResult {
     setLoading(true);
     setError(null);
     try {
-      // Fetch all user info in parallel
+      // Fetch all user info in parallel with individual error handling
       const [profileData, feedData, activityData, statsData] = await Promise.all([
         getUserProfile(userId),
-        getUserFeed(userId),
-        getUserActivity(userId),
+        getUserFeed(userId).catch((err) => {
+          console.warn('Failed to load user feed:', err);
+          return []; // Return empty array on feed error
+        }),
+        getUserActivity(userId).catch((err) => {
+          console.warn('Failed to load user activity:', err);
+          return []; // Return empty array on activity error
+        }),
         getUserStats(userId).catch((err) => {
           if (err?.response?.status === 404) {
-            // Provide empty stats fallback
+            // Provide empty stats fallback for 404
             return {
               totalBets: 0,
               betsWon: 0,
@@ -100,7 +106,8 @@ export function useUserProfile(userId?: number | null): UseUserProfileResult {
               updatedAt: new Date().toISOString(),
             };
           }
-          throw err;
+          console.warn('Failed to load user stats:', err);
+          return null; // Return null on other stats errors
         }),
       ]);
 
@@ -120,7 +127,23 @@ export function useUserProfile(userId?: number | null): UseUserProfileResult {
         profileComplete: profileData.profileComplete,
       });
     } catch (err: any) {
-      setError(err?.message ?? err?.toString() ?? 'Failed to load user');
+      // If it's an auth error and we haven't retried yet, try once more
+      if (err?.response?.status === 401 && retryCount === 0) {
+        console.log('Authentication error on profile load, retrying...');
+        // Wait a brief moment for token refresh to complete
+        setTimeout(() => fetchProfile(1), 100);
+        return;
+      }
+      
+      const errorMessage = err?.response?.status === 401 
+        ? 'Authentication required. Please log in again.'
+        : err?.response?.status === 403
+        ? 'You do not have permission to view this profile.'
+        : err?.response?.status === 404
+        ? 'User profile not found.'
+        : err?.message ?? err?.toString() ?? 'Failed to load user profile';
+        
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -150,7 +173,12 @@ export function useUserProfile(userId?: number | null): UseUserProfileResult {
         profileComplete: updated.profileComplete,
       });
     } catch (err: any) {
-      setError(err?.message ?? err?.toString() ?? 'Failed to save profile');
+      const errorMessage = err?.response?.status === 401 
+        ? 'Authentication required. Please log in again.'
+        : err?.response?.status === 403
+        ? 'You do not have permission to update this profile.'
+        : err?.message ?? err?.toString() ?? 'Failed to save profile';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -164,7 +192,12 @@ export function useUserProfile(userId?: number | null): UseUserProfileResult {
       await createUserPost(userId, payload);
       await fetchProfile(); // Re-fetch feed
     } catch (err: any) {
-      setError(err?.message ?? err?.toString() ?? 'Failed to post');
+      const errorMessage = err?.response?.status === 401 
+        ? 'Authentication required. Please log in again.'
+        : err?.response?.status === 403
+        ? 'You do not have permission to post to this profile.'
+        : err?.message ?? err?.toString() ?? 'Failed to create post';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
