@@ -63,17 +63,23 @@ export class BettingService {
     const user = await this.repo.findUserById(userId);
     if (!user || user.muskBucks < amount) throw new Error('INSUFFICIENT_FUNDS');
 
-    // 3) Compute odds and payout
-    const oddsAtPlacement = opt.odds;
-    const potentialPayout = Math.floor(amount * oddsAtPlacement);
+    // 3) Apply ALL-IN multiplier if user is betting their entire balance
+    let finalOdds = opt.odds;
+    let allInBonus = 1.0;
+    if (amount >= user.muskBucks * 0.95) { // 95%+ of balance = ALL-IN
+      allInBonus = 2.5; // 🚀 MASSIVE 150% ALL-IN BONUS!
+      finalOdds = opt.odds * allInBonus;
+    }
+    
+    const potentialPayout = Math.floor(amount * finalOdds);
 
-    // 4) Persist via repository
+    // 4) Persist via repository with enhanced odds
     const bet = await this.repo.placeBet(
       userId,
       opt.prediction.id,
       optionId,
       amount,
-      oddsAtPlacement,
+      finalOdds, // Use enhanced odds instead of old odds
       potentialPayout,
     );
 
@@ -97,7 +103,7 @@ export class BettingService {
     // 7) Publish real‑time event (present‑tense channel) - legacy format
     await redisClient.publish('bet:place', JSON.stringify(betWithUser));
 
-    // 8) Recalculate odds for this prediction (make market alive!)
+    // 8) Recalculate odds after bet is placed (for next bets)
     await this.recalculateOdds(opt.prediction.id);
 
     // 9) Publish normalized activity event
@@ -113,7 +119,7 @@ export class BettingService {
         predictionTitle: opt.prediction.title,
         optionLabel: opt.label,
         category: opt.prediction.category,
-        odds: oddsAtPlacement,
+        odds: finalOdds,
       }
     );
 
@@ -209,16 +215,45 @@ export class BettingService {
   }
 
   /**
-   * Trigger odds recalculation and broadcast live updates.
+   * Trigger odds recalculation and broadcast enhanced live updates.
    */
   async recalculateOdds(predictionId: number): Promise<void> {
+    // Get odds before recalculation
+    const beforeOdds = await this.repo.getPredictionOptions(predictionId);
+    
+    // Perform recalculation with new exciting factors
     await this.repo.recalculateOdds(predictionId);
     
-    // 🚀 Broadcast live odds update to all clients
-    await redisClient.publish('odds:update', JSON.stringify({
+    // Get odds after recalculation  
+    const afterOdds = await this.repo.getPredictionOptions(predictionId);
+    
+    // Calculate which options had significant changes
+    const significantChanges = afterOdds.filter((after, index) => {
+      const before = beforeOdds[index];
+      if (!before) return false;
+      const change = Math.abs(after.odds - before.odds) / before.odds;
+      return change > 0.1; // 10%+ change is significant
+    });
+
+    // 🔥 Broadcast enhanced odds update with excitement data
+    await redisClient.publish('odds:update:enhanced', JSON.stringify({
       predictionId,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      significantChanges: significantChanges.length,
+      hotMarket: significantChanges.length >= 2, // Multiple options changed significantly
+      options: afterOdds.map((option, index) => {
+        const before = beforeOdds[index];
+        return {
+          id: option.id,
+          label: option.label,
+          odds: option.odds,
+          previousOdds: before?.odds || option.odds,
+          change: before ? (option.odds - before.odds) : 0,
+          changePercent: before ? ((option.odds - before.odds) / before.odds) * 100 : 0
+        };
+      })
     }));
+
   }
 }
 

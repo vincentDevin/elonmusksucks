@@ -90,26 +90,41 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
       );
     };
 
-    // 🚀 NEW: Live odds updates when markets move!
-    const onOddsUpdate = (data: { predictionId: number; timestamp: string }) => {
-      // Refresh the specific prediction to get latest odds
-      console.log('🔥 Odds updated for prediction:', data.predictionId);
-      // For now, we'll rely on the refresh from bet/parlay events
-      // In future, could fetch just this prediction's latest odds
+    // 🎮 Enhanced odds updates with excitement data
+    const onEnhancedOddsUpdate = (data: {
+      predictionId: number;
+      hotMarket: boolean;
+      options: Array<{ id: number; odds: number; label: string; change: number; changePercent: number }>;
+    }) => {
+      console.log('🎯 Enhanced odds updated for prediction:', data.predictionId, data);
+
+      // Update the specific prediction with new odds and market status
+      setPredictions((prev) =>
+        prev.map((p) => {
+          if (p.id === data.predictionId) {
+            const updatedOptions = p.options.map((option) => {
+              const updatedOption = data.options.find((opt) => opt.id === option.id);
+              return updatedOption ? { ...option, odds: updatedOption.odds } : option;
+            });
+            return { ...p, options: updatedOptions, hotMarket: data.hotMarket };
+          }
+          return p;
+        }),
+      );
     };
 
     socket.on('predictionCreated', onCreated);
     socket.on('predictionResolved', onResolved);
     socket.on('betPlaced', onBet);
     socket.on('parlayPlaced', onParlay);
-    socket.on('oddsUpdated', onOddsUpdate);
+    socket.on('oddsUpdatedEnhanced', onEnhancedOddsUpdate);
 
     return () => {
       socket.off('predictionCreated', onCreated);
       socket.off('predictionResolved', onResolved);
       socket.off('betPlaced', onBet);
       socket.off('parlayPlaced', onParlay);
-      socket.off('oddsUpdated', onOddsUpdate);
+      socket.off('oddsUpdatedEnhanced', onEnhancedOddsUpdate);
     };
   }, [socket]);
 

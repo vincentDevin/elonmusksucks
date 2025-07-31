@@ -1,13 +1,14 @@
 // apps/client/src/components/NavBar.tsx
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { FaSun, FaMoon } from 'react-icons/fa';
+import { FaSun, FaMoon, FaBars, FaTimes } from 'react-icons/fa';
 import { useAuth } from '../hooks/useAuth';
 import { useThemeContext } from '../contexts/ThemeContext';
 
 export default function NavBar() {
   const { accessToken, logout, user } = useAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { theme, toggleTheme } = useThemeContext();
   const navigate = useNavigate();
   const loc = useLocation();
@@ -19,7 +20,12 @@ export default function NavBar() {
 
   const linkClasses = (path: string) =>
     `px-3 py-2 rounded ${
-      loc.pathname === path ? 'bg-blue-600 text-white' : 'hover:bg-muted transition-colors'
+      loc.pathname === path ? 'bg-primary text-surface' : 'hover:bg-muted transition-colors'
+    }`;
+
+  const mobileLinkClasses = (path: string) =>
+    `block px-4 py-3 rounded-lg ${
+      loc.pathname === path ? 'bg-primary text-surface' : 'hover:bg-muted transition-colors'
     }`;
 
   return (
@@ -29,7 +35,8 @@ export default function NavBar() {
           🚀 ElonMuskSucks
         </Link>
 
-        <nav className="flex items-center space-x-2">
+        {/* Desktop Navigation */}
+        <nav className="hidden md:flex items-center space-x-2">
           {accessToken ? (
             user ? (
               <>
@@ -48,7 +55,7 @@ export default function NavBar() {
                     className="flex items-center space-x-3 px-3 py-2 rounded hover:bg-muted transition-colors"
                   >
                     <span className="font-medium">{user.name}</span>
-                    <div className="flex items-center space-x-1 bg-gradient-to-r from-yellow-400 to-yellow-600 text-black px-2 py-1 rounded-full text-xs font-semibold shadow-sm">
+                    <div className="flex items-center space-x-1 bg-warning text-surface px-2 py-1 rounded-full text-xs font-semibold shadow-sm">
                       <span>{user.muskBucks.toLocaleString()}</span>
                       <span>🪙</span>
                     </div>
@@ -88,7 +95,7 @@ export default function NavBar() {
                           onClick={handleLogout}
                           className="
                             w-full text-left px-3 py-2 rounded
-                            hover:bg-red-600 hover:text-white
+                            hover:bg-error hover:text-surface
                             transition-colors
                           "
                         >
@@ -124,7 +131,118 @@ export default function NavBar() {
             <span className="sr-only">{theme === 'light' ? 'Dark mode' : 'Light mode'}</span>
           </button>
         </nav>
+
+        {/* Mobile Controls */}
+        <div className="md:hidden flex items-center space-x-2">
+          <button
+            onClick={toggleTheme}
+            aria-label={theme === 'light' ? 'Activate dark mode' : 'Activate light mode'}
+            className="p-2 rounded hover:bg-muted transition-colors"
+          >
+            <span className="text-lg">{theme === 'light' ? <FaMoon /> : <FaSun />}</span>
+          </button>
+          
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label="Toggle mobile menu"
+            className="p-2 rounded hover:bg-muted transition-colors"
+          >
+            {mobileMenuOpen ? <FaTimes className="text-lg" /> : <FaBars className="text-lg" />}
+          </button>
+        </div>
       </div>
+
+      {/* Mobile Menu Overlay */}
+      {mobileMenuOpen && (
+        <div className="md:hidden absolute top-full left-0 right-0 bg-surface border-b border-muted shadow-lg">
+          <div className="container mx-auto p-4 space-y-2">
+            {accessToken ? (
+              user ? (
+                <>
+                  <Link 
+                    to="/dashboard" 
+                    className={mobileLinkClasses('/dashboard')}
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Dashboard
+                  </Link>
+                  <Link 
+                    to="/predictions" 
+                    className={mobileLinkClasses('/predictions')}
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Predictions
+                  </Link>
+                  <Link 
+                    to="/leaderboard" 
+                    className={mobileLinkClasses('/leaderboard')}
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Leaderboard
+                  </Link>
+                  
+                  <div className="border-t border-muted pt-2 mt-2">
+                    <div className="flex items-center space-x-3 px-4 py-3">
+                      <span className="font-medium">{user.name}</span>
+                      <div className="flex items-center space-x-1 bg-warning text-surface px-2 py-1 rounded-full text-xs font-semibold shadow-sm">
+                        <span>{user.muskBucks.toLocaleString()}</span>
+                        <span>🪙</span>
+                      </div>
+                    </div>
+                    
+                    {user.role === 'ADMIN' && (
+                      <Link
+                        to="/admin"
+                        className={mobileLinkClasses('/admin')}
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        Admin
+                      </Link>
+                    )}
+                    
+                    <Link
+                      to={`/profile/${user.id}`}
+                      className={mobileLinkClasses(`/profile/${user.id}`)}
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      Profile
+                    </Link>
+                    
+                    <button
+                      onClick={() => {
+                        handleLogout();
+                        setMobileMenuOpen(false);
+                      }}
+                      className="w-full text-left px-4 py-3 rounded-lg hover:bg-error hover:text-surface transition-colors"
+                    >
+                      Logout
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="px-4 py-3 text-tertiary">Loading...</div>
+              )
+            ) : (
+              <>
+                <Link 
+                  to="/login" 
+                  className={mobileLinkClasses('/login')}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Login
+                </Link>
+                <Link 
+                  to="/register" 
+                  className={mobileLinkClasses('/register')}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Register
+                </Link>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </header>
   );
 }

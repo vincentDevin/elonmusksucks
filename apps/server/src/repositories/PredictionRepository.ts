@@ -48,7 +48,7 @@ export class PredictionRepository implements IPredictionRepository {
         creatorId: data.creatorId,
         type: data.type,
         threshold: data.threshold,
-        options: { create: data.options.map((o) => ({ label: o.label, odds: 1.0 })) },
+        options: { create: data.options.map((o) => ({ label: o.label, odds: 2.0 })) },
       },
       include: {
         options: {

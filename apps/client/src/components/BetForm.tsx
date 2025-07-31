@@ -122,10 +122,10 @@ export default function BetForm({ prediction, addOptimisticBet, onPlaced }: BetF
             Balance: <span className="font-semibold">{balance.toLocaleString()} 🪙</span>
           </p>
           <div className={`px-2 py-1 rounded-full text-xs font-semibold ${
-            betCalculations.riskLevel === 'YOLO 🚀' ? 'bg-red-100 text-red-800' :
-            betCalculations.riskLevel === 'Aggressive' ? 'bg-orange-100 text-orange-800' :
-            betCalculations.riskLevel === 'Moderate' ? 'bg-yellow-100 text-yellow-800' :
-            'bg-green-100 text-green-800'
+            betCalculations.riskLevel === 'YOLO 🚀' ? 'bg-red-600/20 text-red-600' :
+            betCalculations.riskLevel === 'Aggressive' ? 'bg-orange-600/20 text-orange-600' :
+            betCalculations.riskLevel === 'Moderate' ? 'bg-yellow-600/20 text-yellow-600' :
+            'bg-green-600/20 text-green-600'
           }`}>
             {betCalculations.riskLevel}
           </div>
@@ -176,7 +176,7 @@ export default function BetForm({ prediction, addOptimisticBet, onPlaced }: BetF
             </div>
             <div className="flex justify-between text-sm">
               <span>Profit:</span>
-              <span className={`font-semibold ${betCalculations.profit > 0 ? 'text-green-600' : 'text-gray-500'}`}>
+              <span className={`font-semibold ${betCalculations.profit > 0 ? 'text-green-600' : 'text-tertiary'}`}>
                 +{betCalculations.profit.toLocaleString()} 🪙
               </span>
             </div>
@@ -188,7 +188,7 @@ export default function BetForm({ prediction, addOptimisticBet, onPlaced }: BetF
           </div>
         )}
 
-        {err && <p className="text-xs text-red-500 bg-red-50 p-2 rounded">{err}</p>}
+        {err && <p className="text-xs text-red-600 bg-red-600/10 p-2 rounded">{err}</p>}
 
         <div className="flex justify-end space-x-3">
           <button
@@ -205,10 +205,10 @@ export default function BetForm({ prediction, addOptimisticBet, onPlaced }: BetF
             disabled={placing || amount <= 0 || amount > balance}
             className={`px-6 py-2 rounded-lg font-bold transition-all duration-200 disabled:opacity-50 ${
               betCalculations.riskLevel === 'YOLO 🚀' 
-                ? 'bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg hover:shadow-xl'
+                ? 'bg-gradient-to-r from-red-600 to-red-700 text-white shadow-lg hover:shadow-xl'
                 : betCalculations.riskLevel === 'Aggressive'
-                ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg hover:shadow-xl'
-                : 'bg-primary text-surface hover:opacity-90'
+                ? 'bg-gradient-to-r from-orange-600 to-orange-700 text-white shadow-lg hover:shadow-xl'
+                : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg hover:shadow-xl'
             }`}
           >
             {placing ? (
@@ -235,8 +235,8 @@ export default function BetForm({ prediction, addOptimisticBet, onPlaced }: BetF
       disabled={placing}
       className={`px-6 py-2 rounded-lg font-bold shadow cursor-pointer transition-all duration-200 inline-block ${
         placing 
-          ? 'opacity-50 cursor-not-allowed bg-gray-400' 
-          : 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 hover:scale-105 text-white shadow-lg hover:shadow-xl'
+          ? 'opacity-50 cursor-not-allowed bg-accent' 
+          : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 hover:scale-105 text-white shadow-lg hover:shadow-xl'
       }`}
     >
       <span className="flex items-center space-x-2">

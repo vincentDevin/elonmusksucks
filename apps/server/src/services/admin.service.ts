@@ -32,7 +32,23 @@ export const setPredictionStatus = async (
   predictionId: number,
   status: 'approved' | 'rejected',
 ) => {
-  return repo.updatePredictionStatus(predictionId, status);
+  const updated = await repo.updatePredictionStatus(predictionId, status);
+  
+  // 🎊 Broadcast prediction approval/rejection event
+  if (status === 'approved') {
+    const redisClient = require('../lib/redis').default;
+    await redisClient.publish('prediction:create', JSON.stringify({
+      id: updated.id,
+      title: updated.title,
+      description: updated.description,
+      category: updated.category,
+      type: updated.type,
+      approved: true,
+      timestamp: new Date().toISOString()
+    }));
+  }
+  
+  return updated;
 };
 
 // -- Bet & Transaction Oversight --

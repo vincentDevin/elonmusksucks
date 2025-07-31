@@ -51,4 +51,9 @@ export interface IBettingRepository {
    * Recalculate odds for a resolved prediction.
    */
   recalculateOdds(predictionId: number): Promise<void>;
+
+  /**
+   * Get current prediction options for odds comparison.
+   */
+  getPredictionOptions(predictionId: number): Promise<Array<{ id: number; label: string; odds: number }>>;
 }

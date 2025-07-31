@@ -1,6 +1,6 @@
 // apps/client/src/components/dashboard/PredictionsPanel.tsx
 import { usePredictionMarket } from '../../contexts/PredictionContext';
-import PredictionCard from '../PredictionCard'; // thin wrapper around your existing <li> markup
+import CompactPredictionCard from '../CompactPredictionCard';
 
 export default function PredictionsPanel() {
   const { predictions, loading, error } = usePredictionMarket();
@@ -27,11 +27,11 @@ export default function PredictionsPanel() {
             <p>No open predictions available</p>
           </div>
         ) : (
-          <ul className="space-y-4 pr-2">
+          <div className="space-y-4 pr-2">
             {openPredictions.map((p) => (
-              <PredictionCard key={p.id} prediction={p} />
+              <CompactPredictionCard key={p.id} prediction={p} />
             ))}
-          </ul>
+          </div>
         )}
       </div>
     </section>

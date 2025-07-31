@@ -1,4 +1,4 @@
-// apps/client/src/components/dashboard/PredictionCard.tsx
+// apps/client/src/components/PredictionCard.tsx
 import { useState } from 'react';
 import type {
   PublicPredictionOption,
@@ -9,10 +9,9 @@ import type {
 import type { PredictionFull } from '../api/predictions';
 import OddsBar from './OddsBar';
 import BetsList from './BetsList';
-import BetForm from './BetForm';
-import { useParlay } from '../contexts/ParlayContext';
+import BetModal from './BetModal';
 
-/** Slimmed-down card used inside the dashboard predictions feed */
+/** Enhanced card for the main Predictions page */
 interface Props {
   prediction: PredictionFull;
   /** Optional callback when a bet/parlay leg is placed (for optimistic UI) */
@@ -20,80 +19,103 @@ interface Props {
 }
 
 export default function PredictionCard({ prediction, addOptimisticBet }: Props) {
-  const { dispatch: parlayDispatch } = useParlay();
-  const [parlaySel, setParlaySel] = useState(
-    prediction.options.length ? prediction.options[0].id : 0,
-  );
-  const [addingToParlay, setAddingToParlay] = useState<number | null>(null);
+  const [showBetModal, setShowBetModal] = useState(false);
 
   const flatParlays: ParlayLegWithUser[] = prediction.parlayLegs ?? [];
 
   const now = Date.now();
   const expires = new Date(prediction.expiresAt).getTime();
-  let badgeColor = '';
-  let badgeText = '';
-  if (prediction.resolved) {
-    badgeColor = 'bg-gray-400';
-    badgeText = 'Resolved';
-  } else if (now > expires) {
-    badgeColor = 'bg-red-500';
-    badgeText = 'Expired';
-  } else {
-    badgeColor = 'bg-blue-500';
-    badgeText = 'Open';
-  }
-
-  // 🚀 Enhanced parlay leg addition with feedback
-  const handleAddToParlay = (optionId: number) => {
-    setAddingToParlay(optionId);
-    
-    const selectedOption = prediction.options.find(opt => opt.id === optionId);
-    parlayDispatch({
-      type: 'ADD_LEG',
-      leg: { 
-        predictionId: prediction.id, 
-        optionId, 
-        label: selectedOption?.label || 'Unknown Option'
-      },
-    });
-
-    // Visual feedback
-    setTimeout(() => setAddingToParlay(null), 800);
+  const timeLeft = expires - now;
+  const hoursLeft = Math.ceil(timeLeft / (1000 * 60 * 60));
+  
+  // Enhanced status logic using theme tokens
+  const getStatusBadge = () => {
+    if (prediction.resolved) {
+      return { color: 'bg-accent', text: 'Resolved', icon: '✅' };
+    } else if (now > expires) {
+      return { color: 'bg-error', text: 'Expired', icon: '⏰' };
+    } else if (hoursLeft <= 2) {
+      return { color: 'bg-warning', text: 'Ending Soon', icon: '🔥' };
+    } else if (hoursLeft <= 24) {
+      return { color: 'bg-info', text: 'Final Day', icon: '⚡' };
+    } else {
+      return { color: 'bg-success', text: 'Open', icon: '🟢' };
+    }
   };
+  
+  const statusBadge = getStatusBadge();
+
+  // Calculate engagement metrics
+  const totalBets = prediction.bets.length + flatParlays.length;
+  const totalVolume = prediction.bets.reduce((sum, bet) => sum + bet.amount, 0) + 
+                      flatParlays.reduce((sum, leg) => sum + leg.stake, 0);
+  const recentActivity = prediction.bets.filter(bet => 
+    new Date(bet.createdAt).getTime() > Date.now() - 30 * 60 * 1000
+  ).length;
 
   return (
     <li className="relative bg-surface border border-muted p-5 rounded-2xl shadow hover:shadow-lg transition">
-      <span
-        className={`absolute top-4 right-4 px-3 py-1 rounded-full text-xs font-medium text-white ${badgeColor}`}
-      >
-        {badgeText}
-      </span>
+      {/* Enhanced Status Badge */}
+      <div className="absolute top-4 right-4 flex items-center gap-2">
+        <span className={`px-3 py-1 rounded-full text-xs font-medium text-surface ${statusBadge.color} flex items-center gap-1`}>
+          <span>{statusBadge.icon}</span>
+          {statusBadge.text}
+        </span>
+        {recentActivity > 0 && (
+          <span className="px-2 py-1 bg-secondary text-primary text-xs rounded-full font-semibold animate-pulse">
+            🔥 Hot
+          </span>
+        )}
+      </div>
 
-      {/* Title */}
-      <h3 className="text-lg font-semibold mb-1">{prediction.title}</h3>
+      {/* Title */}
+      <h3 className="text-xl font-bold mb-2 text-content pr-24">{prediction.title}</h3>
+      
+      {/* Engagement metrics */}
+      <div className="flex items-center gap-4 text-sm text-tertiary mb-3">
+        <span className="flex items-center gap-1">
+          <span className="text-primary">📊</span>
+          {totalBets} bets
+        </span>
+        {totalVolume > 0 && (
+          <span className="flex items-center gap-1">
+            <span className="text-primary">💰</span>
+            ${totalVolume.toLocaleString()} volume
+          </span>
+        )}
+        <span className="flex items-center gap-1">
+          <span className="text-primary">📈</span>
+          {flatParlays.length} parlays
+        </span>
+      </div>
 
-      {/* Mini meta line */}
+      {/* Mini meta line */}
       {!prediction.resolved && (
-        <p
-          className={`text-xs font-medium mb-3 ${
-            now > expires ? 'text-red-600' : 'text-green-600'
-          }`}
-        >
-          {now > expires
-            ? `Expired ${new Date(prediction.expiresAt).toLocaleString()}`
-            : `Expires ${new Date(prediction.expiresAt).toLocaleString()}`}
-        </p>
+        <div className={`text-sm font-medium flex items-center gap-2 mb-4 ${
+          now > expires ? 'text-error' : hoursLeft <= 2 ? 'text-warning' : hoursLeft <= 24 ? 'text-info' : 'text-success'
+        }`}>
+          <span>{statusBadge.icon}</span>
+          {now > expires ? (
+            `Expired ${new Date(prediction.expiresAt).toLocaleString()}`
+          ) : hoursLeft <= 24 ? (
+            `${hoursLeft}h ${Math.ceil((timeLeft % (1000 * 60 * 60)) / (1000 * 60))}m remaining`
+          ) : (
+            `Expires ${new Date(prediction.expiresAt).toLocaleString()}`
+          )}
+        </div>
       )}
 
-      {/* Odds visual */}
+      {/* Odds visual */}
       <OddsBar
         type={prediction.type as PredictionType}
         options={prediction.options as PublicPredictionOption[]}
         bets={prediction.bets}
         parlayLegs={flatParlays}
+        predictionId={prediction.id}
+        expiresAt={prediction.expiresAt}
       />
 
-      {/* Recent bets */}
+      {/* Recent bets */}
       {(prediction.bets.length > 0 || flatParlays.length > 0) && (
         <BetsList
           type={prediction.type as PredictionType}
@@ -103,48 +125,35 @@ export default function PredictionCard({ prediction, addOptimisticBet }: Props) 
         />
       )}
 
-      {/* Actions */}
+      {/* Enhanced Betting Action */}
       {!prediction.resolved && (
-        <div className="mt-4 flex flex-wrap gap-3 items-center">
-          {/* Bet form (collapsible) */}
-          <BetForm prediction={prediction} addOptimisticBet={addOptimisticBet ?? (() => {})} />
-
-          {/* Parlay selector */}
-          <select
-            value={parlaySel}
-            onChange={(e) => setParlaySel(Number(e.target.value))}
-            className="border border-muted p-2 rounded-lg bg-background"
-          >
-            {prediction.options.map((opt) => (
-              <option key={opt.id} value={opt.id}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-
+        <div className="mt-4">
           <button
-            onClick={() => handleAddToParlay(parlaySel)}
-            disabled={addingToParlay === parlaySel}
-            className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-              addingToParlay === parlaySel
-                ? 'bg-green-500 text-white scale-110'
-                : 'bg-yellow-500 hover:bg-yellow-600 text-white hover:scale-105'
-            }`}
+            onClick={() => setShowBetModal(true)}
+            className="w-full py-3 px-6 bg-info hover:bg-info/90 text-surface font-bold rounded-lg transition-all duration-200 hover:scale-105 shadow-lg hover:shadow-xl"
           >
-            {addingToParlay === parlaySel ? (
-              <span className="flex items-center space-x-1">
-                <span>✅</span>
-                <span>Added to Parlay!</span>
-              </span>
-            ) : (
-              <span className="flex items-center space-x-1">
-                <span>📈</span>
-                <span>Add to Parlay</span>
-              </span>
-            )}
+            <span className="flex items-center justify-center space-x-2">
+              <span>🎯</span>
+              <span>Place Your Bet</span>
+              <span>💰</span>
+            </span>
           </button>
+          
+          {/* Helpful tip */}
+          <div className="mt-2 text-xs text-tertiary text-center">
+            💡 Use the dashboard parlay builder for multi-prediction bets
+          </div>
         </div>
       )}
+
+      {/* Enhanced Bet Modal */}
+      <BetModal
+        prediction={prediction}
+        isOpen={showBetModal}
+        onClose={() => setShowBetModal(false)}
+        mode="full"
+        onBetPlaced={addOptimisticBet}
+      />
     </li>
   );
 }

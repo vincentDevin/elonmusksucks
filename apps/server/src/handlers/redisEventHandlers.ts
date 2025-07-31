@@ -10,7 +10,7 @@ export type RedisChannel =
   | 'prediction:resolve'
   | 'bet:place'
   | 'parlay:place'
-  | 'odds:update'
+  | 'odds:update:enhanced'
   | 'leaderboard:allTime'
   | 'leaderboard:daily'
   | 'activity:newsflash'
@@ -46,8 +46,8 @@ export function registerRedisEventHandlers(io: Server, eventSub: any) {
       case 'parlay:place':
         io.emit('parlayPlaced', payload);
         break;
-      case 'odds:update':
-        io.emit('oddsUpdated', payload);
+      case 'odds:update:enhanced':
+        io.emit('oddsUpdatedEnhanced', payload);
         break;
       case 'leaderboard:allTime':
         io.emit('leaderboardAllTime', payload);

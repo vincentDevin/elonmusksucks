@@ -22,16 +22,16 @@ export default function Dashboard() {
       >
       {/* LEFT column – scrollable main feed */}
         <div className="space-y-8 overflow-y-auto scrollbar-thin scrollbar-track-secondary/20 scrollbar-thumb-primary/40 hover:scrollbar-thumb-primary/60 pr-2">
-        <PredictionsPanel />
         <MyStuffPanel />
+        <PredictionsPanel />
         </div>
 
       {/* RIGHT column – sticky on desktop */}
         <aside className="lg:sticky lg:top-0 space-y-8 overflow-y-auto scrollbar-thin scrollbar-track-secondary/20 scrollbar-thumb-primary/40 hover:scrollbar-thumb-primary/60 pr-2">
-        <ParlayPanel />
         <Suspense fallback={null}>
           <ChatPanel />
         </Suspense>
+        <ParlayPanel />
         </aside>
       </div>
     </div>
