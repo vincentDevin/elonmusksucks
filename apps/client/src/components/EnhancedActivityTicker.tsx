@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useRef, useEffect } from 'react';
+import { useMemo, useState, useRef, useEffect } from 'react';
 import { useNormalizedActivityTicker } from '../hooks/useNormalizedActivityTicker';
 import type { NormalizedActivityEvent, ActivityEventType } from '@ems/types';
 
@@ -143,11 +143,11 @@ export default function EnhancedActivityTicker({
   const { items, loading, error, refresh } = useNormalizedActivityTicker(maxItems);
   const [isPaused, setIsPaused] = useState(false);
   const [typeFilter, setTypeFilter] = useState<ActivityEventType | 'all'>('all');
-  const [scrollPosition, setScrollPosition] = useState(0);
+  // const [scrollPosition, setScrollPosition] = useState(0);
   const [isUserScrolling, setIsUserScrolling] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  const userScrollTimeoutRef = useRef<NodeJS.Timeout>();
+  const userScrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Filter and format items
   const processedItems = useMemo(() => {

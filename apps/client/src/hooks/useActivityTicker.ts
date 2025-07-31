@@ -6,7 +6,7 @@ export function useActivityTicker(limit = 20) {
   const socket = useSocket();
   const [items, setItems] = useState<UserActivity[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+  const [error] = useState<Error | null>(null);
 
   useEffect(() => {
     const requestTicker = () => socket.emit('activity:ticker', limit);

@@ -40,14 +40,21 @@ export class PrismaAuthRepository implements IAuthRepository {
   }
 
   // --- Refresh tokens ---
-  async saveRefreshToken(userId: number, token: string, expiresAt: Date): Promise<void> {
+  async saveRefreshToken(userId: number, hashedToken: string, expiresAt: Date): Promise<void> {
     // Remove any existing tokens for this user
     await prisma.refreshToken.deleteMany({ where: { userId } });
-    // Create the new token
-    await prisma.refreshToken.create({ data: { userId, token, expiresAt } });
+    // Create the new token (now storing hashed version)
+    await prisma.refreshToken.create({ data: { userId, token: hashedToken, expiresAt } });
+  }
+
+  async getAllRefreshTokensForUser(userId: number): Promise<RefreshToken[]> {
+    return prisma.refreshToken.findMany({ 
+      where: { userId, expiresAt: { gt: new Date() } } 
+    });
   }
 
   async getRefreshToken(token: string): Promise<RefreshToken | null> {
+    // This method is now deprecated - use getAllRefreshTokensForUser and compare hashes
     const record = await prisma.refreshToken.findUnique({ where: { token } });
     if (record && record.expiresAt < new Date()) {
       await this.deleteRefreshToken(record.token);

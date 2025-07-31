@@ -394,6 +394,19 @@ export type CreateActivityEvent = Omit<NormalizedActivityEvent, 'id' | 'timestam
   timestamp?: string;
 };
 
+// ——— Moderation Types ——————————————————————————————————————————————
+export enum BanType {
+  TEMPORARY = 'TEMPORARY',
+  PERMANENT = 'PERMANENT'
+}
+
+// ——— Prediction Full Type (Extended) ——————————————————————————————————————————————
+export interface PredictionFull extends PublicPrediction {
+  options: PublicPredictionOption[];
+  bets: BetWithUser[];
+  parlayLegs?: ParlayLegWithUser[];
+}
+
 // ——— Admin DTOs ——————————————————————————————————————————————
 export interface AdminBet extends PublicBet {
   userName:   string;

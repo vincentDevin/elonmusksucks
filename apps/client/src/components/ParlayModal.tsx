@@ -27,7 +27,7 @@ export default function ParlayModal({ isOpen, onClose }: ParlayModalProps) {
   const findPrediction = (predId: number) => predictions.find((p) => p.id === predId);
 
   const findOption = (predId: number, optId: number): PublicPredictionOption | undefined =>
-    findPrediction(predId)?.options.find((o) => o.id === optId);
+    findPrediction(predId)?.options.find((o: any) => o.id === optId);
 
   /* ---------- Enhanced parlay calculations ---------- */
   const parlayCalculations = useMemo(() => {

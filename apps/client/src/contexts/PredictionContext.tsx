@@ -102,8 +102,8 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
       setPredictions((prev) =>
         prev.map((p) => {
           if (p.id === data.predictionId) {
-            const updatedOptions = p.options.map((option) => {
-              const updatedOption = data.options.find((opt) => opt.id === option.id);
+            const updatedOptions = p.options.map((option: any) => {
+              const updatedOption = data.options.find((opt: any) => opt.id === option.id);
               return updatedOption ? { ...option, odds: updatedOption.odds } : option;
             });
             return { ...p, options: updatedOptions, hotMarket: data.hotMarket };

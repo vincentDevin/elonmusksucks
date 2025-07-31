@@ -7,7 +7,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { usePredictionMarket } from '../contexts/PredictionContext';
 import { useAuth } from '../contexts/AuthContext';
-import type { PublicPredictionOption, BetWithUser, PredictionFull } from '@ems/types';
+import type { BetWithUser, PredictionFull } from '@ems/types';
 
 interface BetModalProps {
   prediction: PredictionFull;
@@ -57,8 +57,6 @@ export default function BetModal({ prediction, isOpen, onClose, mode, onBetPlace
     }
 
     const payout = Math.floor(amount * selectedOption.odds);
-    const profit = payout - amount;
-    const profitPercent = (profit / amount) * 100;
     const balanceAfter = balance - amount;
     
     // 🎯 Risk level calculation with emojis

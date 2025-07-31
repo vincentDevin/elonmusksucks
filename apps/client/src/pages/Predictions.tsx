@@ -6,10 +6,9 @@
 // -----------------------------------------------------------------------------
 
 import { useState, useMemo } from 'react';
-import type { PredictionFull } from '../api/predictions';
 
 import CreatePredictionForm from '../components/CreatePredictionForm';
-import PredictionCard from '../components/PredictionCard';
+import UnifiedPredictionCard from '../components/UnifiedPredictionCard';
 
 import { usePredictionMarket } from '../contexts/PredictionContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -141,13 +140,17 @@ export default function Predictions() {
               );
             }
 
-            // For approved predictions, use the enhanced PredictionCard
+            // For approved predictions, use the unified PredictionCard
             return (
-              <PredictionCard
+              <UnifiedPredictionCard
                 key={pred.id}
                 prediction={pred}
+                variant="full"
+                showActions={true}
+                showBetsList={true}
+                showParlayActions={false}
                 addOptimisticBet={(bet) => {
-                  // Handle optimistic bet update if needed
+                  // Handle optimistic update if needed
                   console.log('Optimistic bet placed:', bet);
                 }}
               />

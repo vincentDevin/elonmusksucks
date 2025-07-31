@@ -1,6 +1,6 @@
 // apps/client/src/components/dashboard/PredictionsPanel.tsx
 import { usePredictionMarket } from '../../contexts/PredictionContext';
-import CompactPredictionCard from '../CompactPredictionCard';
+import UnifiedPredictionCard from '../UnifiedPredictionCard';
 
 export default function PredictionsPanel() {
   const { predictions, loading, error } = usePredictionMarket();
@@ -29,7 +29,13 @@ export default function PredictionsPanel() {
         ) : (
           <div className="space-y-4 pr-2">
             {openPredictions.map((p) => (
-              <CompactPredictionCard key={p.id} prediction={p} />
+              <UnifiedPredictionCard 
+                key={p.id} 
+                prediction={p} 
+                variant="compact"
+                showParlayActions={true}
+                showBetsList={false}
+              />
             ))}
           </div>
         )}

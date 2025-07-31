@@ -13,8 +13,9 @@ export interface IAuthRepository {
   updatePassword(userId: number, passwordHash: string): Promise<User>;
 
   // --- Refresh tokens ---
-  saveRefreshToken(userId: number, token: string, expiresAt: Date): Promise<void>;
-  getRefreshToken(token: string): Promise<RefreshToken | null>;
+  saveRefreshToken(userId: number, hashedToken: string, expiresAt: Date): Promise<void>;
+  getAllRefreshTokensForUser(userId: number): Promise<RefreshToken[]>;
+  getRefreshToken(token: string): Promise<RefreshToken | null>; // Deprecated
   deleteRefreshToken(token: string): Promise<void>;
 
   // --- Email verification ---

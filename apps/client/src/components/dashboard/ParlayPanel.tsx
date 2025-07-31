@@ -16,7 +16,7 @@ export default function ParlayPanel() {
   /** Return current odds for the given leg (falls back to 1). */
   const getLegOdds = (leg: { predictionId: number; optionId: number }) => {
     const pred = predictions.find((p) => p.id === leg.predictionId);
-    const opt = pred?.options.find((o) => o.id === leg.optionId);
+    const opt = pred?.options.find((o: any) => o.id === leg.optionId);
     return opt?.odds ?? 1;
   };
 
@@ -24,7 +24,7 @@ export default function ParlayPanel() {
   const findPrediction = (predId: number) => predictions.find((p) => p.id === predId);
 
   const findOption = (predId: number, optId: number) =>
-    findPrediction(predId)?.options.find((o) => o.id === optId);
+    findPrediction(predId)?.options.find((o: any) => o.id === optId);
 
   /* ---------- Enhanced parlay calculations with bonuses ---------- */
   const { baseCombinedOdds, bonusMultiplier, finalOdds, payout, legCount } = useMemo(() => {
