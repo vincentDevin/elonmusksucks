@@ -113,7 +113,7 @@ apps/
 
 ```json
 {
-  "email": "user@example.com",
+  "email": "user<!-- Import failed: example.com", - Only .md files are supported -->
   "password": "yourPassword"
 }
 ```
@@ -214,3 +214,54 @@ redis-cli monitor
 * Auto-generated types from Prisma schema
 * Strict TypeScript enforced
 * ESLint for quality
+
+---
+
+## UI/UX Modernization and Optimization Plan
+
+### 1. High-Level Goals
+- **Modernize the UI:** Refresh the visual design to be more modern, clean, and engaging.
+- **Improve Information Hierarchy:** Make it easier for users to scan and understand the most important information.
+- **Enhance User Interaction:** Make the dashboard more interactive and intuitive to use.
+- **Optimize for Mobile:** Ensure the dashboard is fully responsive and provides a great experience on mobile devices.
+
+### 2. Specific Changes
+
+**a. Layout and Responsiveness:**
+- **Mobile-First Approach:** Redesign the layout with a mobile-first approach, ensuring a seamless experience on smaller screens.
+- **Tabbed Navigation on Mobile:** On mobile, the two-column layout will be replaced with a tabbed interface. The tabs will be: "Feed", "My Activity", and "Chat". This will make it easier for mobile users to navigate between the different sections.
+- **Desktop Layout:** The existing two-column layout will be kept for desktop users, but with improved spacing and alignment.
+
+**b. "My Stuff" Panel (to be renamed "My Activity"):**
+- **Consolidation:** The "My Bets", "My Parlays", and "My Predictions" sections will be combined into a single, filterable list.
+- **Filtering:** Users will be able to filter their activity by type (bets, parlays, predictions) and status (open, resolved).
+- **Visual Polish:** The design of the list items will be improved to be more visually appealing and easier to scan.
+
+**c. Predictions Panel (to be renamed "Prediction Feed"):**
+- **Infinite Scroll:** The current pagination will be replaced with an infinite scroll, which will provide a more seamless browsing experience.
+- **Visual Redesign:** The `UnifiedPredictionCard` component will be redesigned to be more compact and visually engaging.
+- **Filtering and Sorting:** Users will be able to filter the prediction feed by category and sort by "ending soon" and "newest".
+
+**d. Parlay Builder Panel:**
+- **Improved UX:** The Parlay Builder will be redesigned to be more intuitive and user-friendly.
+- **Visual Polish:** The design of the panel will be updated to match the new modern aesthetic.
+
+**e. Chat Panel:**
+- **No changes:** The chat panel will remain as is.
+
+### 3. Implementation Plan
+
+1. **Update `Dashboard.tsx`:**
+    - Implement the new mobile-first layout with tabbed navigation.
+    - Rename the panels to reflect their new names.
+2. **Update `MyStuffPanel.tsx`:**
+    - Combine the three lists into a single, filterable list.
+    - Add filtering controls.
+    - Redesign the list items.
+3. **Update `PredictionPanel.tsx`:**
+    - Implement infinite scroll.
+    - Redesign the `UnifiedPredictionCard` component.
+    - Add filtering and sorting controls.
+4. **Update `ParlayPanel.tsx`:**
+    - Redesign the panel to be more intuitive and user-friendly.
+

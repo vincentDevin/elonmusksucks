@@ -85,6 +85,7 @@ export class PredictionService {
       options: pred.options || [],
       bets: [],
       parlayLegs: [],
+      createdAt: pred.createdAt,
     };
 
     // Publish legacy format

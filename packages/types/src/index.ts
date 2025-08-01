@@ -57,6 +57,7 @@ export type PublicPrediction = Pick<
   | 'type'
   | 'threshold'
   | 'creatorId'
+  | 'createdAt'
 > & {
   /** which option actually won when resolved */
   winningOptionId?: number | null;

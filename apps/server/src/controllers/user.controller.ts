@@ -64,8 +64,8 @@ export async function uploadProfileImageHandler(
       return;
     }
 
-    const imageUrl = await userService.uploadUserProfileImage(targetUserId, file);
-    res.json({ imageUrl });
+    const result = await userService.uploadUserProfileImage(targetUserId, file);
+    res.json(result);
   } catch (err) {
     next(err);
   }

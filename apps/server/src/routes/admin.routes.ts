@@ -8,14 +8,20 @@ const router = Router();
 // All admin routes require a valid access token and ADMIN role
 router.use(requireAuth, requireAdmin);
 
-// — User Management —
-router.get('/users', adminController.getUsers);
+// — Enhanced User Management —
+router.get('/users', adminController.getUsers); // Legacy endpoint
+router.get('/users/search', adminController.searchUsers); // New enhanced search
+router.get('/users/:userId/details', adminController.getUserDetails); // User details
+router.post('/users/bulk', adminController.bulkUpdateUsers); // Bulk operations
 router.patch('/users/:id/role', adminController.updateUserRole);
 router.patch('/users/:id/activate', adminController.activateUser);
 router.patch('/users/:id/balance', adminController.updateUserBalance);
 
-// — Prediction Management —
-router.get('/predictions', adminController.getPredictions);
+// — Enhanced Prediction Management —
+router.get('/predictions', adminController.getPredictions); // Legacy endpoint
+router.get('/predictions/search', adminController.searchPredictions); // New enhanced search
+router.get('/predictions/:predictionId/details', adminController.getPredictionDetails); // Prediction details
+router.post('/predictions/bulk', adminController.bulkUpdatePredictions); // Bulk operations
 router.patch('/predictions/:id/approve', adminController.approvePrediction);
 router.patch('/predictions/:id/reject', adminController.rejectPrediction);
 router.patch('/predictions/:id/resolve', adminController.resolvePrediction);

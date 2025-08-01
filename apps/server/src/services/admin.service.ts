@@ -1,14 +1,40 @@
 // apps/server/src/services/admin.service.ts
 import type { Role } from '@prisma/client';
-import type { IAdminRepository, QueryParams } from '../repositories/IAdminRepository';
+import type { 
+  IAdminRepository, 
+  QueryParams, 
+  UserSearchParams, 
+  PaginatedUsers, 
+  DetailedUser, 
+  BulkUserOperation, 
+  BulkOperationResult,
+  PredictionSearchParams,
+  PaginatedPredictions,
+  DetailedPrediction,
+  BulkPredictionOperation,
+  BulkPredictionResult
+} from '../repositories/IAdminRepository';
 import { PrismaAdminRepository } from '../repositories/AdminRepository';
 import type { UserStatsDTO } from '@ems/types';
 
 const repo: IAdminRepository = new PrismaAdminRepository();
 
-// -- User Management --
+// -- Enhanced User Management --
 export const listUsers = async () => {
+  // Legacy method - kept for backward compatibility
   return repo.findAllUsers();
+};
+
+export const searchUsers = async (params: UserSearchParams): Promise<PaginatedUsers> => {
+  return repo.searchUsers(params);
+};
+
+export const getUserDetails = async (userId: number): Promise<DetailedUser | null> => {
+  return repo.getUserWithDetails(userId);
+};
+
+export const bulkUpdateUsers = async (operation: BulkUserOperation): Promise<BulkOperationResult> => {
+  return repo.bulkUpdateUsers(operation);
 };
 
 export const changeUserRole = async (userId: number, role: Role) => {
@@ -23,9 +49,46 @@ export const adjustUserBalance = async (userId: number, amount: number) => {
   return repo.updateUserBalance(userId, amount);
 };
 
-// -- Prediction Management --
+// -- Enhanced Prediction Management --
 export const listPredictions = async (filters?: QueryParams) => {
   return repo.findPredictions(filters);
+};
+
+export const searchPredictions = async (params: PredictionSearchParams): Promise<PaginatedPredictions> => {
+  return repo.searchPredictions(params);
+};
+
+export const getPredictionDetails = async (predictionId: number): Promise<DetailedPrediction | null> => {
+  return repo.getPredictionWithDetails(predictionId);
+};
+
+export const bulkUpdatePredictions = async (operation: BulkPredictionOperation): Promise<BulkPredictionResult> => {
+  const result = await repo.bulkUpdatePredictions(operation);
+  
+  // Broadcast events for successful operations
+  if (result.successCount > 0) {
+    const redisClient = require('../lib/redis').default;
+    
+    for (const prediction of result.updatedPredictions) {
+      if (operation.operation === 'approve') {
+        await redisClient.publish('prediction:approved', JSON.stringify({
+          id: prediction.id,
+          title: prediction.title,
+          category: prediction.category,
+          timestamp: new Date().toISOString()
+        }));
+      } else if (operation.operation === 'resolve') {
+        await redisClient.publish('prediction:resolved', JSON.stringify({
+          id: prediction.id,
+          title: prediction.title,
+          winningOptionId: prediction.resolutionData?.winningOptionId,
+          timestamp: new Date().toISOString()
+        }));
+      }
+    }
+  }
+  
+  return result;
 };
 
 export const setPredictionStatus = async (
@@ -37,7 +100,7 @@ export const setPredictionStatus = async (
   // 🎊 Broadcast prediction approval/rejection event
   if (status === 'approved') {
     const redisClient = require('../lib/redis').default;
-    await redisClient.publish('prediction:create', JSON.stringify({
+    await redisClient.publish('prediction:approved', JSON.stringify({
       id: updated.id,
       title: updated.title,
       description: updated.description,

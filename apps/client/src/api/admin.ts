@@ -12,9 +12,97 @@ import type {
   Role,
 } from '@ems/types';
 
-/** — User Management — **/
+/** — Enhanced User Management — **/
 export async function listUsers(): Promise<PublicUser[]> {
   const res = await api.get<PublicUser[]>('/api/admin/users');
+  return res.data;
+}
+
+// Enhanced search and pagination types
+export interface UserSearchParams {
+  search?: string;
+  role?: string[];
+  active?: boolean;
+  bannedOnly?: boolean;
+  page: number;
+  limit: number;
+  sortBy?: 'name' | 'email' | 'createdAt' | 'muskBucks' | 'role';
+  sortOrder?: 'asc' | 'desc';
+}
+
+export interface PaginatedUsers {
+  users: DetailedUser[];
+  totalCount: number;
+  totalPages: number;
+  currentPage: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+}
+
+export interface DetailedUser extends PublicUser {
+  banStatus?: {
+    isBanned: boolean;
+    banType?: string;
+    reason?: string;
+    expiresAt?: string;
+  };
+  stats?: {
+    totalBets: number;
+    totalWagered: number;
+    totalWon: number;
+    winRate: number;
+  };
+  recentActivity?: {
+    lastLogin?: string;
+    lastBet?: string;
+    totalLogins: number;
+  };
+  badges?: PublicBadge[];
+}
+
+export interface BulkUserOperation {
+  userIds: number[];
+  operation: 'activate' | 'deactivate' | 'changeRole' | 'adjustBalance' | 'assignBadge' | 'revokeBadge';
+  params?: {
+    role?: Role;
+    amount?: number;
+    badgeId?: number;
+  };
+}
+
+export interface BulkOperationResult {
+  successCount: number;
+  failureCount: number;
+  errors: Array<{ userId: number; error: string }>;
+  updatedUsers: DetailedUser[];
+}
+
+// Enhanced user search with pagination
+export async function searchUsers(params: UserSearchParams): Promise<PaginatedUsers> {
+  const queryParams = new URLSearchParams();
+  
+  if (params.search) queryParams.append('search', params.search);
+  if (params.role) params.role.forEach(r => queryParams.append('role', r));
+  if (params.active !== undefined) queryParams.append('active', params.active.toString());
+  if (params.bannedOnly) queryParams.append('bannedOnly', 'true');
+  queryParams.append('page', params.page.toString());
+  queryParams.append('limit', params.limit.toString());
+  if (params.sortBy) queryParams.append('sortBy', params.sortBy);
+  if (params.sortOrder) queryParams.append('sortOrder', params.sortOrder);
+
+  const res = await api.get<PaginatedUsers>(`/api/admin/users/search?${queryParams}`);
+  return res.data;
+}
+
+// Get detailed user information
+export async function getUserDetails(userId: number): Promise<DetailedUser> {
+  const res = await api.get<DetailedUser>(`/api/admin/users/${userId}/details`);
+  return res.data;
+}
+
+// Bulk user operations
+export async function bulkUpdateUsers(operation: BulkUserOperation): Promise<BulkOperationResult> {
+  const res = await api.post<BulkOperationResult>('/api/admin/users/bulk', operation);
   return res.data;
 }
 
@@ -33,9 +121,124 @@ export async function updateUserBalance(userId: number, amount: number): Promise
   return res.data;
 }
 
-/** — Prediction Management — **/
+/** — Enhanced Prediction Management — **/
 export async function listPredictions(params?: Record<string, any>): Promise<PublicPrediction[]> {
   const res = await api.get<PublicPrediction[]>('/api/admin/predictions', { params });
+  return res.data;
+}
+
+// Enhanced prediction search and pagination types
+export interface PredictionSearchParams {
+  search?: string;
+  category?: string[];
+  status?: ('pending' | 'approved' | 'rejected' | 'resolved')[];
+  creatorId?: number;
+  startDate?: string;
+  endDate?: string;
+  minVolume?: number;
+  maxVolume?: number;
+  page: number;
+  limit: number;
+  sortBy?: 'createdAt' | 'title' | 'category' | 'expiresAt' | 'bettingVolume';
+  sortOrder?: 'asc' | 'desc';
+}
+
+export interface DetailedPrediction extends PublicPrediction {
+  // Properties from PublicPrediction are already included
+  options?: Array<{
+    id: number;
+    label: string;
+    odds: number;
+  }>;
+  creator?: {
+    id: number;
+    name: string;
+    email: string;
+  };
+  analytics?: {
+    totalBets: number;
+    totalVolume: number;
+    uniqueBettors: number;
+    controversyScore: number;
+    popularityScore: number;
+  };
+  qualityFlags?: {
+    isDuplicate: boolean;
+    hasOffensiveContent: boolean;
+    hasSuspiciousActivity: boolean;
+    needsReview: boolean;
+  };
+  resolutionData?: {
+    resolvedBy?: number;
+    resolvedAt?: string;
+    evidence?: string;
+    winningOptionId?: number;
+  };
+}
+
+export interface PaginatedPredictions {
+  predictions: DetailedPrediction[];
+  totalCount: number;
+  totalPages: number;
+  currentPage: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  analytics?: {
+    totalPending: number;
+    totalApproved: number;
+    totalResolved: number;
+    totalRejected: number;
+    avgResolutionTime: number;
+  };
+}
+
+export interface BulkPredictionOperation {
+  predictionIds: number[];
+  operation: 'approve' | 'reject' | 'resolve' | 'delete' | 'feature';
+  params?: {
+    reason?: string;
+    winningOptionId?: number;
+    evidence?: string;
+  };
+}
+
+export interface BulkPredictionResult {
+  successCount: number;
+  failureCount: number;
+  errors: Array<{ predictionId: number; error: string }>;
+  updatedPredictions: DetailedPrediction[];
+}
+
+// Enhanced prediction search with pagination
+export async function searchPredictions(params: PredictionSearchParams): Promise<PaginatedPredictions> {
+  const queryParams = new URLSearchParams();
+  
+  if (params.search) queryParams.append('search', params.search);
+  if (params.category) params.category.forEach(c => queryParams.append('category', c));
+  if (params.status) params.status.forEach(s => queryParams.append('status', s));
+  if (params.creatorId) queryParams.append('creatorId', params.creatorId.toString());
+  if (params.startDate) queryParams.append('startDate', params.startDate);
+  if (params.endDate) queryParams.append('endDate', params.endDate);
+  if (params.minVolume) queryParams.append('minVolume', params.minVolume.toString());
+  if (params.maxVolume) queryParams.append('maxVolume', params.maxVolume.toString());
+  queryParams.append('page', params.page.toString());
+  queryParams.append('limit', params.limit.toString());
+  if (params.sortBy) queryParams.append('sortBy', params.sortBy);
+  if (params.sortOrder) queryParams.append('sortOrder', params.sortOrder);
+
+  const res = await api.get<PaginatedPredictions>(`/api/admin/predictions/search?${queryParams}`);
+  return res.data;
+}
+
+// Get detailed prediction information
+export async function getPredictionDetails(predictionId: number): Promise<DetailedPrediction> {
+  const res = await api.get<DetailedPrediction>(`/api/admin/predictions/${predictionId}/details`);
+  return res.data;
+}
+
+// Bulk prediction operations
+export async function bulkUpdatePredictions(operation: BulkPredictionOperation): Promise<BulkPredictionResult> {
+  const res = await api.post<BulkPredictionResult>('/api/admin/predictions/bulk', operation);
   return res.data;
 }
 

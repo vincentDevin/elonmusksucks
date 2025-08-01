@@ -1,23 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useAdmin } from '../contexts/AdminContext';
-import UserManagement from '../components/admin/UserManagement';
-import PredictionQueue from '../components/admin/PredictionQueue';
+import UnifiedUserManagement from '../components/admin/UnifiedUserManagement';
+import ModernPredictionQueue from '../components/admin/ModernPredictionQueue';
 import BetsTransactions from '../components/admin/BetsTransactions';
 import BadgesManager from '../components/admin/BadgesManager';
 import UserStats from '../components/admin/UserStats';
-import ModerationPanel from '../components/admin/ModerationPanel';
-import BannedUsersWall from '../components/admin/BannedUsersWall';
 
 const AdminDashboard: React.FC = () => {
   const { user } = useAuth();
   const { loadUsers, loadPendingPredictions, loadBets, loadTransactions, loadBadges } = useAdmin();
 
   const tabs = [
-    { key: 'users', label: 'User Management', component: <UserManagement /> },
-    { key: 'moderation', label: 'Moderation', component: <ModerationPanel /> },
-    { key: 'banned', label: 'Banned Users', component: <BannedUsersWall /> },
-    { key: 'predictions', label: 'Prediction Queue', component: <PredictionQueue /> },
+    { key: 'users', label: 'User Management', component: <UnifiedUserManagement /> },
+    { key: 'predictions', label: 'Prediction Management', component: <ModernPredictionQueue /> },
     { key: 'bets', label: 'Bets & Transactions', component: <BetsTransactions /> },
     { key: 'badges', label: 'Badges', component: <BadgesManager /> },
     { key: 'stats', label: 'User Stats', component: <UserStats /> },
@@ -36,21 +32,21 @@ const AdminDashboard: React.FC = () => {
   }, [user, loadUsers, loadPendingPredictions, loadBets, loadTransactions, loadBadges]);
 
   if (user?.role !== 'ADMIN') {
-    return <div className="p-4 text-[var(--color-accent)]">Access denied. Admins only.</div>;
+    return <div className="p-4 text-accent">Access denied. Admins only.</div>;
   }
 
   return (
-    <div className="p-4 bg-[var(--color-background)] text-[var(--color-content)]">
-      <h1 className="text-2xl font-bold text-[var(--color-primary)] mb-4">Admin Dashboard</h1>
-      <nav className="flex space-x-4 border-b border-[var(--color-muted)]">
+    <div className="p-4 bg-background text-content">
+      <h1 className="text-2xl font-bold text-primary mb-4">Admin Dashboard</h1>
+      <nav className="flex space-x-4 border-b border-muted">
         {tabs.map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
             className={`py-2 px-4 -mb-px cursor-pointer font-medium transition ${
               activeTab === tab.key
-                ? 'border-b-2 border-[var(--color-primary)] text-[var(--color-primary)]'
-                : 'text-[var(--color-muted)] hover:text-[var(--color-primary)]'
+                ? 'border-b-2 border-primary text-primary'
+                : 'text-muted hover:text-primary'
             }`}
           >
             {tab.label}

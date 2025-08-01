@@ -15,13 +15,78 @@ import type {
 } from '@ems/types';
 import { PredictionType } from '@ems/types';
 import type { Role } from '@prisma/client';
-import type { QueryParams } from '../repositories/IAdminRepository';
+import type { 
+  QueryParams,
+  UserSearchParams, 
+  BulkUserOperation,
+  PredictionSearchParams,
+  BulkPredictionOperation
+} from '../repositories/IAdminRepository';
 
-// -- User Management --
+// -- Enhanced User Management --
 export async function getUsers(_req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
+    // Legacy endpoint - kept for backward compatibility
     const users: PublicUser[] = await adminService.listUsers();
     res.json(users);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function searchUsers(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const params: UserSearchParams = {
+      search: req.query.search as string,
+      role: req.query.role ? (Array.isArray(req.query.role) ? req.query.role : [req.query.role]) as any : undefined,
+      active: req.query.active !== undefined ? req.query.active === 'true' : undefined,
+      bannedOnly: req.query.bannedOnly === 'true',
+      page: parseInt(req.query.page as string) || 0,
+      limit: parseInt(req.query.limit as string) || 25,
+      sortBy: (req.query.sortBy as any) || 'createdAt',
+      sortOrder: (req.query.sortOrder as any) || 'desc'
+    };
+
+    const result = await adminService.searchUsers(params);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getUserDetails(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const userId = parseInt(req.params.userId);
+    const user = await adminService.getUserDetails(userId);
+    
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+    
+    res.json(user);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function bulkUpdateUsers(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const operation: BulkUserOperation = req.body;
+    
+    // Validate the operation
+    if (!operation.userIds || !Array.isArray(operation.userIds) || operation.userIds.length === 0) {
+      res.status(400).json({ error: 'userIds array is required and cannot be empty' });
+      return;
+    }
+    
+    if (operation.userIds.length > 100) {
+      res.status(400).json({ error: 'Cannot update more than 100 users at once' });
+      return;
+    }
+    
+    const result = await adminService.bulkUpdateUsers(operation);
+    res.json(result);
   } catch (err) {
     next(err);
   }
@@ -68,7 +133,7 @@ export async function updateUserBalance(
   }
 }
 
-// -- Prediction Management --
+// -- Enhanced Prediction Management --
 export async function getPredictions(
   req: Request,
   res: Response,
@@ -78,6 +143,72 @@ export async function getPredictions(
     const filters = req.query as unknown as QueryParams;
     const preds: PublicPrediction[] = await adminService.listPredictions(filters);
     res.json(preds);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function searchPredictions(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const params: PredictionSearchParams = {
+      search: req.query.search as string,
+      category: req.query.category ? (Array.isArray(req.query.category) ? req.query.category : [req.query.category]) as string[] : undefined,
+      status: req.query.status ? (Array.isArray(req.query.status) ? req.query.status : [req.query.status]) as any : undefined,
+      creatorId: req.query.creatorId ? parseInt(req.query.creatorId as string) : undefined,
+      dateRange: req.query.startDate || req.query.endDate ? {
+        start: req.query.startDate ? new Date(req.query.startDate as string) : undefined,
+        end: req.query.endDate ? new Date(req.query.endDate as string) : undefined
+      } : undefined,
+      bettingVolume: req.query.minVolume || req.query.maxVolume ? {
+        min: req.query.minVolume ? parseFloat(req.query.minVolume as string) : undefined,
+        max: req.query.maxVolume ? parseFloat(req.query.maxVolume as string) : undefined
+      } : undefined,
+      page: parseInt(req.query.page as string) || 0,
+      limit: parseInt(req.query.limit as string) || 25,
+      sortBy: (req.query.sortBy as any) || 'createdAt',
+      sortOrder: (req.query.sortOrder as any) || 'desc'
+    };
+
+    const result = await adminService.searchPredictions(params);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getPredictionDetails(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const predictionId = parseInt(req.params.predictionId);
+    const prediction = await adminService.getPredictionDetails(predictionId);
+    
+    if (!prediction) {
+      res.status(404).json({ error: 'Prediction not found' });
+      return;
+    }
+    
+    res.json(prediction);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function bulkUpdatePredictions(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const operation: BulkPredictionOperation = req.body;
+    
+    // Validate the operation
+    if (!operation.predictionIds || !Array.isArray(operation.predictionIds) || operation.predictionIds.length === 0) {
+      res.status(400).json({ error: 'predictionIds array is required and cannot be empty' });
+      return;
+    }
+    
+    if (operation.predictionIds.length > 100) {
+      res.status(400).json({ error: 'Cannot update more than 100 predictions at once' });
+      return;
+    }
+    
+    const result = await adminService.bulkUpdatePredictions(operation);
+    res.json(result);
   } catch (err) {
     next(err);
   }

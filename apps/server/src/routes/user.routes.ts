@@ -1,6 +1,5 @@
 // apps/server/src/routes/user.routes.ts
 import { Router } from 'express';
-import multer from 'multer';
 import {
   getProfile,
   followUserHandler,
@@ -16,9 +15,7 @@ import {
   getUserPredictionsHandler,
 } from '../controllers/user.controller';
 import { requireAuth } from '../middleware/auth.middleware';
-
-// Configure Multer for in-memory storage
-const upload = multer({ storage: multer.memoryStorage() });
+import { uploadConfig, validateFileContent } from '../middleware/fileValidation.middleware';
 
 const router = Router();
 
@@ -28,11 +25,12 @@ router.get('/profile/:userId', requireAuth, getProfile);
 // Update profile fields
 router.put('/:userId', requireAuth, updateProfileHandler);
 
-// Upload profile picture
+// Upload profile picture with enhanced validation
 router.post(
   '/:userId/profile-picture',
   requireAuth,
-  upload.single('image'),
+  uploadConfig.single('image'),
+  validateFileContent,
   uploadProfileImageHandler,
 );
 

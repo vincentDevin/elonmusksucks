@@ -14,6 +14,8 @@ import type {
 } from '@ems/types';
 import type { PublicUserProfile, UserFeedPost, UserActivity, UserStatsDTO } from '@ems/types';
 import { normalizedActivityService } from './normalizedActivity.service';
+import { ImageProcessingService, ProcessedImageSizes } from './imageProcessing.service';
+import { DeleteObjectCommand } from '@aws-sdk/client-s3';
 
 // Define a minimal file interface matching Multer's in-memory buffer
 export type UploadedFile = {
@@ -43,27 +45,123 @@ export class UserService {
     this.bucket = process.env.TIGRIS_S3_BUCKET as string;
   }
 
-  // --- NEW: Upload profile image ---
-  async uploadUserProfileImage(userId: number, file: UploadedFile): Promise<string> {
+  // --- ENHANCED: Upload profile image with processing ---
+  async uploadUserProfileImage(userId: number, file: UploadedFile): Promise<{
+    avatarUrl: string;
+    sizes: {
+      thumbnail: string;
+      profile: string;
+      full: string;
+    };
+  }> {
+    // Clear cached URLs
     await redisClient.del(`profileImageUrl:userId:${userId}`);
-    const key = `${userId}/${Date.now()}-${file.originalname}`;
-    // Upload to S3-compatible storage
+
+    // Get current user to check for existing profile picture
+    const user = await this.repo.findById(userId);
+    if (!user) throw new Error('User not found');
+
+    // Validate and process the image
+    const isValidImage = await ImageProcessingService.validateImage(file.buffer);
+    if (!isValidImage) {
+      throw new Error('Invalid image file. Please upload a valid JPEG, PNG, or WebP image.');
+    }
+
+    // Process image into multiple sizes
+    const processedImages: ProcessedImageSizes = await ImageProcessingService.processProfileImage(
+      file.buffer,
+      userId,
+    );
+
+    // Upload all sizes to storage
+    const uploadPromises = [
+      this.uploadImageToStorage(processedImages.thumbnail),
+      this.uploadImageToStorage(processedImages.profile),
+      this.uploadImageToStorage(processedImages.full),
+    ];
+
+    await Promise.all(uploadPromises);
+
+    // Clean up old profile images if they exist
+    if (user.profilePictureKey) {
+      await this.cleanupOldProfileImages(user.profilePictureKey);
+    }
+
+    // Update user profile with new primary (profile size) key
+    await this.repo.updateProfile(userId, { 
+      profilePictureKey: processedImages.profile.filename,
+    });
+
+    // Generate signed URLs for immediate use (30-day expiry for better caching)
+    const urlPromises = [
+      this.getSignedAvatarUrl(processedImages.thumbnail.filename, 60 * 60 * 24 * 30),
+      this.getSignedAvatarUrl(processedImages.profile.filename, 60 * 60 * 24 * 30),
+      this.getSignedAvatarUrl(processedImages.full.filename, 60 * 60 * 24 * 30),
+    ];
+
+    const [thumbnailUrl, profileUrl, fullUrl] = await Promise.all(urlPromises);
+
+    return {
+      avatarUrl: profileUrl, // Primary avatar URL
+      sizes: {
+        thumbnail: thumbnailUrl,
+        profile: profileUrl,
+        full: fullUrl,
+      },
+    };
+  }
+
+  /**
+   * Upload a processed image to S3-compatible storage
+   */
+  private async uploadImageToStorage(image: { buffer: Buffer; filename: string; contentType: string }): Promise<void> {
     await this.s3.send(
       new PutObjectCommand({
         Bucket: this.bucket,
-        Key: key,
-        Body: file.buffer,
-        ContentType: file.mimetype,
+        Key: image.filename,
+        Body: image.buffer,
+        ContentType: image.contentType,
+        CacheControl: 'public, max-age=2592000', // 30 days
+        Metadata: {
+          'uploaded-at': new Date().toISOString(),
+        },
       }),
     );
+  }
 
-    // Persist the key so we can re-generate a URL later
-    await this.repo.updateProfile(userId, { profilePictureKey: key });
+  /**
+   * Clean up old profile images when a new one is uploaded
+   */
+  private async cleanupOldProfileImages(oldKey: string): Promise<void> {
+    try {
+      // Extract the pattern to find all related sizes
+      // oldKey format: profiles/{userId}/profile-{uuid}.webp
+      const keyParts = oldKey.split('/');
+      if (keyParts.length >= 3) {
+        const userId = keyParts[1];
+        const fileName = keyParts[2];
+        const uuid = fileName.split('-')[1]?.split('.')[0];
+        
+        if (uuid) {
+          // Delete all sizes for this image set
+          const keysToDelete = [
+            `profiles/${userId}/thumbnail-${uuid}.webp`,
+            `profiles/${userId}/profile-${uuid}.webp`,
+            `profiles/${userId}/full-${uuid}.webp`,
+          ];
 
-    // Return a signed URL (valid 7 days)
-    return getSignedUrl(this.s3, new GetObjectCommand({ Bucket: this.bucket, Key: key }), {
-      expiresIn: 60 * 60 * 24 * 7,
-    });
+          const deletePromises = keysToDelete.map(key =>
+            this.s3.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }))
+              .catch(err => console.warn(`Failed to delete old image ${key}:`, err.message))
+          );
+
+          await Promise.all(deletePromises);
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to cleanup old profile images:', error);
+      // Don't throw - image upload should still succeed even if cleanup fails
+    }
   }
 
   /**
