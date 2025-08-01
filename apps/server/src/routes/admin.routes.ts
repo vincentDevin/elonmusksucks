@@ -26,12 +26,37 @@ router.patch('/predictions/:id/approve', adminController.approvePrediction);
 router.patch('/predictions/:id/reject', adminController.rejectPrediction);
 router.patch('/predictions/:id/resolve', adminController.resolvePrediction);
 
-// — Bet & Transaction Oversight —
+// — Enhanced Financial Operations Dashboard —
+router.get('/financial/search', adminController.searchFinancialData);
+router.get('/financial/analytics', adminController.getFinancialAnalytics);
+router.post('/financial/bulk', adminController.bulkFinancialOperation);
+router.get('/financial/export', adminController.exportFinancialData);
+
+// — Legacy Bet & Transaction Oversight (deprecated) —
 router.get('/bets', adminController.getBets);
 router.patch('/bets/:id/refund', adminController.refundBet);
 router.get('/transactions', adminController.getTransactions);
 
-// — Badge & Content Moderation —
+// — Enhanced Badge & Achievement System —
+router.get('/badges/search', adminController.searchBadges);
+router.get('/badges/:badgeId/details', adminController.getBadgeDetails);
+router.post('/badges/create', adminController.createBadgeWithCategories);
+router.put('/badges/:badgeId', adminController.updateBadge);
+router.delete('/badges/:badgeId', adminController.deleteBadge);
+router.get('/badges/analytics', adminController.getBadgeAnalytics);
+router.post('/badges/bulk', adminController.bulkBadgeOperation);
+router.get('/badge-categories', adminController.getBadgeCategories);
+router.post('/badge-categories', adminController.createBadgeCategory);
+
+// — Advanced Analytics & Reporting —
+router.get('/analytics/executive-dashboard', adminController.getExecutiveDashboard);
+router.get('/analytics/user-behavior', adminController.getUserBehaviorAnalytics);
+router.get('/analytics/predictive', adminController.getPredictiveAnalytics);
+router.get('/analytics/reports/:reportType', adminController.generateCustomReport);
+router.get('/analytics/realtime', adminController.getRealtimeMetrics);
+router.get('/analytics/export', adminController.exportAnalyticsData);
+
+// — Legacy Badge & Content Moderation (deprecated) —
 router.get('/posts', adminController.getPosts);
 router.delete('/posts/:id', adminController.deletePost);
 router.get('/badges', adminController.getBadges);

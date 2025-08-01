@@ -3,20 +3,20 @@ import { useAuth } from '../hooks/useAuth';
 import { useAdmin } from '../contexts/AdminContext';
 import UnifiedUserManagement from '../components/admin/UnifiedUserManagement';
 import ModernPredictionQueue from '../components/admin/ModernPredictionQueue';
-import BetsTransactions from '../components/admin/BetsTransactions';
-import BadgesManager from '../components/admin/BadgesManager';
-import UserStats from '../components/admin/UserStats';
+import UnifiedFinancialDashboard from '../components/admin/UnifiedFinancialDashboard';
+import AdvancedBadgeManager from '../components/admin/AdvancedBadgeManager';
+import AdvancedAnalyticsDashboard from '../components/admin/AdvancedAnalyticsDashboard';
 
 const AdminDashboard: React.FC = () => {
   const { user } = useAuth();
-  const { loadUsers, loadPendingPredictions, loadBets, loadTransactions, loadBadges } = useAdmin();
+  const { loadUsers, loadPendingPredictions, loadBadges } = useAdmin();
 
   const tabs = [
     { key: 'users', label: 'User Management', component: <UnifiedUserManagement /> },
     { key: 'predictions', label: 'Prediction Management', component: <ModernPredictionQueue /> },
-    { key: 'bets', label: 'Bets & Transactions', component: <BetsTransactions /> },
-    { key: 'badges', label: 'Badges', component: <BadgesManager /> },
-    { key: 'stats', label: 'User Stats', component: <UserStats /> },
+    { key: 'bets', label: 'Financial Operations', component: <UnifiedFinancialDashboard /> },
+    { key: 'badges', label: 'Badge Management', component: <AdvancedBadgeManager /> },
+    { key: 'analytics', label: 'Advanced Analytics', component: <AdvancedAnalyticsDashboard /> },
   ];
 
   const [activeTab, setActiveTab] = useState<string>(tabs[0].key);
@@ -25,11 +25,9 @@ const AdminDashboard: React.FC = () => {
     if (user?.role === 'ADMIN') {
       loadUsers();
       loadPendingPredictions();
-      loadBets();
-      loadTransactions();
       loadBadges();
     }
-  }, [user, loadUsers, loadPendingPredictions, loadBets, loadTransactions, loadBadges]);
+  }, [user, loadUsers, loadPendingPredictions, loadBadges]);
 
   if (user?.role !== 'ADMIN') {
     return <div className="p-4 text-accent">Access denied. Admins only.</div>;

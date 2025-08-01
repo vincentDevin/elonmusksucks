@@ -127,7 +127,61 @@ export const listTransactions = async (filters?: QueryParams) => {
   return repo.findTransactions(filters);
 };
 
-// -- Badge & Content Moderation --
+// -- Enhanced Financial Operations Dashboard --
+export const searchFinancialData = async (params: any) => {
+  return repo.searchFinancialData(params);
+};
+
+export const getFinancialAnalytics = async (params: any) => {
+  return repo.getFinancialAnalytics(params);
+};
+
+export const bulkFinancialOperation = async (operation: any) => {
+  return repo.bulkFinancialOperation(operation);
+};
+
+export const exportFinancialData = async (params: any) => {
+  return repo.exportFinancialData(params);
+};
+
+// -- Enhanced Badge & Achievement System --
+export const searchBadges = async (params: any) => {
+  return repo.searchBadges(params);
+};
+
+export const getBadgeWithDetails = async (badgeId: number) => {
+  return repo.getBadgeWithDetails(badgeId);
+};
+
+export const createBadgeWithCategories = async (data: any) => {
+  return repo.createBadgeWithCategories(data);
+};
+
+export const updateBadge = async (badgeId: number, data: any) => {
+  return repo.updateBadge(badgeId, data);
+};
+
+export const deleteBadge = async (badgeId: number) => {
+  return repo.deleteBadge(badgeId);
+};
+
+export const getBadgeAnalytics = async (badgeId?: number) => {
+  return repo.getBadgeAnalytics(badgeId);
+};
+
+export const bulkBadgeOperation = async (operation: any) => {
+  return repo.bulkBadgeOperation(operation);
+};
+
+export const getBadgeCategories = async () => {
+  return repo.getBadgeCategories();
+};
+
+export const createBadgeCategory = async (data: any) => {
+  return repo.createBadgeCategory(data);
+};
+
+// -- Legacy Badge & Content Moderation (deprecated) --
 export const listPosts = async (filters?: QueryParams) => {
   return repo.findPosts(filters);
 };
@@ -188,6 +242,31 @@ export const getUserStats = async (userId: number): Promise<UserStatsDTO | null>
     biggestWin: raw.biggestWin,
     updatedAt: raw.updatedAt.toISOString(),
   };
+};
+
+// -- Advanced Analytics & Reporting --
+export const getExecutiveDashboard = async (params: any) => {
+  return repo.getExecutiveDashboard(params);
+};
+
+export const getUserBehaviorAnalytics = async (params: any) => {
+  return repo.getUserBehaviorAnalytics(params);
+};
+
+export const getPredictiveAnalytics = async (params: any) => {
+  return repo.getPredictiveAnalytics(params);
+};
+
+export const generateCustomReport = async (reportType: string, params: Record<string, any>) => {
+  return repo.generateCustomReport(reportType, params);
+};
+
+export const getRealtimeMetrics = async () => {
+  return repo.getRealtimeMetrics();
+};
+
+export const exportAnalyticsData = async (params: { reportType: string; format: 'csv' | 'excel' | 'pdf'; filters?: Record<string, any> }) => {
+  return repo.exportAnalyticsData(params);
 };
 
 // -- Miscellaneous --

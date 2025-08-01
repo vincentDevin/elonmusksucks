@@ -326,7 +326,249 @@ export async function getTransactions(
   }
 }
 
-// -- Badge & Content Moderation --
+// -- Enhanced Financial Operations Dashboard --
+export async function searchFinancialData(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const params = req.query as unknown as any; // Will be typed properly in service
+    const data = await adminService.searchFinancialData(params);
+    res.json(data);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getFinancialAnalytics(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const params = req.query as unknown as any;
+    const analytics = await adminService.getFinancialAnalytics(params);
+    res.json(analytics);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function bulkFinancialOperation(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const operation = req.body;
+    const result = await adminService.bulkFinancialOperation(operation);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function exportFinancialData(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const params = req.query as unknown as any;
+    const result = await adminService.exportFinancialData(params);
+    
+    // Set appropriate headers for file download
+    const format = params.format || 'csv';
+    const dataType = params.dataType || 'bets';
+    const filename = `financial_${dataType}_${new Date().toISOString().split('T')[0]}.${format}`;
+    
+    res.setHeader('Content-Type', format === 'csv' ? 'text/csv' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// -- Enhanced Badge & Achievement System --
+export async function searchBadges(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const params = req.query as unknown as any;
+    const badges = await adminService.searchBadges(params);
+    res.json(badges);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getBadgeDetails(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const badgeId = Number(req.params.badgeId);
+    const badge = await adminService.getBadgeWithDetails(badgeId);
+    if (!badge) {
+      res.status(404).json({ error: 'Badge not found' });
+      return;
+    }
+    res.json(badge);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function createBadgeWithCategories(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const data = req.body;
+    const badge = await adminService.createBadgeWithCategories(data);
+    res.status(201).json(badge);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function updateBadge(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const badgeId = Number(req.params.badgeId);
+    const data = req.body;
+    const badge = await adminService.updateBadge(badgeId, data);
+    res.json(badge);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function deleteBadge(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const badgeId = Number(req.params.badgeId);
+    await adminService.deleteBadge(badgeId);
+    res.status(204).end();
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getBadgeAnalytics(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const badgeId = req.query.badgeId ? Number(req.query.badgeId) : undefined;
+    const analytics = await adminService.getBadgeAnalytics(badgeId);
+    res.json(analytics);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function bulkBadgeOperation(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const operation = req.body;
+    const result = await adminService.bulkBadgeOperation(operation);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getBadgeCategories(_req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const categories = await adminService.getBadgeCategories();
+    res.json(categories);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function createBadgeCategory(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const data = req.body;
+    const category = await adminService.createBadgeCategory(data);
+    res.status(201).json(category);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// -- Advanced Analytics & Reporting --
+export async function getExecutiveDashboard(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const params = {
+      startDate: req.query.startDate ? new Date(req.query.startDate as string) : undefined,
+      endDate: req.query.endDate ? new Date(req.query.endDate as string) : undefined,
+      category: req.query.category as string,
+      userId: req.query.userId ? parseInt(req.query.userId as string) : undefined,
+      granularity: req.query.granularity as 'day' | 'week' | 'month'
+    };
+    
+    const dashboard = await adminService.getExecutiveDashboard(params);
+    res.json(dashboard);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getUserBehaviorAnalytics(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const params = {
+      startDate: req.query.startDate ? new Date(req.query.startDate as string) : undefined,
+      endDate: req.query.endDate ? new Date(req.query.endDate as string) : undefined,
+      category: req.query.category as string,
+      userId: req.query.userId ? parseInt(req.query.userId as string) : undefined,
+      granularity: req.query.granularity as 'day' | 'week' | 'month'
+    };
+    
+    const analytics = await adminService.getUserBehaviorAnalytics(params);
+    res.json(analytics);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getPredictiveAnalytics(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const params = {
+      startDate: req.query.startDate ? new Date(req.query.startDate as string) : undefined,
+      endDate: req.query.endDate ? new Date(req.query.endDate as string) : undefined,
+      category: req.query.category as string,
+      userId: req.query.userId ? parseInt(req.query.userId as string) : undefined,
+      granularity: req.query.granularity as 'day' | 'week' | 'month'
+    };
+    
+    const analytics = await adminService.getPredictiveAnalytics(params);
+    res.json(analytics);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function generateCustomReport(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { reportType } = req.params;
+    const params = req.query as Record<string, any>;
+    
+    const report = await adminService.generateCustomReport(reportType, params);
+    res.json(report);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getRealtimeMetrics(_req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const metrics = await adminService.getRealtimeMetrics();
+    res.json(metrics);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function exportAnalyticsData(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { reportType, format } = req.query;
+    const filters = req.query.filters ? JSON.parse(req.query.filters as string) : {};
+    
+    const data = await adminService.exportAnalyticsData({
+      reportType: reportType as string,
+      format: format as 'csv' | 'excel' | 'pdf',
+      filters
+    });
+    
+    // Set appropriate headers for file download
+    const filename = `analytics_${reportType}_${new Date().toISOString().split('T')[0]}.${format}`;
+    const contentType = format === 'csv' ? 'text/csv' : 
+                       format === 'excel' ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 
+                       'application/pdf';
+    
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(data);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// -- Legacy Badge & Content Moderation (deprecated) --
 export async function getPosts(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const filters = req.query as unknown as QueryParams;
