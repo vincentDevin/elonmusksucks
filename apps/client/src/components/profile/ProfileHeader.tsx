@@ -29,7 +29,7 @@ export function ProfileHeader({
           <h1 className="text-3xl font-bold text-content">{profile.name}</h1>
           <p className="text-tertiary">@{profile.name}</p>
           {profile.bio && <p className="mt-2 text-base text-content">{profile.bio}</p>}
-          
+
           {/* Followers/Following counts */}
           <div className="flex justify-center sm:justify-start space-x-6 mt-3">
             <div>

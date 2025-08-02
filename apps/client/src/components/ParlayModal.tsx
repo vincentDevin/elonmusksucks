@@ -31,28 +31,28 @@ export default function ParlayModal({ isOpen, onClose }: ParlayModalProps) {
 
   /* ---------- Enhanced parlay calculations ---------- */
   const parlayCalculations = useMemo(() => {
-    const individualOdds = state.legs.map(leg => {
+    const individualOdds = state.legs.map((leg) => {
       const option = findOption(leg.predictionId, leg.optionId);
       return option?.odds ?? 1;
     });
-    
+
     const baseCombined = individualOdds.reduce((acc, odds) => acc * odds, 1);
     const legCount = state.legs.length;
-    
+
     let bonusMultiplier = 1;
     if (legCount >= 2) {
       bonusMultiplier = Math.pow(1.15, legCount - 1);
       bonusMultiplier = Math.min(bonusMultiplier, 2.0);
     }
-    
+
     const finalOdds = baseCombined * bonusMultiplier;
-    
+
     return {
       baseCombinedOdds: baseCombined,
       bonusMultiplier,
       finalOdds,
       payout: Math.floor(state.amount * finalOdds),
-      legCount
+      legCount,
     };
   }, [state.legs, state.amount, predictions, findOption]);
 
@@ -135,9 +135,7 @@ export default function ParlayModal({ isOpen, onClose }: ParlayModalProps) {
           <span>Your Stake:</span>
           <span className="text-lg font-bold">{state.amount} 🪙</span>
         </div>
-        <p className="text-xs text-tertiary mt-1">
-          💡 Adjust amount in the Parlay Builder →
-        </p>
+        <p className="text-xs text-tertiary mt-1">💡 Adjust amount in the Parlay Builder →</p>
       </div>
 
       {/* Enhanced payout summary */}

@@ -1,14 +1,14 @@
 import { useState, useEffect, useMemo } from 'react';
-import { 
-  searchFinancialData, 
-  getFinancialAnalytics, 
+import {
+  searchFinancialData,
+  getFinancialAnalytics,
   bulkFinancialOperation,
   exportFinancialData,
-  type FinancialSearchParams, 
-  type PaginatedFinancialData, 
+  type FinancialSearchParams,
+  type PaginatedFinancialData,
   type FinancialAnalytics,
   type DetailedBet,
-  type DetailedTransaction 
+  type DetailedTransaction,
 } from '../../api/admin';
 
 interface FilterState {
@@ -34,21 +34,23 @@ const initialFilters: FilterState = {
   transactionType: [],
   suspiciousOnly: false,
   sortBy: 'createdAt',
-  sortOrder: 'desc'
+  sortOrder: 'desc',
 };
 
 export default function UnifiedFinancialDashboard() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'bets' | 'transactions' | 'analytics'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'bets' | 'transactions' | 'analytics'>(
+    'overview',
+  );
   const [filters, setFilters] = useState<FilterState>(initialFilters);
   const [currentPage, setCurrentPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
-  
+
   // Data states
   const [financialData, setFinancialData] = useState<PaginatedFinancialData | null>(null);
   const [analytics, setAnalytics] = useState<FinancialAnalytics | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Selection and bulk operations
   const [selectedBets, setSelectedBets] = useState<Set<number>>(new Set());
   const [bulkLoading, setBulkLoading] = useState(false);
@@ -57,15 +59,22 @@ export default function UnifiedFinancialDashboard() {
   const loadFinancialData = async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
       const searchParams: FinancialSearchParams = {
         search: filters.search || undefined,
         userId: filters.userId,
         predictionId: filters.predictionId,
-        betType: filters.betType.length > 0 ? filters.betType as ('single' | 'parlay')[] : undefined,
-        status: filters.status.length > 0 ? filters.status as ('pending' | 'won' | 'lost' | 'refunded')[] : undefined,
-        transactionType: filters.transactionType.length > 0 ? filters.transactionType as ('DEBIT' | 'CREDIT')[] : undefined,
+        betType:
+          filters.betType.length > 0 ? (filters.betType as ('single' | 'parlay')[]) : undefined,
+        status:
+          filters.status.length > 0
+            ? (filters.status as ('pending' | 'won' | 'lost' | 'refunded')[])
+            : undefined,
+        transactionType:
+          filters.transactionType.length > 0
+            ? (filters.transactionType as ('DEBIT' | 'CREDIT')[])
+            : undefined,
         minAmount: filters.minAmount,
         maxAmount: filters.maxAmount,
         startDate: filters.startDate,
@@ -74,7 +83,7 @@ export default function UnifiedFinancialDashboard() {
         page: currentPage,
         limit: pageSize,
         sortBy: filters.sortBy,
-        sortOrder: filters.sortOrder
+        sortOrder: filters.sortOrder,
       };
 
       const data = await searchFinancialData(searchParams);
@@ -91,7 +100,7 @@ export default function UnifiedFinancialDashboard() {
     try {
       const analyticsData = await getFinancialAnalytics({
         startDate: filters.startDate,
-        endDate: filters.endDate
+        endDate: filters.endDate,
       });
       setAnalytics(analyticsData);
     } catch (err) {
@@ -113,7 +122,7 @@ export default function UnifiedFinancialDashboard() {
 
   // Handle filter changes
   const updateFilters = (newFilters: Partial<FilterState>) => {
-    setFilters(prev => ({ ...prev, ...newFilters }));
+    setFilters((prev) => ({ ...prev, ...newFilters }));
     setCurrentPage(0); // Reset to first page
   };
 
@@ -125,15 +134,15 @@ export default function UnifiedFinancialDashboard() {
   // Handle bulk operations
   const handleBulkRefund = async () => {
     if (selectedBets.size === 0) return;
-    
+
     setBulkLoading(true);
     try {
       const result = await bulkFinancialOperation({
         betIds: Array.from(selectedBets),
         operation: 'refund',
-        params: { reason: 'Admin bulk refund' }
+        params: { reason: 'Admin bulk refund' },
       });
-      
+
       alert(`Refunded ${result.successCount} bets. Total refunded: $${result.totalRefunded || 0}`);
       setSelectedBets(new Set());
       loadFinancialData(); // Reload data
@@ -145,7 +154,10 @@ export default function UnifiedFinancialDashboard() {
   };
 
   // Handle data export
-  const handleExport = async (format: 'csv' | 'excel', dataType: 'bets' | 'transactions' | 'analytics') => {
+  const handleExport = async (
+    format: 'csv' | 'excel',
+    dataType: 'bets' | 'transactions' | 'analytics',
+  ) => {
     try {
       const blob = await exportFinancialData({
         format,
@@ -154,9 +166,16 @@ export default function UnifiedFinancialDashboard() {
           search: filters.search || undefined,
           userId: filters.userId,
           predictionId: filters.predictionId,
-          betType: filters.betType.length > 0 ? filters.betType as ('single' | 'parlay')[] : undefined,
-          status: filters.status.length > 0 ? filters.status as ('pending' | 'won' | 'lost' | 'refunded')[] : undefined,
-          transactionType: filters.transactionType.length > 0 ? filters.transactionType as ('DEBIT' | 'CREDIT')[] : undefined,
+          betType:
+            filters.betType.length > 0 ? (filters.betType as ('single' | 'parlay')[]) : undefined,
+          status:
+            filters.status.length > 0
+              ? (filters.status as ('pending' | 'won' | 'lost' | 'refunded')[])
+              : undefined,
+          transactionType:
+            filters.transactionType.length > 0
+              ? (filters.transactionType as ('DEBIT' | 'CREDIT')[])
+              : undefined,
           minAmount: filters.minAmount,
           maxAmount: filters.maxAmount,
           startDate: filters.startDate,
@@ -165,8 +184,8 @@ export default function UnifiedFinancialDashboard() {
           page: 0,
           limit: 10000, // Export all data
           sortBy: filters.sortBy,
-          sortOrder: filters.sortOrder
-        }
+          sortOrder: filters.sortOrder,
+        },
       });
 
       // Download the file
@@ -186,20 +205,20 @@ export default function UnifiedFinancialDashboard() {
   // Calculate totals for overview
   const overviewStats = useMemo(() => {
     if (!financialData) return null;
-    
+
     const totalBetAmount = financialData.bets.reduce((sum, bet) => sum + bet.amount, 0);
     const totalPayout = financialData.bets.reduce((sum, bet) => sum + (bet.payout || 0), 0);
     const refundedAmount = financialData.bets
-      .filter(bet => bet.status === 'REFUNDED')
+      .filter((bet) => bet.status === 'REFUNDED')
       .reduce((sum, bet) => sum + bet.amount, 0);
-    
+
     return {
       totalBets: financialData.bets.length,
       totalTransactions: financialData.transactions.length,
       totalBetAmount,
       totalPayout,
       refundedAmount,
-      netRevenue: totalBetAmount - totalPayout - refundedAmount
+      netRevenue: totalBetAmount - totalPayout - refundedAmount,
     };
   }, [financialData]);
 
@@ -231,8 +250,8 @@ export default function UnifiedFinancialDashboard() {
           { key: 'overview', label: 'Overview' },
           { key: 'bets', label: 'Bets' },
           { key: 'transactions', label: 'Transactions' },
-          { key: 'analytics', label: 'Analytics' }
-        ].map(tab => (
+          { key: 'analytics', label: 'Analytics' },
+        ].map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key as any)}
@@ -268,7 +287,9 @@ export default function UnifiedFinancialDashboard() {
             <input
               type="number"
               value={filters.minAmount || ''}
-              onChange={(e) => updateFilters({ minAmount: e.target.value ? Number(e.target.value) : undefined })}
+              onChange={(e) =>
+                updateFilters({ minAmount: e.target.value ? Number(e.target.value) : undefined })
+              }
               placeholder="0"
               className="w-full px-3 py-2 border border-muted rounded focus:outline-none focus:ring-2 focus:ring-primary bg-background text-content"
             />
@@ -279,7 +300,9 @@ export default function UnifiedFinancialDashboard() {
             <input
               type="number"
               value={filters.maxAmount || ''}
-              onChange={(e) => updateFilters({ maxAmount: e.target.value ? Number(e.target.value) : undefined })}
+              onChange={(e) =>
+                updateFilters({ maxAmount: e.target.value ? Number(e.target.value) : undefined })
+              }
               placeholder="∞"
               className="w-full px-3 py-2 border border-muted rounded focus:outline-none focus:ring-2 focus:ring-primary bg-background text-content"
             />
@@ -313,7 +336,11 @@ export default function UnifiedFinancialDashboard() {
               <select
                 multiple
                 value={filters.status}
-                onChange={(e) => updateFilters({ status: Array.from(e.target.selectedOptions, option => option.value) })}
+                onChange={(e) =>
+                  updateFilters({
+                    status: Array.from(e.target.selectedOptions, (option) => option.value),
+                  })
+                }
                 className="w-full px-3 py-2 border border-muted rounded focus:outline-none focus:ring-2 focus:ring-primary bg-background text-content"
               >
                 <option value="pending">Pending</option>
@@ -327,11 +354,17 @@ export default function UnifiedFinancialDashboard() {
           {/* Transaction Type Filter */}
           {activeTab === 'transactions' && (
             <div>
-              <label className="block text-sm font-medium text-content mb-1">Transaction Type</label>
+              <label className="block text-sm font-medium text-content mb-1">
+                Transaction Type
+              </label>
               <select
                 multiple
                 value={filters.transactionType}
-                onChange={(e) => updateFilters({ transactionType: Array.from(e.target.selectedOptions, option => option.value) })}
+                onChange={(e) =>
+                  updateFilters({
+                    transactionType: Array.from(e.target.selectedOptions, (option) => option.value),
+                  })
+                }
                 className="w-full px-3 py-2 border border-muted rounded focus:outline-none focus:ring-2 focus:ring-primary bg-background text-content"
               >
                 <option value="DEBIT">Debit</option>
@@ -370,11 +403,15 @@ export default function UnifiedFinancialDashboard() {
                 <div className="text-sm text-tertiary">Total Bets</div>
               </div>
               <div className="bg-surface p-4 rounded-lg border border-muted">
-                <div className="text-2xl font-bold text-primary">{overviewStats.totalTransactions}</div>
+                <div className="text-2xl font-bold text-primary">
+                  {overviewStats.totalTransactions}
+                </div>
                 <div className="text-sm text-tertiary">Transactions</div>
               </div>
               <div className="bg-surface p-4 rounded-lg border border-muted">
-                <div className="text-2xl font-bold text-primary">${overviewStats.totalBetAmount}</div>
+                <div className="text-2xl font-bold text-primary">
+                  ${overviewStats.totalBetAmount}
+                </div>
                 <div className="text-sm text-tertiary">Bet Volume</div>
               </div>
               <div className="bg-surface p-4 rounded-lg border border-muted">
@@ -382,7 +419,9 @@ export default function UnifiedFinancialDashboard() {
                 <div className="text-sm text-tertiary">Payouts</div>
               </div>
               <div className="bg-surface p-4 rounded-lg border border-muted">
-                <div className="text-2xl font-bold text-primary">${overviewStats.refundedAmount}</div>
+                <div className="text-2xl font-bold text-primary">
+                  ${overviewStats.refundedAmount}
+                </div>
                 <div className="text-sm text-tertiary">Refunded</div>
               </div>
               <div className="bg-surface p-4 rounded-lg border border-muted">
@@ -398,19 +437,27 @@ export default function UnifiedFinancialDashboard() {
               <h3 className="text-lg font-semibold text-content mb-4">Analytics Summary</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
-                  <div className="text-xl font-bold text-primary">${analytics.overview.totalBettingVolume}</div>
+                  <div className="text-xl font-bold text-primary">
+                    ${analytics.overview.totalBettingVolume}
+                  </div>
                   <div className="text-sm text-tertiary">Total Volume</div>
                 </div>
                 <div>
-                  <div className="text-xl font-bold text-primary">{analytics.overview.activeBettors}</div>
+                  <div className="text-xl font-bold text-primary">
+                    {analytics.overview.activeBettors}
+                  </div>
                   <div className="text-sm text-tertiary">Active Bettors</div>
                 </div>
                 <div>
-                  <div className="text-xl font-bold text-primary">${analytics.overview.avgBetSize.toFixed(2)}</div>
+                  <div className="text-xl font-bold text-primary">
+                    ${analytics.overview.avgBetSize.toFixed(2)}
+                  </div>
                   <div className="text-sm text-tertiary">Avg Bet Size</div>
                 </div>
                 <div>
-                  <div className="text-xl font-bold text-primary">${analytics.overview.netRevenue}</div>
+                  <div className="text-xl font-bold text-primary">
+                    ${analytics.overview.netRevenue}
+                  </div>
                   <div className="text-sm text-tertiary">Net Revenue</div>
                 </div>
               </div>
@@ -453,10 +500,13 @@ export default function UnifiedFinancialDashboard() {
                     <th className="px-4 py-3 text-left">
                       <input
                         type="checkbox"
-                        checked={financialData.bets.length > 0 && selectedBets.size === financialData.bets.length}
+                        checked={
+                          financialData.bets.length > 0 &&
+                          selectedBets.size === financialData.bets.length
+                        }
                         onChange={(e) => {
                           if (e.target.checked) {
-                            setSelectedBets(new Set(financialData.bets.map(bet => bet.id)));
+                            setSelectedBets(new Set(financialData.bets.map((bet) => bet.id)));
                           } else {
                             setSelectedBets(new Set());
                           }
@@ -464,12 +514,20 @@ export default function UnifiedFinancialDashboard() {
                       />
                     </th>
                     <th className="px-4 py-3 text-left text-sm font-medium text-content">User</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-content">Prediction</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-content">
+                      Prediction
+                    </th>
                     <th className="px-4 py-3 text-left text-sm font-medium text-content">Amount</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-content">Potential Payout</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-content">
+                      Potential Payout
+                    </th>
                     <th className="px-4 py-3 text-left text-sm font-medium text-content">Status</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-content">Created At</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-content">Actions</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-content">
+                      Created At
+                    </th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-content">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-muted">
@@ -495,20 +553,30 @@ export default function UnifiedFinancialDashboard() {
                         <div className="text-tertiary">{bet.userEmail}</div>
                       </td>
                       <td className="px-4 py-3 text-sm">
-                        <div className="font-medium text-content max-w-xs truncate" title={bet.prediction?.title}>
+                        <div
+                          className="font-medium text-content max-w-xs truncate"
+                          title={bet.prediction?.title}
+                        >
                           {bet.prediction?.title || 'Unknown'}
                         </div>
                         <div className="text-tertiary">{bet.prediction?.category}</div>
                       </td>
                       <td className="px-4 py-3 text-sm font-medium text-content">${bet.amount}</td>
-                      <td className="px-4 py-3 text-sm text-content">${bet.potentialPayout || 0}</td>
+                      <td className="px-4 py-3 text-sm text-content">
+                        ${bet.potentialPayout || 0}
+                      </td>
                       <td className="px-4 py-3">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          bet.status === 'WON' ? 'bg-green-100 text-green-800' :
-                          bet.status === 'LOST' ? 'bg-red-100 text-red-800' :
-                          bet.status === 'REFUNDED' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
+                        <span
+                          className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                            bet.status === 'WON'
+                              ? 'bg-green-100 text-green-800'
+                              : bet.status === 'LOST'
+                                ? 'bg-red-100 text-red-800'
+                                : bet.status === 'REFUNDED'
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : 'bg-gray-100 text-gray-800'
+                          }`}
+                        >
                           {bet.status}
                         </span>
                       </td>
@@ -548,10 +616,10 @@ export default function UnifiedFinancialDashboard() {
               </select>
               <span className="text-sm text-tertiary">per page</span>
             </div>
-            
+
             <div className="flex items-center space-x-2">
               <button
-                onClick={() => setCurrentPage(prev => Math.max(0, prev - 1))}
+                onClick={() => setCurrentPage((prev) => Math.max(0, prev - 1))}
                 disabled={currentPage === 0}
                 className="px-3 py-1 bg-muted text-content rounded hover:opacity-80 disabled:opacity-50 text-sm"
               >
@@ -561,7 +629,9 @@ export default function UnifiedFinancialDashboard() {
                 Page {currentPage + 1} of {financialData.totalPages}
               </span>
               <button
-                onClick={() => setCurrentPage(prev => Math.min(financialData.totalPages - 1, prev + 1))}
+                onClick={() =>
+                  setCurrentPage((prev) => Math.min(financialData.totalPages - 1, prev + 1))
+                }
                 disabled={!financialData.hasNextPage}
                 className="px-3 py-1 bg-muted text-content rounded hover:opacity-80 disabled:opacity-50 text-sm"
               >
@@ -584,9 +654,15 @@ export default function UnifiedFinancialDashboard() {
                     <th className="px-4 py-3 text-left text-sm font-medium text-content">User</th>
                     <th className="px-4 py-3 text-left text-sm font-medium text-content">Type</th>
                     <th className="px-4 py-3 text-left text-sm font-medium text-content">Amount</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-content">Balance After</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-content">Related Bet</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-content">Created At</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-content">
+                      Balance After
+                    </th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-content">
+                      Related Bet
+                    </th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-content">
+                      Created At
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-muted">
@@ -597,9 +673,13 @@ export default function UnifiedFinancialDashboard() {
                         <div className="text-tertiary">{tx.userEmail}</div>
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          tx.type === 'CREDIT' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                        }`}>
+                        <span
+                          className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                            tx.type === 'CREDIT'
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-red-100 text-red-800'
+                          }`}
+                        >
                           {tx.type}
                         </span>
                       </td>
@@ -608,8 +688,11 @@ export default function UnifiedFinancialDashboard() {
                       </td>
                       <td className="px-4 py-3 text-sm text-content">${tx.balanceAfter}</td>
                       <td className="px-4 py-3 text-sm text-tertiary">
-                        {tx.relatedBetId ? `Bet #${tx.relatedBetId}` : 
-                         tx.relatedParlayId ? `Parlay #${tx.relatedParlayId}` : '-'}
+                        {tx.relatedBetId
+                          ? `Bet #${tx.relatedBetId}`
+                          : tx.relatedParlayId
+                            ? `Parlay #${tx.relatedParlayId}`
+                            : '-'}
                       </td>
                       <td className="px-4 py-3 text-sm text-tertiary">
                         {new Date(tx.createdAt).toLocaleDateString()}
@@ -637,10 +720,10 @@ export default function UnifiedFinancialDashboard() {
               </select>
               <span className="text-sm text-tertiary">per page</span>
             </div>
-            
+
             <div className="flex items-center space-x-2">
               <button
-                onClick={() => setCurrentPage(prev => Math.max(0, prev - 1))}
+                onClick={() => setCurrentPage((prev) => Math.max(0, prev - 1))}
                 disabled={currentPage === 0}
                 className="px-3 py-1 bg-muted text-content rounded hover:opacity-80 disabled:opacity-50 text-sm"
               >
@@ -650,7 +733,9 @@ export default function UnifiedFinancialDashboard() {
                 Page {currentPage + 1} of {financialData.totalPages}
               </span>
               <button
-                onClick={() => setCurrentPage(prev => Math.min(financialData.totalPages - 1, prev + 1))}
+                onClick={() =>
+                  setCurrentPage((prev) => Math.min(financialData.totalPages - 1, prev + 1))
+                }
                 disabled={!financialData.hasNextPage}
                 className="px-3 py-1 bg-muted text-content rounded hover:opacity-80 disabled:opacity-50 text-sm"
               >
@@ -669,27 +754,39 @@ export default function UnifiedFinancialDashboard() {
             <h3 className="text-lg font-semibold text-content mb-4">Financial Overview</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div>
-                <div className="text-2xl font-bold text-primary">${analytics.overview.totalBettingVolume}</div>
+                <div className="text-2xl font-bold text-primary">
+                  ${analytics.overview.totalBettingVolume}
+                </div>
                 <div className="text-sm text-tertiary">Total Betting Volume</div>
               </div>
               <div>
-                <div className="text-2xl font-bold text-primary">${analytics.overview.totalPayouts}</div>
+                <div className="text-2xl font-bold text-primary">
+                  ${analytics.overview.totalPayouts}
+                </div>
                 <div className="text-sm text-tertiary">Total Payouts</div>
               </div>
               <div>
-                <div className="text-2xl font-bold text-primary">${analytics.overview.totalRefunds}</div>
+                <div className="text-2xl font-bold text-primary">
+                  ${analytics.overview.totalRefunds}
+                </div>
                 <div className="text-sm text-tertiary">Total Refunds</div>
               </div>
               <div>
-                <div className="text-2xl font-bold text-primary">${analytics.overview.netRevenue}</div>
+                <div className="text-2xl font-bold text-primary">
+                  ${analytics.overview.netRevenue}
+                </div>
                 <div className="text-sm text-tertiary">Net Revenue</div>
               </div>
               <div>
-                <div className="text-2xl font-bold text-primary">{analytics.overview.activeBettors}</div>
+                <div className="text-2xl font-bold text-primary">
+                  {analytics.overview.activeBettors}
+                </div>
                 <div className="text-sm text-tertiary">Active Bettors</div>
               </div>
               <div>
-                <div className="text-2xl font-bold text-primary">${analytics.overview.avgBetSize.toFixed(2)}</div>
+                <div className="text-2xl font-bold text-primary">
+                  ${analytics.overview.avgBetSize.toFixed(2)}
+                </div>
                 <div className="text-sm text-tertiary">Average Bet Size</div>
               </div>
             </div>
@@ -706,7 +803,9 @@ export default function UnifiedFinancialDashboard() {
                       <th className="text-left py-2 text-sm font-medium text-content">Category</th>
                       <th className="text-left py-2 text-sm font-medium text-content">Volume</th>
                       <th className="text-left py-2 text-sm font-medium text-content">Bet Count</th>
-                      <th className="text-left py-2 text-sm font-medium text-content">Profit Margin</th>
+                      <th className="text-left py-2 text-sm font-medium text-content">
+                        Profit Margin
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -731,15 +830,21 @@ export default function UnifiedFinancialDashboard() {
             <h3 className="text-lg font-semibold text-content mb-4">Fraud Detection</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <div className="text-xl font-bold text-yellow-600">{analytics.fraudDetection.suspiciousBets}</div>
+                <div className="text-xl font-bold text-yellow-600">
+                  {analytics.fraudDetection.suspiciousBets}
+                </div>
                 <div className="text-sm text-tertiary">Suspicious Bets</div>
               </div>
               <div>
-                <div className="text-xl font-bold text-red-600">{analytics.fraudDetection.flaggedUsers}</div>
+                <div className="text-xl font-bold text-red-600">
+                  {analytics.fraudDetection.flaggedUsers}
+                </div>
                 <div className="text-sm text-tertiary">Flagged Users</div>
               </div>
               <div>
-                <div className="text-xl font-bold text-orange-600">{analytics.fraudDetection.riskPatterns.length}</div>
+                <div className="text-xl font-bold text-orange-600">
+                  {analytics.fraudDetection.riskPatterns.length}
+                </div>
                 <div className="text-sm text-tertiary">Risk Patterns</div>
               </div>
             </div>

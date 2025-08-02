@@ -6,11 +6,7 @@
 
 import { randomUUID } from 'crypto';
 import redisClient from '../lib/redis';
-import type {
-  NormalizedActivityEvent,
-  CreateActivityEvent,
-  ActivityEventType,
-} from '@ems/types';
+import type { NormalizedActivityEvent, CreateActivityEvent, ActivityEventType } from '@ems/types';
 
 export class NormalizedActivityService {
   private readonly TICKER_LIST = 'activity:ticker:normalized';
@@ -67,7 +63,7 @@ export class NormalizedActivityService {
       optionLabel: string;
       category?: string;
       odds?: number;
-    }
+    },
   ): Promise<NormalizedActivityEvent> {
     return this.createEvent({
       type: 'bet_placed' as ActivityEventType,
@@ -95,7 +91,7 @@ export class NormalizedActivityService {
       parlayId: number;
       legCount: number;
       combinedOdds: number;
-    }
+    },
   ): Promise<NormalizedActivityEvent> {
     return this.createEvent({
       type: 'parlay_started' as ActivityEventType,
@@ -120,7 +116,7 @@ export class NormalizedActivityService {
       id: number;
       title: string;
       category: string;
-    }
+    },
   ): Promise<NormalizedActivityEvent> {
     return this.createEvent({
       type: 'prediction_created' as ActivityEventType,
@@ -144,7 +140,7 @@ export class NormalizedActivityService {
       category: string;
       winningOption: string;
     },
-    resolver: { id: number; name: string; avatarUrl?: string | null }
+    resolver: { id: number; name: string; avatarUrl?: string | null },
   ): Promise<NormalizedActivityEvent> {
     return this.createEvent({
       type: 'prediction_resolved' as ActivityEventType,
@@ -169,7 +165,7 @@ export class NormalizedActivityService {
       predictionTitle: string;
       predictionId: number;
       streak?: number;
-    }
+    },
   ): Promise<NormalizedActivityEvent> {
     return this.createEvent({
       type: 'big_win' as ActivityEventType,
@@ -187,7 +183,7 @@ export class NormalizedActivityService {
   }
 
   /**
-   * Helper: Create post/comment event  
+   * Helper: Create post/comment event
    */
   async createPostEvent(
     user: { id: number; name: string; avatarUrl?: string | null },
@@ -195,15 +191,13 @@ export class NormalizedActivityService {
       id: number;
       content: string;
       isComment: boolean;
-    }
+    },
   ): Promise<NormalizedActivityEvent> {
     return this.createEvent({
       type: post.isComment ? 'comment_created' : 'post_created',
       user,
       meta: {
-        title: post.content.length > 50 
-          ? post.content.substring(0, 47) + '...' 
-          : post.content,
+        title: post.content.length > 50 ? post.content.substring(0, 47) + '...' : post.content,
         postId: post.id,
       },
       priority: 'low',
@@ -219,7 +213,7 @@ export class NormalizedActivityService {
       id: number;
       name: string;
       description?: string;
-    }
+    },
   ): Promise<NormalizedActivityEvent> {
     return this.createEvent({
       type: 'badge_earned' as ActivityEventType,

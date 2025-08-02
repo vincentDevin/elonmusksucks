@@ -95,9 +95,9 @@ export class PredictionRepository implements IPredictionRepository {
         options: {
           include: {
             parlayLegs: {
-              include: { 
-                parlay: { 
-                  include: { 
+              include: {
+                parlay: {
+                  include: {
                     user: {
                       select: {
                         id: true,
@@ -136,8 +136,8 @@ export class PredictionRepository implements IPredictionRepository {
         opt.parlayLegs.forEach((leg) => {
           parlayLegs.push({
             parlayId: leg.parlay.id,
-            user: { 
-              id: leg.parlay.user.id, 
+            user: {
+              id: leg.parlay.user.id,
               name: leg.parlay.user.name,
               avatarUrl: leg.parlay.user.avatarUrl,
               profilePictureKey: leg.parlay.user.profilePictureKey,
@@ -171,9 +171,9 @@ export class PredictionRepository implements IPredictionRepository {
         options: {
           include: {
             parlayLegs: {
-              include: { 
-                parlay: { 
-                  include: { 
+              include: {
+                parlay: {
+                  include: {
                     user: {
                       select: {
                         id: true,
@@ -211,8 +211,8 @@ export class PredictionRepository implements IPredictionRepository {
       opt.parlayLegs.forEach((leg) => {
         parlayLegs.push({
           parlayId: leg.parlay.id,
-          user: { 
-            id: leg.parlay.user.id, 
+          user: {
+            id: leg.parlay.user.id,
             name: leg.parlay.user.name,
             avatarUrl: leg.parlay.user.avatarUrl,
             profilePictureKey: leg.parlay.user.profilePictureKey,

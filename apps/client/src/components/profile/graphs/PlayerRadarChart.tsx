@@ -1,5 +1,12 @@
 // apps/client/src/components/profile/graphs/PlayerRadarChart.tsx
-import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer, Legend } from 'recharts';
+import {
+  Radar,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  ResponsiveContainer,
+  Legend,
+} from 'recharts';
 
 interface RadarChartProps {
   roi: number;

@@ -1,11 +1,11 @@
 // apps/server/src/routes/auth.routes.ts
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.middleware';
-import { 
-  apiLimiter, 
-  authLimiter, 
+import {
+  apiLimiter,
+  authLimiter,
   passwordResetLimiter,
-  accountLockoutMiddleware 
+  accountLockoutMiddleware,
 } from '../middleware/rateLimiter';
 import {
   registerUser,

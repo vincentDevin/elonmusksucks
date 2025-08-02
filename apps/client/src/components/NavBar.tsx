@@ -141,7 +141,7 @@ export default function NavBar() {
           >
             <span className="text-lg">{theme === 'light' ? <FaMoon /> : <FaSun />}</span>
           </button>
-          
+
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-label="Toggle mobile menu"
@@ -159,28 +159,28 @@ export default function NavBar() {
             {accessToken ? (
               user ? (
                 <>
-                  <Link 
-                    to="/dashboard" 
+                  <Link
+                    to="/dashboard"
                     className={mobileLinkClasses('/dashboard')}
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     Dashboard
                   </Link>
-                  <Link 
-                    to="/predictions" 
+                  <Link
+                    to="/predictions"
                     className={mobileLinkClasses('/predictions')}
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     Predictions
                   </Link>
-                  <Link 
-                    to="/leaderboard" 
+                  <Link
+                    to="/leaderboard"
                     className={mobileLinkClasses('/leaderboard')}
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     Leaderboard
                   </Link>
-                  
+
                   <div className="border-t border-muted pt-2 mt-2">
                     <div className="flex items-center space-x-3 px-4 py-3">
                       <span className="font-medium">{user.name}</span>
@@ -189,7 +189,7 @@ export default function NavBar() {
                         <span>🪙</span>
                       </div>
                     </div>
-                    
+
                     {user.role === 'ADMIN' && (
                       <Link
                         to="/admin"
@@ -199,7 +199,7 @@ export default function NavBar() {
                         Admin
                       </Link>
                     )}
-                    
+
                     <Link
                       to={`/profile/${user.id}`}
                       className={mobileLinkClasses(`/profile/${user.id}`)}
@@ -207,7 +207,7 @@ export default function NavBar() {
                     >
                       Profile
                     </Link>
-                    
+
                     <button
                       onClick={() => {
                         handleLogout();
@@ -224,15 +224,15 @@ export default function NavBar() {
               )
             ) : (
               <>
-                <Link 
-                  to="/login" 
+                <Link
+                  to="/login"
                   className={mobileLinkClasses('/login')}
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Login
                 </Link>
-                <Link 
-                  to="/register" 
+                <Link
+                  to="/register"
                   className={mobileLinkClasses('/register')}
                   onClick={() => setMobileMenuOpen(false)}
                 >

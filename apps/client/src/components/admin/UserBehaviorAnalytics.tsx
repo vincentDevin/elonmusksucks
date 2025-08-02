@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   getUserBehaviorAnalytics,
   type UserBehaviorAnalytics as UserBehaviorData,
-  type AnalyticsParams
+  type AnalyticsParams,
 } from '../../api/admin';
 
 interface ChartProps {
@@ -24,14 +24,14 @@ interface ProgressBarProps {
   color?: string;
 }
 
-const ProgressBar: React.FC<ProgressBarProps> = ({ 
-  label, 
-  value, 
-  maxValue, 
-  color = 'bg-primary' 
+const ProgressBar: React.FC<ProgressBarProps> = ({
+  label,
+  value,
+  maxValue,
+  color = 'bg-primary',
 }) => {
   const percentage = maxValue > 0 ? (value / maxValue) * 100 : 0;
-  
+
   return (
     <div className="flex items-center justify-between mb-3">
       <div className="flex-1">
@@ -58,12 +58,12 @@ interface TimePatternBarProps {
   maxVolume: number;
 }
 
-const TimePatternBar: React.FC<TimePatternBarProps> = ({ 
-  hour, 
-  betCount, 
-  volume, 
-  maxBetCount, 
-  maxVolume 
+const TimePatternBar: React.FC<TimePatternBarProps> = ({
+  hour,
+  betCount,
+  volume,
+  maxBetCount,
+  maxVolume,
 }) => {
   const betHeight = maxBetCount > 0 ? (betCount / maxBetCount) * 100 : 0;
   const volumeHeight = maxVolume > 0 ? (volume / maxVolume) * 100 : 0;
@@ -71,12 +71,12 @@ const TimePatternBar: React.FC<TimePatternBarProps> = ({
   return (
     <div className="flex flex-col items-center space-y-2">
       <div className="flex space-x-1 h-24 items-end">
-        <div 
+        <div
           className="w-3 bg-primary rounded-t"
           style={{ height: `${betHeight}%` }}
           title={`${betCount} bets`}
         />
-        <div 
+        <div
           className="w-3 bg-secondary rounded-t"
           style={{ height: `${volumeHeight}%` }}
           title={`$${volume.toLocaleString()} volume`}
@@ -145,7 +145,11 @@ const UserBehaviorAnalytics: React.FC = () => {
         <div className="flex">
           <div className="text-red-600">
             <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              <path
+                fillRule="evenodd"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                clipRule="evenodd"
+              />
             </svg>
           </div>
           <div className="ml-3">
@@ -164,17 +168,17 @@ const UserBehaviorAnalytics: React.FC = () => {
   }
 
   if (!behaviorData) {
-    return (
-      <div className="text-center text-tertiary">
-        No behavior analytics data available
-      </div>
-    );
+    return <div className="text-center text-tertiary">No behavior analytics data available</div>;
   }
 
-  const maxCategoryCount = Math.max(...behaviorData.bettingPatterns.preferredCategories.map(c => c.count));
-  const maxCategoryVolume = Math.max(...behaviorData.bettingPatterns.preferredCategories.map(c => c.volume));
-  const maxBetCount = Math.max(...behaviorData.bettingPatterns.timePatterns.map(p => p.betCount));
-  const maxVolume = Math.max(...behaviorData.bettingPatterns.timePatterns.map(p => p.volume));
+  const maxCategoryCount = Math.max(
+    ...behaviorData.bettingPatterns.preferredCategories.map((c) => c.count),
+  );
+  const maxCategoryVolume = Math.max(
+    ...behaviorData.bettingPatterns.preferredCategories.map((c) => c.volume),
+  );
+  const maxBetCount = Math.max(...behaviorData.bettingPatterns.timePatterns.map((p) => p.betCount));
+  const maxVolume = Math.max(...behaviorData.bettingPatterns.timePatterns.map((p) => p.volume));
 
   return (
     <div className="space-y-6">
@@ -182,14 +186,16 @@ const UserBehaviorAnalytics: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-content">User Behavior Analytics</h2>
-          <p className="text-tertiary mt-1">Detailed insights into user engagement patterns and preferences</p>
+          <p className="text-tertiary mt-1">
+            Detailed insights into user engagement patterns and preferences
+          </p>
         </div>
         <div className="flex space-x-2">
           {[
             { key: '7d', label: '7 Days' },
             { key: '30d', label: '30 Days' },
             { key: '90d', label: '90 Days' },
-            { key: '1y', label: '1 Year' }
+            { key: '1y', label: '1 Year' },
           ].map((range) => (
             <button
               key={range.key}
@@ -210,19 +216,25 @@ const UserBehaviorAnalytics: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-surface rounded-lg p-6 border border-muted">
           <h3 className="text-lg font-semibold text-content mb-2">Average Bets Per User</h3>
-          <p className="text-3xl font-bold text-primary">{behaviorData.bettingPatterns.avgBetsPerUser.toFixed(1)}</p>
+          <p className="text-3xl font-bold text-primary">
+            {behaviorData.bettingPatterns.avgBetsPerUser.toFixed(1)}
+          </p>
           <p className="text-sm text-tertiary mt-1">bets per user</p>
         </div>
-        
+
         <div className="bg-surface rounded-lg p-6 border border-muted">
           <h3 className="text-lg font-semibold text-content mb-2">Average Bet Amount</h3>
-          <p className="text-3xl font-bold text-primary">${behaviorData.bettingPatterns.avgBetAmount.toFixed(0)}</p>
+          <p className="text-3xl font-bold text-primary">
+            ${behaviorData.bettingPatterns.avgBetAmount.toFixed(0)}
+          </p>
           <p className="text-sm text-tertiary mt-1">per bet</p>
         </div>
 
         <div className="bg-surface rounded-lg p-6 border border-muted">
           <h3 className="text-lg font-semibold text-content mb-2">Total Categories</h3>
-          <p className="text-3xl font-bold text-primary">{behaviorData.bettingPatterns.preferredCategories.length}</p>
+          <p className="text-3xl font-bold text-primary">
+            {behaviorData.bettingPatterns.preferredCategories.length}
+          </p>
           <p className="text-sm text-tertiary mt-1">active categories</p>
         </div>
       </div>
@@ -240,7 +252,7 @@ const UserBehaviorAnalytics: React.FC = () => {
               <span className="text-tertiary">Volume ($)</span>
             </div>
           </div>
-          
+
           {behaviorData.bettingPatterns.preferredCategories.slice(0, 8).map((category, index) => (
             <div key={index} className="space-y-2">
               <ProgressBar
@@ -276,7 +288,7 @@ const UserBehaviorAnalytics: React.FC = () => {
               <span className="text-tertiary">Volume ($)</span>
             </div>
           </div>
-          
+
           <div className="flex justify-between items-end space-x-1 overflow-x-auto pb-2">
             {behaviorData.bettingPatterns.timePatterns.map((pattern, index) => (
               <TimePatternBar
@@ -289,17 +301,25 @@ const UserBehaviorAnalytics: React.FC = () => {
               />
             ))}
           </div>
-          
+
           <div className="text-xs text-tertiary text-center mt-4">
-            Peak betting hours are typically {' '}
-            {behaviorData.bettingPatterns.timePatterns
-              .reduce((peak, pattern, index) => 
-                pattern.betCount > (behaviorData.bettingPatterns.timePatterns[peak]?.betCount || 0) ? index : peak, 0
-              )}:00 - {' '}
-            {behaviorData.bettingPatterns.timePatterns
-              .reduce((peak, pattern, index) => 
-                pattern.betCount > (behaviorData.bettingPatterns.timePatterns[peak]?.betCount || 0) ? index : peak, 0
-              ) + 2}:00
+            Peak betting hours are typically{' '}
+            {behaviorData.bettingPatterns.timePatterns.reduce(
+              (peak, pattern, index) =>
+                pattern.betCount > (behaviorData.bettingPatterns.timePatterns[peak]?.betCount || 0)
+                  ? index
+                  : peak,
+              0,
+            )}
+            :00 -{' '}
+            {behaviorData.bettingPatterns.timePatterns.reduce(
+              (peak, pattern, index) =>
+                pattern.betCount > (behaviorData.bettingPatterns.timePatterns[peak]?.betCount || 0)
+                  ? index
+                  : peak,
+              0,
+            ) + 2}
+            :00
           </div>
         </div>
       </ChartContainer>
@@ -312,9 +332,7 @@ const UserBehaviorAnalytics: React.FC = () => {
               <h4 className="font-semibold text-content mb-2">{level.level} Activity</h4>
               <p className="text-2xl font-bold text-primary mb-1">{level.count.toLocaleString()}</p>
               <p className="text-sm text-tertiary">users</p>
-              <p className="text-xs text-tertiary mt-2">
-                Avg Value: ${level.avgValue.toFixed(0)}
-              </p>
+              <p className="text-xs text-tertiary mt-2">Avg Value: ${level.avgValue.toFixed(0)}</p>
             </div>
           ))}
         </div>

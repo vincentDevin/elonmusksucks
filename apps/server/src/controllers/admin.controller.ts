@@ -15,12 +15,12 @@ import type {
 } from '@ems/types';
 import { PredictionType } from '@ems/types';
 import type { Role } from '@prisma/client';
-import type { 
+import type {
   QueryParams,
-  UserSearchParams, 
+  UserSearchParams,
   BulkUserOperation,
   PredictionSearchParams,
-  BulkPredictionOperation
+  BulkPredictionOperation,
 } from '../repositories/IAdminRepository';
 
 // -- Enhanced User Management --
@@ -38,13 +38,15 @@ export async function searchUsers(req: Request, res: Response, next: NextFunctio
   try {
     const params: UserSearchParams = {
       search: req.query.search as string,
-      role: req.query.role ? (Array.isArray(req.query.role) ? req.query.role : [req.query.role]) as any : undefined,
+      role: req.query.role
+        ? ((Array.isArray(req.query.role) ? req.query.role : [req.query.role]) as any)
+        : undefined,
       active: req.query.active !== undefined ? req.query.active === 'true' : undefined,
       bannedOnly: req.query.bannedOnly === 'true',
       page: parseInt(req.query.page as string) || 0,
       limit: parseInt(req.query.limit as string) || 25,
       sortBy: (req.query.sortBy as any) || 'createdAt',
-      sortOrder: (req.query.sortOrder as any) || 'desc'
+      sortOrder: (req.query.sortOrder as any) || 'desc',
     };
 
     const result = await adminService.searchUsers(params);
@@ -54,37 +56,45 @@ export async function searchUsers(req: Request, res: Response, next: NextFunctio
   }
 }
 
-export async function getUserDetails(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function getUserDetails(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const userId = parseInt(req.params.userId);
     const user = await adminService.getUserDetails(userId);
-    
+
     if (!user) {
       res.status(404).json({ error: 'User not found' });
       return;
     }
-    
+
     res.json(user);
   } catch (err) {
     next(err);
   }
 }
 
-export async function bulkUpdateUsers(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function bulkUpdateUsers(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const operation: BulkUserOperation = req.body;
-    
+
     // Validate the operation
     if (!operation.userIds || !Array.isArray(operation.userIds) || operation.userIds.length === 0) {
       res.status(400).json({ error: 'userIds array is required and cannot be empty' });
       return;
     }
-    
+
     if (operation.userIds.length > 100) {
       res.status(400).json({ error: 'Cannot update more than 100 users at once' });
       return;
     }
-    
+
     const result = await adminService.bulkUpdateUsers(operation);
     res.json(result);
   } catch (err) {
@@ -148,25 +158,41 @@ export async function getPredictions(
   }
 }
 
-export async function searchPredictions(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function searchPredictions(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const params: PredictionSearchParams = {
       search: req.query.search as string,
-      category: req.query.category ? (Array.isArray(req.query.category) ? req.query.category : [req.query.category]) as string[] : undefined,
-      status: req.query.status ? (Array.isArray(req.query.status) ? req.query.status : [req.query.status]) as any : undefined,
+      category: req.query.category
+        ? ((Array.isArray(req.query.category)
+            ? req.query.category
+            : [req.query.category]) as string[])
+        : undefined,
+      status: req.query.status
+        ? ((Array.isArray(req.query.status) ? req.query.status : [req.query.status]) as any)
+        : undefined,
       creatorId: req.query.creatorId ? parseInt(req.query.creatorId as string) : undefined,
-      dateRange: req.query.startDate || req.query.endDate ? {
-        start: req.query.startDate ? new Date(req.query.startDate as string) : undefined,
-        end: req.query.endDate ? new Date(req.query.endDate as string) : undefined
-      } : undefined,
-      bettingVolume: req.query.minVolume || req.query.maxVolume ? {
-        min: req.query.minVolume ? parseFloat(req.query.minVolume as string) : undefined,
-        max: req.query.maxVolume ? parseFloat(req.query.maxVolume as string) : undefined
-      } : undefined,
+      dateRange:
+        req.query.startDate || req.query.endDate
+          ? {
+              start: req.query.startDate ? new Date(req.query.startDate as string) : undefined,
+              end: req.query.endDate ? new Date(req.query.endDate as string) : undefined,
+            }
+          : undefined,
+      bettingVolume:
+        req.query.minVolume || req.query.maxVolume
+          ? {
+              min: req.query.minVolume ? parseFloat(req.query.minVolume as string) : undefined,
+              max: req.query.maxVolume ? parseFloat(req.query.maxVolume as string) : undefined,
+            }
+          : undefined,
       page: parseInt(req.query.page as string) || 0,
       limit: parseInt(req.query.limit as string) || 25,
       sortBy: (req.query.sortBy as any) || 'createdAt',
-      sortOrder: (req.query.sortOrder as any) || 'desc'
+      sortOrder: (req.query.sortOrder as any) || 'desc',
     };
 
     const result = await adminService.searchPredictions(params);
@@ -176,37 +202,49 @@ export async function searchPredictions(req: Request, res: Response, next: NextF
   }
 }
 
-export async function getPredictionDetails(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function getPredictionDetails(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const predictionId = parseInt(req.params.predictionId);
     const prediction = await adminService.getPredictionDetails(predictionId);
-    
+
     if (!prediction) {
       res.status(404).json({ error: 'Prediction not found' });
       return;
     }
-    
+
     res.json(prediction);
   } catch (err) {
     next(err);
   }
 }
 
-export async function bulkUpdatePredictions(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function bulkUpdatePredictions(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const operation: BulkPredictionOperation = req.body;
-    
+
     // Validate the operation
-    if (!operation.predictionIds || !Array.isArray(operation.predictionIds) || operation.predictionIds.length === 0) {
+    if (
+      !operation.predictionIds ||
+      !Array.isArray(operation.predictionIds) ||
+      operation.predictionIds.length === 0
+    ) {
       res.status(400).json({ error: 'predictionIds array is required and cannot be empty' });
       return;
     }
-    
+
     if (operation.predictionIds.length > 100) {
       res.status(400).json({ error: 'Cannot update more than 100 predictions at once' });
       return;
     }
-    
+
     const result = await adminService.bulkUpdatePredictions(operation);
     res.json(result);
   } catch (err) {
@@ -327,7 +365,11 @@ export async function getTransactions(
 }
 
 // -- Enhanced Financial Operations Dashboard --
-export async function searchFinancialData(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function searchFinancialData(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const params = req.query as unknown as any; // Will be typed properly in service
     const data = await adminService.searchFinancialData(params);
@@ -337,7 +379,11 @@ export async function searchFinancialData(req: Request, res: Response, next: Nex
   }
 }
 
-export async function getFinancialAnalytics(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function getFinancialAnalytics(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const params = req.query as unknown as any;
     const analytics = await adminService.getFinancialAnalytics(params);
@@ -347,7 +393,11 @@ export async function getFinancialAnalytics(req: Request, res: Response, next: N
   }
 }
 
-export async function bulkFinancialOperation(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function bulkFinancialOperation(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const operation = req.body;
     const result = await adminService.bulkFinancialOperation(operation);
@@ -357,17 +407,26 @@ export async function bulkFinancialOperation(req: Request, res: Response, next: 
   }
 }
 
-export async function exportFinancialData(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function exportFinancialData(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const params = req.query as unknown as any;
     const result = await adminService.exportFinancialData(params);
-    
+
     // Set appropriate headers for file download
     const format = params.format || 'csv';
     const dataType = params.dataType || 'bets';
     const filename = `financial_${dataType}_${new Date().toISOString().split('T')[0]}.${format}`;
-    
-    res.setHeader('Content-Type', format === 'csv' ? 'text/csv' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+
+    res.setHeader(
+      'Content-Type',
+      format === 'csv'
+        ? 'text/csv'
+        : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(result);
   } catch (err) {
@@ -386,7 +445,11 @@ export async function searchBadges(req: Request, res: Response, next: NextFuncti
   }
 }
 
-export async function getBadgeDetails(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function getBadgeDetails(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const badgeId = Number(req.params.badgeId);
     const badge = await adminService.getBadgeWithDetails(badgeId);
@@ -400,7 +463,11 @@ export async function getBadgeDetails(req: Request, res: Response, next: NextFun
   }
 }
 
-export async function createBadgeWithCategories(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function createBadgeWithCategories(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const data = req.body;
     const badge = await adminService.createBadgeWithCategories(data);
@@ -431,7 +498,11 @@ export async function deleteBadge(req: Request, res: Response, next: NextFunctio
   }
 }
 
-export async function getBadgeAnalytics(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function getBadgeAnalytics(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const badgeId = req.query.badgeId ? Number(req.query.badgeId) : undefined;
     const analytics = await adminService.getBadgeAnalytics(badgeId);
@@ -441,7 +512,11 @@ export async function getBadgeAnalytics(req: Request, res: Response, next: NextF
   }
 }
 
-export async function bulkBadgeOperation(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function bulkBadgeOperation(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const operation = req.body;
     const result = await adminService.bulkBadgeOperation(operation);
@@ -451,7 +526,11 @@ export async function bulkBadgeOperation(req: Request, res: Response, next: Next
   }
 }
 
-export async function getBadgeCategories(_req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function getBadgeCategories(
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const categories = await adminService.getBadgeCategories();
     res.json(categories);
@@ -460,7 +539,11 @@ export async function getBadgeCategories(_req: Request, res: Response, next: Nex
   }
 }
 
-export async function createBadgeCategory(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function createBadgeCategory(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const data = req.body;
     const category = await adminService.createBadgeCategory(data);
@@ -471,16 +554,20 @@ export async function createBadgeCategory(req: Request, res: Response, next: Nex
 }
 
 // -- Advanced Analytics & Reporting --
-export async function getExecutiveDashboard(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function getExecutiveDashboard(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const params = {
       startDate: req.query.startDate ? new Date(req.query.startDate as string) : undefined,
       endDate: req.query.endDate ? new Date(req.query.endDate as string) : undefined,
       category: req.query.category as string,
       userId: req.query.userId ? parseInt(req.query.userId as string) : undefined,
-      granularity: req.query.granularity as 'day' | 'week' | 'month'
+      granularity: req.query.granularity as 'day' | 'week' | 'month',
     };
-    
+
     const dashboard = await adminService.getExecutiveDashboard(params);
     res.json(dashboard);
   } catch (err) {
@@ -488,16 +575,20 @@ export async function getExecutiveDashboard(req: Request, res: Response, next: N
   }
 }
 
-export async function getUserBehaviorAnalytics(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function getUserBehaviorAnalytics(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const params = {
       startDate: req.query.startDate ? new Date(req.query.startDate as string) : undefined,
       endDate: req.query.endDate ? new Date(req.query.endDate as string) : undefined,
       category: req.query.category as string,
       userId: req.query.userId ? parseInt(req.query.userId as string) : undefined,
-      granularity: req.query.granularity as 'day' | 'week' | 'month'
+      granularity: req.query.granularity as 'day' | 'week' | 'month',
     };
-    
+
     const analytics = await adminService.getUserBehaviorAnalytics(params);
     res.json(analytics);
   } catch (err) {
@@ -505,16 +596,20 @@ export async function getUserBehaviorAnalytics(req: Request, res: Response, next
   }
 }
 
-export async function getPredictiveAnalytics(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function getPredictiveAnalytics(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const params = {
       startDate: req.query.startDate ? new Date(req.query.startDate as string) : undefined,
       endDate: req.query.endDate ? new Date(req.query.endDate as string) : undefined,
       category: req.query.category as string,
       userId: req.query.userId ? parseInt(req.query.userId as string) : undefined,
-      granularity: req.query.granularity as 'day' | 'week' | 'month'
+      granularity: req.query.granularity as 'day' | 'week' | 'month',
     };
-    
+
     const analytics = await adminService.getPredictiveAnalytics(params);
     res.json(analytics);
   } catch (err) {
@@ -522,11 +617,15 @@ export async function getPredictiveAnalytics(req: Request, res: Response, next: 
   }
 }
 
-export async function generateCustomReport(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function generateCustomReport(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const { reportType } = req.params;
     const params = req.query as Record<string, any>;
-    
+
     const report = await adminService.generateCustomReport(reportType, params);
     res.json(report);
   } catch (err) {
@@ -534,7 +633,11 @@ export async function generateCustomReport(req: Request, res: Response, next: Ne
   }
 }
 
-export async function getRealtimeMetrics(_req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function getRealtimeMetrics(
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const metrics = await adminService.getRealtimeMetrics();
     res.json(metrics);
@@ -543,23 +646,30 @@ export async function getRealtimeMetrics(_req: Request, res: Response, next: Nex
   }
 }
 
-export async function exportAnalyticsData(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function exportAnalyticsData(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const { reportType, format } = req.query;
     const filters = req.query.filters ? JSON.parse(req.query.filters as string) : {};
-    
+
     const data = await adminService.exportAnalyticsData({
       reportType: reportType as string,
       format: format as 'csv' | 'excel' | 'pdf',
-      filters
+      filters,
     });
-    
+
     // Set appropriate headers for file download
     const filename = `analytics_${reportType}_${new Date().toISOString().split('T')[0]}.${format}`;
-    const contentType = format === 'csv' ? 'text/csv' : 
-                       format === 'excel' ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 
-                       'application/pdf';
-    
+    const contentType =
+      format === 'csv'
+        ? 'text/csv'
+        : format === 'excel'
+          ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+          : 'application/pdf';
+
     res.setHeader('Content-Type', contentType);
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(data);

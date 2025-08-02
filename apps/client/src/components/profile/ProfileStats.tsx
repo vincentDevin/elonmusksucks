@@ -18,8 +18,9 @@ export function ProfileStats({
 
   const betWinRate = stats.totalBets > 0 ? stats.betsWon / stats.totalBets : 0;
   const parlayWinRate = stats.totalParlays > 0 ? stats.parlaysWon / stats.totalParlays : 0;
-  const parlayAccuracy = stats.totalParlayLegs > 0 ? stats.parlayLegsWon / stats.totalParlayLegs : 0;
-  
+  const parlayAccuracy =
+    stats.totalParlayLegs > 0 ? stats.parlayLegsWon / stats.totalParlayLegs : 0;
+
   // Calculate overall win rate (combines bets and parlays)
   const totalGames = stats.totalBets + stats.totalParlays;
   const totalWins = stats.betsWon + stats.parlaysWon;
@@ -55,7 +56,9 @@ export function ProfileStats({
           <div className="text-xs text-tertiary">MuskBucks</div>
         </div>
         <div className="text-center">
-          <div className="text-lg font-bold text-content">{stats.totalBets + stats.totalParlays}</div>
+          <div className="text-lg font-bold text-content">
+            {stats.totalBets + stats.totalParlays}
+          </div>
           <div className="text-xs text-tertiary">Total Bets</div>
         </div>
         <div className="text-center">
@@ -63,7 +66,9 @@ export function ProfileStats({
           <div className="text-xs text-tertiary">Win Rate</div>
         </div>
         <div className="text-center">
-          <div className={`text-lg font-bold ${stats.profit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+          <div
+            className={`text-lg font-bold ${stats.profit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
+          >
             {stats.profit >= 0 ? '+' : ''}${stats.profit.toLocaleString()}
           </div>
           <div className="text-xs text-tertiary">Profit</div>
@@ -82,7 +87,7 @@ export function ProfileStats({
                 title="Overall Win/Loss"
               />
             </div>
-            
+
             <div className="bg-background/50 border border-muted rounded-xl p-4 hover:bg-background/70 transition-colors duration-200">
               <FinancialBarChart
                 wagered={stats.totalWagered}
@@ -90,7 +95,7 @@ export function ProfileStats({
                 profit={stats.profit}
               />
             </div>
-            
+
             <div className="bg-background/50 border border-muted rounded-xl p-4 hover:bg-background/70 transition-colors duration-200">
               <PerformanceProgressBars
                 roi={stats.roi}
@@ -104,7 +109,9 @@ export function ProfileStats({
       )}
 
       {/* Raw Stats Section - now collapsible inside the same card */}
-      <div className="border-t border-muted pt-4 mt-4"> {/* Added top border for separation */}
+      <div className="border-t border-muted pt-4 mt-4">
+        {' '}
+        {/* Added top border for separation */}
         <h4
           className="text-base font-semibold mb-3 flex items-center gap-2 cursor-pointer" /* Reduced size */
           onClick={() => setShowRawStats(!showRawStats)}

@@ -10,20 +10,24 @@ export default function PredictionFeed() {
   const observerRef = useRef(null);
 
   const sortedAndFilteredPredictions = useMemo(() => {
-    let filtered = predictions.filter(p => {
+    let filtered = predictions.filter((p) => {
       const now = Date.now();
       const expires = new Date(p.expiresAt).getTime();
       return p.approved && !p.resolved && now <= expires;
     });
 
     if (filterByCategory !== 'all') {
-      filtered = filtered.filter(p => p.category === filterByCategory);
+      filtered = filtered.filter((p) => p.category === filterByCategory);
     }
 
     if (sortBy === 'newest') {
-      return filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      return filtered.sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
     } else if (sortBy === 'endingSoon') {
-      return filtered.sort((a, b) => new Date(a.expiresAt).getTime() - new Date(b.expiresAt).getTime());
+      return filtered.sort(
+        (a, b) => new Date(a.expiresAt).getTime() - new Date(b.expiresAt).getTime(),
+      );
     }
 
     return filtered;
@@ -39,7 +43,7 @@ export default function PredictionFeed() {
           loadMore();
         }
       },
-      { threshold: 1.0 }
+      { threshold: 1.0 },
     );
 
     if (currentObserverRef) {
@@ -61,13 +65,23 @@ export default function PredictionFeed() {
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-bold text-content">Prediction Feed</h2>
         <div className="flex gap-2">
-          <select onChange={(e) => setSortBy(e.target.value)} className="bg-background border border-muted rounded-md px-2 py-1 text-sm">
+          <select
+            onChange={(e) => setSortBy(e.target.value)}
+            className="bg-background border border-muted rounded-md px-2 py-1 text-sm"
+          >
             <option value="newest">Newest</option>
             <option value="endingSoon">Ending Soon</option>
           </select>
-          <select onChange={(e) => setFilterByCategory(e.target.value)} className="bg-background border border-muted rounded-md px-2 py-1 text-sm">
+          <select
+            onChange={(e) => setFilterByCategory(e.target.value)}
+            className="bg-background border border-muted rounded-md px-2 py-1 text-sm"
+          >
             <option value="all">All Categories</option>
-            {[...new Set(predictions.map(p => p.category))].map(c => <option key={c} value={c}>{c}</option>)}
+            {[...new Set(predictions.map((p) => p.category))].map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
           </select>
         </div>
       </div>

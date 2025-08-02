@@ -30,16 +30,20 @@ const ChatModerationControls: React.FC<ChatModerationControlsProps> = ({
     const reason = prompt('Enter reason for deleting this message:');
     if (!reason) return;
 
-    socket.emit('admin:deleteMessage', {
-      messageId,
-      reason,
-    }, (response: { success: boolean; error?: string }) => {
-      if (response.success) {
-        onAction?.();
-      } else {
-        alert(`Failed to delete message: ${response.error}`);
-      }
-    });
+    socket.emit(
+      'admin:deleteMessage',
+      {
+        messageId,
+        reason,
+      },
+      (response: { success: boolean; error?: string }) => {
+        if (response.success) {
+          onAction?.();
+        } else {
+          alert(`Failed to delete message: ${response.error}`);
+        }
+      },
+    );
   };
 
   const handleMuteUser = () => {
@@ -57,18 +61,22 @@ const ChatModerationControls: React.FC<ChatModerationControlsProps> = ({
     const reason = prompt('Enter reason for muting this user:');
     if (!reason) return;
 
-    socket.emit('admin:muteUser', {
-      userId,
-      duration,
-      reason,
-    }, (response: { success: boolean; error?: string }) => {
-      if (response.success) {
-        alert(`User ${userName} muted for ${duration} minutes`);
-        onAction?.();
-      } else {
-        alert(`Failed to mute user: ${response.error}`);
-      }
-    });
+    socket.emit(
+      'admin:muteUser',
+      {
+        userId,
+        duration,
+        reason,
+      },
+      (response: { success: boolean; error?: string }) => {
+        if (response.success) {
+          alert(`User ${userName} muted for ${duration} minutes`);
+          onAction?.();
+        } else {
+          alert(`Failed to mute user: ${response.error}`);
+        }
+      },
+    );
   };
 
   const handleKickUser = () => {
@@ -77,17 +85,21 @@ const ChatModerationControls: React.FC<ChatModerationControlsProps> = ({
     const reason = prompt('Enter reason for kicking this user:');
     if (!reason) return;
 
-    socket.emit('admin:kickUser', {
-      userId,
-      reason,
-    }, (response: { success: boolean; error?: string }) => {
-      if (response.success) {
-        alert(`User ${userName} kicked`);
-        onAction?.();
-      } else {
-        alert(`Failed to kick user: ${response.error}`);
-      }
-    });
+    socket.emit(
+      'admin:kickUser',
+      {
+        userId,
+        reason,
+      },
+      (response: { success: boolean; error?: string }) => {
+        if (response.success) {
+          alert(`User ${userName} kicked`);
+          onAction?.();
+        } else {
+          alert(`Failed to kick user: ${response.error}`);
+        }
+      },
+    );
   };
 
   const handleBanUser = (banType: 'TEMPORARY' | 'PERMANENT') => {
@@ -107,25 +119,30 @@ const ChatModerationControls: React.FC<ChatModerationControlsProps> = ({
     const reason = prompt(`Enter reason for ${banType.toLowerCase()} ban:`);
     if (!reason) return;
 
-    const confirmMessage = banType === 'PERMANENT' 
-      ? `Are you sure you want to permanently ban ${userName}?`
-      : `Are you sure you want to ban ${userName} for ${duration} minutes?`;
+    const confirmMessage =
+      banType === 'PERMANENT'
+        ? `Are you sure you want to permanently ban ${userName}?`
+        : `Are you sure you want to ban ${userName} for ${duration} minutes?`;
 
     if (!confirm(confirmMessage)) return;
 
-    socket.emit('admin:banUser', {
-      userId,
-      banType,
-      reason,
-      duration,
-    }, (response: { success: boolean; error?: string }) => {
-      if (response.success) {
-        alert(`User ${userName} banned`);
-        onAction?.();
-      } else {
-        alert(`Failed to ban user: ${response.error}`);
-      }
-    });
+    socket.emit(
+      'admin:banUser',
+      {
+        userId,
+        banType,
+        reason,
+        duration,
+      },
+      (response: { success: boolean; error?: string }) => {
+        if (response.success) {
+          alert(`User ${userName} banned`);
+          onAction?.();
+        } else {
+          alert(`Failed to ban user: ${response.error}`);
+        }
+      },
+    );
   };
 
   return (
@@ -139,7 +156,7 @@ const ChatModerationControls: React.FC<ChatModerationControlsProps> = ({
           🗑️
         </button>
       )}
-      
+
       {userId && (
         <>
           <button
@@ -149,7 +166,7 @@ const ChatModerationControls: React.FC<ChatModerationControlsProps> = ({
           >
             🔇
           </button>
-          
+
           <button
             onClick={handleKickUser}
             className="px-2 py-1 text-xs bg-orange-600 text-white rounded hover:bg-orange-700 transition-colors"
@@ -157,7 +174,7 @@ const ChatModerationControls: React.FC<ChatModerationControlsProps> = ({
           >
             👢
           </button>
-          
+
           <button
             onClick={() => handleBanUser('TEMPORARY')}
             className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
@@ -165,7 +182,7 @@ const ChatModerationControls: React.FC<ChatModerationControlsProps> = ({
           >
             ⏰
           </button>
-          
+
           <button
             onClick={() => handleBanUser('PERMANENT')}
             className="px-2 py-1 text-xs bg-red-800 text-white rounded hover:bg-red-900 transition-colors"

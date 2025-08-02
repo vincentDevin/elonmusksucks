@@ -73,7 +73,7 @@ export class ImageProcessingService {
     userId: number,
   ): Promise<ProcessedImage> {
     const { width, height } = this.SIZES[sizeName];
-    
+
     // Resize with smart cropping to maintain aspect ratio
     const buffer = await sharpInstance
       .resize(width, height, {
@@ -114,7 +114,7 @@ export class ImageProcessingService {
     size: number;
   }> {
     const metadata = await sharp(buffer).metadata();
-    
+
     if (!metadata.width || !metadata.height || !metadata.format) {
       throw new Error('Invalid image file');
     }

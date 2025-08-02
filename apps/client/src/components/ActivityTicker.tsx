@@ -5,9 +5,7 @@ export default function ActivityTicker() {
   const { items } = useActivityTicker(20);
 
   const text = useMemo(() => {
-    return items
-      .map((a) => formatActivity(a))
-      .join('   •   ');
+    return items.map((a) => formatActivity(a)).join('   •   ');
   }, [items]);
 
   if (!items.length) return null;

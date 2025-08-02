@@ -12,13 +12,13 @@ import {
   AITweet,
   UserPost,
 } from '@prisma/client';
-import type { 
-  QueryParams, 
-  IAdminRepository, 
-  UserSearchParams, 
-  PaginatedUsers, 
-  DetailedUser, 
-  BulkUserOperation, 
+import type {
+  QueryParams,
+  IAdminRepository,
+  UserSearchParams,
+  PaginatedUsers,
+  DetailedUser,
+  BulkUserOperation,
   BulkOperationResult,
   PredictionSearchParams,
   PaginatedPredictions,
@@ -49,7 +49,7 @@ import type {
   UserBehaviorAnalytics,
   PredictiveAnalytics,
   CustomReportData,
-  RealtimeMetrics
+  RealtimeMetrics,
 } from './IAdminRepository';
 
 export class PrismaAdminRepository implements IAdminRepository {
@@ -70,7 +70,7 @@ export class PrismaAdminRepository implements IAdminRepository {
       page,
       limit: requestedLimit,
       sortBy = 'createdAt',
-      sortOrder = 'desc'
+      sortOrder = 'desc',
     } = params;
 
     // Limit results per page to prevent performance issues
@@ -84,7 +84,7 @@ export class PrismaAdminRepository implements IAdminRepository {
     if (search && search.trim()) {
       whereClause.OR = [
         { name: { contains: search.trim(), mode: 'insensitive' } },
-        { email: { contains: search.trim(), mode: 'insensitive' } }
+        { email: { contains: search.trim(), mode: 'insensitive' } },
       ];
     }
 
@@ -118,16 +118,16 @@ export class PrismaAdminRepository implements IAdminRepository {
         include: {
           userBadges: {
             include: {
-              badge: true
-            }
-          }
-        }
+              badge: true,
+            },
+          },
+        },
       }),
-      this.prisma.user.count({ where: whereClause })
+      this.prisma.user.count({ where: whereClause }),
     ]);
 
     // Transform to DetailedUser format with additional information
-    const detailedUsers: DetailedUser[] = users.map(user => {
+    const detailedUsers: DetailedUser[] = users.map((user) => {
       const detailedUser: DetailedUser = {
         ...user,
         badges: user.userBadges?.map((ub: any) => ub.badge) || [],
@@ -135,7 +135,7 @@ export class PrismaAdminRepository implements IAdminRepository {
           totalBets: 0,
           totalWagered: 0,
           totalWon: 0,
-          winRate: 0
+          winRate: 0,
         },
         recentActivity: {
           totalLogins: 0, // Would need to track this separately
@@ -144,8 +144,8 @@ export class PrismaAdminRepository implements IAdminRepository {
           isBanned: false, // Would need UserBan table integration
           banType: undefined,
           reason: undefined,
-          expiresAt: undefined
-        }
+          expiresAt: undefined,
+        },
       };
 
       return detailedUser;
@@ -159,7 +159,7 @@ export class PrismaAdminRepository implements IAdminRepository {
       totalPages,
       currentPage: page,
       hasNextPage: page < totalPages - 1,
-      hasPreviousPage: page > 0
+      hasPreviousPage: page > 0,
     };
   }
 
@@ -169,10 +169,10 @@ export class PrismaAdminRepository implements IAdminRepository {
       include: {
         userBadges: {
           include: {
-            badge: true
-          }
-        }
-      }
+            badge: true,
+          },
+        },
+      },
     });
 
     if (!user) return null;
@@ -184,14 +184,14 @@ export class PrismaAdminRepository implements IAdminRepository {
         totalBets: 0,
         totalWagered: 0,
         totalWon: 0,
-        winRate: 0
+        winRate: 0,
       },
       recentActivity: {
         totalLogins: 0, // Would need login tracking
       },
       banStatus: {
         isBanned: false, // Would need UserBan integration
-      }
+      },
     };
 
     return detailedUser;
@@ -203,14 +203,14 @@ export class PrismaAdminRepository implements IAdminRepository {
       successCount: 0,
       failureCount: 0,
       errors: [],
-      updatedUsers: []
+      updatedUsers: [],
     };
 
     // Process users in batches to avoid overwhelming the database
     const batchSize = 10;
     for (let i = 0; i < userIds.length; i += batchSize) {
       const batch = userIds.slice(i, i + batchSize);
-      
+
       for (const userId of batch) {
         try {
           let updatedUser: User | null = null;
@@ -257,7 +257,7 @@ export class PrismaAdminRepository implements IAdminRepository {
           results.failureCount++;
           results.errors.push({
             userId,
-            error: error instanceof Error ? error.message : 'Unknown error'
+            error: error instanceof Error ? error.message : 'Unknown error',
           });
         }
       }
@@ -307,7 +307,7 @@ export class PrismaAdminRepository implements IAdminRepository {
       page,
       limit: requestedLimit,
       sortBy = 'createdAt',
-      sortOrder = 'desc'
+      sortOrder = 'desc',
     } = params;
 
     // Limit results per page to prevent performance issues
@@ -321,7 +321,7 @@ export class PrismaAdminRepository implements IAdminRepository {
     if (search && search.trim()) {
       whereClause.OR = [
         { title: { contains: search.trim(), mode: 'insensitive' } },
-        { description: { contains: search.trim(), mode: 'insensitive' } }
+        { description: { contains: search.trim(), mode: 'insensitive' } },
       ];
     }
 
@@ -348,7 +348,7 @@ export class PrismaAdminRepository implements IAdminRepository {
     // Status filter (approved, rejected, etc.)
     if (status && status.length > 0) {
       const statusConditions: any[] = [];
-      
+
       if (status.includes('pending')) {
         // For pending, we need to check based on business logic - could be newly created or unresolved
         statusConditions.push({ approved: false, resolved: false });
@@ -364,8 +364,9 @@ export class PrismaAdminRepository implements IAdminRepository {
       }
 
       if (statusConditions.length > 0) {
-        whereClause.OR = whereClause.OR ? 
-          [...whereClause.OR, ...statusConditions] : statusConditions;
+        whereClause.OR = whereClause.OR
+          ? [...whereClause.OR, ...statusConditions]
+          : statusConditions;
       }
     }
 
@@ -391,24 +392,24 @@ export class PrismaAdminRepository implements IAdminRepository {
             select: {
               id: true,
               name: true,
-              email: true
-            }
+              email: true,
+            },
           },
           bets: {
             select: {
               id: true,
               amount: true,
-              userId: true
-            }
-          }
-        }
+              userId: true,
+            },
+          },
+        },
       }),
       this.prisma.prediction.count({ where: whereClause }),
-      this.getPredictionAnalytics()
+      this.getPredictionAnalytics(),
     ]);
 
     // Transform to DetailedPrediction format with analytics
-    const detailedPredictions: DetailedPrediction[] = predictions.map(prediction => {
+    const detailedPredictions: DetailedPrediction[] = predictions.map((prediction) => {
       const bets = (prediction as any).bets || [];
       const uniqueBettors = new Set(bets.map((bet: any) => bet.userId)).size;
       const totalVolume = bets.reduce((sum: number, bet: any) => sum + bet.amount, 0);
@@ -420,14 +421,14 @@ export class PrismaAdminRepository implements IAdminRepository {
           totalVolume,
           uniqueBettors,
           controversyScore: this.calculateControversyScore(bets),
-          popularityScore: this.calculatePopularityScore(bets.length, uniqueBettors)
+          popularityScore: this.calculatePopularityScore(bets.length, uniqueBettors),
         },
         qualityFlags: {
           isDuplicate: false, // Would need separate logic to detect
           hasOffensiveContent: false, // Would need content moderation
           hasSuspiciousActivity: false, // Would need fraud detection
-          needsReview: bets.length === 0 && this.isOlderThan(prediction.createdAt, 24) // No bets after 24h
-        }
+          needsReview: bets.length === 0 && this.isOlderThan(prediction.createdAt, 24), // No bets after 24h
+        },
       };
     });
 
@@ -440,7 +441,7 @@ export class PrismaAdminRepository implements IAdminRepository {
       currentPage: page,
       hasNextPage: page < totalPages - 1,
       hasPreviousPage: page > 0,
-      analytics
+      analytics,
     };
   }
 
@@ -453,20 +454,20 @@ export class PrismaAdminRepository implements IAdminRepository {
           select: {
             id: true,
             name: true,
-            email: true
-          }
+            email: true,
+          },
         },
         bets: {
           include: {
             user: {
               select: {
                 id: true,
-                name: true
-              }
-            }
-          }
-        }
-      }
+                name: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!prediction) return null;
@@ -482,14 +483,14 @@ export class PrismaAdminRepository implements IAdminRepository {
         totalVolume,
         uniqueBettors,
         controversyScore: this.calculateControversyScore(bets),
-        popularityScore: this.calculatePopularityScore(bets.length, uniqueBettors)
+        popularityScore: this.calculatePopularityScore(bets.length, uniqueBettors),
       },
       qualityFlags: {
         isDuplicate: false,
         hasOffensiveContent: false,
         hasSuspiciousActivity: false,
-        needsReview: bets.length === 0 && this.isOlderThan(prediction.createdAt, 24)
-      }
+        needsReview: bets.length === 0 && this.isOlderThan(prediction.createdAt, 24),
+      },
     };
   }
 
@@ -499,14 +500,14 @@ export class PrismaAdminRepository implements IAdminRepository {
       successCount: 0,
       failureCount: 0,
       errors: [],
-      updatedPredictions: []
+      updatedPredictions: [],
     };
 
     // Process predictions in batches to avoid overwhelming the database
     const batchSize = 10;
     for (let i = 0; i < predictionIds.length; i += batchSize) {
       const batch = predictionIds.slice(i, i + batchSize);
-      
+
       for (const predictionId of batch) {
         try {
           let updatedPrediction: Prediction | null = null;
@@ -521,9 +522,9 @@ export class PrismaAdminRepository implements IAdminRepository {
             case 'resolve':
               if (params?.winningOptionId) {
                 updatedPrediction = await this.resolvePredictionWithDetails(
-                  predictionId, 
-                  params.winningOptionId, 
-                  params.evidence
+                  predictionId,
+                  params.winningOptionId,
+                  params.evidence,
                 );
               }
               break;
@@ -536,8 +537,9 @@ export class PrismaAdminRepository implements IAdminRepository {
           }
 
           if (updatedPrediction || op === 'delete') {
-            const detailedPrediction = updatedPrediction ? 
-              await this.getPredictionWithDetails(predictionId) : null;
+            const detailedPrediction = updatedPrediction
+              ? await this.getPredictionWithDetails(predictionId)
+              : null;
             if (detailedPrediction) {
               results.updatedPredictions.push(detailedPrediction);
             }
@@ -547,7 +549,7 @@ export class PrismaAdminRepository implements IAdminRepository {
           results.failureCount++;
           results.errors.push({
             predictionId,
-            error: error instanceof Error ? error.message : 'Unknown error'
+            error: error instanceof Error ? error.message : 'Unknown error',
           });
         }
       }
@@ -567,17 +569,17 @@ export class PrismaAdminRepository implements IAdminRepository {
   }
 
   async resolvePredictionWithDetails(
-    predictionId: number, 
-    winningOptionId: number, 
-    evidence?: string
+    predictionId: number,
+    winningOptionId: number,
+    evidence?: string,
   ): Promise<DetailedPrediction> {
     const resolved = await this.prisma.prediction.update({
       where: { id: predictionId },
-      data: { 
+      data: {
         resolved: true,
         winningOptionId,
-        resolvedAt: new Date()
-      }
+        resolvedAt: new Date(),
+      },
     });
 
     const detailed = await this.getPredictionWithDetails(predictionId);
@@ -588,8 +590,8 @@ export class PrismaAdminRepository implements IAdminRepository {
       resolutionData: {
         resolvedAt: resolved.resolvedAt || new Date(),
         evidence,
-        winningOptionId
-      }
+        winningOptionId,
+      },
     };
   }
 
@@ -599,7 +601,7 @@ export class PrismaAdminRepository implements IAdminRepository {
       this.prisma.prediction.count({ where: { approved: false, resolved: false } }),
       this.prisma.prediction.count({ where: { approved: true, resolved: false } }),
       this.prisma.prediction.count({ where: { resolved: true } }),
-      this.prisma.prediction.count({ where: { approved: false, resolved: true } })
+      this.prisma.prediction.count({ where: { approved: false, resolved: true } }),
     ]);
 
     return {
@@ -607,25 +609,25 @@ export class PrismaAdminRepository implements IAdminRepository {
       totalApproved,
       totalResolved,
       totalRejected,
-      avgResolutionTime: 72 // Placeholder - would need actual calculation
+      avgResolutionTime: 72, // Placeholder - would need actual calculation
     };
   }
 
   private calculateControversyScore(bets: any[]): number {
     // Simple controversy calculation based on bet distribution
     if (bets.length < 2) return 0;
-    
+
     const optionTotals: Record<number, number> = {};
-    bets.forEach(bet => {
+    bets.forEach((bet) => {
       optionTotals[bet.optionId] = (optionTotals[bet.optionId] || 0) + bet.amount;
     });
 
     const values = Object.values(optionTotals);
     const total = values.reduce((sum, val) => sum + val, 0);
-    const normalized = values.map(val => val / total);
-    
+    const normalized = values.map((val) => val / total);
+
     // Higher controversy when bets are more evenly distributed
-    const entropy = -normalized.reduce((sum, p) => sum + (p * Math.log2(p)), 0);
+    const entropy = -normalized.reduce((sum, p) => sum + p * Math.log2(p), 0);
     return Math.min(100, entropy * 50); // Scale to 0-100
   }
 
@@ -675,7 +677,7 @@ export class PrismaAdminRepository implements IAdminRepository {
       page,
       limit: requestedLimit,
       sortBy = 'createdAt',
-      sortOrder = 'desc'
+      sortOrder = 'desc',
     } = params;
 
     const limit = Math.min(requestedLimit, 100);
@@ -724,13 +726,18 @@ export class PrismaAdminRepository implements IAdminRepository {
     }
 
     if (status && status.length > 0) {
-      const prismaStatuses = status.map(s => {
+      const prismaStatuses = status.map((s) => {
         switch (s) {
-          case 'pending': return 'PENDING';
-          case 'won': return 'WON';
-          case 'lost': return 'LOST';
-          case 'refunded': return 'REFUNDED';
-          default: return 'PENDING'; // fallback to PENDING
+          case 'pending':
+            return 'PENDING';
+          case 'won':
+            return 'WON';
+          case 'lost':
+            return 'LOST';
+          case 'refunded':
+            return 'REFUNDED';
+          default:
+            return 'PENDING'; // fallback to PENDING
         }
       });
       betWhere.status = { in: prismaStatuses };
@@ -747,11 +754,11 @@ export class PrismaAdminRepository implements IAdminRepository {
       betWhere.OR = [
         { user: { name: { contains: searchTerm, mode: 'insensitive' } } },
         { user: { email: { contains: searchTerm, mode: 'insensitive' } } },
-        { prediction: { title: { contains: searchTerm, mode: 'insensitive' } } }
+        { prediction: { title: { contains: searchTerm, mode: 'insensitive' } } },
       ];
       transactionWhere.OR = [
         { user: { name: { contains: searchTerm, mode: 'insensitive' } } },
-        { user: { email: { contains: searchTerm, mode: 'insensitive' } } }
+        { user: { email: { contains: searchTerm, mode: 'insensitive' } } },
       ];
     }
 
@@ -765,8 +772,8 @@ export class PrismaAdminRepository implements IAdminRepository {
         include: {
           user: { select: { name: true, email: true } },
           prediction: { select: { id: true, title: true, category: true, resolved: true } },
-          optionOption: { select: { id: true, label: true } }
-        }
+          optionOption: { select: { id: true, label: true } },
+        },
       }),
       this.prisma.bet.count({ where: betWhere }),
       this.prisma.transaction.findMany({
@@ -775,38 +782,42 @@ export class PrismaAdminRepository implements IAdminRepository {
         skip: offset,
         take: limit,
         include: {
-          user: { select: { name: true, email: true } }
-        }
+          user: { select: { name: true, email: true } },
+        },
       }),
-      this.prisma.transaction.count({ where: transactionWhere })
+      this.prisma.transaction.count({ where: transactionWhere }),
     ]);
 
     // Transform to detailed format
-    const detailedBets: DetailedBet[] = bets.map(bet => ({
+    const detailedBets: DetailedBet[] = bets.map((bet) => ({
       ...bet,
       userName: bet.user.name,
       userEmail: bet.user.email,
-      prediction: bet.prediction ? {
-        id: bet.prediction.id,
-        title: bet.prediction.title,
-        category: bet.prediction.category,
-        resolved: bet.prediction.resolved
-      } : undefined,
-      option: bet.optionOption ? {
-        id: bet.optionOption.id,
-        label: bet.optionOption.label
-      } : undefined,
+      prediction: bet.prediction
+        ? {
+            id: bet.prediction.id,
+            title: bet.prediction.title,
+            category: bet.prediction.category,
+            resolved: bet.prediction.resolved,
+          }
+        : undefined,
+      option: bet.optionOption
+        ? {
+            id: bet.optionOption.id,
+            label: bet.optionOption.label,
+          }
+        : undefined,
       analytics: {
         riskScore: 0, // Placeholder - would implement fraud detection logic
         profitability: bet.payout ? (bet.payout - bet.amount) / bet.amount : 0,
-        suspiciousPatterns: [] // Placeholder
-      }
+        suspiciousPatterns: [], // Placeholder
+      },
     }));
 
-    const detailedTransactions: DetailedTransaction[] = transactions.map(tx => ({
+    const detailedTransactions: DetailedTransaction[] = transactions.map((tx) => ({
       ...tx,
       userName: tx.user.name,
-      userEmail: tx.user.email
+      userEmail: tx.user.email,
     }));
 
     const totalPages = Math.ceil(Math.max(totalBets, totalTransactions) / limit);
@@ -819,20 +830,20 @@ export class PrismaAdminRepository implements IAdminRepository {
       totalPages,
       currentPage: page,
       hasNextPage: page < totalPages - 1,
-      hasPreviousPage: page > 0
+      hasPreviousPage: page > 0,
     };
   }
 
   async getFinancialAnalytics(params?: FinancialAnalyticsParams): Promise<FinancialAnalytics> {
     const { startDate, endDate } = params || {};
-    
+
     let dateFilter = {};
     if (startDate || endDate) {
       dateFilter = {
         createdAt: {
           ...(startDate && { gte: new Date(startDate) }),
-          ...(endDate && { lte: new Date(endDate) })
-        }
+          ...(endDate && { lte: new Date(endDate) }),
+        },
       };
     }
 
@@ -842,24 +853,24 @@ export class PrismaAdminRepository implements IAdminRepository {
     const [bets, transactions] = await Promise.all([
       this.prisma.bet.findMany({
         where: dateFilter,
-        include: { prediction: true }
+        include: { prediction: true },
       }),
       this.prisma.transaction.findMany({
-        where: dateFilter
-      })
+        where: dateFilter,
+      }),
     ]);
 
     const totalBettingVolume = bets.reduce((sum, bet) => sum + bet.amount, 0);
     const totalPayouts = transactions
-      .filter(tx => tx.type === 'CREDIT') // CREDIT represents payouts
+      .filter((tx) => tx.type === 'CREDIT') // CREDIT represents payouts
       .reduce((sum, tx) => sum + tx.amount, 0);
     const totalRefunds = transactions
-      .filter(tx => tx.type === 'CREDIT' && tx.relatedBetId) // Credits related to bets are refunds
+      .filter((tx) => tx.type === 'CREDIT' && tx.relatedBetId) // Credits related to bets are refunds
       .reduce((sum, tx) => sum + tx.amount, 0);
 
     // Category breakdown
     const categoryMap = new Map();
-    bets.forEach(bet => {
+    bets.forEach((bet) => {
       const cat = bet.prediction?.category || 'Unknown';
       if (!categoryMap.has(cat)) {
         categoryMap.set(cat, { volume: 0, betCount: 0 });
@@ -873,7 +884,10 @@ export class PrismaAdminRepository implements IAdminRepository {
       category,
       volume: data.volume,
       betCount: data.betCount,
-      profitMargin: data.volume > 0 ? ((data.volume - (totalPayouts * data.betCount / bets.length)) / data.volume) : 0
+      profitMargin:
+        data.volume > 0
+          ? (data.volume - (totalPayouts * data.betCount) / bets.length) / data.volume
+          : 0,
     }));
 
     // Simplified analytics - in production would be more sophisticated
@@ -883,8 +897,8 @@ export class PrismaAdminRepository implements IAdminRepository {
         totalPayouts,
         totalRefunds,
         netRevenue: totalBettingVolume - totalPayouts - totalRefunds,
-        activeBettors: new Set(bets.map(b => b.userId)).size,
-        avgBetSize: bets.length > 0 ? totalBettingVolume / bets.length : 0
+        activeBettors: new Set(bets.map((b) => b.userId)).size,
+        avgBetSize: bets.length > 0 ? totalBettingVolume / bets.length : 0,
       },
       timeSeriesData: [], // Would implement daily/weekly aggregation
       categoryBreakdown,
@@ -892,8 +906,8 @@ export class PrismaAdminRepository implements IAdminRepository {
       fraudDetection: {
         suspiciousBets: 0, // Placeholder
         flaggedUsers: 0,
-        riskPatterns: []
-      }
+        riskPatterns: [],
+      },
     };
 
     return analytics;
@@ -901,7 +915,7 @@ export class PrismaAdminRepository implements IAdminRepository {
 
   async bulkFinancialOperation(operation: BulkFinancialOperation): Promise<BulkFinancialResult> {
     const { betIds = [], userIds = [], operation: op } = operation;
-    
+
     let successCount = 0;
     let failureCount = 0;
     let totalRefunded = 0;
@@ -923,7 +937,7 @@ export class PrismaAdminRepository implements IAdminRepository {
               // Update bet status
               await tx.bet.update({
                 where: { id: betId },
-                data: { status: 'REFUNDED' }
+                data: { status: 'REFUNDED' },
               });
 
               // Create refund transaction
@@ -933,16 +947,16 @@ export class PrismaAdminRepository implements IAdminRepository {
                   type: 'CREDIT', // Using CREDIT for refunds
                   amount: bet.amount,
                   balanceAfter: 0, // Would calculate properly
-                  relatedBetId: betId
-                }
+                  relatedBetId: betId,
+                },
               });
 
               // Update user balance
               await tx.user.update({
                 where: { id: bet.userId },
                 data: {
-                  muskBucks: { increment: bet.amount }
-                }
+                  muskBucks: { increment: bet.amount },
+                },
               });
             });
 
@@ -956,7 +970,6 @@ export class PrismaAdminRepository implements IAdminRepository {
       }
 
       // Additional bulk operations would be implemented here
-
     } catch (error) {
       failureCount = betIds.length + userIds.length;
       errors.push({ id: 0, error: (error as Error).message });
@@ -967,7 +980,7 @@ export class PrismaAdminRepository implements IAdminRepository {
       failureCount,
       totalProcessed: betIds.length + userIds.length,
       totalRefunded,
-      errors
+      errors,
     };
   }
 
@@ -982,46 +995,46 @@ export class PrismaAdminRepository implements IAdminRepository {
       const bets = await this.prisma.bet.findMany({
         include: {
           user: { select: { name: true, email: true } },
-          prediction: { select: { title: true, category: true } }
-        }
+          prediction: { select: { title: true, category: true } },
+        },
       });
 
       headers = ['ID', 'User', 'Email', 'Prediction', 'Amount', 'Status', 'Created At'];
-      data = bets.map(bet => [
+      data = bets.map((bet) => [
         bet.id,
         bet.user.name,
         bet.user.email,
         bet.prediction?.title || 'Unknown',
         bet.amount,
         bet.status,
-        bet.createdAt.toISOString()
+        bet.createdAt.toISOString(),
       ]);
     } else if (dataType === 'transactions') {
       const transactions = await this.prisma.transaction.findMany({
         include: {
-          user: { select: { name: true, email: true } }
-        }
+          user: { select: { name: true, email: true } },
+        },
       });
 
       headers = ['ID', 'User', 'Email', 'Type', 'Amount', 'Balance After', 'Created At'];
-      data = transactions.map(tx => [
+      data = transactions.map((tx) => [
         tx.id,
         tx.user.name,
         tx.user.email,
         tx.type,
         tx.amount,
         tx.balanceAfter,
-        tx.createdAt.toISOString()
+        tx.createdAt.toISOString(),
       ]);
     }
 
     if (format === 'csv') {
-      const csvRows = [headers.join(','), ...data.map(row => row.join(','))];
+      const csvRows = [headers.join(','), ...data.map((row) => row.join(','))];
       return csvRows.join('\n');
     } else {
       // For Excel format, would use a library like xlsx
       // For now, return CSV format
-      const csvRows = [headers.join(','), ...data.map(row => row.join(','))];
+      const csvRows = [headers.join(','), ...data.map((row) => row.join(','))];
       return csvRows.join('\n');
     }
   }
@@ -1037,7 +1050,7 @@ export class PrismaAdminRepository implements IAdminRepository {
       page,
       limit: requestedLimit,
       sortBy = 'createdAt',
-      sortOrder = 'desc'
+      sortOrder = 'desc',
     } = params;
 
     const limit = Math.min(requestedLimit, 100);
@@ -1049,7 +1062,7 @@ export class PrismaAdminRepository implements IAdminRepository {
     if (search && search.trim()) {
       whereClause.OR = [
         { name: { contains: search.trim(), mode: 'insensitive' } },
-        { description: { contains: search.trim(), mode: 'insensitive' } }
+        { description: { contains: search.trim(), mode: 'insensitive' } },
       ];
     }
 
@@ -1073,25 +1086,23 @@ export class PrismaAdminRepository implements IAdminRepository {
         include: {
           users: {
             include: {
-              user: { select: { name: true } }
+              user: { select: { name: true } },
             },
             orderBy: { awardedAt: 'desc' },
-            take: 5 // Recent awards
-          }
-        }
+            take: 5, // Recent awards
+          },
+        },
       }),
-      this.prisma.badge.count({ where: whereClause })
+      this.prisma.badge.count({ where: whereClause }),
     ]);
 
     // Transform to detailed badges
-    const detailedBadges: DetailedBadge[] = badges.map(badge => {
+    const detailedBadges: DetailedBadge[] = badges.map((badge) => {
       const totalUsers = badge.users.length;
       const thisMonth = new Date();
       thisMonth.setMonth(thisMonth.getMonth() - 1);
-      
-      const awardedThisMonth = badge.users.filter(
-        ub => ub.awardedAt >= thisMonth
-      ).length;
+
+      const awardedThisMonth = badge.users.filter((ub) => ub.awardedAt >= thisMonth).length;
 
       return {
         ...badge,
@@ -1099,16 +1110,21 @@ export class PrismaAdminRepository implements IAdminRepository {
           totalUsers,
           awardedThisMonth,
           popularityScore: totalUsers, // Simple popularity score
-          rarityLevel: totalUsers > 100 ? 'common' : 
-                      totalUsers > 50 ? 'rare' :
-                      totalUsers > 10 ? 'epic' : 'legendary'
+          rarityLevel:
+            totalUsers > 100
+              ? 'common'
+              : totalUsers > 50
+                ? 'rare'
+                : totalUsers > 10
+                  ? 'epic'
+                  : 'legendary',
         },
-        recentAwards: badge.users.slice(0, 5).map(ub => ({
+        recentAwards: badge.users.slice(0, 5).map((ub) => ({
           userId: ub.userId,
           userName: ub.user.name,
           awardedAt: ub.awardedAt,
-          reason: ub.reason || undefined
-        }))
+          reason: ub.reason || undefined,
+        })),
       };
     });
 
@@ -1121,7 +1137,7 @@ export class PrismaAdminRepository implements IAdminRepository {
       currentPage: page,
       hasNextPage: page < totalPages - 1,
       hasPreviousPage: page > 0,
-      categoryBreakdown: [] // Would implement with actual categories
+      categoryBreakdown: [], // Would implement with actual categories
     };
   }
 
@@ -1131,12 +1147,12 @@ export class PrismaAdminRepository implements IAdminRepository {
       include: {
         users: {
           include: {
-            user: { select: { name: true } }
+            user: { select: { name: true } },
           },
           orderBy: { awardedAt: 'desc' },
-          take: 10
-        }
-      }
+          take: 10,
+        },
+      },
     });
 
     if (!badge) return null;
@@ -1144,10 +1160,8 @@ export class PrismaAdminRepository implements IAdminRepository {
     const totalUsers = badge.users.length;
     const thisMonth = new Date();
     thisMonth.setMonth(thisMonth.getMonth() - 1);
-    
-    const awardedThisMonth = badge.users.filter(
-      ub => ub.awardedAt >= thisMonth
-    ).length;
+
+    const awardedThisMonth = badge.users.filter((ub) => ub.awardedAt >= thisMonth).length;
 
     return {
       ...badge,
@@ -1155,16 +1169,21 @@ export class PrismaAdminRepository implements IAdminRepository {
         totalUsers,
         awardedThisMonth,
         popularityScore: totalUsers,
-        rarityLevel: totalUsers > 100 ? 'common' : 
-                    totalUsers > 50 ? 'rare' :
-                    totalUsers > 10 ? 'epic' : 'legendary'
+        rarityLevel:
+          totalUsers > 100
+            ? 'common'
+            : totalUsers > 50
+              ? 'rare'
+              : totalUsers > 10
+                ? 'epic'
+                : 'legendary',
       },
-      recentAwards: badge.users.map(ub => ({
+      recentAwards: badge.users.map((ub) => ({
         userId: ub.userId,
         userName: ub.user.name,
         awardedAt: ub.awardedAt,
-        reason: ub.reason || undefined
-      }))
+        reason: ub.reason || undefined,
+      })),
     };
   }
 
@@ -1173,17 +1192,17 @@ export class PrismaAdminRepository implements IAdminRepository {
       data: {
         name: data.name,
         description: data.description,
-        iconUrl: data.iconUrl
+        iconUrl: data.iconUrl,
         // Note: categoryId, rarity, etc. would need to be added to schema
       },
       include: {
         users: {
           include: {
-            user: { select: { name: true } }
+            user: { select: { name: true } },
           },
-          take: 5
-        }
-      }
+          take: 5,
+        },
+      },
     });
 
     return {
@@ -1192,9 +1211,9 @@ export class PrismaAdminRepository implements IAdminRepository {
         totalUsers: 0,
         awardedThisMonth: 0,
         popularityScore: 0,
-        rarityLevel: data.rarity || 'common'
+        rarityLevel: data.rarity || 'common',
       },
-      recentAwards: []
+      recentAwards: [],
     };
   }
 
@@ -1204,26 +1223,24 @@ export class PrismaAdminRepository implements IAdminRepository {
       data: {
         name: data.name,
         description: data.description,
-        iconUrl: data.iconUrl
+        iconUrl: data.iconUrl,
         // Note: Additional fields would need schema updates
       },
       include: {
         users: {
           include: {
-            user: { select: { name: true } }
+            user: { select: { name: true } },
           },
-          take: 5
-        }
-      }
+          take: 5,
+        },
+      },
     });
 
     const totalUsers = badge.users.length;
     const thisMonth = new Date();
     thisMonth.setMonth(thisMonth.getMonth() - 1);
-    
-    const awardedThisMonth = badge.users.filter(
-      ub => ub.awardedAt >= thisMonth
-    ).length;
+
+    const awardedThisMonth = badge.users.filter((ub) => ub.awardedAt >= thisMonth).length;
 
     return {
       ...badge,
@@ -1231,16 +1248,21 @@ export class PrismaAdminRepository implements IAdminRepository {
         totalUsers,
         awardedThisMonth,
         popularityScore: totalUsers,
-        rarityLevel: totalUsers > 100 ? 'common' : 
-                    totalUsers > 50 ? 'rare' :
-                    totalUsers > 10 ? 'epic' : 'legendary'
+        rarityLevel:
+          totalUsers > 100
+            ? 'common'
+            : totalUsers > 50
+              ? 'rare'
+              : totalUsers > 10
+                ? 'epic'
+                : 'legendary',
       },
-      recentAwards: badge.users.map(ub => ({
+      recentAwards: badge.users.map((ub) => ({
         userId: ub.userId,
         userName: ub.user.name,
         awardedAt: ub.awardedAt,
-        reason: ub.reason || undefined
-      }))
+        reason: ub.reason || undefined,
+      })),
     };
   }
 
@@ -1248,12 +1270,12 @@ export class PrismaAdminRepository implements IAdminRepository {
     await this.prisma.$transaction(async (tx) => {
       // Delete all user badge assignments first
       await tx.userBadge.deleteMany({
-        where: { badgeId }
+        where: { badgeId },
       });
-      
+
       // Delete the badge
       await tx.badge.delete({
-        where: { id: badgeId }
+        where: { id: badgeId },
       });
     });
   }
@@ -1267,49 +1289,51 @@ export class PrismaAdminRepository implements IAdminRepository {
         include: {
           users: {
             include: {
-              user: { select: { name: true } }
-            }
-          }
-        }
+              user: { select: { name: true } },
+            },
+          },
+        },
       }),
       this.prisma.userBadge.findMany({
         include: {
           badge: { select: { name: true } },
-          user: { select: { name: true } }
+          user: { select: { name: true } },
         },
         orderBy: { awardedAt: 'desc' },
-        take: 20
+        take: 20,
       }),
       this.prisma.user.findMany({
         include: {
           userBadges: {
             include: {
-              badge: true
-            }
-          }
-        }
-      })
+              badge: true,
+            },
+          },
+        },
+      }),
     ]);
 
     // Calculate most popular badge
-    const badgeUserCounts = badges.map(badge => ({
-      id: badge.id,
-      name: badge.name,
-      userCount: badge.users.length
-    })).sort((a, b) => b.userCount - a.userCount);
+    const badgeUserCounts = badges
+      .map((badge) => ({
+        id: badge.id,
+        name: badge.name,
+        userCount: badge.users.length,
+      }))
+      .sort((a, b) => b.userCount - a.userCount);
 
     const mostPopularBadge = badgeUserCounts[0] || { id: 0, name: 'None', userCount: 0 };
 
     // Calculate top performers
     const topPerformers = users
-      .map(user => ({
+      .map((user) => ({
         userId: user.id,
         userName: user.name,
         badgeCount: user.userBadges.length,
-        rareCount: user.userBadges.filter(ub => {
-          const totalUsers = badges.find(b => b.id === ub.badgeId)?.users.length || 0;
+        rareCount: user.userBadges.filter((ub) => {
+          const totalUsers = badges.find((b) => b.id === ub.badgeId)?.users.length || 0;
           return totalUsers <= 50; // Consider rare if less than 50 users have it
-        }).length
+        }).length,
       }))
       .sort((a, b) => b.badgeCount - a.badgeCount)
       .slice(0, 10);
@@ -1319,30 +1343,46 @@ export class PrismaAdminRepository implements IAdminRepository {
         totalBadges: badges.length,
         totalCategories: 0, // Would implement with actual categories
         totalAwards: userBadges.length,
-        activeUsers: new Set(userBadges.map(ub => ub.userId)).size,
-        mostPopularBadge
+        activeUsers: new Set(userBadges.map((ub) => ub.userId)).size,
+        mostPopularBadge,
       },
       categoryDistribution: [], // Would implement with actual categories
       rarityDistribution: [
-        { rarity: 'common', count: badgeUserCounts.filter(b => b.userCount > 100).length, percentage: 0 },
-        { rarity: 'rare', count: badgeUserCounts.filter(b => b.userCount <= 100 && b.userCount > 50).length, percentage: 0 },
-        { rarity: 'epic', count: badgeUserCounts.filter(b => b.userCount <= 50 && b.userCount > 10).length, percentage: 0 },
-        { rarity: 'legendary', count: badgeUserCounts.filter(b => b.userCount <= 10).length, percentage: 0 }
+        {
+          rarity: 'common',
+          count: badgeUserCounts.filter((b) => b.userCount > 100).length,
+          percentage: 0,
+        },
+        {
+          rarity: 'rare',
+          count: badgeUserCounts.filter((b) => b.userCount <= 100 && b.userCount > 50).length,
+          percentage: 0,
+        },
+        {
+          rarity: 'epic',
+          count: badgeUserCounts.filter((b) => b.userCount <= 50 && b.userCount > 10).length,
+          percentage: 0,
+        },
+        {
+          rarity: 'legendary',
+          count: badgeUserCounts.filter((b) => b.userCount <= 10).length,
+          percentage: 0,
+        },
       ],
-      recentActivity: userBadges.map(ub => ({
+      recentActivity: userBadges.map((ub) => ({
         badgeId: ub.badgeId,
         badgeName: ub.badge.name,
         userId: ub.userId,
         userName: ub.user.name,
-        awardedAt: ub.awardedAt
+        awardedAt: ub.awardedAt,
       })),
-      topPerformers
+      topPerformers,
     };
   }
 
   async bulkBadgeOperation(operation: BulkBadgeOperation): Promise<BulkBadgeResult> {
     const { badgeIds = [], userIds = [], operation: op, params } = operation;
-    
+
     let successCount = 0;
     let failureCount = 0;
     const errors: Array<{ id: number; error: string }> = [];
@@ -1360,12 +1400,15 @@ export class PrismaAdminRepository implements IAdminRepository {
                   userId,
                   badgeId,
                   reason: params.reason,
-                  awardedAt: new Date()
-                }
+                  awardedAt: new Date(),
+                },
               });
               successCount++;
             } catch (error) {
-              errors.push({ id: badgeId, error: `Failed to award badge ${badgeId} to user ${userId}: ${(error as Error).message}` });
+              errors.push({
+                id: badgeId,
+                error: `Failed to award badge ${badgeId} to user ${userId}: ${(error as Error).message}`,
+              });
               failureCount++;
             }
           }
@@ -1376,11 +1419,14 @@ export class PrismaAdminRepository implements IAdminRepository {
           for (const userId of userIds) {
             try {
               await this.prisma.userBadge.deleteMany({
-                where: { badgeId, userId }
+                where: { badgeId, userId },
               });
               successCount++;
             } catch (error) {
-              errors.push({ id: badgeId, error: `Failed to revoke badge ${badgeId} from user ${userId}: ${(error as Error).message}` });
+              errors.push({
+                id: badgeId,
+                error: `Failed to revoke badge ${badgeId} from user ${userId}: ${(error as Error).message}`,
+              });
               failureCount++;
             }
           }
@@ -1392,7 +1438,10 @@ export class PrismaAdminRepository implements IAdminRepository {
             await this.deleteBadge(badgeId);
             successCount++;
           } catch (error) {
-            errors.push({ id: badgeId, error: `Failed to delete badge ${badgeId}: ${(error as Error).message}` });
+            errors.push({
+              id: badgeId,
+              error: `Failed to delete badge ${badgeId}: ${(error as Error).message}`,
+            });
             failureCount++;
           }
         }
@@ -1405,7 +1454,6 @@ export class PrismaAdminRepository implements IAdminRepository {
           updatedUsers.push({ userId, badgeCount });
         }
       }
-
     } catch (error) {
       failureCount = badgeIds.length + userIds.length;
       errors.push({ id: 0, error: (error as Error).message });
@@ -1417,7 +1465,7 @@ export class PrismaAdminRepository implements IAdminRepository {
       totalProcessed: badgeIds.length + userIds.length,
       errors,
       updatedBadges,
-      updatedUsers
+      updatedUsers,
     };
   }
 
@@ -1437,7 +1485,7 @@ export class PrismaAdminRepository implements IAdminRepository {
       color: data.color,
       iconUrl: data.iconUrl,
       badgeCount: 0,
-      createdAt: new Date()
+      createdAt: new Date(),
     };
   }
 
@@ -1482,14 +1530,16 @@ export class PrismaAdminRepository implements IAdminRepository {
 
     const currentPeriodStart = startDate || thirtyDaysAgo;
     const currentPeriodEnd = endDate || now;
-    const previousPeriodStart = new Date(currentPeriodStart.getTime() - (currentPeriodEnd.getTime() - currentPeriodStart.getTime()));
+    const previousPeriodStart = new Date(
+      currentPeriodStart.getTime() - (currentPeriodEnd.getTime() - currentPeriodStart.getTime()),
+    );
     const previousPeriodEnd = currentPeriodStart;
 
     // Overview metrics
     const [totalUsers, totalPredictions, totalBets] = await Promise.all([
       this.prisma.user.count(),
       this.prisma.prediction.count(),
-      this.prisma.bet.count()
+      this.prisma.bet.count(),
     ]);
 
     // Active users based on recent activity (simplified - users with recent bets)
@@ -1497,21 +1547,21 @@ export class PrismaAdminRepository implements IAdminRepository {
       where: {
         bets: {
           some: {
-            createdAt: { gte: thirtyDaysAgo }
-          }
-        }
-      }
+            createdAt: { gte: thirtyDaysAgo },
+          },
+        },
+      },
     });
 
     // Financial metrics
     const totalRevenue = await this.prisma.bet.aggregate({
-      _sum: { amount: true }
+      _sum: { amount: true },
     });
 
     // Calculate payouts from bets that have been resolved
     const totalPayouts = await this.prisma.bet.aggregate({
       where: { payout: { not: null } },
-      _sum: { payout: true }
+      _sum: { payout: true },
     });
 
     const avgUserValue = totalUsers > 0 ? (totalRevenue._sum.amount || 0) / totalUsers : 0;
@@ -1519,37 +1569,43 @@ export class PrismaAdminRepository implements IAdminRepository {
 
     // Current period metrics
     const currentNewUsers = await this.prisma.user.count({
-      where: { createdAt: { gte: currentPeriodStart, lte: currentPeriodEnd } }
+      where: { createdAt: { gte: currentPeriodStart, lte: currentPeriodEnd } },
     });
 
     const currentRevenue = await this.prisma.bet.aggregate({
       where: { createdAt: { gte: currentPeriodStart, lte: currentPeriodEnd } },
-      _sum: { amount: true }
+      _sum: { amount: true },
     });
 
     const currentBets = await this.prisma.bet.count({
-      where: { createdAt: { gte: currentPeriodStart, lte: currentPeriodEnd } }
+      where: { createdAt: { gte: currentPeriodStart, lte: currentPeriodEnd } },
     });
 
     // Previous period metrics for comparison
     const previousNewUsers = await this.prisma.user.count({
-      where: { createdAt: { gte: previousPeriodStart, lte: previousPeriodEnd } }
+      where: { createdAt: { gte: previousPeriodStart, lte: previousPeriodEnd } },
     });
 
     const previousRevenue = await this.prisma.bet.aggregate({
       where: { createdAt: { gte: previousPeriodStart, lte: previousPeriodEnd } },
-      _sum: { amount: true }
+      _sum: { amount: true },
     });
 
     const previousBets = await this.prisma.bet.count({
-      where: { createdAt: { gte: previousPeriodStart, lte: previousPeriodEnd } }
+      where: { createdAt: { gte: previousPeriodStart, lte: previousPeriodEnd } },
     });
 
     // Calculate growth rates
-    const userGrowthRate = previousNewUsers > 0 ? ((currentNewUsers - previousNewUsers) / previousNewUsers) * 100 : 0;
-    const revenueGrowthRate = (previousRevenue._sum.amount || 0) > 0 ? 
-      (((currentRevenue._sum.amount || 0) - (previousRevenue._sum.amount || 0)) / (previousRevenue._sum.amount || 0)) * 100 : 0;
-    const engagementGrowthRate = previousBets > 0 ? ((currentBets - previousBets) / previousBets) * 100 : 0;
+    const userGrowthRate =
+      previousNewUsers > 0 ? ((currentNewUsers - previousNewUsers) / previousNewUsers) * 100 : 0;
+    const revenueGrowthRate =
+      (previousRevenue._sum.amount || 0) > 0
+        ? (((currentRevenue._sum.amount || 0) - (previousRevenue._sum.amount || 0)) /
+            (previousRevenue._sum.amount || 0)) *
+          100
+        : 0;
+    const engagementGrowthRate =
+      previousBets > 0 ? ((currentBets - previousBets) / previousBets) * 100 : 0;
 
     // Retention rate (simplified - users who bet in current period and existed before)
     const retainedUsers = await this.prisma.user.count({
@@ -1559,16 +1615,16 @@ export class PrismaAdminRepository implements IAdminRepository {
           {
             bets: {
               some: {
-                createdAt: { gte: currentPeriodStart, lte: currentPeriodEnd }
-              }
-            }
-          }
-        ]
-      }
+                createdAt: { gte: currentPeriodStart, lte: currentPeriodEnd },
+              },
+            },
+          },
+        ],
+      },
     });
 
     const eligibleUsers = await this.prisma.user.count({
-      where: { createdAt: { lt: currentPeriodStart } }
+      where: { createdAt: { lt: currentPeriodStart } },
     });
 
     const retentionRate = eligibleUsers > 0 ? (retainedUsers / eligibleUsers) * 100 : 0;
@@ -1582,36 +1638,36 @@ export class PrismaAdminRepository implements IAdminRepository {
         totalRevenue: totalRevenue._sum.amount || 0,
         totalPayouts: totalPayouts._sum.payout || 0,
         netProfit,
-        avgUserValue
+        avgUserValue,
       },
       growthMetrics: {
         userGrowthRate,
         revenueGrowthRate,
         engagementGrowthRate,
-        retentionRate
+        retentionRate,
       },
       currentPeriodComparison: {
         newUsers: {
           current: currentNewUsers,
           previous: previousNewUsers,
-          change: userGrowthRate
+          change: userGrowthRate,
         },
         revenue: {
           current: currentRevenue._sum.amount || 0,
           previous: previousRevenue._sum.amount || 0,
-          change: revenueGrowthRate
+          change: revenueGrowthRate,
         },
         bets: {
           current: currentBets,
           previous: previousBets,
-          change: engagementGrowthRate
+          change: engagementGrowthRate,
         },
         engagement: {
           current: currentBets,
           previous: previousBets,
-          change: engagementGrowthRate
-        }
-      }
+          change: engagementGrowthRate,
+        },
+      },
     };
   }
 
@@ -1626,31 +1682,32 @@ export class PrismaAdminRepository implements IAdminRepository {
     // Betting patterns
     const avgBetsResult = await this.prisma.bet.aggregate({
       _avg: { amount: true },
-      _count: true
+      _count: true,
     });
 
-    const avgBetsPerUser = avgBetsResult._count > 0 ? avgBetsResult._count / await this.prisma.user.count() : 0;
+    const avgBetsPerUser =
+      avgBetsResult._count > 0 ? avgBetsResult._count / (await this.prisma.user.count()) : 0;
 
     // Category preferences - using Prisma queries instead of raw SQL
     const betsWithPredictions = await this.prisma.bet.findMany({
       where: {
-        createdAt: { gte: periodStart, lte: periodEnd }
+        createdAt: { gte: periodStart, lte: periodEnd },
       },
       include: {
         prediction: {
-          select: { category: true }
-        }
-      }
+          select: { category: true },
+        },
+      },
     });
 
     // Group by category and calculate stats
     const categoryMap = new Map<string, { count: number; volume: number }>();
-    betsWithPredictions.forEach(bet => {
+    betsWithPredictions.forEach((bet) => {
       const category = bet.prediction.category;
       const existing = categoryMap.get(category) || { count: 0, volume: 0 };
       categoryMap.set(category, {
         count: existing.count + 1,
-        volume: existing.volume + bet.amount
+        volume: existing.volume + bet.amount,
       });
     });
 
@@ -1658,7 +1715,7 @@ export class PrismaAdminRepository implements IAdminRepository {
       .map(([category, stats]) => ({
         category,
         bet_count: BigInt(stats.count),
-        volume: BigInt(stats.volume)
+        volume: BigInt(stats.volume),
       }))
       .sort((a, b) => Number(b.bet_count - a.bet_count))
       .slice(0, 10);
@@ -1666,22 +1723,22 @@ export class PrismaAdminRepository implements IAdminRepository {
     // Time patterns - using Prisma queries
     const betsInPeriod = await this.prisma.bet.findMany({
       where: {
-        createdAt: { gte: periodStart, lte: periodEnd }
+        createdAt: { gte: periodStart, lte: periodEnd },
       },
       select: {
         createdAt: true,
-        amount: true
-      }
+        amount: true,
+      },
     });
 
     // Group by hour
     const hourMap = new Map<number, { count: number; volume: number }>();
-    betsInPeriod.forEach(bet => {
+    betsInPeriod.forEach((bet) => {
       const hour = bet.createdAt.getHours();
       const existing = hourMap.get(hour) || { count: 0, volume: 0 };
       hourMap.set(hour, {
         count: existing.count + 1,
-        volume: existing.volume + bet.amount
+        volume: existing.volume + bet.amount,
       });
     });
 
@@ -1690,7 +1747,7 @@ export class PrismaAdminRepository implements IAdminRepository {
       return {
         hour,
         bet_count: BigInt(stats.count),
-        volume: BigInt(stats.volume)
+        volume: BigInt(stats.volume),
       };
     });
 
@@ -1700,35 +1757,35 @@ export class PrismaAdminRepository implements IAdminRepository {
           { ageRange: '18-25', count: 0, percentage: 0 },
           { ageRange: '26-35', count: 0, percentage: 0 },
           { ageRange: '36-45', count: 0, percentage: 0 },
-          { ageRange: '46+', count: 0, percentage: 0 }
+          { ageRange: '46+', count: 0, percentage: 0 },
         ],
         activityLevels: [
           { level: 'Low', count: 0, avgValue: 0 },
           { level: 'Medium', count: 0, avgValue: 0 },
-          { level: 'High', count: 0, avgValue: 0 }
+          { level: 'High', count: 0, avgValue: 0 },
         ],
-        retentionCohorts: []
+        retentionCohorts: [],
       },
       bettingPatterns: {
         avgBetsPerUser,
         avgBetAmount: avgBetsResult._avg.amount || 0,
-        preferredCategories: categoryStats.map(stat => ({
+        preferredCategories: categoryStats.map((stat) => ({
           category: stat.category,
           count: Number(stat.bet_count),
-          volume: Number(stat.volume)
+          volume: Number(stat.volume),
         })),
         winRateBySegment: [],
-        timePatterns: timePatterns.map(pattern => ({
+        timePatterns: timePatterns.map((pattern) => ({
           hour: pattern.hour,
           betCount: Number(pattern.bet_count),
-          volume: Number(pattern.volume)
-        }))
+          volume: Number(pattern.volume),
+        })),
       },
       engagement: {
         sessionMetrics: { avgLength: 0, avgActions: 0 },
         featureUsage: [],
-        churnRisk: []
-      }
+        churnRisk: [],
+      },
     };
   }
 
@@ -1743,25 +1800,29 @@ export class PrismaAdminRepository implements IAdminRepository {
         NOT: {
           bets: {
             some: {
-              createdAt: { gte: thirtyDaysAgo }
-            }
-          }
-        }
+              createdAt: { gte: thirtyDaysAgo },
+            },
+          },
+        },
       },
       select: {
         id: true,
         name: true,
-        createdAt: true
+        createdAt: true,
       },
-      take: 50
+      take: 50,
     });
 
-    const userChurnPrediction = inactiveUsers.map(user => ({
+    const userChurnPrediction = inactiveUsers.map((user) => ({
       userId: user.id,
       userName: user.name,
       churnProbability: Math.random() * 0.8 + 0.2, // Simplified - would use ML model
       riskFactors: ['Low activity', 'No recent bets', 'Long time since last activity'],
-      recommendations: ['Send engagement email', 'Offer bonus', 'Personalized prediction suggestions']
+      recommendations: [
+        'Send engagement email',
+        'Offer bonus',
+        'Personalized prediction suggestions',
+      ],
     }));
 
     // Engagement forecasting (simplified)
@@ -1771,7 +1832,7 @@ export class PrismaAdminRepository implements IAdminRepository {
         date: date.toISOString().split('T')[0],
         predictedUsers: Math.floor(Math.random() * 100) + 50,
         predictedRevenue: Math.floor(Math.random() * 10000) + 5000,
-        confidence: Math.random() * 0.3 + 0.7
+        confidence: Math.random() * 0.3 + 0.7,
       };
     });
 
@@ -1782,65 +1843,72 @@ export class PrismaAdminRepository implements IAdminRepository {
         emergingCategories: [
           { category: 'Tech', growthRate: 15.5, potential: 8.2 },
           { category: 'Sports', growthRate: 12.3, potential: 7.8 },
-          { category: 'Politics', growthRate: -5.2, potential: 6.1 }
+          { category: 'Politics', growthRate: -5.2, potential: 6.1 },
         ],
         seasonalPatterns: [
           { period: 'Weekend', trend: 'increase', impact: 23.5 },
-          { period: 'Holiday', trend: 'decrease', impact: -12.8 }
+          { period: 'Holiday', trend: 'decrease', impact: -12.8 },
         ],
         marketSentiment: {
           score: 7.2,
-          factors: ['High user engagement', 'Positive revenue trends', 'Growing prediction categories']
-        }
-      }
+          factors: [
+            'High user engagement',
+            'Positive revenue trends',
+            'Growing prediction categories',
+          ],
+        },
+      },
     };
   }
 
-  async generateCustomReport(reportType: string, params: Record<string, any>): Promise<CustomReportData> {
+  async generateCustomReport(
+    reportType: string,
+    params: Record<string, any>,
+  ): Promise<CustomReportData> {
     // Simplified custom report generation
     const reportId = `report_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
+
     let data: Array<Record<string, any>> = [];
-    
+
     switch (reportType) {
       case 'user_activity':
         const users = await this.prisma.user.findMany({
           include: {
             bets: { take: 5 },
-            Prediction: { take: 5 }
+            Prediction: { take: 5 },
           },
-          take: 100
+          take: 100,
         });
-        data = users.map(user => ({
+        data = users.map((user) => ({
           id: user.id,
           name: user.name,
           email: user.email,
           totalBets: user.bets.length,
           totalPredictions: user.Prediction.length,
           balance: user.muskBucks,
-          createdAt: user.createdAt
+          createdAt: user.createdAt,
         }));
         break;
-        
+
       case 'financial_summary':
         const bets = await this.prisma.bet.findMany({
           include: {
             user: { select: { name: true } },
-            prediction: { select: { title: true, category: true } }
+            prediction: { select: { title: true, category: true } },
           },
           take: 1000,
-          orderBy: { createdAt: 'desc' }
+          orderBy: { createdAt: 'desc' },
         });
-        data = bets.map(bet => ({
+        data = bets.map((bet) => ({
           id: bet.id,
           amount: bet.amount,
           userName: bet.user.name,
           predictionTitle: bet.prediction.title,
           category: bet.prediction.category,
-          createdAt: bet.createdAt
+          createdAt: bet.createdAt,
         }));
         break;
-        
+
       default:
         throw new Error(`Unknown report type: ${reportType}`);
     }
@@ -1852,17 +1920,17 @@ export class PrismaAdminRepository implements IAdminRepository {
       metadata: {
         totalRows: data.length,
         generatedAt: new Date().toISOString(),
-        parameters: params
-      }
+        parameters: params,
+      },
     };
   }
 
   async getRealtimeMetrics(): Promise<RealtimeMetrics> {
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-    
+
     const [activeBets, recentTransactions] = await Promise.all([
       this.prisma.bet.count({ where: { createdAt: { gte: fiveMinutesAgo } } }),
-      this.prisma.transaction.count({ where: { createdAt: { gte: fiveMinutesAgo } } })
+      this.prisma.transaction.count({ where: { createdAt: { gte: fiveMinutesAgo } } }),
     ]);
 
     // Active users approximated by users with recent bets
@@ -1870,10 +1938,10 @@ export class PrismaAdminRepository implements IAdminRepository {
       where: {
         bets: {
           some: {
-            createdAt: { gte: fiveMinutesAgo }
-          }
-        }
-      }
+            createdAt: { gte: fiveMinutesAgo },
+          },
+        },
+      },
     });
 
     return {
@@ -1883,13 +1951,17 @@ export class PrismaAdminRepository implements IAdminRepository {
       systemHealth: {
         responseTime: Math.random() * 100 + 50, // Simulated
         errorRate: Math.random() * 0.02, // Simulated
-        uptime: 99.9 // Simulated
+        uptime: 99.9, // Simulated
       },
-      alerts: []
+      alerts: [],
     };
   }
 
-  async exportAnalyticsData(params: { reportType: string; format: 'csv' | 'excel' | 'pdf'; filters?: Record<string, any> }): Promise<Buffer> {
+  async exportAnalyticsData(params: {
+    reportType: string;
+    format: 'csv' | 'excel' | 'pdf';
+    filters?: Record<string, any>;
+  }): Promise<Buffer> {
     // Simplified export - in reality would generate actual files
     const reportData = await this.generateCustomReport(params.reportType, params.filters || {});
     const csvContent = this.convertToCSV(reportData.data);
@@ -1898,19 +1970,21 @@ export class PrismaAdminRepository implements IAdminRepository {
 
   private convertToCSV(data: Array<Record<string, any>>): string {
     if (data.length === 0) return '';
-    
+
     const headers = Object.keys(data[0]);
     const csvHeaders = headers.join(',');
-    const csvRows = data.map(row => 
-      headers.map(header => {
-        const value = row[header];
-        if (typeof value === 'string' && value.includes(',')) {
-          return `"${value}"`;
-        }
-        return String(value || '');
-      }).join(',')
+    const csvRows = data.map((row) =>
+      headers
+        .map((header) => {
+          const value = row[header];
+          if (typeof value === 'string' && value.includes(',')) {
+            return `"${value}"`;
+          }
+          return String(value || '');
+        })
+        .join(','),
     );
-    
+
     return [csvHeaders, ...csvRows].join('\n');
   }
 

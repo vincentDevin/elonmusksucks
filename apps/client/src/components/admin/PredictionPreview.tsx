@@ -13,7 +13,7 @@ const PredictionPreview: React.FC<PredictionPreviewProps> = ({
   predictionId,
   isOpen,
   onClose,
-  onAction
+  onAction,
 }) => {
   const [prediction, setPrediction] = useState<DetailedPrediction | null>(null);
   const [loading, setLoading] = useState(false);
@@ -50,7 +50,7 @@ const PredictionPreview: React.FC<PredictionPreviewProps> = ({
     if (selectedOptionId && prediction) {
       handleAction('resolve', {
         winningOptionId: selectedOptionId,
-        evidence: resolutionEvidence.trim() || undefined
+        evidence: resolutionEvidence.trim() || undefined,
       });
     }
   };
@@ -64,7 +64,7 @@ const PredictionPreview: React.FC<PredictionPreviewProps> = ({
       style: 'currency',
       currency: 'USD',
       minimumFractionDigits: 0,
-      maximumFractionDigits: 0
+      maximumFractionDigits: 0,
     }).format(amount);
   };
 
@@ -78,11 +78,16 @@ const PredictionPreview: React.FC<PredictionPreviewProps> = ({
   const getQualityFlagColor = (flag: string, value: boolean) => {
     if (!value) return 'text-success';
     switch (flag) {
-      case 'needsReview': return 'text-warning';
-      case 'hasSuspiciousActivity': return 'text-error';
-      case 'hasOffensiveContent': return 'text-error';
-      case 'isDuplicate': return 'text-warning';
-      default: return 'text-tertiary';
+      case 'needsReview':
+        return 'text-warning';
+      case 'hasSuspiciousActivity':
+        return 'text-error';
+      case 'hasOffensiveContent':
+        return 'text-error';
+      case 'isDuplicate':
+        return 'text-warning';
+      default:
+        return 'text-tertiary';
     }
   };
 
@@ -120,25 +125,35 @@ const PredictionPreview: React.FC<PredictionPreviewProps> = ({
                   <span className="px-3 py-1 bg-secondary text-surface rounded-full text-sm">
                     {prediction.category}
                   </span>
-                  <span className={`px-3 py-1 rounded-full text-sm ${
-                    prediction.resolved 
-                      ? 'bg-primary text-surface' 
-                      : prediction.approved 
-                        ? 'bg-success text-surface' 
-                        : 'bg-warning text-surface'
-                  }`}>
-                    {prediction.resolved ? 'Resolved' : prediction.approved ? 'Approved' : 'Pending'}
+                  <span
+                    className={`px-3 py-1 rounded-full text-sm ${
+                      prediction.resolved
+                        ? 'bg-primary text-surface'
+                        : prediction.approved
+                          ? 'bg-success text-surface'
+                          : 'bg-warning text-surface'
+                    }`}
+                  >
+                    {prediction.resolved
+                      ? 'Resolved'
+                      : prediction.approved
+                        ? 'Approved'
+                        : 'Pending'}
                   </span>
                 </div>
 
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-tertiary">Created:</span>
-                    <span className="text-content">{formatDate(prediction.createdAt.toString())}</span>
+                    <span className="text-content">
+                      {formatDate(prediction.createdAt.toString())}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-tertiary">Expires:</span>
-                    <span className="text-content">{formatDate(prediction.expiresAt.toString())}</span>
+                    <span className="text-content">
+                      {formatDate(prediction.expiresAt.toString())}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-tertiary">Creator:</span>
@@ -147,7 +162,9 @@ const PredictionPreview: React.FC<PredictionPreviewProps> = ({
                   {prediction.resolutionData?.resolvedAt && (
                     <div className="flex justify-between">
                       <span className="text-tertiary">Resolved:</span>
-                      <span className="text-content">{formatDate(prediction.resolutionData.resolvedAt)}</span>
+                      <span className="text-content">
+                        {formatDate(prediction.resolutionData.resolvedAt)}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -156,7 +173,7 @@ const PredictionPreview: React.FC<PredictionPreviewProps> = ({
               {/* Analytics */}
               <div className="space-y-4">
                 <h4 className="text-lg font-semibold text-content">Analytics</h4>
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-muted p-3 rounded-lg text-center">
                     <div className="text-lg font-semibold text-content">
@@ -164,21 +181,21 @@ const PredictionPreview: React.FC<PredictionPreviewProps> = ({
                     </div>
                     <div className="text-xs text-tertiary">Total Bets</div>
                   </div>
-                  
+
                   <div className="bg-muted p-3 rounded-lg text-center">
                     <div className="text-lg font-semibold text-content">
                       {formatCurrency(prediction.analytics?.totalVolume || 0)}
                     </div>
                     <div className="text-xs text-tertiary">Volume</div>
                   </div>
-                  
+
                   <div className="bg-muted p-3 rounded-lg text-center">
                     <div className="text-lg font-semibold text-content">
                       {prediction.analytics?.uniqueBettors || 0}
                     </div>
                     <div className="text-xs text-tertiary">Unique Bettors</div>
                   </div>
-                  
+
                   <div className="bg-muted p-3 rounded-lg text-center">
                     <div className="text-lg font-semibold text-content">
                       {Math.round(prediction.analytics?.controversyScore || 0)}%
@@ -191,16 +208,17 @@ const PredictionPreview: React.FC<PredictionPreviewProps> = ({
                 <div>
                   <h5 className="font-medium text-content mb-2">Quality Assessment</h5>
                   <div className="space-y-1 text-sm">
-                    {prediction.qualityFlags && Object.entries(prediction.qualityFlags).map(([flag, value]) => (
-                      <div key={flag} className="flex justify-between">
-                        <span className="text-tertiary capitalize">
-                          {flag.replace(/([A-Z])/g, ' $1').toLowerCase()}:
-                        </span>
-                        <span className={getQualityFlagColor(flag, value)}>
-                          {value ? 'Yes' : 'No'}
-                        </span>
-                      </div>
-                    ))}
+                    {prediction.qualityFlags &&
+                      Object.entries(prediction.qualityFlags).map(([flag, value]) => (
+                        <div key={flag} className="flex justify-between">
+                          <span className="text-tertiary capitalize">
+                            {flag.replace(/([A-Z])/g, ' $1').toLowerCase()}:
+                          </span>
+                          <span className={getQualityFlagColor(flag, value)}>
+                            {value ? 'Yes' : 'No'}
+                          </span>
+                        </div>
+                      ))}
                   </div>
                 </div>
               </div>
@@ -227,11 +245,11 @@ const PredictionPreview: React.FC<PredictionPreviewProps> = ({
                         <div className="font-medium text-content">{option.label}</div>
                         <div className="text-sm text-tertiary">Odds: {option.odds.toFixed(2)}</div>
                       </div>
-                      
+
                       {prediction.resolutionData?.winningOptionId === option.id && (
                         <div className="text-success font-semibold">Winner ✓</div>
                       )}
-                      
+
                       {!prediction.resolved && selectedOptionId === option.id && (
                         <div className="text-primary">Selected</div>
                       )}
@@ -255,7 +273,7 @@ const PredictionPreview: React.FC<PredictionPreviewProps> = ({
             {showResolutionForm && !prediction.resolved && (
               <div className="border-t border-muted pt-6">
                 <h4 className="text-lg font-semibold text-content mb-4">Resolve Prediction</h4>
-                
+
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-content mb-2">
@@ -263,7 +281,10 @@ const PredictionPreview: React.FC<PredictionPreviewProps> = ({
                     </label>
                     <div className="space-y-2">
                       {prediction.options?.map((option: any) => (
-                        <label key={option.id} className="flex items-center space-x-2 cursor-pointer">
+                        <label
+                          key={option.id}
+                          className="flex items-center space-x-2 cursor-pointer"
+                        >
                           <input
                             type="radio"
                             name="winningOption"
@@ -328,7 +349,7 @@ const PredictionPreview: React.FC<PredictionPreviewProps> = ({
                     </button>
                   </>
                 )}
-                
+
                 {prediction.approved && !prediction.resolved && (
                   <button
                     onClick={() => setShowResolutionForm(true)}

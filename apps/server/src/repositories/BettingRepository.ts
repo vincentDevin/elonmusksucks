@@ -7,12 +7,14 @@ const prisma = new PrismaClient();
 
 export class BettingRepository implements IBettingRepository {
   async findOptionWithPrediction(optionId: number): Promise<OptionWithPrediction | null> {
-    return await prisma.predictionOption.findUnique({
+    return (await prisma.predictionOption.findUnique({
       where: { id: optionId },
       include: {
-        prediction: { select: { id: true, title: true, category: true, resolved: true, expiresAt: true } },
+        prediction: {
+          select: { id: true, title: true, category: true, resolved: true, expiresAt: true },
+        },
       },
-    }) as OptionWithPrediction | null;
+    })) as OptionWithPrediction | null;
   }
 
   findUserById(userId: number) {
@@ -166,44 +168,44 @@ export class BettingRepository implements IBettingRepository {
     // Get prediction details for time-based calculations
     const prediction = await prisma.prediction.findUnique({
       where: { id: predictionId },
-      include: { bets: true }
+      include: { bets: true },
     });
-    
+
     if (!prediction) return;
 
     const pools = await prisma.bet.groupBy({
       by: ['optionId'],
       where: { predictionId },
       _sum: { amount: true },
-      _count: true
+      _count: true,
     });
 
     const total = pools.reduce((s, p) => s + (p._sum.amount ?? 0), 0);
     const totalBets = pools.reduce((s, p) => s + p._count, 0);
-    
+
     // 🚀 Special handling for predictions with no bets yet - give them exciting starting odds!
     if (total === 0) {
       const allOptions = await prisma.predictionOption.findMany({
-        where: { predictionId }
+        where: { predictionId },
       });
-      
+
       // Apply early bird bonus to initial odds (before any bets)
       const updates = allOptions.map(async (option) => {
         let enhancedOdds = option.odds;
-        
+
         // 🎊 First bet gets MASSIVE early bird bonus!
         const earlyBirdBonus = 2.0; // 100% bonus for the very first bet!
         enhancedOdds = Math.max(option.odds * earlyBirdBonus, 2.0); // Minimum 2.0x
-        
+
         // 🎯 Cap at reasonable maximum
         const finalOdds = Math.min(enhancedOdds, 12.0);
-        
+
         return prisma.predictionOption.update({
           where: { id: option.id },
           data: { odds: finalOdds },
         });
       });
-      
+
       await Promise.all(updates);
       return;
     }
@@ -222,45 +224,61 @@ export class BettingRepository implements IBettingRepository {
 
       // 1. 🚀 Early Bird Bonus (first few bets get massive boost!)
       let earlyBirdBonus = 1.0;
-      if (totalBets <= 3) earlyBirdBonus = 1.5; // 50% bonus!
-      else if (totalBets <= 7) earlyBirdBonus = 1.3; // 30% bonus
+      if (totalBets <= 3)
+        earlyBirdBonus = 1.5; // 50% bonus!
+      else if (totalBets <= 7)
+        earlyBirdBonus = 1.3; // 30% bonus
       else if (totalBets <= 15) earlyBirdBonus = 1.15; // 15% bonus
 
       // 2. 🔥 Hot Market Bonus (rapid betting activity)
       let hotMarketBonus = 1.0;
-      if (recentActivity.betsLast10Min >= 5) hotMarketBonus = 1.4; // 🔥🔥🔥
-      else if (recentActivity.betsLast10Min >= 3) hotMarketBonus = 1.25; // 🔥🔥
+      if (recentActivity.betsLast10Min >= 5)
+        hotMarketBonus = 1.4; // 🔥🔥🔥
+      else if (recentActivity.betsLast10Min >= 3)
+        hotMarketBonus = 1.25; // 🔥🔥
       else if (recentActivity.betsLast10Min >= 2) hotMarketBonus = 1.15; // 🔥
 
       // 3. ⏰ Urgency Multiplier (closing soon = higher odds!)
       let urgencyBonus = 1.0;
-      if (hoursLeft <= 2) urgencyBonus = 1.3; // 30% bonus in final 2 hours!
-      else if (hoursLeft <= 6) urgencyBonus = 1.2; // 20% bonus in final 6 hours
+      if (hoursLeft <= 2)
+        urgencyBonus = 1.3; // 30% bonus in final 2 hours!
+      else if (hoursLeft <= 6)
+        urgencyBonus = 1.2; // 20% bonus in final 6 hours
       else if (hoursLeft <= 24) urgencyBonus = 1.1; // 10% bonus in final day
 
       // 4. 🎯 Underdog Hero Bonus (way more aggressive)
       let underdogBonus = 1.0;
       const marketShare = optionPool / total;
-      if (marketShare < 0.1) underdogBonus = 1.8; // 80% bonus for <10% share!
-      else if (marketShare < 0.2) underdogBonus = 1.5; // 50% bonus for <20% share
+      if (marketShare < 0.1)
+        underdogBonus = 1.8; // 80% bonus for <10% share!
+      else if (marketShare < 0.2)
+        underdogBonus = 1.5; // 50% bonus for <20% share
       else if (marketShare < 0.3) underdogBonus = 1.25; // 25% bonus for <30% share
 
       // 5. 💰 High Stakes Bonus (bigger pools get better odds)
       let highStakesBonus = 1.0;
-      if (total > 5000) highStakesBonus = 1.25; // 25% bonus for 5k+ pools
-      else if (total > 2000) highStakesBonus = 1.15; // 15% bonus for 2k+ pools
+      if (total > 5000)
+        highStakesBonus = 1.25; // 25% bonus for 5k+ pools
+      else if (total > 2000)
+        highStakesBonus = 1.15; // 15% bonus for 2k+ pools
       else if (total > 1000) highStakesBonus = 1.1; // 10% bonus for 1k+ pools
 
       // 6. 🎮 Betting Frenzy Bonus (lots of individual bets)
       let frenzyBonus = 1.0;
-      if (optionBets >= 10) frenzyBonus = 1.2; // 20% bonus for 10+ bets on option
+      if (optionBets >= 10)
+        frenzyBonus = 1.2; // 20% bonus for 10+ bets on option
       else if (optionBets >= 5) frenzyBonus = 1.1; // 10% bonus for 5+ bets
 
       // 🎊 COMBINE ALL BONUSES (this is where the magic happens!)
       const enhancedOdds = Math.max(
-        baseOdds * earlyBirdBonus * hotMarketBonus * urgencyBonus * 
-        underdogBonus * highStakesBonus * frenzyBonus,
-        1.1 // Minimum odds floor
+        baseOdds *
+          earlyBirdBonus *
+          hotMarketBonus *
+          urgencyBonus *
+          underdogBonus *
+          highStakesBonus *
+          frenzyBonus,
+        1.1, // Minimum odds floor
       );
 
       // 🎨 Cap maximum odds to prevent abuse (but keep it exciting!)
@@ -281,21 +299,23 @@ export class BettingRepository implements IBettingRepository {
     const recentBets = await prisma.bet.count({
       where: {
         predictionId,
-        createdAt: { gte: tenMinutesAgo }
-      }
+        createdAt: { gte: tenMinutesAgo },
+      },
     });
 
     return {
-      betsLast10Min: recentBets
+      betsLast10Min: recentBets,
     };
   }
 
   // 🎯 NEW: Get current prediction options for odds comparison
-  async getPredictionOptions(predictionId: number): Promise<Array<{ id: number; label: string; odds: number }>> {
+  async getPredictionOptions(
+    predictionId: number,
+  ): Promise<Array<{ id: number; label: string; odds: number }>> {
     return await prisma.predictionOption.findMany({
       where: { predictionId },
       select: { id: true, label: true, odds: true },
-      orderBy: { id: 'asc' }
+      orderBy: { id: 'asc' },
     });
   }
 }

@@ -16,7 +16,7 @@ import {
   type CreateBadgeData,
   type UpdateBadgeData,
   type BadgeCategory,
-  type CreateBadgeCategoryData
+  type CreateBadgeCategoryData,
 } from '../../api/admin';
 
 interface FilterState {
@@ -34,26 +34,28 @@ const initialFilters: FilterState = {
   search: '',
   rarity: [],
   sortBy: 'createdAt',
-  sortOrder: 'desc'
+  sortOrder: 'desc',
 };
 
 export default function AdvancedBadgeManager() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'badges' | 'analytics' | 'categories'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'badges' | 'analytics' | 'categories'>(
+    'overview',
+  );
   const [filters, setFilters] = useState<FilterState>(initialFilters);
   const [currentPage, setCurrentPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
-  
+
   // Data states
   const [badgeData, setBadgeData] = useState<PaginatedBadges | null>(null);
   const [analytics, setAnalytics] = useState<BadgeAnalytics | null>(null);
   const [categories, setCategories] = useState<BadgeCategory[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Selection and operations
   const [selectedBadges, setSelectedBadges] = useState<Set<number>>(new Set());
   const [bulkLoading, setBulkLoading] = useState(false);
-  
+
   // Modal states
   const [showCreateBadge, setShowCreateBadge] = useState(false);
   const [showCreateCategory, setShowCreateCategory] = useState(false);
@@ -64,21 +66,24 @@ export default function AdvancedBadgeManager() {
   const loadBadgeData = async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
       const searchParams: BadgeSearchParams = {
         search: filters.search || undefined,
         categoryId: filters.categoryId,
         isActive: filters.isActive,
-        rarity: filters.rarity.length > 0 ? filters.rarity as ('common' | 'rare' | 'epic' | 'legendary')[] : undefined,
+        rarity:
+          filters.rarity.length > 0
+            ? (filters.rarity as ('common' | 'rare' | 'epic' | 'legendary')[])
+            : undefined,
         userCount: {
           min: filters.userCountMin,
-          max: filters.userCountMax
+          max: filters.userCountMax,
         },
         page: currentPage,
         limit: pageSize,
         sortBy: filters.sortBy,
-        sortOrder: filters.sortOrder
+        sortOrder: filters.sortOrder,
       };
 
       const data = await searchBadges(searchParams);
@@ -127,7 +132,7 @@ export default function AdvancedBadgeManager() {
 
   // Handle filter changes
   const updateFilters = (newFilters: Partial<FilterState>) => {
-    setFilters(prev => ({ ...prev, ...newFilters }));
+    setFilters((prev) => ({ ...prev, ...newFilters }));
     setCurrentPage(0);
   };
 
@@ -158,10 +163,12 @@ export default function AdvancedBadgeManager() {
   };
 
   const handleDeleteBadge = async (badgeId: number) => {
-    if (!confirm('Are you sure you want to delete this badge? This will remove it from all users.')) {
+    if (
+      !confirm('Are you sure you want to delete this badge? This will remove it from all users.')
+    ) {
       return;
     }
-    
+
     try {
       await deleteBadge(badgeId);
       loadBadgeData();
@@ -171,9 +178,11 @@ export default function AdvancedBadgeManager() {
   };
 
   // Handle bulk operations
-  const handleBulkOperation = async (operation: 'activate' | 'deactivate' | 'delete' | 'changeCategory') => {
+  const handleBulkOperation = async (
+    operation: 'activate' | 'deactivate' | 'delete' | 'changeCategory',
+  ) => {
     if (selectedBadges.size === 0) return;
-    
+
     let confirmMessage = '';
     switch (operation) {
       case 'delete':
@@ -189,7 +198,7 @@ export default function AdvancedBadgeManager() {
         confirmMessage = `Change category for ${selectedBadges.size} badges?`;
         break;
     }
-    
+
     if (!confirm(confirmMessage)) return;
 
     setBulkLoading(true);
@@ -197,9 +206,9 @@ export default function AdvancedBadgeManager() {
       const result = await bulkBadgeOperation({
         badgeIds: Array.from(selectedBadges),
         operation,
-        params: { reason: `Bulk ${operation} operation` }
+        params: { reason: `Bulk ${operation} operation` },
       });
-      
+
       alert(`Operation completed. Success: ${result.successCount}, Failed: ${result.failureCount}`);
       setSelectedBadges(new Set());
       loadBadgeData();
@@ -227,20 +236,22 @@ export default function AdvancedBadgeManager() {
       const details = await getBadgeDetails(badgeId);
       setSelectedBadgeDetails(details);
     } catch (err) {
-      alert('Failed to load badge details: ' + (err instanceof Error ? err.message : 'Unknown error'));
+      alert(
+        'Failed to load badge details: ' + (err instanceof Error ? err.message : 'Unknown error'),
+      );
     }
   };
 
   // Calculate overview stats
   const overviewStats = useMemo(() => {
     if (!badgeData || !analytics) return null;
-    
+
     return {
       totalBadges: analytics.overview.totalBadges,
       totalAwards: analytics.overview.totalAwards,
       activeUsers: analytics.overview.activeUsers,
       mostPopular: analytics.overview.mostPopularBadge,
-      categories: analytics.overview.totalCategories
+      categories: analytics.overview.totalCategories,
     };
   }, [badgeData, analytics]);
 
@@ -278,8 +289,8 @@ export default function AdvancedBadgeManager() {
           { key: 'overview', label: 'Overview' },
           { key: 'badges', label: 'Badge Management' },
           { key: 'analytics', label: 'Analytics' },
-          { key: 'categories', label: 'Categories' }
-        ].map(tab => (
+          { key: 'categories', label: 'Categories' },
+        ].map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key as any)}
@@ -315,11 +326,13 @@ export default function AdvancedBadgeManager() {
               <label className="block text-sm font-medium text-content mb-1">Category</label>
               <select
                 value={filters.categoryId || ''}
-                onChange={(e) => updateFilters({ categoryId: e.target.value ? Number(e.target.value) : undefined })}
+                onChange={(e) =>
+                  updateFilters({ categoryId: e.target.value ? Number(e.target.value) : undefined })
+                }
                 className="w-full px-3 py-2 border border-muted rounded focus:outline-none focus:ring-2 focus:ring-primary bg-background text-content"
               >
                 <option value="">All Categories</option>
-                {categories.map(category => (
+                {categories.map((category) => (
                   <option key={category.id} value={category.id}>
                     {category.name}
                   </option>
@@ -333,7 +346,11 @@ export default function AdvancedBadgeManager() {
               <select
                 multiple
                 value={filters.rarity}
-                onChange={(e) => updateFilters({ rarity: Array.from(e.target.selectedOptions, option => option.value) })}
+                onChange={(e) =>
+                  updateFilters({
+                    rarity: Array.from(e.target.selectedOptions, (option) => option.value),
+                  })
+                }
                 className="w-full px-3 py-2 border border-muted rounded focus:outline-none focus:ring-2 focus:ring-primary bg-background text-content"
               >
                 <option value="common">Common</option>
@@ -349,7 +366,11 @@ export default function AdvancedBadgeManager() {
               <input
                 type="number"
                 value={filters.userCountMin || ''}
-                onChange={(e) => updateFilters({ userCountMin: e.target.value ? Number(e.target.value) : undefined })}
+                onChange={(e) =>
+                  updateFilters({
+                    userCountMin: e.target.value ? Number(e.target.value) : undefined,
+                  })
+                }
                 placeholder="0"
                 className="w-full px-3 py-2 border border-muted rounded focus:outline-none focus:ring-2 focus:ring-primary bg-background text-content"
               />
@@ -360,7 +381,11 @@ export default function AdvancedBadgeManager() {
               <input
                 type="number"
                 value={filters.userCountMax || ''}
-                onChange={(e) => updateFilters({ userCountMax: e.target.value ? Number(e.target.value) : undefined })}
+                onChange={(e) =>
+                  updateFilters({
+                    userCountMax: e.target.value ? Number(e.target.value) : undefined,
+                  })
+                }
                 placeholder="∞"
                 className="w-full px-3 py-2 border border-muted rounded focus:outline-none focus:ring-2 focus:ring-primary bg-background text-content"
               />
@@ -424,7 +449,9 @@ export default function AdvancedBadgeManager() {
             </div>
             <div className="bg-surface p-4 rounded-lg border border-muted">
               <div className="text-lg font-bold text-primary">{overviewStats.mostPopular.name}</div>
-              <div className="text-sm text-tertiary">Most Popular ({overviewStats.mostPopular.userCount} users)</div>
+              <div className="text-sm text-tertiary">
+                Most Popular ({overviewStats.mostPopular.userCount} users)
+              </div>
             </div>
           </div>
 
@@ -434,7 +461,10 @@ export default function AdvancedBadgeManager() {
               <h3 className="text-lg font-semibold text-content mb-4">Recent Badge Awards</h3>
               <div className="space-y-2">
                 {analytics.recentActivity.slice(0, 10).map((activity, index) => (
-                  <div key={index} className="flex items-center justify-between py-2 border-b border-muted last:border-b-0">
+                  <div
+                    key={index}
+                    className="flex items-center justify-between py-2 border-b border-muted last:border-b-0"
+                  >
                     <div>
                       <span className="font-medium text-content">{activity.userName}</span>
                       <span className="text-tertiary mx-2">earned</span>
@@ -493,7 +523,10 @@ export default function AdvancedBadgeManager() {
           {/* Badge Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {badgeData.badges.map((badge: DetailedBadge) => (
-              <div key={badge.id} className="bg-surface p-4 rounded-lg border border-muted hover:border-primary transition-colors">
+              <div
+                key={badge.id}
+                className="bg-surface p-4 rounded-lg border border-muted hover:border-primary transition-colors"
+              >
                 <div className="flex items-start justify-between mb-3">
                   <input
                     type="checkbox"
@@ -513,20 +546,27 @@ export default function AdvancedBadgeManager() {
                     {badge.iconUrl && (
                       <img src={badge.iconUrl} alt={badge.name} className="w-6 h-6 rounded" />
                     )}
-                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                      badge.analytics.rarityLevel === 'legendary' ? 'bg-purple-100 text-purple-800' :
-                      badge.analytics.rarityLevel === 'epic' ? 'bg-orange-100 text-orange-800' :
-                      badge.analytics.rarityLevel === 'rare' ? 'bg-blue-100 text-blue-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
+                    <span
+                      className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                        badge.analytics.rarityLevel === 'legendary'
+                          ? 'bg-purple-100 text-purple-800'
+                          : badge.analytics.rarityLevel === 'epic'
+                            ? 'bg-orange-100 text-orange-800'
+                            : badge.analytics.rarityLevel === 'rare'
+                              ? 'bg-blue-100 text-blue-800'
+                              : 'bg-gray-100 text-gray-800'
+                      }`}
+                    >
                       {badge.analytics.rarityLevel}
                     </span>
                   </div>
                 </div>
-                
+
                 <h4 className="font-semibold text-content mb-2">{badge.name}</h4>
-                <p className="text-sm text-tertiary mb-3 line-clamp-2">{badge.description || 'No description'}</p>
-                
+                <p className="text-sm text-tertiary mb-3 line-clamp-2">
+                  {badge.description || 'No description'}
+                </p>
+
                 <div className="space-y-2 mb-4">
                   <div className="flex justify-between text-sm">
                     <span className="text-tertiary">Users:</span>
@@ -541,7 +581,7 @@ export default function AdvancedBadgeManager() {
                     <span className="text-content">{badge.analytics.popularityScore}</span>
                   </div>
                 </div>
-                
+
                 <div className="flex gap-2">
                   <button
                     onClick={() => handleViewBadgeDetails(badge.id)}
@@ -582,10 +622,10 @@ export default function AdvancedBadgeManager() {
               </select>
               <span className="text-sm text-tertiary">per page</span>
             </div>
-            
+
             <div className="flex items-center space-x-2">
               <button
-                onClick={() => setCurrentPage(prev => Math.max(0, prev - 1))}
+                onClick={() => setCurrentPage((prev) => Math.max(0, prev - 1))}
                 disabled={currentPage === 0}
                 className="px-3 py-1 bg-muted text-content rounded hover:opacity-80 disabled:opacity-50 text-sm"
               >
@@ -595,7 +635,9 @@ export default function AdvancedBadgeManager() {
                 Page {currentPage + 1} of {badgeData.totalPages}
               </span>
               <button
-                onClick={() => setCurrentPage(prev => Math.min(badgeData.totalPages - 1, prev + 1))}
+                onClick={() =>
+                  setCurrentPage((prev) => Math.min(badgeData.totalPages - 1, prev + 1))
+                }
                 disabled={!badgeData.hasNextPage}
                 className="px-3 py-1 bg-muted text-content rounded hover:opacity-80 disabled:opacity-50 text-sm"
               >
@@ -614,19 +656,27 @@ export default function AdvancedBadgeManager() {
             <h3 className="text-lg font-semibold text-content mb-4">Badge System Overview</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <div>
-                <div className="text-2xl font-bold text-primary">{analytics.overview.totalBadges}</div>
+                <div className="text-2xl font-bold text-primary">
+                  {analytics.overview.totalBadges}
+                </div>
                 <div className="text-sm text-tertiary">Total Badges</div>
               </div>
               <div>
-                <div className="text-2xl font-bold text-primary">{analytics.overview.totalAwards}</div>
+                <div className="text-2xl font-bold text-primary">
+                  {analytics.overview.totalAwards}
+                </div>
                 <div className="text-sm text-tertiary">Total Awards</div>
               </div>
               <div>
-                <div className="text-2xl font-bold text-primary">{analytics.overview.activeUsers}</div>
+                <div className="text-2xl font-bold text-primary">
+                  {analytics.overview.activeUsers}
+                </div>
                 <div className="text-sm text-tertiary">Active Users</div>
               </div>
               <div>
-                <div className="text-2xl font-bold text-primary">{analytics.overview.totalCategories}</div>
+                <div className="text-2xl font-bold text-primary">
+                  {analytics.overview.totalCategories}
+                </div>
                 <div className="text-sm text-tertiary">Categories</div>
               </div>
             </div>
@@ -639,12 +689,17 @@ export default function AdvancedBadgeManager() {
               {analytics.rarityDistribution.map((rarity, index) => (
                 <div key={index} className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className={`w-4 h-4 rounded ${
-                      rarity.rarity === 'legendary' ? 'bg-purple-500' :
-                      rarity.rarity === 'epic' ? 'bg-orange-500' :
-                      rarity.rarity === 'rare' ? 'bg-blue-500' :
-                      'bg-gray-500'
-                    }`}></div>
+                    <div
+                      className={`w-4 h-4 rounded ${
+                        rarity.rarity === 'legendary'
+                          ? 'bg-purple-500'
+                          : rarity.rarity === 'epic'
+                            ? 'bg-orange-500'
+                            : rarity.rarity === 'rare'
+                              ? 'bg-blue-500'
+                              : 'bg-gray-500'
+                      }`}
+                    ></div>
                     <span className="capitalize font-medium text-content">{rarity.rarity}</span>
                   </div>
                   <div className="text-right">
@@ -665,8 +720,12 @@ export default function AdvancedBadgeManager() {
                   <thead>
                     <tr className="border-b border-muted">
                       <th className="text-left py-2 text-sm font-medium text-content">User</th>
-                      <th className="text-left py-2 text-sm font-medium text-content">Total Badges</th>
-                      <th className="text-left py-2 text-sm font-medium text-content">Rare Badges</th>
+                      <th className="text-left py-2 text-sm font-medium text-content">
+                        Total Badges
+                      </th>
+                      <th className="text-left py-2 text-sm font-medium text-content">
+                        Rare Badges
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -758,7 +817,11 @@ export default function AdvancedBadgeManager() {
 }
 
 // Modal Components (simplified for brevity)
-function CreateBadgeModal({ categories: _categories, onSubmit, onClose }: {
+function CreateBadgeModal({
+  categories: _categories,
+  onSubmit,
+  onClose,
+}: {
   categories: BadgeCategory[];
   onSubmit: (data: CreateBadgeData) => void;
   onClose: () => void;
@@ -767,7 +830,7 @@ function CreateBadgeModal({ categories: _categories, onSubmit, onClose }: {
     name: '',
     description: '',
     iconUrl: '',
-    rarity: 'common'
+    rarity: 'common',
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -785,7 +848,7 @@ function CreateBadgeModal({ categories: _categories, onSubmit, onClose }: {
             <input
               type="text"
               value={formData.name}
-              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+              onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
               required
               className="w-full px-3 py-2 border border-muted rounded focus:outline-none focus:ring-2 focus:ring-primary bg-background text-content"
             />
@@ -794,7 +857,7 @@ function CreateBadgeModal({ categories: _categories, onSubmit, onClose }: {
             <label className="block text-sm font-medium text-content mb-1">Description</label>
             <textarea
               value={formData.description}
-              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+              onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
               rows={3}
               className="w-full px-3 py-2 border border-muted rounded focus:outline-none focus:ring-2 focus:ring-primary bg-background text-content"
             />
@@ -804,7 +867,7 @@ function CreateBadgeModal({ categories: _categories, onSubmit, onClose }: {
             <input
               type="url"
               value={formData.iconUrl}
-              onChange={(e) => setFormData(prev => ({ ...prev, iconUrl: e.target.value }))}
+              onChange={(e) => setFormData((prev) => ({ ...prev, iconUrl: e.target.value }))}
               className="w-full px-3 py-2 border border-muted rounded focus:outline-none focus:ring-2 focus:ring-primary bg-background text-content"
             />
           </div>
@@ -812,7 +875,7 @@ function CreateBadgeModal({ categories: _categories, onSubmit, onClose }: {
             <label className="block text-sm font-medium text-content mb-1">Rarity</label>
             <select
               value={formData.rarity}
-              onChange={(e) => setFormData(prev => ({ ...prev, rarity: e.target.value as any }))}
+              onChange={(e) => setFormData((prev) => ({ ...prev, rarity: e.target.value as any }))}
               className="w-full px-3 py-2 border border-muted rounded focus:outline-none focus:ring-2 focus:ring-primary bg-background text-content"
             >
               <option value="common">Common</option>
@@ -842,7 +905,12 @@ function CreateBadgeModal({ categories: _categories, onSubmit, onClose }: {
   );
 }
 
-function EditBadgeModal({ badge, categories: _categories, onSubmit, onClose }: {
+function EditBadgeModal({
+  badge,
+  categories: _categories,
+  onSubmit,
+  onClose,
+}: {
   badge: DetailedBadge;
   categories: BadgeCategory[];
   onSubmit: (data: UpdateBadgeData) => void;
@@ -852,7 +920,7 @@ function EditBadgeModal({ badge, categories: _categories, onSubmit, onClose }: {
     name: badge.name,
     description: badge.description || '',
     iconUrl: badge.iconUrl || '',
-    rarity: badge.analytics.rarityLevel
+    rarity: badge.analytics.rarityLevel,
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -870,7 +938,7 @@ function EditBadgeModal({ badge, categories: _categories, onSubmit, onClose }: {
             <input
               type="text"
               value={formData.name}
-              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+              onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
               className="w-full px-3 py-2 border border-muted rounded focus:outline-none focus:ring-2 focus:ring-primary bg-background text-content"
             />
           </div>
@@ -878,7 +946,7 @@ function EditBadgeModal({ badge, categories: _categories, onSubmit, onClose }: {
             <label className="block text-sm font-medium text-content mb-1">Description</label>
             <textarea
               value={formData.description}
-              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+              onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
               rows={3}
               className="w-full px-3 py-2 border border-muted rounded focus:outline-none focus:ring-2 focus:ring-primary bg-background text-content"
             />
@@ -888,7 +956,7 @@ function EditBadgeModal({ badge, categories: _categories, onSubmit, onClose }: {
             <input
               type="url"
               value={formData.iconUrl}
-              onChange={(e) => setFormData(prev => ({ ...prev, iconUrl: e.target.value }))}
+              onChange={(e) => setFormData((prev) => ({ ...prev, iconUrl: e.target.value }))}
               className="w-full px-3 py-2 border border-muted rounded focus:outline-none focus:ring-2 focus:ring-primary bg-background text-content"
             />
           </div>
@@ -913,7 +981,10 @@ function EditBadgeModal({ badge, categories: _categories, onSubmit, onClose }: {
   );
 }
 
-function CreateCategoryModal({ onSubmit, onClose }: {
+function CreateCategoryModal({
+  onSubmit,
+  onClose,
+}: {
   onSubmit: (data: CreateBadgeCategoryData) => void;
   onClose: () => void;
 }) {
@@ -921,7 +992,7 @@ function CreateCategoryModal({ onSubmit, onClose }: {
     name: '',
     description: '',
     color: '#3B82F6',
-    iconUrl: ''
+    iconUrl: '',
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -939,7 +1010,7 @@ function CreateCategoryModal({ onSubmit, onClose }: {
             <input
               type="text"
               value={formData.name}
-              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+              onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
               required
               className="w-full px-3 py-2 border border-muted rounded focus:outline-none focus:ring-2 focus:ring-primary bg-background text-content"
             />
@@ -948,7 +1019,7 @@ function CreateCategoryModal({ onSubmit, onClose }: {
             <label className="block text-sm font-medium text-content mb-1">Description</label>
             <textarea
               value={formData.description}
-              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+              onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
               rows={2}
               className="w-full px-3 py-2 border border-muted rounded focus:outline-none focus:ring-2 focus:ring-primary bg-background text-content"
             />
@@ -958,7 +1029,7 @@ function CreateCategoryModal({ onSubmit, onClose }: {
             <input
               type="color"
               value={formData.color}
-              onChange={(e) => setFormData(prev => ({ ...prev, color: e.target.value }))}
+              onChange={(e) => setFormData((prev) => ({ ...prev, color: e.target.value }))}
               className="w-full h-10 px-1 border border-muted rounded focus:outline-none focus:ring-2 focus:ring-primary bg-background"
             />
           </div>
@@ -983,23 +1054,17 @@ function CreateCategoryModal({ onSubmit, onClose }: {
   );
 }
 
-function BadgeDetailsModal({ badge, onClose }: {
-  badge: DetailedBadge;
-  onClose: () => void;
-}) {
+function BadgeDetailsModal({ badge, onClose }: { badge: DetailedBadge; onClose: () => void }) {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-surface p-6 rounded-lg border border-muted max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-content">Badge Details</h3>
-          <button
-            onClick={onClose}
-            className="text-tertiary hover:text-content"
-          >
+          <button onClick={onClose} className="text-tertiary hover:text-content">
             ✕
           </button>
         </div>
-        
+
         <div className="space-y-6">
           <div className="flex items-center gap-4">
             {badge.iconUrl && (
@@ -1008,12 +1073,17 @@ function BadgeDetailsModal({ badge, onClose }: {
             <div>
               <h4 className="text-xl font-bold text-content">{badge.name}</h4>
               <p className="text-tertiary">{badge.description}</p>
-              <span className={`inline-block px-2 py-1 text-xs font-semibold rounded-full mt-2 ${
-                badge.analytics.rarityLevel === 'legendary' ? 'bg-purple-100 text-purple-800' :
-                badge.analytics.rarityLevel === 'epic' ? 'bg-orange-100 text-orange-800' :
-                badge.analytics.rarityLevel === 'rare' ? 'bg-blue-100 text-blue-800' :
-                'bg-gray-100 text-gray-800'
-              }`}>
+              <span
+                className={`inline-block px-2 py-1 text-xs font-semibold rounded-full mt-2 ${
+                  badge.analytics.rarityLevel === 'legendary'
+                    ? 'bg-purple-100 text-purple-800'
+                    : badge.analytics.rarityLevel === 'epic'
+                      ? 'bg-orange-100 text-orange-800'
+                      : badge.analytics.rarityLevel === 'rare'
+                        ? 'bg-blue-100 text-blue-800'
+                        : 'bg-gray-100 text-gray-800'
+                }`}
+              >
                 {badge.analytics.rarityLevel}
               </span>
             </div>
@@ -1025,15 +1095,21 @@ function BadgeDetailsModal({ badge, onClose }: {
               <div className="text-sm text-tertiary">Total Users</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-primary">{badge.analytics.awardedThisMonth}</div>
+              <div className="text-2xl font-bold text-primary">
+                {badge.analytics.awardedThisMonth}
+              </div>
               <div className="text-sm text-tertiary">This Month</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-primary">{badge.analytics.popularityScore}</div>
+              <div className="text-2xl font-bold text-primary">
+                {badge.analytics.popularityScore}
+              </div>
               <div className="text-sm text-tertiary">Popularity</div>
             </div>
             <div className="text-center">
-              <div className="text-sm font-medium text-content">{new Date(badge.createdAt).toLocaleDateString()}</div>
+              <div className="text-sm font-medium text-content">
+                {new Date(badge.createdAt).toLocaleDateString()}
+              </div>
               <div className="text-sm text-tertiary">Created</div>
             </div>
           </div>
@@ -1043,13 +1119,16 @@ function BadgeDetailsModal({ badge, onClose }: {
               <h5 className="font-semibold text-content mb-3">Recent Awards</h5>
               <div className="space-y-2">
                 {badge.recentAwards.map((award, index) => (
-                  <div key={index} className="flex items-center justify-between py-2 border-b border-muted last:border-b-0">
+                  <div
+                    key={index}
+                    className="flex items-center justify-between py-2 border-b border-muted last:border-b-0"
+                  >
                     <span className="font-medium text-content">{award.userName}</span>
                     <div className="text-right">
-                      <div className="text-sm text-content">{new Date(award.awardedAt).toLocaleDateString()}</div>
-                      {award.reason && (
-                        <div className="text-xs text-tertiary">{award.reason}</div>
-                      )}
+                      <div className="text-sm text-content">
+                        {new Date(award.awardedAt).toLocaleDateString()}
+                      </div>
+                      {award.reason && <div className="text-xs text-tertiary">{award.reason}</div>}
                     </div>
                   </div>
                 ))}

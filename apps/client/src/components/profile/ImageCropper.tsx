@@ -10,11 +10,7 @@ interface ImageCropperProps {
 }
 
 // Helper function to create a circular crop that fits the image
-function centerAspectCrop(
-  mediaWidth: number,
-  mediaHeight: number,
-  aspect: number,
-) {
+function centerAspectCrop(mediaWidth: number, mediaHeight: number, aspect: number) {
   return centerCrop(
     makeAspectCrop(
       {
@@ -60,7 +56,7 @@ export function ImageCropper({ imageSrc, onCropComplete, onCancel, className }: 
       // Set canvas size to match crop area
       const cropWidth = crop.width * scaleX;
       const cropHeight = crop.height * scaleY;
-      
+
       canvas.width = cropWidth;
       canvas.height = cropHeight;
 
@@ -115,7 +111,8 @@ export function ImageCropper({ imageSrc, onCropComplete, onCancel, className }: 
       <div className="text-center">
         <h3 className="text-lg font-semibold text-content mb-2">Crop Your Profile Picture</h3>
         <p className="text-sm text-tertiary">
-          Drag to reposition and resize your image. The cropped area will be used as your circular profile picture.
+          Drag to reposition and resize your image. The cropped area will be used as your circular
+          profile picture.
         </p>
       </div>
 
@@ -140,10 +137,7 @@ export function ImageCropper({ imageSrc, onCropComplete, onCancel, className }: 
       </div>
 
       {/* Preview canvas (hidden) */}
-      <canvas
-        ref={canvasRef}
-        style={{ display: 'none' }}
-      />
+      <canvas ref={canvasRef} style={{ display: 'none' }} />
 
       {/* Action buttons */}
       <div className="flex justify-center space-x-4">

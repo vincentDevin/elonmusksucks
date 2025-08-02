@@ -10,12 +10,12 @@ export type OptionWithPrediction = {
   label: string;
   odds: number;
   predictionId: number;
-  prediction: { 
-    id: number; 
-    title: string; 
+  prediction: {
+    id: number;
+    title: string;
     category: string;
-    resolved: boolean; 
-    expiresAt: Date; 
+    resolved: boolean;
+    expiresAt: Date;
   };
 };
 
@@ -23,7 +23,10 @@ export interface IBettingRepository {
   findOptionWithPrediction(optionId: number): Promise<OptionWithPrediction | null>;
   findUserById(
     userId: number,
-  ): Promise<Pick<import('@prisma/client').User, 'id' | 'muskBucks' | 'name' | 'avatarUrl' | 'profilePictureKey'> | null>;
+  ): Promise<Pick<
+    import('@prisma/client').User,
+    'id' | 'muskBucks' | 'name' | 'avatarUrl' | 'profilePictureKey'
+  > | null>;
 
   /**
    * Persist a single bet and all related updates in one transaction.
@@ -55,5 +58,7 @@ export interface IBettingRepository {
   /**
    * Get current prediction options for odds comparison.
    */
-  getPredictionOptions(predictionId: number): Promise<Array<{ id: number; label: string; odds: number }>>;
+  getPredictionOptions(
+    predictionId: number,
+  ): Promise<Array<{ id: number; label: string; odds: number }>>;
 }

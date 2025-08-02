@@ -49,10 +49,13 @@ const PredictionAnalytics: React.FC<PredictionAnalyticsProps> = ({ className = '
     try {
       // Calculate date range
       const now = new Date();
-      const dateRange = selectedTimeRange !== 'all' ? {
-        start: new Date(now.getTime() - (parseInt(selectedTimeRange) * 24 * 60 * 60 * 1000)),
-        end: now
-      } : undefined;
+      const dateRange =
+        selectedTimeRange !== 'all'
+          ? {
+              start: new Date(now.getTime() - parseInt(selectedTimeRange) * 24 * 60 * 60 * 1000),
+              end: now,
+            }
+          : undefined;
 
       // Fetch all predictions for analytics
       const params: PredictionSearchParams = {
@@ -62,7 +65,7 @@ const PredictionAnalytics: React.FC<PredictionAnalyticsProps> = ({ className = '
         page: 0,
         limit: 1000, // Get more for comprehensive analytics
         sortBy: 'createdAt',
-        sortOrder: 'desc'
+        sortOrder: 'desc',
       };
 
       const results = await searchPredictions(params);
@@ -77,10 +80,10 @@ const PredictionAnalytics: React.FC<PredictionAnalyticsProps> = ({ className = '
 
   const processAnalyticsData = (data: PaginatedPredictions): AnalyticsData => {
     const predictions = data.predictions;
-    
+
     // Category distribution
     const categoryDistribution: Record<string, number> = {};
-    predictions.forEach(p => {
+    predictions.forEach((p) => {
       categoryDistribution[p.category] = (categoryDistribution[p.category] || 0) + 1;
     });
 
@@ -89,7 +92,7 @@ const PredictionAnalytics: React.FC<PredictionAnalyticsProps> = ({ className = '
 
     // Popularity trends by category
     const categoryPopularity: Record<string, { total: number; count: number }> = {};
-    predictions.forEach(p => {
+    predictions.forEach((p) => {
       if (!categoryPopularity[p.category]) {
         categoryPopularity[p.category] = { total: 0, count: 0 };
       }
@@ -97,14 +100,16 @@ const PredictionAnalytics: React.FC<PredictionAnalyticsProps> = ({ className = '
       categoryPopularity[p.category].count += 1;
     });
 
-    const popularityTrends = Object.entries(categoryPopularity).map(([category, data]) => ({
-      category,
-      averagePopularity: data.count > 0 ? data.total / data.count : 0
-    })).sort((a, b) => b.averagePopularity - a.averagePopularity);
+    const popularityTrends = Object.entries(categoryPopularity)
+      .map(([category, data]) => ({
+        category,
+        averagePopularity: data.count > 0 ? data.total / data.count : 0,
+      }))
+      .sort((a, b) => b.averagePopularity - a.averagePopularity);
 
     // Controversy analysis by category
     const categoryControversy: Record<string, { total: number; count: number }> = {};
-    predictions.forEach(p => {
+    predictions.forEach((p) => {
       if (!categoryControversy[p.category]) {
         categoryControversy[p.category] = { total: 0, count: 0 };
       }
@@ -112,18 +117,20 @@ const PredictionAnalytics: React.FC<PredictionAnalyticsProps> = ({ className = '
       categoryControversy[p.category].count += 1;
     });
 
-    const controversyAnalysis = Object.entries(categoryControversy).map(([category, data]) => ({
-      category,
-      averageControversy: data.count > 0 ? data.total / data.count : 0
-    })).sort((a, b) => b.averageControversy - a.averageControversy);
+    const controversyAnalysis = Object.entries(categoryControversy)
+      .map(([category, data]) => ({
+        category,
+        averageControversy: data.count > 0 ? data.total / data.count : 0,
+      }))
+      .sort((a, b) => b.averageControversy - a.averageControversy);
 
     // Volume trends (simplified - would need more sophisticated date grouping in real implementation)
     const volumeTrends = predictions
       .slice(0, 10) // Last 10 predictions for trend
-      .map(p => ({
+      .map((p) => ({
         date: new Date(p.createdAt.toString()).toLocaleDateString(),
         volume: p.analytics?.totalVolume || 0,
-        count: 1
+        count: 1,
       }));
 
     return {
@@ -135,11 +142,11 @@ const PredictionAnalytics: React.FC<PredictionAnalyticsProps> = ({ className = '
         pending: data.analytics?.totalPending || 0,
         approved: data.analytics?.totalApproved || 0,
         resolved: data.analytics?.totalResolved || 0,
-        rejected: data.analytics?.totalRejected || 0
+        rejected: data.analytics?.totalRejected || 0,
       },
       popularityTrends,
       controversyAnalysis,
-      volumeTrends
+      volumeTrends,
     };
   };
 
@@ -148,7 +155,7 @@ const PredictionAnalytics: React.FC<PredictionAnalyticsProps> = ({ className = '
       style: 'currency',
       currency: 'USD',
       minimumFractionDigits: 0,
-      maximumFractionDigits: 0
+      maximumFractionDigits: 0,
     }).format(amount);
   };
 
@@ -189,7 +196,7 @@ const PredictionAnalytics: React.FC<PredictionAnalyticsProps> = ({ className = '
             <h2 className="text-2xl font-bold text-content">Prediction Analytics</h2>
             <p className="text-tertiary">Comprehensive insights and performance metrics</p>
           </div>
-          
+
           <div className="flex items-center space-x-4">
             <select
               value={selectedCategory}
@@ -197,11 +204,13 @@ const PredictionAnalytics: React.FC<PredictionAnalyticsProps> = ({ className = '
               className="px-3 py-2 border border-muted rounded-lg bg-surface text-content"
             >
               <option value="">All Categories</option>
-              {categories.map(category => (
-                <option key={category} value={category}>{category}</option>
+              {categories.map((category) => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
               ))}
             </select>
-            
+
             <select
               value={selectedTimeRange}
               onChange={(e) => setSelectedTimeRange(e.target.value as any)}
@@ -221,17 +230,21 @@ const PredictionAnalytics: React.FC<PredictionAnalyticsProps> = ({ className = '
             <div className="text-2xl font-bold text-content">{analytics.totalPredictions}</div>
             <div className="text-sm text-tertiary">Total Predictions</div>
           </div>
-          
+
           <div className="bg-muted p-4 rounded-lg text-center">
-            <div className="text-2xl font-bold text-content">{formatCurrency(analytics.totalVolume)}</div>
+            <div className="text-2xl font-bold text-content">
+              {formatCurrency(analytics.totalVolume)}
+            </div>
             <div className="text-sm text-tertiary">Total Volume</div>
           </div>
-          
+
           <div className="bg-muted p-4 rounded-lg text-center">
-            <div className="text-2xl font-bold text-content">{analytics.averageResolutionTime}h</div>
+            <div className="text-2xl font-bold text-content">
+              {analytics.averageResolutionTime}h
+            </div>
             <div className="text-sm text-tertiary">Avg Resolution</div>
           </div>
-          
+
           <div className="bg-muted p-4 rounded-lg text-center">
             <div className="text-2xl font-bold text-content">
               {getPercentage(analytics.statusDistribution.resolved, analytics.totalPredictions)}%
@@ -245,12 +258,12 @@ const PredictionAnalytics: React.FC<PredictionAnalyticsProps> = ({ className = '
         {/* Status Distribution */}
         <div className="bg-surface border border-muted rounded-lg p-6">
           <h3 className="text-lg font-semibold text-content mb-4">Status Distribution</h3>
-          
+
           <div className="space-y-3">
             {Object.entries(analytics.statusDistribution).map(([status, count]) => {
               const percentage = getPercentage(count, analytics.totalPredictions);
               const maxCount = Math.max(...Object.values(analytics.statusDistribution));
-              
+
               return (
                 <div key={status} className="flex items-center justify-between">
                   <div className="flex items-center space-x-3 flex-1">
@@ -258,10 +271,13 @@ const PredictionAnalytics: React.FC<PredictionAnalyticsProps> = ({ className = '
                     <div className="flex-1 bg-muted rounded-full h-2">
                       <div
                         className={`h-2 rounded-full ${
-                          status === 'pending' ? 'bg-warning' :
-                          status === 'approved' ? 'bg-success' :
-                          status === 'resolved' ? 'bg-primary' :
-                          'bg-error'
+                          status === 'pending'
+                            ? 'bg-warning'
+                            : status === 'approved'
+                              ? 'bg-success'
+                              : status === 'resolved'
+                                ? 'bg-primary'
+                                : 'bg-error'
                         }`}
                         style={{ width: getBarWidth(count, maxCount) }}
                       />
@@ -280,15 +296,15 @@ const PredictionAnalytics: React.FC<PredictionAnalyticsProps> = ({ className = '
         {/* Category Distribution */}
         <div className="bg-surface border border-muted rounded-lg p-6">
           <h3 className="text-lg font-semibold text-content mb-4">Category Distribution</h3>
-          
+
           <div className="space-y-3">
             {Object.entries(analytics.categoryDistribution)
-              .sort(([,a], [,b]) => b - a)
+              .sort(([, a], [, b]) => b - a)
               .slice(0, 6)
               .map(([category, count]) => {
                 const percentage = getPercentage(count, analytics.totalPredictions);
                 const maxCount = Math.max(...Object.values(analytics.categoryDistribution));
-                
+
                 return (
                   <div key={category} className="flex items-center justify-between">
                     <div className="flex items-center space-x-3 flex-1">
@@ -313,11 +329,13 @@ const PredictionAnalytics: React.FC<PredictionAnalyticsProps> = ({ className = '
         {/* Popularity Trends */}
         <div className="bg-surface border border-muted rounded-lg p-6">
           <h3 className="text-lg font-semibold text-content mb-4">Popularity by Category</h3>
-          
+
           <div className="space-y-3">
             {analytics.popularityTrends.slice(0, 5).map(({ category, averagePopularity }) => {
-              const maxPopularity = Math.max(...analytics.popularityTrends.map(t => t.averagePopularity));
-              
+              const maxPopularity = Math.max(
+                ...analytics.popularityTrends.map((t) => t.averagePopularity),
+              );
+
               return (
                 <div key={category} className="flex items-center justify-between">
                   <div className="flex items-center space-x-3 flex-1">
@@ -341,11 +359,13 @@ const PredictionAnalytics: React.FC<PredictionAnalyticsProps> = ({ className = '
         {/* Controversy Analysis */}
         <div className="bg-surface border border-muted rounded-lg p-6">
           <h3 className="text-lg font-semibold text-content mb-4">Controversy by Category</h3>
-          
+
           <div className="space-y-3">
             {analytics.controversyAnalysis.slice(0, 5).map(({ category, averageControversy }) => {
-              const maxControversy = Math.max(...analytics.controversyAnalysis.map(c => c.averageControversy));
-              
+              const maxControversy = Math.max(
+                ...analytics.controversyAnalysis.map((c) => c.averageControversy),
+              );
+
               return (
                 <div key={category} className="flex items-center justify-between">
                   <div className="flex items-center space-x-3 flex-1">
@@ -353,9 +373,11 @@ const PredictionAnalytics: React.FC<PredictionAnalyticsProps> = ({ className = '
                     <div className="flex-1 bg-muted rounded-full h-2">
                       <div
                         className={`h-2 rounded-full ${
-                          averageControversy > 70 ? 'bg-error' :
-                          averageControversy > 40 ? 'bg-warning' :
-                          'bg-success'
+                          averageControversy > 70
+                            ? 'bg-error'
+                            : averageControversy > 40
+                              ? 'bg-warning'
+                              : 'bg-success'
                         }`}
                         style={{ width: getBarWidth(averageControversy, maxControversy) }}
                       />
@@ -374,7 +396,7 @@ const PredictionAnalytics: React.FC<PredictionAnalyticsProps> = ({ className = '
       {/* Performance Insights */}
       <div className="bg-surface border border-muted rounded-lg p-6">
         <h3 className="text-lg font-semibold text-content mb-4">Performance Insights</h3>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="text-center">
             <div className="text-2xl font-bold text-success mb-2">
@@ -382,18 +404,19 @@ const PredictionAnalytics: React.FC<PredictionAnalyticsProps> = ({ className = '
             </div>
             <div className="text-sm text-tertiary">Most Popular Category</div>
           </div>
-          
+
           <div className="text-center">
             <div className="text-2xl font-bold text-error mb-2">
               {analytics.controversyAnalysis[0]?.category || 'N/A'}
             </div>
             <div className="text-sm text-tertiary">Most Controversial Category</div>
           </div>
-          
+
           <div className="text-center">
             <div className="text-2xl font-bold text-primary mb-2">
-              {Object.entries(analytics.categoryDistribution)
-                .sort(([,a], [,b]) => b - a)[0]?.[0] || 'N/A'}
+              {Object.entries(analytics.categoryDistribution).sort(
+                ([, a], [, b]) => b - a,
+              )[0]?.[0] || 'N/A'}
             </div>
             <div className="text-sm text-tertiary">Most Active Category</div>
           </div>

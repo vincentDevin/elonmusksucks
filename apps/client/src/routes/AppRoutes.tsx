@@ -7,6 +7,7 @@ import ResetPassword from '../pages/ResetPassword';
 import Dashboard from '../pages/Dashboard';
 import Predictions from '../pages/Predictions';
 import Leaderboard from '../pages/Leaderboard';
+import EnhancedLeaderboard from '../pages/EnhancedLeaderboard';
 import PrivateRoute from '../components/PrivateRoute';
 import Home from '../pages/Home';
 import Profile from '../pages/Profile';
@@ -31,7 +32,8 @@ export default function AppRoutes() {
       <Route element={<PrivateRoute />}>
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/predictions" element={<Predictions />} />
-        <Route path="/leaderboard" element={<Leaderboard />} />
+        <Route path="/leaderboard" element={<EnhancedLeaderboard />} />
+        <Route path="/leaderboard/classic" element={<Leaderboard />} />
         <Route path="/profile/:userId" element={<Profile />} />
 
         {/* Admin-only route */}

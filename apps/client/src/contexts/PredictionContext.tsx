@@ -94,7 +94,13 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
     const onEnhancedOddsUpdate = (data: {
       predictionId: number;
       hotMarket: boolean;
-      options: Array<{ id: number; odds: number; label: string; change: number; changePercent: number }>;
+      options: Array<{
+        id: number;
+        odds: number;
+        label: string;
+        change: number;
+        changePercent: number;
+      }>;
     }) => {
       console.log('🎯 Enhanced odds updated for prediction:', data.predictionId, data);
 

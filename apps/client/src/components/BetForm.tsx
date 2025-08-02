@@ -30,20 +30,20 @@ export default function BetForm({ prediction, addOptimisticBet, onPlaced }: BetF
 
   // 🚀 Enhanced live calculations with excitement factors
   const betCalculations = useMemo(() => {
-    const selectedOption = prediction.options.find(opt => opt.id === optionId);
+    const selectedOption = prediction.options.find((opt) => opt.id === optionId);
     if (!selectedOption || amount <= 0) {
       return {
         payout: 0,
         profit: 0,
         riskLevel: 'Conservative',
         marketImpact: false,
-        oddsDisplay: selectedOption?.odds?.toFixed(2) || '0.00'
+        oddsDisplay: selectedOption?.odds?.toFixed(2) || '0.00',
       };
     }
 
     const payout = Math.floor(amount * selectedOption.odds);
     const profit = payout - amount;
-    
+
     // Risk level calculation
     let riskLevel = 'Conservative';
     if (amount > balance * 0.5) riskLevel = 'YOLO 🚀';
@@ -58,7 +58,7 @@ export default function BetForm({ prediction, addOptimisticBet, onPlaced }: BetF
       profit,
       riskLevel,
       marketImpact,
-      oddsDisplay: selectedOption.odds.toFixed(2)
+      oddsDisplay: selectedOption.odds.toFixed(2),
     };
   }, [amount, optionId, balance, prediction.options]);
 
@@ -121,12 +121,17 @@ export default function BetForm({ prediction, addOptimisticBet, onPlaced }: BetF
           <p className="text-sm">
             Balance: <span className="font-semibold">{balance.toLocaleString()} 🪙</span>
           </p>
-          <div className={`px-2 py-1 rounded-full text-xs font-semibold ${
-            betCalculations.riskLevel === 'YOLO 🚀' ? 'bg-red-600/20 text-red-600' :
-            betCalculations.riskLevel === 'Aggressive' ? 'bg-orange-600/20 text-orange-600' :
-            betCalculations.riskLevel === 'Moderate' ? 'bg-yellow-600/20 text-yellow-600' :
-            'bg-green-600/20 text-green-600'
-          }`}>
+          <div
+            className={`px-2 py-1 rounded-full text-xs font-semibold ${
+              betCalculations.riskLevel === 'YOLO 🚀'
+                ? 'bg-red-600/20 text-red-600'
+                : betCalculations.riskLevel === 'Aggressive'
+                  ? 'bg-orange-600/20 text-orange-600'
+                  : betCalculations.riskLevel === 'Moderate'
+                    ? 'bg-yellow-600/20 text-yellow-600'
+                    : 'bg-green-600/20 text-green-600'
+            }`}
+          >
             {betCalculations.riskLevel}
           </div>
         </div>
@@ -172,18 +177,20 @@ export default function BetForm({ prediction, addOptimisticBet, onPlaced }: BetF
             </div>
             <div className="flex justify-between text-sm">
               <span>Potential Payout:</span>
-              <span className="font-bold text-green-600">{betCalculations.payout.toLocaleString()} 🪙</span>
+              <span className="font-bold text-green-600">
+                {betCalculations.payout.toLocaleString()} 🪙
+              </span>
             </div>
             <div className="flex justify-between text-sm">
               <span>Profit:</span>
-              <span className={`font-semibold ${betCalculations.profit > 0 ? 'text-green-600' : 'text-tertiary'}`}>
+              <span
+                className={`font-semibold ${betCalculations.profit > 0 ? 'text-green-600' : 'text-tertiary'}`}
+              >
                 +{betCalculations.profit.toLocaleString()} 🪙
               </span>
             </div>
             {betCalculations.marketImpact && (
-              <p className="text-xs text-blue-600 font-medium">
-                🔥 Your bet will move the market!
-              </p>
+              <p className="text-xs text-blue-600 font-medium">🔥 Your bet will move the market!</p>
             )}
           </div>
         )}
@@ -204,11 +211,11 @@ export default function BetForm({ prediction, addOptimisticBet, onPlaced }: BetF
             onClick={submit}
             disabled={placing || amount <= 0 || amount > balance}
             className={`px-6 py-2 rounded-lg font-bold transition-all duration-200 disabled:opacity-50 ${
-              betCalculations.riskLevel === 'YOLO 🚀' 
+              betCalculations.riskLevel === 'YOLO 🚀'
                 ? 'bg-gradient-to-r from-red-600 to-red-700 text-white shadow-lg hover:shadow-xl'
                 : betCalculations.riskLevel === 'Aggressive'
-                ? 'bg-gradient-to-r from-orange-600 to-orange-700 text-white shadow-lg hover:shadow-xl'
-                : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg hover:shadow-xl'
+                  ? 'bg-gradient-to-r from-orange-600 to-orange-700 text-white shadow-lg hover:shadow-xl'
+                  : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg hover:shadow-xl'
             }`}
           >
             {placing ? (
@@ -234,8 +241,8 @@ export default function BetForm({ prediction, addOptimisticBet, onPlaced }: BetF
       }}
       disabled={placing}
       className={`px-6 py-2 rounded-lg font-bold shadow cursor-pointer transition-all duration-200 inline-block ${
-        placing 
-          ? 'opacity-50 cursor-not-allowed bg-accent' 
+        placing
+          ? 'opacity-50 cursor-not-allowed bg-accent'
           : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 hover:scale-105 text-white shadow-lg hover:shadow-xl'
       }`}
     >

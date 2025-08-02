@@ -17,7 +17,7 @@ const UnifiedUserManagement: React.FC<UnifiedUserManagementProps> = ({ className
     totalPages: 0,
     currentPage: 0,
     hasNextPage: false,
-    hasPreviousPage: false
+    hasPreviousPage: false,
   });
   const [loading, setLoading] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -44,7 +44,7 @@ const UnifiedUserManagement: React.FC<UnifiedUserManagementProps> = ({ className
       totalPages: results.totalPages,
       currentPage: results.currentPage,
       hasNextPage: results.hasNextPage,
-      hasPreviousPage: results.hasPreviousPage
+      hasPreviousPage: results.hasPreviousPage,
     });
   }, []);
 
@@ -54,35 +54,35 @@ const UnifiedUserManagement: React.FC<UnifiedUserManagementProps> = ({ className
 
   const handleUserUpdate = useCallback((_userId: number) => {
     // Trigger a refresh of the search results
-    setRefreshTrigger(prev => prev + 1);
+    setRefreshTrigger((prev) => prev + 1);
   }, []);
 
   const handleBulkUpdate = useCallback(() => {
     // Trigger a refresh of the search results after bulk operations
-    setRefreshTrigger(prev => prev + 1);
+    setRefreshTrigger((prev) => prev + 1);
   }, []);
 
   const formatPaginationInfo = () => {
     if (paginationInfo.totalCount === 0) return 'No users found';
-    
+
     const start = paginationInfo.currentPage * 25 + 1;
     const end = Math.min((paginationInfo.currentPage + 1) * 25, paginationInfo.totalCount);
-    
+
     return `Showing ${start}-${end} of ${paginationInfo.totalCount} users`;
   };
 
   const getPerformanceMetrics = () => {
     const totalBets = users.reduce((sum, user) => sum + (user.stats?.totalBets || 0), 0);
     const totalWagered = users.reduce((sum, user) => sum + (user.stats?.totalWagered || 0), 0);
-    const activeUsers = users.filter(user => user.active).length;
-    const adminUsers = users.filter(user => user.role === 'ADMIN').length;
+    const activeUsers = users.filter((user) => user.active).length;
+    const adminUsers = users.filter((user) => user.role === 'ADMIN').length;
 
     return {
       totalBets,
       totalWagered,
       activeUsers,
       adminUsers,
-      totalUsers: paginationInfo.totalCount
+      totalUsers: paginationInfo.totalCount,
     };
   };
 
@@ -101,9 +101,7 @@ const UnifiedUserManagement: React.FC<UnifiedUserManagementProps> = ({ className
           </div>
           <div className="text-right">
             <div className="text-sm text-tertiary">{formatPaginationInfo()}</div>
-            {loading && (
-              <div className="text-sm text-primary mt-1">Loading...</div>
-            )}
+            {loading && <div className="text-sm text-primary mt-1">Loading...</div>}
           </div>
         </div>
 
@@ -165,7 +163,7 @@ const UnifiedUserManagement: React.FC<UnifiedUserManagementProps> = ({ className
             <div className="text-sm text-tertiary">
               Page {paginationInfo.currentPage + 1} of {paginationInfo.totalPages}
             </div>
-            
+
             <div className="flex items-center space-x-2">
               <button
                 disabled={!paginationInfo.hasPreviousPage}
@@ -173,13 +171,13 @@ const UnifiedUserManagement: React.FC<UnifiedUserManagementProps> = ({ className
               >
                 Previous
               </button>
-              
+
               {/* Page Numbers */}
               <div className="flex items-center space-x-1">
                 {Array.from({ length: Math.min(5, paginationInfo.totalPages) }, (_, i) => {
                   const pageNum = paginationInfo.currentPage - 2 + i;
                   if (pageNum < 0 || pageNum >= paginationInfo.totalPages) return null;
-                  
+
                   return (
                     <button
                       key={pageNum}
@@ -194,7 +192,7 @@ const UnifiedUserManagement: React.FC<UnifiedUserManagementProps> = ({ className
                   );
                 })}
               </div>
-              
+
               <button
                 disabled={!paginationInfo.hasNextPage}
                 className="px-3 py-1 text-sm border border-muted rounded disabled:opacity-50 hover:bg-muted transition"
@@ -214,8 +212,9 @@ const UnifiedUserManagement: React.FC<UnifiedUserManagementProps> = ({ className
             <div>
               <div className="text-sm font-medium text-content">Performance Optimized</div>
               <div className="text-xs text-tertiary mt-1">
-                This interface uses virtual scrolling and database-level pagination to efficiently 
-                handle large user datasets. Search results are debounced and cached for optimal performance.
+                This interface uses virtual scrolling and database-level pagination to efficiently
+                handle large user datasets. Search results are debounced and cached for optimal
+                performance.
               </div>
             </div>
           </div>

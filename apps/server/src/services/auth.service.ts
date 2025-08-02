@@ -66,9 +66,9 @@ export async function getRefreshToken(
   // We need the userId from the JWT payload to look up candidate tokens
   const payload = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET!) as any;
   if (!payload?.userId) return null;
-  
+
   const storedTokens = await repo.getAllRefreshTokensForUser(payload.userId);
-  
+
   // Compare the provided token against all stored hashed tokens for this user
   for (const storedToken of storedTokens) {
     const isMatch = await bcrypt.compare(token, storedToken.token);
@@ -81,7 +81,7 @@ export async function getRefreshToken(
       return storedToken;
     }
   }
-  
+
   return null;
 }
 

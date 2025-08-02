@@ -18,7 +18,11 @@ function getRequestMetadata(req: Request) {
   };
 }
 
-export async function banUser(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+export async function banUser(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const { userId, banType, reason, duration } = req.body as {
       userId: number;
@@ -50,7 +54,11 @@ export async function banUser(req: AuthenticatedRequest, res: Response, next: Ne
   }
 }
 
-export async function unbanUser(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+export async function unbanUser(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const userId = Number(req.params.userId);
 
@@ -69,7 +77,11 @@ export async function unbanUser(req: AuthenticatedRequest, res: Response, next: 
   }
 }
 
-export async function muteUser(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+export async function muteUser(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const { userId, duration, reason } = req.body as {
       userId: number;
@@ -84,7 +96,14 @@ export async function muteUser(req: AuthenticatedRequest, res: Response, next: N
 
     const { ipAddress, userAgent } = getRequestMetadata(req);
 
-    const ban = await moderationService.muteUser(userId, req.user.id, duration, reason, ipAddress, userAgent);
+    const ban = await moderationService.muteUser(
+      userId,
+      req.user.id,
+      duration,
+      reason,
+      ipAddress,
+      userAgent,
+    );
 
     res.status(201).json(ban);
   } catch (err) {
@@ -92,7 +111,11 @@ export async function muteUser(req: AuthenticatedRequest, res: Response, next: N
   }
 }
 
-export async function kickUser(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+export async function kickUser(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const { userId, reason } = req.body as {
       userId: number;
@@ -114,7 +137,11 @@ export async function kickUser(req: AuthenticatedRequest, res: Response, next: N
   }
 }
 
-export async function deleteMessage(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+export async function deleteMessage(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const messageId = Number(req.params.messageId);
     const { reason } = req.body as { reason: string };
@@ -134,7 +161,11 @@ export async function deleteMessage(req: AuthenticatedRequest, res: Response, ne
   }
 }
 
-export async function deletePost(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+export async function deletePost(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const postId = Number(req.params.postId);
     const { reason } = req.body as { reason: string };
@@ -154,7 +185,11 @@ export async function deletePost(req: AuthenticatedRequest, res: Response, next:
   }
 }
 
-export async function getActiveBans(_req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function getActiveBans(
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const bans = await moderationService.getActiveBans();
     res.json(bans);
@@ -163,7 +198,11 @@ export async function getActiveBans(_req: Request, res: Response, next: NextFunc
   }
 }
 
-export async function getUserBanStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function getUserBanStatus(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const userId = Number(req.params.userId);
     const ban = await moderationService.getUserBanStatus(userId);
@@ -173,7 +212,11 @@ export async function getUserBanStatus(req: Request, res: Response, next: NextFu
   }
 }
 
-export async function getModerationHistory(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function getModerationHistory(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const targetUserId = req.query.targetUserId ? Number(req.query.targetUserId) : undefined;
     const moderatorId = req.query.moderatorId ? Number(req.query.moderatorId) : undefined;
@@ -185,7 +228,11 @@ export async function getModerationHistory(req: Request, res: Response, next: Ne
   }
 }
 
-export async function getRecentModerationActions(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function getRecentModerationActions(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const limit = req.query.limit ? Number(req.query.limit) : undefined;
     const actions = await moderationService.getRecentModerationActions(limit);

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   getPredictiveAnalytics,
   type PredictiveAnalytics as PredictiveData,
-  type AnalyticsParams
+  type AnalyticsParams,
 } from '../../api/admin';
 
 interface RiskIndicatorProps {
@@ -26,11 +26,13 @@ const RiskIndicator: React.FC<RiskIndicatorProps> = ({ probability, size = 'medi
   const sizeClasses = {
     small: 'px-2 py-1 text-xs',
     medium: 'px-3 py-1 text-sm',
-    large: 'px-4 py-2 text-base'
+    large: 'px-4 py-2 text-base',
   };
 
   return (
-    <span className={`inline-flex items-center rounded-full font-medium ${getRiskColor(probability)} ${sizeClasses[size]}`}>
+    <span
+      className={`inline-flex items-center rounded-full font-medium ${getRiskColor(probability)} ${sizeClasses[size]}`}
+    >
       {getRiskLabel(probability)} ({(probability * 100).toFixed(0)}%)
     </span>
   );
@@ -48,25 +50,24 @@ const TrendCard: React.FC<TrendCardProps> = ({ title, value, unit, trend, descri
   const trendColors = {
     up: 'text-green-600',
     down: 'text-red-600',
-    stable: 'text-gray-600'
+    stable: 'text-gray-600',
   };
 
   const trendIcons = {
     up: '↗',
     down: '↘',
-    stable: '→'
+    stable: '→',
   };
 
   return (
     <div className="bg-surface rounded-lg p-6 border border-muted">
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-lg font-semibold text-content">{title}</h3>
-        <span className={`text-2xl ${trendColors[trend]}`}>
-          {trendIcons[trend]}
-        </span>
+        <span className={`text-2xl ${trendColors[trend]}`}>{trendIcons[trend]}</span>
       </div>
       <p className="text-3xl font-bold text-primary mb-1">
-        {typeof value === 'number' && value % 1 !== 0 ? value.toFixed(1) : value}{unit}
+        {typeof value === 'number' && value % 1 !== 0 ? value.toFixed(1) : value}
+        {unit}
       </p>
       <p className="text-sm text-tertiary">{description}</p>
     </div>
@@ -74,36 +75,44 @@ const TrendCard: React.FC<TrendCardProps> = ({ title, value, unit, trend, descri
 };
 
 interface ForecastLineProps {
-  data: Array<{ date: string; predictedUsers: number; predictedRevenue: number; confidence: number }>;
+  data: Array<{
+    date: string;
+    predictedUsers: number;
+    predictedRevenue: number;
+    confidence: number;
+  }>;
   metric: 'users' | 'revenue';
 }
 
 const ForecastLine: React.FC<ForecastLineProps> = ({ data, metric }) => {
-  const maxValue = Math.max(...data.map(d => metric === 'users' ? d.predictedUsers : d.predictedRevenue));
-  const minConfidence = Math.min(...data.map(d => d.confidence));
-  
+  const maxValue = Math.max(
+    ...data.map((d) => (metric === 'users' ? d.predictedUsers : d.predictedRevenue)),
+  );
+  const minConfidence = Math.min(...data.map((d) => d.confidence));
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h4 className="font-medium text-content capitalize">{metric} Forecast</h4>
         <div className="text-xs text-tertiary">
-          Confidence: {(minConfidence * 100).toFixed(0)}% - {(Math.max(...data.map(d => d.confidence)) * 100).toFixed(0)}%
+          Confidence: {(minConfidence * 100).toFixed(0)}% -{' '}
+          {(Math.max(...data.map((d) => d.confidence)) * 100).toFixed(0)}%
         </div>
       </div>
-      
+
       <div className="relative h-32 flex items-end space-x-1">
         {data.slice(0, 14).map((point, index) => {
           const value = metric === 'users' ? point.predictedUsers : point.predictedRevenue;
           const height = (value / maxValue) * 100;
           const opacity = point.confidence;
-          
+
           return (
             <div key={index} className="flex-1 flex flex-col items-center">
-              <div 
+              <div
                 className="w-full bg-primary rounded-t"
-                style={{ 
+                style={{
                   height: `${height}%`,
-                  opacity: opacity
+                  opacity: opacity,
                 }}
                 title={`${new Date(point.date).toLocaleDateString()}: ${value.toLocaleString()} (${(point.confidence * 100).toFixed(0)}% confidence)`}
               />
@@ -111,7 +120,7 @@ const ForecastLine: React.FC<ForecastLineProps> = ({ data, metric }) => {
           );
         })}
       </div>
-      
+
       <div className="flex justify-between text-xs text-tertiary">
         <span>Today</span>
         <span>+14 days</span>
@@ -133,7 +142,7 @@ const PredictiveAnalytics: React.FC = () => {
 
       const params: AnalyticsParams = {
         startDate: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString(),
-        endDate: new Date().toISOString()
+        endDate: new Date().toISOString(),
       };
 
       const data = await getPredictiveAnalytics(params);
@@ -163,7 +172,11 @@ const PredictiveAnalytics: React.FC = () => {
         <div className="flex">
           <div className="text-red-600">
             <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              <path
+                fillRule="evenodd"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                clipRule="evenodd"
+              />
             </svg>
           </div>
           <div className="ml-3">
@@ -182,11 +195,7 @@ const PredictiveAnalytics: React.FC = () => {
   }
 
   if (!predictiveData) {
-    return (
-      <div className="text-center text-tertiary">
-        No predictive analytics data available
-      </div>
-    );
+    return <div className="text-center text-tertiary">No predictive analytics data available</div>;
   }
 
   return (
@@ -194,7 +203,9 @@ const PredictiveAnalytics: React.FC = () => {
       {/* Header */}
       <div>
         <h2 className="text-2xl font-bold text-content">Predictive Analytics</h2>
-        <p className="text-tertiary mt-1">AI-powered insights and forecasting for proactive decision making</p>
+        <p className="text-tertiary mt-1">
+          AI-powered insights and forecasting for proactive decision making
+        </p>
       </div>
 
       {/* Navigation Tabs */}
@@ -203,7 +214,7 @@ const PredictiveAnalytics: React.FC = () => {
           {[
             { key: 'churn', label: 'Churn Prediction', icon: '⚠️' },
             { key: 'forecast', label: 'Engagement Forecast', icon: '📈' },
-            { key: 'trends', label: 'Market Trends', icon: '🔍' }
+            { key: 'trends', label: 'Market Trends', icon: '🔍' },
           ].map((tab) => (
             <button
               key={tab.key}
@@ -225,9 +236,7 @@ const PredictiveAnalytics: React.FC = () => {
       {selectedTab === 'churn' && (
         <div className="space-y-6">
           <div className="bg-surface rounded-lg p-6 border border-muted">
-            <h3 className="text-lg font-semibold text-content mb-4">
-              User Churn Risk Analysis
-            </h3>
+            <h3 className="text-lg font-semibold text-content mb-4">User Churn Risk Analysis</h3>
             <p className="text-tertiary mb-6">
               {predictiveData.userChurnPrediction.length} users identified as at-risk for churning
             </p>
@@ -275,7 +284,8 @@ const PredictiveAnalytics: React.FC = () => {
             {predictiveData.userChurnPrediction.length > 10 && (
               <div className="text-center mt-4">
                 <p className="text-sm text-tertiary">
-                  Showing top 10 at-risk users. {predictiveData.userChurnPrediction.length - 10} more users in full report.
+                  Showing top 10 at-risk users. {predictiveData.userChurnPrediction.length - 10}{' '}
+                  more users in full report.
                 </p>
               </div>
             )}
@@ -288,17 +298,11 @@ const PredictiveAnalytics: React.FC = () => {
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-surface rounded-lg p-6 border border-muted">
-              <ForecastLine 
-                data={predictiveData.engagementForecasting} 
-                metric="users"
-              />
+              <ForecastLine data={predictiveData.engagementForecasting} metric="users" />
             </div>
-            
+
             <div className="bg-surface rounded-lg p-6 border border-muted">
-              <ForecastLine 
-                data={predictiveData.engagementForecasting} 
-                metric="revenue"
-              />
+              <ForecastLine data={predictiveData.engagementForecasting} metric="revenue" />
             </div>
           </div>
 
@@ -346,7 +350,9 @@ const PredictiveAnalytics: React.FC = () => {
                   title={category.category}
                   value={category.growthRate}
                   unit="%"
-                  trend={category.growthRate > 0 ? 'up' : category.growthRate < 0 ? 'down' : 'stable'}
+                  trend={
+                    category.growthRate > 0 ? 'up' : category.growthRate < 0 ? 'down' : 'stable'
+                  }
                   description={`Growth rate with ${category.potential}/10 potential`}
                 />
               ))}
@@ -358,14 +364,22 @@ const PredictiveAnalytics: React.FC = () => {
             <h3 className="text-lg font-semibold text-content mb-4">Seasonal Patterns</h3>
             <div className="space-y-4">
               {predictiveData.trendAnalysis.seasonalPatterns.map((pattern, index) => (
-                <div key={index} className="flex items-center justify-between p-4 bg-muted rounded-lg">
+                <div
+                  key={index}
+                  className="flex items-center justify-between p-4 bg-muted rounded-lg"
+                >
                   <div>
                     <h4 className="font-medium text-content">{pattern.period}</h4>
-                    <p className="text-sm text-tertiary capitalize">{pattern.trend} trend observed</p>
+                    <p className="text-sm text-tertiary capitalize">
+                      {pattern.trend} trend observed
+                    </p>
                   </div>
                   <div className="text-right">
-                    <p className={`text-lg font-bold ${pattern.impact > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {pattern.impact > 0 ? '+' : ''}{pattern.impact.toFixed(1)}%
+                    <p
+                      className={`text-lg font-bold ${pattern.impact > 0 ? 'text-green-600' : 'text-red-600'}`}
+                    >
+                      {pattern.impact > 0 ? '+' : ''}
+                      {pattern.impact.toFixed(1)}%
                     </p>
                     <p className="text-xs text-tertiary">impact</p>
                   </div>
@@ -388,7 +402,9 @@ const PredictiveAnalytics: React.FC = () => {
                 <div className="w-full bg-muted rounded-full h-4">
                   <div
                     className="bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 h-4 rounded-full"
-                    style={{ width: `${(predictiveData.trendAnalysis.marketSentiment.score / 10) * 100}%` }}
+                    style={{
+                      width: `${(predictiveData.trendAnalysis.marketSentiment.score / 10) * 100}%`,
+                    }}
                   />
                 </div>
               </div>

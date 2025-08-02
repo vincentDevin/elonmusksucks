@@ -48,8 +48,8 @@ export class PrismaAuthRepository implements IAuthRepository {
   }
 
   async getAllRefreshTokensForUser(userId: number): Promise<RefreshToken[]> {
-    return prisma.refreshToken.findMany({ 
-      where: { userId, expiresAt: { gt: new Date() } } 
+    return prisma.refreshToken.findMany({
+      where: { userId, expiresAt: { gt: new Date() } },
     });
   }
 

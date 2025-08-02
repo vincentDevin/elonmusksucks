@@ -18,7 +18,11 @@ export function PerformanceBarChart({ roi, winRate, parlayAccuracy }: Performanc
     <div className="flex flex-col items-center">
       <h4 className="font-semibold text-sm mb-2">Performance Metrics (%)</h4>
       <ResponsiveContainer width="100%" height={400}>
-        <BarChart data={data} layout="horizontal" margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+        <BarChart
+          data={data}
+          layout="horizontal"
+          margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+        >
           <XAxis type="category" dataKey="name" />
           <YAxis type="number" domain={[0, 100]} />
           <Tooltip formatter={(value: number) => `${value.toFixed(1)}%`} />

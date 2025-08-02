@@ -46,7 +46,10 @@ export interface IModerationRepository {
 
   // Moderation logging
   createModerationLog(data: CreateModerationLogData): Promise<ModerationLog>;
-  getModerationHistory(targetUserId?: number, moderatorId?: number): Promise<ModerationLogWithUsers[]>;
+  getModerationHistory(
+    targetUserId?: number,
+    moderatorId?: number,
+  ): Promise<ModerationLogWithUsers[]>;
   getRecentModerationActions(limit?: number): Promise<ModerationLogWithUsers[]>;
 
   // User management

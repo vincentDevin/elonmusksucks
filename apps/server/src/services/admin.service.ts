@@ -1,18 +1,18 @@
 // apps/server/src/services/admin.service.ts
 import type { Role } from '@prisma/client';
-import type { 
-  IAdminRepository, 
-  QueryParams, 
-  UserSearchParams, 
-  PaginatedUsers, 
-  DetailedUser, 
-  BulkUserOperation, 
+import type {
+  IAdminRepository,
+  QueryParams,
+  UserSearchParams,
+  PaginatedUsers,
+  DetailedUser,
+  BulkUserOperation,
   BulkOperationResult,
   PredictionSearchParams,
   PaginatedPredictions,
   DetailedPrediction,
   BulkPredictionOperation,
-  BulkPredictionResult
+  BulkPredictionResult,
 } from '../repositories/IAdminRepository';
 import { PrismaAdminRepository } from '../repositories/AdminRepository';
 import type { UserStatsDTO } from '@ems/types';
@@ -33,7 +33,9 @@ export const getUserDetails = async (userId: number): Promise<DetailedUser | nul
   return repo.getUserWithDetails(userId);
 };
 
-export const bulkUpdateUsers = async (operation: BulkUserOperation): Promise<BulkOperationResult> => {
+export const bulkUpdateUsers = async (
+  operation: BulkUserOperation,
+): Promise<BulkOperationResult> => {
   return repo.bulkUpdateUsers(operation);
 };
 
@@ -54,40 +56,52 @@ export const listPredictions = async (filters?: QueryParams) => {
   return repo.findPredictions(filters);
 };
 
-export const searchPredictions = async (params: PredictionSearchParams): Promise<PaginatedPredictions> => {
+export const searchPredictions = async (
+  params: PredictionSearchParams,
+): Promise<PaginatedPredictions> => {
   return repo.searchPredictions(params);
 };
 
-export const getPredictionDetails = async (predictionId: number): Promise<DetailedPrediction | null> => {
+export const getPredictionDetails = async (
+  predictionId: number,
+): Promise<DetailedPrediction | null> => {
   return repo.getPredictionWithDetails(predictionId);
 };
 
-export const bulkUpdatePredictions = async (operation: BulkPredictionOperation): Promise<BulkPredictionResult> => {
+export const bulkUpdatePredictions = async (
+  operation: BulkPredictionOperation,
+): Promise<BulkPredictionResult> => {
   const result = await repo.bulkUpdatePredictions(operation);
-  
+
   // Broadcast events for successful operations
   if (result.successCount > 0) {
     const redisClient = require('../lib/redis').default;
-    
+
     for (const prediction of result.updatedPredictions) {
       if (operation.operation === 'approve') {
-        await redisClient.publish('prediction:approved', JSON.stringify({
-          id: prediction.id,
-          title: prediction.title,
-          category: prediction.category,
-          timestamp: new Date().toISOString()
-        }));
+        await redisClient.publish(
+          'prediction:approved',
+          JSON.stringify({
+            id: prediction.id,
+            title: prediction.title,
+            category: prediction.category,
+            timestamp: new Date().toISOString(),
+          }),
+        );
       } else if (operation.operation === 'resolve') {
-        await redisClient.publish('prediction:resolved', JSON.stringify({
-          id: prediction.id,
-          title: prediction.title,
-          winningOptionId: prediction.resolutionData?.winningOptionId,
-          timestamp: new Date().toISOString()
-        }));
+        await redisClient.publish(
+          'prediction:resolved',
+          JSON.stringify({
+            id: prediction.id,
+            title: prediction.title,
+            winningOptionId: prediction.resolutionData?.winningOptionId,
+            timestamp: new Date().toISOString(),
+          }),
+        );
       }
     }
   }
-  
+
   return result;
 };
 
@@ -96,21 +110,24 @@ export const setPredictionStatus = async (
   status: 'approved' | 'rejected',
 ) => {
   const updated = await repo.updatePredictionStatus(predictionId, status);
-  
+
   // 🎊 Broadcast prediction approval/rejection event
   if (status === 'approved') {
     const redisClient = require('../lib/redis').default;
-    await redisClient.publish('prediction:approved', JSON.stringify({
-      id: updated.id,
-      title: updated.title,
-      description: updated.description,
-      category: updated.category,
-      type: updated.type,
-      approved: true,
-      timestamp: new Date().toISOString()
-    }));
+    await redisClient.publish(
+      'prediction:approved',
+      JSON.stringify({
+        id: updated.id,
+        title: updated.title,
+        description: updated.description,
+        category: updated.category,
+        type: updated.type,
+        approved: true,
+        timestamp: new Date().toISOString(),
+      }),
+    );
   }
-  
+
   return updated;
 };
 
@@ -265,7 +282,11 @@ export const getRealtimeMetrics = async () => {
   return repo.getRealtimeMetrics();
 };
 
-export const exportAnalyticsData = async (params: { reportType: string; format: 'csv' | 'excel' | 'pdf'; filters?: Record<string, any> }) => {
+export const exportAnalyticsData = async (params: {
+  reportType: string;
+  format: 'csv' | 'excel' | 'pdf';
+  filters?: Record<string, any>;
+}) => {
   return repo.exportAnalyticsData(params);
 };
 

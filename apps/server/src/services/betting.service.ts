@@ -14,7 +14,7 @@ import { UserService } from './user.service';
 
 export class BettingService {
   private userService = new UserService();
-  
+
   constructor(private repo: IBettingRepository = new BettingRepository()) {}
 
   /**
@@ -28,7 +28,7 @@ export class BettingService {
   } {
     const legCount = individualOdds.length;
     const baseCombinedOdds = individualOdds.reduce((prod, odds) => prod * odds, 1);
-    
+
     // Exciting bonus multipliers for more legs!
     // 2 legs: 15% bonus, 3 legs: 32% bonus, 4 legs: 52% bonus, 5+ legs: 75% bonus
     let bonusMultiplier = 1;
@@ -37,14 +37,14 @@ export class BettingService {
       // Cap the bonus at 2.0x for balance (10+ legs would be wild otherwise)
       bonusMultiplier = Math.min(bonusMultiplier, 2.0);
     }
-    
+
     const finalOdds = baseCombinedOdds * bonusMultiplier;
-    
+
     return {
       baseCombinedOdds,
       bonusMultiplier,
       finalOdds,
-      legCount
+      legCount,
     };
   }
 
@@ -66,11 +66,12 @@ export class BettingService {
     // 3) Apply ALL-IN multiplier if user is betting their entire balance
     let finalOdds = opt.odds;
     let allInBonus = 1.0;
-    if (amount >= user.muskBucks * 0.95) { // 95%+ of balance = ALL-IN
+    if (amount >= user.muskBucks * 0.95) {
+      // 95%+ of balance = ALL-IN
       allInBonus = 2.5; // 🚀 MASSIVE 150% ALL-IN BONUS!
       finalOdds = opt.odds * allInBonus;
     }
-    
+
     const potentialPayout = Math.floor(amount * finalOdds);
 
     // 4) Persist via repository with enhanced odds
@@ -120,7 +121,7 @@ export class BettingService {
         optionLabel: opt.label,
         category: opt.prediction.category,
         odds: finalOdds,
-      }
+      },
     );
 
     return bet;
@@ -153,7 +154,7 @@ export class BettingService {
     if (!user || user.muskBucks < amount) throw new Error('INSUFFICIENT_FUNDS');
 
     // 4) Compute enhanced combined odds with exciting bonuses!
-    const oddsCalculation = this.calculateEnhancedParlayOdds(validLegs.map(o => o.odds));
+    const oddsCalculation = this.calculateEnhancedParlayOdds(validLegs.map((o) => o.odds));
     const potentialPayout = Math.floor(amount * oddsCalculation.finalOdds);
 
     // 5) Persist via repository
@@ -191,10 +192,8 @@ export class BettingService {
     );
 
     // 8) Recalculate odds for all affected predictions (make markets alive!)
-    const affectedPredictions = Array.from(new Set(validLegs.map(leg => leg.prediction.id)));
-    await Promise.all(
-      affectedPredictions.map(predId => this.recalculateOdds(predId))
-    );
+    const affectedPredictions = Array.from(new Set(validLegs.map((leg) => leg.prediction.id)));
+    await Promise.all(affectedPredictions.map((predId) => this.recalculateOdds(predId)));
 
     // 9) Publish normalized parlay activity event with final odds
     await normalizedActivityService.createParlayStartedEvent(
@@ -208,7 +207,7 @@ export class BettingService {
         parlayId: parlay.id,
         legCount: oddsCalculation.legCount,
         combinedOdds: oddsCalculation.finalOdds,
-      }
+      },
     );
 
     return parlay;
@@ -220,13 +219,13 @@ export class BettingService {
   async recalculateOdds(predictionId: number): Promise<void> {
     // Get odds before recalculation
     const beforeOdds = await this.repo.getPredictionOptions(predictionId);
-    
+
     // Perform recalculation with new exciting factors
     await this.repo.recalculateOdds(predictionId);
-    
-    // Get odds after recalculation  
+
+    // Get odds after recalculation
     const afterOdds = await this.repo.getPredictionOptions(predictionId);
-    
+
     // Calculate which options had significant changes
     const significantChanges = afterOdds.filter((after, index) => {
       const before = beforeOdds[index];
@@ -236,24 +235,26 @@ export class BettingService {
     });
 
     // 🔥 Broadcast enhanced odds update with excitement data
-    await redisClient.publish('odds:update:enhanced', JSON.stringify({
-      predictionId,
-      timestamp: new Date().toISOString(),
-      significantChanges: significantChanges.length,
-      hotMarket: significantChanges.length >= 2, // Multiple options changed significantly
-      options: afterOdds.map((option, index) => {
-        const before = beforeOdds[index];
-        return {
-          id: option.id,
-          label: option.label,
-          odds: option.odds,
-          previousOdds: before?.odds || option.odds,
-          change: before ? (option.odds - before.odds) : 0,
-          changePercent: before ? ((option.odds - before.odds) / before.odds) * 100 : 0
-        };
-      })
-    }));
-
+    await redisClient.publish(
+      'odds:update:enhanced',
+      JSON.stringify({
+        predictionId,
+        timestamp: new Date().toISOString(),
+        significantChanges: significantChanges.length,
+        hotMarket: significantChanges.length >= 2, // Multiple options changed significantly
+        options: afterOdds.map((option, index) => {
+          const before = beforeOdds[index];
+          return {
+            id: option.id,
+            label: option.label,
+            odds: option.odds,
+            previousOdds: before?.odds || option.odds,
+            change: before ? option.odds - before.odds : 0,
+            changePercent: before ? ((option.odds - before.odds) / before.odds) * 100 : 0,
+          };
+        }),
+      }),
+    );
   }
 }
 

@@ -42,7 +42,9 @@ const ChatBar: React.FC = () => {
             className="ml-1 sm:ml-2 text-xs font-semibold text-info bg-info/10 px-1.5 sm:px-2 py-0.5 rounded flex-shrink-0"
             title="Number of logged-in users online"
           >
-            <span className="hidden sm:inline">{loggedInUserCount} user{loggedInUserCount === 1 ? '' : 's'} online</span>
+            <span className="hidden sm:inline">
+              {loggedInUserCount} user{loggedInUserCount === 1 ? '' : 's'} online
+            </span>
             <span className="sm:hidden">{loggedInUserCount}</span>
           </span>
           {/* Show hint only if minimized and not logged in - hide on very small screens */}
@@ -52,7 +54,11 @@ const ChatBar: React.FC = () => {
             </span>
           )}
         </div>
-        {expanded ? <MinusIcon className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" /> : <PlusIcon className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />}
+        {expanded ? (
+          <MinusIcon className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+        ) : (
+          <PlusIcon className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+        )}
       </div>
       {/* Chat content */}
       <div

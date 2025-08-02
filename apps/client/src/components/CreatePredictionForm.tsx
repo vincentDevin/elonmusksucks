@@ -30,7 +30,7 @@ export default function CreatePredictionForm({ onCreated, onCancel }: CreatePred
 
   // Validate that expiration date is in the future
   const isExpirationValid = expiresAt && new Date(expiresAt) > new Date();
-  
+
   const canSubmit =
     Boolean(title) &&
     Boolean(description) &&

@@ -34,17 +34,21 @@ const BannedUsersWall: React.FC = () => {
     try {
       if (socket) {
         // Use WebSocket for immediate response
-        socket.emit('admin:unbanUser', { userId }, (response: { success: boolean; error?: string }) => {
-          if (response.success) {
-            setBans(prev => prev.filter(ban => ban.userId !== userId));
-          } else {
-            alert(`Failed to unban user: ${response.error}`);
-          }
-        });
+        socket.emit(
+          'admin:unbanUser',
+          { userId },
+          (response: { success: boolean; error?: string }) => {
+            if (response.success) {
+              setBans((prev) => prev.filter((ban) => ban.userId !== userId));
+            } else {
+              alert(`Failed to unban user: ${response.error}`);
+            }
+          },
+        );
       } else {
         // Fallback to HTTP API
         await moderationApi.unbanUser(userId);
-        setBans(prev => prev.filter(ban => ban.userId !== userId));
+        setBans((prev) => prev.filter((ban) => ban.userId !== userId));
       }
     } catch (err) {
       alert('Failed to unban user');
@@ -57,20 +61,20 @@ const BannedUsersWall: React.FC = () => {
     if (ban.banType === 'PERMANENT') {
       return 'Permanent';
     }
-    
+
     if (ban.expiresAt) {
       const expiryDate = new Date(ban.expiresAt);
       const now = new Date();
-      
+
       if (expiryDate <= now) {
         return 'Expired';
       }
-      
+
       const diffMs = expiryDate.getTime() - now.getTime();
       const diffMins = Math.floor(diffMs / (1000 * 60));
       const diffHours = Math.floor(diffMins / 60);
       const diffDays = Math.floor(diffHours / 24);
-      
+
       if (diffDays > 0) {
         return `${diffDays} day(s)`;
       } else if (diffHours > 0) {
@@ -79,7 +83,7 @@ const BannedUsersWall: React.FC = () => {
         return `${diffMins} minute(s)`;
       }
     }
-    
+
     return 'Unknown';
   };
 
@@ -96,7 +100,7 @@ const BannedUsersWall: React.FC = () => {
       };
 
       const handleUserUnban = (data: { targetUserId: number }) => {
-        setBans(prev => prev.filter(ban => ban.userId !== data.targetUserId));
+        setBans((prev) => prev.filter((ban) => ban.userId !== data.targetUserId));
       };
 
       socket.on('adminModerationUserBan', handleUserBan);
@@ -151,9 +155,7 @@ const BannedUsersWall: React.FC = () => {
       </div>
 
       {bans.length === 0 ? (
-        <div className="text-center py-8 text-[var(--color-muted)]">
-          No banned users
-        </div>
+        <div className="text-center py-8 text-[var(--color-muted)]">No banned users</div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {bans.map((ban) => (
@@ -163,12 +165,8 @@ const BannedUsersWall: React.FC = () => {
             >
               <div className="flex justify-between items-start mb-3">
                 <div>
-                  <h3 className="font-semibold text-[var(--color-content)]">
-                    {ban.user.name}
-                  </h3>
-                  <p className="text-sm text-[var(--color-muted)]">
-                    {ban.user.email}
-                  </p>
+                  <h3 className="font-semibold text-[var(--color-content)]">{ban.user.name}</h3>
+                  <p className="text-sm text-[var(--color-muted)]">{ban.user.email}</p>
                 </div>
                 <span
                   className={`px-2 py-1 text-xs rounded ${
@@ -189,9 +187,7 @@ const BannedUsersWall: React.FC = () => {
 
                 <div>
                   <span className="font-medium text-[var(--color-content)]">Duration:</span>
-                  <span className="ml-2 text-[var(--color-muted)]">
-                    {formatDuration(ban)}
-                  </span>
+                  <span className="ml-2 text-[var(--color-muted)]">{formatDuration(ban)}</span>
                 </div>
 
                 <div>

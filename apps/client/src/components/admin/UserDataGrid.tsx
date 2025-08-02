@@ -39,7 +39,7 @@ const UserRow: React.FC<UserRowProps> = ({ index, style, data }) => {
       await bulkUpdateUsers({
         userIds: [user.id],
         operation: 'changeRole',
-        params: { role: newRole }
+        params: { role: newRole },
       });
       onUserUpdate(user.id);
     } catch (error) {
@@ -51,7 +51,7 @@ const UserRow: React.FC<UserRowProps> = ({ index, style, data }) => {
     try {
       await bulkUpdateUsers({
         userIds: [user.id],
-        operation: active ? 'activate' : 'deactivate'
+        operation: active ? 'activate' : 'deactivate',
       });
       onUserUpdate(user.id);
     } catch (error) {
@@ -61,12 +61,12 @@ const UserRow: React.FC<UserRowProps> = ({ index, style, data }) => {
 
   const handleBalanceUpdate = async () => {
     if (balance === user.muskBucks) return;
-    
+
     try {
       await bulkUpdateUsers({
         userIds: [user.id],
         operation: 'adjustBalance',
-        params: { amount: balance }
+        params: { amount: balance },
       });
       onUserUpdate(user.id);
     } catch (error) {
@@ -82,7 +82,7 @@ const UserRow: React.FC<UserRowProps> = ({ index, style, data }) => {
       await bulkUpdateUsers({
         userIds: [user.id],
         operation: action === 'assign' ? 'assignBadge' : 'revokeBadge',
-        params: { badgeId: selectedBadgeId }
+        params: { badgeId: selectedBadgeId },
       });
       onUserUpdate(user.id);
       setSelectedBadgeId(null);
@@ -245,14 +245,14 @@ const UserDataGrid: React.FC<UserDataGridProps> = ({
   onUserUpdate,
   onBulkUpdate,
   loading = false,
-  className = ''
+  className = '',
 }) => {
   const [selectedUsers, setSelectedUsers] = useState<Set<number>>(new Set());
   const [bulkOperation, setBulkOperation] = useState<BulkUserOperation['operation'] | ''>('');
   const [bulkParams, setBulkParams] = useState<any>({});
 
   const handleUserSelect = useCallback((userId: number, selected: boolean) => {
-    setSelectedUsers(prev => {
+    setSelectedUsers((prev) => {
       const newSet = new Set(prev);
       if (selected) {
         newSet.add(userId);
@@ -267,7 +267,7 @@ const UserDataGrid: React.FC<UserDataGridProps> = ({
     if (selectedUsers.size === users.length) {
       setSelectedUsers(new Set());
     } else {
-      setSelectedUsers(new Set(users.map(u => u.id)));
+      setSelectedUsers(new Set(users.map((u) => u.id)));
     }
   };
 
@@ -278,9 +278,9 @@ const UserDataGrid: React.FC<UserDataGridProps> = ({
       await bulkUpdateUsers({
         userIds: Array.from(selectedUsers),
         operation: bulkOperation,
-        params: bulkParams
+        params: bulkParams,
       });
-      
+
       setSelectedUsers(new Set());
       setBulkOperation('');
       setBulkParams({});
@@ -290,13 +290,16 @@ const UserDataGrid: React.FC<UserDataGridProps> = ({
     }
   };
 
-  const rowData = useMemo(() => ({
-    users,
-    badges,
-    selectedUsers,
-    onUserSelect: handleUserSelect,
-    onUserUpdate
-  }), [users, badges, selectedUsers, handleUserSelect, onUserUpdate]);
+  const rowData = useMemo(
+    () => ({
+      users,
+      badges,
+      selectedUsers,
+      onUserSelect: handleUserSelect,
+      onUserUpdate,
+    }),
+    [users, badges, selectedUsers, handleUserSelect, onUserUpdate],
+  );
 
   return (
     <div className={`bg-surface border border-muted rounded-lg ${className}`}>
@@ -306,15 +309,11 @@ const UserDataGrid: React.FC<UserDataGridProps> = ({
           <h3 className="text-lg font-semibold text-content">
             Users ({users.length})
             {selectedUsers.size > 0 && (
-              <span className="ml-2 text-sm text-primary">
-                {selectedUsers.size} selected
-              </span>
+              <span className="ml-2 text-sm text-primary">{selectedUsers.size} selected</span>
             )}
           </h3>
-          
-          {loading && (
-            <div className="text-sm text-tertiary">Loading...</div>
-          )}
+
+          {loading && <div className="text-sm text-tertiary">Loading...</div>}
         </div>
 
         {/* Bulk Operations */}
@@ -373,7 +372,12 @@ const UserDataGrid: React.FC<UserDataGridProps> = ({
 
             <button
               onClick={handleBulkOperation}
-              disabled={!bulkOperation || (bulkOperation !== 'activate' && bulkOperation !== 'deactivate' && !Object.keys(bulkParams).length)}
+              disabled={
+                !bulkOperation ||
+                (bulkOperation !== 'activate' &&
+                  bulkOperation !== 'deactivate' &&
+                  !Object.keys(bulkParams).length)
+              }
               className="px-4 py-2 bg-primary text-surface rounded disabled:opacity-50 hover:opacity-90 transition"
             >
               Apply to {selectedUsers.size} users
@@ -405,13 +409,7 @@ const UserDataGrid: React.FC<UserDataGridProps> = ({
       {/* Virtual Scrolling List */}
       <div className="h-96">
         {users.length > 0 ? (
-          <List
-            height={384}
-            width="100%"
-            itemCount={users.length}
-            itemSize={64}
-            itemData={rowData}
-          >
+          <List height={384} width="100%" itemCount={users.length} itemSize={64} itemData={rowData}>
             {UserRow}
           </List>
         ) : (

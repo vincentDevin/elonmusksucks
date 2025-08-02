@@ -15,7 +15,7 @@ export function FinancialBarChart({ wagered, won, profit }: BarChartProps) {
     profitPositive: '#22c55e',
     profitNegative: '#ef4444',
     text: '#000000',
-    muted: '#6b7280'
+    muted: '#6b7280',
   });
 
   // Update colors based on theme
@@ -28,40 +28,40 @@ export function FinancialBarChart({ wagered, won, profit }: BarChartProps) {
         profitPositive: isDark ? '#4ade80' : '#16a34a',
         profitNegative: isDark ? '#f87171' : '#dc2626',
         text: isDark ? '#f1f5f9' : '#0f172a',
-        muted: isDark ? '#94a3b8' : '#64748b'
+        muted: isDark ? '#94a3b8' : '#64748b',
       });
     };
 
     updateColors();
-    
+
     // Listen for theme changes
     const observer = new MutationObserver(updateColors);
     observer.observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ['class']
+      attributeFilter: ['class'],
     });
 
     return () => observer.disconnect();
   }, []);
 
   const data = [
-    { 
-      name: 'Wagered', 
-      amount: wagered, 
+    {
+      name: 'Wagered',
+      amount: wagered,
       color: colors.wagered,
-      displayAmount: `$${wagered.toLocaleString()}`
+      displayAmount: `$${wagered.toLocaleString()}`,
     },
-    { 
-      name: 'Won', 
-      amount: won, 
+    {
+      name: 'Won',
+      amount: won,
       color: colors.won,
-      displayAmount: `$${won.toLocaleString()}`
+      displayAmount: `$${won.toLocaleString()}`,
     },
-    { 
-      name: 'Profit', 
-      amount: profit, 
+    {
+      name: 'Profit',
+      amount: profit,
       color: profit >= 0 ? colors.profitPositive : colors.profitNegative,
-      displayAmount: `${profit >= 0 ? '+' : ''}$${profit.toLocaleString()}`
+      displayAmount: `${profit >= 0 ? '+' : ''}$${profit.toLocaleString()}`,
     },
   ];
 
@@ -97,18 +97,18 @@ export function FinancialBarChart({ wagered, won, profit }: BarChartProps) {
     <div className="flex flex-col items-center h-[280px]">
       <h4 className="font-semibold text-sm mb-2 text-center text-content">Financials</h4>
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart 
-          data={data} 
+        <BarChart
+          data={data}
           margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
           barCategoryGap="20%"
         >
-          <XAxis 
-            dataKey="name" 
+          <XAxis
+            dataKey="name"
             tick={{ fontSize: 12, fill: colors.text }}
             axisLine={{ stroke: colors.muted }}
             tickLine={{ stroke: colors.muted }}
           />
-          <YAxis 
+          <YAxis
             tick={{ fontSize: 11, fill: colors.muted }}
             axisLine={{ stroke: colors.muted }}
             tickLine={{ stroke: colors.muted }}

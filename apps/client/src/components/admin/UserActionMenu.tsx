@@ -18,11 +18,7 @@ interface ActionMenuItem {
   disabled?: boolean;
 }
 
-const UserActionMenu: React.FC<UserActionMenuProps> = ({
-  user,
-  badges,
-  onUserUpdate
-}) => {
+const UserActionMenu: React.FC<UserActionMenuProps> = ({ user, badges, onUserUpdate }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [showModal, setShowModal] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -62,7 +58,7 @@ const UserActionMenu: React.FC<UserActionMenuProps> = ({
     performAction({
       userIds: [user.id],
       operation: 'changeRole',
-      params: { role: newRole }
+      params: { role: newRole },
     });
   };
 
@@ -70,7 +66,7 @@ const UserActionMenu: React.FC<UserActionMenuProps> = ({
     performAction({
       userIds: [user.id],
       operation: 'adjustBalance',
-      params: { amount: balanceAmount }
+      params: { amount: balanceAmount },
     });
   };
 
@@ -79,7 +75,7 @@ const UserActionMenu: React.FC<UserActionMenuProps> = ({
     performAction({
       userIds: [user.id],
       operation: 'assignBadge',
-      params: { badgeId: selectedBadgeId }
+      params: { badgeId: selectedBadgeId },
     });
   };
 
@@ -88,14 +84,14 @@ const UserActionMenu: React.FC<UserActionMenuProps> = ({
     performAction({
       userIds: [user.id],
       operation: 'revokeBadge',
-      params: { badgeId: selectedBadgeId }
+      params: { badgeId: selectedBadgeId },
     });
   };
 
   const handleActivateToggle = () => {
     performAction({
       userIds: [user.id],
-      operation: user.active ? 'deactivate' : 'activate'
+      operation: user.active ? 'deactivate' : 'activate',
     });
   };
 
@@ -104,7 +100,9 @@ const UserActionMenu: React.FC<UserActionMenuProps> = ({
       const details = await getUserDetails(user.id);
       console.log('User details:', details);
       // This would typically open a detailed view modal
-      alert(`User Details:\nName: ${details.name}\nEmail: ${details.email}\nTotal Bets: ${details.stats?.totalBets || 0}\nWin Rate: ${((details.stats?.winRate || 0) * 100).toFixed(1)}%`);
+      alert(
+        `User Details:\nName: ${details.name}\nEmail: ${details.email}\nTotal Bets: ${details.stats?.totalBets || 0}\nWin Rate: ${((details.stats?.winRate || 0) * 100).toFixed(1)}%`,
+      );
     } catch (error) {
       console.error('Failed to fetch user details:', error);
     }
@@ -113,7 +111,7 @@ const UserActionMenu: React.FC<UserActionMenuProps> = ({
 
   const formatUserBadges = () => {
     if (!user.badges || user.badges.length === 0) return 'No badges';
-    return user.badges.map(b => b.name).join(', ');
+    return user.badges.map((b) => b.name).join(', ');
   };
 
   const menuItems: ActionMenuItem[] = [
@@ -178,7 +176,7 @@ const UserActionMenu: React.FC<UserActionMenuProps> = ({
   const Modal: React.FC<{ title: string; children: React.ReactNode; onClose: () => void }> = ({
     title,
     children,
-    onClose
+    onClose,
   }) => (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-surface border border-muted rounded-lg p-6 max-w-md w-full mx-4">
@@ -213,7 +211,7 @@ const UserActionMenu: React.FC<UserActionMenuProps> = ({
               <div className="text-sm font-medium text-content truncate">{user.name}</div>
               <div className="text-xs text-tertiary truncate">{user.email}</div>
             </div>
-            
+
             <div className="py-1">
               {menuItems.map((item) => (
                 <button
@@ -226,8 +224,8 @@ const UserActionMenu: React.FC<UserActionMenuProps> = ({
                   }}
                   disabled={item.disabled}
                   className={`w-full px-3 py-2 text-left text-sm flex items-center space-x-2 ${
-                    item.disabled 
-                      ? 'text-tertiary cursor-not-allowed' 
+                    item.disabled
+                      ? 'text-tertiary cursor-not-allowed'
                       : `${getVariantStyles(item.variant)} cursor-pointer`
                   } transition-colors`}
                 >
@@ -331,16 +329,16 @@ const UserActionMenu: React.FC<UserActionMenuProps> = ({
                 className="w-full px-3 py-2 border border-muted rounded-lg bg-surface text-content"
               >
                 <option value="">Select a badge...</option>
-                {badges.filter(badge => !user.badges?.some(ub => ub.id === badge.id)).map((badge) => (
-                  <option key={badge.id} value={badge.id}>
-                    {badge.name}
-                  </option>
-                ))}
+                {badges
+                  .filter((badge) => !user.badges?.some((ub) => ub.id === badge.id))
+                  .map((badge) => (
+                    <option key={badge.id} value={badge.id}>
+                      {badge.name}
+                    </option>
+                  ))}
               </select>
             </div>
-            <div className="text-sm text-tertiary">
-              Current badges: {formatUserBadges()}
-            </div>
+            <div className="text-sm text-tertiary">Current badges: {formatUserBadges()}</div>
             <div className="flex space-x-3">
               <button
                 onClick={handleBadgeAssign}
@@ -402,14 +400,15 @@ const UserActionMenu: React.FC<UserActionMenuProps> = ({
 
       {/* Ban User Modal */}
       {showModal === 'ban' && (
-        <Modal title={user.banStatus?.isBanned ? "Unban User" : "Ban User"} onClose={() => setShowModal(null)}>
+        <Modal
+          title={user.banStatus?.isBanned ? 'Unban User' : 'Ban User'}
+          onClose={() => setShowModal(null)}
+        >
           <div className="space-y-4">
             {!user.banStatus?.isBanned ? (
               <>
                 <div>
-                  <label className="block text-sm font-medium text-content mb-2">
-                    Ban reason
-                  </label>
+                  <label className="block text-sm font-medium text-content mb-2">Ban reason</label>
                   <textarea
                     value={banReason}
                     onChange={(e) => setBanReason(e.target.value)}
@@ -436,25 +435,32 @@ const UserActionMenu: React.FC<UserActionMenuProps> = ({
             ) : (
               <div className="text-sm text-content">
                 <p className="mb-2">This user is currently banned.</p>
-                <p className="text-tertiary">Reason: {user.banStatus.reason || 'No reason provided'}</p>
+                <p className="text-tertiary">
+                  Reason: {user.banStatus.reason || 'No reason provided'}
+                </p>
                 <p className="text-tertiary">Type: {user.banStatus.banType || 'Unknown'}</p>
                 {user.banStatus.expiresAt && (
-                  <p className="text-tertiary">Expires: {new Date(user.banStatus.expiresAt).toLocaleDateString()}</p>
+                  <p className="text-tertiary">
+                    Expires: {new Date(user.banStatus.expiresAt).toLocaleDateString()}
+                  </p>
                 )}
               </div>
             )}
-            
+
             <div className="flex space-x-3">
               <button
                 onClick={() => {
                   // This would need implementation in the backend
-                  console.log(user.banStatus?.isBanned ? 'Unbanning user' : 'Banning user', { banReason, banDuration });
+                  console.log(user.banStatus?.isBanned ? 'Unbanning user' : 'Banning user', {
+                    banReason,
+                    banDuration,
+                  });
                   setShowModal(null);
                 }}
                 disabled={loading || (!user.banStatus?.isBanned && !banReason.trim())}
                 className="flex-1 px-4 py-2 bg-error text-surface rounded-lg disabled:opacity-50 hover:opacity-90 transition"
               >
-                {loading ? 'Processing...' : (user.banStatus?.isBanned ? 'Unban User' : 'Ban User')}
+                {loading ? 'Processing...' : user.banStatus?.isBanned ? 'Unban User' : 'Ban User'}
               </button>
               <button
                 onClick={() => setShowModal(null)}

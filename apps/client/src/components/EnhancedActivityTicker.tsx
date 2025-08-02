@@ -31,11 +31,11 @@ function formatNormalizedActivity(event: NormalizedActivityEvent): {
 } {
   const { user, meta, type, priority } = event;
   const userName = user.name;
-  
+
   // Base classes
   let className = 'inline-flex items-center space-x-1 ';
   let icon = '•';
-  
+
   // Priority-based styling
   switch (priority) {
     case 'high':
@@ -48,12 +48,12 @@ function formatNormalizedActivity(event: NormalizedActivityEvent): {
       className += 'text-tertiary ';
       break;
   }
-  
+
   // High-value styling
   if (meta.isHighValue) {
     className += 'animate-pulse ';
   }
-  
+
   // Win/loss styling
   if (meta.isWin === true) {
     className += 'text-green-600 dark:text-green-400 ';
@@ -62,7 +62,7 @@ function formatNormalizedActivity(event: NormalizedActivityEvent): {
   }
 
   let text = '';
-  
+
   switch (type) {
     case 'bet_placed':
       icon = '💰';
@@ -72,26 +72,26 @@ function formatNormalizedActivity(event: NormalizedActivityEvent): {
       text = `${userName} bet ${amount}${option}${odds}`;
       if (meta.title) text += ` on ${meta.title}`;
       break;
-      
+
     case 'parlay_started':
       icon = '🎯';
       const parlayAmount = meta.amount ? `$${meta.amount}` : '';
       const parlayOdds = meta.odds ? ` @${meta.odds.toFixed(1)}x` : '';
       text = `${userName} started ${meta.title || 'a parlay'} for ${parlayAmount}${parlayOdds}`;
       break;
-      
+
     case 'prediction_created':
       icon = '🔮';
       text = `${userName} created: "${meta.title}"`;
       if (meta.category) text += ` [${meta.category}]`;
       break;
-      
+
     case 'prediction_resolved':
       icon = '✅';
       text = `"${meta.title}" resolved`;
       if (meta.option) text += ` → ${meta.option}`;
       break;
-      
+
     case 'big_win':
       icon = '🏆';
       const winAmount = meta.amount ? `$${meta.amount}` : '';
@@ -99,27 +99,27 @@ function formatNormalizedActivity(event: NormalizedActivityEvent): {
       if (meta.streak && meta.streak > 1) text += ` (${meta.streak} streak!)`;
       if (meta.title) text += ` on "${meta.title}"`;
       break;
-      
+
     case 'post_created':
       icon = '📝';
       text = `${userName}: "${meta.title}"`;
       break;
-      
+
     case 'comment_created':
       icon = '💬';
       text = `${userName} commented: "${meta.title}"`;
       break;
-      
+
     case 'badge_earned':
       icon = '🏅';
       text = `${userName} earned "${meta.title}"`;
       break;
-      
+
     case 'leaderboard_update':
       icon = '📊';
       text = `Leaderboard updated`;
       break;
-      
+
     default:
       text = `${userName} - ${type}`;
   }
@@ -134,11 +134,11 @@ interface Props {
   className?: string;
 }
 
-export default function EnhancedActivityTicker({ 
-  maxItems = 20, 
+export default function EnhancedActivityTicker({
+  maxItems = 20,
   showControls = false,
   priorityFilter = 'all',
-  className = ''
+  className = '',
 }: Props) {
   const { items, loading, error, refresh } = useNormalizedActivityTicker(maxItems);
   const [isPaused, setIsPaused] = useState(false);
@@ -152,28 +152,26 @@ export default function EnhancedActivityTicker({
   // Filter and format items
   const processedItems = useMemo(() => {
     let filtered = items;
-    
+
     // Priority filter
     if (priorityFilter !== 'all') {
-      filtered = filtered.filter(item => item.priority === priorityFilter);
+      filtered = filtered.filter((item) => item.priority === priorityFilter);
     }
-    
+
     // Type filter
     if (typeFilter !== 'all') {
-      filtered = filtered.filter(item => item.type === typeFilter);
+      filtered = filtered.filter((item) => item.type === typeFilter);
     }
-    
+
     // Format for display
-    return filtered.map(item => ({
+    return filtered.map((item) => ({
       ...item,
-      formatted: formatNormalizedActivity(item)
+      formatted: formatNormalizedActivity(item),
     }));
   }, [items, priorityFilter, typeFilter]);
 
   const tickerText = useMemo(() => {
-    return processedItems
-      .map(item => item.formatted.text)
-      .join('   •   ');
+    return processedItems.map((item) => item.formatted.text).join('   •   ');
   }, [processedItems]);
 
   // Handle horizontal scrolling with mouse wheel
@@ -185,15 +183,15 @@ export default function EnhancedActivityTicker({
       e.preventDefault();
       const scrollAmount = e.deltaY || e.deltaX;
       container.scrollLeft += scrollAmount;
-      
+
       setIsUserScrolling(true);
       setIsPaused(true);
-      
+
       // Clear existing timeout
       if (userScrollTimeoutRef.current) {
         clearTimeout(userScrollTimeoutRef.current);
       }
-      
+
       // Resume auto-scroll after 3 seconds of no user interaction
       userScrollTimeoutRef.current = setTimeout(() => {
         setIsUserScrolling(false);
@@ -202,7 +200,7 @@ export default function EnhancedActivityTicker({
     };
 
     container.addEventListener('wheel', handleWheel, { passive: false });
-    
+
     return () => {
       container.removeEventListener('wheel', handleWheel);
       if (userScrollTimeoutRef.current) {
@@ -229,7 +227,7 @@ export default function EnhancedActivityTicker({
       if (!isScrolling) {
         const deltaX = Math.abs(e.touches[0].clientX - startX);
         const deltaY = Math.abs(e.touches[0].clientY - startY);
-        
+
         // If horizontal movement is greater than vertical, handle as horizontal scroll
         if (deltaX > deltaY && deltaX > 10) {
           isScrolling = true;
@@ -248,12 +246,12 @@ export default function EnhancedActivityTicker({
 
     const handleTouchEnd = () => {
       isScrolling = false;
-      
+
       // Resume auto-scroll after 3 seconds
       if (userScrollTimeoutRef.current) {
         clearTimeout(userScrollTimeoutRef.current);
       }
-      
+
       userScrollTimeoutRef.current = setTimeout(() => {
         setIsUserScrolling(false);
         setIsPaused(false);
@@ -287,7 +285,7 @@ export default function EnhancedActivityTicker({
 
     const animationDuration = Math.max(30, tickerText.length / 3) * 1000; // Convert to ms
     const scrollDistance = scrollWidth + containerWidth;
-    
+
     let startTime: number;
     let animationId: number;
 
@@ -295,9 +293,9 @@ export default function EnhancedActivityTicker({
       if (!startTime) startTime = timestamp;
       const elapsed = timestamp - startTime;
       const progress = (elapsed % animationDuration) / animationDuration;
-      
+
       container.scrollLeft = progress * scrollDistance - containerWidth;
-      
+
       if (!isPaused && !isUserScrolling) {
         animationId = requestAnimationFrame(animate);
       }
@@ -325,10 +323,7 @@ export default function EnhancedActivityTicker({
       <div className={`bg-red-600 dark:bg-red-700 text-white text-sm py-1 ${className}`}>
         <div className="px-4 flex items-center justify-between">
           <span>Failed to load activity feed</span>
-          <button 
-            onClick={refresh}
-            className="text-xs underline hover:no-underline text-white"
-          >
+          <button onClick={refresh} className="text-xs underline hover:no-underline text-white">
             Retry
           </button>
         </div>
@@ -337,10 +332,11 @@ export default function EnhancedActivityTicker({
   }
 
   if (!processedItems.length) {
-    const message = typeFilter === 'all' && priorityFilter === 'all' 
-      ? 'No recent activity...' 
-      : `No ${typeFilter === 'all' ? '' : typeFilter.replace('_', ' ')} activity found...`;
-    
+    const message =
+      typeFilter === 'all' && priorityFilter === 'all'
+        ? 'No recent activity...'
+        : `No ${typeFilter === 'all' ? '' : typeFilter.replace('_', ' ')} activity found...`;
+
     return (
       <div className={`bg-muted dark:bg-muted text-content text-sm ${className}`}>
         {showControls && (
@@ -368,10 +364,7 @@ export default function EnhancedActivityTicker({
                 <option value="badge_earned">🏅 Badges</option>
               </select>
             </div>
-            <button
-              onClick={refresh}
-              className="hover:text-primary text-content"
-            >
+            <button onClick={refresh} className="hover:text-primary text-content">
               🔄 Refresh
             </button>
           </div>
@@ -408,56 +401,45 @@ export default function EnhancedActivityTicker({
               <option value="badge_earned">🏅 Badges</option>
             </select>
           </div>
-          <button
-            onClick={refresh}
-            className="hover:text-primary text-content"
-          >
+          <button onClick={refresh} className="hover:text-primary text-content">
             🔄 Refresh
           </button>
         </div>
       )}
-      
-      <div 
+
+      <div
         ref={scrollContainerRef}
         className="scrollbar-hidden overflow-x-auto overflow-y-hidden whitespace-nowrap py-2 bg-primary/5"
-        style={{ 
-          scrollBehavior: 'smooth'
+        style={{
+          scrollBehavior: 'smooth',
         }}
       >
-        <div 
-          ref={contentRef}
-          className="inline-flex items-center px-4 min-w-full"
-        >
+        <div ref={contentRef} className="inline-flex items-center px-4 min-w-full">
           {processedItems.map((item, index) => (
             <span key={item.id} className={`${item.formatted.className} flex-shrink-0`}>
               <span className="mr-2">{item.formatted.icon}</span>
               {item.formatted.text}
-              {index < processedItems.length - 1 && (
-                <span className="mx-4 text-tertiary">•</span>
-              )}
+              {index < processedItems.length - 1 && <span className="mx-4 text-tertiary">•</span>}
             </span>
           ))}
           {/* Add duplicate content for seamless scrolling */}
-          {processedItems.length > 0 && processedItems.map((item, index) => (
-            <span key={`dup-${item.id}`} className={`${item.formatted.className} flex-shrink-0`}>
-              <span className="mx-4 text-tertiary">•</span>
-              <span className="mr-2">{item.formatted.icon}</span>
-              {item.formatted.text}
-              {index < processedItems.length - 1 && (
+          {processedItems.length > 0 &&
+            processedItems.map((item, index) => (
+              <span key={`dup-${item.id}`} className={`${item.formatted.className} flex-shrink-0`}>
                 <span className="mx-4 text-tertiary">•</span>
-              )}
-            </span>
-          ))}
+                <span className="mr-2">{item.formatted.icon}</span>
+                {item.formatted.text}
+                {index < processedItems.length - 1 && <span className="mx-4 text-tertiary">•</span>}
+              </span>
+            ))}
         </div>
       </div>
-      
+
       {processedItems.length > 0 && (
         <div className="px-4 py-1 bg-secondary/10 text-xs text-center text-tertiary flex items-center justify-center gap-2">
           <span>{processedItems.length} recent activities • Updated live</span>
           {isUserScrolling && (
-            <span className="text-primary">
-              🖱️ Scroll to browse • Auto-resume in 3s
-            </span>
+            <span className="text-primary">🖱️ Scroll to browse • Auto-resume in 3s</span>
           )}
         </div>
       )}

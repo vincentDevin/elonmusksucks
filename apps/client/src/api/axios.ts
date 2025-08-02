@@ -40,7 +40,7 @@ const processQueue = (error: any, token: string | null = null) => {
       resolve(token);
     }
   });
-  
+
   failedQueue = [];
 };
 
@@ -67,12 +67,14 @@ api.interceptors.response.use(
     if (isRefreshing) {
       return new Promise((resolve, reject) => {
         failedQueue.push({ resolve, reject });
-      }).then((token) => {
-        originalRequest.headers.Authorization = `Bearer ${token}`;
-        return api(originalRequest);
-      }).catch((err) => {
-        return Promise.reject(err);
-      });
+      })
+        .then((token) => {
+          originalRequest.headers.Authorization = `Bearer ${token}`;
+          return api(originalRequest);
+        })
+        .catch((err) => {
+          return Promise.reject(err);
+        });
     }
 
     originalRequest._retry = true;
@@ -82,18 +84,18 @@ api.interceptors.response.use(
       // Attempt to refresh the token
       const response = await api.post('/api/auth/refresh');
       const { accessToken: newToken } = response.data;
-      
+
       // Update the token
       setAccessToken(newToken);
-      
+
       // Notify AuthContext about the new token
       if (tokenRefreshCallback) {
         tokenRefreshCallback(newToken);
       }
-      
+
       // Process the queue with the new token
       processQueue(null, newToken);
-      
+
       // Retry the original request with the new token
       originalRequest.headers.Authorization = `Bearer ${newToken}`;
       return api(originalRequest);
@@ -101,24 +103,24 @@ api.interceptors.response.use(
       // Refresh failed, clear token and handle auth failure
       processQueue(refreshError, null);
       setAccessToken('');
-      
+
       // Call the auth failure callback if it exists (clears auth context)
       if (authFailureCallback) {
         authFailureCallback();
       }
-      
+
       // Only redirect if we're not already on auth pages
       const currentPath = window.location.pathname;
       if (!currentPath.includes('/login') && !currentPath.includes('/register')) {
         console.log('Session expired, redirecting to login');
         window.location.href = '/login';
       }
-      
+
       return Promise.reject(refreshError);
     } finally {
       isRefreshing = false;
     }
-  }
+  },
 );
 
 export default api;

@@ -82,7 +82,7 @@ export async function initSocket(httpServer: HTTPServer) {
         socket.join('admin');
         console.log(`[socket] Admin user ${(socket as any).user.id} joined admin room`);
       }
-      
+
       // registerRoomHandlers(io, socket); // Uncomment when multi‑room is live
       registerChatHandlers(socket);
       registerBetHandlers(socket);

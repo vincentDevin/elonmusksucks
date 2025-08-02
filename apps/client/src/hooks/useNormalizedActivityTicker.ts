@@ -22,18 +22,21 @@ export function useNormalizedActivityTicker(limit = 20) {
   }, []);
 
   // Handle real-time activity updates
-  const handleNewsflash = useCallback((item: NormalizedActivityEvent) => {
-    setItems((prev) => {
-      // Avoid duplicates by ID and ensure chronological order
-      const filtered = prev.filter(existingItem => existingItem.id !== item.id);
-      const updated = [item, ...filtered];
-      
-      // Sort by timestamp to maintain order
-      updated.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-      
-      return updated.slice(0, limit);
-    });
-  }, [limit]);
+  const handleNewsflash = useCallback(
+    (item: NormalizedActivityEvent) => {
+      setItems((prev) => {
+        // Avoid duplicates by ID and ensure chronological order
+        const filtered = prev.filter((existingItem) => existingItem.id !== item.id);
+        const updated = [item, ...filtered];
+
+        // Sort by timestamp to maintain order
+        updated.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+        return updated.slice(0, limit);
+      });
+    },
+    [limit],
+  );
 
   // Handle connection errors
   const handleError = useCallback((err: any) => {
@@ -48,13 +51,13 @@ export function useNormalizedActivityTicker(limit = 20) {
     socket.on('activity:ticker:normalized', handleTicker);
     socket.on('activityNewsflash:normalized', handleNewsflash);
     socket.on('error', handleError);
-    
+
     // Handle disconnection/reconnection
     socket.on('disconnect', () => {
       console.log('[normalized-activity] Socket disconnected');
       setLoading(true);
     });
-    
+
     socket.on('reconnect', () => {
       console.log('[normalized-activity] Socket reconnected, refreshing ticker');
       requestTicker();
@@ -74,7 +77,7 @@ export function useNormalizedActivityTicker(limit = 20) {
       socket.off('reconnect');
     };
   }, [socket, requestTicker, handleTicker, handleNewsflash, handleError]);
-  
+
   // Auto-refresh every 30 seconds to ensure fresh data
   useEffect(() => {
     const interval = setInterval(() => {
@@ -82,7 +85,7 @@ export function useNormalizedActivityTicker(limit = 20) {
         requestTicker();
       }
     }, 30000);
-    
+
     return () => clearInterval(interval);
   }, [socket, loading, requestTicker]);
 
@@ -92,13 +95,13 @@ export function useNormalizedActivityTicker(limit = 20) {
     requestTicker();
   }, [requestTicker]);
 
-  return { 
-    items, 
-    loading, 
-    error, 
+  return {
+    items,
+    loading,
+    error,
     refresh,
     // Helper functions for filtering
-    getHighPriorityItems: () => items.filter(item => item.priority === 'high'),
-    getItemsByType: (type: string) => items.filter(item => item.type === type),
+    getHighPriorityItems: () => items.filter((item) => item.priority === 'high'),
+    getItemsByType: (type: string) => items.filter((item) => item.type === type),
   };
 }

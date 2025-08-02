@@ -28,25 +28,25 @@ export default function ParlayPanel() {
 
   /* ---------- Enhanced parlay calculations with bonuses ---------- */
   const { baseCombinedOdds, bonusMultiplier, finalOdds, payout, legCount } = useMemo(() => {
-    const individualOdds = state.legs.map(leg => getLegOdds(leg));
+    const individualOdds = state.legs.map((leg) => getLegOdds(leg));
     const baseCombined = individualOdds.reduce((acc, odds) => acc * odds, 1);
     const legCount = state.legs.length;
-    
+
     // Apply exciting bonus multipliers for more legs!
     let bonusMultiplier = 1;
     if (legCount >= 2) {
       bonusMultiplier = Math.pow(1.15, legCount - 1);
       bonusMultiplier = Math.min(bonusMultiplier, 2.0); // Cap at 2.0x
     }
-    
+
     const finalOdds = baseCombined * bonusMultiplier;
-    
+
     return {
       baseCombinedOdds: baseCombined,
       bonusMultiplier,
       finalOdds,
       payout: Math.floor(state.amount * finalOdds),
-      legCount
+      legCount,
     };
   }, [state.legs, state.amount, getLegOdds]);
 
@@ -135,10 +135,12 @@ export default function ParlayPanel() {
                 type="number"
                 min={1}
                 value={state.amount}
-                onChange={(e) => dispatch({
-                  type: 'SET_AMOUNT',
-                  amount: Number(e.target.value)
-                })}
+                onChange={(e) =>
+                  dispatch({
+                    type: 'SET_AMOUNT',
+                    amount: Number(e.target.value),
+                  })
+                }
                 placeholder="Enter amount..."
                 className="w-full border border-muted p-3 rounded-lg bg-background text-content focus:outline-none focus:ring-2 focus:ring-primary transition-all"
               />
@@ -151,27 +153,37 @@ export default function ParlayPanel() {
 
             {bonusMultiplier > 1 && (
               <div className="flex justify-between text-sm text-green-600 font-semibold animate-pulse">
-                <span className="flex items-center">
-                  🎉 {legCount}-Leg Bonus
-                </span>
+                <span className="flex items-center">🎉 {legCount}-Leg Bonus</span>
                 <span>+{((bonusMultiplier - 1) * 100).toFixed(0)}%</span>
               </div>
             )}
 
             <div className="flex justify-between text-lg font-bold border-t border-muted pt-2">
               <span>Final Odds</span>
-              <span className={`transition-all duration-300 ${
-                isCalculating ? 'scale-110 text-blue-500' : bonusMultiplier > 1 ? 'text-green-600' : ''
-              }`}>
+              <span
+                className={`transition-all duration-300 ${
+                  isCalculating
+                    ? 'scale-110 text-blue-500'
+                    : bonusMultiplier > 1
+                      ? 'text-green-600'
+                      : ''
+                }`}
+              >
                 {finalOdds.toFixed(2)}×
               </span>
             </div>
 
             <div className="flex justify-between text-sm font-medium">
               <span>Potential Payout</span>
-              <span className={`transition-all duration-300 ${
-                isCalculating ? 'scale-110 text-blue-500' : bonusMultiplier > 1 ? 'text-green-600 font-bold' : ''
-              }`}>
+              <span
+                className={`transition-all duration-300 ${
+                  isCalculating
+                    ? 'scale-110 text-blue-500'
+                    : bonusMultiplier > 1
+                      ? 'text-green-600 font-bold'
+                      : ''
+                }`}
+              >
                 {state.amount ? payout.toLocaleString() : '–'} 🪙
               </span>
             </div>
@@ -181,14 +193,18 @@ export default function ParlayPanel() {
               <div className="mt-3">
                 <div className="flex justify-between text-xs text-tertiary mb-1">
                   <span>Profit Potential</span>
-                  <span>+{((payout - state.amount) / state.amount * 100).toFixed(0)}%</span>
+                  <span>+{(((payout - state.amount) / state.amount) * 100).toFixed(0)}%</span>
                 </div>
                 <div className="w-full bg-muted rounded-full h-2">
                   <div
                     className={`h-2 rounded-full transition-all duration-500 ${
-                      finalOdds < 2 ? 'bg-green-400' :
-                      finalOdds < 5 ? 'bg-yellow-400' :
-                      finalOdds < 10 ? 'bg-orange-400' : 'bg-red-400'
+                      finalOdds < 2
+                        ? 'bg-green-400'
+                        : finalOdds < 5
+                          ? 'bg-yellow-400'
+                          : finalOdds < 10
+                            ? 'bg-orange-400'
+                            : 'bg-red-400'
                     }`}
                     style={{ width: `${Math.min((finalOdds / 20) * 100, 100)}%` }}
                   />
@@ -199,8 +215,8 @@ export default function ParlayPanel() {
             <button
               onClick={() => setOpen(true)}
               className={`w-full mt-2 py-2 rounded-lg font-bold disabled:opacity-50 transition-all duration-200 ${
-                bonusMultiplier > 1 
-                  ? 'bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg hover:shadow-xl hover:from-green-600 hover:to-green-700' 
+                bonusMultiplier > 1
+                  ? 'bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg hover:shadow-xl hover:from-green-600 hover:to-green-700'
                   : 'bg-primary text-surface hover:opacity-90'
               }`}
               disabled={state.legs.length === 0}

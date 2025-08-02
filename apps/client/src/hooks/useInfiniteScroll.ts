@@ -13,7 +13,7 @@ export function useInfiniteScroll<T>(items: T[], pageSize: number = 10) {
 
   const loadMore = useCallback(() => {
     if (hasMore) {
-      setPage(prev => prev + 1);
+      setPage((prev) => prev + 1);
     }
   }, [hasMore]);
 

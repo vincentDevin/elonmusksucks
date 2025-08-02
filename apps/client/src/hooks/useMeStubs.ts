@@ -75,7 +75,7 @@ export function useMyBets() {
   // Listen for real-time bet updates
   useEffect(() => {
     if (!user?.id || !socket) return;
-    
+
     const handleBetPlaced = (betData: any) => {
       // Only refresh if this bet belongs to the current user
       if (betData.user?.id === user.id) {
@@ -127,7 +127,7 @@ export function useMyParlays() {
   // Listen for real-time parlay updates
   useEffect(() => {
     if (!user?.id || !socket) return;
-    
+
     const handleParlayPlaced = (parlayData: any) => {
       // Only refresh if this parlay belongs to the current user
       if (parlayData.user?.id === user.id) {
@@ -179,7 +179,7 @@ export function useMyPredictions() {
   // Listen for real-time prediction updates
   useEffect(() => {
     if (!user?.id || !socket) return;
-    
+
     const handlePredictionCreated = (predictionData: any) => {
       // Only refresh if this prediction was created by the current user
       if (predictionData.creatorId === user.id) {

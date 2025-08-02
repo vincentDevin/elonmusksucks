@@ -23,14 +23,14 @@ interface UnifiedPredictionCardProps {
   className?: string;
 }
 
-export default function UnifiedPredictionCard({ 
-  prediction, 
+export default function UnifiedPredictionCard({
+  prediction,
   variant = 'full',
   showActions = true,
   showBetsList = true,
   showParlayActions = false,
   addOptimisticBet,
-  className = ''
+  className = '',
 }: UnifiedPredictionCardProps) {
   const { dispatch: parlayDispatch } = useParlay();
   const [showBetModal, setShowBetModal] = useState(false);
@@ -47,7 +47,7 @@ export default function UnifiedPredictionCard({
   const expires = new Date(prediction.expiresAt).getTime();
   const timeLeft = expires - now;
   const hoursLeft = Math.ceil(timeLeft / (1000 * 60 * 60));
-  
+
   // Status badge logic using theme tokens
   const getStatusBadge = () => {
     if (prediction.resolved) {
@@ -62,32 +62,33 @@ export default function UnifiedPredictionCard({
       return { color: 'bg-success', text: 'Open', icon: '🟢' };
     }
   };
-  
+
   const statusBadge = getStatusBadge();
 
   // Engagement metrics
   const totalBets = prediction.bets.length + flatParlays.length;
-  const totalVolume = prediction.bets.reduce((sum: number, bet: BetWithUser) => sum + bet.amount, 0) + 
-                      flatParlays.reduce((sum: number, leg: ParlayLegWithUser) => sum + leg.stake, 0);
-  const recentActivity = prediction.bets.filter((bet: BetWithUser) => 
-    new Date(bet.createdAt).getTime() > Date.now() - 30 * 60 * 1000
+  const totalVolume =
+    prediction.bets.reduce((sum: number, bet: BetWithUser) => sum + bet.amount, 0) +
+    flatParlays.reduce((sum: number, leg: ParlayLegWithUser) => sum + leg.stake, 0);
+  const recentActivity = prediction.bets.filter(
+    (bet: BetWithUser) => new Date(bet.createdAt).getTime() > Date.now() - 30 * 60 * 1000,
   ).length;
 
   // Parlay handlers
   const handleAddToParlay = (optionId: number) => {
     if (!prediction.options.length) return;
-    
+
     const selectedOption = prediction.options.find((opt: any) => opt.id === optionId);
     if (!selectedOption) return;
-    
+
     setAddingToParlay(optionId);
-    
+
     parlayDispatch({
       type: 'ADD_LEG',
-      leg: { 
-        predictionId: prediction.id, 
-        optionId, 
-        label: selectedOption.label 
+      leg: {
+        predictionId: prediction.id,
+        optionId,
+        label: selectedOption.label,
       },
     });
 
@@ -144,7 +145,7 @@ export default function UnifiedPredictionCard({
 
           {/* Title */}
           <h3 className={titleClasses}>{prediction.title}</h3>
-          
+
           {/* Engagement metrics */}
           <div className="flex items-center gap-4 text-sm text-tertiary mb-3">
             <span className="flex items-center gap-1">
@@ -153,8 +154,7 @@ export default function UnifiedPredictionCard({
             </span>
             {totalVolume > 0 && (
               <span className="flex items-center gap-1">
-                <span className="text-primary">💰</span>
-                ${totalVolume.toLocaleString()} volume
+                <span className="text-primary">💰</span>${totalVolume.toLocaleString()} volume
               </span>
             )}
             <span className="flex items-center gap-1">
@@ -165,17 +165,23 @@ export default function UnifiedPredictionCard({
 
           {/* Time remaining */}
           {!prediction.resolved && (
-            <div className={`text-sm font-medium flex items-center gap-2 mb-4 ${
-              now > expires ? 'text-error' : hoursLeft <= 2 ? 'text-warning' : hoursLeft <= 24 ? 'text-info' : 'text-success'
-            }`}>
+            <div
+              className={`text-sm font-medium flex items-center gap-2 mb-4 ${
+                now > expires
+                  ? 'text-error'
+                  : hoursLeft <= 2
+                    ? 'text-warning'
+                    : hoursLeft <= 24
+                      ? 'text-info'
+                      : 'text-success'
+              }`}
+            >
               <span>{statusBadge.icon}</span>
-              {now > expires ? (
-                `Expired ${new Date(prediction.expiresAt).toLocaleString()}`
-              ) : hoursLeft <= 24 ? (
-                `${hoursLeft}h ${Math.ceil((timeLeft % (1000 * 60 * 60)) / (1000 * 60))}m remaining`
-              ) : (
-                `Expires ${new Date(prediction.expiresAt).toLocaleString()}`
-              )}
+              {now > expires
+                ? `Expired ${new Date(prediction.expiresAt).toLocaleString()}`
+                : hoursLeft <= 24
+                  ? `${hoursLeft}h ${Math.ceil((timeLeft % (1000 * 60 * 60)) / (1000 * 60))}m remaining`
+                  : `Expires ${new Date(prediction.expiresAt).toLocaleString()}`}
             </div>
           )}
 
@@ -185,12 +191,17 @@ export default function UnifiedPredictionCard({
             type={prediction.type as PredictionType}
             options={prediction.options as PublicPredictionOption[]}
             bets={prediction.bets}
-            parlayLegs={flatParlays.map(leg => ({
+            parlayLegs={flatParlays.map((leg) => ({
               ...leg,
-              createdAt: leg.createdAt instanceof Date ? leg.createdAt.toISOString() : leg.createdAt
+              createdAt:
+                leg.createdAt instanceof Date ? leg.createdAt.toISOString() : leg.createdAt,
             }))}
             predictionId={prediction.id}
-            expiresAt={typeof prediction.expiresAt === 'string' ? prediction.expiresAt : prediction.expiresAt.toISOString()}
+            expiresAt={
+              typeof prediction.expiresAt === 'string'
+                ? prediction.expiresAt
+                : prediction.expiresAt.toISOString()
+            }
           />
 
           {/* Recent bets */}
@@ -216,7 +227,7 @@ export default function UnifiedPredictionCard({
                   <span>💰</span>
                 </span>
               </button>
-              
+
               <div className="mt-2 text-xs text-tertiary text-center">
                 💡 Use the dashboard parlay builder for multi-prediction bets
               </div>
@@ -235,36 +246,45 @@ export default function UnifiedPredictionCard({
           <h3 className={titleClasses}>{prediction.title}</h3>
 
           {/* Quick stats */}
-          <div className={`flex items-center gap-3 mb-3 text-sm text-tertiary ${isMini ? 'text-xs gap-2' : ''}`}>
+          <div
+            className={`flex items-center gap-3 mb-3 text-sm text-tertiary ${isMini ? 'text-xs gap-2' : ''}`}
+          >
             <span className="flex items-center gap-1">
               <span className="text-primary">📊</span>
               {totalBets} {isMini ? '' : 'bets'}
             </span>
             {totalVolume > 0 && (
               <span className="flex items-center gap-1">
-                <span className="text-primary">💰</span>
-                ${isMini ? Math.round(totalVolume/1000) + 'k' : totalVolume.toLocaleString()}
+                <span className="text-primary">💰</span>$
+                {isMini ? Math.round(totalVolume / 1000) + 'k' : totalVolume.toLocaleString()}
               </span>
             )}
             {!prediction.resolved && (
               <span className={`text-xs ${now > expires ? 'text-error' : 'text-tertiary'}`}>
-                {now > expires ? 'Expired' : `${Math.ceil((expires - now) / (1000 * 60 * 60))}h left`}
+                {now > expires
+                  ? 'Expired'
+                  : `${Math.ceil((expires - now) / (1000 * 60 * 60))}h left`}
               </span>
             )}
           </div>
 
           {/* Compact Odds */}
           <UnifiedOddsBar
-            variant={isCompact ? "compact" : "mini"}
+            variant={isCompact ? 'compact' : 'mini'}
             type={prediction.type as PredictionType}
             options={prediction.options as PublicPredictionOption[]}
             bets={prediction.bets}
-            parlayLegs={flatParlays.map(leg => ({
+            parlayLegs={flatParlays.map((leg) => ({
               ...leg,
-              createdAt: leg.createdAt instanceof Date ? leg.createdAt.toISOString() : leg.createdAt
+              createdAt:
+                leg.createdAt instanceof Date ? leg.createdAt.toISOString() : leg.createdAt,
             }))}
             predictionId={prediction.id}
-            expiresAt={typeof prediction.expiresAt === 'string' ? prediction.expiresAt : prediction.expiresAt.toISOString()}
+            expiresAt={
+              typeof prediction.expiresAt === 'string'
+                ? prediction.expiresAt
+                : prediction.expiresAt.toISOString()
+            }
           />
 
           {/* Parlay Option Selector */}
@@ -319,8 +339,8 @@ export default function UnifiedPredictionCard({
                     showParlaySelector
                       ? 'bg-secondary text-content border-2 border-secondary'
                       : addingToParlay !== null
-                      ? 'bg-success text-surface scale-105'
-                      : 'bg-warning hover:bg-warning/90 text-surface hover:scale-105'
+                        ? 'bg-success text-surface scale-105'
+                        : 'bg-warning hover:bg-warning/90 text-surface hover:scale-105'
                   }`}
                 >
                   {addingToParlay !== null ? (
@@ -345,8 +365,10 @@ export default function UnifiedPredictionCard({
                 Latest: {prediction.bets[prediction.bets.length - 1]?.user?.name || 'Anonymous'}
               </span>
               <span className="flex items-center gap-1">
-                {prediction.options.find((opt: any) => 
-                  prediction.bets.some((bet: BetWithUser) => bet.optionId === opt.id && bet.amount > 500)
+                {prediction.options.find((opt: any) =>
+                  prediction.bets.some(
+                    (bet: BetWithUser) => bet.optionId === opt.id && bet.amount > 500,
+                  ),
                 ) && <span title="High-stakes activity">🔥</span>}
                 {flatParlays.length > 0 && <span title="Parlay activity">📈</span>}
               </span>
@@ -360,7 +382,7 @@ export default function UnifiedPredictionCard({
         prediction={prediction}
         isOpen={showBetModal}
         onClose={() => setShowBetModal(false)}
-        mode={isFullSize ? "full" : "compact"}
+        mode={isFullSize ? 'full' : 'compact'}
         onBetPlaced={addOptimisticBet}
       />
     </>

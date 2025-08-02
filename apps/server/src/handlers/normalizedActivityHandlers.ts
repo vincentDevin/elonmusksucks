@@ -30,7 +30,7 @@ export function registerNormalizedActivityHandlers(socket: Socket) {
 export function registerNormalizedActivityRedisHandlers(io: Server, eventSub: any) {
   eventSub.on('message', (channel: string, message: string) => {
     if (channel !== 'activity:newsflash:normalized') return;
-    
+
     let payload: NormalizedActivityEvent;
     try {
       payload = JSON.parse(message);

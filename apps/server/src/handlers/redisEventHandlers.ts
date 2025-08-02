@@ -13,6 +13,8 @@ export type RedisChannel =
   | 'odds:update:enhanced'
   | 'leaderboard:allTime'
   | 'leaderboard:daily'
+  | 'leaderboard:rankChange'
+  | 'leaderboard:milestone'
   | 'activity:newsflash'
   | 'activity:newsflash:normalized'
   | 'moderation:userBan'
@@ -54,6 +56,12 @@ export function registerRedisEventHandlers(io: Server, eventSub: any) {
         break;
       case 'leaderboard:daily':
         io.emit('leaderboardDaily', payload);
+        break;
+      case 'leaderboard:rankChange':
+        io.emit('leaderboard:rankChange', payload);
+        break;
+      case 'leaderboard:milestone':
+        io.emit('leaderboard:milestone', payload);
         break;
       case 'activity:newsflash':
         io.emit('activityNewsflash', payload);

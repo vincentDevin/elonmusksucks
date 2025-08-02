@@ -2,11 +2,7 @@ import React, { useState } from 'react';
 import ExecutiveDashboard from './ExecutiveDashboard';
 import UserBehaviorAnalytics from './UserBehaviorAnalytics';
 import PredictiveAnalytics from './PredictiveAnalytics';
-import {
-  generateCustomReport,
-  exportAnalyticsData,
-  type CustomReportData
-} from '../../api/admin';
+import { generateCustomReport, exportAnalyticsData, type CustomReportData } from '../../api/admin';
 
 interface TabConfig {
   key: string;
@@ -27,22 +23,22 @@ const AdvancedAnalyticsDashboard: React.FC = () => {
       label: 'Executive Dashboard',
       icon: '📊',
       component: <ExecutiveDashboard />,
-      description: 'High-level KPIs and business metrics for executive decision making'
+      description: 'High-level KPIs and business metrics for executive decision making',
     },
     {
       key: 'behavior',
       label: 'User Behavior',
       icon: '👥',
       component: <UserBehaviorAnalytics />,
-      description: 'Detailed user engagement patterns and behavioral insights'
+      description: 'Detailed user engagement patterns and behavioral insights',
     },
     {
       key: 'predictive',
       label: 'Predictive Analytics',
       icon: '🔮',
       component: <PredictiveAnalytics />,
-      description: 'AI-powered forecasting and churn prediction models'
-    }
+      description: 'AI-powered forecasting and churn prediction models',
+    },
   ];
 
   const handleExportReport = async (reportType: string, format: 'csv' | 'excel' | 'pdf') => {
@@ -55,8 +51,8 @@ const AdvancedAnalyticsDashboard: React.FC = () => {
         format,
         filters: {
           startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-          endDate: new Date().toISOString()
-        }
+          endDate: new Date().toISOString(),
+        },
       });
 
       // Create download link
@@ -82,10 +78,10 @@ const AdvancedAnalyticsDashboard: React.FC = () => {
   const handleGenerateCustomReport = async (reportType: string) => {
     try {
       setExportStatus(`Generating custom ${reportType} report...`);
-      
+
       const report: CustomReportData = await generateCustomReport(reportType, {
         startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-        endDate: new Date().toISOString()
+        endDate: new Date().toISOString(),
       });
 
       // Convert to CSV and download
@@ -103,30 +99,34 @@ const AdvancedAnalyticsDashboard: React.FC = () => {
       setExportStatus(`Custom report "${report.title}" downloaded successfully!`);
       setTimeout(() => setExportStatus(null), 3000);
     } catch (error) {
-      setExportStatus(`Report generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setExportStatus(
+        `Report generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
       setTimeout(() => setExportStatus(null), 5000);
     }
   };
 
   const convertToCSV = (data: Array<Record<string, any>>): string => {
     if (data.length === 0) return '';
-    
+
     const headers = Object.keys(data[0]);
     const csvHeaders = headers.join(',');
-    const csvRows = data.map(row => 
-      headers.map(header => {
-        const value = row[header];
-        if (typeof value === 'string' && value.includes(',')) {
-          return `"${value}"`;
-        }
-        return String(value || '');
-      }).join(',')
+    const csvRows = data.map((row) =>
+      headers
+        .map((header) => {
+          const value = row[header];
+          if (typeof value === 'string' && value.includes(',')) {
+            return `"${value}"`;
+          }
+          return String(value || '');
+        })
+        .join(','),
     );
-    
+
     return [csvHeaders, ...csvRows].join('\n');
   };
 
-  const currentTab = tabs.find(tab => tab.key === activeTab);
+  const currentTab = tabs.find((tab) => tab.key === activeTab);
 
   return (
     <div className="space-y-6">
@@ -138,7 +138,7 @@ const AdvancedAnalyticsDashboard: React.FC = () => {
             Comprehensive business intelligence and data insights platform
           </p>
         </div>
-        
+
         {/* Export Controls */}
         <div className="flex items-center space-x-3">
           <div className="relative">
@@ -172,13 +172,15 @@ const AdvancedAnalyticsDashboard: React.FC = () => {
           </div>
 
           {exportStatus && (
-            <div className={`px-3 py-2 rounded-lg text-sm ${
-              exportStatus.includes('failed') 
-                ? 'bg-red-100 text-red-800 border border-red-200'
-                : exportStatus.includes('success') 
-                ? 'bg-green-100 text-green-800 border border-green-200'
-                : 'bg-blue-100 text-blue-800 border border-blue-200'
-            }`}>
+            <div
+              className={`px-3 py-2 rounded-lg text-sm ${
+                exportStatus.includes('failed')
+                  ? 'bg-red-100 text-red-800 border border-red-200'
+                  : exportStatus.includes('success')
+                    ? 'bg-green-100 text-green-800 border border-green-200'
+                    : 'bg-blue-100 text-blue-800 border border-blue-200'
+              }`}
+            >
               {exportStatus}
             </div>
           )}
@@ -211,9 +213,7 @@ const AdvancedAnalyticsDashboard: React.FC = () => {
       </div>
 
       {/* Tab Content */}
-      <div className="min-h-[600px]">
-        {currentTab?.component}
-      </div>
+      <div className="min-h-[600px]">{currentTab?.component}</div>
 
       {/* Analytics Info Footer */}
       <div className="bg-surface border border-muted rounded-lg p-6">
@@ -227,7 +227,7 @@ const AdvancedAnalyticsDashboard: React.FC = () => {
               <li>• Real-time system performance metrics</li>
             </ul>
           </div>
-          
+
           <div>
             <h3 className="font-semibold text-content mb-2">Update Frequency</h3>
             <ul className="text-sm text-tertiary space-y-1">
@@ -237,7 +237,7 @@ const AdvancedAnalyticsDashboard: React.FC = () => {
               <li>• Predictive models: Daily recalculation</li>
             </ul>
           </div>
-          
+
           <div>
             <h3 className="font-semibold text-content mb-2">Analytics Features</h3>
             <ul className="text-sm text-tertiary space-y-1">

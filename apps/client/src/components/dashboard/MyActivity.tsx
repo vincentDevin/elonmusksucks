@@ -39,7 +39,10 @@ export default function MyActivity() {
     <section className="bg-surface border border-muted rounded-2xl p-4 shadow-lg">
       <div className="flex justify-between items-center mb-3">
         <h2 className="text-lg font-semibold text-content">My Activity</h2>
-        <select onChange={(e) => setFilter(e.target.value)} className="bg-background border border-muted rounded-md px-2 py-1 text-sm">
+        <select
+          onChange={(e) => setFilter(e.target.value)}
+          className="bg-background border border-muted rounded-md px-2 py-1 text-sm"
+        >
           <option value="all">All</option>
           <option value="bets">Bets</option>
           <option value="parlays">Parlays</option>
@@ -55,7 +58,10 @@ export default function MyActivity() {
       ) : (
         <ul className="text-sm space-y-2 pr-2">
           {filteredData().map((item) => (
-            <li key={item.id} className="flex justify-between py-2 px-3 bg-background/50 rounded-lg">
+            <li
+              key={item.id}
+              className="flex justify-between py-2 px-3 bg-background/50 rounded-lg"
+            >
               <div className="flex flex-col">
                 <span className="text-content font-medium break-words">
                   {item.predictionTitle || item.title || `${item.legCount} legs`}
@@ -69,7 +75,11 @@ export default function MyActivity() {
                   {item.amount ? `${item.amount}🪙` : ''}
                 </div>
                 <div className="text-xs text-tertiary">
-                  {item.odds ? `@ ${item.odds.toFixed(2)}x` : item.potentialPayout ? `→ ${item.potentialPayout}🪙` : ''}
+                  {item.odds
+                    ? `@ ${item.odds.toFixed(2)}x`
+                    : item.potentialPayout
+                      ? `→ ${item.potentialPayout}🪙`
+                      : ''}
                 </div>
               </div>
             </li>

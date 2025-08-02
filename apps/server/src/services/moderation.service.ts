@@ -86,9 +86,8 @@ export const moderationService = {
     }
 
     // Calculate expiration for temporary bans
-    const expiresAt = banType === 'TEMPORARY' && duration 
-      ? new Date(Date.now() + duration * 60 * 1000) 
-      : undefined;
+    const expiresAt =
+      banType === 'TEMPORARY' && duration ? new Date(Date.now() + duration * 60 * 1000) : undefined;
 
     // Create ban
     const ban = await moderationRepo.createBan({
@@ -174,7 +173,13 @@ export const moderationService = {
   },
 
   // Kick user (disconnect from chat)
-  async kickUser(userId: number, moderatorId: number, reason: string, ipAddress?: string, userAgent?: string) {
+  async kickUser(
+    userId: number,
+    moderatorId: number,
+    reason: string,
+    ipAddress?: string,
+    userAgent?: string,
+  ) {
     // Log and publish (no persistent state change for kick)
     await logAndPublishAction(
       'USER_KICK',

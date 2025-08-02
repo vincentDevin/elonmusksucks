@@ -8,9 +8,14 @@ interface PerformanceProgressBarsProps {
   parlayAccuracy: number;
 }
 
-function ProgressBar({ label, value, max, colors }: { 
-  label: string; 
-  value: number; 
+function ProgressBar({
+  label,
+  value,
+  max,
+  colors,
+}: {
+  label: string;
+  value: number;
   max: number;
   colors: any;
 }) {
@@ -39,16 +44,13 @@ function ProgressBar({ label, value, max, colors }: {
         <span className="text-xs font-medium text-content">{label}</span>
         <span className="text-xs font-semibold text-primary">{displayValue}%</span>
       </div>
-      <div 
-        className="w-full rounded-full h-2"
-        style={{ backgroundColor: colors.background }}
-      >
+      <div className="w-full rounded-full h-2" style={{ backgroundColor: colors.background }}>
         <div
           className="h-2 rounded-full transition-all duration-300"
-          style={{ 
-            width: `${percentage}%`, 
+          style={{
+            width: `${percentage}%`,
             backgroundColor: barBgColor,
-            boxShadow: `0 0 3px ${barBgColor}33`
+            boxShadow: `0 0 3px ${barBgColor}33`,
           }}
         ></div>
       </div>
@@ -56,12 +58,17 @@ function ProgressBar({ label, value, max, colors }: {
   );
 }
 
-export function PerformanceProgressBars({ roi, betWinRate, parlayWinRate, parlayAccuracy }: PerformanceProgressBarsProps) {
+export function PerformanceProgressBars({
+  roi,
+  betWinRate,
+  parlayWinRate,
+  parlayAccuracy,
+}: PerformanceProgressBarsProps) {
   const [colors, setColors] = useState({
     positive: '#22c55e',
     negative: '#ef4444',
     warning: '#f59e0b',
-    background: '#e5e7eb'
+    background: '#e5e7eb',
   });
 
   // Update colors based on theme
@@ -72,17 +79,17 @@ export function PerformanceProgressBars({ roi, betWinRate, parlayWinRate, parlay
         positive: isDark ? '#4ade80' : '#16a34a',
         negative: isDark ? '#f87171' : '#dc2626',
         warning: isDark ? '#fbbf24' : '#d97706',
-        background: isDark ? '#374151' : '#e5e7eb'
+        background: isDark ? '#374151' : '#e5e7eb',
       });
     };
 
     updateColors();
-    
+
     // Listen for theme changes
     const observer = new MutationObserver(updateColors);
     observer.observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ['class']
+      attributeFilter: ['class'],
     });
 
     return () => observer.disconnect();
@@ -105,20 +112,33 @@ export function PerformanceProgressBars({ roi, betWinRate, parlayWinRate, parlay
   return (
     <div className="flex flex-col p-4 h-[280px] overflow-hidden">
       <h4 className="font-semibold text-sm mb-3 text-center text-content">Performance Metrics</h4>
-      
+
       {/* Progress bars container with controlled height */}
       <div className="flex-1 flex flex-col justify-evenly min-h-0">
         <ProgressBar label="ROI" value={roi * 100} max={100} colors={colors} />
         <ProgressBar label="Bet Win Rate" value={betWinRate * 100} max={100} colors={colors} />
-        <ProgressBar label="Parlay Win Rate" value={parlayWinRate * 100} max={100} colors={colors} />
-        <ProgressBar label="Parlay Accuracy" value={parlayAccuracy * 100} max={100} colors={colors} />
+        <ProgressBar
+          label="Parlay Win Rate"
+          value={parlayWinRate * 100}
+          max={100}
+          colors={colors}
+        />
+        <ProgressBar
+          label="Parlay Accuracy"
+          value={parlayAccuracy * 100}
+          max={100}
+          colors={colors}
+        />
       </div>
-      
+
       {/* Compact color legend */}
       <div className="mt-2 text-xs text-tertiary">
         <div className="flex items-center justify-center gap-4">
           <div className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: colors.positive }}></div>
+            <div
+              className="w-2 h-2 rounded-full"
+              style={{ backgroundColor: colors.positive }}
+            ></div>
             <span>Good</span>
           </div>
           <div className="flex items-center gap-1">
@@ -126,7 +146,10 @@ export function PerformanceProgressBars({ roi, betWinRate, parlayWinRate, parlay
             <span>Average</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: colors.negative }}></div>
+            <div
+              className="w-2 h-2 rounded-full"
+              style={{ backgroundColor: colors.negative }}
+            ></div>
             <span>Poor</span>
           </div>
         </div>

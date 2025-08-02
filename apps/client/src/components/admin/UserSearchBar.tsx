@@ -19,19 +19,21 @@ interface UserSearchBarProps {
 const UserSearchBar: React.FC<UserSearchBarProps> = ({
   onSearchResults,
   onLoadingChange,
-  className = ''
+  className = '',
 }) => {
   const [searchText, setSearchText] = useState('');
   const [selectedRoles, setSelectedRoles] = useState<Role[]>([]);
   const [activeFilter, setActiveFilter] = useState<boolean | undefined>(undefined);
   const [bannedFilter, setBannedFilter] = useState(false);
-  const [sortBy, setSortBy] = useState<'name' | 'email' | 'createdAt' | 'muskBucks' | 'role'>('createdAt');
+  const [sortBy, setSortBy] = useState<'name' | 'email' | 'createdAt' | 'muskBucks' | 'role'>(
+    'createdAt',
+  );
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [currentPage, setCurrentPage] = useState(0);
   const [showFilters, setShowFilters] = useState(false);
   const [suggestions, setSuggestions] = useState<DetailedUser[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  
+
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const suggestionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -39,37 +41,50 @@ const UserSearchBar: React.FC<UserSearchBarProps> = ({
   const limit = 25;
 
   // Debounced search function
-  const performSearch = useCallback(async (params: Partial<UserSearchParams> = {}) => {
-    try {
-      onLoadingChange(true);
-      const searchParams: UserSearchParams = {
-        search: searchText.trim() || undefined,
-        role: selectedRoles.length > 0 ? selectedRoles.map(r => r.toString()) : undefined,
-        active: activeFilter,
-        bannedOnly: bannedFilter,
-        page: currentPage,
-        limit,
-        sortBy,
-        sortOrder,
-        ...params
-      };
+  const performSearch = useCallback(
+    async (params: Partial<UserSearchParams> = {}) => {
+      try {
+        onLoadingChange(true);
+        const searchParams: UserSearchParams = {
+          search: searchText.trim() || undefined,
+          role: selectedRoles.length > 0 ? selectedRoles.map((r) => r.toString()) : undefined,
+          active: activeFilter,
+          bannedOnly: bannedFilter,
+          page: currentPage,
+          limit,
+          sortBy,
+          sortOrder,
+          ...params,
+        };
 
-      const results = await searchUsers(searchParams);
-      onSearchResults(results);
-    } catch (error) {
-      console.error('Search failed:', error);
-      onSearchResults({
-        users: [],
-        totalCount: 0,
-        totalPages: 0,
-        currentPage: 0,
-        hasNextPage: false,
-        hasPreviousPage: false
-      });
-    } finally {
-      onLoadingChange(false);
-    }
-  }, [searchText, selectedRoles, activeFilter, bannedFilter, currentPage, sortBy, sortOrder, onLoadingChange, onSearchResults]);
+        const results = await searchUsers(searchParams);
+        onSearchResults(results);
+      } catch (error) {
+        console.error('Search failed:', error);
+        onSearchResults({
+          users: [],
+          totalCount: 0,
+          totalPages: 0,
+          currentPage: 0,
+          hasNextPage: false,
+          hasPreviousPage: false,
+        });
+      } finally {
+        onLoadingChange(false);
+      }
+    },
+    [
+      searchText,
+      selectedRoles,
+      activeFilter,
+      bannedFilter,
+      currentPage,
+      sortBy,
+      sortOrder,
+      onLoadingChange,
+      onSearchResults,
+    ],
+  );
 
   // Debounced suggestions for autocomplete
   const fetchSuggestions = async (query: string) => {
@@ -85,7 +100,7 @@ const UserSearchBar: React.FC<UserSearchBarProps> = ({
         page: 0,
         limit: 5,
         sortBy: 'name',
-        sortOrder: 'asc'
+        sortOrder: 'asc',
       });
       setSuggestions(results.users);
       setShowSuggestions(true);
@@ -141,10 +156,8 @@ const UserSearchBar: React.FC<UserSearchBarProps> = ({
   };
 
   const handleRoleToggle = (role: Role) => {
-    setSelectedRoles(prev => 
-      prev.includes(role) 
-        ? prev.filter(r => r !== role)
-        : [...prev, role]
+    setSelectedRoles((prev) =>
+      prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role],
     );
   };
 
@@ -171,11 +184,13 @@ const UserSearchBar: React.FC<UserSearchBarProps> = ({
               placeholder="Search users by name or email..."
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
-              onFocus={() => searchText.length >= 2 && suggestions.length > 0 && setShowSuggestions(true)}
+              onFocus={() =>
+                searchText.length >= 2 && suggestions.length > 0 && setShowSuggestions(true)
+              }
               onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
               className="w-full px-4 py-2 border border-muted rounded-lg bg-surface text-content focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
             />
-            
+
             {/* Autocomplete Suggestions */}
             {showSuggestions && suggestions.length > 0 && (
               <div className="absolute top-full left-0 right-0 z-10 mt-1 bg-surface border border-muted rounded-lg shadow-lg max-h-48 overflow-y-auto">
@@ -192,18 +207,18 @@ const UserSearchBar: React.FC<UserSearchBarProps> = ({
               </div>
             )}
           </div>
-          
+
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className={`px-4 py-2 rounded-lg border transition-colors ${ 
-              showFilters 
-                ? 'bg-primary text-surface border-primary' 
+            className={`px-4 py-2 rounded-lg border transition-colors ${
+              showFilters
+                ? 'bg-primary text-surface border-primary'
                 : 'bg-surface text-content border-muted hover:bg-muted'
             }`}
           >
             Filters
           </button>
-          
+
           <button
             onClick={handleClearFilters}
             className="px-4 py-2 bg-secondary text-surface rounded-lg hover:opacity-90 transition-opacity"
@@ -240,7 +255,9 @@ const UserSearchBar: React.FC<UserSearchBarProps> = ({
               <label className="block text-sm font-medium text-content mb-2">Active Status</label>
               <select
                 value={activeFilter === undefined ? '' : activeFilter ? 'true' : 'false'}
-                onChange={(e) => setActiveFilter(e.target.value === '' ? undefined : e.target.value === 'true')}
+                onChange={(e) =>
+                  setActiveFilter(e.target.value === '' ? undefined : e.target.value === 'true')
+                }
                 className="w-full px-3 py-2 border border-muted rounded-lg bg-surface text-content"
               >
                 <option value="">All Users</option>

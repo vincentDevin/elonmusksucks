@@ -13,7 +13,6 @@ import UnifiedPredictionCard from '../components/UnifiedPredictionCard';
 import { usePredictionMarket } from '../contexts/PredictionContext';
 import { useAuth } from '../contexts/AuthContext';
 
-
 export default function Predictions() {
   const { predictions: raw, loading, error, createPrediction } = usePredictionMarket();
   const { user } = useAuth();
@@ -25,7 +24,7 @@ export default function Predictions() {
     const now = Date.now();
     return raw.filter((p) => {
       const expires = new Date(p.expiresAt).getTime();
-      
+
       switch (tab) {
         case 'PENDING':
           return !p.approved;

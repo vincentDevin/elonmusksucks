@@ -264,7 +264,7 @@ export async function getUserBetsHandler(
 
     // Only allow users to view their own bets
     if (targetUserId !== viewerId) {
-      res.status(403).json({ error: 'Cannot view other users\' bets' });
+      res.status(403).json({ error: "Cannot view other users' bets" });
       return;
     }
 
@@ -276,7 +276,7 @@ export async function getUserBetsHandler(
 }
 
 /**
- * GET /api/users/:userId/parlays  
+ * GET /api/users/:userId/parlays
  * Fetch user's active parlays (only for own profile)
  */
 export async function getUserParlaysHandler(
@@ -290,7 +290,7 @@ export async function getUserParlaysHandler(
 
     // Only allow users to view their own parlays
     if (targetUserId !== viewerId) {
-      res.status(403).json({ error: 'Cannot view other users\' parlays' });
+      res.status(403).json({ error: "Cannot view other users' parlays" });
       return;
     }
 
@@ -316,7 +316,7 @@ export async function getUserPredictionsHandler(
 
     // Only allow users to view their own predictions
     if (targetUserId !== viewerId) {
-      res.status(403).json({ error: 'Cannot view other users\' predictions' });
+      res.status(403).json({ error: "Cannot view other users' predictions" });
       return;
     }
 
@@ -325,4 +325,111 @@ export async function getUserPredictionsHandler(
   } catch (err) {
     next(err);
   }
+}
+
+/**
+ * GET /api/users/:userId/enhanced-stats
+ * Get enhanced user statistics for dashboard
+ */
+export async function getEnhancedUserStatsHandler(
+  req: ReqWithUser,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const targetUserId = Number(req.params.userId);
+    const viewerId = req.user?.id;
+
+    // Only allow users to view their own enhanced stats
+    if (targetUserId !== viewerId) {
+      res.status(403).json({ error: "Cannot view other users' enhanced stats" });
+      return;
+    }
+
+    // Get basic stats and enhance them
+    const basicStats = await userService.getUserStats(targetUserId);
+
+    // Calculate enhanced metrics
+    const winRate = basicStats ? basicStats.betsWon / Math.max(basicStats.totalBets, 1) : 0;
+    const netProfit = basicStats?.profit || 0;
+
+    // Mock category accuracy data (in production, this would come from bet history analysis)
+    const categoryAccuracy = [
+      { category: 'Sports', accuracy: 0.65, totalBets: 15, wins: 10 },
+      { category: 'Politics', accuracy: 0.58, totalBets: 8, wins: 5 },
+      { category: 'Technology', accuracy: 0.72, totalBets: 12, wins: 9 },
+      { category: 'Entertainment', accuracy: 0.45, totalBets: 6, wins: 3 },
+    ];
+
+    const bestCategory = categoryAccuracy.reduce((best, current) =>
+      current.accuracy > best.accuracy ? current : best,
+    ).category;
+
+    const enhancedStats = {
+      // Performance metrics
+      totalBets: basicStats?.totalBets || 0,
+      winRate,
+      profitLoss: netProfit,
+      categoryAccuracy,
+      currentStreak: {
+        type: winRate > 0.5 ? 'win' : 'lose',
+        count: basicStats?.currentStreak || 0,
+        isActive: (basicStats?.currentStreak || 0) > 0,
+      },
+      bestCategory,
+      totalWagered: basicStats?.totalWagered || 0,
+      avgBetSize: basicStats ? basicStats.totalWagered / Math.max(basicStats.totalBets, 1) : 0,
+
+      // Achievement progress (mock data)
+      achievementProgress: [
+        {
+          id: 'streak_master',
+          title: 'Streak Master',
+          description: 'Win 10 bets in a row',
+          progress: Math.min(9, basicStats?.currentStreak || 0),
+          target: 10,
+          isCompleted: false,
+        },
+        {
+          id: 'high_roller',
+          title: 'High Roller',
+          description: 'Place a 1000🪙 bet',
+          progress: Math.min(800, basicStats?.totalWagered || 0),
+          target: 1000,
+          isCompleted: false,
+        },
+      ],
+      achievementCompletionRate: 0.3,
+
+      // Trend data (mock)
+      weeklyVolume: generateTrendData(basicStats?.totalWagered || 0, 7),
+      monthlyProfitLoss: generateTrendData(netProfit, 30),
+      categoryStats: categoryAccuracy.map((cat) => ({
+        category: cat.category,
+        betCount: cat.totalBets,
+        winRate: cat.accuracy,
+        profitLoss: cat.totalBets * 50 * (cat.accuracy - 0.5),
+        avgBetSize: 50,
+      })),
+    };
+
+    res.json(enhancedStats);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// Helper function to generate trend data
+function generateTrendData(baseValue: number, points: number) {
+  const data = [];
+  for (let i = points - 1; i >= 0; i--) {
+    const date = new Date();
+    date.setDate(date.getDate() - i);
+    const variation = (Math.random() - 0.5) * 0.4;
+    data.push({
+      date: date.toISOString().split('T')[0],
+      value: Math.max(0, (baseValue * (1 + variation)) / points),
+    });
+  }
+  return data;
 }

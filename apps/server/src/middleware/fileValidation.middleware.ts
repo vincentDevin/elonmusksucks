@@ -4,10 +4,10 @@ import multer from 'multer';
 // File magic number signatures for validation
 const ALLOWED_FILE_SIGNATURES = {
   'image/jpeg': [
-    [0xFF, 0xD8, 0xFF], // JPEG
+    [0xff, 0xd8, 0xff], // JPEG
   ],
   'image/png': [
-    [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A], // PNG
+    [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], // PNG
   ],
   'image/webp': [
     [0x52, 0x49, 0x46, 0x46], // RIFF (WebP container)
@@ -24,7 +24,7 @@ function validateFileSignature(buffer: Buffer, mimeType: string): boolean {
   const signatures = ALLOWED_FILE_SIGNATURES[mimeType as keyof typeof ALLOWED_FILE_SIGNATURES];
   if (!signatures) return false;
 
-  return signatures.some(signature => {
+  return signatures.some((signature) => {
     if (buffer.length < signature.length) return false;
     return signature.every((byte, index) => buffer[index] === byte);
   });
@@ -74,7 +74,7 @@ export const uploadConfig = multer({
  */
 export const validateFileContent = (req: Request, res: Response, next: NextFunction): void => {
   const file = req.file;
-  
+
   if (!file) {
     next();
     return;
@@ -102,7 +102,12 @@ export const validateFileContent = (req: Request, res: Response, next: NextFunct
 /**
  * Error handler for Multer upload errors
  */
-export const handleUploadError = (error: any, _req: Request, res: Response, next: NextFunction): void => {
+export const handleUploadError = (
+  error: any,
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): void => {
   if (error instanceof multer.MulterError) {
     switch (error.code) {
       case 'LIMIT_FILE_SIZE':

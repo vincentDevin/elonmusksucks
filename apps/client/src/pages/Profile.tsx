@@ -93,7 +93,7 @@ export default function Profile() {
       </div>
     );
   }
-  
+
   if (error || !profile) {
     return (
       <div className="max-w-2xl mx-auto text-center py-16">
@@ -103,7 +103,7 @@ export default function Profile() {
           <p className="text-red-500 mb-4">{error || 'Failed to load profile'}</p>
           {error?.includes('Authentication required') && (
             <button
-              onClick={() => window.location.href = '/login'}
+              onClick={() => (window.location.href = '/login')}
               className="px-4 py-2 bg-primary text-surface rounded-lg hover:bg-primary/90 transition-colors"
             >
               Go to Login
@@ -168,7 +168,7 @@ export default function Profile() {
       ) : (
         <>
           <ProfileBadges badges={profile.badges} />
-          
+
           <ProfileStats
             profile={{ muskBucks: profile.muskBucks, rank: profile.rank }}
             stats={statsData}

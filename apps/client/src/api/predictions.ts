@@ -1,8 +1,5 @@
 import api from './axios';
-import type {
-  PredictionFull,
-  PredictionType,
-} from '@ems/types';
+import type { PredictionFull, PredictionType } from '@ems/types';
 
 // Re-export for compatibility
 export type { PredictionFull } from '@ems/types';

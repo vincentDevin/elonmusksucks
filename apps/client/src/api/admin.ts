@@ -62,7 +62,13 @@ export interface DetailedUser extends PublicUser {
 
 export interface BulkUserOperation {
   userIds: number[];
-  operation: 'activate' | 'deactivate' | 'changeRole' | 'adjustBalance' | 'assignBadge' | 'revokeBadge';
+  operation:
+    | 'activate'
+    | 'deactivate'
+    | 'changeRole'
+    | 'adjustBalance'
+    | 'assignBadge'
+    | 'revokeBadge';
   params?: {
     role?: Role;
     amount?: number;
@@ -80,9 +86,9 @@ export interface BulkOperationResult {
 // Enhanced user search with pagination
 export async function searchUsers(params: UserSearchParams): Promise<PaginatedUsers> {
   const queryParams = new URLSearchParams();
-  
+
   if (params.search) queryParams.append('search', params.search);
-  if (params.role) params.role.forEach(r => queryParams.append('role', r));
+  if (params.role) params.role.forEach((r) => queryParams.append('role', r));
   if (params.active !== undefined) queryParams.append('active', params.active.toString());
   if (params.bannedOnly) queryParams.append('bannedOnly', 'true');
   queryParams.append('page', params.page.toString());
@@ -210,12 +216,14 @@ export interface BulkPredictionResult {
 }
 
 // Enhanced prediction search with pagination
-export async function searchPredictions(params: PredictionSearchParams): Promise<PaginatedPredictions> {
+export async function searchPredictions(
+  params: PredictionSearchParams,
+): Promise<PaginatedPredictions> {
   const queryParams = new URLSearchParams();
-  
+
   if (params.search) queryParams.append('search', params.search);
-  if (params.category) params.category.forEach(c => queryParams.append('category', c));
-  if (params.status) params.status.forEach(s => queryParams.append('status', s));
+  if (params.category) params.category.forEach((c) => queryParams.append('category', c));
+  if (params.status) params.status.forEach((s) => queryParams.append('status', s));
   if (params.creatorId) queryParams.append('creatorId', params.creatorId.toString());
   if (params.startDate) queryParams.append('startDate', params.startDate);
   if (params.endDate) queryParams.append('endDate', params.endDate);
@@ -237,7 +245,9 @@ export async function getPredictionDetails(predictionId: number): Promise<Detail
 }
 
 // Bulk prediction operations
-export async function bulkUpdatePredictions(operation: BulkPredictionOperation): Promise<BulkPredictionResult> {
+export async function bulkUpdatePredictions(
+  operation: BulkPredictionOperation,
+): Promise<BulkPredictionResult> {
   const res = await api.post<BulkPredictionResult>('/api/admin/predictions/bulk', operation);
   return res.data;
 }
@@ -397,15 +407,18 @@ export interface BulkFinancialResult {
 }
 
 // Enhanced financial data endpoints
-export async function searchFinancialData(params: FinancialSearchParams): Promise<PaginatedFinancialData> {
+export async function searchFinancialData(
+  params: FinancialSearchParams,
+): Promise<PaginatedFinancialData> {
   const queryParams = new URLSearchParams();
-  
+
   if (params.search) queryParams.append('search', params.search);
   if (params.userId) queryParams.append('userId', params.userId.toString());
   if (params.predictionId) queryParams.append('predictionId', params.predictionId.toString());
-  if (params.betType) params.betType.forEach(t => queryParams.append('betType', t));
-  if (params.status) params.status.forEach(s => queryParams.append('status', s));
-  if (params.transactionType) params.transactionType.forEach(t => queryParams.append('transactionType', t));
+  if (params.betType) params.betType.forEach((t) => queryParams.append('betType', t));
+  if (params.status) params.status.forEach((s) => queryParams.append('status', s));
+  if (params.transactionType)
+    params.transactionType.forEach((t) => queryParams.append('transactionType', t));
   if (params.minAmount) queryParams.append('minAmount', params.minAmount.toString());
   if (params.maxAmount) queryParams.append('maxAmount', params.maxAmount.toString());
   if (params.startDate) queryParams.append('startDate', params.startDate);
@@ -420,9 +433,9 @@ export async function searchFinancialData(params: FinancialSearchParams): Promis
   return res.data;
 }
 
-export async function getFinancialAnalytics(params?: { 
-  startDate?: string; 
-  endDate?: string; 
+export async function getFinancialAnalytics(params?: {
+  startDate?: string;
+  endDate?: string;
   category?: string;
 }): Promise<FinancialAnalytics> {
   const queryParams = new URLSearchParams();
@@ -434,7 +447,9 @@ export async function getFinancialAnalytics(params?: {
   return res.data;
 }
 
-export async function bulkFinancialOperation(operation: BulkFinancialOperation): Promise<BulkFinancialResult> {
+export async function bulkFinancialOperation(
+  operation: BulkFinancialOperation,
+): Promise<BulkFinancialResult> {
   const res = await api.post<BulkFinancialResult>('/api/admin/financial/bulk', operation);
   return res.data;
 }
@@ -447,12 +462,12 @@ export async function exportFinancialData(params: {
   const queryParams = new URLSearchParams();
   queryParams.append('format', params.format);
   queryParams.append('dataType', params.dataType);
-  
+
   if (params.filters) {
     Object.entries(params.filters).forEach(([key, value]) => {
       if (value !== undefined && value !== null) {
         if (Array.isArray(value)) {
-          value.forEach(v => queryParams.append(key, v.toString()));
+          value.forEach((v) => queryParams.append(key, v.toString()));
         } else {
           queryParams.append(key, value.toString());
         }
@@ -461,7 +476,7 @@ export async function exportFinancialData(params: {
   }
 
   const res = await api.get(`/api/admin/financial/export?${queryParams}`, {
-    responseType: 'blob'
+    responseType: 'blob',
   });
   return res.data;
 }
@@ -620,11 +635,11 @@ export interface CreateBadgeCategoryData {
 // Enhanced badge API endpoints
 export async function searchBadges(params: BadgeSearchParams): Promise<PaginatedBadges> {
   const queryParams = new URLSearchParams();
-  
+
   if (params.search) queryParams.append('search', params.search);
   if (params.categoryId) queryParams.append('categoryId', params.categoryId.toString());
   if (params.isActive !== undefined) queryParams.append('isActive', params.isActive.toString());
-  if (params.rarity) params.rarity.forEach(r => queryParams.append('rarity', r));
+  if (params.rarity) params.rarity.forEach((r) => queryParams.append('rarity', r));
   if (params.userCount?.min) queryParams.append('userCountMin', params.userCount.min.toString());
   if (params.userCount?.max) queryParams.append('userCountMax', params.userCount.max.toString());
   queryParams.append('page', params.page.toString());
@@ -852,35 +867,45 @@ export interface RealtimeMetrics {
 }
 
 // Analytics API functions
-export async function getExecutiveDashboard(params?: AnalyticsParams): Promise<ExecutiveDashboardData> {
+export async function getExecutiveDashboard(
+  params?: AnalyticsParams,
+): Promise<ExecutiveDashboardData> {
   const queryParams = new URLSearchParams();
-  
+
   if (params?.startDate) queryParams.append('startDate', params.startDate);
   if (params?.endDate) queryParams.append('endDate', params.endDate);
   if (params?.category) queryParams.append('category', params.category);
   if (params?.userId) queryParams.append('userId', params.userId.toString());
   if (params?.granularity) queryParams.append('granularity', params.granularity);
 
-  const res = await api.get<ExecutiveDashboardData>(`/api/admin/analytics/executive-dashboard?${queryParams}`);
+  const res = await api.get<ExecutiveDashboardData>(
+    `/api/admin/analytics/executive-dashboard?${queryParams}`,
+  );
   return res.data;
 }
 
-export async function getUserBehaviorAnalytics(params?: AnalyticsParams): Promise<UserBehaviorAnalytics> {
+export async function getUserBehaviorAnalytics(
+  params?: AnalyticsParams,
+): Promise<UserBehaviorAnalytics> {
   const queryParams = new URLSearchParams();
-  
+
   if (params?.startDate) queryParams.append('startDate', params.startDate);
   if (params?.endDate) queryParams.append('endDate', params.endDate);
   if (params?.category) queryParams.append('category', params.category);
   if (params?.userId) queryParams.append('userId', params.userId.toString());
   if (params?.granularity) queryParams.append('granularity', params.granularity);
 
-  const res = await api.get<UserBehaviorAnalytics>(`/api/admin/analytics/user-behavior?${queryParams}`);
+  const res = await api.get<UserBehaviorAnalytics>(
+    `/api/admin/analytics/user-behavior?${queryParams}`,
+  );
   return res.data;
 }
 
-export async function getPredictiveAnalytics(params?: AnalyticsParams): Promise<PredictiveAnalytics> {
+export async function getPredictiveAnalytics(
+  params?: AnalyticsParams,
+): Promise<PredictiveAnalytics> {
   const queryParams = new URLSearchParams();
-  
+
   if (params?.startDate) queryParams.append('startDate', params.startDate);
   if (params?.endDate) queryParams.append('endDate', params.endDate);
   if (params?.category) queryParams.append('category', params.category);
@@ -891,9 +916,12 @@ export async function getPredictiveAnalytics(params?: AnalyticsParams): Promise<
   return res.data;
 }
 
-export async function generateCustomReport(reportType: string, params?: Record<string, any>): Promise<CustomReportData> {
+export async function generateCustomReport(
+  reportType: string,
+  params?: Record<string, any>,
+): Promise<CustomReportData> {
   const queryParams = new URLSearchParams();
-  
+
   if (params) {
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined && value !== null) {
@@ -902,7 +930,9 @@ export async function generateCustomReport(reportType: string, params?: Record<s
     });
   }
 
-  const res = await api.get<CustomReportData>(`/api/admin/analytics/reports/${reportType}?${queryParams}`);
+  const res = await api.get<CustomReportData>(
+    `/api/admin/analytics/reports/${reportType}?${queryParams}`,
+  );
   return res.data;
 }
 
@@ -919,13 +949,13 @@ export async function exportAnalyticsData(params: {
   const queryParams = new URLSearchParams();
   queryParams.append('reportType', params.reportType);
   queryParams.append('format', params.format);
-  
+
   if (params.filters) {
     queryParams.append('filters', JSON.stringify(params.filters));
   }
 
   const res = await api.get(`/api/admin/analytics/export?${queryParams}`, {
-    responseType: 'blob'
+    responseType: 'blob',
   });
   return res.data;
 }

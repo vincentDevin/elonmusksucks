@@ -131,7 +131,7 @@ export default function ChatWidget() {
 
     const handleModerationEvent = (event: any) => {
       let moderationEvent: ModerationEvent;
-      
+
       switch (event.type) {
         case 'userBan':
           moderationEvent = {
@@ -181,16 +181,20 @@ export default function ChatWidget() {
         default:
           return;
       }
-      
+
       pushModerationEvent(moderationEvent);
     };
 
     // Listen for moderation events
     socket.on('moderationUserBan', (data) => handleModerationEvent({ ...data, type: 'userBan' }));
-    socket.on('moderationUserUnban', (data) => handleModerationEvent({ ...data, type: 'userUnban' }));
+    socket.on('moderationUserUnban', (data) =>
+      handleModerationEvent({ ...data, type: 'userUnban' }),
+    );
     socket.on('moderationUserMute', (data) => handleModerationEvent({ ...data, type: 'userMute' }));
     socket.on('moderationUserKick', (data) => handleModerationEvent({ ...data, type: 'userKick' }));
-    socket.on('moderationMessageDelete', (data) => handleModerationEvent({ ...data, type: 'messageDeleted' }));
+    socket.on('moderationMessageDelete', (data) =>
+      handleModerationEvent({ ...data, type: 'messageDeleted' }),
+    );
 
     return () => {
       socket.off('moderationUserBan');
@@ -245,7 +249,11 @@ export default function ChatWidget() {
   };
 
   /* ---------- moderation helpers ---------- */
-  const handleQuickModeration = async (action: 'ban' | 'mute' | 'kick', userId: number, userName: string) => {
+  const handleQuickModeration = async (
+    action: 'ban' | 'mute' | 'kick',
+    userId: number,
+    userName: string,
+  ) => {
     const reason = prompt(`Enter reason for ${action}ing ${userName}:`);
     if (!reason) return;
 
@@ -270,7 +278,7 @@ export default function ChatWidget() {
 
   const handleDeleteMessage = async (messageId: number) => {
     if (!confirm('Are you sure you want to delete this message?')) return;
-    
+
     try {
       await moderationAPI.deleteMessage(messageId);
     } catch (error) {
@@ -286,9 +294,7 @@ export default function ChatWidget() {
       <div className="flex items-center justify-between px-4 py-2 border-b border-muted bg-surface">
         <div className="flex items-center gap-2">
           <span className="font-semibold text-sm">Live Chat</span>
-          <span className="text-xs text-tertiary">
-            ({onlineUsers.length} online)
-          </span>
+          <span className="text-xs text-tertiary">({onlineUsers.length} online)</span>
         </div>
         {isAdmin && (
           <button
@@ -326,7 +332,7 @@ export default function ChatWidget() {
 
           let message = '';
           let bgColor = '';
-          
+
           switch (ev.type) {
             case 'ban':
               message = `${ev.targetUser} was banned ${formatDuration(ev.duration)} by ${ev.moderator}`;
@@ -357,7 +363,9 @@ export default function ChatWidget() {
               style={{ animation: 'fadeInOut 4.5s ease', maxWidth: 280 }}
             >
               {message}
-              {ev.reason && <div className="text-xs opacity-75 text-tertiary">Reason: {ev.reason}</div>}
+              {ev.reason && (
+                <div className="text-xs opacity-75 text-tertiary">Reason: {ev.reason}</div>
+              )}
             </div>
           );
         })}
@@ -383,13 +391,11 @@ export default function ChatWidget() {
                 className={`h-12 w-12 flex-shrink-0 rounded-full overflow-hidden border border-accent cursor-pointer hover:ring-2 hover:ring-primary transition ${
                   selectedUserId === g.userId ? 'ring-2 ring-primary' : ''
                 }`}
-                onClick={() => isAdmin && setSelectedUserId(selectedUserId === g.userId ? null : g.userId)}
+                onClick={() =>
+                  isAdmin && setSelectedUserId(selectedUserId === g.userId ? null : g.userId)
+                }
               >
-                <img
-                  src={g.avatar}
-                  alt={g.userName}
-                  className="h-full w-full object-cover"
-                />
+                <img src={g.avatar} alt={g.userName} className="h-full w-full object-cover" />
               </div>
               <div className="flex-1">
                 <div className="flex items-center gap-2">
@@ -459,7 +465,9 @@ export default function ChatWidget() {
       {/* moderation panel (admin only) */}
       {isAdmin && showModerationPanel && (
         <div className="px-4 py-3 bg-red-50 dark:bg-red-950/30 border-t border-red-200 dark:border-red-800">
-          <h4 className="text-sm font-semibold text-red-800 dark:text-red-300 mb-2">Moderation Panel</h4>
+          <h4 className="text-sm font-semibold text-red-800 dark:text-red-300 mb-2">
+            Moderation Panel
+          </h4>
           <div className="space-y-2">
             <div className="text-xs text-red-700 dark:text-red-400">
               <strong>Online Users ({onlineUsers.length}):</strong>
@@ -476,7 +484,9 @@ export default function ChatWidget() {
                     <span className="text-xs text-content">
                       {user.name}
                       {user.role === 'ADMIN' && (
-                        <span className="ml-1 text-red-600 dark:text-red-400 font-bold">(ADMIN)</span>
+                        <span className="ml-1 text-red-600 dark:text-red-400 font-bold">
+                          (ADMIN)
+                        </span>
                       )}
                     </span>
                   </div>
@@ -506,7 +516,8 @@ export default function ChatWidget() {
               ))}
             </div>
             <div className="text-xs text-red-600 dark:text-red-400 mt-2">
-              Click on user avatars in chat for quick moderation, or hover over messages to delete them.
+              Click on user avatars in chat for quick moderation, or hover over messages to delete
+              them.
             </div>
           </div>
         </div>

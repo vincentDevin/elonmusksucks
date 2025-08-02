@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { FixedSizeList as List } from 'react-window';
 import { searchPredictions, bulkUpdatePredictions, getPredictionDetails } from '../../api/admin';
-import type { 
-  PredictionSearchParams, 
-  DetailedPrediction, 
+import type {
+  PredictionSearchParams,
+  DetailedPrediction,
   PaginatedPredictions,
-  BulkPredictionOperation 
+  BulkPredictionOperation,
 } from '../../api/admin';
 
 interface ModernPredictionQueueProps {
@@ -27,7 +27,8 @@ interface PredictionRowProps {
 }
 
 const PredictionRow: React.FC<PredictionRowProps> = ({ index, style, data }) => {
-  const { predictions, selectedPredictions, onPredictionSelect, onPredictionAction, currentTab } = data;
+  const { predictions, selectedPredictions, onPredictionSelect, onPredictionAction, currentTab } =
+    data;
   const prediction = predictions[index];
   const isSelected = selectedPredictions.has(prediction.id);
   const isEven = index % 2 === 0;
@@ -38,11 +39,16 @@ const PredictionRow: React.FC<PredictionRowProps> = ({ index, style, data }) => 
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending': return 'text-warning';
-      case 'approved': return 'text-success';
-      case 'resolved': return 'text-primary';
-      case 'rejected': return 'text-error';
-      default: return 'text-content';
+      case 'pending':
+        return 'text-warning';
+      case 'approved':
+        return 'text-success';
+      case 'resolved':
+        return 'text-primary';
+      case 'rejected':
+        return 'text-error';
+      default:
+        return 'text-content';
     }
   };
 
@@ -58,9 +64,13 @@ const PredictionRow: React.FC<PredictionRowProps> = ({ index, style, data }) => 
     return 'Quiet';
   };
 
-  const currentStatus = prediction.resolved ? 'resolved' : 
-                      prediction.approved ? 'approved' : 
-                      !prediction.approved && currentTab === 'rejected' ? 'rejected' : 'pending';
+  const currentStatus = prediction.resolved
+    ? 'resolved'
+    : prediction.approved
+      ? 'approved'
+      : !prediction.approved && currentTab === 'rejected'
+        ? 'rejected'
+        : 'pending';
 
   return (
     <div
@@ -119,19 +129,29 @@ const PredictionRow: React.FC<PredictionRowProps> = ({ index, style, data }) => 
       <div className="col-span-2 text-xs">
         <div className="flex items-center space-x-2">
           <span className="text-tertiary">Controversy:</span>
-          <span className={`font-medium ${
-            (prediction.analytics?.controversyScore || 0) > 70 ? 'text-error' : 
-            (prediction.analytics?.controversyScore || 0) > 40 ? 'text-warning' : 'text-success'
-          }`}>
+          <span
+            className={`font-medium ${
+              (prediction.analytics?.controversyScore || 0) > 70
+                ? 'text-error'
+                : (prediction.analytics?.controversyScore || 0) > 40
+                  ? 'text-warning'
+                  : 'text-success'
+            }`}
+          >
             {getControversyLevel(prediction.analytics?.controversyScore || 0)}
           </span>
         </div>
         <div className="flex items-center space-x-2">
           <span className="text-tertiary">Interest:</span>
-          <span className={`font-medium ${
-            (prediction.analytics?.popularityScore || 0) > 70 ? 'text-error' : 
-            (prediction.analytics?.popularityScore || 0) > 40 ? 'text-primary' : 'text-tertiary'
-          }`}>
+          <span
+            className={`font-medium ${
+              (prediction.analytics?.popularityScore || 0) > 70
+                ? 'text-error'
+                : (prediction.analytics?.popularityScore || 0) > 40
+                  ? 'text-primary'
+                  : 'text-tertiary'
+            }`}
+          >
             {getPopularityLevel(prediction.analytics?.popularityScore || 0)}
           </span>
         </div>
@@ -197,8 +217,8 @@ const ModernPredictionQueue: React.FC<ModernPredictionQueueProps> = ({ className
       totalApproved: 0,
       totalResolved: 0,
       totalRejected: 0,
-      avgResolutionTime: 0
-    }
+      avgResolutionTime: 0,
+    },
   });
   const [loading, setLoading] = useState(false);
   const [selectedPredictions, setSelectedPredictions] = useState<Set<number>>(new Set());
@@ -208,43 +228,46 @@ const ModernPredictionQueue: React.FC<ModernPredictionQueueProps> = ({ className
 
   const categories = ['Politics', 'Sports', 'Technology', 'Entertainment', 'Economics', 'Science'];
 
-  const fetchPredictions = useCallback(async (page = 0) => {
-    setLoading(true);
-    try {
-      const params: PredictionSearchParams = {
-        search: searchText.trim() || undefined,
-        category: selectedCategory ? [selectedCategory] : undefined,
-        status: [activeTab],
-        page,
-        limit: 25,
-        sortBy: 'createdAt',
-        sortOrder: 'desc'
-      };
+  const fetchPredictions = useCallback(
+    async (page = 0) => {
+      setLoading(true);
+      try {
+        const params: PredictionSearchParams = {
+          search: searchText.trim() || undefined,
+          category: selectedCategory ? [selectedCategory] : undefined,
+          status: [activeTab],
+          page,
+          limit: 25,
+          sortBy: 'createdAt',
+          sortOrder: 'desc',
+        };
 
-      const results = await searchPredictions(params);
-      setPredictions(results.predictions);
-      setPaginationInfo({
-        totalCount: results.totalCount,
-        totalPages: results.totalPages,
-        currentPage: results.currentPage,
-        hasNextPage: results.hasNextPage,
-        hasPreviousPage: results.hasPreviousPage,
-        analytics: results.analytics
-      });
-    } catch (error) {
-      console.error('Failed to fetch predictions:', error);
-      setPredictions([]);
-      setPaginationInfo({
-        totalCount: 0,
-        totalPages: 0,
-        currentPage: 0,
-        hasNextPage: false,
-        hasPreviousPage: false
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [activeTab, searchText, selectedCategory]);
+        const results = await searchPredictions(params);
+        setPredictions(results.predictions);
+        setPaginationInfo({
+          totalCount: results.totalCount,
+          totalPages: results.totalPages,
+          currentPage: results.currentPage,
+          hasNextPage: results.hasNextPage,
+          hasPreviousPage: results.hasPreviousPage,
+          analytics: results.analytics,
+        });
+      } catch (error) {
+        console.error('Failed to fetch predictions:', error);
+        setPredictions([]);
+        setPaginationInfo({
+          totalCount: 0,
+          totalPages: 0,
+          currentPage: 0,
+          hasNextPage: false,
+          hasPreviousPage: false,
+        });
+      } finally {
+        setLoading(false);
+      }
+    },
+    [activeTab, searchText, selectedCategory],
+  );
 
   useEffect(() => {
     fetchPredictions(0);
@@ -252,7 +275,7 @@ const ModernPredictionQueue: React.FC<ModernPredictionQueueProps> = ({ className
   }, [fetchPredictions]);
 
   const handlePredictionSelect = useCallback((predictionId: number, selected: boolean) => {
-    setSelectedPredictions(prev => {
+    setSelectedPredictions((prev) => {
       const newSet = new Set(prev);
       if (selected) {
         newSet.add(predictionId);
@@ -267,7 +290,7 @@ const ModernPredictionQueue: React.FC<ModernPredictionQueueProps> = ({ className
     if (selectedPredictions.size === predictions.length) {
       setSelectedPredictions(new Set());
     } else {
-      setSelectedPredictions(new Set(predictions.map(p => p.id)));
+      setSelectedPredictions(new Set(predictions.map((p) => p.id)));
     }
   };
 
@@ -282,7 +305,7 @@ const ModernPredictionQueue: React.FC<ModernPredictionQueueProps> = ({ className
     try {
       const operation: BulkPredictionOperation = {
         predictionIds: [predictionId],
-        operation: action as any
+        operation: action as any,
       };
 
       await bulkUpdatePredictions(operation);
@@ -298,7 +321,7 @@ const ModernPredictionQueue: React.FC<ModernPredictionQueueProps> = ({ className
     try {
       const operation: BulkPredictionOperation = {
         predictionIds: Array.from(selectedPredictions),
-        operation: bulkOperation
+        operation: bulkOperation,
       };
 
       await bulkUpdatePredictions(operation);
@@ -315,14 +338,14 @@ const ModernPredictionQueue: React.FC<ModernPredictionQueueProps> = ({ className
     selectedPredictions,
     onPredictionSelect: handlePredictionSelect,
     onPredictionAction: handlePredictionAction,
-    currentTab: activeTab
+    currentTab: activeTab,
   };
 
   const tabs: { key: TabType; label: string; count: number }[] = [
     { key: 'pending', label: 'Pending', count: paginationInfo.analytics?.totalPending || 0 },
     { key: 'approved', label: 'Approved', count: paginationInfo.analytics?.totalApproved || 0 },
     { key: 'resolved', label: 'Resolved', count: paginationInfo.analytics?.totalResolved || 0 },
-    { key: 'rejected', label: 'Rejected', count: paginationInfo.analytics?.totalRejected || 0 }
+    { key: 'rejected', label: 'Rejected', count: paginationInfo.analytics?.totalRejected || 0 },
   ];
 
   return (
@@ -332,7 +355,9 @@ const ModernPredictionQueue: React.FC<ModernPredictionQueueProps> = ({ className
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-2xl font-bold text-content">Prediction Management</h2>
-            <p className="text-tertiary">Advanced prediction queue with analytics and bulk operations</p>
+            <p className="text-tertiary">
+              Advanced prediction queue with analytics and bulk operations
+            </p>
           </div>
           <div className="text-right">
             <div className="text-sm text-tertiary">
@@ -380,7 +405,9 @@ const ModernPredictionQueue: React.FC<ModernPredictionQueueProps> = ({ className
           >
             <option value="">All Categories</option>
             {categories.map((category) => (
-              <option key={category} value={category}>{category}</option>
+              <option key={category} value={category}>
+                {category}
+              </option>
             ))}
           </select>
         </div>
@@ -389,7 +416,7 @@ const ModernPredictionQueue: React.FC<ModernPredictionQueueProps> = ({ className
         {selectedPredictions.size > 0 && (
           <div className="flex items-center space-x-4 p-3 bg-muted rounded-lg">
             <span className="text-sm text-content">{selectedPredictions.size} selected</span>
-            
+
             <select
               value={bulkOperation}
               onChange={(e) => setBulkOperation(e.target.value as any)}
@@ -402,9 +429,7 @@ const ModernPredictionQueue: React.FC<ModernPredictionQueueProps> = ({ className
                   <option value="reject">Reject All</option>
                 </>
               )}
-              {activeTab === 'approved' && (
-                <option value="resolve">Resolve All</option>
-              )}
+              {activeTab === 'approved' && <option value="resolve">Resolve All</option>}
               <option value="delete">Delete All</option>
             </select>
 
@@ -463,9 +488,11 @@ const ModernPredictionQueue: React.FC<ModernPredictionQueueProps> = ({ className
         {paginationInfo.totalPages > 1 && (
           <div className="flex items-center justify-between p-4 border-t border-muted">
             <div className="text-sm text-tertiary">
-              Showing {paginationInfo.currentPage * 25 + 1}-{Math.min((paginationInfo.currentPage + 1) * 25, paginationInfo.totalCount)} of {paginationInfo.totalCount}
+              Showing {paginationInfo.currentPage * 25 + 1}-
+              {Math.min((paginationInfo.currentPage + 1) * 25, paginationInfo.totalCount)} of{' '}
+              {paginationInfo.totalCount}
             </div>
-            
+
             <div className="flex items-center space-x-2">
               <button
                 disabled={!paginationInfo.hasPreviousPage}
@@ -474,11 +501,11 @@ const ModernPredictionQueue: React.FC<ModernPredictionQueueProps> = ({ className
               >
                 Previous
               </button>
-              
+
               <span className="text-sm text-content">
                 Page {paginationInfo.currentPage + 1} of {paginationInfo.totalPages}
               </span>
-              
+
               <button
                 disabled={!paginationInfo.hasNextPage}
                 onClick={() => fetchPredictions(paginationInfo.currentPage + 1)}

@@ -46,7 +46,10 @@ export class UserService {
   }
 
   // --- ENHANCED: Upload profile image with processing ---
-  async uploadUserProfileImage(userId: number, file: UploadedFile): Promise<{
+  async uploadUserProfileImage(
+    userId: number,
+    file: UploadedFile,
+  ): Promise<{
     avatarUrl: string;
     sizes: {
       thumbnail: string;
@@ -88,7 +91,7 @@ export class UserService {
     }
 
     // Update user profile with new primary (profile size) key
-    await this.repo.updateProfile(userId, { 
+    await this.repo.updateProfile(userId, {
       profilePictureKey: processedImages.profile.filename,
     });
 
@@ -114,7 +117,11 @@ export class UserService {
   /**
    * Upload a processed image to S3-compatible storage
    */
-  private async uploadImageToStorage(image: { buffer: Buffer; filename: string; contentType: string }): Promise<void> {
+  private async uploadImageToStorage(image: {
+    buffer: Buffer;
+    filename: string;
+    contentType: string;
+  }): Promise<void> {
     await this.s3.send(
       new PutObjectCommand({
         Bucket: this.bucket,
@@ -141,7 +148,7 @@ export class UserService {
         const userId = keyParts[1];
         const fileName = keyParts[2];
         const uuid = fileName.split('-')[1]?.split('.')[0];
-        
+
         if (uuid) {
           // Delete all sizes for this image set
           const keysToDelete = [
@@ -150,9 +157,10 @@ export class UserService {
             `profiles/${userId}/full-${uuid}.webp`,
           ];
 
-          const deletePromises = keysToDelete.map(key =>
-            this.s3.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }))
-              .catch(err => console.warn(`Failed to delete old image ${key}:`, err.message))
+          const deletePromises = keysToDelete.map((key) =>
+            this.s3
+              .send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }))
+              .catch((err) => console.warn(`Failed to delete old image ${key}:`, err.message)),
           );
 
           await Promise.all(deletePromises);
@@ -340,7 +348,7 @@ export class UserService {
       type: parentId ? 'COMMENT_CREATED' : 'POST_CREATED',
       details: { postId: post.id },
     });
-    
+
     // Create normalized activity event
     const author = await this.getPublicSocketUser(authorId);
     if (author) {
@@ -354,10 +362,10 @@ export class UserService {
           id: post.id,
           content,
           isComment: Boolean(parentId),
-        }
+        },
       );
     }
-    
+
     return toFeedPostDTO(post);
   }
 
@@ -470,16 +478,18 @@ export class UserService {
   /**
    * Get user's active bets (pending/open bets only)
    */
-  async getUserActiveBets(userId: number): Promise<Array<{
-    id: number;
-    predictionId: number;
-    predictionTitle: string;
-    amount: number;
-    odds: number;
-    optionLabel?: string;
-    status: string;
-    createdAt: string;
-  }>> {
+  async getUserActiveBets(userId: number): Promise<
+    Array<{
+      id: number;
+      predictionId: number;
+      predictionTitle: string;
+      amount: number;
+      odds: number;
+      optionLabel?: string;
+      status: string;
+      createdAt: string;
+    }>
+  > {
     const bets = await prisma.bet.findMany({
       where: {
         userId,
@@ -491,21 +501,21 @@ export class UserService {
             id: true,
             title: true,
             resolved: true,
-          }
+          },
         },
         optionOption: {
           select: {
             label: true,
-          }
-        }
+          },
+        },
       },
       orderBy: {
-        createdAt: 'desc'
+        createdAt: 'desc',
       },
       take: 10, // Limit to recent bets
     });
 
-    return bets.map(bet => ({
+    return bets.map((bet) => ({
       id: bet.id,
       predictionId: bet.predictionId,
       predictionTitle: bet.prediction.title,
@@ -520,19 +530,21 @@ export class UserService {
   /**
    * Get user's active parlays (pending parlays only)
    */
-  async getUserActiveParlays(userId: number): Promise<Array<{
-    id: number;
-    amount: number;
-    combinedOdds: number;
-    potentialPayout: number;
-    legCount: number;
-    status: string;
-    createdAt: string;
-    legs: Array<{
-      predictionTitle: string;
-      optionLabel: string;
-    }>;
-  }>> {
+  async getUserActiveParlays(userId: number): Promise<
+    Array<{
+      id: number;
+      amount: number;
+      combinedOdds: number;
+      potentialPayout: number;
+      legCount: number;
+      status: string;
+      createdAt: string;
+      legs: Array<{
+        predictionTitle: string;
+        optionLabel: string;
+      }>;
+    }>
+  > {
     const parlays = await prisma.parlay.findMany({
       where: {
         userId,
@@ -546,20 +558,20 @@ export class UserService {
                 prediction: {
                   select: {
                     title: true,
-                  }
-                }
-              }
-            }
-          }
-        }
+                  },
+                },
+              },
+            },
+          },
+        },
       },
       orderBy: {
-        createdAt: 'desc'
+        createdAt: 'desc',
       },
       take: 10, // Limit to recent parlays
     });
 
-    return parlays.map(parlay => ({
+    return parlays.map((parlay) => ({
       id: parlay.id,
       amount: parlay.amount,
       combinedOdds: parlay.combinedOdds,
@@ -567,7 +579,7 @@ export class UserService {
       legCount: parlay.legs.length,
       status: parlay.status,
       createdAt: parlay.createdAt.toISOString(),
-      legs: parlay.legs.map(leg => ({
+      legs: parlay.legs.map((leg) => ({
         predictionTitle: leg.option.prediction.title,
         optionLabel: leg.option.label,
       })),
@@ -577,17 +589,19 @@ export class UserService {
   /**
    * Get user's created predictions (approved and pending)
    */
-  async getUserPredictions(userId: number): Promise<Array<{
-    id: number;
-    title: string;
-    category: string;
-    type: string;
-    approved: boolean;
-    resolved: boolean;
-    expiresAt: string;
-    createdAt: string;
-    totalBets?: number;
-  }>> {
+  async getUserPredictions(userId: number): Promise<
+    Array<{
+      id: number;
+      title: string;
+      category: string;
+      type: string;
+      approved: boolean;
+      resolved: boolean;
+      expiresAt: string;
+      createdAt: string;
+      totalBets?: number;
+    }>
+  > {
     const predictions = await prisma.prediction.findMany({
       where: {
         creatorId: userId,
@@ -596,16 +610,16 @@ export class UserService {
         _count: {
           select: {
             bets: true,
-          }
-        }
+          },
+        },
       },
       orderBy: {
-        createdAt: 'desc'
+        createdAt: 'desc',
       },
       take: 10, // Limit to recent predictions
     });
 
-    return predictions.map(prediction => ({
+    return predictions.map((prediction) => ({
       id: prediction.id,
       title: prediction.title,
       category: prediction.category,

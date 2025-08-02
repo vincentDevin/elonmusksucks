@@ -18,12 +18,12 @@ export type QueryParams = Record<string, any>;
 
 /** Enhanced search and pagination parameters for user management */
 export interface UserSearchParams {
-  search?: string;          // Search name/email with fuzzy matching
-  role?: Role[];           // Filter by multiple roles
-  active?: boolean;        // Filter by active status
-  bannedOnly?: boolean;    // Show only banned users
-  page: number;            // Pagination support (0-based)
-  limit: number;           // Results per page (max 100)
+  search?: string; // Search name/email with fuzzy matching
+  role?: Role[]; // Filter by multiple roles
+  active?: boolean; // Filter by active status
+  bannedOnly?: boolean; // Show only banned users
+  page: number; // Pagination support (0-based)
+  limit: number; // Results per page (max 100)
   sortBy?: 'name' | 'email' | 'createdAt' | 'muskBucks' | 'role';
   sortOrder?: 'asc' | 'desc';
 }
@@ -63,7 +63,13 @@ export interface DetailedUser extends User {
 /** Bulk operation request */
 export interface BulkUserOperation {
   userIds: number[];
-  operation: 'activate' | 'deactivate' | 'changeRole' | 'adjustBalance' | 'assignBadge' | 'revokeBadge';
+  operation:
+    | 'activate'
+    | 'deactivate'
+    | 'changeRole'
+    | 'adjustBalance'
+    | 'assignBadge'
+    | 'revokeBadge';
   params?: {
     role?: Role;
     amount?: number;
@@ -83,10 +89,10 @@ export interface BulkOperationResult {
 
 /** Prediction search and filtering parameters */
 export interface PredictionSearchParams {
-  search?: string;          // Search title and description
-  category?: string[];      // Filter by categories
+  search?: string; // Search title and description
+  category?: string[]; // Filter by categories
   status?: ('pending' | 'approved' | 'rejected' | 'resolved')[];
-  creatorId?: number;       // Filter by specific creator
+  creatorId?: number; // Filter by specific creator
   dateRange?: {
     start?: Date;
     end?: Date;
@@ -113,7 +119,7 @@ export interface DetailedPrediction extends Prediction {
     totalVolume: number;
     uniqueBettors: number;
     controversyScore: number; // Based on bet distribution
-    popularityScore: number;  // Based on betting activity
+    popularityScore: number; // Based on betting activity
   };
   qualityFlags?: {
     isDuplicate: boolean;
@@ -598,7 +604,11 @@ export interface IAdminRepository {
     predictionId: number,
     status: 'approved' | 'rejected',
   ): Promise<Prediction>;
-  resolvePredictionWithDetails(predictionId: number, winningOptionId: number, evidence?: string): Promise<DetailedPrediction>;
+  resolvePredictionWithDetails(
+    predictionId: number,
+    winningOptionId: number,
+    evidence?: string,
+  ): Promise<DetailedPrediction>;
 
   // -- Enhanced Financial Operations Dashboard --
   searchFinancialData(params: FinancialSearchParams): Promise<PaginatedFinancialData>;
@@ -636,7 +646,11 @@ export interface IAdminRepository {
   getPredictiveAnalytics(params: AnalyticsParams): Promise<PredictiveAnalytics>;
   generateCustomReport(reportType: string, params: Record<string, any>): Promise<CustomReportData>;
   getRealtimeMetrics(): Promise<RealtimeMetrics>;
-  exportAnalyticsData(params: { reportType: string; format: 'csv' | 'excel' | 'pdf'; filters?: Record<string, any> }): Promise<Buffer>;
+  exportAnalyticsData(params: {
+    reportType: string;
+    format: 'csv' | 'excel' | 'pdf';
+    filters?: Record<string, any>;
+  }): Promise<Buffer>;
 
   // -- Leaderboard & Stats --
   recalculateLeaderboard(): Promise<void>;

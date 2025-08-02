@@ -19,10 +19,10 @@ export type PredictionRedisChannel =
   | 'parlay:placed';
 
 const CHANNEL_TO_BROADCAST: Record<PredictionRedisChannel, string> = {
-  'prediction:create':  'predictionCreated',
+  'prediction:create': 'predictionCreated',
   'prediction:resolve': 'predictionResolved',
-  'bet:placed':         'betPlaced',
-  'parlay:placed':      'parlayPlaced',
+  'bet:placed': 'betPlaced',
+  'parlay:placed': 'parlayPlaced',
 };
 
 export function registerRedisPredictionHandlers(io: Server, eventSub: any) {

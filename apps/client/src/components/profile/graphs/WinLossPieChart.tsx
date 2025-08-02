@@ -13,7 +13,7 @@ export function WinLossPieChart({ wins, losses, title }: PieChartProps) {
     win: '#22c55e',
     loss: '#ef4444',
     text: '#000000',
-    muted: '#6b7280'
+    muted: '#6b7280',
   });
 
   // Update colors based on theme
@@ -24,17 +24,17 @@ export function WinLossPieChart({ wins, losses, title }: PieChartProps) {
         win: isDark ? '#4ade80' : '#16a34a',
         loss: isDark ? '#f87171' : '#dc2626',
         text: isDark ? '#f1f5f9' : '#0f172a',
-        muted: isDark ? '#94a3b8' : '#64748b'
+        muted: isDark ? '#94a3b8' : '#64748b',
       });
     };
 
     updateColors();
-    
+
     // Listen for theme changes
     const observer = new MutationObserver(updateColors);
     observer.observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ['class']
+      attributeFilter: ['class'],
     });
 
     return () => observer.disconnect();
@@ -54,7 +54,9 @@ export function WinLossPieChart({ wins, losses, title }: PieChartProps) {
       return (
         <div className="bg-surface border border-muted rounded-lg p-3 shadow-lg">
           <p className="text-content font-medium">{data.name}</p>
-          <p className="text-primary">{data.value} ({percentage}%)</p>
+          <p className="text-primary">
+            {data.value} ({percentage}%)
+          </p>
         </div>
       );
     }
@@ -66,10 +68,7 @@ export function WinLossPieChart({ wins, losses, title }: PieChartProps) {
       <div className="flex justify-center gap-4 mt-2">
         {payload.map((entry: any, index: number) => (
           <div key={index} className="flex items-center gap-2">
-            <div 
-              className="w-3 h-3 rounded-full"
-              style={{ backgroundColor: entry.color }}
-            />
+            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }} />
             <span className="text-sm text-content">{entry.value}</span>
           </div>
         ))}
@@ -94,12 +93,12 @@ export function WinLossPieChart({ wins, losses, title }: PieChartProps) {
       <h4 className="font-semibold text-sm mb-2 text-center text-content">{title}</h4>
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
-          <Pie 
-            data={data} 
-            dataKey="value" 
-            nameKey="name" 
-            cx="50%" 
-            cy="50%" 
+          <Pie
+            data={data}
+            dataKey="value"
+            nameKey="name"
+            cx="50%"
+            cy="50%"
             outerRadius="70%"
             innerRadius="30%"
             paddingAngle={2}

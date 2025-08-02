@@ -90,7 +90,7 @@ export class PredictionService {
 
     // Publish legacy format
     await redisClient.publish('prediction:create', JSON.stringify(dto));
-    
+
     // Publish normalized activity event
     const creator = await this.userService.getPublicSocketUser(params.creatorId);
     if (creator) {
@@ -104,10 +104,10 @@ export class PredictionService {
           id: pred.id,
           title: pred.title,
           category: pred.category,
-        }
+        },
       );
     }
-    
+
     return dto;
   }
 

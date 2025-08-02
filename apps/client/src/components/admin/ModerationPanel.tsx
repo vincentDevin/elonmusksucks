@@ -45,71 +45,87 @@ const ModerationPanel: React.FC = () => {
       if (socket) {
         switch (action) {
           case 'ban':
-            socket.emit('admin:banUser', {
-              userId: quickActionForm.userId,
-              banType: 'PERMANENT',
-              reason: quickActionForm.reason,
-            }, (response: { success: boolean; error?: string }) => {
-              if (response.success) {
-                alert('User banned successfully');
-                setShowQuickAction(null);
-                setQuickActionForm({ userId: 0, reason: '', duration: 60 });
-                loadRecentActions();
-              } else {
-                alert(`Failed to ban user: ${response.error}`);
-              }
-            });
+            socket.emit(
+              'admin:banUser',
+              {
+                userId: quickActionForm.userId,
+                banType: 'PERMANENT',
+                reason: quickActionForm.reason,
+              },
+              (response: { success: boolean; error?: string }) => {
+                if (response.success) {
+                  alert('User banned successfully');
+                  setShowQuickAction(null);
+                  setQuickActionForm({ userId: 0, reason: '', duration: 60 });
+                  loadRecentActions();
+                } else {
+                  alert(`Failed to ban user: ${response.error}`);
+                }
+              },
+            );
             break;
 
           case 'tempban':
-            socket.emit('admin:banUser', {
-              userId: quickActionForm.userId,
-              banType: 'TEMPORARY',
-              reason: quickActionForm.reason,
-              duration: quickActionForm.duration || 60,
-            }, (response: { success: boolean; error?: string }) => {
-              if (response.success) {
-                alert('User temporarily banned successfully');
-                setShowQuickAction(null);
-                setQuickActionForm({ userId: 0, reason: '', duration: 60 });
-                loadRecentActions();
-              } else {
-                alert(`Failed to ban user: ${response.error}`);
-              }
-            });
+            socket.emit(
+              'admin:banUser',
+              {
+                userId: quickActionForm.userId,
+                banType: 'TEMPORARY',
+                reason: quickActionForm.reason,
+                duration: quickActionForm.duration || 60,
+              },
+              (response: { success: boolean; error?: string }) => {
+                if (response.success) {
+                  alert('User temporarily banned successfully');
+                  setShowQuickAction(null);
+                  setQuickActionForm({ userId: 0, reason: '', duration: 60 });
+                  loadRecentActions();
+                } else {
+                  alert(`Failed to ban user: ${response.error}`);
+                }
+              },
+            );
             break;
 
           case 'mute':
-            socket.emit('admin:muteUser', {
-              userId: quickActionForm.userId,
-              duration: quickActionForm.duration || 60,
-              reason: quickActionForm.reason,
-            }, (response: { success: boolean; error?: string }) => {
-              if (response.success) {
-                alert('User muted successfully');
-                setShowQuickAction(null);
-                setQuickActionForm({ userId: 0, reason: '', duration: 60 });
-                loadRecentActions();
-              } else {
-                alert(`Failed to mute user: ${response.error}`);
-              }
-            });
+            socket.emit(
+              'admin:muteUser',
+              {
+                userId: quickActionForm.userId,
+                duration: quickActionForm.duration || 60,
+                reason: quickActionForm.reason,
+              },
+              (response: { success: boolean; error?: string }) => {
+                if (response.success) {
+                  alert('User muted successfully');
+                  setShowQuickAction(null);
+                  setQuickActionForm({ userId: 0, reason: '', duration: 60 });
+                  loadRecentActions();
+                } else {
+                  alert(`Failed to mute user: ${response.error}`);
+                }
+              },
+            );
             break;
 
           case 'kick':
-            socket.emit('admin:kickUser', {
-              userId: quickActionForm.userId,
-              reason: quickActionForm.reason,
-            }, (response: { success: boolean; error?: string }) => {
-              if (response.success) {
-                alert('User kicked successfully');
-                setShowQuickAction(null);
-                setQuickActionForm({ userId: 0, reason: '', duration: 60 });
-                loadRecentActions();
-              } else {
-                alert(`Failed to kick user: ${response.error}`);
-              }
-            });
+            socket.emit(
+              'admin:kickUser',
+              {
+                userId: quickActionForm.userId,
+                reason: quickActionForm.reason,
+              },
+              (response: { success: boolean; error?: string }) => {
+                if (response.success) {
+                  alert('User kicked successfully');
+                  setShowQuickAction(null);
+                  setQuickActionForm({ userId: 0, reason: '', duration: 60 });
+                  loadRecentActions();
+                } else {
+                  alert(`Failed to kick user: ${response.error}`);
+                }
+              },
+            );
             break;
         }
       }
@@ -181,7 +197,7 @@ const ModerationPanel: React.FC = () => {
         <h3 className="text-lg font-semibold text-[var(--color-primary)] mb-4">
           Quick Moderation Actions
         </h3>
-        
+
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
           <button
             onClick={() => setShowQuickAction('ban')}
@@ -213,11 +229,15 @@ const ModerationPanel: React.FC = () => {
         {showQuickAction && (
           <div className="border-t border-[var(--color-muted)] pt-4">
             <h4 className="font-medium text-[var(--color-content)] mb-3">
-              {showQuickAction === 'ban' ? 'Permanent Ban' :
-               showQuickAction === 'tempban' ? 'Temporary Ban' :
-               showQuickAction === 'mute' ? 'Mute User' : 'Kick User'}
+              {showQuickAction === 'ban'
+                ? 'Permanent Ban'
+                : showQuickAction === 'tempban'
+                  ? 'Temporary Ban'
+                  : showQuickAction === 'mute'
+                    ? 'Mute User'
+                    : 'Kick User'}
             </h4>
-            
+
             <div className="grid gap-3">
               <div>
                 <label className="block text-sm font-medium text-[var(--color-content)] mb-1">
@@ -226,10 +246,12 @@ const ModerationPanel: React.FC = () => {
                 <input
                   type="number"
                   value={quickActionForm.userId || ''}
-                  onChange={(e) => setQuickActionForm(prev => ({
-                    ...prev,
-                    userId: parseInt(e.target.value) || 0
-                  }))}
+                  onChange={(e) =>
+                    setQuickActionForm((prev) => ({
+                      ...prev,
+                      userId: parseInt(e.target.value) || 0,
+                    }))
+                  }
                   className="w-full px-3 py-2 border border-[var(--color-muted)] rounded bg-[var(--color-background)] text-[var(--color-content)]"
                   placeholder="Enter user ID"
                 />
@@ -242,10 +264,12 @@ const ModerationPanel: React.FC = () => {
                 <input
                   type="text"
                   value={quickActionForm.reason}
-                  onChange={(e) => setQuickActionForm(prev => ({
-                    ...prev,
-                    reason: e.target.value
-                  }))}
+                  onChange={(e) =>
+                    setQuickActionForm((prev) => ({
+                      ...prev,
+                      reason: e.target.value,
+                    }))
+                  }
                   className="w-full px-3 py-2 border border-[var(--color-muted)] rounded bg-[var(--color-background)] text-[var(--color-content)]"
                   placeholder="Enter reason"
                 />
@@ -259,10 +283,12 @@ const ModerationPanel: React.FC = () => {
                   <input
                     type="number"
                     value={quickActionForm.duration || ''}
-                    onChange={(e) => setQuickActionForm(prev => ({
-                      ...prev,
-                      duration: parseInt(e.target.value) || 60
-                    }))}
+                    onChange={(e) =>
+                      setQuickActionForm((prev) => ({
+                        ...prev,
+                        duration: parseInt(e.target.value) || 60,
+                      }))
+                    }
                     className="w-full px-3 py-2 border border-[var(--color-muted)] rounded bg-[var(--color-background)] text-[var(--color-content)]"
                     placeholder="Duration in minutes"
                   />

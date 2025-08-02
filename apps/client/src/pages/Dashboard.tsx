@@ -1,39 +1,32 @@
 // apps/client/src/pages/Dashboard.tsx
-import { Suspense, lazy } from 'react';
-import PredictionsPanel from '../components/dashboard/PredictionPanel';
-import ParlayPanel from '../components/dashboard/ParlayPanel';
-import MyStuffPanel from '../components/dashboard/MyStuffPanel';
-const ChatPanel = lazy(() => import('../components/dashboard/ChatPanel'));
+import { useState } from 'react';
+import DashboardSettings from '../components/dashboard/customization/DashboardSettings';
+import MobileDashboard from '../components/dashboard/mobile/MobileDashboard';
+import DesktopDashboard from '../components/dashboard/desktop/DesktopDashboard';
+import { useMobileOptimization } from '../hooks/useMobileOptimization';
 
 /**
- * Layout notes
+ * Responsive Dashboard Layout
  * ──────────────────────────────────────────────────────────────
- * • Mobile  (<lg) : single column
- * • Desktop (lg)  : fluid left column + sidebar min 22rem, max 32rem
- * • XL      (xl)  : give sidebar even more room (min 26rem, max 36rem)
+ * • Mobile  (<768px)   : Mobile-optimized tabbed interface
+ * • Tablet  (768-1024) : Adaptive layout based on orientation
+ * • Desktop (1024+)    : Sophisticated multi-column layout
+ * • Ultra-wide (1600+) : Advanced 3-4 column trading interface
  */
 export default function Dashboard() {
-  return (
-    <div className="min-h-[calc(100vh-6rem)] max-h-[calc(100vh-6rem)] overflow-hidden">
-      <div
-        className="grid gap-8 h-full
-                      lg:grid-cols-[1fr_minmax(22rem,_32rem)]
-                      xl:grid-cols-[1fr_minmax(26rem,_36rem)]"
-      >
-      {/* LEFT column – scrollable main feed */}
-        <div className="space-y-8 overflow-y-auto scrollbar-thin scrollbar-track-secondary/20 scrollbar-thumb-primary/40 hover:scrollbar-thumb-primary/60 pr-2">
-        <MyStuffPanel />
-        <PredictionsPanel />
-        </div>
+  const [showSettings, setShowSettings] = useState(false);
+  const { shouldUseCompactLayout } = useMobileOptimization();
 
-      {/* RIGHT column – sticky on desktop */}
-        <aside className="lg:sticky lg:top-0 space-y-8 overflow-y-auto scrollbar-thin scrollbar-track-secondary/20 scrollbar-thumb-primary/40 hover:scrollbar-thumb-primary/60 pr-2">
-        <Suspense fallback={null}>
-          <ChatPanel />
-        </Suspense>
-        <ParlayPanel />
-        </aside>
-      </div>
-    </div>
-  );
+  // Use mobile layout for mobile devices and portrait tablets
+  if (shouldUseCompactLayout()) {
+    return (
+      <>
+        <MobileDashboard />
+        <DashboardSettings isOpen={showSettings} onClose={() => setShowSettings(false)} />
+      </>
+    );
+  }
+
+  // Desktop layout - sophisticated multi-column design
+  return <DesktopDashboard />;
 }

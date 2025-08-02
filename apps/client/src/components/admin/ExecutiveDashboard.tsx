@@ -4,7 +4,7 @@ import {
   getRealtimeMetrics,
   type ExecutiveDashboardData,
   type RealtimeMetrics,
-  type AnalyticsParams
+  type AnalyticsParams,
 } from '../../api/admin';
 
 interface KPICardProps {
@@ -15,10 +15,20 @@ interface KPICardProps {
   positive?: boolean;
 }
 
-const KPICard: React.FC<KPICardProps> = ({ title, value, change, suffix = '', positive: _positive }) => {
+const KPICard: React.FC<KPICardProps> = ({
+  title,
+  value,
+  change,
+  suffix = '',
+  positive: _positive,
+}) => {
   const formatValue = (val: string | number): string => {
     if (typeof val === 'number') {
-      if (title.toLowerCase().includes('revenue') || title.toLowerCase().includes('profit') || title.toLowerCase().includes('value')) {
+      if (
+        title.toLowerCase().includes('revenue') ||
+        title.toLowerCase().includes('profit') ||
+        title.toLowerCase().includes('value')
+      ) {
         return `$${val.toLocaleString()}`;
       }
       return val.toLocaleString();
@@ -35,15 +45,14 @@ const KPICard: React.FC<KPICardProps> = ({ title, value, change, suffix = '', po
         <div>
           <p className="text-tertiary text-sm font-medium">{title}</p>
           <p className="text-2xl font-bold text-content mt-1">
-            {formatValue(value)}{suffix}
+            {formatValue(value)}
+            {suffix}
           </p>
         </div>
         {change !== undefined && (
           <div className={`flex items-center ${changeColor}`}>
             <span className="text-lg">{changeIcon}</span>
-            <span className="text-sm font-medium ml-1">
-              {Math.abs(change).toFixed(1)}%
-            </span>
+            <span className="text-sm font-medium ml-1">{Math.abs(change).toFixed(1)}%</span>
           </div>
         )}
       </div>
@@ -62,7 +71,7 @@ const MetricCard: React.FC<MetricCardProps> = ({ title, value, unit, status }) =
   const statusDots = {
     good: 'bg-green-500',
     warning: 'bg-yellow-500',
-    error: 'bg-red-500'
+    error: 'bg-red-500',
   };
 
   return (
@@ -113,7 +122,7 @@ const ExecutiveDashboard: React.FC = () => {
 
       const [dashboard, realtime] = await Promise.all([
         getExecutiveDashboard(params),
-        getRealtimeMetrics()
+        getRealtimeMetrics(),
       ]);
 
       setDashboardData(dashboard);
@@ -127,7 +136,7 @@ const ExecutiveDashboard: React.FC = () => {
 
   useEffect(() => {
     loadDashboardData();
-    
+
     // Set up auto-refresh for real-time metrics every 30 seconds
     const interval = setInterval(async () => {
       try {
@@ -155,7 +164,11 @@ const ExecutiveDashboard: React.FC = () => {
         <div className="flex">
           <div className="text-red-600">
             <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              <path
+                fillRule="evenodd"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                clipRule="evenodd"
+              />
             </svg>
           </div>
           <div className="ml-3">
@@ -174,14 +187,13 @@ const ExecutiveDashboard: React.FC = () => {
   }
 
   if (!dashboardData || !realtimeMetrics) {
-    return (
-      <div className="text-center text-tertiary">
-        No dashboard data available
-      </div>
-    );
+    return <div className="text-center text-tertiary">No dashboard data available</div>;
   }
 
-  const getSystemHealthStatus = (responseTime: number, errorRate: number): 'good' | 'warning' | 'error' => {
+  const getSystemHealthStatus = (
+    responseTime: number,
+    errorRate: number,
+  ): 'good' | 'warning' | 'error' => {
     if (responseTime > 200 || errorRate > 0.05) return 'error';
     if (responseTime > 100 || errorRate > 0.02) return 'warning';
     return 'good';
@@ -200,7 +212,7 @@ const ExecutiveDashboard: React.FC = () => {
             { key: '7d', label: '7 Days' },
             { key: '30d', label: '30 Days' },
             { key: '90d', label: '90 Days' },
-            { key: '1y', label: '1 Year' }
+            { key: '1y', label: '1 Year' },
           ].map((range) => (
             <button
               key={range.key}
@@ -249,7 +261,10 @@ const ExecutiveDashboard: React.FC = () => {
             title="Response Time"
             value={realtimeMetrics.systemHealth.responseTime}
             unit="ms"
-            status={getSystemHealthStatus(realtimeMetrics.systemHealth.responseTime, realtimeMetrics.systemHealth.errorRate)}
+            status={getSystemHealthStatus(
+              realtimeMetrics.systemHealth.responseTime,
+              realtimeMetrics.systemHealth.errorRate,
+            )}
           />
           <MetricCard
             title="System Uptime"
@@ -269,32 +284,20 @@ const ExecutiveDashboard: React.FC = () => {
             value={dashboardData.overview.totalUsers}
             change={dashboardData.currentPeriodComparison.newUsers.change}
           />
-          <KPICard
-            title="Active Users"
-            value={dashboardData.overview.activeUsers}
-          />
+          <KPICard title="Active Users" value={dashboardData.overview.activeUsers} />
           <KPICard
             title="Total Revenue"
             value={dashboardData.overview.totalRevenue}
             change={dashboardData.currentPeriodComparison.revenue.change}
           />
-          <KPICard
-            title="Net Profit"
-            value={dashboardData.overview.netProfit}
-          />
-          <KPICard
-            title="Total Predictions"
-            value={dashboardData.overview.totalPredictions}
-          />
+          <KPICard title="Net Profit" value={dashboardData.overview.netProfit} />
+          <KPICard title="Total Predictions" value={dashboardData.overview.totalPredictions} />
           <KPICard
             title="Total Bets"
             value={dashboardData.overview.totalBets}
             change={dashboardData.currentPeriodComparison.bets.change}
           />
-          <KPICard
-            title="Avg User Value"
-            value={dashboardData.overview.avgUserValue}
-          />
+          <KPICard title="Avg User Value" value={dashboardData.overview.avgUserValue} />
           <KPICard
             title="User Retention"
             value={dashboardData.growthMetrics.retentionRate}
@@ -344,33 +347,36 @@ const ExecutiveDashboard: React.FC = () => {
             <div className="p-4 font-medium text-content">Previous Period</div>
             <div className="p-4 font-medium text-content">Change</div>
           </div>
-          
+
           {[
             {
               name: 'New Users',
               current: dashboardData.currentPeriodComparison.newUsers.current,
               previous: dashboardData.currentPeriodComparison.newUsers.previous,
-              change: dashboardData.currentPeriodComparison.newUsers.change
+              change: dashboardData.currentPeriodComparison.newUsers.change,
             },
             {
               name: 'Revenue',
               current: `$${dashboardData.currentPeriodComparison.revenue.current.toLocaleString()}`,
               previous: `$${dashboardData.currentPeriodComparison.revenue.previous.toLocaleString()}`,
-              change: dashboardData.currentPeriodComparison.revenue.change
+              change: dashboardData.currentPeriodComparison.revenue.change,
             },
             {
               name: 'Total Bets',
               current: dashboardData.currentPeriodComparison.bets.current,
               previous: dashboardData.currentPeriodComparison.bets.previous,
-              change: dashboardData.currentPeriodComparison.bets.change
-            }
+              change: dashboardData.currentPeriodComparison.bets.change,
+            },
           ].map((row, index) => (
             <div key={index} className="grid grid-cols-4 border-t border-muted">
               <div className="p-4 text-content font-medium">{row.name}</div>
               <div className="p-4 text-content">{row.current}</div>
               <div className="p-4 text-content">{row.previous}</div>
-              <div className={`p-4 font-medium ${row.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {row.change >= 0 ? '+' : ''}{row.change.toFixed(1)}%
+              <div
+                className={`p-4 font-medium ${row.change >= 0 ? 'text-green-600' : 'text-red-600'}`}
+              >
+                {row.change >= 0 ? '+' : ''}
+                {row.change.toFixed(1)}%
               </div>
             </div>
           ))}
