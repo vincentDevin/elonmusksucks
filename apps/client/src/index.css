@@ -1,41 +1,46 @@
 @import 'tailwindcss';
+@import './theme/theme-variables.css';
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Define your light-mode tokens */
+/* 
+ * NOTE: Theme variables are now managed by the UnifiedThemeProvider
+ * These are fallback values only. The JavaScript theme system will 
+ * override these with proper theme colors.
+ */
 @theme {
-  --color-primary: #166534; /* forest green */
-  --color-muted: #e5e5e5; /* light gray */
-  --color-tertiary: #94a3b8; /* slate blue-gray */
-  --color-surface: #ffffff; /* pure white */
-  --color-accent: #64748b; /* bluish tint */
-  --color-secondary: #dcfce7; /* light green highlight */
-  --color-content: #0f172a; /* almost black text */
-  --color-background: #f8fafc; /* off-white bg */
+  --color-primary: #3b82f6; /* Blue 500 - fallback */
+  --color-muted: #e2e8f0; /* Slate 200 - fallback */
+  --color-tertiary: #64748b; /* Slate 500 - fallback */
+  --color-surface: #ffffff; /* White - fallback */
+  --color-accent: #10b981; /* Emerald 500 - fallback */
+  --color-secondary: #60a5fa; /* Blue 400 - fallback */
+  --color-content: #1e293b; /* Slate 800 - fallback */
+  --color-background: #f8fafc; /* Slate 50 - fallback */
 
   /* Semantic status colors */
-  --color-success: #10b981; /* green */
-  --color-warning: #f59e0b; /* amber */
-  --color-error: #ef4444; /* red */
-  --color-info: #3b82f6; /* blue */
+  --color-success: #10b981; /* Emerald 500 */
+  --color-warning: #f59e0b; /* Amber 500 */
+  --color-error: #ef4444; /* Red 500 */
+  --color-info: #3b82f6; /* Blue 500 */
 }
 
-/* Override for dark mode when .dark is on any ancestor */
+/* Legacy dark mode support (will be replaced by theme system) */
 .dark {
-  --color-primary: #4ade80;
-  --color-muted: #334155;
-  --color-tertiary: #64748b;
-  --color-surface: #1e293b;
-  --color-accent: #94a3b8;
-  --color-secondary: #064e3b;
-  --color-content: #f1f5f9;
-  --color-background: #0f172a;
+  --color-primary: #10b981;
+  --color-muted: #374151;
+  --color-tertiary: #9ca3af;
+  --color-surface: #1f2937;
+  --color-accent: #34d399;
+  --color-secondary: #059669;
+  --color-content: #f9fafb;
+  --color-background: #111827;
 
   /* Semantic status colors for dark mode */
-  --color-success: #34d399;
-  --color-warning: #fbbf24;
-  --color-error: #f87171;
-  --color-info: #60a5fa;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+  --color-info: #3b82f6;
 }
 
 /* Enhanced Activity Ticker Animations */

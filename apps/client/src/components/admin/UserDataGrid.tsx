@@ -3,6 +3,7 @@ import { FixedSizeList as List } from 'react-window';
 import type { DetailedUser, BulkUserOperation } from '../../api/admin';
 import type { Role, PublicBadge } from '@ems/types';
 import { bulkUpdateUsers } from '../../api/admin';
+import UserActionMenu from './UserActionMenu';
 
 interface UserDataGridProps {
   users: DetailedUser[];
@@ -228,12 +229,7 @@ const UserRow: React.FC<UserRowProps> = ({ index, style, data }) => {
 
       {/* Actions Menu Trigger */}
       <div className="col-span-1 flex justify-center">
-        <button
-          className="p-1 text-tertiary hover:text-content rounded hover:bg-muted transition"
-          title="More actions"
-        >
-          ⋮
-        </button>
+        <UserActionMenu user={user} badges={badges} onUserUpdate={onUserUpdate} />
       </div>
     </div>
   );

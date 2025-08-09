@@ -1,12 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { FixedSizeList as List } from 'react-window';
-import { searchPredictions, bulkUpdatePredictions, getPredictionDetails } from '../../api/admin';
+import {
+  searchPredictions,
+  bulkUpdatePredictions,
+  getPredictionDetails,
+  resolvePrediction,
+} from '../../api/admin';
 import type {
   PredictionSearchParams,
   DetailedPrediction,
   PaginatedPredictions,
   BulkPredictionOperation,
 } from '../../api/admin';
+import ResolvePredictionModal from './ResolvePredictionModal';
 
 interface ModernPredictionQueueProps {
   className?: string;
@@ -226,6 +232,11 @@ const ModernPredictionQueue: React.FC<ModernPredictionQueueProps> = ({ className
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [bulkOperation, setBulkOperation] = useState<BulkPredictionOperation['operation'] | ''>('');
 
+  // Resolve modal state
+  const [resolveModalOpen, setResolveModalOpen] = useState(false);
+  const [predictionToResolve, setPredictionToResolve] = useState<DetailedPrediction | null>(null);
+  const [isResolving, setIsResolving] = useState(false);
+
   const categories = ['Politics', 'Sports', 'Technology', 'Entertainment', 'Economics', 'Science'];
 
   const fetchPredictions = useCallback(
@@ -302,6 +313,16 @@ const ModernPredictionQueue: React.FC<ModernPredictionQueueProps> = ({ className
       return;
     }
 
+    if (action === 'resolve') {
+      // Find the prediction and open resolve modal
+      const prediction = predictions.find((p) => p.id === predictionId);
+      if (prediction) {
+        setPredictionToResolve(prediction);
+        setResolveModalOpen(true);
+      }
+      return;
+    }
+
     try {
       const operation: BulkPredictionOperation = {
         predictionIds: [predictionId],
@@ -312,6 +333,23 @@ const ModernPredictionQueue: React.FC<ModernPredictionQueueProps> = ({ className
       fetchPredictions(paginationInfo.currentPage);
     } catch (error) {
       console.error(`Failed to ${action} prediction:`, error);
+    }
+  };
+
+  const handleResolve = async (winningOptionId: number) => {
+    if (!predictionToResolve) return;
+
+    setIsResolving(true);
+    try {
+      await resolvePrediction(predictionToResolve.id, winningOptionId);
+      fetchPredictions(paginationInfo.currentPage);
+      setResolveModalOpen(false);
+      setPredictionToResolve(null);
+    } catch (error) {
+      console.error('Failed to resolve prediction:', error);
+      throw error; // Re-throw so modal can handle it
+    } finally {
+      setIsResolving(false);
     }
   };
 
@@ -517,6 +555,29 @@ const ModernPredictionQueue: React.FC<ModernPredictionQueueProps> = ({ className
           </div>
         )}
       </div>
+
+      {/* Resolve Prediction Modal */}
+      {resolveModalOpen && predictionToResolve && (
+        <ResolvePredictionModal
+          prediction={{
+            ...predictionToResolve,
+            createdAt:
+              predictionToResolve.createdAt instanceof Date
+                ? predictionToResolve.createdAt.toISOString()
+                : predictionToResolve.createdAt,
+            expiresAt:
+              predictionToResolve.expiresAt instanceof Date
+                ? predictionToResolve.expiresAt.toISOString()
+                : predictionToResolve.expiresAt,
+          }}
+          onResolve={handleResolve}
+          onClose={() => {
+            setResolveModalOpen(false);
+            setPredictionToResolve(null);
+          }}
+          isResolving={isResolving}
+        />
+      )}
     </div>
   );
 };

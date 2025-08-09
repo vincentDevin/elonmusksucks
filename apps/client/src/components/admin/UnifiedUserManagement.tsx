@@ -4,6 +4,9 @@ import UserDataGrid from './UserDataGrid';
 import type { DetailedUser, PaginatedUsers } from '../../api/admin';
 import type { PublicBadge } from '@ems/types';
 import { listBadges } from '../../api/admin';
+import { useSocket } from '../../contexts/SocketContext';
+import * as moderationApi from '../../api/moderation';
+import type { ModerationLogEntry } from '../../api/moderation';
 
 interface UnifiedUserManagementProps {
   className?: string;
@@ -21,8 +24,11 @@ const UnifiedUserManagement: React.FC<UnifiedUserManagementProps> = ({ className
   });
   const [loading, setLoading] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [recentModerationActions, setRecentModerationActions] = useState<ModerationLogEntry[]>([]);
+  const [showModerationLog, setShowModerationLog] = useState(false);
+  const socket = useSocket();
 
-  // Load badges on component mount
+  // Load badges and moderation log on component mount
   useEffect(() => {
     const loadBadges = async () => {
       try {
@@ -34,8 +40,45 @@ const UnifiedUserManagement: React.FC<UnifiedUserManagementProps> = ({ className
       }
     };
 
+    const loadModerationActions = async () => {
+      try {
+        const actions = await moderationApi.getRecentModerationActions(10);
+        setRecentModerationActions(actions);
+      } catch (error) {
+        console.error('Failed to load moderation actions:', error);
+      }
+    };
+
     loadBadges();
+    loadModerationActions();
   }, []);
+
+  // Listen for real-time moderation updates
+  useEffect(() => {
+    if (socket) {
+      const handleModerationUpdate = async () => {
+        try {
+          const actions = await moderationApi.getRecentModerationActions(10);
+          setRecentModerationActions(actions);
+          setRefreshTrigger((prev) => prev + 1);
+        } catch (error) {
+          console.error('Failed to reload moderation actions:', error);
+        }
+      };
+
+      socket.on('adminModerationUserBan', handleModerationUpdate);
+      socket.on('adminModerationUserUnban', handleModerationUpdate);
+      socket.on('adminModerationUserMute', handleModerationUpdate);
+      socket.on('adminModerationUserKick', handleModerationUpdate);
+
+      return () => {
+        socket.off('adminModerationUserBan', handleModerationUpdate);
+        socket.off('adminModerationUserUnban', handleModerationUpdate);
+        socket.off('adminModerationUserMute', handleModerationUpdate);
+        socket.off('adminModerationUserKick', handleModerationUpdate);
+      };
+    }
+  }, [socket]);
 
   const handleSearchResults = useCallback((results: PaginatedUsers) => {
     setUsers(results.users);
@@ -94,9 +137,9 @@ const UnifiedUserManagement: React.FC<UnifiedUserManagementProps> = ({ className
       <div className="bg-surface border border-muted rounded-lg p-6">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-2xl font-bold text-content">User Management</h2>
+            <h2 className="text-2xl font-bold text-content">User Management & Moderation</h2>
             <p className="text-tertiary">
-              Unified interface for managing users, roles, and permissions
+              Unified interface for managing users, roles, permissions, and moderation actions
             </p>
           </div>
           <div className="text-right">
@@ -220,6 +263,99 @@ const UnifiedUserManagement: React.FC<UnifiedUserManagementProps> = ({ className
           </div>
         </div>
       )}
+
+      {/* Recent Moderation Actions */}
+      <div className="bg-surface border border-muted rounded-lg p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-content">Recent Moderation Actions</h3>
+          <button
+            onClick={() => setShowModerationLog(!showModerationLog)}
+            className="text-sm text-primary hover:text-primary/80 transition-colors"
+          >
+            {showModerationLog ? 'Hide' : 'Show'} Log
+          </button>
+        </div>
+
+        {showModerationLog && (
+          <div className="space-y-2">
+            {recentModerationActions.length === 0 ? (
+              <div className="text-center py-8 text-tertiary">No recent moderation actions</div>
+            ) : (
+              recentModerationActions.map((action) => (
+                <div
+                  key={action.id}
+                  className="flex items-center justify-between p-3 bg-muted rounded-lg"
+                >
+                  <div className="flex items-center space-x-3">
+                    <span className="text-lg">
+                      {action.action === 'USER_BAN'
+                        ? '🚫'
+                        : action.action === 'USER_UNBAN'
+                          ? '✅'
+                          : action.action === 'USER_MUTE'
+                            ? '🔇'
+                            : action.action === 'USER_KICK'
+                              ? '👟'
+                              : '⚠️'}
+                    </span>
+                    <div>
+                      <div className="text-sm font-medium text-content">
+                        <span className="text-primary">{action.moderator.name}</span>{' '}
+                        {action.action === 'USER_BAN'
+                          ? 'banned'
+                          : action.action === 'USER_UNBAN'
+                            ? 'unbanned'
+                            : action.action === 'USER_MUTE'
+                              ? 'muted'
+                              : action.action === 'USER_KICK'
+                                ? 'kicked'
+                                : action.action}{' '}
+                        {action.targetUser && (
+                          <span className="text-accent">{action.targetUser.name}</span>
+                        )}
+                      </div>
+                      {action.reason && (
+                        <div className="text-xs text-tertiary mt-1">Reason: {action.reason}</div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-xs text-tertiary">
+                    {new Date(action.createdAt).toLocaleString()}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {/* Quick Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 pt-4 border-t border-muted">
+          <div className="text-center">
+            <div className="text-lg font-semibold text-error">
+              {recentModerationActions.filter((a) => a.action === 'USER_BAN').length}
+            </div>
+            <div className="text-xs text-tertiary">Recent Bans</div>
+          </div>
+          <div className="text-center">
+            <div className="text-lg font-semibold text-warning">
+              {recentModerationActions.filter((a) => a.action === 'USER_MUTE').length}
+            </div>
+            <div className="text-xs text-tertiary">Recent Mutes</div>
+          </div>
+          <div className="text-center">
+            <div className="text-lg font-semibold text-info">
+              {recentModerationActions.filter((a) => a.action === 'USER_KICK').length}
+            </div>
+            <div className="text-xs text-tertiary">Recent Kicks</div>
+          </div>
+          <div className="text-center">
+            <div className="text-lg font-semibold text-success">
+              {recentModerationActions.filter((a) => a.action === 'USER_UNBAN').length}
+            </div>
+            <div className="text-xs text-tertiary">Recent Unbans</div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

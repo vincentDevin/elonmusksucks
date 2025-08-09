@@ -38,7 +38,6 @@ export default function Profile() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [following, setFollowing] = useState(profile?.isFollowing ?? false);
-  const [replyParentId, setReplyParentId] = useState<number | null>(null);
 
   // Sync the follow‐button state
   useEffect(() => {
@@ -82,7 +81,6 @@ export default function Profile() {
 
   const handlePost = async (content: string, parentId?: number | null) => {
     await postToFeed({ content, parentId });
-    setReplyParentId(null);
   };
 
   if (loading) {
@@ -185,11 +183,7 @@ export default function Profile() {
             </p>
           )}
 
-          <ProfileFeed feed={feed} loading={loading} onReply={setReplyParentId} />
-
-          {replyParentId !== null && currentUser && (
-            <CreatePostForm onSubmit={handlePost} parentId={replyParentId} disabled={loading} />
-          )}
+          <ProfileFeed feed={feed} loading={loading} onSubmit={handlePost} />
         </>
       )}
     </div>

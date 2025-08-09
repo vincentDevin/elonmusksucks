@@ -13,7 +13,7 @@ import type {
   DbUserActivity,
 } from '@ems/types';
 import type { PublicUserProfile, UserFeedPost, UserActivity, UserStatsDTO } from '@ems/types';
-import { normalizedActivityService } from './normalizedActivity.service';
+import { unifiedActivityService } from './unifiedActivity.service';
 import { ImageProcessingService, ProcessedImageSizes } from './imageProcessing.service';
 import { DeleteObjectCommand } from '@aws-sdk/client-s3';
 
@@ -95,11 +95,11 @@ export class UserService {
       profilePictureKey: processedImages.profile.filename,
     });
 
-    // Generate signed URLs for immediate use (30-day expiry for better caching)
+    // Generate signed URLs for immediate use (7-day expiry - AWS S3 maximum)
     const urlPromises = [
-      this.getSignedAvatarUrl(processedImages.thumbnail.filename, 60 * 60 * 24 * 30),
-      this.getSignedAvatarUrl(processedImages.profile.filename, 60 * 60 * 24 * 30),
-      this.getSignedAvatarUrl(processedImages.full.filename, 60 * 60 * 24 * 30),
+      this.getSignedAvatarUrl(processedImages.thumbnail.filename, 60 * 60 * 24 * 7),
+      this.getSignedAvatarUrl(processedImages.profile.filename, 60 * 60 * 24 * 7),
+      this.getSignedAvatarUrl(processedImages.full.filename, 60 * 60 * 24 * 7),
     ];
 
     const [thumbnailUrl, profileUrl, fullUrl] = await Promise.all(urlPromises);
@@ -177,8 +177,12 @@ export class UserService {
    * Accepts a storage key (from user.profilePictureKey).
    */
   async getSignedAvatarUrl(key: string, expiresInSeconds = 3600): Promise<string> {
+    // AWS S3 presigned URLs can't exceed 7 days (604800 seconds)
+    const maxExpiry = 60 * 60 * 24 * 7; // 7 days
+    const safeExpiry = Math.min(expiresInSeconds, maxExpiry);
+
     return getSignedUrl(this.s3, new GetObjectCommand({ Bucket: this.bucket, Key: key }), {
-      expiresIn: expiresInSeconds,
+      expiresIn: safeExpiry,
     });
   }
 
@@ -342,17 +346,17 @@ export class UserService {
       content,
       parentId: typeof parentId === 'undefined' ? null : parentId,
     });
-    // Create legacy activity record
+    // Create legacy activity record (still needed for getUserActivity endpoint)
     await this.repo.createUserActivity({
       userId: authorId,
       type: parentId ? 'COMMENT_CREATED' : 'POST_CREATED',
       details: { postId: post.id },
     });
 
-    // Create normalized activity event
+    // Create unified activity event
     const author = await this.getPublicSocketUser(authorId);
     if (author) {
-      await normalizedActivityService.createPostEvent(
+      await unifiedActivityService.createPostActivity(
         {
           id: author.id,
           name: author.name,
@@ -394,26 +398,27 @@ export class UserService {
   async createUserActivity(userId: number, type: string, details?: any): Promise<UserActivity> {
     const activity = await this.repo.createUserActivity({ userId, type, details });
 
-    // Decide if this activity is ticker-worthy
-    if (
-      [
-        'PREDICTION_CREATED',
-        'PREDICTION_RESOLVED',
-        'BET_PLACED',
-        'PARLAY_PLACED',
-        'POST_CREATED',
-        'COMMENT_CREATED',
-        'BADGE_EARNED',
-      ].includes(type)
-    ) {
-      publishTicker({
-        id: activity.id,
-        userId,
-        type,
-        details,
-        createdAt: new Date().toISOString(),
-      });
-    }
+    // Legacy ticker publishing removed - now handled by unified activity system
+    // The unified activity service broadcasts all activities globally
+    // if (
+    //   [
+    //     'PREDICTION_CREATED',
+    //     'PREDICTION_RESOLVED',
+    //     'BET_PLACED',
+    //     'PARLAY_PLACED',
+    //     'POST_CREATED',
+    //     'COMMENT_CREATED',
+    //     'BADGE_EARNED',
+    //   ].includes(type)
+    // ) {
+    //   publishTicker({
+    //     id: activity.id,
+    //     userId,
+    //     type,
+    //     details,
+    //     createdAt: new Date().toISOString(),
+    //   });
+    // }
 
     return toActivityDTO(activity);
   }
@@ -661,21 +666,7 @@ function toActivityDTO(a: DbUserActivity): UserActivity {
   };
 }
 
-const TICKER_CHANNEL = 'activity:newsflash';
-const TICKER_LIST = 'activity:ticker';
-const TICKER_MAX = 100; // keep the 100 most-recent items
-
-function publishTicker(item: {
-  id: number; // activity id
-  userId: number;
-  type: string;
-  details?: any;
-  createdAt: string; // ISO
-}) {
-  const json = JSON.stringify(item);
-  // 1) realtime broadcast
-  redisClient.publish(TICKER_CHANNEL, json);
-  // 2) bootstrap list for new connections
-  redisClient.lpush(TICKER_LIST, json);
-  redisClient.ltrim(TICKER_LIST, 0, TICKER_MAX - 1);
-}
+// Legacy ticker publishing removed - now handled by unified activity system
+// const TICKER_CHANNEL = 'activity:newsflash';
+// const TICKER_LIST = 'activity:ticker';
+// const TICKER_MAX = 100;

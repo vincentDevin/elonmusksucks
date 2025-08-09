@@ -5,6 +5,7 @@
 // -----------------------------------------------------------------------------
 
 import { useState, useMemo, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { usePredictionMarket } from '../contexts/PredictionContext';
 import { useAuth } from '../contexts/AuthContext';
 import type { BetWithUser, PredictionFull } from '@ems/types';
@@ -186,8 +187,8 @@ export default function BetModal({
     }
   };
 
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+  return createPortal(
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[100]">
       <div
         className={`bg-surface border border-muted rounded-2xl shadow-2xl ${modalSize} ${spacing} relative overflow-hidden`}
       >
@@ -415,6 +416,7 @@ export default function BetModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

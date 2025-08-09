@@ -22,6 +22,7 @@ import {
 import type { BetWithUser, ParlayLegWithUser } from '@ems/types';
 import { socketRequest } from '../lib/socketRequest';
 import { useSocket } from './SocketContext';
+import { useAuth } from './AuthContext';
 
 // ---- Context shape ----
 interface Ctx {
@@ -42,6 +43,7 @@ const PredictionCtx = createContext<Ctx | undefined>(undefined);
 
 export function PredictionProvider({ children }: { children: ReactNode }) {
   const socket = useSocket();
+  const { refreshUser } = useAuth();
   const [predictions, setPredictions] = useState<PredictionFull[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -151,22 +153,38 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
   );
 
   // ── Bet/parlay helpers via socketRequest ──────────────────────────────────
-  const placeBet = useCallback(async (payload: { optionId: number; amount: number }) => {
-    console.log('PredictionContext placeBet called', payload);
-    try {
-      await socketRequest('bet:place', payload);
-      console.log('PredictionContext placeBet success');
-    } catch (error) {
-      console.error('PredictionContext placeBet error', error);
-      throw error;
-    }
-  }, []);
+  const placeBet = useCallback(
+    async (payload: { optionId: number; amount: number }) => {
+      console.log('PredictionContext placeBet called', payload);
+      try {
+        await socketRequest('bet:place', payload);
+        console.log('PredictionContext placeBet success');
+
+        // Trigger user refresh to update balance and stats
+        // Note: AuthContext already handles optimistic updates via Socket.IO events
+        setTimeout(() => refreshUser(), 100);
+      } catch (error) {
+        console.error('PredictionContext placeBet error', error);
+        throw error;
+      }
+    },
+    [refreshUser],
+  );
 
   const placeParlay = useCallback(
     async (payload: { legs: { optionId: number }[]; amount: number }) => {
-      await socketRequest('parlay:place', payload);
+      try {
+        await socketRequest('parlay:place', payload);
+
+        // Trigger user refresh to update balance and stats
+        // Note: AuthContext already handles optimistic updates via Socket.IO events
+        setTimeout(() => refreshUser(), 100);
+      } catch (error) {
+        console.error('PredictionContext placeParlay error', error);
+        throw error;
+      }
     },
-    [],
+    [refreshUser],
   );
 
   const value = useMemo<Ctx>(

@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { DetailedUser, BulkUserOperation } from '../../api/admin';
-import type { Role, PublicBadge } from '@ems/types';
+import type { Role, PublicBadge, BanType } from '@ems/types';
 import { bulkUpdateUsers, getUserDetails } from '../../api/admin';
+import { banUser, unbanUser } from '../../api/moderation';
+import { useSocket } from '../../contexts/SocketContext';
 
 interface UserActionMenuProps {
   user: DetailedUser;
@@ -27,6 +29,8 @@ const UserActionMenu: React.FC<UserActionMenuProps> = ({ user, badges, onUserUpd
   const [newRole, setNewRole] = useState<Role>(user.role);
   const [banReason, setBanReason] = useState('');
   const [banDuration, setBanDuration] = useState<'permanent' | '1d' | '7d' | '30d'>('1d');
+  const [muteDuration, setMuteDuration] = useState(60);
+  const socket = useSocket();
 
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -77,6 +81,92 @@ const UserActionMenu: React.FC<UserActionMenuProps> = ({ user, badges, onUserUpd
       operation: 'assignBadge',
       params: { badgeId: selectedBadgeId },
     });
+  };
+
+  const handleBanUser = async () => {
+    setLoading(true);
+    try {
+      if (user.banStatus?.isBanned) {
+        // Unban the user
+        await unbanUser(user.id);
+      } else {
+        // Ban the user
+        const duration =
+          banDuration === 'permanent'
+            ? undefined
+            : banDuration === '1d'
+              ? 24 * 60 * 60 * 1000
+              : banDuration === '7d'
+                ? 7 * 24 * 60 * 60 * 1000
+                : banDuration === '30d'
+                  ? 30 * 24 * 60 * 60 * 1000
+                  : undefined;
+
+        await banUser({
+          userId: user.id,
+          banType: 'USER' as BanType,
+          reason: banReason,
+          duration,
+        });
+      }
+
+      onUserUpdate(user.id);
+      setShowModal(null);
+      setBanReason('');
+      setBanDuration('1d');
+    } catch (error) {
+      console.error('Failed to ban/unban user:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleMuteUser = async () => {
+    if (!socket) return;
+
+    setLoading(true);
+    socket.emit(
+      'admin:muteUser',
+      {
+        userId: user.id,
+        duration: muteDuration,
+        reason: banReason,
+      },
+      (response: { success: boolean; error?: string }) => {
+        setLoading(false);
+        if (response.success) {
+          onUserUpdate(user.id);
+          setShowModal(null);
+          setBanReason('');
+          setMuteDuration(60);
+        } else {
+          alert(`Failed to mute user: ${response.error}`);
+        }
+      },
+    );
+  };
+
+  const handleKickUser = async () => {
+    if (!socket) return;
+
+    setLoading(true);
+    socket.emit(
+      'admin:kickUser',
+      {
+        userId: user.id,
+        reason: banReason,
+      },
+      (response: { success: boolean; error?: string }) => {
+        setLoading(false);
+        if (response.success) {
+          onUserUpdate(user.id);
+          setShowModal(null);
+          setBanReason('');
+        } else {
+          alert(`Failed to kick user: ${response.error}`);
+        }
+      },
+    );
   };
 
   const handleBadgeRevoke = () => {
@@ -152,6 +242,22 @@ const UserActionMenu: React.FC<UserActionMenuProps> = ({ user, badges, onUserUpd
       icon: '❌',
       action: () => setShowModal('revoke-badge'),
       disabled: !user.badges || user.badges.length === 0,
+    },
+    {
+      id: 'mute-user',
+      label: 'Mute User',
+      icon: '🔇',
+      action: () => setShowModal('mute'),
+      variant: 'warning',
+      disabled: user.banStatus?.isBanned,
+    },
+    {
+      id: 'kick-user',
+      label: 'Kick User',
+      icon: '👟',
+      action: () => setShowModal('kick'),
+      variant: 'warning',
+      disabled: user.banStatus?.isBanned,
     },
     {
       id: 'ban-user',
@@ -398,6 +504,92 @@ const UserActionMenu: React.FC<UserActionMenuProps> = ({ user, badges, onUserUpd
         </Modal>
       )}
 
+      {/* Mute User Modal */}
+      {showModal === 'mute' && (
+        <Modal title="Mute User" onClose={() => setShowModal(null)}>
+          <div className="space-y-4">
+            <div className="text-sm text-content">
+              Mute <span className="font-semibold">{user.name}</span> from using chat
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-content mb-2">Reason</label>
+              <textarea
+                value={banReason}
+                onChange={(e) => setBanReason(e.target.value)}
+                className="w-full px-3 py-2 border border-muted rounded-lg bg-surface text-content h-20 resize-none"
+                placeholder="Enter reason for muting this user..."
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-content mb-2">
+                Duration (minutes)
+              </label>
+              <input
+                type="number"
+                value={muteDuration}
+                onChange={(e) => setMuteDuration(Number(e.target.value) || 60)}
+                className="w-full px-3 py-2 border border-muted rounded-lg bg-surface text-content"
+                placeholder="Duration in minutes"
+                min="1"
+              />
+            </div>
+            <div className="flex space-x-3">
+              <button
+                onClick={handleMuteUser}
+                disabled={loading || !banReason.trim()}
+                className="flex-1 px-4 py-2 bg-warning text-surface rounded-lg disabled:opacity-50 hover:opacity-90 transition"
+              >
+                {loading ? 'Processing...' : 'Mute User'}
+              </button>
+              <button
+                onClick={() => setShowModal(null)}
+                className="flex-1 px-4 py-2 bg-secondary text-surface rounded-lg hover:opacity-90 transition"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Kick User Modal */}
+      {showModal === 'kick' && (
+        <Modal title="Kick User" onClose={() => setShowModal(null)}>
+          <div className="space-y-4">
+            <div className="text-sm text-content">
+              Kick <span className="font-semibold">{user.name}</span> from the platform
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-content mb-2">Reason</label>
+              <textarea
+                value={banReason}
+                onChange={(e) => setBanReason(e.target.value)}
+                className="w-full px-3 py-2 border border-muted rounded-lg bg-surface text-content h-20 resize-none"
+                placeholder="Enter reason for kicking this user..."
+              />
+            </div>
+            <div className="text-sm text-tertiary">
+              This will disconnect the user from all active sessions.
+            </div>
+            <div className="flex space-x-3">
+              <button
+                onClick={handleKickUser}
+                disabled={loading || !banReason.trim()}
+                className="flex-1 px-4 py-2 bg-warning text-surface rounded-lg disabled:opacity-50 hover:opacity-90 transition"
+              >
+                {loading ? 'Processing...' : 'Kick User'}
+              </button>
+              <button
+                onClick={() => setShowModal(null)}
+                className="flex-1 px-4 py-2 bg-secondary text-surface rounded-lg hover:opacity-90 transition"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
       {/* Ban User Modal */}
       {showModal === 'ban' && (
         <Modal
@@ -449,14 +641,7 @@ const UserActionMenu: React.FC<UserActionMenuProps> = ({ user, badges, onUserUpd
 
             <div className="flex space-x-3">
               <button
-                onClick={() => {
-                  // This would need implementation in the backend
-                  console.log(user.banStatus?.isBanned ? 'Unbanning user' : 'Banning user', {
-                    banReason,
-                    banDuration,
-                  });
-                  setShowModal(null);
-                }}
+                onClick={handleBanUser}
                 disabled={loading || (!user.banStatus?.isBanned && !banReason.trim())}
                 className="flex-1 px-4 py-2 bg-error text-surface rounded-lg disabled:opacity-50 hover:opacity-90 transition"
               >

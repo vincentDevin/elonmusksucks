@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   getExecutiveDashboard,
   getRealtimeMetrics,
@@ -6,6 +6,7 @@ import {
   type RealtimeMetrics,
   type AnalyticsParams,
 } from '../../api/admin';
+import { useSocket } from '../../contexts/SocketContext';
 
 interface KPICardProps {
   title: string;
@@ -89,6 +90,7 @@ const MetricCard: React.FC<MetricCardProps> = ({ title, value, unit, status }) =
 };
 
 const ExecutiveDashboard: React.FC = () => {
+  const socket = useSocket();
   const [dashboardData, setDashboardData] = useState<ExecutiveDashboardData | null>(null);
   const [realtimeMetrics, setRealtimeMetrics] = useState<RealtimeMetrics | null>(null);
   const [loading, setLoading] = useState(true);
@@ -134,21 +136,27 @@ const ExecutiveDashboard: React.FC = () => {
     }
   };
 
+  // Handle real-time metrics updates via socket
+  const handleMetricsUpdate = useCallback((data: { metrics: RealtimeMetrics }) => {
+    console.log('[ExecutiveDashboard] Received real-time metrics update');
+    setRealtimeMetrics(data.metrics);
+  }, []);
+
   useEffect(() => {
     loadDashboardData();
-
-    // Set up auto-refresh for real-time metrics every 30 seconds
-    const interval = setInterval(async () => {
-      try {
-        const realtime = await getRealtimeMetrics();
-        setRealtimeMetrics(realtime);
-      } catch (err) {
-        console.error('Failed to refresh real-time metrics:', err);
-      }
-    }, 30000);
-
-    return () => clearInterval(interval);
   }, [dateRange]);
+
+  // Set up socket listeners for real-time updates
+  useEffect(() => {
+    if (!socket) return;
+
+    // Listen for admin metrics updates
+    socket.on('admin:metrics:update', handleMetricsUpdate);
+
+    return () => {
+      socket.off('admin:metrics:update', handleMetricsUpdate);
+    };
+  }, [socket, handleMetricsUpdate]);
 
   if (loading) {
     return (
@@ -235,7 +243,7 @@ const ExecutiveDashboard: React.FC = () => {
           <h3 className="text-lg font-semibold text-content">Real-time System Metrics</h3>
           <div className="flex items-center text-sm text-tertiary">
             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse mr-2"></div>
-            Live (updates every 30s)
+            Live (real-time events)
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">

@@ -1,5 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { UserService } from '../services/user.service';
+import { EnhancedUserStatsService } from '../services/enhancedUserStats.service';
+import { unifiedActivityService } from '../services/unifiedActivity.service';
+import { achievementService } from '../services/achievement.service';
 import type { PublicUserProfile, UserFeedPost, UserActivity, UserStatsDTO } from '@ems/types';
 
 // Define MulterFile type explicitly to avoid mismatched declarations
@@ -18,8 +21,9 @@ export type ReqWithUser = Request & {
   file?: MulterFile;
 };
 
-// Instantiate the service (uses Prisma-backed repository by default)
+// Instantiate the services (uses Prisma-backed repository by default)
 const userService = new UserService();
+const enhancedUserStatsService = new EnhancedUserStatsService();
 
 /**
  * GET /api/users/:userId
@@ -89,8 +93,41 @@ export async function followUserHandler(
     }
     await userService.followUser(followerId, followingId);
 
-    // Record activity
+    // Record activity (legacy)
     await userService.createUserActivity(followerId, 'USER_FOLLOWED', { followingId });
+
+    // Publish follow activity through unified system
+    const followedUser = await userService.getUserProfile(followingId);
+    const followerUser = await userService.getUserProfile(followerId);
+
+    if (followedUser && followerUser) {
+      await unifiedActivityService.publishActivity({
+        type: 'user_followed',
+        userId: followerId,
+        userName: followerUser.name,
+        title: `${followerUser.name} followed ${followedUser.name}`,
+        description: `New connection in the prediction community`,
+        icon: '👥',
+        color: 'text-blue-400',
+        priority: 'low',
+        isPersonal: false, // User follows are public social activities
+        isHighValue: false, // Low priority social activity
+        meta: {
+          followedUserId: followingId,
+          followedUserName: followedUser.name,
+        },
+      });
+    }
+
+    // Check for achievement unlocks
+    await achievementService.checkAndUpdateAchievements({
+      type: 'user_followed',
+      userId: followerId,
+      data: {
+        followedUserId: followingId,
+        followedUserName: followedUser?.name || 'Unknown',
+      },
+    });
 
     res.sendStatus(204);
   } catch (err) {
@@ -346,72 +383,8 @@ export async function getEnhancedUserStatsHandler(
       return;
     }
 
-    // Get basic stats and enhance them
-    const basicStats = await userService.getUserStats(targetUserId);
-
-    // Calculate enhanced metrics
-    const winRate = basicStats ? basicStats.betsWon / Math.max(basicStats.totalBets, 1) : 0;
-    const netProfit = basicStats?.profit || 0;
-
-    // Mock category accuracy data (in production, this would come from bet history analysis)
-    const categoryAccuracy = [
-      { category: 'Sports', accuracy: 0.65, totalBets: 15, wins: 10 },
-      { category: 'Politics', accuracy: 0.58, totalBets: 8, wins: 5 },
-      { category: 'Technology', accuracy: 0.72, totalBets: 12, wins: 9 },
-      { category: 'Entertainment', accuracy: 0.45, totalBets: 6, wins: 3 },
-    ];
-
-    const bestCategory = categoryAccuracy.reduce((best, current) =>
-      current.accuracy > best.accuracy ? current : best,
-    ).category;
-
-    const enhancedStats = {
-      // Performance metrics
-      totalBets: basicStats?.totalBets || 0,
-      winRate,
-      profitLoss: netProfit,
-      categoryAccuracy,
-      currentStreak: {
-        type: winRate > 0.5 ? 'win' : 'lose',
-        count: basicStats?.currentStreak || 0,
-        isActive: (basicStats?.currentStreak || 0) > 0,
-      },
-      bestCategory,
-      totalWagered: basicStats?.totalWagered || 0,
-      avgBetSize: basicStats ? basicStats.totalWagered / Math.max(basicStats.totalBets, 1) : 0,
-
-      // Achievement progress (mock data)
-      achievementProgress: [
-        {
-          id: 'streak_master',
-          title: 'Streak Master',
-          description: 'Win 10 bets in a row',
-          progress: Math.min(9, basicStats?.currentStreak || 0),
-          target: 10,
-          isCompleted: false,
-        },
-        {
-          id: 'high_roller',
-          title: 'High Roller',
-          description: 'Place a 1000🪙 bet',
-          progress: Math.min(800, basicStats?.totalWagered || 0),
-          target: 1000,
-          isCompleted: false,
-        },
-      ],
-      achievementCompletionRate: 0.3,
-
-      // Trend data (mock)
-      weeklyVolume: generateTrendData(basicStats?.totalWagered || 0, 7),
-      monthlyProfitLoss: generateTrendData(netProfit, 30),
-      categoryStats: categoryAccuracy.map((cat) => ({
-        category: cat.category,
-        betCount: cat.totalBets,
-        winRate: cat.accuracy,
-        profitLoss: cat.totalBets * 50 * (cat.accuracy - 0.5),
-        avgBetSize: 50,
-      })),
-    };
+    // Get enhanced stats using the new service with real data calculations
+    const enhancedStats = await enhancedUserStatsService.getEnhancedStats(targetUserId);
 
     res.json(enhancedStats);
   } catch (err) {
@@ -419,17 +392,30 @@ export async function getEnhancedUserStatsHandler(
   }
 }
 
-// Helper function to generate trend data
-function generateTrendData(baseValue: number, points: number) {
-  const data = [];
-  for (let i = points - 1; i >= 0; i--) {
-    const date = new Date();
-    date.setDate(date.getDate() - i);
-    const variation = (Math.random() - 0.5) * 0.4;
-    data.push({
-      date: date.toISOString().split('T')[0],
-      value: Math.max(0, (baseValue * (1 + variation)) / points),
-    });
+/**
+ * GET /api/users/:userId/achievements
+ * Get user's achievement progress
+ */
+export async function getUserAchievementsHandler(
+  req: ReqWithUser,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const targetUserId = Number(req.params.userId);
+    const viewerId = req.user?.id;
+
+    // Only allow users to view their own achievements
+    if (targetUserId !== viewerId) {
+      res.status(403).json({ error: "Cannot view other users' achievements" });
+      return;
+    }
+
+    // Get user achievement progress
+    const achievements = await achievementService.getUserAchievementProgress(targetUserId);
+
+    res.json(achievements);
+  } catch (err) {
+    next(err);
   }
-  return data;
 }

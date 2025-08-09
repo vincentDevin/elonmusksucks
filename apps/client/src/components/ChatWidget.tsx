@@ -10,53 +10,28 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useChat } from '../contexts/ChatContext';
 import { useSocket } from '../contexts/SocketContext';
+import api from '../api/axios';
 
 const FALLBACK_AVATAR =
   'https://ui-avatars.com/api/?name=Unknown&background=64748b&color=fff&size=48';
 
-// Moderation API functions
+// Moderation API functions using axios client (handles auth automatically)
 const moderationAPI = {
   banUser: async (userId: number, reason: string, duration?: number) => {
-    const response = await fetch('/api/moderation/ban', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${localStorage.getItem('token')}`,
-      },
-      body: JSON.stringify({ userId, reason, duration }),
-    });
-    return response.json();
+    const response = await api.post('/api/moderation/ban', { userId, reason, duration });
+    return response.data;
   },
   muteUser: async (userId: number, reason: string, duration?: number) => {
-    const response = await fetch('/api/moderation/mute', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${localStorage.getItem('token')}`,
-      },
-      body: JSON.stringify({ userId, reason, duration }),
-    });
-    return response.json();
+    const response = await api.post('/api/moderation/mute', { userId, reason, duration });
+    return response.data;
   },
   kickUser: async (userId: number, reason: string) => {
-    const response = await fetch('/api/moderation/kick', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${localStorage.getItem('token')}`,
-      },
-      body: JSON.stringify({ userId, reason }),
-    });
-    return response.json();
+    const response = await api.post('/api/moderation/kick', { userId, reason });
+    return response.data;
   },
   deleteMessage: async (messageId: number) => {
-    const response = await fetch(`/api/moderation/message/${messageId}`, {
-      method: 'DELETE',
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem('token')}`,
-      },
-    });
-    return response.json();
+    const response = await api.delete(`/api/moderation/message/${messageId}`);
+    return response.data;
   },
 };
 

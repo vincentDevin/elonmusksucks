@@ -166,16 +166,15 @@ export default function PredictionSectionCard({
                 </div>
 
                 {/* Prediction Card */}
-                <div
-                  className="transform transition-all duration-200 hover:scale-[1.02]"
-                  onClick={() => onMarkViewed(prediction.id)}
-                >
+                <div className="transform transition-all duration-200 hover:scale-[1.02]">
                   <UnifiedPredictionCard
                     prediction={prediction}
                     variant="compact"
                     showParlayActions={true}
                     showBetsList={false}
+                    hideInlineParlaySelector={true}
                     className="shadow-sm hover:shadow-md transition-shadow"
+                    onCardView={() => onMarkViewed(prediction.id)}
                   />
                 </div>
 

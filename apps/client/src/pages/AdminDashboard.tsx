@@ -12,7 +12,7 @@ const AdminDashboard: React.FC = () => {
   const { loadUsers, loadPendingPredictions, loadBadges } = useAdmin();
 
   const tabs = [
-    { key: 'users', label: 'User Management', component: <UnifiedUserManagement /> },
+    { key: 'users', label: 'User Management & Moderation', component: <UnifiedUserManagement /> },
     { key: 'predictions', label: 'Prediction Management', component: <ModernPredictionQueue /> },
     { key: 'bets', label: 'Financial Operations', component: <UnifiedFinancialDashboard /> },
     { key: 'badges', label: 'Badge Management', component: <AdvancedBadgeManager /> },

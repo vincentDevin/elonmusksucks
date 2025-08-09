@@ -1,8 +1,14 @@
 // apps/client/src/components/dashboard/customization/PrivacySettings.tsx
-import { useDashboardCustomization } from '../../../hooks/useDashboardCustomization';
+import { useAdvancedThemes } from '../../../theme/hooks/useUnifiedTheme';
 
 export default function PrivacySettings() {
-  const { preferences, updatePrivacy } = useDashboardCustomization();
+  const { preferences, updatePreferences } = useAdvancedThemes();
+
+  const updatePrivacy = (updates: any) => {
+    updatePreferences({
+      privacy: { ...preferences.privacy, ...updates },
+    });
+  };
 
   const ToggleSwitch = ({
     enabled,

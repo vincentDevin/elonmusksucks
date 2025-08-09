@@ -9,8 +9,10 @@ import type { IBettingRepository, OptionWithPrediction } from '../repositories/I
 import type { DbBet, DbParlay, BetWithUser, ParlayLegWithUser } from '@ems/types';
 import { BettingRepository } from '../repositories/BettingRepository';
 import redisClient from '../lib/redis';
-import { normalizedActivityService } from './normalizedActivity.service';
+import { unifiedActivityService } from './unifiedActivity.service';
 import { UserService } from './user.service';
+import { achievementService } from './achievement.service';
+import { broadcastRealtimeMetrics } from './admin.service';
 
 export class BettingService {
   private userService = new UserService();
@@ -107,22 +109,58 @@ export class BettingService {
     // 8) Recalculate odds after bet is placed (for next bets)
     await this.recalculateOdds(opt.prediction.id);
 
-    // 9) Publish normalized activity event
-    await normalizedActivityService.createBetPlacedEvent(
+    // 9) Publish to unified activity system
+    await unifiedActivityService.createBetActivity(
       {
         id: user.id,
         name: user.name,
         avatarUrl,
       },
       {
+        id: bet.id,
         amount,
+        odds: finalOdds,
         predictionId: opt.prediction.id,
         predictionTitle: opt.prediction.title,
         optionLabel: opt.label,
         category: opt.prediction.category,
-        odds: finalOdds,
       },
     );
+
+    // 10) This activity is already published by unifiedActivityService above
+    // No need for duplicate ActivityRecorder call
+
+    // 11) Check for achievement unlocks
+    await achievementService.checkAndUpdateAchievements({
+      type: 'bet_placed',
+      userId,
+      data: {
+        betId: bet.id,
+        predictionId: opt.prediction.id,
+        amount,
+        category: opt.prediction.category,
+      },
+    });
+
+    // 12) Trigger enhanced stats update
+    try {
+      const statsUpdatePayload = {
+        userId,
+        reason: 'bet_placed',
+        betId: bet.id,
+        predictionId: opt.prediction.id,
+        amount,
+        category: opt.prediction.category,
+        timestamp: new Date().toISOString(),
+      };
+
+      await redisClient.publish('user:stats_update', JSON.stringify(statsUpdatePayload));
+    } catch (error) {
+      console.error('[betting] Error publishing bet placed stats update:', error);
+    }
+
+    // 13) Broadcast real-time metrics update to admin dashboard
+    await broadcastRealtimeMetrics();
 
     return bet;
   }
@@ -195,20 +233,59 @@ export class BettingService {
     const affectedPredictions = Array.from(new Set(validLegs.map((leg) => leg.prediction.id)));
     await Promise.all(affectedPredictions.map((predId) => this.recalculateOdds(predId)));
 
-    // 9) Publish normalized parlay activity event with final odds
-    await normalizedActivityService.createParlayStartedEvent(
+    // 9) Publish to unified activity system
+    await unifiedActivityService.createParlayActivity(
       {
         id: user.id,
         name: user.name,
         avatarUrl,
       },
       {
+        id: parlay.id,
         amount,
-        parlayId: parlay.id,
         legCount: oddsCalculation.legCount,
         combinedOdds: oddsCalculation.finalOdds,
       },
     );
+
+    // 10) This activity is already published by unifiedActivityService above
+    // No need for duplicate ActivityRecorder call
+
+    // 11) Check for achievement unlocks
+    await achievementService.checkAndUpdateAchievements({
+      type: 'parlay_completed',
+      userId,
+      data: {
+        parlayId: parlay.id,
+        amount,
+        legCount: oddsCalculation.legCount,
+        won: false, // Will be updated when parlay is resolved
+      },
+    });
+
+    // 12) Trigger enhanced stats update
+    try {
+      const statsUpdatePayload = {
+        userId,
+        reason: 'parlay_placed',
+        parlayId: parlay.id,
+        amount,
+        legCount: oddsCalculation.legCount,
+        predictions: validLegs.map((leg) => ({
+          id: leg.prediction.id,
+          title: leg.prediction.title,
+          category: leg.prediction.category,
+        })),
+        timestamp: new Date().toISOString(),
+      };
+
+      await redisClient.publish('user:stats_update', JSON.stringify(statsUpdatePayload));
+    } catch (error) {
+      console.error('[betting] Error publishing parlay placed stats update:', error);
+    }
+
+    // Broadcast real-time metrics update to admin dashboard
+    await broadcastRealtimeMetrics();
 
     return parlay;
   }

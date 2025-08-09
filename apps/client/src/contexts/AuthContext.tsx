@@ -102,32 +102,102 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
   }, [clearAuth, handleTokenRefresh]);
 
-  // Listen for bet/parlay events to refresh user balance in real-time
+  // Listen for balance-affecting events to update user balance in real-time
   useEffect(() => {
     if (!user?.id || !socket) return;
 
-    const handleBetPlaced = (betData: { user?: { id: number } }) => {
+    const handleUserBalanceUpdate = (data: { userId: number; newBalance: number }) => {
+      // Only update if this balance change belongs to the current user
+      if (data.userId === user.id) {
+        setUser((prevUser) => (prevUser ? { ...prevUser, muskBucks: data.newBalance } : null));
+      }
+    };
+
+    const handleBetPlaced = (betData: { user?: { id: number }; amount?: number }) => {
       // Only refresh if this bet belongs to the current user
       if (betData.user?.id === user.id) {
+        // Optimistic update - subtract bet amount immediately
+        if (betData.amount && user.muskBucks >= betData.amount) {
+          setUser((prevUser) =>
+            prevUser
+              ? {
+                  ...prevUser,
+                  muskBucks: prevUser.muskBucks - betData.amount!,
+                }
+              : null,
+          );
+        }
+        // Also refresh from server to ensure accuracy
         refreshUser();
       }
     };
 
-    const handleParlayPlaced = (parlayData: { user?: { id: number } }) => {
+    const handleParlayPlaced = (parlayData: { user?: { id: number }; amount?: number }) => {
       // Only refresh if this parlay belongs to the current user
       if (parlayData.user?.id === user.id) {
+        // Optimistic update - subtract parlay amount immediately
+        if (parlayData.amount && user.muskBucks >= parlayData.amount) {
+          setUser((prevUser) =>
+            prevUser
+              ? {
+                  ...prevUser,
+                  muskBucks: prevUser.muskBucks - parlayData.amount!,
+                }
+              : null,
+          );
+        }
+        // Also refresh from server to ensure accuracy
         refreshUser();
       }
     };
 
+    const handleBetResolved = (data: { userId: number; payout?: number; amount?: number }) => {
+      // Handle bet resolution payouts
+      if (data.userId === user.id && data.payout) {
+        setUser((prevUser) =>
+          prevUser
+            ? {
+                ...prevUser,
+                muskBucks: prevUser.muskBucks + data.payout!,
+              }
+            : null,
+        );
+        // Refresh from server to ensure accuracy
+        refreshUser();
+      }
+    };
+
+    const handleParlayResolved = (data: { userId: number; payout?: number }) => {
+      // Handle parlay resolution payouts
+      if (data.userId === user.id && data.payout) {
+        setUser((prevUser) =>
+          prevUser
+            ? {
+                ...prevUser,
+                muskBucks: prevUser.muskBucks + data.payout!,
+              }
+            : null,
+        );
+        // Refresh from server to ensure accuracy
+        refreshUser();
+      }
+    };
+
+    // Listen for various balance-affecting events
+    socket.on('userBalanceUpdate', handleUserBalanceUpdate);
     socket.on('betPlaced', handleBetPlaced);
     socket.on('parlayPlaced', handleParlayPlaced);
+    socket.on('betResolved', handleBetResolved);
+    socket.on('parlayResolved', handleParlayResolved);
 
     return () => {
+      socket.off('userBalanceUpdate', handleUserBalanceUpdate);
       socket.off('betPlaced', handleBetPlaced);
       socket.off('parlayPlaced', handleParlayPlaced);
+      socket.off('betResolved', handleBetResolved);
+      socket.off('parlayResolved', handleParlayResolved);
     };
-  }, [user?.id, refreshUser]);
+  }, [user?.id, user?.muskBucks, refreshUser]);
 
   return (
     <AuthContext.Provider

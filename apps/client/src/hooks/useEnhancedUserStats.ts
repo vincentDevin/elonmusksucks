@@ -135,11 +135,12 @@ export function useEnhancedUserStats() {
 
     try {
       // Try enhanced stats endpoint first, fallback to basic stats
-      const [enhancedStatsResponse, activityResponse] = await Promise.all([
+      const [enhancedStatsResponse, activityResponse, achievementsResponse] = await Promise.all([
         api
           .get(`/api/users/${user.id}/enhanced-stats`)
           .catch(() => api.get(`/api/users/${user.id}/stats`).catch(() => ({ data: null }))),
         api.get(`/api/users/${user.id}/activity`).catch(() => ({ data: [] })),
+        api.get(`/api/users/${user.id}/achievements`).catch(() => ({ data: [] })),
       ]);
 
       // Calculate enhanced stats from available data
@@ -175,9 +176,12 @@ export function useEnhancedUserStats() {
         }
       });
 
-      const bestCategory = accuracyByCategory.reduce((best, current) =>
-        current.accuracy > best.accuracy ? current : best,
-      ).category;
+      const bestCategory =
+        accuracyByCategory.length > 0
+          ? accuracyByCategory.reduce((best, current) =>
+              current.accuracy > best.accuracy ? current : best,
+            ).category
+          : 'N/A';
 
       // Generate mock trend data
       const generateTrendData = (baseValue: number, points: number = 7): TrendData[] => {
@@ -200,14 +204,14 @@ export function useEnhancedUserStats() {
           winRate,
           profitLoss,
           accuracyByCategory,
-          currentStreak: {
-            type: Math.random() > 0.5 ? 'win' : 'lose',
-            count: Math.floor(Math.random() * 5) + 1,
-            isActive: Math.random() > 0.3,
+          currentStreak: baseStats?.currentStreak || {
+            type: 'win',
+            count: 0,
+            isActive: false,
           },
           bestCategory,
           totalWagered,
-          avgBetSize: totalBets > 0 ? totalWagered / totalBets : 0,
+          avgBetSize: baseStats?.avgBetSize || (totalBets > 0 ? totalWagered / totalBets : 0),
         },
         portfolio: {
           activeBetsValue,
@@ -218,44 +222,38 @@ export function useEnhancedUserStats() {
           potentialWinnings,
         },
         ranking: {
-          currentPosition: Math.floor(Math.random() * 100) + 1,
-          positionChange: Math.floor(Math.random() * 10) - 5,
-          percentile: calculatePercentile(50, leaderboard.stats?.totalUsers || 1000),
-          nextMilestone: calculateNextMilestone(50),
+          currentPosition: baseStats?.ranking?.rank || 0,
+          positionChange: baseStats?.ranking?.change || 0,
+          percentile:
+            baseStats?.ranking?.percentile ||
+            calculatePercentile(
+              baseStats?.ranking?.rank || 0,
+              leaderboard.stats?.totalUsers || 1000,
+            ),
+          nextMilestone: calculateNextMilestone(baseStats?.ranking?.rank || 0),
         },
         achievements: {
-          recentBadges: [], // No badge system yet
-          progressToNext: baseStats?.achievementProgress || [
-            {
-              id: 'streak_master',
-              title: 'Streak Master',
-              description: 'Win 10 bets in a row',
-              progress: Math.min(9, Math.floor(Math.random() * 12)),
-              target: 10,
-              isCompleted: false,
-            },
-            {
-              id: 'high_roller',
-              title: 'High Roller',
-              description: 'Place a 1000🪙 bet',
-              progress: Math.min(800, activeBetsValue),
-              target: 1000,
-              isCompleted: false,
-            },
-          ],
-          totalBadges: 3,
-          completionRate: baseStats?.achievementCompletionRate || 0.3,
+          recentBadges: [], // TODO: Implement recent badges from backend
+          progressToNext: achievementsResponse.data || [],
+          totalBadges: achievementsResponse.data?.filter((a: any) => a.isCompleted).length || 0,
+          completionRate:
+            achievementsResponse.data?.length > 0
+              ? achievementsResponse.data.filter((a: any) => a.isCompleted).length /
+                achievementsResponse.data.length
+              : 0,
         },
         trends: {
-          weeklyBettingVolume: generateTrendData(activeBetsValue / 7),
-          monthlyProfitLoss: generateTrendData(profitLoss / 30),
-          categoryEngagement: accuracyByCategory.map((cat) => ({
-            category: cat.category,
-            betCount: cat.totalBets,
-            winRate: cat.accuracy,
-            profitLoss: cat.totalBets * 50 * (cat.accuracy - 0.5),
-            avgBetSize: 50,
-          })),
+          weeklyBettingVolume: baseStats?.weeklyVolume || generateTrendData(activeBetsValue / 7),
+          monthlyProfitLoss: baseStats?.monthlyProfitLoss || generateTrendData(profitLoss / 30),
+          categoryEngagement:
+            baseStats?.categoryStats ||
+            accuracyByCategory.map((cat) => ({
+              category: cat.category,
+              betCount: cat.totalBets,
+              winRate: cat.accuracy,
+              profitLoss: cat.totalBets * 50 * (cat.accuracy - 0.5),
+              avgBetSize: 50,
+            })),
           recentActivity: activityResponse.data?.slice(0, 10) || [],
         },
       };
@@ -412,22 +410,46 @@ export function useEnhancedUserStats() {
   useEffect(() => {
     if (!user?.id || !socket) return;
 
+    const handleStatsUpdate = (data: any) => {
+      console.log('[useEnhancedUserStats] Received stats:update', data);
+      if (data.userId === user.id) {
+        fetchEnhancedStats();
+      }
+    };
+
+    const handleStatsRefresh = (data: any) => {
+      console.log('[useEnhancedUserStats] Received stats:refresh', data);
+      if (data.userId === user.id) {
+        fetchEnhancedStats();
+      }
+    };
+
     const handleUserStatsUpdate = (data: any) => {
+      console.log('[useEnhancedUserStats] Received user:stats_update', data);
+      if (data.userId === user.id) {
+        fetchEnhancedStats();
+      }
+    };
+
+    const handleRankingChange = (data: any) => {
+      console.log('[useEnhancedUserStats] Received ranking:change', data);
       if (data.userId === user.id) {
         fetchEnhancedStats();
       }
     };
 
     const handleAchievementUnlocked = (data: any) => {
-      if (data.userId === user.id) {
+      console.log('[useEnhancedUserStats] Received achievement:unlocked', data);
+      if (data.userId === user.id || data.achievement?.userId === user.id) {
         // Add to recent activity
+        const achievement = data.achievement || data;
         const newActivity: ActivityItem = {
           id: `achievement_${Date.now()}`,
           type: 'achievement_earned',
           title: 'Achievement Unlocked!',
-          description: data.title,
-          timestamp: new Date().toISOString(),
-          metadata: { achievement: data },
+          description: achievement.title || achievement.name || 'New achievement',
+          timestamp: data.timestamp || new Date().toISOString(),
+          metadata: { achievement },
         };
         setRecentActivity((prev) => [newActivity, ...prev].slice(0, 10));
 
@@ -436,14 +458,23 @@ export function useEnhancedUserStats() {
       }
     };
 
-    socket.on('userStatsUpdate', handleUserStatsUpdate);
-    socket.on('achievementUnlocked', handleAchievementUnlocked);
+    // Listen to new event names from backend
+    socket.on('stats:update', handleStatsUpdate);
+    socket.on('stats:refresh', handleStatsRefresh);
+    socket.on('user:stats_update', handleUserStatsUpdate);
+    socket.on('ranking:change', handleRankingChange);
+    socket.on('achievement:unlocked', handleAchievementUnlocked);
+
+    // Keep some legacy events for backward compatibility
     socket.on('betPlaced', () => fetchEnhancedStats());
     socket.on('betResolved', () => fetchEnhancedStats());
 
     return () => {
-      socket.off('userStatsUpdate', handleUserStatsUpdate);
-      socket.off('achievementUnlocked', handleAchievementUnlocked);
+      socket.off('stats:update', handleStatsUpdate);
+      socket.off('stats:refresh', handleStatsRefresh);
+      socket.off('user:stats_update', handleUserStatsUpdate);
+      socket.off('ranking:change', handleRankingChange);
+      socket.off('achievement:unlocked', handleAchievementUnlocked);
       socket.off('betPlaced');
       socket.off('betResolved');
     };

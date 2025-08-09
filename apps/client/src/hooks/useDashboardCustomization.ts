@@ -59,8 +59,6 @@ export interface DashboardPreferences {
   performance: {
     reducedAnimations: boolean;
     reducedData: boolean;
-    autoRefresh: boolean;
-    refreshInterval: number; // seconds
   };
 }
 
@@ -233,8 +231,6 @@ const DEFAULT_PREFERENCES: DashboardPreferences = {
   performance: {
     reducedAnimations: false,
     reducedData: false,
-    autoRefresh: true,
-    refreshInterval: 30,
   },
 };
 

@@ -1,8 +1,14 @@
 // apps/client/src/components/dashboard/customization/NotificationSettings.tsx
-import { useDashboardCustomization } from '../../../hooks/useDashboardCustomization';
+import { useAdvancedThemes } from '../../../theme/hooks/useUnifiedTheme';
 
 export default function NotificationSettings() {
-  const { preferences, updateNotifications } = useDashboardCustomization();
+  const { preferences, updatePreferences } = useAdvancedThemes();
+
+  const updateNotifications = (updates: any) => {
+    updatePreferences({
+      notifications: { ...preferences.notifications, ...updates },
+    });
+  };
 
   const ToggleSwitch = ({
     enabled,

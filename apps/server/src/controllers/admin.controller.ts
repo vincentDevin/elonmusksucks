@@ -10,10 +10,8 @@ import type {
   PublicBadge,
   PublicUserBadge,
   PublicAITweet,
-  AdminBet,
   AdminTransaction,
 } from '@ems/types';
-import { PredictionType } from '@ems/types';
 import type { Role } from '@prisma/client';
 import type {
   QueryParams,
@@ -301,33 +299,8 @@ export async function resolvePrediction(
 export async function getBets(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const filters = req.query as unknown as QueryParams;
-    const bets: PublicBet[] = await adminService.listBets(filters);
-    const preds: PublicPrediction[] = await adminService.listPredictions(filters);
-    const users: PublicUser[] = await adminService.listUsers();
-
-    const detailed: AdminBet[] = bets.map((b) => {
-      const matching = preds.find((p) => p.id === b.predictionId);
-      return {
-        ...b,
-        userName: users.find((u) => u.id === b.userId)?.name ?? 'Unknown',
-        prediction:
-          matching ??
-          ({
-            id: b.predictionId,
-            title: 'Unknown prediction',
-            description: '',
-            category: '',
-            expiresAt: new Date(),
-            approved: false,
-            resolved: false,
-            type: PredictionType.MULTIPLE,
-            threshold: null,
-            creatorId: 0,
-          } as PublicPrediction),
-      };
-    });
-
-    res.json(detailed);
+    const bets = await adminService.listBets(filters);
+    res.json(bets);
   } catch (err) {
     next(err);
   }

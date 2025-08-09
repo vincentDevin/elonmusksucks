@@ -2,7 +2,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSocket } from '../contexts/SocketContext';
 import { useAuth } from '../contexts/AuthContext';
-import api from '../api/axios';
 
 export interface ActivityItem {
   id: string;
@@ -109,129 +108,58 @@ export function useActivityStream() {
     },
   });
 
-  // Fetch initial activity stream
-  const fetchActivities = useCallback(
-    async (offset = 0, limit = 20) => {
-      setState((prev) => ({ ...prev, loading: true, error: null }));
+  // Initialize activity stream from Socket.IO only
+  const initializeActivityStream = useCallback(() => {
+    if (!socket) return;
 
-      try {
-        // Use existing user activity endpoint as fallback
-        let activities: ActivityItem[] = [];
+    setState((prev) => ({ ...prev, loading: true, error: null }));
 
-        if (user?.id) {
-          try {
-            const response = await api.get(`/api/users/${user.id}/activity`);
-            activities = (response.data || [])
-              .slice(offset, offset + limit)
-              .map((_activity: unknown, index: number) => ({
-                id: `activity_${index}_${Date.now()}`,
-                type: 'friend_activity' as const,
-                title: 'Recent Activity',
-                description: 'Activity from your account',
-                timestamp: new Date(Date.now() - index * 60000).toISOString(),
-                userId: user.id,
-                userName: user.name,
-                isPersonal: true,
-                priority: 'low' as const,
-                icon: ACTIVITY_ICONS.friend_activity,
-                color: ACTIVITY_COLORS.friend_activity,
-              }));
-          } catch {
-            // If that fails, create some mock activities
-            activities = generateMockActivities(offset, limit);
-          }
-        } else {
-          activities = generateMockActivities(offset, limit);
-        }
+    // Request initial activity data via socket
+    socket.emit('activity:request', {
+      limit: 50,
+      userId: user?.id,
+      includePersonal: true,
+      includeSocial: true,
+      includePlatform: true,
+    });
+  }, [socket, user?.id]);
 
-        setState((prev) => ({
-          ...prev,
-          activities: offset === 0 ? activities : [...prev.activities, ...activities],
-          hasMore: activities.length === limit, // Simple pagination logic
-          loading: false,
-        }));
-      } catch (err: unknown) {
-        const errorMessage = err instanceof Error ? err.message : 'Failed to load activity stream';
-        setState((prev) => ({
-          ...prev,
-          error: errorMessage,
-          loading: false,
-        }));
-      }
+  // Handle initial activity stream response
+  const handleActivityResponse = useCallback(
+    (activities: any[]) => {
+      const processedActivities: ActivityItem[] = activities.map((activity) => {
+        const isPersonal = activity.userId === user?.id;
+
+        return {
+          id: activity.id || `activity_${Date.now()}_${Math.random()}`,
+          type: activity.type || 'friend_activity',
+          title: activity.title || 'Activity Update',
+          description: activity.description || '',
+          timestamp: activity.timestamp || new Date().toISOString(),
+          userId: activity.userId,
+          userName: activity.userName || activity.user?.name,
+          userAvatar: activity.userAvatar || activity.user?.avatarUrl,
+          amount: activity.amount,
+          predictionId: activity.predictionId,
+          predictionTitle: activity.predictionTitle || activity.prediction?.title,
+          category: activity.category,
+          metadata: activity.metadata || {},
+          isPersonal,
+          priority: activity.priority || 'medium',
+          icon: ACTIVITY_ICONS[activity.type as keyof typeof ACTIVITY_ICONS] || '📋',
+          color: ACTIVITY_COLORS[activity.type as keyof typeof ACTIVITY_COLORS] || 'text-gray-500',
+        };
+      });
+
+      setState((prev) => ({
+        ...prev,
+        activities: processedActivities,
+        loading: false,
+        hasMore: false, // No pagination for real-time data
+      }));
     },
-    [state.filters, user?.id],
+    [user?.id],
   );
-
-  // Generate mock activities for demo purposes
-  const generateMockActivities = useCallback(
-    (offset: number, limit: number): ActivityItem[] => {
-      const mockTypes: ActivityItem['type'][] = [
-        'bet_placed',
-        'prediction_created',
-        'achievement_earned',
-        'rank_changed',
-        'trending_prediction',
-      ];
-
-      const activities: ActivityItem[] = [];
-      for (let i = 0; i < limit; i++) {
-        const type = mockTypes[Math.floor(Math.random() * mockTypes.length)];
-        const timeAgo = (offset + i) * 5 + Math.random() * 10; // Minutes ago
-
-        activities.push({
-          id: `mock_${offset + i}_${Date.now()}`,
-          type,
-          title: getMockTitle(type),
-          description: getMockDescription(type),
-          timestamp: new Date(Date.now() - timeAgo * 60000).toISOString(),
-          userId: user?.id,
-          userName: user?.name,
-          amount: type.includes('bet') ? Math.floor(Math.random() * 500) + 50 : undefined,
-          isPersonal: Math.random() > 0.3,
-          priority: Math.random() > 0.7 ? 'high' : Math.random() > 0.4 ? 'medium' : 'low',
-          icon: ACTIVITY_ICONS[type],
-          color: ACTIVITY_COLORS[type],
-        });
-      }
-
-      return activities;
-    },
-    [user?.id, user?.name],
-  );
-
-  const getMockTitle = (type: ActivityItem['type']): string => {
-    switch (type) {
-      case 'bet_placed':
-        return 'New bet placed';
-      case 'prediction_created':
-        return 'Prediction created';
-      case 'achievement_earned':
-        return 'Achievement unlocked!';
-      case 'rank_changed':
-        return 'Rank updated';
-      case 'trending_prediction':
-        return 'Prediction trending';
-      default:
-        return 'Activity update';
-    }
-  };
-
-  const getMockDescription = (type: ActivityItem['type']): string => {
-    switch (type) {
-      case 'bet_placed':
-        return 'Someone placed a bet on a popular prediction';
-      case 'prediction_created':
-        return 'A new prediction was created in Technology';
-      case 'achievement_earned':
-        return 'Earned the "Consistent Trader" badge';
-      case 'rank_changed':
-        return 'Your leaderboard position improved';
-      case 'trending_prediction':
-        return 'High activity prediction gaining momentum';
-      default:
-        return 'Platform activity update';
-    }
-  };
 
   // Create activity item from real-time event
   const createActivityFromEvent = useCallback(
@@ -354,7 +282,7 @@ export function useActivityStream() {
     [user?.id],
   );
 
-  // Listen for real-time events
+  // Listen for real-time events and initial data
   useEffect(() => {
     if (!socket) return;
 
@@ -368,12 +296,23 @@ export function useActivityStream() {
       }
     };
 
-    // Personal activity events
-    socket.on('betPlaced', handleActivity('betPlaced'));
-    socket.on('parlayPlaced', handleActivity('parlayPlaced'));
-    socket.on('predictionCreated', handleActivity('predictionCreated'));
-    socket.on('achievementUnlocked', handleActivity('achievementUnlocked'));
+    // Handle initial activity stream response
+    socket.on('activity:response', handleActivityResponse);
+
+    // Handle connection events
+    socket.on('connect', initializeActivityStream);
+    socket.on('reconnect', initializeActivityStream);
+
+    // Real-time activity events with enhanced data
+    socket.on('bet:placed', handleActivity('betPlaced'));
+    socket.on('bet:resolved', handleActivity('betResolved'));
+    socket.on('parlay:placed', handleActivity('parlayPlaced'));
+    socket.on('parlay:resolved', handleActivity('parlayResolved'));
+    socket.on('prediction:created', handleActivity('predictionCreated'));
+    socket.on('prediction:resolved', handleActivity('predictionResolved'));
+    socket.on('achievement:unlocked', handleActivity('achievementUnlocked'));
     socket.on('leaderboard:rankChange', handleActivity('leaderboard:rankChange'));
+    socket.on('activity:update', handleActivity('activityUpdate'));
 
     // Platform-wide events (filtered by relevance)
     socket.on('bigBetAlert', (data: any) => {
@@ -416,16 +355,39 @@ export function useActivityStream() {
       }));
     });
 
+    // Handle errors
+    socket.on('activity:error', (error: any) => {
+      console.error('[activity-stream] Socket error:', error);
+      setState((prev) => ({
+        ...prev,
+        error: error.message || 'Failed to load activity stream',
+        loading: false,
+      }));
+    });
+
+    // Initialize if already connected
+    if (socket.connected) {
+      initializeActivityStream();
+    }
+
     return () => {
-      socket.off('betPlaced');
-      socket.off('parlayPlaced');
-      socket.off('predictionCreated');
-      socket.off('achievementUnlocked');
+      socket.off('activity:response');
+      socket.off('connect');
+      socket.off('reconnect');
+      socket.off('bet:placed');
+      socket.off('bet:resolved');
+      socket.off('parlay:placed');
+      socket.off('parlay:resolved');
+      socket.off('prediction:created');
+      socket.off('prediction:resolved');
+      socket.off('achievement:unlocked');
       socket.off('leaderboard:rankChange');
+      socket.off('activity:update');
       socket.off('bigBetAlert');
       socket.off('predictionTrending');
+      socket.off('activity:error');
     };
-  }, [socket, createActivityFromEvent]);
+  }, [socket, createActivityFromEvent, handleActivityResponse, initializeActivityStream]);
 
   // Filter activities based on current filters
   const filteredActivities = useMemo(() => {
@@ -486,26 +448,19 @@ export function useActivityStream() {
     }));
   }, []);
 
-  // Load more activities
+  // Load more activities (simplified for real-time data)
   const loadMore = useCallback(() => {
-    if (!state.hasMore || state.loading) return;
-    fetchActivities(state.activities.length);
-  }, [state.hasMore, state.loading, state.activities.length, fetchActivities]);
+    // No more pagination needed for real-time data
+    // Could request more historical data if needed
+    console.log("[activity-stream] Load more requested - real-time data doesn't need pagination");
+  }, []);
 
   // Refresh activities
   const refresh = useCallback(() => {
-    fetchActivities(0);
-  }, [fetchActivities]);
-
-  // Initial fetch
-  useEffect(() => {
-    fetchActivities(0);
-  }, []);
-
-  // Refresh when filters change
-  useEffect(() => {
-    fetchActivities(0);
-  }, [state.filters]);
+    if (socket) {
+      initializeActivityStream();
+    }
+  }, [socket, initializeActivityStream]);
 
   return {
     activities: filteredActivities,

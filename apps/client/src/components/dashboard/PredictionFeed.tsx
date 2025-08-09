@@ -100,6 +100,7 @@ export default function PredictionFeed() {
               variant="compact"
               showParlayActions={true}
               showBetsList={false}
+              hideInlineParlaySelector={true}
             />
           ))}
           {hasMore && (

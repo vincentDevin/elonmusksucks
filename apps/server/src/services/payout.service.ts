@@ -12,6 +12,7 @@ import redis from '../lib/redis';
 import IORedis from 'ioredis';
 import { leaderboardService } from './leaderboard.service';
 import type { LeaderboardTrigger } from './leaderboard.service';
+import { unifiedActivityService } from './unifiedActivity.service';
 
 // Create a separate Redis client for subscriptions to avoid conflicts
 const subscriptionRedis = new IORedis({
@@ -50,8 +51,36 @@ export class PayoutService {
     if (typeof this.repo.markResolving !== 'function') {
       const resolved = await this.repo.resolvePrediction(predictionId, winningOptionId);
 
-      // Publish real‑time update so front‑end sees result instantly
+      // Publish real‑time update so front‑end sees result instantly (legacy)
       await redis.publish('prediction:resolve', JSON.stringify(resolved));
+
+      // The resolved prediction from the repository includes options
+      const resolvedWithOptions = resolved as PublicPrediction & {
+        options?: Array<{ id: number; label: string }>;
+      };
+      const winningOption = resolvedWithOptions.options?.find(
+        (opt: any) => opt.id === winningOptionId,
+      );
+
+      // Publish to unified activity system
+      if (winningOption) {
+        // Get resolver info (could be system/admin)
+        const resolver = {
+          id: 0, // System resolver
+          name: 'System',
+          avatarUrl: null,
+        };
+
+        await unifiedActivityService.createPredictionResolvedActivity(
+          {
+            id: resolved.id,
+            title: resolved.title,
+            category: resolved.category,
+            winningOption: winningOption.label,
+          },
+          resolver,
+        );
+      }
 
       // Trigger leaderboard update for prediction completion
       await this.triggerLeaderboardUpdate(predictionId, resolved);

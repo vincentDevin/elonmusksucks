@@ -1,8 +1,14 @@
 // apps/client/src/components/dashboard/customization/PerformanceSettings.tsx
-import { useDashboardCustomization } from '../../../hooks/useDashboardCustomization';
+import { useAdvancedThemes } from '../../../theme/hooks/useUnifiedTheme';
 
 export default function PerformanceSettings() {
-  const { preferences, updatePerformance } = useDashboardCustomization();
+  const { preferences, updatePreferences } = useAdvancedThemes();
+
+  const updatePerformance = (updates: any) => {
+    updatePreferences({
+      performance: { ...preferences.performance, ...updates },
+    });
+  };
 
   const ToggleSwitch = ({
     enabled,
@@ -62,39 +68,6 @@ export default function PerformanceSettings() {
         </div>
       </div>
 
-      <div className="bg-background/50 rounded-xl p-4 border border-muted">
-        <h4 className="font-semibold text-content mb-4">Auto-Refresh</h4>
-        <div className="space-y-4">
-          <ToggleSwitch
-            enabled={preferences.performance.autoRefresh}
-            onChange={(value) => updatePerformance({ autoRefresh: value })}
-            label="Auto-Refresh Data"
-            description="Automatically refresh dashboard data"
-          />
-
-          {preferences.performance.autoRefresh && (
-            <div>
-              <label className="block text-sm font-medium text-content mb-2">
-                Refresh Interval: {preferences.performance.refreshInterval}s
-              </label>
-              <input
-                type="range"
-                min="10"
-                max="300"
-                step="10"
-                value={preferences.performance.refreshInterval}
-                onChange={(e) => updatePerformance({ refreshInterval: parseInt(e.target.value) })}
-                className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer"
-              />
-              <div className="flex justify-between text-xs text-tertiary mt-1">
-                <span>10s (Fast)</span>
-                <span>300s (Battery Saving)</span>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
       <div className="bg-yellow-50/10 border border-yellow-200 rounded-xl p-4">
         <h4 className="font-semibold text-content mb-2 flex items-center">
           <span className="mr-2">⚡</span>
@@ -103,7 +76,7 @@ export default function PerformanceSettings() {
         <ul className="text-sm text-tertiary space-y-1">
           <li>• Enable reduced animations on slower devices</li>
           <li>• Use reduced data mode on mobile connections</li>
-          <li>• Increase refresh interval to save battery life</li>
+          <li>• Real-time updates use Socket.IO (no polling needed)</li>
           <li>• Close unused browser tabs for better performance</li>
         </ul>
       </div>

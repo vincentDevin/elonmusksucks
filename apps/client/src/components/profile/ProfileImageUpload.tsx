@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
 import { ImageCropper } from './ImageCropper';
 
 interface ProfileImageUploadProps {
@@ -32,6 +33,7 @@ export function ProfileImageUpload({
   className,
   disabled = false,
 }: ProfileImageUploadProps) {
+  const { accessToken } = useAuth();
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -89,7 +91,10 @@ export function ProfileImageUpload({
   };
 
   const uploadCroppedImage = async (blob: Blob) => {
-    if (!selectedFile) return;
+    if (!selectedFile || !accessToken) {
+      onUploadError('Authentication required');
+      return;
+    }
 
     setIsUploading(true);
     setUploadProgress(0);
@@ -103,7 +108,7 @@ export function ProfileImageUpload({
       const response = await fetch(`/api/users/${userId}/profile-picture`, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          Authorization: `Bearer ${accessToken}`,
         },
         body: formData,
       });

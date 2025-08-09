@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { usePredictionDiscovery } from '../../hooks/usePredictionDiscovery';
 import PredictionFilters from './discovery/PredictionFilters';
 import PredictionSectionCard from './discovery/PredictionSectionCard';
+import UnifiedPredictionCard from '../UnifiedPredictionCard';
 
 type ViewMode = 'sections' | 'all';
 
@@ -139,18 +140,22 @@ export default function PredictionPanel() {
 
             <div className="space-y-4 max-h-[600px] overflow-y-auto scrollbar-thin scrollbar-track-secondary/20 scrollbar-thumb-primary/40 hover:scrollbar-thumb-primary/60 pr-2">
               {enhancedPredictions.map((prediction) => (
-                <PredictionSectionCard
+                <div
                   key={prediction.id}
-                  section={{
-                    id: 'single',
-                    title: '',
-                    icon: '',
-                    predictions: [prediction],
-                    count: 1,
-                  }}
-                  onFavoriteToggle={toggleFavorite}
-                  onMarkViewed={markAsViewed}
-                />
+                  className="bg-background/50 rounded-xl border border-muted overflow-hidden"
+                >
+                  <div className="p-4">
+                    <UnifiedPredictionCard
+                      prediction={prediction}
+                      variant="compact"
+                      showParlayActions={true}
+                      showBetsList={false}
+                      hideInlineParlaySelector={true}
+                      className="shadow-sm hover:shadow-md transition-shadow"
+                      onCardView={() => markAsViewed(prediction.id)}
+                    />
+                  </div>
+                </div>
               ))}
             </div>
           </div>

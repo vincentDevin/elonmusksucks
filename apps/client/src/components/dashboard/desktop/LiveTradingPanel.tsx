@@ -1,5 +1,6 @@
 // apps/client/src/components/dashboard/desktop/LiveTradingPanel.tsx
 import { useState, useEffect } from 'react';
+import { useSocket } from '../../../contexts/SocketContext';
 
 interface LiveOrder {
   id: string;
@@ -10,6 +11,8 @@ interface LiveOrder {
   timestamp: string;
   status: 'pending' | 'confirmed' | 'rejected';
   user?: string;
+  userId?: number;
+  predictionId?: number;
 }
 
 interface MarketMovement {
@@ -19,65 +22,125 @@ interface MarketMovement {
   newOdds: number;
   change: number;
   volume: number;
+  timestamp: string;
 }
 
 export default function LiveTradingPanel() {
+  const socket = useSocket();
   const [liveOrders, setLiveOrders] = useState<LiveOrder[]>([]);
   const [marketMovements, setMarketMovements] = useState<MarketMovement[]>([]);
   const [activeTab, setActiveTab] = useState<'orders' | 'movements'>('orders');
+  const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
-    // Simulate live data updates
-    const interval = setInterval(() => {
-      // Mock live orders
-      if (Math.random() > 0.7) {
+    if (!socket) return;
+
+    // Listen for real bet placement events
+    const handleBetPlaced = (data: any) => {
+      const newOrder: LiveOrder = {
+        id: `bet_${data.betId || data.id || Date.now()}`,
+        type: 'bet',
+        prediction: data.predictionTitle || data.prediction?.title || 'Unknown Prediction',
+        amount: data.amount || 0,
+        odds: data.odds || data.oddsAtPlacement || 1.0,
+        timestamp: new Date().toISOString(),
+        status: 'confirmed',
+        user: data.userName || data.user?.name || 'Anonymous',
+        userId: data.userId || data.user?.id,
+        predictionId: data.predictionId,
+      };
+
+      setLiveOrders((prev) => [newOrder, ...prev.slice(0, 19)]);
+    };
+
+    // Listen for real parlay placement events
+    const handleParlayPlaced = (data: any) => {
+      const newOrder: LiveOrder = {
+        id: `parlay_${data.parlayId || data.id || Date.now()}`,
+        type: 'parlay',
+        prediction: `${data.legCount || 0}-leg parlay`,
+        amount: data.amount || 0,
+        odds: data.combinedOdds || 1.0,
+        timestamp: new Date().toISOString(),
+        status: 'confirmed',
+        user: data.userName || data.user?.name || 'Anonymous',
+        userId: data.userId || data.user?.id,
+      };
+
+      setLiveOrders((prev) => [newOrder, ...prev.slice(0, 19)]);
+    };
+
+    // Listen for market movements (odds changes)
+    const handleOddsChange = (data: any) => {
+      const movement: MarketMovement = {
+        predictionId: data.predictionId?.toString() || Date.now().toString(),
+        title: data.predictionTitle || data.title || 'Market Update',
+        oldOdds: data.oldOdds || 1.0,
+        newOdds: data.newOdds || 1.0,
+        change: data.change || 0,
+        volume: data.volume || data.totalVolume || 0,
+        timestamp: new Date().toISOString(),
+      };
+
+      setMarketMovements((prev) => [movement, ...prev.slice(0, 19)]);
+    };
+
+    // Listen for big bet alerts (whale activity)
+    const handleBigBet = (data: any) => {
+      if (data.amount >= 1000) {
         const newOrder: LiveOrder = {
-          id: Date.now().toString(),
-          type: Math.random() > 0.7 ? 'parlay' : 'bet',
-          prediction: `Prediction ${Math.floor(Math.random() * 100)}`,
-          amount: Math.floor(Math.random() * 500) + 50,
-          odds: Math.random() * 3 + 1.5,
+          id: `whale_${data.betId || Date.now()}`,
+          type: data.type === 'parlay' ? 'parlay' : 'bet',
+          prediction: data.predictionTitle || 'High-Value Bet',
+          amount: data.amount,
+          odds: data.odds || 1.0,
           timestamp: new Date().toISOString(),
-          status: 'pending',
-          user: `User${Math.floor(Math.random() * 1000)}`,
+          status: 'confirmed',
+          user: data.userName || '🐋 Whale',
+          userId: data.userId,
+          predictionId: data.predictionId,
         };
 
-        setLiveOrders((prev) => [newOrder, ...prev.slice(0, 9)]);
-
-        // Simulate status changes
-        setTimeout(
-          () => {
-            setLiveOrders((prev) =>
-              prev.map((order) =>
-                order.id === newOrder.id
-                  ? { ...order, status: Math.random() > 0.1 ? 'confirmed' : 'rejected' }
-                  : order,
-              ),
-            );
-          },
-          Math.random() * 3000 + 1000,
-        );
+        setLiveOrders((prev) => [newOrder, ...prev.slice(0, 19)]);
       }
+    };
 
-      // Mock market movements
-      if (Math.random() > 0.8) {
-        const movement: MarketMovement = {
-          predictionId: Date.now().toString(),
-          title: `Market ${Math.floor(Math.random() * 50)}`,
-          oldOdds: Math.random() * 3 + 1.5,
-          newOdds: 0,
-          change: 0,
-          volume: Math.floor(Math.random() * 10000) + 1000,
-        };
-        movement.newOdds = movement.oldOdds * (1 + (Math.random() - 0.5) * 0.3);
-        movement.change = ((movement.newOdds - movement.oldOdds) / movement.oldOdds) * 100;
+    // Register Socket.IO event listeners
+    socket.on('bet:placed', handleBetPlaced);
+    socket.on('parlay:placed', handleParlayPlaced);
+    socket.on('market:oddsChange', handleOddsChange);
+    socket.on('bigBetAlert', handleBigBet);
+    socket.on('prediction:trending', handleOddsChange); // Also show trending as market movement
 
-        setMarketMovements((prev) => [movement, ...prev.slice(0, 9)]);
-      }
-    }, 2000);
+    // Handle connection status
+    const handleConnect = () => {
+      setIsConnected(true);
+      // No need to subscribe - events are automatically broadcast
+    };
 
-    return () => clearInterval(interval);
-  }, []);
+    const handleDisconnect = () => {
+      setIsConnected(false);
+    };
+
+    // Set up connection listeners
+    socket.on('connect', handleConnect);
+    socket.on('disconnect', handleDisconnect);
+
+    // Set initial connection state
+    setIsConnected(socket.connected);
+
+    // Events are automatically broadcast - no subscription needed
+
+    return () => {
+      socket.off('bet:placed', handleBetPlaced);
+      socket.off('parlay:placed', handleParlayPlaced);
+      socket.off('market:oddsChange', handleOddsChange);
+      socket.off('bigBetAlert', handleBigBet);
+      socket.off('prediction:trending', handleOddsChange);
+      socket.off('connect', handleConnect);
+      socket.off('disconnect', handleDisconnect);
+    };
+  }, [socket]);
 
   const getStatusColor = (status: LiveOrder['status']) => {
     switch (status) {
@@ -121,7 +184,12 @@ export default function LiveTradingPanel() {
           <div className="flex items-center space-x-2">
             <span className="text-xl">⚡</span>
             <h3 className="font-semibold text-content">Live Trading</h3>
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+            <div
+              className={`w-2 h-2 rounded-full ${
+                isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'
+              }`}
+            ></div>
+            <span className="text-xs text-tertiary">{isConnected ? 'Live' : 'Disconnected'}</span>
           </div>
 
           <div className="flex bg-background rounded-lg p-1 border border-muted">
@@ -157,7 +225,17 @@ export default function LiveTradingPanel() {
             {liveOrders.length === 0 ? (
               <div className="text-center py-8 text-tertiary">
                 <div className="text-4xl mb-2">📊</div>
-                <p>Waiting for live orders...</p>
+                {isConnected ? (
+                  <div>
+                    <p>Waiting for live trading activity...</p>
+                    <p className="text-xs mt-2">Orders will appear here when users place bets</p>
+                  </div>
+                ) : (
+                  <div>
+                    <p>Connecting to trading feed...</p>
+                    <p className="text-xs mt-2">Real-time data will load once connected</p>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="space-y-3">
@@ -203,7 +281,17 @@ export default function LiveTradingPanel() {
             {marketMovements.length === 0 ? (
               <div className="text-center py-8 text-tertiary">
                 <div className="text-4xl mb-2">📈</div>
-                <p>Waiting for market movements...</p>
+                {isConnected ? (
+                  <div>
+                    <p>Waiting for market movements...</p>
+                    <p className="text-xs mt-2">Odds changes and volume spikes will appear here</p>
+                  </div>
+                ) : (
+                  <div>
+                    <p>Connecting to market data...</p>
+                    <p className="text-xs mt-2">Live market updates will load once connected</p>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="space-y-3">

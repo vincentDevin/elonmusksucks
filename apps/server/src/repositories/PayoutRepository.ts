@@ -2,6 +2,7 @@
 import { PrismaClient, Prisma } from '@prisma/client';
 import type { IPayoutRepository } from './IPayoutRepository';
 import type { PublicPrediction, DbUserStats } from '@ems/types';
+import redisClient from '../lib/redis';
 
 const prisma = new PrismaClient();
 
@@ -54,6 +55,24 @@ export class PayoutRepository implements IPayoutRepository {
               payout: isWinner ? b.potentialPayout : undefined,
             },
           });
+
+          // Publish bet status change event for real-time updates
+          try {
+            const betStatusPayload = {
+              betId: b.id,
+              userId: b.userId,
+              predictionId,
+              status: isWinner ? 'WON' : 'LOST',
+              amount: b.amount,
+              payout: isWinner ? (b.potentialPayout ?? 0) : 0,
+              timestamp: new Date().toISOString(),
+            };
+
+            // Publish to single channel - handler will route to user room
+            await redisClient.publish('bet:status_change', JSON.stringify(betStatusPayload));
+          } catch (error) {
+            console.error('[payout] Error publishing bet status change:', error);
+          }
 
           if (isWinner) {
             const user = await tx.user.findUnique({ where: { id: b.userId } });
@@ -126,6 +145,22 @@ export class PayoutRepository implements IPayoutRepository {
                 (prevStats.totalWagered + b.amount),
             },
           });
+
+          // Trigger enhanced stats update after basic stats are updated
+          try {
+            const statsUpdatePayload = {
+              userId: b.userId,
+              reason: 'bet_resolved',
+              betId: b.id,
+              predictionId,
+              status: isWinner ? 'WON' : 'LOST',
+              timestamp: new Date().toISOString(),
+            };
+
+            await redisClient.publish('user:stats_update', JSON.stringify(statsUpdatePayload));
+          } catch (error) {
+            console.error('[payout] Error publishing stats update event:', error);
+          }
         }
 
         // --- STEP 3: process parlays ---
@@ -157,6 +192,25 @@ export class PayoutRepository implements IPayoutRepository {
             where: { id: parlayId },
             data: { status: lost ? 'LOST' : 'WON' },
           });
+
+          // Publish parlay status change event for real-time updates
+          try {
+            const parlayStatusPayload = {
+              parlayId,
+              userId: parlay.userId,
+              status: lost ? 'LOST' : 'WON',
+              amount: parlay.amount,
+              payout: lost ? 0 : payoutAmount,
+              legCount,
+              legsWon,
+              timestamp: new Date().toISOString(),
+            };
+
+            // Publish to single channel - handler will route to user room
+            await redisClient.publish('parlay:status_change', JSON.stringify(parlayStatusPayload));
+          } catch (error) {
+            console.error('[payout] Error publishing parlay status change:', error);
+          }
 
           if (!lost) {
             const newBal = parlay.user.muskBucks + payoutAmount;
@@ -229,6 +283,23 @@ export class PayoutRepository implements IPayoutRepository {
                 (prevP.totalWagered + parlay.amount),
             },
           });
+
+          // Trigger enhanced stats update after parlay stats are updated
+          try {
+            const statsUpdatePayload = {
+              userId: parlay.userId,
+              reason: 'parlay_resolved',
+              parlayId,
+              status: lost ? 'LOST' : 'WON',
+              legCount,
+              legsWon,
+              timestamp: new Date().toISOString(),
+            };
+
+            await redisClient.publish('user:stats_update', JSON.stringify(statsUpdatePayload));
+          } catch (error) {
+            console.error('[payout] Error publishing parlay stats update event:', error);
+          }
         }
 
         return updatedPrediction;

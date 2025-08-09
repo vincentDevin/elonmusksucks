@@ -12,11 +12,11 @@ import redisClient from './lib/redis';
 import { socketAuthMiddleware } from './middleware/socketAuthMiddleware';
 import { registerChatHandlers } from './handlers/chatHandlers';
 import { registerBetHandlers } from './handlers/betSocketHandlers';
-import { registerActivityTickerHandlers } from './handlers/activityTickerHandlers';
 import { registerRedisEventHandlers } from './handlers/redisEventHandlers';
 import { registerRedisChatHandlers } from './handlers/redisChatEventHandlers';
-import { registerNormalizedActivityHandlers } from './handlers/normalizedActivityHandlers';
 import { registerModerationHandlers } from './handlers/moderationHandlers';
+import { registerStatisticsRedisHandlers } from './handlers/statisticsSocketHandlers';
+import { setupUnifiedActivityHandlers } from './handlers/unifiedActivityHandlers';
 // import { registerRoomHandlers } from './handlers/roomHandlers'; // future rooms
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -52,8 +52,18 @@ export async function initSocket(httpServer: HTTPServer) {
     'parlay:place',
     'leaderboard:allTime',
     'leaderboard:daily',
-    'activity:newsflash',
-    'activity:newsflash:normalized', // New normalized events
+    // Stats and ranking events
+    'stats:update',
+    'stats:refresh',
+    'ranking:change',
+    'achievement:unlocked',
+    'user:stats_update',
+    // Bet and parlay status events
+    'bet:status_change',
+    'parlay:status_change',
+    // Admin metrics events
+    'admin:metrics:update',
+    // NOTE: Removed 'activity:newsflash' - now handled by unified activity system
     // Moderation events
     'moderation:userBan',
     'moderation:userUnban',
@@ -66,9 +76,22 @@ export async function initSocket(httpServer: HTTPServer) {
   registerRedisEventHandlers(io, eventSub);
   // registerNormalizedActivityRedisHandlers(io, eventSub); // Now handled by main handler
 
+  // ── Statistics event subscriptions ────────────────────────────────────────
+  const statsSub = redisClient.duplicate();
+  registerStatisticsRedisHandlers(io, statsSub);
+
+  // ── Unified Activity event subscriptions ──────────────────────────────────
+  // Note: Unified activity handlers manage all activity streams via single source
+  const { setupUnifiedActivityRedisHandlers } = await import('./handlers/unifiedActivityHandlers');
+  setupUnifiedActivityRedisHandlers(io);
+
+  // Give the unified activity service access to Socket.IO for immediate broadcasts
+  const { unifiedActivityService } = await import('./services/unifiedActivity.service');
+  unifiedActivityService.setSocketIO(io);
+
   // ── Chat event subscriptions ──────────────────────────────────────────────
   const chatSub = redisClient.duplicate();
-  await registerRedisChatHandlers(io, chatSub);
+  registerRedisChatHandlers(io, chatSub);
 
   // ── Auth middleware must run before per‑socket handlers ───────────────────
   io.use(socketAuthMiddleware);
@@ -77,18 +100,25 @@ export async function initSocket(httpServer: HTTPServer) {
   io.on('connection', (socket) => {
     console.log('[socket] client connected:', socket.id);
     try {
+      const user = (socket as any).user;
+
+      // Join user-specific room for personal events
+      if (user?.id) {
+        socket.join(`user:${user.id}`);
+        console.log(`[socket] User ${user.id} joined personal room`);
+      }
+
       // Join admin room if user is admin
-      if ((socket as any).user?.role === 'ADMIN') {
+      if (user?.role === 'ADMIN') {
         socket.join('admin');
-        console.log(`[socket] Admin user ${(socket as any).user.id} joined admin room`);
+        console.log(`[socket] Admin user ${user.id} joined admin room`);
       }
 
       // registerRoomHandlers(io, socket); // Uncomment when multi‑room is live
       registerChatHandlers(socket);
       registerBetHandlers(socket);
-      registerActivityTickerHandlers(socket);
-      registerNormalizedActivityHandlers(socket);
       registerModerationHandlers(socket);
+      setupUnifiedActivityHandlers(socket);
     } catch (err) {
       console.error('[socket] handler error:', err);
     }

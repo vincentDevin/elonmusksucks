@@ -4,6 +4,7 @@ import type { EnhancedUserStats } from '../../../hooks/useEnhancedUserStats';
 
 interface QuickStatsGridProps {
   stats: EnhancedUserStats;
+  userRank?: { allTimeRank: number | null; dailyRank: number | null } | null;
   className?: string;
 }
 
@@ -16,9 +17,13 @@ interface StatItem {
   subtext?: string;
 }
 
-export default function QuickStatsGrid({ stats, className = '' }: QuickStatsGridProps) {
+export default function QuickStatsGrid({ stats, userRank, className = '' }: QuickStatsGridProps) {
   const quickStats = useMemo((): StatItem[] => {
     const { portfolio, ranking, achievements, performance } = stats;
+
+    // Use userRank from leaderboard hook if available, otherwise fall back to stats
+    const currentRank = userRank?.allTimeRank || ranking.currentPosition;
+    const hasRank = currentRank && currentRank > 0;
 
     return [
       {
@@ -31,16 +36,18 @@ export default function QuickStatsGrid({ stats, className = '' }: QuickStatsGrid
       },
       {
         label: 'Leaderboard Rank',
-        value: ranking.currentPosition > 0 ? `#${ranking.currentPosition}` : 'Unranked',
+        value: hasRank ? `#${currentRank}` : 'Unranked',
         change: ranking.positionChange,
         icon: '🏆',
         color:
-          ranking.currentPosition <= 10
+          currentRank <= 10
             ? 'text-yellow-500'
-            : ranking.currentPosition <= 50
+            : currentRank <= 50
               ? 'text-orange-500'
               : 'text-gray-500',
-        subtext: `Top ${ranking.percentile}%${ranking.positionChange > 0 ? ` (+${ranking.positionChange})` : ''}`,
+        subtext: hasRank
+          ? `Top ${ranking.percentile}%${ranking.positionChange > 0 ? ` (+${ranking.positionChange})` : ''}`
+          : 'Start playing to rank up',
       },
       {
         label: 'Active Bets',
@@ -74,7 +81,7 @@ export default function QuickStatsGrid({ stats, className = '' }: QuickStatsGrid
         subtext: portfolio.potentialWinnings > 0 ? 'From active parlays' : 'No active parlays',
       },
     ];
-  }, [stats]);
+  }, [stats, userRank]);
 
   const ChangeIndicator = ({ change }: { change?: number }) => {
     if (!change || change === 0) return null;
@@ -90,23 +97,25 @@ export default function QuickStatsGrid({ stats, className = '' }: QuickStatsGrid
     <div className={`bg-background/50 rounded-xl p-4 border border-muted ${className}`}>
       <h3 className="font-semibold text-content mb-3 flex items-center">📊 Quick Stats</h3>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+      <div className="space-y-2">
         {quickStats.map((stat, _index) => (
           <div
             key={stat.label}
-            className="bg-surface rounded-lg p-3 border border-muted hover:border-primary/30 transition-colors"
+            className="bg-surface rounded-lg p-3 border border-muted hover:border-primary/30 transition-colors flex items-center justify-between"
           >
-            <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center space-x-3">
               <span className={`text-lg ${stat.color}`}>{stat.icon}</span>
-              <ChangeIndicator change={stat.change} />
+              <div className="space-y-0.5">
+                <div className="text-xs text-tertiary font-medium">{stat.label}</div>
+                {stat.subtext && (
+                  <div className="text-xs text-tertiary opacity-75">{stat.subtext}</div>
+                )}
+              </div>
             </div>
 
-            <div className="space-y-1">
+            <div className="flex items-center">
               <div className="text-lg font-bold text-content leading-tight">{stat.value}</div>
-              <div className="text-xs text-tertiary font-medium">{stat.label}</div>
-              {stat.subtext && (
-                <div className="text-xs text-tertiary opacity-75">{stat.subtext}</div>
-              )}
+              <ChangeIndicator change={stat.change} />
             </div>
           </div>
         ))}

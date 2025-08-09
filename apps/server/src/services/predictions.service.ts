@@ -10,7 +10,8 @@ import { PredictionRepository } from '../repositories/PredictionRepository';
 import { PredictionType } from '@prisma/client';
 import redisClient from '../lib/redis';
 import { UserService } from '../services/user.service';
-import { normalizedActivityService } from './normalizedActivity.service';
+import { unifiedActivityService } from './unifiedActivity.service';
+import { achievementService } from './achievement.service';
 
 /** Final shape the **client** expects for each parlay leg */
 export type ParlayLegWithUser = {
@@ -91,10 +92,10 @@ export class PredictionService {
     // Publish legacy format
     await redisClient.publish('prediction:create', JSON.stringify(dto));
 
-    // Publish normalized activity event
+    // Publish to unified activity system
     const creator = await this.userService.getPublicSocketUser(params.creatorId);
     if (creator) {
-      await normalizedActivityService.createPredictionCreatedEvent(
+      await unifiedActivityService.createPredictionActivity(
         {
           id: creator.id,
           name: creator.name,
@@ -106,6 +107,20 @@ export class PredictionService {
           category: pred.category,
         },
       );
+
+      // Activity already published by unifiedActivityService above
+      // No need for duplicate ActivityRecorder call
+
+      // Check for achievement unlocks
+      await achievementService.checkAndUpdateAchievements({
+        type: 'prediction_created',
+        userId: params.creatorId,
+        data: {
+          predictionId: pred.id,
+          title: pred.title,
+          category: pred.category,
+        },
+      });
     }
 
     return dto;

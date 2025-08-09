@@ -14,6 +14,7 @@ import {
   getUserParlaysHandler,
   getUserPredictionsHandler,
   getEnhancedUserStatsHandler,
+  getUserAchievementsHandler,
 } from '../controllers/user.controller';
 import { requireAuth } from '../middleware/auth.middleware';
 import { uploadConfig, validateFileContent } from '../middleware/fileValidation.middleware';
@@ -49,6 +50,7 @@ router.delete('/:userId/follow', requireAuth, unfollowUserHandler);
 // User stats
 router.get('/:userId/stats', requireAuth, getUserStatsHandler);
 router.get('/:userId/enhanced-stats', requireAuth, getEnhancedUserStatsHandler);
+router.get('/:userId/achievements', requireAuth, getUserAchievementsHandler);
 
 // User activity data for dashboard
 router.get('/:userId/bets', requireAuth, getUserBetsHandler);

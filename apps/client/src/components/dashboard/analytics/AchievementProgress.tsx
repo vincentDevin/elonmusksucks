@@ -22,12 +22,13 @@ export default function AchievementProgress({ stats, className = '' }: Achieveme
     return 'bg-primary';
   };
 
-  const getCategoryIcon = (id: string) => {
-    if (id.includes('rank')) return '🏆';
-    if (id.includes('streak')) return '🔥';
-    if (id.includes('profit')) return '💰';
-    if (id.includes('volume')) return '📊';
-    if (id.includes('prediction')) return '🎯';
+  const getCategoryIcon = (id: string | number) => {
+    const idStr = String(id);
+    if (idStr.includes('rank')) return '🏆';
+    if (idStr.includes('streak')) return '🔥';
+    if (idStr.includes('profit')) return '💰';
+    if (idStr.includes('volume')) return '📊';
+    if (idStr.includes('prediction')) return '🎯';
     return '🏅';
   };
 

@@ -95,6 +95,8 @@ model User {
   posts              UserPost[]          @relation("OwnerToPost")
   comments           UserPost[]          @relation("AuthorToPost")
   activities         UserActivity[]
+  relatedActivities  UserActivity[] @relation("RelatedUserActivity")
+  achievements       UserAchievement[]
   stats              UserStats?
   Prediction         Prediction[]
   messages           Message[]
@@ -155,6 +157,7 @@ model Prediction {
   createdAt       DateTime           @default(now())
   creatorId       Int
   creator         User               @relation(fields: [creatorId], references: [id])
+  activities      UserActivity[]
 
   @@index([expiresAt, resolved])
 }
@@ -185,6 +188,7 @@ model Bet {
   won             Boolean? // null until resolved
   payout          Int? // null until resolved
   createdAt       DateTime          @default(now())
+  activities      UserActivity[]
 }
 
 model AITweet {
@@ -236,6 +240,42 @@ model Badge {
   iconUrl     String?
   users       UserBadge[] @relation("BadgeToUserBadge")
   createdAt   DateTime    @default(now())
+}
+
+model Achievement {
+  id            Int                 @id @default(autoincrement())
+  name          String              @unique
+  title         String              // Display title
+  description   String              // Achievement description
+  category      String              // Category: getting_started, performance, volume, accuracy, social
+  targetValue   Int                 // Target value to achieve (e.g., 10 for "Win 10 bets")
+  iconUrl       String?             // Icon URL for display
+  isActive      Boolean             @default(true) // Whether this achievement is currently active
+  sortOrder     Int                 @default(0) // Display order
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @default(now()) @updatedAt
+  
+  // Relations
+  userProgress  UserAchievement[]
+  
+  @@index([category, sortOrder])
+  @@index([isActive, category])
+}
+
+model UserAchievement {
+  id            Int         @id @default(autoincrement())
+  user          User        @relation(fields: [userId], references: [id])
+  userId        Int
+  achievement   Achievement @relation(fields: [achievementId], references: [id])
+  achievementId Int
+  progress      Int         @default(0) // Current progress towards target
+  completedAt   DateTime?   // When achievement was completed (null if not completed)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @default(now()) @updatedAt
+  
+  @@unique([userId, achievementId])
+  @@index([userId, progress])
+  @@index([achievementId, completedAt])
 }
 
 model UserBadge {
@@ -310,12 +350,32 @@ model UserPost {
 }
 
 model UserActivity {
-  id        Int      @id @default(autoincrement())
-  user      User     @relation(fields: [userId], references: [id])
-  userId    Int
-  type      String // e.g. "BET_PLACED", "BET_WON", "POST_CREATED", etc.
-  details   Json? // Store event metadata (e.g., betId, predictionId, badgeId, postId)
-  createdAt DateTime @default(now())
+  id               Int         @id @default(autoincrement())
+  user             User        @relation(fields: [userId], references: [id])
+  userId           Int
+  type             String // e.g. "BET_PLACED", "BET_WON", "POST_CREATED", etc.
+  title            String? // Activity title for display
+  description      String? // Activity description for display
+  details          Json? // Store event metadata (e.g., betId, predictionId, badgeId, postId)
+  isPersonal       Boolean     @default(false) @map("is_personal") // Whether this is personal or public activity
+  priority         String      @default("medium") // Priority level: low, medium, high
+  relatedUserId    Int?        @map("related_user_id") // Reference to another user involved
+  predictionId     Int?        @map("prediction_id") // Reference to related prediction
+  betId            Int?        @map("bet_id") // Reference to related bet
+  createdAt        DateTime    @default(now())
+  
+  // Relations
+  relatedUser      User?       @relation("RelatedUserActivity", fields: [relatedUserId], references: [id])
+  prediction       Prediction? @relation(fields: [predictionId], references: [id])
+  bet              Bet?        @relation(fields: [betId], references: [id])
+
+  // Indexes for optimal query performance
+  @@index([userId, createdAt(sort: Desc)], name: "idx_user_activities_user_time")
+  @@index([type, priority, createdAt(sort: Desc)], name: "idx_user_activities_type_priority")
+  @@index([isPersonal, createdAt(sort: Desc)], name: "idx_user_activities_public")
+  @@index([relatedUserId, createdAt(sort: Desc)], name: "idx_user_activities_related_user")
+  @@index([predictionId, createdAt(sort: Desc)], name: "idx_user_activities_prediction")
+  @@index([betId, createdAt(sort: Desc)], name: "idx_user_activities_bet")
 }
 
 model UserStats {

@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useMyBets, useMyParlays, useMyPredictions } from '../../hooks/useMeStubs';
+import { useSocket } from '../../contexts/SocketContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface ActivityItem {
   id: number;
@@ -15,12 +17,43 @@ interface ActivityItem {
 }
 
 export default function MyActivity() {
+  const socket = useSocket();
+  const { user } = useAuth();
   const [filter, setFilter] = useState('all');
   const myBets = useMyBets();
   const myParlays = useMyParlays();
   const myPredictions = useMyPredictions();
 
   const isLoading = myBets.loading || myParlays.loading || myPredictions.loading;
+
+  // Listen for bet and parlay status changes
+  useEffect(() => {
+    if (!socket || !user?.id) return;
+
+    const handleBetStatusChange = (data: any) => {
+      console.log('[MyActivity] Bet status changed:', data);
+      if (data.userId === user.id) {
+        // Refresh bets data
+        myBets.refetch?.();
+      }
+    };
+
+    const handleParlayStatusChange = (data: any) => {
+      console.log('[MyActivity] Parlay status changed:', data);
+      if (data.userId === user.id) {
+        // Refresh parlays data
+        myParlays.refetch?.();
+      }
+    };
+
+    socket.on('bet:status_change', handleBetStatusChange);
+    socket.on('parlay:status_change', handleParlayStatusChange);
+
+    return () => {
+      socket.off('bet:status_change', handleBetStatusChange);
+      socket.off('parlay:status_change', handleParlayStatusChange);
+    };
+  }, [socket, user?.id, myBets, myParlays]);
 
   const filteredData = (): ActivityItem[] => {
     switch (filter) {

@@ -16,6 +16,7 @@ import type {
 } from '../repositories/IAdminRepository';
 import { PrismaAdminRepository } from '../repositories/AdminRepository';
 import type { UserStatsDTO } from '@ems/types';
+import redisClient from '../lib/redis';
 
 const repo: IAdminRepository = new PrismaAdminRepository();
 
@@ -293,4 +294,30 @@ export const exportAnalyticsData = async (params: {
 // -- Miscellaneous --
 export const generateAITweet = async () => {
   return repo.triggerAITweet();
+};
+
+// -- Real-time Metrics Broadcasting --
+/**
+ * Broadcast real-time metrics update to admin dashboard
+ * Call this whenever significant events occur (bet placed, user registered, etc.)
+ */
+export const broadcastRealtimeMetrics = async () => {
+  try {
+    // Get current real-time metrics
+    const metrics = await repo.getRealtimeMetrics();
+
+    // Publish to Redis for Socket.IO broadcasting
+    await redisClient.publish(
+      'admin:metrics:update',
+      JSON.stringify({
+        metrics,
+        timestamp: new Date().toISOString(),
+        type: 'realtime_update',
+      }),
+    );
+
+    console.log('[admin-service] Broadcast real-time metrics update');
+  } catch (error) {
+    console.error('[admin-service] Error broadcasting metrics:', error);
+  }
 };

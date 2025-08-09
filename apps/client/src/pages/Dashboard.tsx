@@ -1,6 +1,6 @@
 // apps/client/src/pages/Dashboard.tsx
 import { useState } from 'react';
-import DashboardSettings from '../components/dashboard/customization/DashboardSettings';
+import UnifiedDashboardSettings from '../components/dashboard/customization/UnifiedDashboardSettings';
 import MobileDashboard from '../components/dashboard/mobile/MobileDashboard';
 import DesktopDashboard from '../components/dashboard/desktop/DesktopDashboard';
 import { useMobileOptimization } from '../hooks/useMobileOptimization';
@@ -22,7 +22,7 @@ export default function Dashboard() {
     return (
       <>
         <MobileDashboard />
-        <DashboardSettings isOpen={showSettings} onClose={() => setShowSettings(false)} />
+        <UnifiedDashboardSettings isOpen={showSettings} onClose={() => setShowSettings(false)} />
       </>
     );
   }

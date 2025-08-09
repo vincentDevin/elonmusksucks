@@ -646,7 +646,34 @@ export class PrismaAdminRepository implements IAdminRepository {
 
   // -- Bet & Transaction Oversight --
   async findBets(_filters?: QueryParams): Promise<Bet[]> {
-    return this.prisma.bet.findMany();
+    return this.prisma.bet.findMany({
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            avatarUrl: true,
+          },
+        },
+        prediction: {
+          select: {
+            id: true,
+            title: true,
+            category: true,
+            expiresAt: true,
+            approved: true,
+            resolved: true,
+            creatorId: true,
+          },
+        },
+        optionOption: {
+          select: {
+            id: true,
+            label: true,
+          },
+        },
+      },
+    });
   }
 
   async refundBet(betId: number): Promise<Bet> {
@@ -657,7 +684,17 @@ export class PrismaAdminRepository implements IAdminRepository {
   }
 
   async findTransactions(_filters?: QueryParams): Promise<Transaction[]> {
-    return this.prisma.transaction.findMany();
+    return this.prisma.transaction.findMany({
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            avatarUrl: true,
+          },
+        },
+      },
+    });
   }
 
   // -- Enhanced Financial Operations Dashboard --

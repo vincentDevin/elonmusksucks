@@ -21,6 +21,8 @@ interface UnifiedPredictionCardProps {
   showParlayActions?: boolean;
   addOptimisticBet?: (bet: BetWithUser) => void;
   className?: string;
+  hideInlineParlaySelector?: boolean; // Hide inline parlay selector but keep parlay button
+  onCardView?: () => void; // Callback when card is viewed (not when buttons are clicked)
 }
 
 export default function UnifiedPredictionCard({
@@ -31,6 +33,8 @@ export default function UnifiedPredictionCard({
   showParlayActions = false,
   addOptimisticBet,
   className = '',
+  hideInlineParlaySelector = false,
+  onCardView,
 }: UnifiedPredictionCardProps) {
   const { dispatch: parlayDispatch } = useParlay();
   const [showBetModal, setShowBetModal] = useState(false);
@@ -100,6 +104,18 @@ export default function UnifiedPredictionCard({
 
   const toggleParlaySelector = () => {
     setShowParlaySelector(!showParlaySelector);
+  };
+
+  // Add default/best option to parlay (for Dashboard)
+  const handleAddDefaultToParlay = () => {
+    // Add the option with the best odds (highest odds typically)
+    const bestOption = prediction.options.reduce((best, current) =>
+      current.odds > best.odds ? current : best,
+    );
+
+    if (bestOption) {
+      handleAddToParlay(bestOption.id);
+    }
   };
 
   // Responsive classes based on variant
@@ -218,7 +234,10 @@ export default function UnifiedPredictionCard({
           {showActions && !prediction.resolved && (
             <div className="mt-4">
               <button
-                onClick={() => setShowBetModal(true)}
+                onClick={(e) => {
+                  e.stopPropagation(); // Prevent event bubbling to card view handler
+                  setShowBetModal(true);
+                }}
                 className="w-full py-3 px-6 bg-info hover:bg-info/90 text-surface font-bold rounded-lg transition-all duration-200 hover:scale-105 shadow-lg hover:shadow-xl"
               >
                 <span className="flex items-center justify-center space-x-2">
@@ -235,7 +254,7 @@ export default function UnifiedPredictionCard({
           )}
         </li>
       ) : (
-        <div className={cardClasses}>
+        <div className={cardClasses} onClick={onCardView}>
           {/* Compact/Mini Status Badge */}
           <span className={badgeClasses}>
             {!isMini && <span>{statusBadge.icon}</span>}
@@ -288,40 +307,52 @@ export default function UnifiedPredictionCard({
           />
 
           {/* Parlay Option Selector */}
-          {showParlayActions && showParlaySelector && !prediction.resolved && now <= expires && (
-            <div className="mt-3 p-3 bg-secondary/20 rounded-lg border border-secondary">
-              <div className="text-sm font-medium text-content mb-2">Choose option for parlay:</div>
-              <div className="space-y-2">
-                {prediction.options.map((option: any) => (
-                  <button
-                    key={option.id}
-                    onClick={() => handleAddToParlay(option.id)}
-                    disabled={addingToParlay !== null}
-                    className={`w-full p-2 rounded-lg text-sm transition-all duration-200 text-left ${
-                      addingToParlay === option.id
-                        ? 'bg-success text-surface scale-105'
-                        : 'bg-surface border border-muted hover:border-primary hover:scale-102'
-                    }`}
-                  >
-                    <div className="flex justify-between items-center">
-                      <span className="font-medium">{option.label}</span>
-                      <span className="text-primary font-bold">{option.odds.toFixed(2)}×</span>
-                    </div>
-                    {addingToParlay === option.id && (
-                      <div className="text-xs mt-1 opacity-90">✅ Added to parlay!</div>
-                    )}
-                  </button>
-                ))}
+          {showParlayActions &&
+            showParlaySelector &&
+            !hideInlineParlaySelector &&
+            !prediction.resolved &&
+            now <= expires && (
+              <div className="mt-3 p-3 bg-secondary/20 rounded-lg border border-secondary">
+                <div className="text-sm font-medium text-content mb-2">
+                  Choose option for parlay:
+                </div>
+                <div className="space-y-2">
+                  {prediction.options.map((option: any) => (
+                    <button
+                      key={option.id}
+                      onClick={(e) => {
+                        e.stopPropagation(); // Prevent event bubbling to card view handler
+                        handleAddToParlay(option.id);
+                      }}
+                      disabled={addingToParlay !== null}
+                      className={`w-full p-2 rounded-lg text-sm transition-all duration-200 text-left ${
+                        addingToParlay === option.id
+                          ? 'bg-success text-surface scale-105'
+                          : 'bg-surface border border-muted hover:border-primary hover:scale-102'
+                      }`}
+                    >
+                      <div className="flex justify-between items-center">
+                        <span className="font-medium">{option.label}</span>
+                        <span className="text-primary font-bold">{option.odds.toFixed(2)}×</span>
+                      </div>
+                      {addingToParlay === option.id && (
+                        <div className="text-xs mt-1 opacity-90">✅ Added to parlay!</div>
+                      )}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
           {/* Compact Actions */}
           {showActions && !prediction.resolved && now <= expires && (
             <div className={`mt-3 flex gap-2 ${isMini ? 'flex-col' : ''}`}>
               {/* Bet Button */}
               <button
-                onClick={() => setShowBetModal(true)}
+                onClick={(e) => {
+                  e.stopPropagation(); // Prevent event bubbling to card view handler
+                  setShowBetModal(true);
+                }}
                 className={`${isMini ? 'w-full' : 'flex-1'} px-3 py-2 bg-info hover:bg-info/90 text-surface text-sm font-medium rounded-lg transition-all duration-200 hover:scale-105`}
               >
                 <span className="flex items-center justify-center space-x-1">
@@ -333,10 +364,17 @@ export default function UnifiedPredictionCard({
               {/* Parlay Button */}
               {showParlayActions && (
                 <button
-                  onClick={toggleParlaySelector}
+                  onClick={(e) => {
+                    e.stopPropagation(); // Prevent event bubbling to card view handler
+                    if (hideInlineParlaySelector) {
+                      handleAddDefaultToParlay();
+                    } else {
+                      toggleParlaySelector();
+                    }
+                  }}
                   disabled={addingToParlay !== null}
                   className={`px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
-                    showParlaySelector
+                    showParlaySelector && !hideInlineParlaySelector
                       ? 'bg-secondary text-content border-2 border-secondary'
                       : addingToParlay !== null
                         ? 'bg-success text-surface scale-105'
@@ -346,6 +384,11 @@ export default function UnifiedPredictionCard({
                   {addingToParlay !== null ? (
                     <span className="flex items-center space-x-1">
                       <span>✅</span>
+                    </span>
+                  ) : hideInlineParlaySelector ? (
+                    <span className="flex items-center space-x-1">
+                      <span>📈</span>
+                      <span>+</span>
                     </span>
                   ) : (
                     <span className="flex items-center space-x-1">
@@ -382,7 +425,7 @@ export default function UnifiedPredictionCard({
         prediction={prediction}
         isOpen={showBetModal}
         onClose={() => setShowBetModal(false)}
-        mode={isFullSize ? 'full' : 'compact'}
+        mode="full"
         onBetPlaced={addOptimisticBet}
       />
     </>

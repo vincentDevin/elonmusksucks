@@ -29,7 +29,7 @@ export default function NavBar() {
     }`;
 
   return (
-    <header className="relative z-50 border-b border-muted bg-surface text-content">
+    <header className="relative z-60 border-b border-muted bg-surface text-content">
       <div className="container mx-auto flex items-center justify-between p-4">
         <Link to="/" className="text-xl font-bold">
           🚀 ElonMuskSucks
@@ -63,11 +63,11 @@ export default function NavBar() {
                   {dropdownOpen && (
                     <ul
                       className="
-                        absolute right-0 mt-2
+                        absolute z-60 right-0 mt-2
                         bg-surface text-content
                         border border-muted rounded shadow
                         space-y-1 p-2 w-40
-                        transition-colors
+                        transition-colors 
                       "
                     >
                       {user.role === 'ADMIN' && (

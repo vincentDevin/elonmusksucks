@@ -1,6 +1,7 @@
 // apps/client/src/components/dashboard/MyStuffPanel.tsx
 import { useState } from 'react';
 import { useEnhancedUserStats } from '../../hooks/useEnhancedUserStats';
+import { useEnhancedLeaderboard } from '../../hooks/useEnhancedLeaderboard';
 import PerformanceMetricsCard from './analytics/PerformanceMetricsCard';
 import QuickStatsGrid from './analytics/QuickStatsGrid';
 import SmartInsights from './analytics/SmartInsights';
@@ -12,6 +13,7 @@ type ViewMode = 'analytics' | 'activity';
 export default function MyStuffPanel() {
   const [viewMode, setViewMode] = useState<ViewMode>('analytics');
   const { stats, loading, error, smartInsights, quickActions } = useEnhancedUserStats();
+  const { userRank } = useEnhancedLeaderboard('all-time');
 
   if (loading) {
     return (
@@ -83,7 +85,7 @@ export default function MyStuffPanel() {
           <PerformanceMetricsCard stats={stats} />
 
           {/* Quick Stats Grid - Full Width */}
-          <QuickStatsGrid stats={stats} />
+          <QuickStatsGrid stats={stats} userRank={userRank} />
 
           {/* Smart Insights - Full Width */}
           <SmartInsights insights={smartInsights} />

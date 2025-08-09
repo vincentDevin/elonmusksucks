@@ -15,8 +15,14 @@ export type RedisChannel =
   | 'leaderboard:daily'
   | 'leaderboard:rankChange'
   | 'leaderboard:milestone'
-  | 'activity:newsflash'
-  | 'activity:newsflash:normalized'
+  | 'stats:update'
+  | 'stats:refresh'
+  | 'ranking:change'
+  | 'achievement:unlocked'
+  | 'user:stats_update'
+  | 'bet:status_change'
+  | 'parlay:status_change'
+  | 'admin:metrics:update'
   | 'moderation:userBan'
   | 'moderation:userUnban'
   | 'moderation:userMute'
@@ -63,12 +69,65 @@ export function registerRedisEventHandlers(io: Server, eventSub: any) {
       case 'leaderboard:milestone':
         io.emit('leaderboard:milestone', payload);
         break;
-      case 'activity:newsflash':
-        io.emit('activityNewsflash', payload);
+
+      // Stats and achievements events
+      case 'stats:update':
+        // Emit to specific user room if userId is in payload
+        const statsPayload = payload as any;
+        if (statsPayload.userId) {
+          io.to(`user:${statsPayload.userId}`).emit('stats:update', payload);
+        } else {
+          io.emit('stats:update', payload);
+        }
         break;
-      case 'activity:newsflash:normalized':
-        io.emit('activityNewsflash:normalized', payload);
+      case 'stats:refresh':
+        const refreshPayload = payload as any;
+        if (refreshPayload.userId) {
+          io.to(`user:${refreshPayload.userId}`).emit('stats:refresh', payload);
+        }
         break;
+      case 'ranking:change':
+        const rankingPayload = payload as any;
+        if (rankingPayload.userId) {
+          io.to(`user:${rankingPayload.userId}`).emit('ranking:change', payload);
+        }
+        io.emit('ranking:change', payload); // Also broadcast globally for leaderboard updates
+        break;
+      case 'achievement:unlocked':
+        const achievementPayload = payload as any;
+        if (achievementPayload.userId) {
+          io.to(`user:${achievementPayload.userId}`).emit('achievement:unlocked', payload);
+        }
+        io.emit('achievement:unlocked', payload); // Also broadcast globally for activity feed
+        break;
+      case 'user:stats_update':
+        const userStatsPayload = payload as any;
+        if (userStatsPayload.userId) {
+          io.to(`user:${userStatsPayload.userId}`).emit('user:stats_update', payload);
+        }
+        break;
+
+      // Bet and parlay status events
+      case 'bet:status_change':
+        const betStatusPayload = payload as any;
+        if (betStatusPayload.userId) {
+          io.to(`user:${betStatusPayload.userId}`).emit('bet:status_change', payload);
+        }
+        break;
+      case 'parlay:status_change':
+        const parlayStatusPayload = payload as any;
+        if (parlayStatusPayload.userId) {
+          io.to(`user:${parlayStatusPayload.userId}`).emit('parlay:status_change', payload);
+        }
+        break;
+
+      // Admin metrics event for real-time dashboard updates
+      case 'admin:metrics:update':
+        // Broadcast to admin room only
+        io.to('admin').emit('admin:metrics:update', payload);
+        break;
+
+      // NOTE: 'activity:newsflash' removed - handled by unified activity system
       case 'moderation:userBan':
         io.emit('moderationUserBan', payload);
         // Emit to admin room specifically
