@@ -4,7 +4,7 @@
 // • Sanitises DB records and injects signed avatar URLs for bets & parlay legs
 // -----------------------------------------------------------------------------
 
-import type { DbPrediction, DbPredictionOption, DbBet, PublicPrediction } from '@ems/types';
+import type { DbPrediction, DbPredictionOption, DbBet, PublicPrediction, ParlayLegWithUser } from '@ems/types';
 import type { IPredictionRepository } from '../repositories/IPredictionRepository';
 import { PredictionRepository } from '../repositories/PredictionRepository';
 import { PredictionType } from '@prisma/client';
@@ -13,18 +13,7 @@ import { UserService } from '../services/user.service';
 import { unifiedActivityService } from './unifiedActivity.service';
 import { achievementService } from './achievement.service';
 
-/** Final shape the **client** expects for each parlay leg */
-export type ParlayLegWithUser = {
-  parlayId: number;
-  stake: number;
-  optionId: number;
-  createdAt: Date;
-  user: {
-    id: number;
-    name: string;
-    avatarUrl: string | null;
-  };
-};
+// Using the global ParlayLegWithUser type from @ems/types
 
 export class PredictionService {
   private userService = new UserService();
@@ -148,18 +137,7 @@ export class PredictionService {
           };
         }
       >;
-      parlayLegs: Array<{
-        parlayId: number;
-        stake: number;
-        optionId: number;
-        createdAt: Date;
-        user: {
-          id: number;
-          name: string;
-          avatarUrl?: string | null;
-          profilePictureKey?: string | null;
-        };
-      }>;
+      parlayLegs: ParlayLegWithUser[];
     },
   ) {
     // --- quick helper to resolve a final URL --------------------------------

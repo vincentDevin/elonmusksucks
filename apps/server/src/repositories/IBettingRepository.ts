@@ -37,7 +37,7 @@ export interface IBettingRepository {
     optionId: number,
     amount: number,
     oddsAtPlacement: number,
-    potentialPayout: number,
+    potentialPayout: bigint,
   ): Promise<DbBet>;
 
   /**
@@ -47,7 +47,7 @@ export interface IBettingRepository {
     userId: number,
     legs: Array<{ predictionId: number; optionId: number; oddsAtPlacement: number }>,
     amount: number,
-    potentialPayout: number,
+    potentialPayout: bigint,
   ): Promise<DbParlay>;
 
   /**

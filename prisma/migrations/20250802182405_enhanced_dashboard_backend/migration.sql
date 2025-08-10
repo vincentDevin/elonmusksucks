@@ -46,7 +46,8 @@ ADD COLUMN     "priority" TEXT NOT NULL DEFAULT 'medium',
 ADD COLUMN     "related_user_id" INTEGER,
 ADD COLUMN     "title" TEXT;
 
--- CreateTable
+-- CreateTable (Drop materialized view if exists first)
+DROP MATERIALIZED VIEW IF EXISTS "leaderboard_view";
 CREATE TABLE "leaderboard_view" (
     "user_id" INTEGER NOT NULL,
     "user_name" TEXT NOT NULL,

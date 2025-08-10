@@ -30,7 +30,7 @@ export class BettingRepository implements IBettingRepository {
     optionId: number,
     amount: number,
     oddsAtPlacement: number,
-    potentialPayout: number,
+    potentialPayout: bigint,
   ): Promise<DbBet> {
     return await prisma.$transaction(async (tx) => {
       const user = await tx.user.update({
@@ -42,7 +42,7 @@ export class BettingRepository implements IBettingRepository {
         data: {
           userId,
           type: 'DEBIT',
-          amount,
+          amount: BigInt(amount),
           balanceAfter: user.muskBucks,
           relatedBetId: null,
           relatedParlayId: null,
@@ -50,7 +50,7 @@ export class BettingRepository implements IBettingRepository {
       });
 
       const bet = await tx.bet.create({
-        data: { userId, predictionId, optionId, amount, oddsAtPlacement, potentialPayout },
+        data: { userId, predictionId, optionId, amount: BigInt(amount), oddsAtPlacement, potentialPayout },
       });
 
       // upsert stats for single bet
@@ -67,20 +67,20 @@ export class BettingRepository implements IBettingRepository {
           totalParlayLegs: 0,
           parlayLegsWon: 0,
           parlayLegsLost: 0,
-          totalWagered: amount,
-          totalWon: 0,
-          profit: -amount,
+          totalWagered: BigInt(amount),
+          totalWon: BigInt(0),
+          profit: BigInt(-amount),
           roi: 0,
           currentStreak: 0,
           longestStreak: 0,
           mostCommonBet: null,
-          biggestWin: 0,
+          biggestWin: BigInt(0),
           updatedAt: new Date(),
         },
         update: {
           totalBets: { increment: 1 },
-          totalWagered: { increment: amount },
-          profit: { decrement: amount },
+          totalWagered: { increment: BigInt(amount) },
+          profit: { decrement: BigInt(amount) },
         },
       });
 
@@ -92,7 +92,7 @@ export class BettingRepository implements IBettingRepository {
     userId: number,
     legs: Array<{ predictionId: number; optionId: number; oddsAtPlacement: number }>,
     amount: number,
-    potentialPayout: number,
+    potentialPayout: bigint,
   ): Promise<DbParlay> {
     const legCount = legs.length;
 
@@ -106,7 +106,7 @@ export class BettingRepository implements IBettingRepository {
         data: {
           userId,
           type: 'DEBIT',
-          amount,
+          amount: BigInt(amount),
           balanceAfter: user.muskBucks,
           relatedBetId: null,
           relatedParlayId: null,
@@ -116,7 +116,7 @@ export class BettingRepository implements IBettingRepository {
       const parlay = await tx.parlay.create({
         data: {
           userId,
-          amount,
+          amount: BigInt(amount),
           combinedOdds: legs.reduce((a, l) => a * l.oddsAtPlacement, 1),
           potentialPayout,
           legs: {
@@ -142,21 +142,21 @@ export class BettingRepository implements IBettingRepository {
           totalParlayLegs: legCount,
           parlayLegsWon: 0,
           parlayLegsLost: legCount,
-          totalWagered: amount,
-          totalWon: 0,
-          profit: -amount,
+          totalWagered: BigInt(amount),
+          totalWon: BigInt(0),
+          profit: BigInt(-amount),
           roi: 0,
           currentStreak: 0,
           longestStreak: 0,
           mostCommonBet: null,
-          biggestWin: 0,
+          biggestWin: BigInt(0),
           updatedAt: new Date(),
         },
         update: {
           totalParlays: { increment: 1 },
           totalParlayLegs: { increment: legCount },
-          totalWagered: { increment: amount },
-          profit: { decrement: amount },
+          totalWagered: { increment: BigInt(amount) },
+          profit: { decrement: BigInt(amount) },
         },
       });
 
@@ -180,7 +180,7 @@ export class BettingRepository implements IBettingRepository {
       _count: true,
     });
 
-    const total = pools.reduce((s, p) => s + (p._sum.amount ?? 0), 0);
+    const total = pools.reduce((s, p) => s + Number(p._sum.amount ?? 0), 0);
     const totalBets = pools.reduce((s, p) => s + p._count, 0);
 
     // 🚀 Special handling for predictions with no bets yet - give them exciting starting odds!
@@ -216,7 +216,7 @@ export class BettingRepository implements IBettingRepository {
     const hoursLeft = timeUntilExpiry / (1000 * 60 * 60);
 
     const updates = pools.map(async (p) => {
-      const optionPool = p._sum.amount ?? 0;
+      const optionPool = Number(p._sum.amount ?? 0);
       const optionBets = p._count;
       const baseOdds = total / Math.max(optionPool, 1);
 

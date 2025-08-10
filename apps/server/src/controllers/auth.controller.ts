@@ -119,7 +119,7 @@ export const me: RequestHandler = async (req, res, next) => {
       name: user.name,
       email: user.email,
       role: user.role,
-      muskBucks: user.muskBucks,
+      muskBucks: user.muskBucks.toString(),
       profileComplete: user.profileComplete,
       avatarUrl: user.avatarUrl,
     });

@@ -180,8 +180,9 @@ async function main() {
     data: { approved: true }
   });
 
-  console.log('🔄 Refreshing leaderboard_view...');
-  await prisma.$executeRaw`REFRESH MATERIALIZED VIEW leaderboard_view`;
+  // Note: leaderboard_view is now a regular table, not a materialized view
+  // console.log('🔄 Refreshing leaderboard_view...');
+  // await prisma.$executeRaw`REFRESH MATERIALIZED VIEW leaderboard_view`;
 
   console.log('✅ Seeding complete!');
 }

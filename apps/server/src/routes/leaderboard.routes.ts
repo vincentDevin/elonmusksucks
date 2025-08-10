@@ -13,6 +13,9 @@ import { requireAuth } from '../middleware/auth.middleware';
 
 const router = Router();
 
+// Root endpoint - defaults to all-time leaderboard
+router.get('/', getTopAllTime);
+
 // Public leaderboard endpoints (legacy)
 router.get('/all-time', getTopAllTime);
 router.get('/daily', getTopDaily);

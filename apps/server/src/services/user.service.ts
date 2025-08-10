@@ -263,7 +263,7 @@ export class UserService {
       id: user.id,
       name: user.name,
       role: user.role,
-      muskBucks: user.muskBucks,
+      muskBucks: user.muskBucks.toString(),
       profileComplete: user.profileComplete,
       rank,
       bio: user.bio,
@@ -438,14 +438,14 @@ export class UserService {
       totalParlayLegs: stats.totalParlayLegs,
       parlayLegsWon: stats.parlayLegsWon,
       parlayLegsLost: stats.parlayLegsLost,
-      totalWagered: stats.totalWagered,
-      totalWon: stats.totalWon,
-      profit: stats.profit,
+      totalWagered: stats.totalWagered.toString(),
+      totalWon: stats.totalWon.toString(),
+      profit: stats.profit.toString(),
       roi: stats.roi,
       currentStreak: stats.currentStreak,
       longestStreak: stats.longestStreak,
       mostCommonBet: stats.mostCommonBet ?? null,
-      biggestWin: stats.biggestWin,
+      biggestWin: stats.biggestWin.toString(),
       updatedAt: stats.updatedAt instanceof Date ? stats.updatedAt.toISOString() : stats.updatedAt,
     };
   }
@@ -488,7 +488,7 @@ export class UserService {
       id: number;
       predictionId: number;
       predictionTitle: string;
-      amount: number;
+      amount: string;
       odds: number;
       optionLabel?: string;
       status: string;
@@ -524,7 +524,7 @@ export class UserService {
       id: bet.id,
       predictionId: bet.predictionId,
       predictionTitle: bet.prediction.title,
-      amount: bet.amount,
+      amount: bet.amount.toString(),
       odds: bet.oddsAtPlacement || 1.0,
       optionLabel: bet.optionOption?.label,
       status: bet.status,
@@ -538,9 +538,9 @@ export class UserService {
   async getUserActiveParlays(userId: number): Promise<
     Array<{
       id: number;
-      amount: number;
+      amount: string;
       combinedOdds: number;
-      potentialPayout: number;
+      potentialPayout: string;
       legCount: number;
       status: string;
       createdAt: string;
@@ -578,9 +578,9 @@ export class UserService {
 
     return parlays.map((parlay) => ({
       id: parlay.id,
-      amount: parlay.amount,
+      amount: parlay.amount.toString(),
       combinedOdds: parlay.combinedOdds,
-      potentialPayout: parlay.potentialPayout,
+      potentialPayout: parlay.potentialPayout.toString(),
       legCount: parlay.legs.length,
       status: parlay.status,
       createdAt: parlay.createdAt.toISOString(),

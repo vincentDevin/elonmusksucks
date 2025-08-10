@@ -138,11 +138,22 @@ export const listBets = async (filters?: QueryParams) => {
 };
 
 export const refundBet = async (betId: number) => {
-  return repo.refundBet(betId);
+  const bet = await repo.refundBet(betId);
+  return {
+    ...bet,
+    amount: bet.amount.toString(),
+    potentialPayout: bet.potentialPayout?.toString() || null,
+    payout: bet.payout?.toString() || null,
+  };
 };
 
 export const listTransactions = async (filters?: QueryParams) => {
-  return repo.findTransactions(filters);
+  const transactions = await repo.findTransactions(filters);
+  return transactions.map((tx) => ({
+    ...tx,
+    amount: tx.amount.toString(),
+    balanceAfter: tx.balanceAfter.toString(),
+  }));
 };
 
 // -- Enhanced Financial Operations Dashboard --
@@ -250,14 +261,14 @@ export const getUserStats = async (userId: number): Promise<UserStatsDTO | null>
     totalParlayLegs: raw.totalParlayLegs,
     parlayLegsWon: raw.parlayLegsWon,
     parlayLegsLost: raw.parlayLegsLost,
-    totalWagered: raw.totalWagered,
-    totalWon: raw.totalWon,
-    profit: raw.profit,
+    totalWagered: raw.totalWagered.toString(),
+    totalWon: raw.totalWon.toString(),
+    profit: raw.profit.toString(),
     roi: raw.roi,
     currentStreak: raw.currentStreak,
     longestStreak: raw.longestStreak,
     mostCommonBet: raw.mostCommonBet,
-    biggestWin: raw.biggestWin,
+    biggestWin: raw.biggestWin.toString(),
     updatedAt: raw.updatedAt.toISOString(),
   };
 };

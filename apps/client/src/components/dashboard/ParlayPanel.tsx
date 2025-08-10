@@ -93,6 +93,7 @@ export default function ParlayPanel() {
       profitPercent,
       balanceAfter: balance - state.amount,
       isYolo: state.amount > balance * 0.8,
+      isHugeNumber: finalPayout > Number.MAX_SAFE_INTEGER,
     };
   }, [state.legs, state.amount, balance]);
 
@@ -192,28 +193,61 @@ export default function ParlayPanel() {
               const odds = getLegOdds(leg);
               const pred = findPrediction(leg.predictionId);
               const opt = findOption(leg.predictionId, leg.optionId);
+              const allOptions = pred?.options || [];
 
               return (
                 <li
                   key={`${leg.predictionId}-${leg.optionId}-${i}`}
-                  className="flex justify-between items-start py-1"
+                  className="flex flex-col space-y-2 py-2 border-b border-muted last:border-b-0"
                 >
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold truncate">
-                      {pred ? pred.title : `Prediction #${leg.predictionId}`}
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold truncate">
+                        {pred ? pred.title : `Prediction #${leg.predictionId}`}
+                      </div>
                     </div>
+                    <button
+                      onClick={() => dispatch({ type: 'REMOVE_LEG', optionId: leg.optionId })}
+                      aria-label="Remove leg"
+                      className="ml-2 text-red-600 hover:text-red-800 text-xs px-2 py-1 rounded hover:bg-red-100 transition"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                  
+                  {/* Option selector for this leg */}
+                  {allOptions.length > 1 ? (
+                    <select
+                      value={leg.optionId}
+                      onChange={(e) => {
+                        const newOptionId = Number(e.target.value);
+                        const newOption = allOptions.find(opt => opt.id === newOptionId);
+                        if (newOption) {
+                          dispatch({
+                            type: 'ADD_LEG', // This will replace existing leg for same prediction
+                            leg: {
+                              optionId: newOptionId,
+                              predictionId: leg.predictionId,
+                              label: newOption.label
+                            }
+                          });
+                        }
+                      }}
+                      className="w-full text-sm border border-muted rounded-md px-2 py-1 bg-background text-content focus:outline-none focus:ring-1 focus:ring-primary"
+                      disabled={placing}
+                    >
+                      {allOptions.map((option: any) => (
+                        <option key={option.id} value={option.id}>
+                          {option.label} (@{option.odds?.toFixed(2) || '1.00'}×)
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
                     <div className="text-xs text-tertiary flex items-center justify-between">
                       <span className="truncate">{opt?.label ?? leg.label}</span>
                       <span className="ml-2 flex-shrink-0">@&nbsp;{odds.toFixed(2)}×</span>
                     </div>
-                  </div>
-                  <button
-                    onClick={() => dispatch({ type: 'REMOVE_LEG', optionId: leg.optionId })}
-                    aria-label="Remove leg"
-                    className="ml-2 text-red-600 hover:text-red-800 text-xs px-2 py-1 rounded hover:bg-red-100 transition"
-                  >
-                    Remove
-                  </button>
+                  )}
                 </li>
               );
             })}
@@ -407,6 +441,16 @@ export default function ParlayPanel() {
                   style={{ width: `${Math.min((parlayCalculations.finalOdds / 20) * 100, 100)}%` }}
                 />
               </div>
+            </div>
+          )}
+
+          {/* Huge number precision warning */}
+          {parlayCalculations.isHugeNumber && (
+            <div className="bg-purple-600/10 border border-purple-600/20 rounded-lg p-2">
+              <p className="text-xs text-purple-600 font-semibold flex items-center">
+                <span className="mr-1">🚀</span>
+                ASTRONOMICAL PAYOUT: Numbers this large may have display precision limits!
+              </p>
             </div>
           )}
 

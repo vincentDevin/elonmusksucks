@@ -51,151 +51,157 @@ export class BettingService {
   }
 
   /**
-   * Place a single bet and publish real‑time event with user info.
+   * Place a single bet with full transaction atomicity for all money operations.
    */
   async placeBet(userId: number, optionId: number, amount: number): Promise<DbBet> {
-    // 1) Load option + prediction
+    // 1) Pre-validation outside transaction (read-only operations)
     const opt = await this.repo.findOptionWithPrediction(optionId);
     if (!opt) throw new Error('OPTION_NOT_FOUND');
     if (opt.prediction.resolved || opt.prediction.expiresAt < new Date()) {
       throw new Error('PREDICTION_CLOSED');
     }
 
-    // 2) Check user balance and get user info
     const user = await this.repo.findUserById(userId);
-    if (!user || user.muskBucks < amount) throw new Error('INSUFFICIENT_FUNDS');
+    if (!user || Number(user.muskBucks) < amount) throw new Error('INSUFFICIENT_FUNDS');
 
-    // 3) Apply ALL-IN multiplier if user is betting their entire balance
+    // 2) Calculate enhanced odds (before transaction)
     let finalOdds = opt.odds;
     let allInBonus = 1.0;
-    if (amount >= user.muskBucks * 0.95) {
-      // 95%+ of balance = ALL-IN
+    if (amount >= Number(user.muskBucks) * 0.95) {
       allInBonus = 2.5; // 🚀 MASSIVE 150% ALL-IN BONUS!
       finalOdds = opt.odds * allInBonus;
     }
 
-    const potentialPayout = Math.floor(amount * finalOdds);
+    const potentialPayout = BigInt(Math.floor(amount * finalOdds));
 
-    // 4) Persist via repository with enhanced odds
+    // 3) Execute all money operations atomically
     const bet = await this.repo.placeBet(
       userId,
       opt.prediction.id,
       optionId,
       amount,
-      finalOdds, // Use enhanced odds instead of old odds
+      finalOdds,
       potentialPayout,
     );
 
-    // 5) Generate proper signed avatar URL
-    const avatarUrl = user.profilePictureKey
-      ? await this.userService.getCachedProfileImageUrl(user.id, user.profilePictureKey, 3600)
-      : user.avatarUrl;
-
-    // 6) Compose full bet event payload including user info
-    const betWithUser: BetWithUser = {
-      ...bet,
-      user: {
-        id: user.id,
-        name: user.name,
-        avatarUrl,
-      },
-      optionLabel: opt.label,
-      predictionTitle: opt.prediction.title,
-    };
-
-    // 7) Publish real‑time event (present‑tense channel) - legacy format
-    await redisClient.publish('bet:place', JSON.stringify(betWithUser));
-
-    // 8) Recalculate odds after bet is placed (for next bets)
-    await this.recalculateOdds(opt.prediction.id);
-
-    // 9) Publish to unified activity system
-    await unifiedActivityService.createBetActivity(
-      {
-        id: user.id,
-        name: user.name,
-        avatarUrl,
-      },
-      {
-        id: bet.id,
-        amount,
-        odds: finalOdds,
-        predictionId: opt.prediction.id,
-        predictionTitle: opt.prediction.title,
-        optionLabel: opt.label,
-        category: opt.prediction.category,
-      },
-    );
-
-    // 10) This activity is already published by unifiedActivityService above
-    // No need for duplicate ActivityRecorder call
-
-    // 11) Check for achievement unlocks
-    await achievementService.checkAndUpdateAchievements({
-      type: 'bet_placed',
-      userId,
-      data: {
-        betId: bet.id,
-        predictionId: opt.prediction.id,
-        amount,
-        category: opt.prediction.category,
-      },
-    });
-
-    // 12) Trigger enhanced stats update
+    // 4) Post-transaction operations (safe to fail without data corruption)
     try {
-      const statsUpdatePayload = {
-        userId,
-        reason: 'bet_placed',
-        betId: bet.id,
-        predictionId: opt.prediction.id,
-        amount,
-        category: opt.prediction.category,
-        timestamp: new Date().toISOString(),
+      // Generate proper signed avatar URL
+      const avatarUrl = user.profilePictureKey
+        ? await this.userService.getCachedProfileImageUrl(user.id, user.profilePictureKey, 3600)
+        : user.avatarUrl;
+
+      // Compose bet event payload
+      const betWithUser: BetWithUser = {
+        ...bet,
+        amount: bet.amount.toString(),
+        potentialPayout: bet.potentialPayout?.toString() || null,
+        payout: bet.payout?.toString() || null,
+        user: {
+          id: user.id,
+          name: user.name,
+          avatarUrl,
+        },
+        optionLabel: opt.label,
+        predictionTitle: opt.prediction.title,
       };
 
-      await redisClient.publish('user:stats_update', JSON.stringify(statsUpdatePayload));
+      // Execute all post-transaction operations in parallel for performance
+      await Promise.allSettled([
+        // Publish real‑time event
+        redisClient.publish('bet:place', JSON.stringify(betWithUser)),
+        
+        // Recalculate odds after bet placement
+        this.recalculateOdds(opt.prediction.id),
+        
+        // Publish to unified activity system
+        unifiedActivityService.createBetActivity(
+          {
+            id: user.id,
+            name: user.name,
+            avatarUrl,
+          },
+          {
+            id: bet.id,
+            amount,
+            odds: finalOdds,
+            predictionId: opt.prediction.id,
+            predictionTitle: opt.prediction.title,
+            optionLabel: opt.label,
+            category: opt.prediction.category,
+          },
+        ),
+        
+        // Check for achievement unlocks
+        achievementService.checkAndUpdateAchievements({
+          type: 'bet_placed',
+          userId,
+          data: {
+            betId: bet.id,
+            predictionId: opt.prediction.id,
+            amount,
+            category: opt.prediction.category,
+          },
+        }),
+        
+        // Trigger stats update
+        redisClient.publish('user:stats_update', JSON.stringify({
+          userId,
+          reason: 'bet_placed',
+          betId: bet.id,
+          predictionId: opt.prediction.id,
+          amount,
+          category: opt.prediction.category,
+          timestamp: new Date().toISOString(),
+        })),
+        
+        // Broadcast real-time metrics
+        broadcastRealtimeMetrics(),
+      ]);
     } catch (error) {
-      console.error('[betting] Error publishing bet placed stats update:', error);
+      console.error('[betting] Error in post-transaction operations for bet:', bet.id, error);
+      // Don't throw - bet was successfully placed, these are just notifications
     }
-
-    // 13) Broadcast real-time metrics update to admin dashboard
-    await broadcastRealtimeMetrics();
 
     return bet;
   }
 
   /**
-   * Place a parlay bet and publish real‑time event.
+   * Place a parlay bet with full transaction atomicity for all money operations.
    */
   async placeParlay(
     userId: number,
     legs: Array<{ optionId: number }>,
     amount: number,
   ): Promise<DbParlay> {
-    // 1) Get all leg details
+    // 1) Pre-validation outside transaction (read-only operations)
     const detailed = await Promise.all(
       legs.map(({ optionId }) => this.repo.findOptionWithPrediction(optionId)),
     );
     const validLegs = detailed.filter((opt): opt is OptionWithPrediction => opt !== null);
     if (validLegs.length !== legs.length) throw new Error('OPTION_NOT_FOUND');
 
-    // 2) Ensure none closed
+    // Ensure none closed
     for (const opt of validLegs) {
       if (opt.prediction.resolved || opt.prediction.expiresAt < new Date()) {
         throw new Error(`PREDICTION_${opt.prediction.id}_CLOSED`);
       }
     }
 
-    // 3) Check user balance
     const user = await this.repo.findUserById(userId);
-    if (!user || user.muskBucks < amount) throw new Error('INSUFFICIENT_FUNDS');
+    if (!user || Number(user.muskBucks) < amount) throw new Error('INSUFFICIENT_FUNDS');
 
-    // 4) Compute enhanced combined odds with exciting bonuses!
+    // 2) Calculate enhanced odds matching frontend exactly (before transaction)
     const oddsCalculation = this.calculateEnhancedParlayOdds(validLegs.map((o) => o.odds));
-    const potentialPayout = Math.floor(amount * oddsCalculation.finalOdds);
+    const basePayout = Math.floor(amount * oddsCalculation.finalOdds);
+    
+    // 🚀 ALL-IN bonus detection for parlays (matching frontend logic)
+    const isAllIn = amount >= Number(user.muskBucks) * 0.95;
+    const allInMultiplier = isAllIn ? 1.5 : 1.0; // Extra 50% bonus for all-in parlays
+    const finalPayout = isAllIn ? Math.floor(basePayout * allInMultiplier) : basePayout;
+    const potentialPayout = BigInt(finalPayout);
 
-    // 5) Persist via repository
+    // 3) Execute all money operations atomically
     const parlay = await this.repo.placeParlay(
       userId,
       validLegs.map((o) => ({
@@ -207,85 +213,85 @@ export class BettingService {
       potentialPayout,
     );
 
-    // 6) Generate proper signed avatar URL
-    const avatarUrl = user.profilePictureKey
-      ? await this.userService.getCachedProfileImageUrl(user.id, user.profilePictureKey, 3600)
-      : user.avatarUrl;
-
-    // 7) Publish a leg event for each leg with extra info
-    const legsPayload: ParlayLegWithUser[] = validLegs.map((o) => ({
-      parlayId: parlay.id,
-      user: { id: user.id, name: user.name, avatarUrl },
-      stake: amount,
-      optionId: o.id,
-      createdAt: parlay.createdAt,
-      predictionId: o.prediction.id,
-      optionLabel: o.label,
-      predictionTitle: o.prediction.title,
-    }));
-
-    // 7) Publish legacy leg events
-    await Promise.all(
-      legsPayload.map((leg) => redisClient.publish('parlay:place', JSON.stringify(leg))),
-    );
-
-    // 8) Recalculate odds for all affected predictions (make markets alive!)
-    const affectedPredictions = Array.from(new Set(validLegs.map((leg) => leg.prediction.id)));
-    await Promise.all(affectedPredictions.map((predId) => this.recalculateOdds(predId)));
-
-    // 9) Publish to unified activity system
-    await unifiedActivityService.createParlayActivity(
-      {
-        id: user.id,
-        name: user.name,
-        avatarUrl,
-      },
-      {
-        id: parlay.id,
-        amount,
-        legCount: oddsCalculation.legCount,
-        combinedOdds: oddsCalculation.finalOdds,
-      },
-    );
-
-    // 10) This activity is already published by unifiedActivityService above
-    // No need for duplicate ActivityRecorder call
-
-    // 11) Check for achievement unlocks
-    await achievementService.checkAndUpdateAchievements({
-      type: 'parlay_completed',
-      userId,
-      data: {
-        parlayId: parlay.id,
-        amount,
-        legCount: oddsCalculation.legCount,
-        won: false, // Will be updated when parlay is resolved
-      },
-    });
-
-    // 12) Trigger enhanced stats update
+    // 4) Post-transaction operations (safe to fail without data corruption)
     try {
-      const statsUpdatePayload = {
-        userId,
-        reason: 'parlay_placed',
+      // Generate proper signed avatar URL
+      const avatarUrl = user.profilePictureKey
+        ? await this.userService.getCachedProfileImageUrl(user.id, user.profilePictureKey, 3600)
+        : user.avatarUrl;
+
+      // Prepare leg events payload
+      const legsPayload: ParlayLegWithUser[] = validLegs.map((o) => ({
         parlayId: parlay.id,
-        amount,
-        legCount: oddsCalculation.legCount,
-        predictions: validLegs.map((leg) => ({
-          id: leg.prediction.id,
-          title: leg.prediction.title,
-          category: leg.prediction.category,
+        user: { id: user.id, name: user.name, avatarUrl },
+        stake: amount.toString(),
+        optionId: o.id,
+        createdAt: parlay.createdAt,
+        predictionId: o.prediction.id,
+        optionLabel: o.label,
+        predictionTitle: o.prediction.title,
+      }));
+
+      // Get affected predictions for odds recalculation
+      const affectedPredictions = Array.from(new Set(validLegs.map((leg) => leg.prediction.id)));
+
+      // Execute all post-transaction operations in parallel for performance
+      await Promise.allSettled([
+        // Publish legacy leg events
+        ...legsPayload.map((leg) => redisClient.publish('parlay:place', JSON.stringify(leg))),
+        
+        // Recalculate odds for all affected predictions
+        ...affectedPredictions.map((predId) => this.recalculateOdds(predId)),
+        
+        // Publish to unified activity system
+        unifiedActivityService.createParlayActivity(
+          {
+            id: user.id,
+            name: user.name,
+            avatarUrl,
+          },
+          {
+            id: parlay.id,
+            amount,
+            legCount: oddsCalculation.legCount,
+            combinedOdds: oddsCalculation.finalOdds,
+          },
+        ),
+        
+        // Check for achievement unlocks
+        achievementService.checkAndUpdateAchievements({
+          type: 'parlay_completed',
+          userId,
+          data: {
+            parlayId: parlay.id,
+            amount,
+            legCount: oddsCalculation.legCount,
+            won: false, // Will be updated when parlay is resolved
+          },
+        }),
+        
+        // Trigger stats update
+        redisClient.publish('user:stats_update', JSON.stringify({
+          userId,
+          reason: 'parlay_placed',
+          parlayId: parlay.id,
+          amount,
+          legCount: oddsCalculation.legCount,
+          predictions: validLegs.map((leg) => ({
+            id: leg.prediction.id,
+            title: leg.prediction.title,
+            category: leg.prediction.category,
+          })),
+          timestamp: new Date().toISOString(),
         })),
-        timestamp: new Date().toISOString(),
-      };
-
-      await redisClient.publish('user:stats_update', JSON.stringify(statsUpdatePayload));
+        
+        // Broadcast real-time metrics
+        broadcastRealtimeMetrics(),
+      ]);
     } catch (error) {
-      console.error('[betting] Error publishing parlay placed stats update:', error);
+      console.error('[betting] Error in post-transaction operations for parlay:', parlay.id, error);
+      // Don't throw - parlay was successfully placed, these are just notifications
     }
-
-    // Broadcast real-time metrics update to admin dashboard
-    await broadcastRealtimeMetrics();
 
     return parlay;
   }

@@ -68,7 +68,7 @@ model User {
   profileComplete    Boolean             @default(false)
   role               Role                @default(USER)
   active             Boolean             @default(true)
-  muskBucks          Int                 @default(1000)
+  muskBucks          BigInt              @default(1000)
   bets               Bet[]
   refreshTokens      RefreshToken[]
   userBadges         UserBadge[]         @relation("UserToUserBadge")
@@ -160,6 +160,10 @@ model Prediction {
   activities      UserActivity[]
 
   @@index([expiresAt, resolved])
+  @@index([creatorId, createdAt(sort: Desc)])
+  @@index([category, createdAt(sort: Desc)])
+  @@index([approved, resolved, createdAt(sort: Desc)])
+  @@index([category, approved])
 }
 
 model PredictionOption {
@@ -179,16 +183,22 @@ model Bet {
   userId          Int
   prediction      Prediction        @relation(fields: [predictionId], references: [id])
   predictionId    Int
-  amount          Int
+  amount          BigInt
   oddsAtPlacement Float? // snapshot of odds when placing the bet
-  potentialPayout Int? // computed at placement: amount * oddsAtPlacement
+  potentialPayout BigInt? // computed at placement: amount * oddsAtPlacement
   status          BetStatus         @default(PENDING)
   optionOption    PredictionOption? @relation("OptionToBet", fields: [optionId], references: [id])
   optionId        Int?
   won             Boolean? // null until resolved
-  payout          Int? // null until resolved
+  payout          BigInt? // null until resolved
   createdAt       DateTime          @default(now())
   activities      UserActivity[]
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([predictionId, createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
+  @@index([userId, status])
+  @@index([userId, predictionId, createdAt(sort: Desc)])
 }
 
 model AITweet {
@@ -211,12 +221,12 @@ model LeaderboardEntry {
   userId    Int     @id @map("user_id")
   userName  String  @map("user_name")
   avatarUrl String? @map("avatar_url")
-  balance   Int     @map("balance")
+  balance   BigInt  @map("balance")
 
-  totalBets    Int   @map("total_bets")
-  winRate      Float @map("win_rate")
-  profitAll    Int   @map("profit_all")
-  profitPeriod Int   @map("profit_period")
+  totalBets    Int     @map("total_bets")
+  winRate      Float   @map("win_rate")
+  profitAll    BigInt  @map("profit_all")
+  profitPeriod BigInt  @map("profit_period")
   roi          Float @map("roi")
 
   longestStreak Int @map("longest_streak")
@@ -305,12 +315,15 @@ model Parlay {
   id              Int         @id @default(autoincrement())
   user            User        @relation(fields: [userId], references: [id])
   userId          Int
-  amount          Int
+  amount          BigInt
   combinedOdds    Float
-  potentialPayout Int
+  potentialPayout BigInt
   status          BetStatus   @default(PENDING)
   legs            ParlayLeg[]
   createdAt       DateTime    @default(now())
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
 }
 
 model ParlayLeg {
@@ -328,11 +341,16 @@ model Transaction {
   user            User            @relation(fields: [userId], references: [id])
   userId          Int
   type            TransactionType
-  amount          Int
-  balanceAfter    Int
+  amount          BigInt
+  balanceAfter    BigInt
   relatedBetId    Int? // single bet
   relatedParlayId Int? // parlay bet
   createdAt       DateTime        @default(now())
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([type, createdAt(sort: Desc)])
+  @@index([relatedBetId])
+  @@index([relatedParlayId])
 }
 
 model UserPost {
@@ -397,10 +415,11 @@ model UserStats {
   parlayLegsLost  Int @default(0)
 
   // combined‐order metrics
-  totalWagered Int   @default(0) // bets+parlays
-  totalWon     Int   @default(0) // sum of payouts
-  profit       Int   @default(0) // totalWon – totalWagered
+  totalWagered BigInt @default(0) // bets+parlays
+  totalWon     BigInt @default(0) // sum of payouts
+  profit       BigInt @default(0) // totalWon – totalWagered
   roi          Float @default(0) // profit / totalWagered
+  winRate      Float @default(0) // (betsWon + parlaysWon) / (totalBets + totalParlays)
 
   // streak tracking
   currentStreak Int @default(0)
@@ -408,9 +427,14 @@ model UserStats {
 
   // extras
   mostCommonBet String?
-  biggestWin    Int     @default(0)
+  biggestWin    BigInt  @default(0)
 
   updatedAt DateTime @default(now()) @updatedAt
+
+  // Performance indexes for leaderboard queries
+  @@index([totalWon(sort: Desc)])
+  @@index([winRate(sort: Desc)])
+  @@index([totalWagered(sort: Desc)])
 }
 
 model UserBan {

@@ -83,7 +83,7 @@ export type PredictionType =
 
 // ——— Bet ——————————————————————————————————————————————
 export type DbBet     = PrismaBet;
-export type PublicBet = Pick<
+export type PublicBet = Omit<Pick<
   PrismaBet,
   | 'id'
   | 'userId'
@@ -96,7 +96,11 @@ export type PublicBet = Pick<
   | 'won'
   | 'payout'
   | 'createdAt'
->;
+>, 'amount' | 'potentialPayout' | 'payout'> & {
+  amount: string;
+  potentialPayout: string | null;
+  payout: string | null;
+};
 
 export interface BetWithUser extends PublicBet {
   user: {
@@ -117,8 +121,9 @@ export type ParlayLegWithUser = {
     id: number;
     name: string;
     avatarUrl: string | null;
+    profilePictureKey?: string | null;
   };
-  stake: number;
+  stake: string;
   optionId: number;
   createdAt: Date;
   /** parent prediction id for context */
@@ -128,7 +133,7 @@ export type ParlayLegWithUser = {
 };
 
 export type DbParlay     = PrismaParlay;
-export type PublicParlay = Pick<
+export type PublicParlay = Omit<Pick<
   PrismaParlay,
   | 'id'
   | 'userId'
@@ -137,7 +142,10 @@ export type PublicParlay = Pick<
   | 'potentialPayout'
   | 'status'
   | 'createdAt'
->;
+>, 'amount' | 'potentialPayout'> & {
+  amount: string;
+  potentialPayout: string;
+};
 
 export type DbParlayLeg     = PrismaParlayLeg;
 export interface PublicParlayLeg {
@@ -149,7 +157,7 @@ export interface PublicParlayLeg {
   parlay: {
     id:            number;
     user:          { id: number; name: string };
-    amount:        number;
+    amount:        string;
     combinedOdds:  number;
   };
 }
@@ -167,11 +175,11 @@ export interface PublicLeaderboardEntry {
   userId:           number;
   userName:         string;
   avatarUrl:        string | null;
-  balance:          number;
+  balance:          string;
   totalBets:        number;
   winRate:          number;
-  profitAll:        number;
-  profitPeriod:     number;
+  profitAll:        string;
+  profitPeriod:     string;
   roi:              number;
   longestStreak:    number;
   currentStreak:    number;
@@ -206,7 +214,7 @@ export type PublicFollow = Pick<
 
 // ——— Transaction ————————————————————————————————————————————
 export type DbTransaction   = PrismaTransaction;
-export type PublicTransaction = Pick<
+export type PublicTransaction = Omit<Pick<
   PrismaTransaction,
   | 'id'
   | 'userId'
@@ -216,7 +224,10 @@ export type PublicTransaction = Pick<
   | 'relatedBetId'
   | 'relatedParlayId'
   | 'createdAt'
->;
+>, 'amount' | 'balanceAfter'> & {
+  amount: string;
+  balanceAfter: string;
+};
 
 // ——— UserStats (internal) ——————————————————————————————————————
 export type DbUserStats = {
@@ -233,17 +244,17 @@ export type DbUserStats = {
   totalParlayLegs:  number;
   parlayLegsWon:    number;
   parlayLegsLost:   number;
-  // combined metrics
-  totalWagered:     number;
-  totalWon:         number;
-  profit:           number;
+  // combined metrics  
+  totalWagered:     bigint;
+  totalWon:         bigint;
+  profit:           bigint;
   roi:              number;
   // streak tracking
   currentStreak:    number;
   longestStreak:    number;
   // extras
   mostCommonBet:    string | null;
-  biggestWin:       number;
+  biggestWin:       bigint;
   updatedAt:        Date;
 };
 
@@ -252,7 +263,7 @@ export interface PublicUserProfile {
   id:               number;
   name:             string;
   role: string;
-  muskBucks:        number;
+  muskBucks:        string;
   profileComplete:  boolean;
   rank?:            number;
   bio?:             string | null;
@@ -284,14 +295,14 @@ export type UserStatsDTO = {
   totalParlayLegs:  number;
   parlayLegsWon:    number;
   parlayLegsLost:   number;
-  totalWagered:     number;
-  totalWon:         number;
-  profit:           number;
+  totalWagered:     string;
+  totalWon:         string;
+  profit:           string;
   roi:              number;
   currentStreak:    number;
   longestStreak:    number;
   mostCommonBet:    string | null;
-  biggestWin:       number;
+  biggestWin:       string;
   updatedAt:        string;
 };
 
@@ -359,7 +370,7 @@ export type ActivityPriority = (typeof ActivityPriority)[keyof typeof ActivityPr
 export type ActivityEventMeta = {
   // Display context
   title?: string;                // prediction title, post content preview  
-  amount?: number;               // bet amount, payout amount, prize value
+  amount?: string;               // bet amount, payout amount, prize value
   option?: string;               // chosen option label
   category?: string;             // prediction category
   streak?: number;               // winning/losing streak context

@@ -846,7 +846,7 @@ export class PrismaAdminRepository implements IAdminRepository {
         : undefined,
       analytics: {
         riskScore: 0, // Placeholder - would implement fraud detection logic
-        profitability: bet.payout ? (bet.payout - bet.amount) / bet.amount : 0,
+        profitability: bet.payout ? Number(bet.payout - bet.amount) / Number(bet.amount) : 0,
         suspiciousPatterns: [], // Placeholder
       },
     }));
@@ -897,13 +897,13 @@ export class PrismaAdminRepository implements IAdminRepository {
       }),
     ]);
 
-    const totalBettingVolume = bets.reduce((sum, bet) => sum + bet.amount, 0);
+    const totalBettingVolume = bets.reduce((sum, bet) => sum + Number(bet.amount), 0);
     const totalPayouts = transactions
       .filter((tx) => tx.type === 'CREDIT') // CREDIT represents payouts
-      .reduce((sum, tx) => sum + tx.amount, 0);
+      .reduce((sum, tx) => sum + Number(tx.amount), 0);
     const totalRefunds = transactions
       .filter((tx) => tx.type === 'CREDIT' && tx.relatedBetId) // Credits related to bets are refunds
-      .reduce((sum, tx) => sum + tx.amount, 0);
+      .reduce((sum, tx) => sum + Number(tx.amount), 0);
 
     // Category breakdown
     const categoryMap = new Map();
@@ -997,7 +997,7 @@ export class PrismaAdminRepository implements IAdminRepository {
               });
             });
 
-            totalRefunded += bet.amount;
+            totalRefunded += Number(bet.amount);
             successCount++;
           } catch (error) {
             errors.push({ id: betId, error: (error as Error).message });
@@ -1601,8 +1601,8 @@ export class PrismaAdminRepository implements IAdminRepository {
       _sum: { payout: true },
     });
 
-    const avgUserValue = totalUsers > 0 ? (totalRevenue._sum.amount || 0) / totalUsers : 0;
-    const netProfit = (totalRevenue._sum.amount || 0) - (totalPayouts._sum.payout || 0);
+    const avgUserValue = totalUsers > 0 ? Number(totalRevenue._sum.amount || 0) / totalUsers : 0;
+    const netProfit = Number(totalRevenue._sum.amount || 0) - Number(totalPayouts._sum.payout || 0);
 
     // Current period metrics
     const currentNewUsers = await this.prisma.user.count({
@@ -1636,9 +1636,9 @@ export class PrismaAdminRepository implements IAdminRepository {
     const userGrowthRate =
       previousNewUsers > 0 ? ((currentNewUsers - previousNewUsers) / previousNewUsers) * 100 : 0;
     const revenueGrowthRate =
-      (previousRevenue._sum.amount || 0) > 0
-        ? (((currentRevenue._sum.amount || 0) - (previousRevenue._sum.amount || 0)) /
-            (previousRevenue._sum.amount || 0)) *
+      Number(previousRevenue._sum.amount || 0) > 0
+        ? ((Number(currentRevenue._sum.amount || 0) - Number(previousRevenue._sum.amount || 0)) /
+            Number(previousRevenue._sum.amount || 0)) *
           100
         : 0;
     const engagementGrowthRate =
@@ -1672,8 +1672,8 @@ export class PrismaAdminRepository implements IAdminRepository {
         activeUsers,
         totalPredictions,
         totalBets,
-        totalRevenue: totalRevenue._sum.amount || 0,
-        totalPayouts: totalPayouts._sum.payout || 0,
+        totalRevenue: Number(totalRevenue._sum.amount || 0),
+        totalPayouts: Number(totalPayouts._sum.payout || 0),
         netProfit,
         avgUserValue,
       },
@@ -1690,8 +1690,8 @@ export class PrismaAdminRepository implements IAdminRepository {
           change: userGrowthRate,
         },
         revenue: {
-          current: currentRevenue._sum.amount || 0,
-          previous: previousRevenue._sum.amount || 0,
+          current: Number(currentRevenue._sum.amount || 0),
+          previous: Number(previousRevenue._sum.amount || 0),
           change: revenueGrowthRate,
         },
         bets: {
@@ -1744,7 +1744,7 @@ export class PrismaAdminRepository implements IAdminRepository {
       const existing = categoryMap.get(category) || { count: 0, volume: 0 };
       categoryMap.set(category, {
         count: existing.count + 1,
-        volume: existing.volume + bet.amount,
+        volume: existing.volume + Number(bet.amount),
       });
     });
 
@@ -1775,7 +1775,7 @@ export class PrismaAdminRepository implements IAdminRepository {
       const existing = hourMap.get(hour) || { count: 0, volume: 0 };
       hourMap.set(hour, {
         count: existing.count + 1,
-        volume: existing.volume + bet.amount,
+        volume: existing.volume + Number(bet.amount),
       });
     });
 
@@ -1853,7 +1853,7 @@ export class PrismaAdminRepository implements IAdminRepository {
     const userChurnPrediction = inactiveUsers.map((user) => ({
       userId: user.id,
       userName: user.name,
-      churnProbability: Math.random() * 0.8 + 0.2, // Simplified - would use ML model
+      churnProbability: 0.5, // Placeholder - ML implementation pending
       riskFactors: ['Low activity', 'No recent bets', 'Long time since last activity'],
       recommendations: [
         'Send engagement email',
@@ -1867,9 +1867,9 @@ export class PrismaAdminRepository implements IAdminRepository {
       const date = new Date(now.getTime() + i * 24 * 60 * 60 * 1000);
       return {
         date: date.toISOString().split('T')[0],
-        predictedUsers: Math.floor(Math.random() * 100) + 50,
-        predictedRevenue: Math.floor(Math.random() * 10000) + 5000,
-        confidence: Math.random() * 0.3 + 0.7,
+        predictedUsers: 75, // Placeholder - ML implementation pending
+        predictedRevenue: 7500, // Placeholder - ML implementation pending
+        confidence: 0.85, // Placeholder - ML implementation pending
       };
     });
 
@@ -1903,7 +1903,7 @@ export class PrismaAdminRepository implements IAdminRepository {
     params: Record<string, any>,
   ): Promise<CustomReportData> {
     // Simplified custom report generation
-    const reportId = `report_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const reportId = `report_${Date.now()}_${Date.now().toString(36)}`;
 
     let data: Array<Record<string, any>> = [];
 
@@ -1986,8 +1986,8 @@ export class PrismaAdminRepository implements IAdminRepository {
       activeBets,
       recentTransactions,
       systemHealth: {
-        responseTime: Math.random() * 100 + 50, // Simulated
-        errorRate: Math.random() * 0.02, // Simulated
+        responseTime: 75, // Placeholder - metrics integration pending
+        errorRate: 0.01, // Placeholder - metrics integration pending
         uptime: 99.9, // Simulated
       },
       alerts: [],
@@ -2027,8 +2027,9 @@ export class PrismaAdminRepository implements IAdminRepository {
 
   // -- Leaderboard & Stats --
   async recalculateLeaderboard(): Promise<void> {
-    // refresh the materialized view
-    await this.prisma.$executeRawUnsafe('REFRESH MATERIALIZED VIEW CONCURRENTLY leaderboard_view;');
+    // Note: leaderboard_view is now a regular table updated by triggers
+    // No need to refresh materialized view anymore
+    // The table is automatically updated via database triggers on bet/payout events
   }
 
   async findUserStats(userId: number): Promise<UserStats | null> {

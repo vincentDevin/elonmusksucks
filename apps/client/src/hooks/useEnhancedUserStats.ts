@@ -155,19 +155,12 @@ export function useEnhancedUserStats() {
       // Extract performance data from enhanced stats or calculate from current data
       const baseStats = enhancedStatsResponse.data;
       const totalBets = baseStats?.totalBets || myBets.data?.length || 0;
-      const winRate = baseStats?.winRate || 0.65; // Mock realistic win rate
-      const profitLoss = baseStats?.profitLoss || baseStats?.netProfit || activeBetsValue * 0.15;
+      const winRate = baseStats?.winRate || 0; // Default to 0 if no data
+      const profitLoss = baseStats?.profitLoss || baseStats?.netProfit || 0;
       const totalWagered = baseStats?.totalWagered || activeBetsValue;
 
-      // Use server category accuracy data or generate mock data
-      const accuracyByCategory: CategoryAccuracy[] =
-        baseStats?.categoryAccuracy ||
-        ['Sports', 'Politics', 'Entertainment', 'Technology', 'Finance'].map((category, index) => ({
-          category,
-          accuracy: 0.5 + Math.sin(index) * 0.3, // Realistic variation between 0.2-0.8
-          totalBets: Math.floor(totalBets / 5) + Math.floor(Math.random() * 5),
-          wins: 0,
-        }));
+      // Use server category accuracy data or empty array if not available
+      const accuracyByCategory: CategoryAccuracy[] = baseStats?.categoryAccuracy || [];
 
       // Ensure wins are calculated if not provided
       accuracyByCategory.forEach((cat) => {
@@ -183,19 +176,9 @@ export function useEnhancedUserStats() {
             ).category
           : 'N/A';
 
-      // Generate mock trend data
-      const generateTrendData = (baseValue: number, points: number = 7): TrendData[] => {
-        const data: TrendData[] = [];
-        for (let i = points - 1; i >= 0; i--) {
-          const date = new Date();
-          date.setDate(date.getDate() - i);
-          const variation = (Math.random() - 0.5) * 0.4;
-          data.push({
-            date: date.toISOString().split('T')[0],
-            value: Math.max(0, baseValue * (1 + variation)),
-          });
-        }
-        return data;
+      // Generate empty trend data if not available from server
+      const generateTrendData = (_baseValue: number, _points: number = 7): TrendData[] => {
+        return []; // Return empty array instead of mock data
       };
 
       const enhancedStats: EnhancedUserStats = {

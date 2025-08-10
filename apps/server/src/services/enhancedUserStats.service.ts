@@ -95,17 +95,17 @@ export class EnhancedUserStatsService {
 
     const winRate = basicStats.totalBets > 0 ? basicStats.betsWon / basicStats.totalBets : 0;
     const avgBetSize =
-      basicStats.totalBets > 0 ? basicStats.totalWagered / basicStats.totalBets : 0;
+      basicStats.totalBets > 0 ? Number(basicStats.totalWagered) / basicStats.totalBets : 0;
 
     return {
       // Performance metrics
       totalBets: basicStats.totalBets,
       winRate,
-      profitLoss: basicStats.profit,
+      profitLoss: Number(basicStats.profit),
       categoryAccuracy,
       currentStreak,
       bestCategory,
-      totalWagered: basicStats.totalWagered,
+      totalWagered: Number(basicStats.totalWagered),
       avgBetSize,
 
       // Ranking data
@@ -126,7 +126,7 @@ export class EnhancedUserStatsService {
       // Trend data
       weeklyVolume: trends.weeklyVolume,
       monthlyProfitLoss: trends.monthlyProfitLoss,
-      categoryStats: this.calculateCategoryStats(categoryAccuracy, basicStats.totalWagered),
+      categoryStats: this.calculateCategoryStats(categoryAccuracy, Number(basicStats.totalWagered)),
     };
   }
 
@@ -356,9 +356,9 @@ export class EnhancedUserStatsService {
         id: 'high_roller',
         title: 'High Roller',
         description: 'Wager 10,000🪙 total',
-        progress: Math.min(basicStats.totalWagered, 10000),
+        progress: Math.min(Number(basicStats.totalWagered), 10000),
         target: 10000,
-        isCompleted: basicStats.totalWagered >= 10000,
+        isCompleted: Number(basicStats.totalWagered) >= 10000,
       },
       {
         id: 'category_expert',

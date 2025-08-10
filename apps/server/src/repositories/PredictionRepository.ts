@@ -7,17 +7,10 @@
 
 import prisma from '../db';
 import type { IPredictionRepository } from './IPredictionRepository';
-import type { DbPrediction, DbPredictionOption, DbBet, DbUser } from '@ems/types';
+import type { DbPrediction, DbPredictionOption, DbBet, DbUser, ParlayLegWithUser } from '@ems/types';
 import type { PredictionType } from '@ems/types';
 
-/** Shape for a parlay leg that already contains user meta (with avatar support) */
-export type ParlayLegWithUser = {
-  parlayId: number;
-  user: Pick<DbUser, 'id' | 'name' | 'avatarUrl' | 'profilePictureKey'>;
-  stake: number;
-  optionId: number;
-  createdAt: Date;
-};
+// Using the global ParlayLegWithUser type from @ems/types
 
 export class PredictionRepository implements IPredictionRepository {
   async createPrediction(data: {
@@ -140,9 +133,9 @@ export class PredictionRepository implements IPredictionRepository {
               id: leg.parlay.user.id,
               name: leg.parlay.user.name,
               avatarUrl: leg.parlay.user.avatarUrl,
-              profilePictureKey: leg.parlay.user.profilePictureKey,
+              ...(leg.parlay.user.profilePictureKey && { profilePictureKey: leg.parlay.user.profilePictureKey }),
             },
-            stake: leg.parlay.amount,
+            stake: leg.parlay.amount.toString(),
             optionId: opt.id,
             createdAt: leg.createdAt,
           });
@@ -215,9 +208,9 @@ export class PredictionRepository implements IPredictionRepository {
             id: leg.parlay.user.id,
             name: leg.parlay.user.name,
             avatarUrl: leg.parlay.user.avatarUrl,
-            profilePictureKey: leg.parlay.user.profilePictureKey,
+            ...(leg.parlay.user.profilePictureKey && { profilePictureKey: leg.parlay.user.profilePictureKey }),
           },
-          stake: leg.parlay.amount,
+          stake: leg.parlay.amount.toString(),
           optionId: opt.id,
           createdAt: leg.createdAt,
         });

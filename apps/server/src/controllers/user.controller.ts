@@ -36,6 +36,12 @@ export async function getProfile(
 ): Promise<void> {
   try {
     const targetUserId = Number(req.params.userId);
+    
+    if (isNaN(targetUserId)) {
+      res.status(400).json({ error: 'Invalid user ID' });
+      return;
+    }
+    
     const viewerId = req.user?.id;
     const profileDTO: PublicUserProfile = await userService.getUserProfile(targetUserId, viewerId);
     res.json(profileDTO);
@@ -275,6 +281,12 @@ export async function getUserStatsHandler(
 ): Promise<void> {
   try {
     const userId = Number(req.params.userId);
+    
+    if (isNaN(userId)) {
+      res.status(400).json({ error: 'Invalid user ID' });
+      return;
+    }
+    
     const stats: UserStatsDTO | null = await userService.getUserStats(userId);
     if (!stats) {
       res.status(404).json({ error: 'Stats not found' });

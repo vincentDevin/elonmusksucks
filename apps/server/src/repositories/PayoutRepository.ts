@@ -77,13 +77,13 @@ export class PayoutRepository implements IPayoutRepository {
           if (isWinner) {
             const user = await tx.user.findUnique({ where: { id: b.userId } });
             if (user) {
-              const newBal = user.muskBucks + payoutAmount;
+              const newBal = user.muskBucks + BigInt(payoutAmount);
               await tx.user.update({ where: { id: user.id }, data: { muskBucks: newBal } });
               await tx.transaction.create({
                 data: {
                   userId: user.id,
                   type: 'CREDIT',
-                  amount: payoutAmount,
+                  amount: BigInt(payoutAmount),
                   balanceAfter: newBal,
                   relatedBetId: b.id,
                   relatedParlayId: null,
@@ -107,24 +107,24 @@ export class PayoutRepository implements IPayoutRepository {
               parlayLegsWon: 0,
               parlayLegsLost: 0,
               totalWagered: b.amount,
-              totalWon: payoutAmount,
-              profit: payoutAmount - b.amount,
+              totalWon: BigInt(payoutAmount),
+              profit: BigInt(payoutAmount) - b.amount,
               roi: 0,
               currentStreak: isWinner ? (statsBefore?.currentStreak ?? 0) + 1 : 0,
               longestStreak: isWinner
                 ? Math.max(statsBefore?.longestStreak ?? 0, (statsBefore?.currentStreak ?? 0) + 1)
                 : (statsBefore?.longestStreak ?? 0),
               mostCommonBet: null,
-              biggestWin: payoutAmount,
+              biggestWin: BigInt(payoutAmount),
             },
             update: {
               totalBets: { increment: 1 },
               betsWon: isWinner ? { increment: 1 } : undefined,
               betsLost: !isWinner ? { increment: 1 } : undefined,
               totalWagered: { increment: b.amount },
-              totalWon: { increment: payoutAmount },
-              profit: { increment: payoutAmount - b.amount },
-              biggestWin: { set: Math.max(statsBefore?.biggestWin ?? 0, payoutAmount) },
+              totalWon: { increment: BigInt(payoutAmount) },
+              profit: { increment: BigInt(payoutAmount) - b.amount },
+              biggestWin: { set: BigInt(payoutAmount) > (statsBefore?.biggestWin ?? BigInt(0)) ? BigInt(payoutAmount) : (statsBefore?.biggestWin ?? BigInt(0)) },
               currentStreak: isWinner ? { set: (statsBefore?.currentStreak ?? 0) + 1 } : { set: 0 },
               longestStreak: isWinner
                 ? {
@@ -140,9 +140,7 @@ export class PayoutRepository implements IPayoutRepository {
           await tx.userStats.update({
             where: { userId: b.userId },
             data: {
-              roi:
-                (prevStats.profit + (payoutAmount - b.amount)) /
-                (prevStats.totalWagered + b.amount),
+              roi: Number(prevStats.profit + (BigInt(payoutAmount) - b.amount)) / Number(prevStats.totalWagered + b.amount),
             },
           });
 
@@ -213,13 +211,13 @@ export class PayoutRepository implements IPayoutRepository {
           }
 
           if (!lost) {
-            const newBal = parlay.user.muskBucks + payoutAmount;
+            const newBal = parlay.user.muskBucks + BigInt(payoutAmount);
             await tx.user.update({ where: { id: parlay.userId }, data: { muskBucks: newBal } });
             await tx.transaction.create({
               data: {
                 userId: parlay.userId,
                 type: 'CREDIT',
-                amount: payoutAmount,
+                amount: BigInt(payoutAmount),
                 balanceAfter: newBal,
                 relatedBetId: null,
                 relatedParlayId: parlay.id,
@@ -242,15 +240,15 @@ export class PayoutRepository implements IPayoutRepository {
               parlayLegsWon: legsWon,
               parlayLegsLost: legCount - legsWon,
               totalWagered: parlay.amount,
-              totalWon: payoutAmount,
-              profit: payoutAmount - parlay.amount,
+              totalWon: BigInt(payoutAmount),
+              profit: BigInt(payoutAmount) - parlay.amount,
               roi: 0,
               currentStreak: lost ? 0 : (statsBefore?.currentStreak ?? 0) + 1,
               longestStreak: lost
                 ? (statsBefore?.longestStreak ?? 0)
                 : Math.max(statsBefore?.longestStreak ?? 0, (statsBefore?.currentStreak ?? 0) + 1),
               mostCommonBet: null,
-              biggestWin: payoutAmount,
+              biggestWin: BigInt(payoutAmount),
             },
             update: {
               totalParlays: { increment: 1 },
@@ -260,9 +258,9 @@ export class PayoutRepository implements IPayoutRepository {
               parlayLegsWon: { increment: legsWon },
               parlayLegsLost: { increment: legCount - legsWon },
               totalWagered: { increment: parlay.amount },
-              totalWon: { increment: payoutAmount },
-              profit: { increment: payoutAmount - parlay.amount },
-              biggestWin: { set: Math.max(statsBefore?.biggestWin ?? 0, payoutAmount) },
+              totalWon: { increment: BigInt(payoutAmount) },
+              profit: { increment: BigInt(payoutAmount) - parlay.amount },
+              biggestWin: { set: BigInt(payoutAmount) > (statsBefore?.biggestWin ?? BigInt(0)) ? BigInt(payoutAmount) : (statsBefore?.biggestWin ?? BigInt(0)) },
               currentStreak: lost ? { set: 0 } : { set: (statsBefore?.currentStreak ?? 0) + 1 },
               longestStreak: lost
                 ? undefined
@@ -279,8 +277,8 @@ export class PayoutRepository implements IPayoutRepository {
             where: { userId: parlay.userId },
             data: {
               roi:
-                (prevP.profit + (payoutAmount - parlay.amount)) /
-                (prevP.totalWagered + parlay.amount),
+                Number(prevP.profit + (BigInt(payoutAmount) - parlay.amount)) /
+                Number(prevP.totalWagered + parlay.amount),
             },
           });
 
