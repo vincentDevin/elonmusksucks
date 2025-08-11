@@ -16,6 +16,7 @@ import {
   verifyEmail,
   requestPasswordReset,
   performPasswordReset,
+  updateTheme,
 } from '../controllers/auth.controller';
 
 const router = Router();
@@ -29,6 +30,7 @@ router.get('/verify-email', apiLimiter, verifyEmail);
 // Protected routes
 router.post('/logout', requireAuth, logoutUser);
 router.get('/me', requireAuth, me);
+router.put('/theme', requireAuth, updateTheme);
 
 // Password reset flows (with aggressive rate limiting)
 router.post('/request-password-reset', passwordResetLimiter, requestPasswordReset);

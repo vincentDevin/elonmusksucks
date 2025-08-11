@@ -1,6 +1,11 @@
 // apps/client/src/components/dashboard/desktop/MarketOverview.tsx
 import { useState, useEffect } from 'react';
-import { getMarketOverview, getMarketHealth, type MarketStats, type MarketHealth } from '../../../api/market';
+import {
+  getMarketOverview,
+  getMarketHealth,
+  type MarketStats,
+  type MarketHealth,
+} from '../../../api/market';
 
 export default function MarketOverview() {
   const [stats, setStats] = useState<MarketStats | null>(null);
@@ -14,25 +19,25 @@ export default function MarketOverview() {
       try {
         setLoading(true);
         setError(null);
-        
+
         const [marketStats, marketHealth] = await Promise.all([
           getMarketOverview(),
-          getMarketHealth()
+          getMarketHealth(),
         ]);
-        
+
         setStats(marketStats);
         setHealth(marketHealth);
       } catch (err) {
         console.error('Error fetching market data:', err);
         setError('Failed to load market data');
-        
+
         // Fallback to basic data structure to prevent UI breaks
         setStats({
           totalVolume: 0,
           activeMarkets: 0,
           totalUsers: 0,
           volumeChange: 0,
-          trending: []
+          trending: [],
         });
         setHealth({
           liquidity: 0,
@@ -43,8 +48,8 @@ export default function MarketOverview() {
             recentActivity: 0,
             avgBetSize: 0,
             uniqueBettors: 0,
-            activeCategories: 0
-          }
+            activeCategories: 0,
+          },
         });
       } finally {
         setLoading(false);
@@ -221,10 +226,13 @@ export default function MarketOverview() {
                 </span>
               </div>
               <div className="w-full bg-muted rounded-full h-2">
-                <div 
+                <div
                   className={`rounded-full h-2 ${
-                    health.liquidity >= 80 ? 'bg-success' : 
-                    health.liquidity >= 50 ? 'bg-warning' : 'bg-error'
+                    health.liquidity >= 80
+                      ? 'bg-success'
+                      : health.liquidity >= 50
+                        ? 'bg-warning'
+                        : 'bg-error'
                   }`}
                   style={{ width: `${health.liquidity}%` }}
                 ></div>
@@ -236,14 +244,21 @@ export default function MarketOverview() {
               <div className="flex justify-between text-sm">
                 <span className="text-tertiary">Activity Level</span>
                 <span className="text-content">
-                  {health.activity >= 80 ? 'Very High' : health.activity >= 50 ? 'High' : 'Moderate'}
+                  {health.activity >= 80
+                    ? 'Very High'
+                    : health.activity >= 50
+                      ? 'High'
+                      : 'Moderate'}
                 </span>
               </div>
               <div className="w-full bg-muted rounded-full h-2">
-                <div 
+                <div
                   className={`rounded-full h-2 ${
-                    health.activity >= 80 ? 'bg-info' : 
-                    health.activity >= 50 ? 'bg-primary' : 'bg-secondary'
+                    health.activity >= 80
+                      ? 'bg-info'
+                      : health.activity >= 50
+                        ? 'bg-primary'
+                        : 'bg-secondary'
                   }`}
                   style={{ width: `${health.activity}%` }}
                 ></div>
@@ -259,10 +274,13 @@ export default function MarketOverview() {
                 </span>
               </div>
               <div className="w-full bg-muted rounded-full h-2">
-                <div 
+                <div
                   className={`rounded-full h-2 ${
-                    health.volatility >= 80 ? 'bg-warning' : 
-                    health.volatility >= 50 ? 'bg-accent' : 'bg-secondary'
+                    health.volatility >= 80
+                      ? 'bg-warning'
+                      : health.volatility >= 50
+                        ? 'bg-accent'
+                        : 'bg-secondary'
                   }`}
                   style={{ width: `${health.volatility}%` }}
                 ></div>
@@ -274,14 +292,21 @@ export default function MarketOverview() {
               <div className="flex justify-between text-sm">
                 <span className="text-tertiary">User Satisfaction</span>
                 <span className="text-content">
-                  {health.satisfaction >= 80 ? 'Excellent' : health.satisfaction >= 60 ? 'Good' : 'Fair'}
+                  {health.satisfaction >= 80
+                    ? 'Excellent'
+                    : health.satisfaction >= 60
+                      ? 'Good'
+                      : 'Fair'}
                 </span>
               </div>
               <div className="w-full bg-muted rounded-full h-2">
-                <div 
+                <div
                   className={`rounded-full h-2 ${
-                    health.satisfaction >= 80 ? 'bg-success' : 
-                    health.satisfaction >= 60 ? 'bg-primary' : 'bg-warning'
+                    health.satisfaction >= 80
+                      ? 'bg-success'
+                      : health.satisfaction >= 60
+                        ? 'bg-primary'
+                        : 'bg-warning'
                   }`}
                   style={{ width: `${health.satisfaction}%` }}
                 ></div>

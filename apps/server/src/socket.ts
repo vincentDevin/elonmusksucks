@@ -43,8 +43,12 @@ export async function initSocket(httpServer: HTTPServer) {
   io.adapter(createAdapter(pubClient, subClient));
   console.log('[socket] Redis adapter attached');
 
+  // Store Redis clients for cleanup
+  const redisClients: any[] = [pubClient, subClient];
+
   // ── Domain event subscriptions ────────────────────────────────────────────
   const eventSub = redisClient.duplicate();
+  redisClients.push(eventSub);
   await eventSub.subscribe(
     'prediction:create',
     'prediction:resolve',
@@ -78,12 +82,14 @@ export async function initSocket(httpServer: HTTPServer) {
 
   // ── Statistics event subscriptions ────────────────────────────────────────
   const statsSub = redisClient.duplicate();
+  redisClients.push(statsSub);
   registerStatisticsRedisHandlers(io, statsSub);
 
   // ── Unified Activity event subscriptions ──────────────────────────────────
   // Note: Unified activity handlers manage all activity streams via single source
   const { setupUnifiedActivityRedisHandlers } = await import('./handlers/unifiedActivityHandlers');
-  setupUnifiedActivityRedisHandlers(io);
+  const unifiedActivitySub = setupUnifiedActivityRedisHandlers(io);
+  redisClients.push(unifiedActivitySub);
 
   // Give the unified activity service access to Socket.IO for immediate broadcasts
   const { unifiedActivityService } = await import('./services/unifiedActivity.service');
@@ -91,6 +97,7 @@ export async function initSocket(httpServer: HTTPServer) {
 
   // ── Chat event subscriptions ──────────────────────────────────────────────
   const chatSub = redisClient.duplicate();
+  redisClients.push(chatSub);
   registerRedisChatHandlers(io, chatSub);
 
   // ── Auth middleware must run before per‑socket handlers ───────────────────
@@ -125,6 +132,50 @@ export async function initSocket(httpServer: HTTPServer) {
   });
 
   io.on('error', (err) => console.error('[socket.io] SERVER ERROR:', err));
+
+  // ── CRITICAL: Redis client cleanup on server shutdown ────────────────────
+  const gracefulShutdown = async (signal: string) => {
+    console.log(`[socket] Received ${signal}, cleaning up Redis connections...`);
+
+    try {
+      // Close Socket.IO server first
+      io.close(() => {
+        console.log('[socket] Socket.IO server closed');
+      });
+
+      // Clean up all Redis clients
+      await Promise.all(
+        redisClients.map(async (client, index) => {
+          try {
+            await client.quit();
+            console.log(`[socket] Redis client ${index} closed`);
+          } catch (err) {
+            console.error(`[socket] Error closing Redis client ${index}:`, err);
+            // Force disconnect if quit fails
+            await client.disconnect();
+          }
+        }),
+      );
+
+      console.log('[socket] All Redis connections cleaned up');
+    } catch (err) {
+      console.error('[socket] Error during Redis cleanup:', err);
+    }
+
+    // Exit gracefully
+    process.exit(0);
+  };
+
+  // Register cleanup handlers for various shutdown signals
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+  process.on('SIGUSR2', () => gracefulShutdown('SIGUSR2')); // nodemon restart
+
+  // Handle uncaught errors to prevent Redis connection leaks
+  process.on('uncaughtException', async (err) => {
+    console.error('[socket] Uncaught exception, cleaning up Redis:', err);
+    await gracefulShutdown('uncaughtException');
+  });
 
   return io;
 }

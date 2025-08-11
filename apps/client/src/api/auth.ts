@@ -55,6 +55,7 @@ export interface User {
   muskBucks: number;
   profileComplete: boolean;
   avatarUrl: string | null;
+  theme: string;
 }
 
 /**
@@ -95,5 +96,13 @@ export async function performPasswordReset(
   data: PasswordResetPayload,
 ): Promise<{ message: string }> {
   const res = await api.post<{ message: string }>('/api/auth/reset-password', data);
+  return res.data;
+}
+
+/**
+ * Update user's theme preference
+ */
+export async function updateTheme(themeId: string): Promise<{ success: boolean; theme: string }> {
+  const res = await api.put<{ success: boolean; theme: string }>('/api/auth/theme', { themeId });
   return res.data;
 }

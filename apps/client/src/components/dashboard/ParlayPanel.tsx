@@ -5,6 +5,7 @@ import { usePredictionMarket } from '../../contexts/PredictionContext';
 import { useSocket } from '../../contexts/SocketContext';
 import { useAuth } from '../../contexts/AuthContext';
 import type { PublicPredictionOption } from '@ems/types';
+import { formatMuskBucks } from '../../utils/formatting';
 
 export default function ParlayPanel() {
   const { state, dispatch, clear } = useParlay();
@@ -214,22 +215,22 @@ export default function ParlayPanel() {
                       Remove
                     </button>
                   </div>
-                  
+
                   {/* Option selector for this leg */}
                   {allOptions.length > 1 ? (
                     <select
                       value={leg.optionId}
                       onChange={(e) => {
                         const newOptionId = Number(e.target.value);
-                        const newOption = allOptions.find(opt => opt.id === newOptionId);
+                        const newOption = allOptions.find((opt) => opt.id === newOptionId);
                         if (newOption) {
                           dispatch({
                             type: 'ADD_LEG', // This will replace existing leg for same prediction
                             leg: {
                               optionId: newOptionId,
                               predictionId: leg.predictionId,
-                              label: newOption.label
-                            }
+                              label: newOption.label,
+                            },
                           });
                         }
                       }}
@@ -298,7 +299,7 @@ export default function ParlayPanel() {
             </div>
 
             {/* Balance display */}
-            <div className="text-xs text-tertiary">Balance: {balance.toLocaleString()} 🪙</div>
+            <div className="text-xs text-tertiary">Balance: {formatMuskBucks(balance)} 🪙</div>
           </div>
 
           {/* Wager level display */}
@@ -398,7 +399,7 @@ export default function ParlayPanel() {
                           : ''
                 }`}
               >
-                {state.amount ? parlayCalculations.payout.toLocaleString() : '–'} 🪙
+                {state.amount ? formatMuskBucks(parlayCalculations.payout) : '–'} 🪙
               </span>
             </div>
 
@@ -412,7 +413,7 @@ export default function ParlayPanel() {
                       : ''
                   }
                 >
-                  {parlayCalculations.balanceAfter.toLocaleString()} 🪙
+                  {formatMuskBucks(parlayCalculations.balanceAfter)} 🪙
                 </span>
               </div>
             )}
@@ -543,12 +544,12 @@ export default function ParlayPanel() {
               <div className="border-t border-muted pt-2 mt-2">
                 <div className="flex justify-between text-sm">
                   <span>Your Stake:</span>
-                  <span className="font-bold">{state.amount.toLocaleString()} 🪙</span>
+                  <span className="font-bold">{formatMuskBucks(state.amount)} 🪙</span>
                 </div>
                 <div className="flex justify-between text-sm mt-1">
                   <span>Total Return:</span>
                   <span className="font-bold text-green-600">
-                    {parlayCalculations.payout.toLocaleString()} 🪙
+                    {formatMuskBucks(parlayCalculations.payout)} 🪙
                   </span>
                 </div>
               </div>

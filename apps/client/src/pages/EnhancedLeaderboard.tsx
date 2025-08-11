@@ -1,5 +1,5 @@
 // apps/client/src/pages/EnhancedLeaderboard.tsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -8,6 +8,7 @@ import {
   TrophyIcon,
   UsersIcon,
   CalendarIcon,
+  ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -17,12 +18,23 @@ import {
 } from '../hooks/useEnhancedLeaderboard';
 import LeaderboardEntry from '../components/leaderboard/LeaderboardEntry';
 import AchievementNotification from '../components/leaderboard/AchievementNotification';
+import { getShameWall, getShameWallStats } from '../api/shameWall';
+import type { ShameWallEntry, ShameWallStats } from '../api/shameWall';
+
+type TabType = 'leaderboard' | 'shame-wall';
 
 export default function EnhancedLeaderboard() {
   const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState<TabType>('leaderboard');
   const [period, setPeriod] = useState<LeaderboardPeriod>('all-time');
   const [metric, setMetric] = useState<LeaderboardMetric>('profit');
   const [showStats, setShowStats] = useState(false);
+
+  // Shame Wall state
+  const [shameWall, setShameWall] = useState<ShameWallEntry[]>([]);
+  const [shameWallStats, setShameWallStats] = useState<ShameWallStats | null>(null);
+  const [shameWallLoading, setShameWallLoading] = useState(false);
+  const [shameWallError, setShameWallError] = useState<string | null>(null);
 
   const {
     data: leaderboard,
@@ -46,6 +58,27 @@ export default function EnhancedLeaderboard() {
     enableAchievements: true,
   });
 
+  // Fetch shame wall data when tab is selected
+  useEffect(() => {
+    if (activeTab === 'shame-wall') {
+      const fetchShameWall = async () => {
+        setShameWallLoading(true);
+        setShameWallError(null);
+        try {
+          const [wallData, statsData] = await Promise.all([getShameWall(), getShameWallStats()]);
+          setShameWall(wallData);
+          setShameWallStats(statsData);
+        } catch (err) {
+          setShameWallError(err instanceof Error ? err.message : 'Failed to load shame wall');
+        } finally {
+          setShameWallLoading(false);
+        }
+      };
+
+      fetchShameWall();
+    }
+  }, [activeTab]);
+
   const periods: { key: LeaderboardPeriod; label: string; icon: any }[] = [
     { key: 'all-time', label: 'All-Time', icon: TrophyIcon },
     { key: 'daily', label: 'Daily', icon: CalendarIcon },
@@ -58,24 +91,36 @@ export default function EnhancedLeaderboard() {
     { key: 'roi', label: 'ROI', description: 'Return on investment' },
   ];
 
-  if (loading && leaderboard.length === 0) {
+  // Handle initial loading states for both tabs
+  const isInitialLoading =
+    activeTab === 'leaderboard'
+      ? loading && leaderboard.length === 0
+      : shameWallLoading && shameWall.length === 0;
+
+  const hasError = activeTab === 'leaderboard' ? error : shameWallError;
+
+  if (isInitialLoading) {
     return (
       <div className="p-6 max-w-6xl mx-auto">
         <div className="text-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-tertiary">Loading leaderboard…</p>
+          <p className="text-tertiary">
+            Loading {activeTab === 'leaderboard' ? 'leaderboard' : 'shame wall'}…
+          </p>
         </div>
       </div>
     );
   }
 
-  if (error) {
+  if (hasError) {
     return (
       <div className="p-6 max-w-6xl mx-auto">
         <div className="text-center py-12">
-          <p className="text-red-500 mb-4">Error: {error.message}</p>
+          <p className="text-red-500 mb-4">
+            Error: {hasError instanceof Error ? hasError.message : hasError}
+          </p>
           <button
-            onClick={refresh}
+            onClick={() => (activeTab === 'leaderboard' ? refresh() : setActiveTab('shame-wall'))}
             className="bg-primary text-surface px-4 py-2 rounded-lg hover:bg-primary/80 transition-colors"
           >
             Try Again
@@ -90,15 +135,51 @@ export default function EnhancedLeaderboard() {
       {/* Achievement Notifications */}
       <AchievementNotification achievements={achievements} onClear={clearAchievements} />
 
+      {/* Main Tab Navigation */}
+      <div className="flex justify-center space-x-4 mb-6">
+        <button
+          onClick={() => setActiveTab('leaderboard')}
+          className={`flex items-center space-x-3 px-6 py-3 rounded-xl font-bold text-lg transition-all duration-200 ${
+            activeTab === 'leaderboard'
+              ? 'bg-primary text-surface shadow-xl scale-105'
+              : 'bg-surface text-content hover:bg-accent hover:scale-105'
+          }`}
+        >
+          <TrophyIcon className="w-6 h-6" />
+          <span>Leaderboard</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('shame-wall')}
+          className={`flex items-center space-x-3 px-6 py-3 rounded-xl font-bold text-lg transition-all duration-200 ${
+            activeTab === 'shame-wall'
+              ? 'bg-red-500 text-white shadow-xl scale-105'
+              : 'bg-surface text-content hover:bg-red-50 hover:text-red-600 hover:scale-105'
+          }`}
+        >
+          <ExclamationTriangleIcon className="w-6 h-6" />
+          <span>Shame Wall</span>
+        </button>
+      </div>
+
       {/* Header */}
       <div className="text-center space-y-4">
         <h1 className="text-4xl font-extrabold text-primary flex items-center justify-center space-x-3">
-          <TrophyIcon className="w-10 h-10" />
-          <span>Live Leaderboard</span>
-          <TrophyIcon className="w-10 h-10" />
+          {activeTab === 'leaderboard' ? (
+            <>
+              <TrophyIcon className="w-10 h-10" />
+              <span>Live Leaderboard</span>
+              <TrophyIcon className="w-10 h-10" />
+            </>
+          ) : (
+            <>
+              <ExclamationTriangleIcon className="w-10 h-10 text-red-500" />
+              <span className="text-red-500">Wall of Shame</span>
+              <ExclamationTriangleIcon className="w-10 h-10 text-red-500" />
+            </>
+          )}
         </h1>
 
-        {stats && (
+        {activeTab === 'leaderboard' && stats && (
           <div className="text-sm text-tertiary space-y-1">
             <p>
               {stats.totalUsers.toLocaleString()} total users • {stats.activeUsers.toLocaleString()}{' '}
@@ -109,75 +190,129 @@ export default function EnhancedLeaderboard() {
             )}
           </div>
         )}
+
+        {activeTab === 'shame-wall' && shameWallStats && (
+          <div className="text-sm text-tertiary space-y-1">
+            <p>
+              {shameWallStats.totalBanned} banned users • {shameWallStats.permanentBans} permanent •{' '}
+              {shameWallStats.temporaryBans} temporary
+            </p>
+            {shameWallStats.mostCommonReasons.length > 0 && (
+              <p>
+                Most common: {shameWallStats.mostCommonReasons[0].reason} (
+                {shameWallStats.mostCommonReasons[0].count})
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Controls */}
-      <div className="bg-surface rounded-xl p-4 space-y-4">
-        {/* Period Selection */}
-        <div className="flex flex-wrap justify-center space-x-2">
-          {periods.map(({ key, label, icon: Icon }) => (
+      {/* Controls - Only for Leaderboard */}
+      {activeTab === 'leaderboard' && (
+        <div className="bg-surface rounded-xl p-4 space-y-4">
+          {/* Period Selection */}
+          <div className="flex flex-wrap justify-center space-x-2">
+            {periods.map(({ key, label, icon: Icon }) => (
+              <button
+                key={key}
+                onClick={() => setPeriod(key)}
+                className={`
+                  flex items-center space-x-2 px-4 py-2 rounded-full font-medium transition-all duration-200
+                  ${
+                    period === key
+                      ? 'bg-primary text-surface shadow-lg scale-105'
+                      : 'bg-muted text-content hover:bg-accent hover:scale-105'
+                  }
+                `}
+              >
+                <Icon className="w-4 h-4" />
+                <span>{label}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Metric Selection */}
+          <div className="flex flex-wrap justify-center space-x-2">
+            {metrics.map(({ key, label, description }) => (
+              <button
+                key={key}
+                onClick={() => setMetric(key)}
+                title={description}
+                className={`
+                  px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200
+                  ${
+                    metric === key
+                      ? 'bg-secondary text-surface'
+                      : 'bg-muted/50 text-content hover:bg-muted'
+                  }
+                `}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex justify-center space-x-4">
             <button
-              key={key}
-              onClick={() => setPeriod(key)}
-              className={`
-                flex items-center space-x-2 px-4 py-2 rounded-full font-medium transition-all duration-200
-                ${
-                  period === key
-                    ? 'bg-primary text-surface shadow-lg scale-105'
-                    : 'bg-muted text-content hover:bg-accent hover:scale-105'
-                }
-              `}
+              onClick={refresh}
+              disabled={loading}
+              className="flex items-center space-x-2 bg-accent text-content px-3 py-2 rounded-lg hover:bg-accent/80 transition-colors disabled:opacity-50"
             >
-              <Icon className="w-4 h-4" />
-              <span>{label}</span>
+              <ArrowPathIcon className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              <span>Refresh</span>
             </button>
-          ))}
-        </div>
 
-        {/* Metric Selection */}
-        <div className="flex flex-wrap justify-center space-x-2">
-          {metrics.map(({ key, label, description }) => (
             <button
-              key={key}
-              onClick={() => setMetric(key)}
-              title={description}
-              className={`
-                px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200
-                ${
-                  metric === key
-                    ? 'bg-secondary text-surface'
-                    : 'bg-muted/50 text-content hover:bg-muted'
-                }
-              `}
+              onClick={() => setShowStats(!showStats)}
+              className="flex items-center space-x-2 bg-muted text-content px-3 py-2 rounded-lg hover:bg-accent transition-colors"
             >
-              {label}
+              <ChartBarIcon className="w-4 h-4" />
+              <span>{showStats ? 'Hide' : 'Show'} Stats</span>
             </button>
-          ))}
+          </div>
         </div>
+      )}
 
-        {/* Action Buttons */}
-        <div className="flex justify-center space-x-4">
-          <button
-            onClick={refresh}
-            disabled={loading}
-            className="flex items-center space-x-2 bg-accent text-content px-3 py-2 rounded-lg hover:bg-accent/80 transition-colors disabled:opacity-50"
-          >
-            <ArrowPathIcon className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            <span>Refresh</span>
-          </button>
-
-          <button
-            onClick={() => setShowStats(!showStats)}
-            className="flex items-center space-x-2 bg-muted text-content px-3 py-2 rounded-lg hover:bg-accent transition-colors"
-          >
-            <ChartBarIcon className="w-4 h-4" />
-            <span>{showStats ? 'Hide' : 'Show'} Stats</span>
-          </button>
+      {/* Shame Wall Controls */}
+      {activeTab === 'shame-wall' && (
+        <div className="bg-surface rounded-xl p-4">
+          <div className="flex justify-center space-x-4">
+            <button
+              onClick={() => {
+                if (activeTab === 'shame-wall') {
+                  const fetchShameWall = async () => {
+                    setShameWallLoading(true);
+                    try {
+                      const [wallData, statsData] = await Promise.all([
+                        getShameWall(),
+                        getShameWallStats(),
+                      ]);
+                      setShameWall(wallData);
+                      setShameWallStats(statsData);
+                    } catch (err) {
+                      setShameWallError(
+                        err instanceof Error ? err.message : 'Failed to load shame wall',
+                      );
+                    } finally {
+                      setShameWallLoading(false);
+                    }
+                  };
+                  fetchShameWall();
+                }
+              }}
+              disabled={shameWallLoading}
+              className="flex items-center space-x-2 bg-accent text-content px-3 py-2 rounded-lg hover:bg-accent/80 transition-colors disabled:opacity-50"
+            >
+              <ArrowPathIcon className={`w-4 h-4 ${shameWallLoading ? 'animate-spin' : ''}`} />
+              <span>Refresh</span>
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* User's Current Rank */}
-      {user && userRank && (
+      {/* User's Current Rank - Only for Leaderboard */}
+      {activeTab === 'leaderboard' && user && userRank && (
         <div className="bg-primary/10 border border-primary/20 rounded-xl p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
@@ -196,8 +331,8 @@ export default function EnhancedLeaderboard() {
         </div>
       )}
 
-      {/* Statistics Panel */}
-      {showStats && stats && (
+      {/* Statistics Panel - Only for Leaderboard */}
+      {activeTab === 'leaderboard' && showStats && stats && (
         <div className="bg-surface rounded-xl p-6">
           <h3 className="text-lg font-semibold mb-4 flex items-center space-x-2">
             <ChartBarIcon className="w-5 h-5" />
@@ -232,8 +367,8 @@ export default function EnhancedLeaderboard() {
         </div>
       )}
 
-      {/* Recent Rank Changes */}
-      {recentChanges.length > 0 && (
+      {/* Recent Rank Changes - Only for Leaderboard */}
+      {activeTab === 'leaderboard' && recentChanges.length > 0 && (
         <div className="bg-surface rounded-xl p-4">
           <h3 className="text-sm font-semibold text-tertiary mb-3">Recent Rank Changes</h3>
           <div className="flex flex-wrap gap-2">
@@ -256,8 +391,114 @@ export default function EnhancedLeaderboard() {
         </div>
       )}
 
+      {/* Shame Wall Entries */}
+      {activeTab === 'shame-wall' && (
+        <>
+          {shameWall.length > 0 ? (
+            <ul className="space-y-4">
+              {shameWall.map((entry) => (
+                <li
+                  key={entry.userId}
+                  className="bg-surface rounded-xl shadow-sm hover:shadow-md transition border-l-4 border-red-500"
+                >
+                  <div className="p-6">
+                    {/* Header with User Info and Ban Status */}
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center space-x-4">
+                        {entry.avatarUrl ? (
+                          <img
+                            src={entry.avatarUrl}
+                            alt={`${entry.userName}'s avatar`}
+                            className="w-16 h-16 rounded-full object-cover border-4 border-red-200"
+                          />
+                        ) : (
+                          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center border-4 border-red-200">
+                            <span className="text-red-500 text-2xl">😱</span>
+                          </div>
+                        )}
+                        <div>
+                          <h3 className="text-xl font-bold text-content">{entry.userName}</h3>
+                          <div className="flex items-center space-x-2 mt-1">
+                            <span
+                              className={`px-3 py-1 rounded-full text-sm font-bold ${
+                                entry.endDate
+                                  ? 'bg-orange-100 text-orange-800'
+                                  : 'bg-red-100 text-red-800'
+                              }`}
+                            >
+                              {entry.endDate ? 'Temporary Ban' : 'Permanent Ban'}
+                            </span>
+                            {entry.banCount > 1 && (
+                              <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium">
+                                {entry.banCount} bans
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right text-sm text-tertiary">
+                        <div>Banned: {new Date(entry.startDate).toLocaleDateString()}</div>
+                        {entry.endDate && (
+                          <div>Until: {new Date(entry.endDate).toLocaleDateString()}</div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Ban Reason */}
+                    <div className="mb-4 p-3 bg-red-50 rounded-lg border border-red-200">
+                      <h4 className="text-sm font-medium text-red-800 mb-1">Reason for Ban:</h4>
+                      <p className="text-red-700">{entry.reason}</p>
+                    </div>
+
+                    {/* Shame Achievements */}
+                    {entry.shameAchievements.length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-medium text-tertiary mb-2">
+                          Shame Achievements:
+                        </h4>
+                        <div className="flex flex-wrap gap-2">
+                          {entry.shameAchievements.map((achievement) => (
+                            <div
+                              key={achievement.slug}
+                              className="bg-red-100 border border-red-300 rounded-lg p-2 min-w-[120px]"
+                            >
+                              <div className="flex items-center space-x-2">
+                                <span className="text-lg">😱</span>
+                                <div>
+                                  <div className="text-xs font-bold text-red-800">
+                                    {achievement.title}
+                                  </div>
+                                  <div className="text-xs text-red-600 mt-1">
+                                    {achievement.description}
+                                  </div>
+                                  <div className="text-xs text-red-500 mt-1">
+                                    {new Date(achievement.awardedAt).toLocaleDateString()}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="text-center py-12">
+              <div className="text-6xl mb-4">🎉</div>
+              <h3 className="text-xl font-semibold text-content mb-2">
+                No one is currently banned!
+              </h3>
+              <p className="text-tertiary">Everyone is behaving themselves... for now.</p>
+            </div>
+          )}
+        </>
+      )}
+
       {/* Leaderboard Entries */}
-      {leaderboard.length > 0 ? (
+      {activeTab === 'leaderboard' && leaderboard.length > 0 ? (
         <ul className="space-y-4">
           {leaderboard.map((entry, idx) => {
             const rank = (currentPage - 1) * 25 + idx + 1;
@@ -276,14 +517,14 @@ export default function EnhancedLeaderboard() {
             );
           })}
         </ul>
-      ) : (
+      ) : activeTab === 'leaderboard' ? (
         <div className="text-center py-12">
           <p className="text-tertiary">No leaderboard entries yet.</p>
         </div>
-      )}
+      ) : null}
 
-      {/* Pagination */}
-      {pagination.totalPages > 1 && (
+      {/* Pagination - Only for Leaderboard */}
+      {activeTab === 'leaderboard' && pagination.totalPages > 1 && (
         <div className="flex items-center justify-center space-x-4 py-6">
           <button
             onClick={prevPage}
@@ -330,12 +571,13 @@ export default function EnhancedLeaderboard() {
       )}
 
       {/* Loading overlay */}
-      {loading && leaderboard.length > 0 && (
+      {((activeTab === 'leaderboard' && loading && leaderboard.length > 0) ||
+        (activeTab === 'shame-wall' && shameWallLoading && shameWall.length > 0)) && (
         <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-40">
           <div className="bg-surface rounded-lg p-4 shadow-lg">
             <div className="flex items-center space-x-3">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-              <span>Updating leaderboard...</span>
+              <span>Updating {activeTab === 'leaderboard' ? 'leaderboard' : 'shame wall'}...</span>
             </div>
           </div>
         </div>

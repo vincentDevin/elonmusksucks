@@ -1,5 +1,5 @@
 // apps/client/src/components/dashboard/analytics/PerformanceMetricsCard.tsx
-import { useMemo } from 'react';
+import { useMemo, memo } from 'react';
 import type { EnhancedUserStats } from '../../../hooks/useEnhancedUserStats';
 
 interface PerformanceMetricsCardProps {
@@ -7,7 +7,7 @@ interface PerformanceMetricsCardProps {
   className?: string;
 }
 
-export default function PerformanceMetricsCard({
+const PerformanceMetricsCard = memo(function PerformanceMetricsCard({
   stats,
   className = '',
 }: PerformanceMetricsCardProps) {
@@ -127,4 +127,6 @@ export default function PerformanceMetricsCard({
       )}
     </div>
   );
-}
+});
+
+export default PerformanceMetricsCard;

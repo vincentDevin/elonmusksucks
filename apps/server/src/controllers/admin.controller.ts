@@ -2,6 +2,9 @@
 import { Request, Response, NextFunction } from 'express';
 import * as adminService from '../services/admin.service';
 import { payoutService } from '../services/payout.service';
+import { adminAchievementService } from '../services/adminAchievement.service';
+import { shameWallService } from '../services/shameWall.service';
+import { serializeBigInt } from '../utils/bigintSerializer';
 import type {
   PublicUser,
   PublicPrediction,
@@ -26,7 +29,7 @@ export async function getUsers(_req: Request, res: Response, next: NextFunction)
   try {
     // Legacy endpoint - kept for backward compatibility
     const users: PublicUser[] = await adminService.listUsers();
-    res.json(users);
+    res.json(serializeBigInt(users));
   } catch (err) {
     next(err);
   }
@@ -48,7 +51,7 @@ export async function searchUsers(req: Request, res: Response, next: NextFunctio
     };
 
     const result = await adminService.searchUsers(params);
-    res.json(result);
+    res.json(serializeBigInt(result));
   } catch (err) {
     next(err);
   }
@@ -94,7 +97,7 @@ export async function bulkUpdateUsers(
     }
 
     const result = await adminService.bulkUpdateUsers(operation);
-    res.json(result);
+    res.json(serializeBigInt(result));
   } catch (err) {
     next(err);
   }
@@ -194,7 +197,7 @@ export async function searchPredictions(
     };
 
     const result = await adminService.searchPredictions(params);
-    res.json(result);
+    res.json(serializeBigInt(result));
   } catch (err) {
     next(err);
   }
@@ -244,7 +247,7 @@ export async function bulkUpdatePredictions(
     }
 
     const result = await adminService.bulkUpdatePredictions(operation);
-    res.json(result);
+    res.json(serializeBigInt(result));
   } catch (err) {
     next(err);
   }
@@ -300,7 +303,7 @@ export async function getBets(req: Request, res: Response, next: NextFunction): 
   try {
     const filters = req.query as unknown as QueryParams;
     const bets = await adminService.listBets(filters);
-    res.json(bets);
+    res.json(serializeBigInt(bets));
   } catch (err) {
     next(err);
   }
@@ -331,7 +334,7 @@ export async function getTransactions(
       userName: users.find((u) => u.id === t.userId)?.name ?? 'Unknown',
     }));
 
-    res.json(detailedTxns);
+    res.json(serializeBigInt(detailedTxns));
   } catch (err) {
     next(err);
   }
@@ -346,7 +349,7 @@ export async function searchFinancialData(
   try {
     const params = req.query as unknown as any; // Will be typed properly in service
     const data = await adminService.searchFinancialData(params);
-    res.json(data);
+    res.json(serializeBigInt(data));
   } catch (err) {
     next(err);
   }
@@ -360,7 +363,7 @@ export async function getFinancialAnalytics(
   try {
     const params = req.query as unknown as any;
     const analytics = await adminService.getFinancialAnalytics(params);
-    res.json(analytics);
+    res.json(serializeBigInt(analytics));
   } catch (err) {
     next(err);
   }
@@ -772,6 +775,245 @@ export async function triggerAITweet(
   try {
     const tweet: PublicAITweet = await adminService.generateAITweet();
     res.status(201).json(tweet);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// -- Achievement Management System --
+
+export async function getAllAchievements(
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const achievements = await adminAchievementService.getAllAchievements();
+    res.json(serializeBigInt(achievements));
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getAchievementById(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const achievementId = parseInt(req.params.id);
+    const achievement = await adminAchievementService.getAchievementById(achievementId);
+
+    if (!achievement) {
+      res.status(404).json({ error: 'Achievement not found' });
+      return;
+    }
+
+    res.json(serializeBigInt(achievement));
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function createAchievement(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const data = req.body;
+    const achievement = await adminAchievementService.createAchievement(data);
+    res.status(201).json(serializeBigInt(achievement));
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function updateAchievement(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const achievementId = parseInt(req.params.id);
+    const data = req.body;
+    const achievement = await adminAchievementService.updateAchievement(achievementId, data);
+    res.json(serializeBigInt(achievement));
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function deleteAchievement(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const achievementId = parseInt(req.params.id);
+    await adminAchievementService.deleteAchievement(achievementId);
+    res.status(204).send();
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function grantAchievement(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const achievementId = parseInt(req.params.id);
+    const userId = parseInt(req.params.userId);
+    await adminAchievementService.grantAchievement(achievementId, userId);
+    res.status(200).json({ message: 'Achievement granted successfully' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function revokeAchievement(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const achievementId = parseInt(req.params.id);
+    const userId = parseInt(req.params.userId);
+    await adminAchievementService.revokeAchievement(achievementId, userId);
+    res.status(200).json({ message: 'Achievement revoked successfully' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function bulkGrantAchievement(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const achievementId = parseInt(req.params.id);
+    const { userIds } = req.body;
+
+    if (!Array.isArray(userIds)) {
+      res.status(400).json({ error: 'userIds must be an array' });
+      return;
+    }
+
+    const result = await adminAchievementService.bulkGrantAchievement(achievementId, userIds);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getUsersWithAchievement(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const achievementId = parseInt(req.params.id);
+    const users = await adminAchievementService.getUsersWithAchievement(achievementId);
+    res.json(serializeBigInt(users));
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getAchievementAnalytics(
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const analytics = await adminAchievementService.getAchievementAnalytics();
+    res.json(serializeBigInt(analytics));
+  } catch (err) {
+    next(err);
+  }
+}
+
+// -- Shame Wall Management System --
+
+export async function issueBan(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { userId, reason, durationDays } = req.body;
+    const moderatorId = (req as any).user?.id; // From auth middleware
+
+    if (!moderatorId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    if (!userId || !reason) {
+      res.status(400).json({ error: 'userId and reason are required' });
+      return;
+    }
+
+    const banHistory = await shameWallService.issueBan({
+      userId: parseInt(userId),
+      reason,
+      durationDays: durationDays ? parseInt(durationDays) : undefined,
+      moderatorId,
+    });
+
+    res.status(201).json(serializeBigInt(banHistory));
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function liftBan(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const banId = parseInt(req.params.banId);
+    const moderatorId = (req as any).user?.id;
+    const { reason } = req.body;
+
+    if (!moderatorId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    await shameWallService.liftBan(banId, moderatorId, reason);
+    res.status(200).json({ message: 'Ban lifted successfully' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getBanHistory(
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const history = await shameWallService.getBanHistory();
+    res.json(serializeBigInt(history));
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function awardShameAchievement(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { userId, slug, reason } = req.body;
+    const moderatorId = (req as any).user?.id;
+
+    if (!moderatorId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    await shameWallService.awardShameAchievement(parseInt(userId), slug, moderatorId, reason);
+
+    res.status(200).json({ message: 'Shame achievement awarded' });
   } catch (err) {
     next(err);
   }

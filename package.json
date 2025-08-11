@@ -20,6 +20,8 @@
     "prisma:generate": "dotenv -e .env -- prisma generate --schema prisma/schema.prisma",
     "prisma:migrate:dev": "dotenv -e .env -- prisma migrate reset --force --skip-generate --schema prisma/schema.prisma",
     "seed:dev": "ts-node --transpile-only prisma/seed.ts",
+    "seed:prod": "ts-node --transpile-only scripts/prod-seed.ts",
+    "seed:achievements": "node scripts/seed-achievements.cjs",
     "test": "jest",
     "test:server": "dotenv -e .env.test jest --selectProjects=server",
     "worker": "npm run worker --workspace=apps/server"

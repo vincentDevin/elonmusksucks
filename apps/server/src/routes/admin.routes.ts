@@ -48,6 +48,24 @@ router.post('/badges/bulk', adminController.bulkBadgeOperation);
 router.get('/badge-categories', adminController.getBadgeCategories);
 router.post('/badge-categories', adminController.createBadgeCategory);
 
+// — Achievement Management System —
+router.get('/achievements', adminController.getAllAchievements);
+router.get('/achievements/analytics', adminController.getAchievementAnalytics);
+router.get('/achievements/:id', adminController.getAchievementById);
+router.post('/achievements', adminController.createAchievement);
+router.put('/achievements/:id', adminController.updateAchievement);
+router.delete('/achievements/:id', adminController.deleteAchievement);
+router.post('/achievements/:id/grant/:userId', adminController.grantAchievement);
+router.delete('/achievements/:id/revoke/:userId', adminController.revokeAchievement);
+router.post('/achievements/:id/bulk-grant', adminController.bulkGrantAchievement);
+router.get('/achievements/:id/users', adminController.getUsersWithAchievement);
+
+// — Shame Wall Management System —
+router.post('/bans', adminController.issueBan);
+router.delete('/bans/:banId', adminController.liftBan);
+router.get('/bans/history', adminController.getBanHistory);
+router.post('/shame-achievements', adminController.awardShameAchievement);
+
 // — Advanced Analytics & Reporting —
 router.get('/analytics/executive-dashboard', adminController.getExecutiveDashboard);
 router.get('/analytics/user-behavior', adminController.getUserBehaviorAnalytics);

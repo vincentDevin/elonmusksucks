@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import { PrismaClient, TransactionType, BetStatus } from '@prisma/client';
+import { SEED_ACHIEVEMENTS } from './achievement-catalog';
 
 const prisma = new PrismaClient();
 
@@ -26,6 +27,7 @@ async function main() {
   await clear('UserPost',         () => prisma.userPost.deleteMany());
   await clear('PredictionOption', () => prisma.predictionOption.deleteMany());
   await clear('Prediction',       () => prisma.prediction.deleteMany());
+  await clear('UserAchievement',  () => prisma.userAchievement.deleteMany());
   await clear('UserBadge',        () => prisma.userBadge.deleteMany());
   await clear('Badge',            () => prisma.badge.deleteMany());
   await clear('Follow',           () => prisma.follow.deleteMany());
@@ -56,7 +58,46 @@ async function main() {
     }}),
   ]);
 
-  console.log('🏅 Badges and follows…');
+  console.log('🏆 Seeding comprehensive achievement catalog...');
+  console.log(`Upserting ${SEED_ACHIEVEMENTS.length} achievements by slug...`);
+  
+  // Upsert all achievements by slug for idempotency
+  for (const achievement of SEED_ACHIEVEMENTS) {
+    await prisma.achievement.upsert({
+      where: { slug: achievement.slug },
+      update: {
+        name: achievement.name,
+        title: achievement.title,
+        description: achievement.description,
+        category: achievement.category,
+        rarity: achievement.rarity,
+        targetValue: achievement.targetValue,
+        autoAward: achievement.autoAward,
+        manualOnly: achievement.manualOnly,
+        isShame: achievement.isShame,
+        iconUrl: achievement.iconUrl,
+        sortOrder: achievement.sortOrder,
+        isActive: true,
+      },
+      create: {
+        slug: achievement.slug,
+        name: achievement.name,
+        title: achievement.title,
+        description: achievement.description,
+        category: achievement.category,
+        rarity: achievement.rarity,
+        targetValue: achievement.targetValue,
+        autoAward: achievement.autoAward,
+        manualOnly: achievement.manualOnly,
+        isShame: achievement.isShame,
+        iconUrl: achievement.iconUrl,
+        sortOrder: achievement.sortOrder,
+        isActive: true,
+      },
+    });
+  }
+  
+  console.log('🏅 Legacy badges and follows...');
   const [badgeFirstBet, badgeHighRoller] = await prisma.$transaction([
     prisma.badge.create({ data: { name: 'First Bet', description: 'Placed first bet', iconUrl: '' } }),
     prisma.badge.create({ data: { name: 'High Roller', description: 'Bet >1000', iconUrl: '' } }),

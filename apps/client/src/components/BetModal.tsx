@@ -8,6 +8,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { usePredictionMarket } from '../contexts/PredictionContext';
 import { useAuth } from '../contexts/AuthContext';
+import { formatMuskBucks } from '../utils/formatting';
 import type { BetWithUser, PredictionFull } from '@ems/types';
 
 interface BetModalProps {
@@ -201,7 +202,7 @@ export default function BetModal({
                 {betCalculations.isYolo ? 'YOLO BET PLACED!' : 'BET PLACED!'}
               </div>
               <div className="text-green-600 font-semibold">
-                +{betCalculations.profit.toLocaleString()} 🪙 potential profit!
+                +{formatMuskBucks(betCalculations.profit)} 🪙 potential profit!
               </div>
             </div>
           </div>
@@ -217,7 +218,7 @@ export default function BetModal({
             </h3>
             <div className="text-sm text-tertiary mt-1">
               Balance:{' '}
-              <span className="font-semibold text-primary">{balance.toLocaleString()} 🪙</span>
+              <span className="font-semibold text-primary">{formatMuskBucks(balance)} 🪙</span>
             </div>
           </div>
 
@@ -334,7 +335,7 @@ export default function BetModal({
                       : 'text-green-600'
                 }`}
               >
-                {betCalculations.payout.toLocaleString()} 🪙
+                {formatMuskBucks(betCalculations.payout)} 🪙
               </span>
             </div>
 
@@ -347,7 +348,7 @@ export default function BetModal({
                     : 'text-tertiary'
                 }
               >
-                {betCalculations.balanceAfter.toLocaleString()} 🪙
+                {formatMuskBucks(betCalculations.balanceAfter)} 🪙
               </span>
             </div>
 

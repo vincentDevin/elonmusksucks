@@ -12,6 +12,7 @@ import redisClient from '../lib/redis';
 import { unifiedActivityService } from './unifiedActivity.service';
 import { UserService } from './user.service';
 import { achievementService } from './achievement.service';
+import { achievementEvaluatorService } from './achievementEvaluator.service';
 import { broadcastRealtimeMetrics } from './admin.service';
 
 export class BettingService {
@@ -110,10 +111,10 @@ export class BettingService {
       await Promise.allSettled([
         // Publish real‑time event
         redisClient.publish('bet:place', JSON.stringify(betWithUser)),
-        
+
         // Recalculate odds after bet placement
         this.recalculateOdds(opt.prediction.id),
-        
+
         // Publish to unified activity system
         unifiedActivityService.createBetActivity(
           {
@@ -131,8 +132,8 @@ export class BettingService {
             category: opt.prediction.category,
           },
         ),
-        
-        // Check for achievement unlocks
+
+        // Check for achievement unlocks (legacy system)
         achievementService.checkAndUpdateAchievements({
           type: 'bet_placed',
           userId,
@@ -143,18 +144,35 @@ export class BettingService {
             category: opt.prediction.category,
           },
         }),
-        
-        // Trigger stats update
-        redisClient.publish('user:stats_update', JSON.stringify({
+
+        // Check for achievement unlocks (advanced evaluator)
+        achievementEvaluatorService.processAchievementEvent({
+          type: 'bet_placed',
           userId,
-          reason: 'bet_placed',
-          betId: bet.id,
-          predictionId: opt.prediction.id,
-          amount,
-          category: opt.prediction.category,
           timestamp: new Date().toISOString(),
-        })),
-        
+          data: {
+            betId: bet.id,
+            predictionId: opt.prediction.id,
+            amount,
+            category: opt.prediction.category,
+            wasAllIn: false, // We'll need to calculate this
+          },
+        }),
+
+        // Trigger stats update
+        redisClient.publish(
+          'user:stats_update',
+          JSON.stringify({
+            userId,
+            reason: 'bet_placed',
+            betId: bet.id,
+            predictionId: opt.prediction.id,
+            amount,
+            category: opt.prediction.category,
+            timestamp: new Date().toISOString(),
+          }),
+        ),
+
         // Broadcast real-time metrics
         broadcastRealtimeMetrics(),
       ]);
@@ -194,7 +212,7 @@ export class BettingService {
     // 2) Calculate enhanced odds matching frontend exactly (before transaction)
     const oddsCalculation = this.calculateEnhancedParlayOdds(validLegs.map((o) => o.odds));
     const basePayout = Math.floor(amount * oddsCalculation.finalOdds);
-    
+
     // 🚀 ALL-IN bonus detection for parlays (matching frontend logic)
     const isAllIn = amount >= Number(user.muskBucks) * 0.95;
     const allInMultiplier = isAllIn ? 1.5 : 1.0; // Extra 50% bonus for all-in parlays
@@ -239,10 +257,10 @@ export class BettingService {
       await Promise.allSettled([
         // Publish legacy leg events
         ...legsPayload.map((leg) => redisClient.publish('parlay:place', JSON.stringify(leg))),
-        
+
         // Recalculate odds for all affected predictions
         ...affectedPredictions.map((predId) => this.recalculateOdds(predId)),
-        
+
         // Publish to unified activity system
         unifiedActivityService.createParlayActivity(
           {
@@ -257,8 +275,8 @@ export class BettingService {
             combinedOdds: oddsCalculation.finalOdds,
           },
         ),
-        
-        // Check for achievement unlocks
+
+        // Check for achievement unlocks (legacy system)
         achievementService.checkAndUpdateAchievements({
           type: 'parlay_completed',
           userId,
@@ -269,22 +287,38 @@ export class BettingService {
             won: false, // Will be updated when parlay is resolved
           },
         }),
-        
-        // Trigger stats update
-        redisClient.publish('user:stats_update', JSON.stringify({
+
+        // Check for achievement unlocks (advanced evaluator)
+        achievementEvaluatorService.processAchievementEvent({
+          type: 'bet_placed', // Parlay is a type of bet in the advanced system
           userId,
-          reason: 'parlay_placed',
-          parlayId: parlay.id,
-          amount,
-          legCount: oddsCalculation.legCount,
-          predictions: validLegs.map((leg) => ({
-            id: leg.prediction.id,
-            title: leg.prediction.title,
-            category: leg.prediction.category,
-          })),
           timestamp: new Date().toISOString(),
-        })),
-        
+          data: {
+            parlayId: parlay.id,
+            amount,
+            legCount: oddsCalculation.legCount,
+            isParlay: true,
+          },
+        }),
+
+        // Trigger stats update
+        redisClient.publish(
+          'user:stats_update',
+          JSON.stringify({
+            userId,
+            reason: 'parlay_placed',
+            parlayId: parlay.id,
+            amount,
+            legCount: oddsCalculation.legCount,
+            predictions: validLegs.map((leg) => ({
+              id: leg.prediction.id,
+              title: leg.prediction.title,
+              category: leg.prediction.category,
+            })),
+            timestamp: new Date().toISOString(),
+          }),
+        ),
+
         // Broadcast real-time metrics
         broadcastRealtimeMetrics(),
       ]);

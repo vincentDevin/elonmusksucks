@@ -7,7 +7,13 @@
 
 import prisma from '../db';
 import type { IPredictionRepository } from './IPredictionRepository';
-import type { DbPrediction, DbPredictionOption, DbBet, DbUser, ParlayLegWithUser } from '@ems/types';
+import type {
+  DbPrediction,
+  DbPredictionOption,
+  DbBet,
+  DbUser,
+  ParlayLegWithUser,
+} from '@ems/types';
 import type { PredictionType } from '@ems/types';
 
 // Using the global ParlayLegWithUser type from @ems/types
@@ -133,7 +139,9 @@ export class PredictionRepository implements IPredictionRepository {
               id: leg.parlay.user.id,
               name: leg.parlay.user.name,
               avatarUrl: leg.parlay.user.avatarUrl,
-              ...(leg.parlay.user.profilePictureKey && { profilePictureKey: leg.parlay.user.profilePictureKey }),
+              ...(leg.parlay.user.profilePictureKey && {
+                profilePictureKey: leg.parlay.user.profilePictureKey,
+              }),
             },
             stake: leg.parlay.amount.toString(),
             optionId: opt.id,
@@ -208,7 +216,9 @@ export class PredictionRepository implements IPredictionRepository {
             id: leg.parlay.user.id,
             name: leg.parlay.user.name,
             avatarUrl: leg.parlay.user.avatarUrl,
-            ...(leg.parlay.user.profilePictureKey && { profilePictureKey: leg.parlay.user.profilePictureKey }),
+            ...(leg.parlay.user.profilePictureKey && {
+              profilePictureKey: leg.parlay.user.profilePictureKey,
+            }),
           },
           stake: leg.parlay.amount.toString(),
           optionId: opt.id,

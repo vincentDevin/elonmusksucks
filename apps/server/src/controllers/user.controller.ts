@@ -3,6 +3,7 @@ import { UserService } from '../services/user.service';
 import { EnhancedUserStatsService } from '../services/enhancedUserStats.service';
 import { unifiedActivityService } from '../services/unifiedActivity.service';
 import { achievementService } from '../services/achievement.service';
+import { adminAchievementService } from '../services/adminAchievement.service';
 import type { PublicUserProfile, UserFeedPost, UserActivity, UserStatsDTO } from '@ems/types';
 
 // Define MulterFile type explicitly to avoid mismatched declarations
@@ -36,12 +37,12 @@ export async function getProfile(
 ): Promise<void> {
   try {
     const targetUserId = Number(req.params.userId);
-    
+
     if (isNaN(targetUserId)) {
       res.status(400).json({ error: 'Invalid user ID' });
       return;
     }
-    
+
     const viewerId = req.user?.id;
     const profileDTO: PublicUserProfile = await userService.getUserProfile(targetUserId, viewerId);
     res.json(profileDTO);
@@ -281,12 +282,12 @@ export async function getUserStatsHandler(
 ): Promise<void> {
   try {
     const userId = Number(req.params.userId);
-    
+
     if (isNaN(userId)) {
       res.status(400).json({ error: 'Invalid user ID' });
       return;
     }
-    
+
     const stats: UserStatsDTO | null = await userService.getUserStats(userId);
     if (!stats) {
       res.status(404).json({ error: 'Stats not found' });
@@ -427,6 +428,32 @@ export async function getUserAchievementsHandler(
     const achievements = await achievementService.getUserAchievementProgress(targetUserId);
 
     res.json(achievements);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getRecentAchievementsHandler(
+  req: ReqWithUser,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const targetUserId = Number(req.params.userId);
+    const viewerId = req.user?.id;
+    const limit = parseInt(req.query.limit as string) || 5;
+
+    // Only allow users to view their own recent achievements
+    if (targetUserId !== viewerId) {
+      res.status(403).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    const recentAchievements = await adminAchievementService.getRecentAchievements(
+      targetUserId,
+      limit,
+    );
+    res.json(recentAchievements);
   } catch (err) {
     next(err);
   }

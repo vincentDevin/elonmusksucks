@@ -37,10 +37,6 @@ enum TransactionType {
   CREDIT
 }
 
-enum Theme {
-  LIGHT
-  DARK
-}
 
 enum BanType {
   TEMPORARY
@@ -86,7 +82,7 @@ model User {
   longestStreak      Int                 @default(0)
   // user settings
   notifyOnResolve    Boolean             @default(true)
-  theme              Theme               @default(LIGHT)
+  theme              String              @default("light-clean")  // Unified theme system ID
   twoFactorEnabled   Boolean             @default(false)
   createdAt          DateTime            @default(now())
   parlayes           Parlay[]
@@ -255,12 +251,17 @@ model Badge {
 model Achievement {
   id            Int                 @id @default(autoincrement())
   name          String              @unique
+  slug          String?             @unique // Kebab-case unique identifier for seeds/lookups
   title         String              // Display title
   description   String              // Achievement description
-  category      String              // Category: getting_started, performance, volume, accuracy, social
+  category      String              // Category: betting, prediction, chat, leaderboard, event, secret, participation, shame
+  rarity        String              @default("common") // common, uncommon, rare, legendary, secret, shame
   targetValue   Int                 // Target value to achieve (e.g., 10 for "Win 10 bets")
   iconUrl       String?             // Icon URL for display
   isActive      Boolean             @default(true) // Whether this achievement is currently active
+  autoAward     Boolean             @default(true) // Whether this achievement is auto-awarded via triggers
+  manualOnly    Boolean             @default(false) // Whether this achievement can only be manually granted
+  isShame       Boolean             @default(false) // Whether this is a shame achievement for banned users
   sortOrder     Int                 @default(0) // Display order
   createdAt     DateTime            @default(now())
   updatedAt     DateTime            @default(now()) @updatedAt
@@ -270,6 +271,10 @@ model Achievement {
   
   @@index([category, sortOrder])
   @@index([isActive, category])
+  @@index([rarity])
+  @@index([autoAward])
+  @@index([isShame])
+  @@index([category, rarity])
 }
 
 model UserAchievement {

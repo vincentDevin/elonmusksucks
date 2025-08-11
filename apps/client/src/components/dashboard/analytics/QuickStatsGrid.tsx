@@ -1,5 +1,5 @@
 // apps/client/src/components/dashboard/analytics/QuickStatsGrid.tsx
-import { useMemo } from 'react';
+import { useMemo, memo } from 'react';
 import type { EnhancedUserStats } from '../../../hooks/useEnhancedUserStats';
 
 interface QuickStatsGridProps {
@@ -17,7 +17,11 @@ interface StatItem {
   subtext?: string;
 }
 
-export default function QuickStatsGrid({ stats, userRank, className = '' }: QuickStatsGridProps) {
+const QuickStatsGrid = memo(function QuickStatsGrid({
+  stats,
+  userRank,
+  className = '',
+}: QuickStatsGridProps) {
   const quickStats = useMemo((): StatItem[] => {
     const { portfolio, ranking, achievements, performance } = stats;
 
@@ -137,4 +141,6 @@ export default function QuickStatsGrid({ stats, userRank, className = '' }: Quic
       )}
     </div>
   );
-}
+});
+
+export default QuickStatsGrid;

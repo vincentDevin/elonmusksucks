@@ -1,12 +1,15 @@
 // apps/client/src/components/dashboard/analytics/SmartInsights.tsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 
 interface SmartInsightsProps {
   insights: string[];
   className?: string;
 }
 
-export default function SmartInsights({ insights, className = '' }: SmartInsightsProps) {
+const SmartInsights = memo(function SmartInsights({
+  insights,
+  className = '',
+}: SmartInsightsProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
 
@@ -98,4 +101,6 @@ export default function SmartInsights({ insights, className = '' }: SmartInsight
       `}</style>
     </div>
   );
-}
+});
+
+export default SmartInsights;

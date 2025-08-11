@@ -5,6 +5,7 @@ import redisClient from '../lib/redis';
 import { LeaderboardRepository } from '../repositories/LeaderboardRepository';
 import type { Job } from 'bullmq';
 import type { LeaderboardTrigger, LeaderboardMetrics } from '../services/leaderboard.service';
+import { achievementService } from '../services/achievement.service';
 
 const repo = new LeaderboardRepository();
 
@@ -44,12 +45,54 @@ const refreshWorker = new Worker(
     const startTime = Date.now();
 
     try {
+      // Get previous rankings before refresh (for comparison)
+      const previousTopAllTime = await repo.getTopAllTime(100);
+      const previousRankings = new Map(
+        previousTopAllTime.map((entry, index) => [entry.userId, index + 1]),
+      );
+
       // Refresh materialized view
       await repo.refreshMaterializedView();
 
       // Fetch updated data with enhanced limits
       const topAllTime = await repo.getTopAllTime(50); // Increased from 25
       const topDaily = await repo.getTopDaily(50);
+
+      // Check for ranking changes and trigger achievements
+      const currentTopAllTime = await repo.getTopAllTime(100);
+      for (let i = 0; i < currentTopAllTime.length; i++) {
+        const entry = currentTopAllTime[i];
+        const currentRank = i + 1;
+        const previousRank = previousRankings.get(entry.userId) || 999;
+
+        // If user improved their ranking significantly
+        if (previousRank > currentRank) {
+          console.log(
+            `[leaderboard] User ${entry.userId} improved from rank ${previousRank} to ${currentRank}`,
+          );
+
+          // Trigger ranking achievement check
+          try {
+            await achievementService.checkAndUpdateAchievements({
+              type: 'ranking_updated',
+              userId: entry.userId,
+              data: {
+                currentRank,
+                previousRank,
+                improvement: previousRank - currentRank,
+                isTopHundred: currentRank <= 100,
+                isTopTen: currentRank <= 10,
+                isTopThree: currentRank <= 3,
+              },
+            });
+          } catch (error) {
+            console.error(
+              `[leaderboard] Error checking ranking achievements for user ${entry.userId}:`,
+              error,
+            );
+          }
+        }
+      }
 
       // Publish to Redis channels
       await Promise.all([

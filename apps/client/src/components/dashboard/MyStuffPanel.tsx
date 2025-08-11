@@ -1,18 +1,17 @@
 // apps/client/src/components/dashboard/MyStuffPanel.tsx
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import { useEnhancedUserStats } from '../../hooks/useEnhancedUserStats';
 import { useEnhancedLeaderboard } from '../../hooks/useEnhancedLeaderboard';
 import PerformanceMetricsCard from './analytics/PerformanceMetricsCard';
 import QuickStatsGrid from './analytics/QuickStatsGrid';
 import SmartInsights from './analytics/SmartInsights';
-import QuickActions from './analytics/QuickActions';
 import AchievementProgress from './analytics/AchievementProgress';
 
 type ViewMode = 'analytics' | 'activity';
 
-export default function MyStuffPanel() {
+const MyStuffPanel = memo(function MyStuffPanel() {
   const [viewMode, setViewMode] = useState<ViewMode>('analytics');
-  const { stats, loading, error, smartInsights, quickActions } = useEnhancedUserStats();
+  const { stats, loading, error, smartInsights } = useEnhancedUserStats();
   const { userRank } = useEnhancedLeaderboard('all-time');
 
   if (loading) {
@@ -90,9 +89,6 @@ export default function MyStuffPanel() {
           {/* Smart Insights - Full Width */}
           <SmartInsights insights={smartInsights} />
 
-          {/* Quick Actions - Full Width */}
-          <QuickActions actions={quickActions} />
-
           {/* Achievement Progress - Full Width */}
           <AchievementProgress stats={stats} />
         </div>
@@ -155,4 +151,6 @@ export default function MyStuffPanel() {
       )}
     </section>
   );
-}
+});
+
+export default MyStuffPanel;

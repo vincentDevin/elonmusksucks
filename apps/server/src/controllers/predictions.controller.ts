@@ -20,18 +20,18 @@ export const getAllPredictions = async (
 ): Promise<void> => {
   try {
     const all = await predictionService.listAllPredictions();
-    
+
     // Convert BigInt fields to strings for JSON serialization
-    const serializedPredictions = all.map(prediction => ({
+    const serializedPredictions = all.map((prediction) => ({
       ...prediction,
-      bets: prediction.bets.map(bet => ({
+      bets: prediction.bets.map((bet) => ({
         ...bet,
         amount: bet.amount.toString(),
         potentialPayout: bet.potentialPayout?.toString() || null,
         payout: bet.payout?.toString() || null,
       })),
     }));
-    
+
     res.json(serializedPredictions);
   } catch (err) {
     next(err);
@@ -54,18 +54,18 @@ export const getPredictionById = async (
       res.status(404).json({ error: 'Prediction not found' });
       return;
     }
-    
+
     // Convert BigInt fields to strings for JSON serialization
     const serializedPrediction = {
       ...prediction,
-      bets: prediction.bets.map(bet => ({
+      bets: prediction.bets.map((bet) => ({
         ...bet,
         amount: bet.amount.toString(),
         potentialPayout: bet.potentialPayout?.toString() || null,
         payout: bet.payout?.toString() || null,
       })),
     };
-    
+
     res.json(serializedPrediction);
   } catch (err) {
     next(err);

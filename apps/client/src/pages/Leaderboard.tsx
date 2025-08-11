@@ -1,22 +1,64 @@
 // apps/client/src/pages/Leaderboard.tsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useLeaderboard } from '../hooks/useLeaderboard';
 import type { LeaderboardPeriod } from '../hooks/useLeaderboard';
 import { UserCircleIcon } from '@heroicons/react/24/outline';
+import { getShameWall, getShameWallStats } from '../api/shameWall';
+import type { ShameWallEntry, ShameWallStats } from '../api/shameWall';
+
+type TabType = 'leaderboard' | 'shame-wall';
 
 export default function Leaderboard() {
+  const [activeTab, setActiveTab] = useState<TabType>('leaderboard');
   const [period, setPeriod] = useState<LeaderboardPeriod>('all-time');
   const { data: leaderboard, loading, error } = useLeaderboard(period, 25);
 
-  if (loading) {
-    return <p className="p-4 text-center text-tertiary">Loading leaderboard…</p>;
+  // Shame Wall state
+  const [shameWall, setShameWall] = useState<ShameWallEntry[]>([]);
+  const [shameWallStats, setShameWallStats] = useState<ShameWallStats | null>(null);
+  const [shameWallLoading, setShameWallLoading] = useState(false);
+  const [shameWallError, setShameWallError] = useState<string | null>(null);
+
+  // Fetch shame wall data when tab is selected
+  useEffect(() => {
+    if (activeTab === 'shame-wall') {
+      const fetchShameWall = async () => {
+        setShameWallLoading(true);
+        setShameWallError(null);
+        try {
+          const [wallData, statsData] = await Promise.all([getShameWall(), getShameWallStats()]);
+          setShameWall(wallData);
+          setShameWallStats(statsData);
+        } catch (err) {
+          setShameWallError(err instanceof Error ? err.message : 'Failed to load shame wall');
+        } finally {
+          setShameWallLoading(false);
+        }
+      };
+
+      fetchShameWall();
+    }
+  }, [activeTab]);
+
+  // Loading states
+  const isLoading = activeTab === 'leaderboard' ? loading : shameWallLoading;
+  const hasError = activeTab === 'leaderboard' ? error : shameWallError;
+  const isEmpty = activeTab === 'leaderboard' ? !leaderboard.length : !shameWall.length;
+
+  if (isLoading) {
+    return (
+      <p className="p-4 text-center text-tertiary">
+        Loading {activeTab === 'leaderboard' ? 'leaderboard' : 'shame wall'}…
+      </p>
+    );
   }
-  if (error) {
-    return <p className="p-4 text-center text-red-500">Error: {error.message}</p>;
-  }
-  if (!leaderboard.length) {
-    return <p className="p-4 text-center text-tertiary">No leaderboard entries yet.</p>;
+  if (hasError) {
+    return (
+      <p className="p-4 text-center text-red-500">
+        Error: {hasError instanceof Error ? hasError.message : hasError}
+      </p>
+    );
   }
 
   return (

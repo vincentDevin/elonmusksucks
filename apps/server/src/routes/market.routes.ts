@@ -1,5 +1,9 @@
 import { Router } from 'express';
-import { getMarketOverview, getMarketHealth, getTrendingPredictions } from '../controllers/market.controller';
+import {
+  getMarketOverview,
+  getMarketHealth,
+  getTrendingPredictions,
+} from '../controllers/market.controller';
 
 const router = Router();
 

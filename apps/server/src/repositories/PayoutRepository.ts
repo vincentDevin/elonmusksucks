@@ -3,6 +3,8 @@ import { PrismaClient, Prisma } from '@prisma/client';
 import type { IPayoutRepository } from './IPayoutRepository';
 import type { PublicPrediction, DbUserStats } from '@ems/types';
 import redisClient from '../lib/redis';
+import { achievementService } from '../services/achievement.service';
+import { achievementEvaluatorService } from '../services/achievementEvaluator.service';
 
 const prisma = new PrismaClient();
 
@@ -124,7 +126,12 @@ export class PayoutRepository implements IPayoutRepository {
               totalWagered: { increment: b.amount },
               totalWon: { increment: BigInt(payoutAmount) },
               profit: { increment: BigInt(payoutAmount) - b.amount },
-              biggestWin: { set: BigInt(payoutAmount) > (statsBefore?.biggestWin ?? BigInt(0)) ? BigInt(payoutAmount) : (statsBefore?.biggestWin ?? BigInt(0)) },
+              biggestWin: {
+                set:
+                  BigInt(payoutAmount) > (statsBefore?.biggestWin ?? BigInt(0))
+                    ? BigInt(payoutAmount)
+                    : (statsBefore?.biggestWin ?? BigInt(0)),
+              },
               currentStreak: isWinner ? { set: (statsBefore?.currentStreak ?? 0) + 1 } : { set: 0 },
               longestStreak: isWinner
                 ? {
@@ -140,7 +147,9 @@ export class PayoutRepository implements IPayoutRepository {
           await tx.userStats.update({
             where: { userId: b.userId },
             data: {
-              roi: Number(prevStats.profit + (BigInt(payoutAmount) - b.amount)) / Number(prevStats.totalWagered + b.amount),
+              roi:
+                Number(prevStats.profit + (BigInt(payoutAmount) - b.amount)) /
+                Number(prevStats.totalWagered + b.amount),
             },
           });
 
@@ -158,6 +167,103 @@ export class PayoutRepository implements IPayoutRepository {
             await redisClient.publish('user:stats_update', JSON.stringify(statsUpdatePayload));
           } catch (error) {
             console.error('[payout] Error publishing stats update event:', error);
+          }
+
+          // Trigger achievement checks for bet resolution
+          try {
+            // Check bet won/lost achievements
+            await achievementService.checkAndUpdateAchievements({
+              type: isWinner ? 'bet_won' : 'bet_lost',
+              userId: b.userId,
+              data: {
+                betId: b.id,
+                predictionId,
+                amount: Number(b.amount),
+                payout: Number(payoutAmount),
+                category: updatedPrediction.category,
+              },
+            });
+
+            // Check streak achievements (only if this was a win/loss that affected streak)
+            const updatedStats = await tx.userStats.findUnique({ where: { userId: b.userId } });
+            if (updatedStats) {
+              await achievementService.checkAndUpdateAchievements({
+                type: 'streak_updated',
+                userId: b.userId,
+                data: {
+                  currentStreak: updatedStats.currentStreak,
+                  longestStreak: updatedStats.longestStreak,
+                },
+              });
+
+              // Check accuracy achievements
+              const winRate =
+                updatedStats.totalBets > 0
+                  ? (updatedStats.betsWon / updatedStats.totalBets) * 100
+                  : 0;
+              await achievementService.checkAndUpdateAchievements({
+                type: 'accuracy_updated',
+                userId: b.userId,
+                data: {
+                  winRate,
+                  totalBets: updatedStats.totalBets,
+                  betsWon: updatedStats.betsWon,
+                },
+              });
+
+              // Check volume achievements
+              await achievementService.checkAndUpdateAchievements({
+                type: 'volume_updated',
+                userId: b.userId,
+                data: {
+                  totalWagered: Number(updatedStats.totalWagered),
+                  totalBets: updatedStats.totalBets,
+                  biggestWin: Number(updatedStats.biggestWin),
+                },
+              });
+
+              // Check profit achievements
+              await achievementService.checkAndUpdateAchievements({
+                type: 'profit_updated',
+                userId: b.userId,
+                data: {
+                  profit: Number(updatedStats.profit),
+                  totalWon: Number(updatedStats.totalWon),
+                  roi: updatedStats.roi,
+                },
+              });
+            }
+
+            // Advanced achievement evaluator for bet resolution
+            await achievementEvaluatorService.processAchievementEvent({
+              type: isWinner ? 'bet_won' : 'bet_lost',
+              userId: b.userId,
+              timestamp: new Date().toISOString(),
+              data: {
+                betId: b.id,
+                predictionId,
+                amount: Number(b.amount),
+                payout: Number(payoutAmount),
+                category: updatedPrediction.category,
+                odds: Number(b.oddsAtPlacement),
+              },
+            });
+
+            // Advanced achievement evaluator for streak updates
+            if (updatedStats) {
+              await achievementEvaluatorService.processAchievementEvent({
+                type: 'streak_updated',
+                userId: b.userId,
+                timestamp: new Date().toISOString(),
+                data: {
+                  currentStreak: updatedStats.currentStreak,
+                  longestStreak: updatedStats.longestStreak,
+                  previousStreak: statsBefore?.currentStreak || 0,
+                },
+              });
+            }
+          } catch (error) {
+            console.error('[payout] Error checking achievements for bet resolution:', error);
           }
         }
 
@@ -260,7 +366,12 @@ export class PayoutRepository implements IPayoutRepository {
               totalWagered: { increment: parlay.amount },
               totalWon: { increment: BigInt(payoutAmount) },
               profit: { increment: BigInt(payoutAmount) - parlay.amount },
-              biggestWin: { set: BigInt(payoutAmount) > (statsBefore?.biggestWin ?? BigInt(0)) ? BigInt(payoutAmount) : (statsBefore?.biggestWin ?? BigInt(0)) },
+              biggestWin: {
+                set:
+                  BigInt(payoutAmount) > (statsBefore?.biggestWin ?? BigInt(0))
+                    ? BigInt(payoutAmount)
+                    : (statsBefore?.biggestWin ?? BigInt(0)),
+              },
               currentStreak: lost ? { set: 0 } : { set: (statsBefore?.currentStreak ?? 0) + 1 },
               longestStreak: lost
                 ? undefined
@@ -297,6 +408,79 @@ export class PayoutRepository implements IPayoutRepository {
             await redisClient.publish('user:stats_update', JSON.stringify(statsUpdatePayload));
           } catch (error) {
             console.error('[payout] Error publishing parlay stats update event:', error);
+          }
+
+          // Trigger achievement checks for parlay resolution
+          try {
+            // Parlay achievements are already triggered in betting.service when parlay is placed
+            // Here we check win/loss related achievements after resolution
+
+            // Check streak achievements for parlays
+            const updatedStats = await tx.userStats.findUnique({
+              where: { userId: parlay.userId },
+            });
+            if (updatedStats) {
+              await achievementService.checkAndUpdateAchievements({
+                type: 'streak_updated',
+                userId: parlay.userId,
+                data: {
+                  currentStreak: updatedStats.currentStreak,
+                  longestStreak: updatedStats.longestStreak,
+                },
+              });
+
+              // Check volume achievements (parlays contribute to volume)
+              await achievementService.checkAndUpdateAchievements({
+                type: 'volume_updated',
+                userId: parlay.userId,
+                data: {
+                  totalWagered: Number(updatedStats.totalWagered),
+                  totalBets: updatedStats.totalBets + updatedStats.totalParlays,
+                  biggestWin: Number(updatedStats.biggestWin),
+                },
+              });
+
+              // Check profit achievements
+              await achievementService.checkAndUpdateAchievements({
+                type: 'profit_updated',
+                userId: parlay.userId,
+                data: {
+                  profit: Number(updatedStats.profit),
+                  totalWon: Number(updatedStats.totalWon),
+                  roi: updatedStats.roi,
+                },
+              });
+            }
+
+            // Advanced achievement evaluator for parlay resolution
+            await achievementEvaluatorService.processAchievementEvent({
+              type: lost ? 'parlay_lost' : 'parlay_won',
+              userId: parlay.userId,
+              timestamp: new Date().toISOString(),
+              data: {
+                parlayId,
+                legCount,
+                legsWon,
+                payout: lost ? 0 : Number(payoutAmount),
+                amount: Number(parlay.amount),
+              },
+            });
+
+            // Advanced achievement evaluator for streak updates (parlay)
+            if (updatedStats) {
+              await achievementEvaluatorService.processAchievementEvent({
+                type: 'streak_updated',
+                userId: parlay.userId,
+                timestamp: new Date().toISOString(),
+                data: {
+                  currentStreak: updatedStats.currentStreak,
+                  longestStreak: updatedStats.longestStreak,
+                  previousStreak: statsBefore?.currentStreak || 0,
+                },
+              });
+            }
+          } catch (error) {
+            console.error('[payout] Error checking achievements for parlay resolution:', error);
           }
         }
 

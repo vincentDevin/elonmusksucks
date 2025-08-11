@@ -333,7 +333,7 @@ export class LeaderboardRepository implements ILeaderboardRepository {
         parlay_legs_won = EXCLUDED.parlay_legs_won,
         rank_change = EXCLUDED.rank_change;
     `;
-    
+
     // Clear all leaderboard caches after data update
     await this.clearCache();
   }

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import ExecutiveDashboard from './ExecutiveDashboard';
 import UserBehaviorAnalytics from './UserBehaviorAnalytics';
 import PredictiveAnalytics from './PredictiveAnalytics';
+import DatabaseMonitor from './DatabaseMonitor';
 import { generateCustomReport, exportAnalyticsData, type CustomReportData } from '../../api/admin';
 
 interface TabConfig {
@@ -38,6 +39,13 @@ const AdvancedAnalyticsDashboard: React.FC = () => {
       icon: '🔮',
       component: <PredictiveAnalytics />,
       description: 'AI-powered forecasting and churn prediction models',
+    },
+    {
+      key: 'database',
+      label: 'Database Performance',
+      icon: '🗄️',
+      component: <DatabaseMonitor />,
+      description: 'Real-time database query performance monitoring and health metrics',
     },
   ];
 

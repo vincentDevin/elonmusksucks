@@ -185,7 +185,12 @@ export class ActivityStreamService {
       user: activity.user,
       relatedUser: activity.relatedUser || undefined,
       prediction: activity.prediction || undefined,
-      bet: activity.bet || undefined,
+      bet: activity.bet
+        ? {
+            id: activity.bet.id,
+            amount: Number(activity.bet.amount),
+          }
+        : undefined,
     }));
   }
 
@@ -336,7 +341,12 @@ export class ActivityStreamService {
       user: activity.user,
       relatedUser: activity.relatedUser || undefined,
       prediction: activity.prediction || undefined,
-      bet: activity.bet || undefined,
+      bet: activity.bet
+        ? {
+            id: activity.bet.id,
+            amount: Number(activity.bet.amount),
+          }
+        : undefined,
     }));
   }
 
@@ -369,7 +379,12 @@ export class ActivityStreamService {
         user: activity.user,
         relatedUser: activity.relatedUser || undefined,
         prediction: activity.prediction || undefined,
-        bet: activity.bet || undefined,
+        bet: activity.bet
+          ? {
+              id: activity.bet.id,
+              amount: Number(activity.bet.amount),
+            }
+          : undefined,
       };
 
       // Emit to personal activity stream

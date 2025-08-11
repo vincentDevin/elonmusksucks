@@ -959,3 +959,166 @@ export async function exportAnalyticsData(params: {
   });
   return res.data;
 }
+
+/** — New Achievement Management System — **/
+
+// Achievement types for the new unified system
+export interface Achievement {
+  id: number;
+  name: string;
+  slug: string;
+  title: string;
+  description: string;
+  category: string;
+  rarity: 'common' | 'uncommon' | 'rare' | 'legendary' | 'secret' | 'shame';
+  targetValue: number;
+  iconUrl: string | null;
+  isActive: boolean;
+  autoAward: boolean;
+  manualOnly: boolean;
+  isShame: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AchievementWithStats extends Achievement {
+  totalUsers: number;
+  completedUsers: number;
+  completionRate: number;
+  recentUnlocks: Array<{
+    userId: number;
+    userName: string;
+    completedAt: string;
+  }>;
+}
+
+export interface AchievementAnalytics {
+  overview: {
+    totalAchievements: number;
+    totalCategories: number;
+    totalUnlocks: number;
+    activeUsers: number;
+    averageCompletion: number;
+  };
+  categoryBreakdown: Array<{
+    category: string;
+    achievementCount: number;
+    totalUnlocks: number;
+    averageCompletion: number;
+  }>;
+  topAchievements: Array<{
+    id: number;
+    name: string;
+    title: string;
+    completedUsers: number;
+    completionRate: number;
+  }>;
+  recentActivity: Array<{
+    achievementId: number;
+    achievementTitle: string;
+    userId: number;
+    userName: string;
+    completedAt: string;
+  }>;
+}
+
+export interface CreateAchievementData {
+  name: string;
+  title: string;
+  description: string;
+  category: string;
+  rarity: 'common' | 'uncommon' | 'rare' | 'legendary' | 'secret' | 'shame';
+  targetValue: number;
+  iconUrl?: string;
+  autoAward?: boolean;
+  manualOnly?: boolean;
+  isShame?: boolean;
+  sortOrder?: number;
+}
+
+export interface UpdateAchievementData {
+  title?: string;
+  description?: string;
+  category?: string;
+  rarity?: 'common' | 'uncommon' | 'rare' | 'legendary' | 'secret' | 'shame';
+  targetValue?: number;
+  iconUrl?: string;
+  autoAward?: boolean;
+  manualOnly?: boolean;
+  isShame?: boolean;
+  sortOrder?: number;
+  isActive?: boolean;
+}
+
+export interface BulkGrantResult {
+  successCount: number;
+  failureCount: number;
+  errors: Array<{ userId: number; error: string }>;
+}
+
+// Achievement API functions
+export async function getAllAchievements(): Promise<AchievementWithStats[]> {
+  const res = await api.get<AchievementWithStats[]>('/api/admin/achievements');
+  return res.data;
+}
+
+export async function getAchievementById(achievementId: number): Promise<AchievementWithStats> {
+  const res = await api.get<AchievementWithStats>(`/api/admin/achievements/${achievementId}`);
+  return res.data;
+}
+
+export async function createAchievement(
+  data: CreateAchievementData,
+): Promise<AchievementWithStats> {
+  const res = await api.post<AchievementWithStats>('/api/admin/achievements', data);
+  return res.data;
+}
+
+export async function updateAchievement(
+  achievementId: number,
+  data: UpdateAchievementData,
+): Promise<AchievementWithStats> {
+  const res = await api.put<AchievementWithStats>(`/api/admin/achievements/${achievementId}`, data);
+  return res.data;
+}
+
+export async function deleteAchievement(achievementId: number): Promise<void> {
+  await api.delete(`/api/admin/achievements/${achievementId}`);
+}
+
+export async function grantAchievement(achievementId: number, userId: number): Promise<void> {
+  await api.post(`/api/admin/achievements/${achievementId}/grant/${userId}`);
+}
+
+export async function revokeAchievement(achievementId: number, userId: number): Promise<void> {
+  await api.delete(`/api/admin/achievements/${achievementId}/revoke/${userId}`);
+}
+
+export async function bulkGrantAchievement(
+  achievementId: number,
+  userIds: number[],
+): Promise<BulkGrantResult> {
+  const res = await api.post<BulkGrantResult>(
+    `/api/admin/achievements/${achievementId}/bulk-grant`,
+    { userIds },
+  );
+  return res.data;
+}
+
+export async function getUsersWithAchievement(achievementId: number): Promise<
+  Array<{
+    userId: number;
+    userName: string;
+    progress: number;
+    completedAt: string | null;
+  }>
+> {
+  const res = await api.get(`/api/admin/achievements/${achievementId}/users`);
+  return res.data;
+}
+
+export async function getAchievementAnalytics(): Promise<AchievementAnalytics> {
+  const res = await api.get<AchievementAnalytics>('/api/admin/achievements/analytics');
+  return res.data;
+}

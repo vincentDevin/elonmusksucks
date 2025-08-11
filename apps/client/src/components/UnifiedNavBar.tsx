@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { FaBars, FaTimes } from 'react-icons/fa';
 import { useAuth } from '../hooks/useAuth';
 import { LightDarkToggle } from '../theme';
+import { formatMuskBucks, getMuskBucksColorClasses } from '../utils/formatting';
 
 /**
  * Updated NavBar component using the unified theme system
@@ -58,8 +59,10 @@ export default function UnifiedNavBar() {
                     className="flex items-center space-x-3 px-3 py-2 rounded hover:bg-muted transition-colors"
                   >
                     <span className="font-medium">{user.name}</span>
-                    <div className="flex items-center space-x-1 bg-warning text-surface px-2 py-1 rounded-full text-xs font-semibold shadow-sm">
-                      <span>{user.muskBucks.toLocaleString()}</span>
+                    <div
+                      className={`flex items-center space-x-1 px-3 py-1.5 rounded-full text-xs font-bold transition-all hover:scale-105 ${getMuskBucksColorClasses(user.muskBucks)}`}
+                    >
+                      <span>{formatMuskBucks(user.muskBucks)}</span>
                       <span>🪙</span>
                     </div>
                   </button>
@@ -174,8 +177,10 @@ export default function UnifiedNavBar() {
                   <div className="border-t border-muted pt-2 mt-2">
                     <div className="flex items-center space-x-3 px-4 py-3">
                       <span className="font-medium">{user.name}</span>
-                      <div className="flex items-center space-x-1 bg-warning text-surface px-2 py-1 rounded-full text-xs font-semibold shadow-sm">
-                        <span>{user.muskBucks.toLocaleString()}</span>
+                      <div
+                        className={`flex items-center space-x-1 px-3 py-1.5 rounded-full text-xs font-bold ${getMuskBucksColorClasses(user.muskBucks)}`}
+                      >
+                        <span>{formatMuskBucks(user.muskBucks)}</span>
                         <span>🪙</span>
                       </div>
                     </div>

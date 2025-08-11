@@ -5,6 +5,7 @@ import { useSocket } from '../contexts/SocketContext';
 import { useMyBets, useMyParlays, useMyPredictions } from './useMeStubs';
 import { useEnhancedLeaderboard } from './useEnhancedLeaderboard';
 import api from '../api/axios';
+import { cache, CACHE_KEYS, CACHE_TTL } from '../utils/cache';
 
 export interface CategoryAccuracy {
   category: string;
@@ -21,19 +22,24 @@ export interface Streak {
 
 export interface AchievementProgress {
   id: string;
+  achievementId: number;
+  name: string;
   title: string;
   description: string;
+  category: string;
   progress: number;
-  target: number;
+  targetValue: number;
   isCompleted: boolean;
+  completedAt?: string;
 }
 
 export interface Badge {
   id: string;
   name: string;
+  title: string;
   description: string;
-  iconUrl?: string;
-  earnedAt: string;
+  iconUrl?: string | null;
+  completedAt: string;
   category: string;
 }
 
@@ -79,6 +85,7 @@ export interface EnhancedUserStats {
     recentBadges: Badge[];
     progressToNext: AchievementProgress[];
     totalBadges: number;
+    totalAvailable: number;
     completionRate: number;
   };
   trends: {
@@ -126,142 +133,180 @@ export function useEnhancedUserStats() {
   const [error, setError] = useState<string | null>(null);
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
 
-  // Fetch enhanced user statistics
-  const fetchEnhancedStats = useCallback(async () => {
-    if (!user?.id) return;
+  // Fetch enhanced user statistics with advanced caching
+  const fetchEnhancedStats = useCallback(
+    async (force = false) => {
+      if (!user?.id) return;
 
-    setLoading(true);
-    setError(null);
-
-    try {
-      // Try enhanced stats endpoint first, fallback to basic stats
-      const [enhancedStatsResponse, activityResponse, achievementsResponse] = await Promise.all([
-        api
-          .get(`/api/users/${user.id}/enhanced-stats`)
-          .catch(() => api.get(`/api/users/${user.id}/stats`).catch(() => ({ data: null }))),
-        api.get(`/api/users/${user.id}/activity`).catch(() => ({ data: [] })),
-        api.get(`/api/users/${user.id}/achievements`).catch(() => ({ data: [] })),
-      ]);
-
-      // Calculate enhanced stats from available data
-      const activeBetsValue = myBets.data?.reduce((sum, bet) => sum + bet.amount, 0) || 0;
-      const activeParlaysValue =
-        myParlays.data?.reduce((sum, parlay) => sum + parlay.amount, 0) || 0;
-      const potentialWinnings =
-        myParlays.data?.reduce((sum, parlay) => sum + parlay.potentialPayout, 0) || 0;
-      const pendingPredictions = myPredictions.data?.filter((p) => !p.approved).length || 0;
-      const approvalRate = calculateApprovalRate(myPredictions.data || []);
-
-      // Extract performance data from enhanced stats or calculate from current data
-      const baseStats = enhancedStatsResponse.data;
-      const totalBets = baseStats?.totalBets || myBets.data?.length || 0;
-      const winRate = baseStats?.winRate || 0; // Default to 0 if no data
-      const profitLoss = baseStats?.profitLoss || baseStats?.netProfit || 0;
-      const totalWagered = baseStats?.totalWagered || activeBetsValue;
-
-      // Use server category accuracy data or empty array if not available
-      const accuracyByCategory: CategoryAccuracy[] = baseStats?.categoryAccuracy || [];
-
-      // Ensure wins are calculated if not provided
-      accuracyByCategory.forEach((cat) => {
-        if (!cat.wins) {
-          cat.wins = Math.floor(cat.totalBets * cat.accuracy);
+      // Check cache first unless forcing refresh
+      const cacheKey = CACHE_KEYS.USER_STATS(user.id);
+      if (!force) {
+        const cachedStats = cache.get<EnhancedUserStats>(cacheKey);
+        if (cachedStats) {
+          setStats(cachedStats);
+          setLoading(false);
+          return;
         }
-      });
+      }
 
-      const bestCategory =
-        accuracyByCategory.length > 0
-          ? accuracyByCategory.reduce((best, current) =>
-              current.accuracy > best.accuracy ? current : best,
-            ).category
-          : 'N/A';
+      setLoading(true);
+      setError(null);
 
-      // Generate empty trend data if not available from server
-      const generateTrendData = (_baseValue: number, _points: number = 7): TrendData[] => {
-        return []; // Return empty array instead of mock data
-      };
+      try {
+        // Try enhanced stats endpoint first, fallback to basic stats
+        const [
+          enhancedStatsResponse,
+          activityResponse,
+          achievementsResponse,
+          recentAchievementsResponse,
+          allAchievementsResponse,
+        ] = await Promise.all([
+          api
+            .get(`/api/users/${user.id}/enhanced-stats`)
+            .catch(() => api.get(`/api/users/${user.id}/stats`).catch(() => ({ data: null }))),
+          api.get(`/api/users/${user.id}/activity`).catch(() => ({ data: [] })),
+          api.get(`/api/users/${user.id}/achievements`).catch(() => ({ data: [] })),
+          api.get(`/api/users/${user.id}/achievements/recent?limit=5`).catch(() => ({ data: [] })),
+          api.get('/api/admin/achievements').catch(() => ({ data: [] })), // Get all available achievements
+        ]);
 
-      const enhancedStats: EnhancedUserStats = {
-        performance: {
-          totalBets,
-          winRate,
-          profitLoss,
-          accuracyByCategory,
-          currentStreak: baseStats?.currentStreak || {
-            type: 'win',
-            count: 0,
-            isActive: false,
+        // Calculate enhanced stats from available data
+        const activeBetsValue = myBets.data?.reduce((sum, bet) => sum + bet.amount, 0) || 0;
+        const activeParlaysValue =
+          myParlays.data?.reduce((sum, parlay) => sum + parlay.amount, 0) || 0;
+        const potentialWinnings =
+          myParlays.data?.reduce((sum, parlay) => sum + parlay.potentialPayout, 0) || 0;
+        const pendingPredictions = myPredictions.data?.filter((p) => !p.approved).length || 0;
+        const approvalRate = calculateApprovalRate(myPredictions.data || []);
+
+        // Extract performance data from enhanced stats or calculate from current data
+        const baseStats = enhancedStatsResponse.data;
+        const totalBets = baseStats?.totalBets || myBets.data?.length || 0;
+        const winRate = baseStats?.winRate || 0; // Default to 0 if no data
+        const profitLoss = baseStats?.profitLoss || baseStats?.netProfit || 0;
+        const totalWagered = baseStats?.totalWagered || activeBetsValue;
+
+        // Use server category accuracy data or empty array if not available
+        const accuracyByCategory: CategoryAccuracy[] = baseStats?.categoryAccuracy || [];
+
+        // Ensure wins are calculated if not provided
+        accuracyByCategory.forEach((cat) => {
+          if (!cat.wins) {
+            cat.wins = Math.floor(cat.totalBets * cat.accuracy);
+          }
+        });
+
+        const bestCategory =
+          accuracyByCategory.length > 0
+            ? accuracyByCategory.reduce((best, current) =>
+                current.accuracy > best.accuracy ? current : best,
+              ).category
+            : 'N/A';
+
+        // Generate empty trend data if not available from server
+        const generateTrendData = (_baseValue: number, _points: number = 7): TrendData[] => {
+          return []; // Return empty array instead of mock data
+        };
+
+        const enhancedStats: EnhancedUserStats = {
+          performance: {
+            totalBets,
+            winRate,
+            profitLoss,
+            accuracyByCategory,
+            currentStreak: baseStats?.currentStreak || {
+              type: 'win',
+              count: 0,
+              isActive: false,
+            },
+            bestCategory,
+            totalWagered,
+            avgBetSize: baseStats?.avgBetSize || (totalBets > 0 ? totalWagered / totalBets : 0),
           },
-          bestCategory,
-          totalWagered,
-          avgBetSize: baseStats?.avgBetSize || (totalBets > 0 ? totalWagered / totalBets : 0),
-        },
-        portfolio: {
-          activeBetsValue,
-          activeParlaysValue,
-          pendingPredictions,
-          approvalRate,
-          totalPortfolioValue: activeBetsValue + activeParlaysValue,
-          potentialWinnings,
-        },
-        ranking: {
-          currentPosition: baseStats?.ranking?.rank || 0,
-          positionChange: baseStats?.ranking?.change || 0,
-          percentile:
-            baseStats?.ranking?.percentile ||
-            calculatePercentile(
-              baseStats?.ranking?.rank || 0,
-              leaderboard.stats?.totalUsers || 1000,
-            ),
-          nextMilestone: calculateNextMilestone(baseStats?.ranking?.rank || 0),
-        },
-        achievements: {
-          recentBadges: [], // TODO: Implement recent badges from backend
-          progressToNext: achievementsResponse.data || [],
-          totalBadges: achievementsResponse.data?.filter((a: any) => a.isCompleted).length || 0,
-          completionRate:
-            achievementsResponse.data?.length > 0
-              ? achievementsResponse.data.filter((a: any) => a.isCompleted).length /
-                achievementsResponse.data.length
-              : 0,
-        },
-        trends: {
-          weeklyBettingVolume: baseStats?.weeklyVolume || generateTrendData(activeBetsValue / 7),
-          monthlyProfitLoss: baseStats?.monthlyProfitLoss || generateTrendData(profitLoss / 30),
-          categoryEngagement:
-            baseStats?.categoryStats ||
-            accuracyByCategory.map((cat) => ({
-              category: cat.category,
-              betCount: cat.totalBets,
-              winRate: cat.accuracy,
-              profitLoss: cat.totalBets * 50 * (cat.accuracy - 0.5),
-              avgBetSize: 50,
-            })),
-          recentActivity: activityResponse.data?.slice(0, 10) || [],
-        },
-      };
+          portfolio: {
+            activeBetsValue,
+            activeParlaysValue,
+            pendingPredictions,
+            approvalRate,
+            totalPortfolioValue: activeBetsValue + activeParlaysValue,
+            potentialWinnings,
+          },
+          ranking: {
+            currentPosition: baseStats?.ranking?.rank || 0,
+            positionChange: baseStats?.ranking?.change || 0,
+            percentile:
+              baseStats?.ranking?.percentile ||
+              calculatePercentile(
+                baseStats?.ranking?.rank || 0,
+                leaderboard.stats?.totalUsers || 1000,
+              ),
+            nextMilestone: calculateNextMilestone(baseStats?.ranking?.rank || 0),
+          },
+          achievements: {
+            recentBadges: recentAchievementsResponse.data || [],
+            progressToNext: achievementsResponse.data || [],
+            totalBadges: achievementsResponse.data?.filter((a: any) => a.isCompleted).length || 0,
+            totalAvailable: allAchievementsResponse.data?.length || 0,
+            completionRate:
+              allAchievementsResponse.data?.length > 0
+                ? (achievementsResponse.data?.filter((a: any) => a.isCompleted).length || 0) /
+                  allAchievementsResponse.data.length
+                : 0,
+          },
+          trends: {
+            weeklyBettingVolume: baseStats?.weeklyVolume || generateTrendData(activeBetsValue / 7),
+            monthlyProfitLoss: baseStats?.monthlyProfitLoss || generateTrendData(profitLoss / 30),
+            categoryEngagement:
+              baseStats?.categoryStats ||
+              accuracyByCategory.map((cat) => ({
+                category: cat.category,
+                betCount: cat.totalBets,
+                winRate: cat.accuracy,
+                profitLoss: cat.totalBets * 50 * (cat.accuracy - 0.5),
+                avgBetSize: 50,
+              })),
+            recentActivity: activityResponse.data?.slice(0, 10) || [],
+          },
+        };
 
-      setStats(enhancedStats);
-      setRecentActivity(activityResponse.data || []);
-    } catch (err: unknown) {
-      console.error('Failed to fetch enhanced user stats:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load stats';
-      setError(errorMessage);
+        // Cache the stats with appropriate TTL
+        cache.set(cacheKey, enhancedStats, CACHE_TTL.SHORT);
 
-      // Fallback to basic stats from existing hooks
-      const fallbackStats = createFallbackStats();
-      setStats(fallbackStats);
-    } finally {
-      setLoading(false);
-    }
-  }, [
-    user?.id,
-    myBets.data,
-    myParlays.data,
-    myPredictions.data,
-    leaderboard.userRank,
-    leaderboard.stats,
-  ]);
+        // Also cache individual components with longer TTLs
+        cache.set(
+          CACHE_KEYS.USER_ACHIEVEMENTS(user.id),
+          achievementsResponse.data || [],
+          CACHE_TTL.MEDIUM,
+        );
+        cache.set(
+          CACHE_KEYS.USER_RECENT_ACHIEVEMENTS(user.id),
+          recentAchievementsResponse.data || [],
+          CACHE_TTL.MEDIUM,
+        );
+
+        setStats(enhancedStats);
+        setRecentActivity(activityResponse.data || []);
+      } catch (err: unknown) {
+        console.error('Failed to fetch enhanced user stats:', err);
+        const errorMessage = err instanceof Error ? err.message : 'Failed to load stats';
+        setError(errorMessage);
+
+        // Fallback to basic stats from existing hooks
+        const fallbackStats = createFallbackStats();
+        setStats(fallbackStats);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [
+      user?.id,
+      myBets.data,
+      myParlays.data,
+      myPredictions.data,
+      leaderboard.userRank,
+      leaderboard.stats,
+    ],
+  );
 
   // Create fallback stats from existing data
   const createFallbackStats = useCallback((): EnhancedUserStats => {
@@ -300,6 +345,7 @@ export function useEnhancedUserStats() {
         recentBadges: [],
         progressToNext: [],
         totalBadges: 0,
+        totalAvailable: 0,
         completionRate: 0,
       },
       trends: {
@@ -389,35 +435,46 @@ export function useEnhancedUserStats() {
     return insights.slice(0, 3); // Limit to 3 insights
   }, [stats]);
 
-  // Listen for real-time updates
+  // Listen for real-time updates with throttling
   useEffect(() => {
     if (!user?.id || !socket) return;
+
+    // Throttle stats updates to avoid excessive API calls
+    let updateTimeout: NodeJS.Timeout | null = null;
+
+    const throttledRefresh = () => {
+      if (updateTimeout) return; // Already scheduled
+      updateTimeout = setTimeout(() => {
+        fetchEnhancedStats(true); // Force refresh
+        updateTimeout = null;
+      }, 1000); // Throttle to max 1 update per second
+    };
 
     const handleStatsUpdate = (data: any) => {
       console.log('[useEnhancedUserStats] Received stats:update', data);
       if (data.userId === user.id) {
-        fetchEnhancedStats();
+        throttledRefresh();
       }
     };
 
     const handleStatsRefresh = (data: any) => {
       console.log('[useEnhancedUserStats] Received stats:refresh', data);
       if (data.userId === user.id) {
-        fetchEnhancedStats();
+        throttledRefresh();
       }
     };
 
     const handleUserStatsUpdate = (data: any) => {
       console.log('[useEnhancedUserStats] Received user:stats_update', data);
       if (data.userId === user.id) {
-        fetchEnhancedStats();
+        throttledRefresh();
       }
     };
 
     const handleRankingChange = (data: any) => {
       console.log('[useEnhancedUserStats] Received ranking:change', data);
       if (data.userId === user.id) {
-        fetchEnhancedStats();
+        throttledRefresh();
       }
     };
 
@@ -448,11 +505,14 @@ export function useEnhancedUserStats() {
     socket.on('ranking:change', handleRankingChange);
     socket.on('achievement:unlocked', handleAchievementUnlocked);
 
-    // Keep some legacy events for backward compatibility
-    socket.on('betPlaced', () => fetchEnhancedStats());
-    socket.on('betResolved', () => fetchEnhancedStats());
+    // Keep some legacy events for backward compatibility with throttling
+    socket.on('betPlaced', throttledRefresh);
+    socket.on('betResolved', throttledRefresh);
 
     return () => {
+      if (updateTimeout) {
+        clearTimeout(updateTimeout);
+      }
       socket.off('stats:update', handleStatsUpdate);
       socket.off('stats:refresh', handleStatsRefresh);
       socket.off('user:stats_update', handleUserStatsUpdate);
@@ -463,10 +523,19 @@ export function useEnhancedUserStats() {
     };
   }, [user?.id, socket, fetchEnhancedStats]);
 
-  // Initial fetch
+  // Initial fetch with cache check
   useEffect(() => {
-    fetchEnhancedStats();
-  }, [fetchEnhancedStats]);
+    if (!user?.id) return;
+
+    // Check if we already have cached data
+    const cachedStats = cache.get<EnhancedUserStats>(CACHE_KEYS.USER_STATS(user.id));
+    if (!cachedStats) {
+      fetchEnhancedStats();
+    } else {
+      setStats(cachedStats);
+      setLoading(false);
+    }
+  }, [user?.id, fetchEnhancedStats]);
 
   return {
     stats,
@@ -475,7 +544,7 @@ export function useEnhancedUserStats() {
     recentActivity,
     quickActions,
     smartInsights,
-    refresh: fetchEnhancedStats,
+    refresh: () => fetchEnhancedStats(true),
   };
 }
 

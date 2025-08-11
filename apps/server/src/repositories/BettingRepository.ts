@@ -50,7 +50,14 @@ export class BettingRepository implements IBettingRepository {
       });
 
       const bet = await tx.bet.create({
-        data: { userId, predictionId, optionId, amount: BigInt(amount), oddsAtPlacement, potentialPayout },
+        data: {
+          userId,
+          predictionId,
+          optionId,
+          amount: BigInt(amount),
+          oddsAtPlacement,
+          potentialPayout,
+        },
       });
 
       // upsert stats for single bet

@@ -5,6 +5,7 @@ import jwt from 'jsonwebtoken';
 import type { User } from '@prisma/client';
 import type { IAuthRepository } from '../repositories/IAuthRepository';
 import { PrismaAuthRepository } from '../repositories/AuthRepository';
+import { userCache } from '../utils/userCache';
 
 const SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS) || 12;
 const DUMMY_HASH = '$2b$10$KIXh1g4myh5j9hFSUVjdaeQXG7q3NDy4W8P4Y8XxYQCEhiqbz0R4e';
@@ -92,7 +93,19 @@ export async function deleteRefreshToken(token: string): Promise<void> {
 // --- User lookup ---
 
 export async function getUserById(userId: number): Promise<User | null> {
-  return repo.findById(userId);
+  // Check cache first
+  const cachedUser = userCache.get(userId);
+  if (cachedUser) {
+    return cachedUser;
+  }
+
+  // Fetch from database and cache result
+  const user = await repo.findById(userId);
+  if (user) {
+    userCache.set(userId, user);
+  }
+
+  return user;
 }
 
 // --- Email verification ---

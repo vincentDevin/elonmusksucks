@@ -8,6 +8,7 @@
 import { useState, useMemo } from 'react';
 import { usePredictionMarket } from '../contexts/PredictionContext';
 import { useAuth } from '../contexts/AuthContext';
+import { formatMuskBucks } from '../utils/formatting';
 import type { PublicPredictionOption, BetWithUser } from '@ems/types';
 
 interface BetFormProps {
@@ -119,7 +120,7 @@ export default function BetForm({ prediction, addOptimisticBet, onPlaced }: BetF
         {/* Balance and Risk Level */}
         <div className="flex justify-between items-center">
           <p className="text-sm">
-            Balance: <span className="font-semibold">{balance.toLocaleString()} 🪙</span>
+            Balance: <span className="font-semibold">{formatMuskBucks(balance)} 🪙</span>
           </p>
           <div
             className={`px-2 py-1 rounded-full text-xs font-semibold ${
@@ -178,7 +179,7 @@ export default function BetForm({ prediction, addOptimisticBet, onPlaced }: BetF
             <div className="flex justify-between text-sm">
               <span>Potential Payout:</span>
               <span className="font-bold text-green-600">
-                {betCalculations.payout.toLocaleString()} 🪙
+                {formatMuskBucks(betCalculations.payout)} 🪙
               </span>
             </div>
             <div className="flex justify-between text-sm">
@@ -186,7 +187,7 @@ export default function BetForm({ prediction, addOptimisticBet, onPlaced }: BetF
               <span
                 className={`font-semibold ${betCalculations.profit > 0 ? 'text-green-600' : 'text-tertiary'}`}
               >
-                +{betCalculations.profit.toLocaleString()} 🪙
+                +{formatMuskBucks(betCalculations.profit)} 🪙
               </span>
             </div>
             {betCalculations.marketImpact && (

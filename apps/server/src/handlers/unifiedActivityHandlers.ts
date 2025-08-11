@@ -304,6 +304,8 @@ export function setupUnifiedActivityRedisHandlers(io: any) {
   });
 
   console.log('[unified-activity-redis] Redis subscriber initialized for global broadcasting');
+
+  // MEMORY LEAK FIX: Return the client so it can be tracked for cleanup
   return redisSub;
 }
 

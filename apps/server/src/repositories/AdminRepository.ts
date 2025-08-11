@@ -412,7 +412,7 @@ export class PrismaAdminRepository implements IAdminRepository {
     const detailedPredictions: DetailedPrediction[] = predictions.map((prediction) => {
       const bets = (prediction as any).bets || [];
       const uniqueBettors = new Set(bets.map((bet: any) => bet.userId)).size;
-      const totalVolume = bets.reduce((sum: number, bet: any) => sum + bet.amount, 0);
+      const totalVolume = bets.reduce((sum: number, bet: any) => sum + Number(bet.amount), 0);
 
       return {
         ...prediction,
@@ -474,7 +474,7 @@ export class PrismaAdminRepository implements IAdminRepository {
 
     const bets = (prediction as any).bets || [];
     const uniqueBettors = new Set(bets.map((bet: any) => bet.userId)).size;
-    const totalVolume = bets.reduce((sum: number, bet: any) => sum + bet.amount, 0);
+    const totalVolume = bets.reduce((sum: number, bet: any) => sum + Number(bet.amount), 0);
 
     return {
       ...prediction,
@@ -619,7 +619,7 @@ export class PrismaAdminRepository implements IAdminRepository {
 
     const optionTotals: Record<number, number> = {};
     bets.forEach((bet) => {
-      optionTotals[bet.optionId] = (optionTotals[bet.optionId] || 0) + bet.amount;
+      optionTotals[bet.optionId] = (optionTotals[bet.optionId] || 0) + Number(bet.amount);
     });
 
     const values = Object.values(optionTotals);
@@ -913,7 +913,7 @@ export class PrismaAdminRepository implements IAdminRepository {
         categoryMap.set(cat, { volume: 0, betCount: 0 });
       }
       const data = categoryMap.get(cat);
-      data.volume += bet.amount;
+      data.volume += Number(bet.amount); // Convert BigInt to number
       data.betCount += 1;
     });
 

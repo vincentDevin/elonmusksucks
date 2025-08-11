@@ -1,5 +1,5 @@
 // apps/client/src/components/dashboard/desktop/DesktopDashboard.tsx
-import { Suspense, lazy, useState } from 'react';
+import { Suspense, lazy, useState, memo, useMemo } from 'react';
 import { useAdvancedThemes } from '../../../theme/hooks/useUnifiedTheme';
 import { useMobileOptimization } from '../../../hooks/useMobileOptimization';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -13,6 +13,7 @@ import UnifiedDashboardSettings from '../customization/UnifiedDashboardSettings'
 import DesktopWidgets from './DesktopWidgets';
 import MarketOverview from './MarketOverview';
 import QuickBetModal from '../QuickBetModal';
+import { formatMuskBucks } from '../../../utils/formatting';
 import CreatePredictionModal from '../CreatePredictionModal';
 
 const ChatPanel = lazy(() => import('../ChatPanel'));
@@ -21,7 +22,7 @@ interface DesktopDashboardProps {
   className?: string;
 }
 
-export default function DesktopDashboard({ className = '' }: DesktopDashboardProps) {
+const DesktopDashboard = memo(function DesktopDashboard({ className = '' }: DesktopDashboardProps) {
   const [showSettings, setShowSettings] = useState(false);
   const [showQuickBetModal, setShowQuickBetModal] = useState(false);
   const [showCreatePredictionModal, setShowCreatePredictionModal] = useState(false);
@@ -34,13 +35,8 @@ export default function DesktopDashboard({ className = '' }: DesktopDashboardPro
   // Performance preferences
   const { reducedAnimations, reducedData } = preferences.performance;
 
-  // Enhanced breakpoint system for modular grid
-  const is5K = screenWidth >= 2880; // Ultra-wide 5K/6K displays
-  const is1440p = screenWidth >= 2560; // 1440p displays (primary target)
-  const is1080p = screenWidth >= 1920; // 1080p displays
-  const isWide = screenWidth >= 1600; // Standard wide displays
-
-  const getGridLayout = () => {
+  // Memoize grid layout calculation to avoid recalculation on every render
+  const gridLayout = useMemo(() => {
     // Modular grid system optimized for component space requirements
     if (screenWidth >= 2880) {
       // Ultra-wide 5K/6K: 4-column specialized layout
@@ -58,7 +54,20 @@ export default function DesktopDashboard({ className = '' }: DesktopDashboardPro
       // Compact desktop: 2-column fallback
       return 'grid-cols-[1fr_380px]';
     }
-  };
+  }, [screenWidth]);
+
+  // Memoize breakpoint calculations to avoid recalculation
+  const breakpoints = useMemo(
+    () => ({
+      is5K: screenWidth >= 2880,
+      is1440p: screenWidth >= 2560,
+      is1080p: screenWidth >= 1920,
+      isWide: screenWidth >= 1600,
+    }),
+    [screenWidth],
+  );
+
+  const { is5K, is1440p, is1080p, isWide } = breakpoints;
 
   return (
     <div className={`min-h-screen bg-background ${className}`}>
@@ -120,7 +129,7 @@ export default function DesktopDashboard({ className = '' }: DesktopDashboardPro
                 </div>
                 <div className="text-center">
                   <div className="text-content font-bold">
-                    {user?.muskBucks?.toLocaleString() || '—'}🪙
+                    {user?.muskBucks ? formatMuskBucks(user.muskBucks) : '—'}🪙
                   </div>
                   <div className="text-tertiary">Balance</div>
                 </div>
@@ -174,7 +183,7 @@ export default function DesktopDashboard({ className = '' }: DesktopDashboardPro
       </header>
 
       {/* Main Dashboard Grid - Modular Layout System */}
-      <main className={`grid gap-6 p-6 ${getGridLayout()}`}>
+      <main className={`grid gap-6 p-6 ${gridLayout}`}>
         {/* Column 1: Analytics Hub - Personal Command Center + Market Overview */}
         {isWide && (
           <aside className="space-y-6 overflow-y-auto scrollbar-thin scrollbar-track-secondary/20 scrollbar-thumb-primary/40">
@@ -363,4 +372,6 @@ export default function DesktopDashboard({ className = '' }: DesktopDashboardPro
       />
     </div>
   );
-}
+});
+
+export default DesktopDashboard;

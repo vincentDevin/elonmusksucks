@@ -4,7 +4,13 @@
 // • Sanitises DB records and injects signed avatar URLs for bets & parlay legs
 // -----------------------------------------------------------------------------
 
-import type { DbPrediction, DbPredictionOption, DbBet, PublicPrediction, ParlayLegWithUser } from '@ems/types';
+import type {
+  DbPrediction,
+  DbPredictionOption,
+  DbBet,
+  PublicPrediction,
+  ParlayLegWithUser,
+} from '@ems/types';
 import type { IPredictionRepository } from '../repositories/IPredictionRepository';
 import { PredictionRepository } from '../repositories/PredictionRepository';
 import { PredictionType } from '@prisma/client';
@@ -12,6 +18,7 @@ import redisClient from '../lib/redis';
 import { UserService } from '../services/user.service';
 import { unifiedActivityService } from './unifiedActivity.service';
 import { achievementService } from './achievement.service';
+import { achievementEvaluatorService } from './achievementEvaluator.service';
 
 // Using the global ParlayLegWithUser type from @ems/types
 
@@ -100,10 +107,22 @@ export class PredictionService {
       // Activity already published by unifiedActivityService above
       // No need for duplicate ActivityRecorder call
 
-      // Check for achievement unlocks
+      // Check for achievement unlocks (legacy system)
       await achievementService.checkAndUpdateAchievements({
         type: 'prediction_created',
         userId: params.creatorId,
+        data: {
+          predictionId: pred.id,
+          title: pred.title,
+          category: pred.category,
+        },
+      });
+
+      // Check for achievement unlocks (advanced evaluator)
+      await achievementEvaluatorService.processAchievementEvent({
+        type: 'prediction_created',
+        userId: params.creatorId,
+        timestamp: new Date().toISOString(),
         data: {
           predictionId: pred.id,
           title: pred.title,

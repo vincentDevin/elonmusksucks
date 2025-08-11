@@ -1,5 +1,11 @@
 // apps/server/src/repositories/IPredictionRepository.ts
-import type { DbPrediction, DbPredictionOption, DbBet, DbUser, ParlayLegWithUser } from '@ems/types';
+import type {
+  DbPrediction,
+  DbPredictionOption,
+  DbBet,
+  DbUser,
+  ParlayLegWithUser,
+} from '@ems/types';
 import type { PredictionType } from '@ems/types';
 
 // Using the global ParlayLegWithUser type from @ems/types
