@@ -18,7 +18,13 @@ import type {
   BetOption as PrismaBetOption,
   BetStatus as PrismaBetStatus,
   TransactionType as PrismaTransactionType,
-  Theme as PrismaTheme,
+  // Homepage Timeline Models
+  FeedSource as PrismaFeedSource,
+  FeedStatus as PrismaFeedStatus,
+  Article as PrismaArticle,
+  ArticleStatus as PrismaArticleStatus,
+  Tweet as PrismaTweet,
+  PredictionSourceLink as PrismaPredictionSourceLink,
 } from '@prisma/client';
 
 // ——— Enums ——————————————————————————————————————————————
@@ -26,7 +32,8 @@ export type Role            = PrismaRole;
 export type BetOption       = PrismaBetOption;
 export type BetStatus       = PrismaBetStatus;
 export type TransactionType = PrismaTransactionType;
-export type Theme           = PrismaTheme;
+export type FeedStatus      = PrismaFeedStatus;
+export type ArticleStatus   = PrismaArticleStatus;
 
 // ——— User ——————————————————————————————————————————————
 export type DbUser     = PrismaUser;
@@ -271,7 +278,7 @@ export interface PublicUserProfile {
   location?:        string | null;
   timezone?:        string | null;
   notifyOnResolve:  boolean;
-  theme:            Theme;
+  theme:            string;
   twoFactorEnabled: boolean;
   stats: {
     successRate:     number;
@@ -427,3 +434,207 @@ export interface AdminBet extends PublicBet {
 export interface AdminTransaction extends PublicTransaction {
   userName:   string;
 }
+
+// ——— Homepage Timeline Types ——————————————————————————————————————————————
+export type DbFeedSource = PrismaFeedSource;
+export type PublicFeedSource = {
+  id: number;
+  name: string;
+  url: string;
+  siteUrl: string | null;
+  status: FeedStatus;
+  allowImages: boolean;
+  lastFetchedAt: string | null;
+  lastSuccessAt: string | null;
+  lastErrorAt: string | null;
+  lastErrorMsg: string | null;
+  fetchCount: number;
+  errorCount: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type DbArticle = PrismaArticle;
+export type PublicArticle = {
+  id: number;
+  feedId: number;
+  guid: string | null;
+  url: string;
+  canonicalUrl: string | null;
+  title: string;
+  excerpt: string | null;
+  leadImageUrl: string | null;
+  publishedAt: string | null;
+  fetchedAt: string;
+  hash: string;
+  status: ArticleStatus;
+  tags: string[];
+  modNotes: string | null;
+  reactions: number;
+  comments: number;
+  createdAt: string;
+  updatedAt: string;
+  feed?: PublicFeedSource;
+};
+
+export type DbTweet = PrismaTweet;
+export type PublicTweet = {
+  id: string;
+  postedAt: string;
+  text: string;
+  permalink: string;
+  authorHandle: string;
+  likeCount: number;
+  replyCount: number;
+  repostCount: number;
+  quotesCount: number;
+  status: string;
+  fetchedAt: string;
+};
+
+export type DbPredictionSourceLink = PrismaPredictionSourceLink;
+export type PublicPredictionSourceLink = {
+  id: number;
+  predictionId: number;
+  articleId: number | null;
+  tweetId: string | null;
+  url: string;
+  title: string | null;
+  publisher: string | null;
+  capturedAt: string;
+  prediction?: PublicPrediction;
+  article?: PublicArticle;
+  tweet?: PublicTweet;
+};
+
+// Timeline unified content types
+export type TimelineItem = {
+  id: string; // composite: 'article-123' or 'tweet-456'
+  type: 'article' | 'tweet';
+  timestamp: string;
+  content: {
+    title: string;
+    excerpt?: string;
+    url: string;
+    imageUrl?: string | null;
+    author?: string; // feed name or twitter handle
+    source?: string; // domain or 'Twitter'
+  };
+  engagement: {
+    reactions: number;
+    comments: number;
+  };
+  tags: string[];
+  sourceLinks?: PublicPredictionSourceLink[];
+};
+
+// Admin management types
+export type FeedManagementData = {
+  totalFeeds: number;
+  activeFeeds: number;
+  pausedFeeds: number;
+  blockedFeeds: number;
+  totalArticles: number;
+  pendingArticles: number;
+  approvedArticles: number;
+  rejectedArticles: number;
+  lastFetchedAt: string | null;
+  averageFetchTime: number; // in minutes
+  errorRate: number; // percentage
+};
+
+export type ArticleModerationData = {
+  id: number;
+  title: string;
+  url: string;
+  feedName: string;
+  publishedAt: string | null;
+  status: ArticleStatus;
+  tags: string[];
+  excerpt: string | null;
+  modNotes: string | null;
+  leadImageUrl: string | null;
+};
+
+// API Request/Response Types
+export type CreateFeedRequest = {
+  name: string;
+  url: string;
+  siteUrl?: string;
+  allowImages?: boolean;
+};
+
+export type UpdateFeedRequest = Partial<CreateFeedRequest> & {
+  status?: FeedStatus;
+};
+
+export type UpdateArticleRequest = {
+  status: ArticleStatus;
+  tags?: string[];
+  modNotes?: string;
+};
+
+export type TimelineResponse = {
+  items: TimelineItem[];
+  pagination: {
+    cursor?: string;
+    hasMore: boolean;
+    total?: number;
+  };
+};
+
+export type FeedStatsResponse = {
+  feedId: number;
+  totalArticles: number;
+  recentArticles: number;
+  errorRate: number;
+  avgFetchTime: number;
+  lastSuccess: string | null;
+  lastError: string | null;
+};
+
+// OPML Import/Export Types
+export type OPMLFeed = {
+  title: string;
+  xmlUrl: string;
+  htmlUrl?: string;
+  type?: string;
+};
+
+export type OPMLCategory = {
+  title: string;
+  feeds: OPMLFeed[];
+};
+
+export type OPMLDocument = {
+  title: string;
+  categories: OPMLCategory[];
+  feeds: OPMLFeed[]; // Root level feeds
+};
+
+export type OPMLImportResult = {
+  imported: number;
+  duplicates: number;
+  errors: Array<{
+    url: string;
+    error: string;
+  }>;
+};
+
+// Worker Job Types
+export type FeedFetchJob = {
+  feedId: number;
+  url: string;
+  forceRefresh?: boolean;
+};
+
+export type TwitterFetchJob = {
+  tweetId: string;
+  url: string;
+};
+
+export type ArticleProcessingJob = {
+  articleId: number;
+  extractImages?: boolean;
+  generateTags?: boolean;
+};

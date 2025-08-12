@@ -29,7 +29,12 @@ export type RedisChannel =
   | 'moderation:userKick'
   | 'moderation:messageDelete'
   | 'moderation:postDelete'
-  | 'user:activity';
+  | 'user:activity'
+  | 'feed:article:new'
+  | 'admin:moderation:bulk'
+  | 'admin:retagging:bulk'
+  | 'admin:feed:refresh'
+  | 'timeline:articles:new';
 
 export function registerRedisEventHandlers(io: Server, eventSub: any) {
   eventSub.on('message', (channel: RedisChannel, message: string) => {
@@ -157,6 +162,29 @@ export function registerRedisEventHandlers(io: Server, eventSub: any) {
         io.emit('userActivity', payload);
         io.to('admin').emit('adminUserActivity', payload);
         break;
+
+      // Timeline events
+      case 'feed:article:new':
+        // Notify admins of new articles for moderation
+        io.to('admin').emit('timeline:article:new', payload);
+        break;
+      case 'admin:moderation:bulk':
+        // Real-time admin updates for bulk moderation
+        io.to('admin').emit('timeline:moderation:bulk', payload);
+        break;
+      case 'admin:retagging:bulk':
+        // Real-time admin updates for bulk retagging
+        io.to('admin').emit('timeline:retagging:bulk', payload);
+        break;
+      case 'admin:feed:refresh':
+        // Notify admin room of feed refresh requests
+        io.to('admin').emit('timeline:feed:refresh', payload);
+        break;
+      case 'timeline:articles:new':
+        // Notify public timeline of newly approved articles
+        io.emit('timeline:articles:approved', payload);
+        break;
+        
       default:
         console.warn('[socket] Unhandled Redis channel', channel);
     }

@@ -21,6 +21,8 @@ import activityRoutes from './routes/activity.routes';
 import marketRoutes from './routes/market.routes';
 import shameWallRoutes from './routes/shameWall.routes';
 import monitoringRoutes from './routes/monitoring.routes';
+import timelineRoutes from './routes/timeline.routes.simple';
+import feedsRoutes from './routes/feeds.routes.simple';
 
 const app = express();
 
@@ -63,6 +65,8 @@ app.use('/api/activity', activityRoutes);
 app.use('/api/market', marketRoutes);
 app.use('/api/shame-wall', shameWallRoutes);
 app.use('/api/monitoring', monitoringRoutes);
+app.use('/api/timeline', timelineRoutes);
+app.use('/api/admin/feeds', feedsRoutes);
 
 // Global error handler
 app.use((err: any, _req: any, res: any, _next: any) => {

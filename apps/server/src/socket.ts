@@ -76,6 +76,12 @@ export async function initSocket(httpServer: HTTPServer) {
     'moderation:messageDelete',
     'moderation:postDelete',
     'user:activity',
+    // Timeline events
+    'feed:article:new',
+    'admin:moderation:bulk',
+    'admin:retagging:bulk',
+    'admin:feed:refresh',
+    'timeline:articles:new',
   );
   registerRedisEventHandlers(io, eventSub);
   // registerNormalizedActivityRedisHandlers(io, eventSub); // Now handled by main handler

@@ -152,8 +152,9 @@ model Prediction {
   options         PredictionOption[]
   createdAt       DateTime           @default(now())
   creatorId       Int
-  creator         User               @relation(fields: [creatorId], references: [id])
+  creator         User                   @relation(fields: [creatorId], references: [id])
   activities      UserActivity[]
+  sourceLinks     PredictionSourceLink[]
 
   @@index([expiresAt, resolved])
   @@index([creatorId, createdAt(sort: Desc)])
@@ -474,4 +475,106 @@ model ModerationLog {
   @@index([targetUserId])
   @@index([action])
   @@index([createdAt])
+}
+
+// ============================================
+// Homepage Timeline Models
+// ============================================
+
+enum FeedStatus {
+  ACTIVE
+  PAUSED
+  BLOCKED
+}
+
+enum ArticleStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model FeedSource {
+  id            Int        @id @default(autoincrement())
+  name          String
+  url           String     @unique
+  siteUrl       String?
+  status        FeedStatus @default(ACTIVE)
+  allowImages   Boolean    @default(true)
+  lastFetchedAt DateTime?
+  lastSuccessAt DateTime?
+  lastErrorAt   DateTime?
+  lastErrorMsg  String?
+  fetchCount    Int        @default(0)
+  errorCount    Int        @default(0)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  articles      Article[]
+  
+  @@index([status])
+  @@index([lastFetchedAt])
+}
+
+model Article {
+  id                   Int                    @id @default(autoincrement())
+  feedId               Int
+  guid                 String?
+  url                  String                 @unique
+  canonicalUrl         String?
+  title                String
+  excerpt              String?                @db.Text
+  leadImageUrl         String?
+  publishedAt          DateTime?
+  fetchedAt            DateTime               @default(now())
+  hash                 String                 @unique
+  status               ArticleStatus          @default(PENDING)
+  tags                 String[]               @default([])
+  modNotes             String?
+  reactions            Int                    @default(0)
+  comments             Int                    @default(0)
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  feed                 FeedSource             @relation(fields: [feedId], references: [id], onDelete: Cascade)
+  sourceLinks          PredictionSourceLink[]
+
+  @@index([status, publishedAt(sort: Desc)])
+  @@index([hash])
+  @@index([feedId])
+  @@index([createdAt(sort: Desc)])
+}
+
+model Tweet {
+  id                   String                 @id // Twitter snowflake ID
+  postedAt             DateTime
+  text                 String                 @db.Text
+  permalink            String                 @unique
+  authorHandle         String
+  likeCount            Int                    @default(0)
+  replyCount           Int                    @default(0)
+  repostCount          Int                    @default(0)
+  quotesCount          Int                    @default(0)
+  status               String                 @default("VISIBLE")
+  fetchedAt            DateTime               @default(now())
+  sourceLinks          PredictionSourceLink[]
+
+  @@index([postedAt(sort: Desc)])
+  @@index([authorHandle])
+  @@index([status])
+}
+
+model PredictionSourceLink {
+  id           Int         @id @default(autoincrement())
+  predictionId Int
+  articleId    Int?
+  tweetId      String?
+  url          String
+  title        String?
+  publisher    String?
+  capturedAt   DateTime    @default(now())
+  prediction   Prediction  @relation(fields: [predictionId], references: [id], onDelete: Cascade)
+  article      Article?    @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  tweet        Tweet?      @relation(fields: [tweetId], references: [id], onDelete: Cascade)
+  
+  @@index([predictionId])
+  @@index([articleId])
+  @@index([tweetId])
 }

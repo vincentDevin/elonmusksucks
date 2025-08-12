@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "nodemon --watch src --ext ts --exec \"ts-node src/index.ts\"",
-    "worker": "concurrently \"ts-node src/workers/payout.worker.ts\" \"ts-node src/workers/leaderboard.worker.ts\"",
+    "worker": "concurrently \"ts-node src/workers/payout.worker.ts\" \"ts-node src/workers/leaderboard.worker.ts\" \"ts-node src/workers/feed.worker.ts\" \"ts-node src/workers/article.worker.ts\"",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "prisma:generate": "dotenv -e ../../.env -- prisma generate --schema ../../prisma/schema.prisma",
@@ -30,7 +30,11 @@
     "multer": "^2.0.1",
     "sharp": "^0.34.3",
     "socket.io": "^4.8.1",
-    "uuid": "^10.0.0"
+    "uuid": "^10.0.0",
+    "feedparser": "^2.2.10",
+    "open-graph-scraper": "^6.8.2",
+    "crypto": "^1.0.1",
+    "xml2js": "^0.6.2"
   },
   "devDependencies": {
     "@prisma/client": "^6.10.1",
@@ -42,6 +46,7 @@
     "@types/multer": "^2.0.0",
     "@types/node": "^22.15.31",
     "@types/uuid": "^9.0.8",
+    "@types/xml2js": "^0.4.14",
     "dotenv-cli": "^8.0.0",
     "nodemon": "^3.1.10",
     "prisma": "^6.10.1",

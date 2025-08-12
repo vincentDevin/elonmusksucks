@@ -584,7 +584,7 @@ export class UserService {
       legCount: parlay.legs.length,
       status: parlay.status,
       createdAt: parlay.createdAt.toISOString(),
-      legs: parlay.legs.map((leg) => ({
+      legs: parlay.legs.map((leg: any) => ({
         predictionTitle: leg.option.prediction.title,
         optionLabel: leg.option.label,
       })),
