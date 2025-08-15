@@ -35,6 +35,16 @@ export class PredictionService {
         options: DbPredictionOption[];
         bets: Array<DbBet & { user: { id: number; name: string; avatarUrl: string | null } }>;
         parlayLegs: ParlayLegWithUser[];
+        sourceLinks: Array<{
+          id: number;
+          predictionId: number;
+          articleId: number | null;
+          tweetId: string | null;
+          url: string;
+          title: string | null;
+          publisher: string | null;
+          capturedAt: string;
+        }>;
       }
     >
   > {
@@ -157,6 +167,16 @@ export class PredictionService {
         }
       >;
       parlayLegs: ParlayLegWithUser[];
+      sourceLinks?: Array<{
+        id: number;
+        predictionId: number;
+        articleId: number | null;
+        tweetId: string | null;
+        url: string;
+        title: string | null;
+        publisher: string | null;
+        capturedAt: Date;
+      }>;
     },
   ) {
     // --- quick helper to resolve a final URL --------------------------------
@@ -205,7 +225,13 @@ export class PredictionService {
       createdAt,
     }));
 
-    return { ...pred, options, bets, parlayLegs };
+    // --- sourceLinks (convert Date to string) -------------------------------
+    const sourceLinks = (pred.sourceLinks || []).map((link) => ({
+      ...link,
+      capturedAt: link.capturedAt.toISOString(),
+    }));
+
+    return { ...pred, options, bets, parlayLegs, sourceLinks };
   }
 }
 

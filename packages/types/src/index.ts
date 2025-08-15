@@ -424,6 +424,7 @@ export interface PredictionFull extends PublicPrediction {
   options: PublicPredictionOption[];
   bets: BetWithUser[];
   parlayLegs?: ParlayLegWithUser[];
+  sourceLinks?: PublicPredictionSourceLink[];
 }
 
 // ——— Admin DTOs ——————————————————————————————————————————————

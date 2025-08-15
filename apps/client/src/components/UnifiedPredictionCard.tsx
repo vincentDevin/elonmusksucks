@@ -12,6 +12,7 @@ import UnifiedOddsBar from './UnifiedOddsBar';
 import BetsList from './BetsList';
 import BetModal from './BetModal';
 import { useParlay } from '../contexts/ParlayContext';
+import { PredictionSourceList } from './prediction/PredictionSourceList';
 
 interface UnifiedPredictionCardProps {
   prediction: PredictionFull;
@@ -179,6 +180,13 @@ export default function UnifiedPredictionCard({
             </span>
           </div>
 
+          {/* Source Links */}
+          {prediction.sourceLinks && prediction.sourceLinks.length > 0 && (
+            <div className="mb-3">
+              <PredictionSourceList sources={prediction.sourceLinks} />
+            </div>
+          )}
+
           {/* Time remaining */}
           {!prediction.resolved && (
             <div
@@ -286,6 +294,13 @@ export default function UnifiedPredictionCard({
               </span>
             )}
           </div>
+
+          {/* Source Links - Compact */}
+          {!isMini && prediction.sourceLinks && prediction.sourceLinks.length > 0 && (
+            <div className="mb-2">
+              <PredictionSourceList sources={prediction.sourceLinks} compact />
+            </div>
+          )}
 
           {/* Compact Odds */}
           <UnifiedOddsBar

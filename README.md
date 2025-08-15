@@ -1,6 +1,6 @@
 # elonmusksucks.net 🚀
 
-A satirical prediction market platform parodying Elon Musk's ventures. Users bet "MuskBucks" on outrageous predictions, compete on leaderboards, and engage in real-time chat. The platform combines gambling mechanics with social features in a production-ready TypeScript monorepo architecture.
+A satirical prediction market platform parodying Elon Musk's ventures. Users bet "MuskBucks" on outrageous predictions, compete on leaderboards, and engage in real-time chat. Features a comprehensive RSS feed timeline system, achievement badges, and dynamic odds calculation. Production-ready TypeScript monorepo with real-time Socket.IO updates.
 
 ## 🏗️ Architecture & Tech Stack
 
@@ -19,9 +19,10 @@ A satirical prediction market platform parodying Elon Musk's ventures. Users bet
 
 **Infrastructure:**
 - **Real-time Updates:** Socket.IO with Redis pub/sub for cross-server broadcasting
-- **Background Jobs:** BullMQ workers for payouts, leaderboards, and statistics
+- **Background Jobs:** BullMQ workers for payouts, leaderboards, RSS feeds, and statistics
 - **File Storage:** Tigris S3-compatible object storage with image processing
 - **Authentication:** JWT (access + refresh tokens) with bcrypt hashing
+- **Email Service:** SendGrid integration for auth flows (verification, password reset)
 - **Deployment:** Docker containers ready for Fly.io or similar platforms
 
 ---
@@ -33,20 +34,20 @@ elonmusksucks/
 ├── apps/
 │   ├── client/          # Vite + React frontend (TypeScript, TailwindCSS)
 │   │   ├── src/
-│   │   │   ├── components/  # UI components (unified cards, modals, admin panels)
-│   │   │   ├── contexts/    # React contexts (Auth, Prediction, Chat, Socket)
+│   │   │   ├── components/  # UI components (unified cards, timeline, admin panels)
+│   │   │   ├── contexts/    # React contexts (Auth, Parlay, Chat, Socket, Timeline)
 │   │   │   ├── hooks/       # Custom hooks (activity streams, stats, profiles)
-│   │   │   ├── pages/       # Route components (Dashboard, Profile, Admin)
+│   │   │   ├── pages/       # Route components (Dashboard, Profile, Admin, Timeline)
 │   │   │   ├── theme/       # Unified theme system (10 themes, semantic colors)
 │   │   │   └── api/         # Axios API clients with auto-refresh tokens
 │   │   └── dist/            # Production build output
 │   └── server/          # Express backend (TypeScript, Prisma)
 │       ├── src/
-│       │   ├── controllers/ # REST endpoint handlers
-│       │   ├── services/    # Business logic layer
+│       │   ├── controllers/ # REST endpoint handlers (auth, predictions, feeds)
+│       │   ├── services/    # Business logic layer (predictions, achievements, email)
 │       │   ├── repositories/# Data access layer (Prisma wrappers)
-│       │   ├── handlers/    # Socket.IO event handlers
-│       │   └── workers/     # BullMQ job processors
+│       │   ├── handlers/    # Socket.IO event handlers (real-time updates)
+│       │   └── workers/     # BullMQ job processors (feeds, payouts, leaderboards)
 │       └── dist/            # Compiled JavaScript
 ├── packages/
 │   └── types/           # Shared TypeScript types (auto-generated from Prisma)
@@ -70,9 +71,11 @@ elonmusksucks/
 - **Tigris Account** for S3-compatible file storage (profile images)
 - **dotenv-cli** (`npm i -g dotenv-cli`) for environment management
 
-**Optional for Production:**
+**Optional but Recommended:**
+- **SendGrid Account** for email services (auth flows)
 - **Docker** & **Docker Compose** for containerized deployment
 - **Fly.io account** or similar platform for hosting
+- **Sentry Account** for error tracking in production
 
 ---
 
@@ -111,6 +114,10 @@ TIGRIS_S3_ENDPOINT=https://fly.storage.tigris.dev
 TIGRIS_ACCESS_KEY_ID=tid_your_access_key
 TIGRIS_SECRET_ACCESS_KEY=tsec_your_secret_key
 TIGRIS_S3_BUCKET=your_bucket_name
+
+# SendGrid Email (optional, for auth flows)
+SENDGRID_API_KEY=SG.your_sendgrid_api_key
+FROM_EMAIL=noreply@elonmusksucks.net
 ```
 
 ### 3. **Complete Setup**
@@ -125,6 +132,7 @@ This comprehensive setup command will:
 - Generate Prisma client and shared TypeScript types
 - Build the type packages
 - Seed development data (predictions, users, bets)
+- Seed achievement catalog (77 achievements across 8 categories)
 
 ### 4. **Start Development Environment**
 
@@ -140,9 +148,12 @@ npm run dev
 **Development Features:**
 - 🔄 Hot reload on both client and server
 - 🔌 Real-time WebSocket connections
-- 📊 Live prediction markets and betting
-- 💬 Real-time chat functionality
-- 🎨 Theme system with 10+ options
+- 📊 Live prediction markets with dynamic odds calculation
+- 💬 Real-time chat functionality (desktop only currently)
+- 🎨 Theme system with 10 themes across light/dark/high-contrast
+- 📰 RSS feed timeline with admin moderation
+- 🏆 Achievement system with 77 unlockable badges
+- 🎯 Parlay betting system with multipliers
 
 ---
 
@@ -183,27 +194,38 @@ npm run format
 
 ### **Prediction Market Engine**
 - **Multi-option Predictions:** Users create and bet on complex prediction markets
-- **Dynamic Odds System:** Real-time odds calculation based on betting activity  
-- **Parlay Betting:** Combine multiple predictions for higher payouts
+- **6-Factor Dynamic Odds Engine:** Real-time odds calculation with market heat indicators  
+- **Advanced Parlay System:** Combine multiple predictions with bonus multipliers
 - **Automated Payouts:** BullMQ workers process results and distribute winnings
+- **Prediction Source Links:** Link articles/tweets as evidence for predictions
 
 ### **Real-time Systems**
-- **Socket.IO Integration:** Live updates for bets, predictions, chat, and leaderboards
+- **Socket.IO Integration:** Live updates for bets, predictions, chat, timeline, and leaderboards
 - **Unified Activity Feed:** Real-time global activity ticker with Redis pub/sub
 - **Live Statistics:** User stats, rankings, and achievements update instantly
 - **Cross-server Broadcasting:** Redis adapter enables horizontal scaling
+- **21 Socket Event Types:** Comprehensive real-time coverage across all features
+
+### **Content & Timeline**
+- **RSS Feed Ingestion:** BullMQ workers fetch and process feeds with deduplication
+- **Admin Moderation Queue:** Bulk approve/reject articles with keyboard shortcuts
+- **Homepage Timeline:** Infinite-scroll articles with "Use as prediction source"
+- **Auto-tagging System:** Rule-based categorization (Tesla, SpaceX, Legal, Markets, AI)
+- **OPML Import/Export:** Manage feed subscriptions efficiently
 
 ### **User Experience**
 - **Unified Theme System:** 10 themes across light/dark/high-contrast categories
-- **Responsive Dashboard:** Desktop and mobile-optimized layouts
-- **Profile System:** Avatar uploads with automatic image processing and resizing
-- **Achievement System:** Badges and milestones for user engagement
+- **Responsive Dashboard:** Desktop and mobile-optimized layouts (chat desktop-only)
+- **Profile System:** Avatar uploads with automatic image processing via Tigris S3
+- **Achievement System:** 77 achievements across 8 categories with real-time unlocking
+- **RuneScape-Style Currency:** Formatted as 1.2k, 1.5M with wealth-based colors
 
 ### **Admin & Moderation**
-- **Admin Dashboard:** Prediction management, user moderation, and analytics
-- **Real-time Metrics:** Live performance monitoring and system health
-- **User Management:** Ban, mute, and content moderation tools
-- **Prediction Queue:** Streamlined prediction approval workflow
+- **Admin Dashboard:** Prediction management, user moderation, feed management
+- **Real-time Metrics:** Live performance monitoring with Socket.IO broadcasts
+- **Shame Wall System:** Public display of banned users with reason tracking
+- **Feed Health Monitoring:** Track success rates, failures, and approval metrics
+- **Bulk Operations:** Mass moderation actions with transaction safety
 
 ---
 
@@ -228,7 +250,8 @@ npm run format
 | `npm run prisma:generate` | Regenerate Prisma client after schema changes |
 | `npm run prisma:migrate:dev` | Reset DB and apply all migrations |
 | `npm run seed:dev` | Populate DB with test data |
-| `npm run worker` | Start payout + leaderboard workers manually |
+| `npm run seed:achievements` | Seed achievement catalog (77 achievements) |
+| `npm run worker` | Start payout + leaderboard + feed workers manually |
 
 ### **Workspace-Specific Commands**
 
@@ -297,32 +320,35 @@ npm run format
 ## 🚀 Production Status & Roadmap
 
 ### **✅ Production Ready Features**
+- **Dynamic Betting System:** 6-factor odds engine with real-time updates
+- **Achievement System:** 77 achievements across 8 categories fully operational
+- **Homepage Timeline:** RSS feed ingestion with admin moderation
+- **Prediction Source Links:** Articles/tweets linked to predictions
 - **Unified Theme System:** 10 themes with semantic color classes
-- **Unified Activity System:** Real-time global activity feed 
-- **Socket.IO Infrastructure:** Complete event-driven real-time updates
-- **Profile Image Uploads:** Working authentication and S3 integration
-- **Admin Dashboard:** User management and prediction moderation
-- **Responsive Design:** Desktop and mobile-optimized interfaces
+- **Unified Activity System:** Real-time global activity feed
+- **Socket.IO Infrastructure:** 21 event types with Redis adapter
+- **Transaction Atomicity:** All money operations wrapped in Prisma transactions
+- **BigInt Migration:** Unlimited monetary precision for all financial values
+- **Email Service:** SendGrid integration for auth flows
+- **Database Performance:** 44 production indexes covering all query patterns
 
-### **🚧 Current Development Focus**
-- **Dynamic Odds System:** Implementing market-based odds calculation
-- **Achievement System:** Badge unlocking and user progression
-- **Mobile Chat Integration:** Adding chat to mobile dashboard
-- **Performance Optimization:** Bundle size and query optimization
-- **Test Coverage:** Expanding to 70%+ coverage for critical paths
+### **🚧 Current Priority Tasks**
+- **Mobile Chat Integration:** Add chat panel to mobile dashboard (currently desktop-only)
+- **Logging Infrastructure:** Replace 50+ console.logs with structured logging
+- **Performance Monitoring:** Load testing for timeline and betting systems
+- **SSR Implementation:** Server-side rendering for SEO optimization
 
 ### **📋 Known Issues & Technical Debt**
-- Missing indexes on high-query database columns
-- N+1 query patterns in some repository methods  
-- Limited test coverage (currently ~5%)
-- No API versioning system
-- Docker image optimization needed
+- **Mobile Chat Missing:** Chat component not included in mobile dashboard
+- **Console.log Statements:** Development logs in production code (50+ files)
+- **Limited Test Coverage:** Currently ~5% coverage, needs expansion
+- **No API Versioning:** API endpoints not versioned for backwards compatibility
 
-### **🎯 Next Sprint Objectives**
-1. **Production Readiness:** Transaction atomicity for money operations
-2. **Dynamic Odds:** Implement parimutuel or market maker algorithms
-3. **Mobile Experience:** Complete mobile dashboard with chat integration
-4. **Scale Preparation:** Load testing and horizontal scaling proof-of-concept
+### **🎯 Upcoming Features**
+1. **Enhanced Analytics:** User behavior tracking and prediction performance metrics
+2. **Advanced Parlay Builder:** Visual interface for complex multi-leg bets
+3. **Social Features:** User follows, prediction sharing, comment threads
+4. **Market Insights:** AI-powered prediction analysis and trends
 
 ### **🤝 Contributing**
 
@@ -361,9 +387,9 @@ git commit -m "feat: add your feature description"
 ## 📚 Documentation & Resources
 
 - **[CLAUDE.md](./CLAUDE.md)** - Comprehensive engineering guide and architecture documentation
-- **[API Documentation]** - Auto-generated OpenAPI specs (planned)
-- **[Database Schema](./prisma/schema.prisma)** - Complete data model definitions
-- **[Theme System Guide](./CLAUDE.md#theme-system-development-guidelines)** - Component development with themes
+- **[Database Schema](./prisma/schema.prisma)** - Complete data model definitions with 44 indexes
+- **[Theme System Guide](./CLAUDE.md#unified-theme-system)** - Component development with 10 themes
+- **[Socket Events Reference](./CLAUDE.md#socket-events)** - Real-time event documentation
 
 **External Dependencies:**
 - **[Vite](https://vitejs.dev)** - Frontend build tool and dev server

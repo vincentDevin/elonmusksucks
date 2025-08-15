@@ -36,6 +36,16 @@ export class PredictionRepository implements IPredictionRepository {
           user: Pick<DbUser, 'id' | 'name' | 'avatarUrl' | 'profilePictureKey'>;
         }
       >;
+      sourceLinks: Array<{
+        id: number;
+        predictionId: number;
+        articleId: number | null;
+        tweetId: string | null;
+        url: string;
+        title: string | null;
+        publisher: string | null;
+        capturedAt: Date;
+      }>;
     }
   > {
     return prisma.prediction.create({
@@ -71,6 +81,18 @@ export class PredictionRepository implements IPredictionRepository {
             },
           },
         },
+        sourceLinks: {
+          select: {
+            id: true,
+            predictionId: true,
+            articleId: true,
+            tweetId: true,
+            url: true,
+            title: true,
+            publisher: true,
+            capturedAt: true,
+          },
+        },
       },
     });
   }
@@ -85,6 +107,16 @@ export class PredictionRepository implements IPredictionRepository {
           }
         >;
         parlayLegs: ParlayLegWithUser[];
+        sourceLinks: Array<{
+          id: number;
+          predictionId: number;
+          articleId: number | null;
+          tweetId: string | null;
+          url: string;
+          title: string | null;
+          publisher: string | null;
+          capturedAt: Date;
+        }>;
       }
     >
   > {
@@ -123,11 +155,23 @@ export class PredictionRepository implements IPredictionRepository {
             },
           },
         },
+        sourceLinks: {
+          select: {
+            id: true,
+            predictionId: true,
+            articleId: true,
+            tweetId: true,
+            url: true,
+            title: true,
+            publisher: true,
+            capturedAt: true,
+          },
+        },
       },
     });
 
     return preds.map((pred) => {
-      const { options, bets, ...rest } = pred;
+      const { options, bets, sourceLinks, ...rest } = pred;
 
       // --- flatten parlay legs ---
       const parlayLegs: ParlayLegWithUser[] = [];
@@ -150,7 +194,7 @@ export class PredictionRepository implements IPredictionRepository {
         }),
       );
 
-      return { ...rest, options, bets, parlayLegs } as any;
+      return { ...rest, options, bets, parlayLegs, sourceLinks } as any;
     });
   }
 
@@ -163,6 +207,16 @@ export class PredictionRepository implements IPredictionRepository {
           }
         >;
         parlayLegs: ParlayLegWithUser[];
+        sourceLinks: Array<{
+          id: number;
+          predictionId: number;
+          articleId: number | null;
+          tweetId: string | null;
+          url: string;
+          title: string | null;
+          publisher: string | null;
+          capturedAt: Date;
+        }>;
       })
     | null
   > {
@@ -201,12 +255,24 @@ export class PredictionRepository implements IPredictionRepository {
             },
           },
         },
+        sourceLinks: {
+          select: {
+            id: true,
+            predictionId: true,
+            articleId: true,
+            tweetId: true,
+            url: true,
+            title: true,
+            publisher: true,
+            capturedAt: true,
+          },
+        },
       },
     });
 
     if (!pred) return null;
 
-    const { options, bets, ...rest } = pred;
+    const { options, bets, sourceLinks, ...rest } = pred;
     const parlayLegs: ParlayLegWithUser[] = [];
     options.forEach((opt) =>
       opt.parlayLegs.forEach((leg) => {
@@ -227,6 +293,6 @@ export class PredictionRepository implements IPredictionRepository {
       }),
     );
 
-    return { ...rest, options, bets, parlayLegs } as any;
+    return { ...rest, options, bets, parlayLegs, sourceLinks } as any;
   }
 }
