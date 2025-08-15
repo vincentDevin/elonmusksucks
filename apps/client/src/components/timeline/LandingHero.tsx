@@ -16,7 +16,9 @@ interface LandingHeroProps {
  */
 export const LandingHero: React.FC<LandingHeroProps> = ({ className = '' }) => {
   return (
-    <section className={`bg-gradient-to-b from-gray-900 to-gray-800 text-white py-16 px-4 ${className}`}>
+    <section
+      className={`bg-gradient-to-b from-gray-900 to-gray-800 text-white py-16 px-4 ${className}`}
+    >
       <div className="max-w-4xl mx-auto text-center">
         {/* Main Headline */}
         <h1 className="text-4xl md:text-6xl font-bold mb-6 leading-tight">
@@ -27,19 +29,19 @@ export const LandingHero: React.FC<LandingHeroProps> = ({ className = '' }) => {
 
         {/* Subheadline with dry humor */}
         <p className="text-xl md:text-2xl text-gray-300 mb-8 leading-relaxed">
-          Because someone has to keep track of the <em>visionary genius</em> 
+          Because someone has to keep track of the <em>visionary genius</em>
           who thinks tunnels will solve traffic and Mars needs a McDonald's.
         </p>
 
         {/* Value Proposition */}
         <div className="bg-gray-800/50 rounded-lg p-6 mb-8 backdrop-blur-sm">
           <p className="text-lg text-gray-200 mb-4">
-            Track every Tesla "breakthrough," SpaceX "innovation," and X "improvement" 
-            in real-time. Place your bets with MuskBucks™ and watch the chaos unfold.
+            Track every Tesla "breakthrough," SpaceX "innovation," and X "improvement" in real-time.
+            Place your bets with MuskBucks™ and watch the chaos unfold.
           </p>
           <p className="text-base text-gray-400">
-            Featuring RSS feeds from tech journalism's finest and the occasional 
-            3 AM Twitter meltdown. What could go wrong?
+            Featuring RSS feeds from tech journalism's finest and the occasional 3 AM Twitter
+            meltdown. What could go wrong?
           </p>
         </div>
 
@@ -68,7 +70,7 @@ export const LandingHero: React.FC<LandingHeroProps> = ({ className = '' }) => {
               Real articles from actual journalists who occasionally fact-check things.
             </p>
           </div>
-          
+
           <div className="bg-gray-800/30 p-4 rounded-lg">
             <div className="text-2xl mb-2">🐦</div>
             <h3 className="font-semibold mb-2">Tweet Tracker</h3>
@@ -76,7 +78,7 @@ export const LandingHero: React.FC<LandingHeroProps> = ({ className = '' }) => {
               Every brilliant 280-character business strategy, archived for posterity.
             </p>
           </div>
-          
+
           <div className="bg-gray-800/30 p-4 rounded-lg">
             <div className="text-2xl mb-2">📊</div>
             <h3 className="font-semibold mb-2">Prediction Market</h3>
@@ -89,12 +91,12 @@ export const LandingHero: React.FC<LandingHeroProps> = ({ className = '' }) => {
         {/* Disclaimer with humor */}
         <div className="mt-8 text-xs text-gray-500">
           <p>
-            * elonmusksucks.net is a satirical platform for entertainment purposes. 
-            No actual rockets were harmed in the making of this website.
+            * elonmusksucks.net is a satirical platform for entertainment purposes. No actual
+            rockets were harmed in the making of this website.
           </p>
           <p className="mt-1">
-            ** MuskBucks are not legal tender and cannot be exchanged for Dogecoin, 
-            Tesla stock, or Mars real estate.
+            ** MuskBucks are not legal tender and cannot be exchanged for Dogecoin, Tesla stock, or
+            Mars real estate.
           </p>
         </div>
       </div>

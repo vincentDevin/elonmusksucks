@@ -1,7 +1,13 @@
 // apps/client/src/components/admin/FeedsManager.tsx
 import React, { useState, useEffect } from 'react';
-import type { PublicFeedSource, CreateFeedRequest, UpdateFeedRequest, FeedStatsResponse } from '@ems/types';
+import type {
+  PublicFeedSource,
+  CreateFeedRequest,
+  UpdateFeedRequest,
+  FeedStatsResponse,
+} from '@ems/types';
 import { useSocket } from '../../contexts/SocketContext';
+import * as feedsAPI from '../../api/feeds';
 
 interface FeedsManagerProps {
   className?: string;
@@ -24,10 +30,12 @@ export const FeedsManager: React.FC<FeedsManagerProps> = ({ className = '' }) =>
   const [error, setError] = useState<string | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingFeed, setEditingFeed] = useState<PublicFeedSource | null>(null);
+  const [refreshingFeeds, setRefreshingFeeds] = useState<Set<number>>(new Set());
   const socket = useSocket();
 
   useEffect(() => {
     loadFeeds();
+    loadStats();
   }, []);
 
   // Socket.IO integration for real-time feed updates
@@ -37,16 +45,31 @@ export const FeedsManager: React.FC<FeedsManagerProps> = ({ className = '' }) =>
     // Listen for feed refresh notifications
     const handleFeedRefresh = (data: any) => {
       console.log('[FeedsManager] Feed refresh notification:', data);
-      
-      // Show success notification or update feed status
-      // For now, just refresh the feeds list
+
+      // Remove from refreshing set and reload feeds
+      setRefreshingFeeds((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(data.feedId);
+        return newSet;
+      });
+
       loadFeeds();
+      loadStats();
+    };
+
+    // Listen for admin feed refresh events
+    const handleAdminFeedRefresh = (data: any) => {
+      console.log('[FeedsManager] Admin feed refresh:', data);
+      loadFeeds();
+      loadStats();
     };
 
     // Register event listeners
+    socket.on('admin:feed:refresh', handleAdminFeedRefresh);
     socket.on('timeline:feed:refresh', handleFeedRefresh);
 
     return () => {
+      socket.off('admin:feed:refresh', handleAdminFeedRefresh);
       socket.off('timeline:feed:refresh', handleFeedRefresh);
     };
   }, [socket]);
@@ -55,18 +78,9 @@ export const FeedsManager: React.FC<FeedsManagerProps> = ({ className = '' }) =>
     try {
       setLoading(true);
       setError(null);
-      
-      const response = await fetch('/api/admin/feeds', {
-        credentials: 'include'
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch feeds: ${response.status}`);
-      }
-      
-      const feedsData = await response.json();
+
+      const feedsData = await feedsAPI.listFeeds();
       setFeeds(feedsData);
-      
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load feeds');
     } finally {
@@ -74,21 +88,30 @@ export const FeedsManager: React.FC<FeedsManagerProps> = ({ className = '' }) =>
     }
   };
 
+  const loadStats = async () => {
+    try {
+      const statsData = await feedsAPI.getFeedStats();
+
+      // Convert array to object keyed by feedId
+      const statsMap = statsData.reduce(
+        (acc: Record<number, FeedStatsResponse>, stat: FeedStatsResponse) => {
+          acc[stat.feedId] = stat;
+          return acc;
+        },
+        {},
+      );
+
+      setStats(statsMap);
+    } catch (err) {
+      console.error('Failed to load feed stats:', err);
+      // Don't set error state for stats failures, just log them
+    }
+  };
+
   const handleCreateFeed = async (feedData: CreateFeedRequest) => {
     try {
-      const response = await fetch('/api/admin/feeds', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(feedData)
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to create feed: ${response.status}`);
-      }
-      
-      const newFeed = await response.json();
-      setFeeds(prev => [...prev, newFeed]);
+      const newFeed = await feedsAPI.createFeed(feedData);
+      setFeeds((prev) => [...prev, newFeed]);
       setIsAddModalOpen(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create feed');
@@ -97,19 +120,8 @@ export const FeedsManager: React.FC<FeedsManagerProps> = ({ className = '' }) =>
 
   const handleUpdateFeed = async (feedId: number, updateData: UpdateFeedRequest) => {
     try {
-      const response = await fetch(`/api/admin/feeds/${feedId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(updateData)
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to update feed: ${response.status}`);
-      }
-      
-      const updatedFeed = await response.json();
-      setFeeds(prev => prev.map(feed => feed.id === feedId ? updatedFeed : feed));
+      const updatedFeed = await feedsAPI.updateFeed(feedId, updateData);
+      setFeeds((prev) => prev.map((feed) => (feed.id === feedId ? updatedFeed : feed)));
       setEditingFeed(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update feed');
@@ -117,21 +129,15 @@ export const FeedsManager: React.FC<FeedsManagerProps> = ({ className = '' }) =>
   };
 
   const handleDeleteFeed = async (feedId: number) => {
-    if (!confirm('Are you sure you want to delete this feed? This will also delete all its articles.')) {
+    if (
+      !confirm('Are you sure you want to delete this feed? This will also delete all its articles.')
+    ) {
       return;
     }
 
     try {
-      const response = await fetch(`/api/admin/feeds/${feedId}`, { 
-        method: 'DELETE',
-        credentials: 'include'
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to delete feed: ${response.status}`);
-      }
-      
-      setFeeds(prev => prev.filter(feed => feed.id !== feedId));
+      await feedsAPI.deleteFeed(feedId);
+      setFeeds((prev) => prev.filter((feed) => feed.id !== feedId));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete feed');
     }
@@ -139,27 +145,50 @@ export const FeedsManager: React.FC<FeedsManagerProps> = ({ className = '' }) =>
 
   const handleRefreshFeed = async (feedId: number) => {
     try {
-      // Note: Manual refresh endpoint not yet implemented in backend
-      const response = await fetch(`/api/admin/feeds/${feedId}/refresh`, { 
-        method: 'POST',
-        credentials: 'include'
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to refresh feed: ${response.status}`);
-      }
-      
-      // Reload feeds to get updated fetch status
-      await loadFeeds();
+      setRefreshingFeeds((prev) => new Set(prev).add(feedId));
+
+      await feedsAPI.refreshFeed(feedId);
+
+      // The Socket.IO handler will remove from refreshing set and reload feeds
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to refresh feed');
+      setRefreshingFeeds((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(feedId);
+        return newSet;
+      });
     }
+  };
+
+  const getStatusBadgeClasses = (status: string) => {
+    switch (status) {
+      case 'ACTIVE':
+        return 'bg-success/10 text-success border border-success/20';
+      case 'PAUSED':
+        return 'bg-warning/10 text-warning border border-warning/20';
+      case 'BLOCKED':
+        return 'bg-danger/10 text-danger border border-danger/20';
+      default:
+        return 'bg-muted/10 text-muted border border-muted/20';
+    }
+  };
+
+  const formatDate = (dateString?: string | null) => {
+    if (!dateString) return { date: 'Never', time: '' };
+    const date = new Date(dateString);
+    return {
+      date: date.toLocaleDateString(),
+      time: date.toLocaleTimeString(),
+    };
   };
 
   if (loading) {
     return (
       <div className={`p-6 ${className}`}>
-        <div className="text-center">Loading feeds...</div>
+        <div className="text-center text-content">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <p className="mt-2">Loading feeds...</p>
+        </div>
       </div>
     );
   }
@@ -167,123 +196,173 @@ export const FeedsManager: React.FC<FeedsManagerProps> = ({ className = '' }) =>
   return (
     <div className={`p-6 ${className}`}>
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold">RSS Feeds Manager</h2>
+        <h2 className="text-2xl font-bold text-content">RSS Feeds Manager</h2>
         <button
           onClick={() => setIsAddModalOpen(true)}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
         >
           Add Feed
         </button>
       </div>
 
       {error && (
-        <div className="mb-4 p-4 bg-red-100 text-red-700 rounded">
+        <div className="mb-4 p-4 bg-danger/10 text-danger border border-danger/20 rounded-md">
           {error}
         </div>
       )}
 
-      <div className="bg-white shadow rounded-lg overflow-hidden">
+      <div className="bg-surface border border-muted rounded-lg overflow-hidden shadow-sm">
         {feeds.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">
+          <div className="p-8 text-center text-content/70">
             <p className="text-lg mb-2">No feeds configured</p>
             <p>Add your first RSS feed to start ingesting content.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-muted">
+              <thead className="bg-muted/5">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-content/60 uppercase tracking-wider">
                     Feed
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-content/60 uppercase tracking-wider">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-content/60 uppercase tracking-wider">
                     Health
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-content/60 uppercase tracking-wider">
                     Last Fetch
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-content/60 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {feeds.map((feed) => (
-                  <tr key={feed.id}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">{feed.name}</div>
-                        <div className="text-sm text-gray-500">{feed.url}</div>
-                        {feed.siteUrl && (
-                          <div className="text-xs text-blue-600">
-                            <a href={feed.siteUrl} target="_blank" rel="noopener noreferrer">
-                              {feed.siteUrl}
-                            </a>
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        feed.status === 'ACTIVE' 
-                          ? 'bg-green-100 text-green-800'
-                          : feed.status === 'PAUSED'
-                          ? 'bg-yellow-100 text-yellow-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}>
-                        {feed.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      <div>
-                        {feed.fetchCount > 0 && (
-                          <>
-                            <div>Fetches: {feed.fetchCount}</div>
-                            <div>Errors: {feed.errorCount}</div>
-                            {feed.lastErrorMsg && (
-                              <div className="text-red-600 text-xs truncate max-w-xs" title={feed.lastErrorMsg}>
-                                {feed.lastErrorMsg}
-                              </div>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {feed.lastFetchedAt ? (
+              <tbody className="bg-surface divide-y divide-muted">
+                {feeds.map((feed) => {
+                  const lastFetch = formatDate(feed.lastFetchedAt);
+                  const isRefreshing = refreshingFeeds.has(feed.id);
+
+                  return (
+                    <tr key={feed.id} className="hover:bg-muted/5">
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <div>
-                          <div>{new Date(feed.lastFetchedAt).toLocaleDateString()}</div>
-                          <div className="text-xs">{new Date(feed.lastFetchedAt).toLocaleTimeString()}</div>
+                          <div className="text-sm font-medium text-content">{feed.name}</div>
+                          <div className="text-sm text-content/60 break-all">{feed.url}</div>
+                          {feed.siteUrl && (
+                            <div className="text-xs text-primary">
+                              <a
+                                href={feed.siteUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="hover:underline"
+                              >
+                                {feed.siteUrl}
+                              </a>
+                            </div>
+                          )}
                         </div>
-                      ) : (
-                        'Never'
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                      <button
-                        onClick={() => setEditingFeed(feed)}
-                        className="text-blue-600 hover:text-blue-900"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleRefreshFeed(feed.id)}
-                        className="text-green-600 hover:text-green-900"
-                      >
-                        Refresh
-                      </button>
-                      <button
-                        onClick={() => handleDeleteFeed(feed.id)}
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span
+                          className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadgeClasses(feed.status)}`}
+                        >
+                          {feed.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-content/70">
+                        <div>
+                          {(() => {
+                            const feedStats = stats[feed.id];
+                            if (!feedStats && feed.fetchCount === 0) {
+                              return <span className="text-content/60">No data</span>;
+                            }
+
+                            return (
+                              <>
+                                {feedStats && (
+                                  <>
+                                    <div>Articles: {feedStats.totalArticles}</div>
+                                    <div>Recent (7d): {feedStats.recentArticles}</div>
+                                    <div
+                                      className={
+                                        feedStats.errorRate > 10
+                                          ? 'text-danger'
+                                          : feedStats.errorRate > 5
+                                            ? 'text-warning'
+                                            : 'text-success'
+                                      }
+                                    >
+                                      Error Rate: {feedStats.errorRate}%
+                                    </div>
+                                    <div className="text-xs">
+                                      Avg Fetch: {feedStats.avgFetchTime}ms
+                                    </div>
+                                  </>
+                                )}
+                                {!feedStats && (
+                                  <>
+                                    <div>Fetches: {feed.fetchCount}</div>
+                                    <div className={feed.errorCount > 0 ? 'text-danger' : ''}>
+                                      Errors: {feed.errorCount}
+                                    </div>
+                                  </>
+                                )}
+                                {feed.lastErrorMsg && (
+                                  <div
+                                    className="text-danger text-xs truncate max-w-xs"
+                                    title={feed.lastErrorMsg}
+                                  >
+                                    {feed.lastErrorMsg}
+                                  </div>
+                                )}
+                              </>
+                            );
+                          })()}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-content/70">
+                        {lastFetch.date !== 'Never' ? (
+                          <div>
+                            <div>{lastFetch.date}</div>
+                            <div className="text-xs">{lastFetch.time}</div>
+                          </div>
+                        ) : (
+                          <div>Never</div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-3">
+                        <button
+                          onClick={() => setEditingFeed(feed)}
+                          className="text-primary hover:text-primary/80 transition-colors"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleRefreshFeed(feed.id)}
+                          disabled={isRefreshing}
+                          className="text-success hover:text-success/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                        >
+                          {isRefreshing ? (
+                            <>
+                              <div className="animate-spin rounded-full h-3 w-3 border-b border-success mr-1"></div>
+                              Refreshing...
+                            </>
+                          ) : (
+                            'Refresh'
+                          )}
+                        </button>
+                        <button
+                          onClick={() => handleDeleteFeed(feed.id)}
+                          className="text-danger hover:text-danger/80 transition-colors"
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -292,46 +371,52 @@ export const FeedsManager: React.FC<FeedsManagerProps> = ({ className = '' }) =>
 
       {/* Add Feed Modal */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold mb-4">Add New Feed</h3>
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              const formData = new FormData(e.currentTarget);
-              handleCreateFeed({
-                name: formData.get('name') as string,
-                url: formData.get('url') as string,
-                siteUrl: formData.get('siteUrl') as string || undefined,
-                allowImages: (formData.get('allowImages') as string) === 'on'
-              });
-            }}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-surface border border-muted rounded-lg p-6 w-full max-w-md shadow-lg">
+            <h3 className="text-lg font-semibold mb-4 text-content">Add New Feed</h3>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const formData = new FormData(e.currentTarget);
+                handleCreateFeed({
+                  name: formData.get('name') as string,
+                  url: formData.get('url') as string,
+                  siteUrl: (formData.get('siteUrl') as string) || undefined,
+                  allowImages: (formData.get('allowImages') as string) === 'on',
+                });
+              }}
+            >
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Name</label>
+                  <label className="block text-sm font-medium text-content mb-1">Name</label>
                   <input
                     type="text"
                     name="name"
                     required
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                    className="w-full border border-muted rounded-md px-3 py-2 bg-background text-content focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                     placeholder="e.g., TechCrunch"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">RSS/Atom URL</label>
+                  <label className="block text-sm font-medium text-content mb-1">
+                    RSS/Atom URL
+                  </label>
                   <input
                     type="url"
                     name="url"
                     required
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                    className="w-full border border-muted rounded-md px-3 py-2 bg-background text-content focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                     placeholder="https://example.com/feed.xml"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Site URL (optional)</label>
+                  <label className="block text-sm font-medium text-content mb-1">
+                    Site URL (optional)
+                  </label>
                   <input
                     type="url"
                     name="siteUrl"
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                    className="w-full border border-muted rounded-md px-3 py-2 bg-background text-content focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                     placeholder="https://example.com"
                   />
                 </div>
@@ -341,9 +426,9 @@ export const FeedsManager: React.FC<FeedsManagerProps> = ({ className = '' }) =>
                       type="checkbox"
                       name="allowImages"
                       defaultChecked
-                      className="mr-2"
+                      className="mr-2 text-primary focus:ring-primary"
                     />
-                    <span className="text-sm text-gray-700">Allow images</span>
+                    <span className="text-sm text-content">Allow images</span>
                   </label>
                 </div>
               </div>
@@ -351,13 +436,13 @@ export const FeedsManager: React.FC<FeedsManagerProps> = ({ className = '' }) =>
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
-                  className="px-4 py-2 text-gray-600 border border-gray-300 rounded hover:bg-gray-50"
+                  className="px-4 py-2 text-content/70 border border-muted rounded-md hover:bg-muted/5 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                  className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
                 >
                   Add Feed
                 </button>
@@ -369,56 +454,60 @@ export const FeedsManager: React.FC<FeedsManagerProps> = ({ className = '' }) =>
 
       {/* Edit Feed Modal */}
       {editingFeed && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold mb-4">Edit Feed</h3>
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              const formData = new FormData(e.currentTarget);
-              handleUpdateFeed(editingFeed.id, {
-                name: formData.get('name') as string,
-                url: formData.get('url') as string,
-                siteUrl: formData.get('siteUrl') as string || undefined,
-                status: formData.get('status') as 'ACTIVE' | 'PAUSED' | 'BLOCKED',
-                allowImages: (formData.get('allowImages') as string) === 'on'
-              });
-            }}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-surface border border-muted rounded-lg p-6 w-full max-w-md shadow-lg">
+            <h3 className="text-lg font-semibold mb-4 text-content">Edit Feed</h3>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const formData = new FormData(e.currentTarget);
+                handleUpdateFeed(editingFeed.id, {
+                  name: formData.get('name') as string,
+                  url: formData.get('url') as string,
+                  siteUrl: (formData.get('siteUrl') as string) || undefined,
+                  status: formData.get('status') as 'ACTIVE' | 'PAUSED' | 'BLOCKED',
+                  allowImages: (formData.get('allowImages') as string) === 'on',
+                });
+              }}
+            >
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Name</label>
+                  <label className="block text-sm font-medium text-content mb-1">Name</label>
                   <input
                     type="text"
                     name="name"
                     required
                     defaultValue={editingFeed.name}
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                    className="w-full border border-muted rounded-md px-3 py-2 bg-background text-content focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">RSS/Atom URL</label>
+                  <label className="block text-sm font-medium text-content mb-1">
+                    RSS/Atom URL
+                  </label>
                   <input
                     type="url"
                     name="url"
                     required
                     defaultValue={editingFeed.url}
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                    className="w-full border border-muted rounded-md px-3 py-2 bg-background text-content focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Site URL</label>
+                  <label className="block text-sm font-medium text-content mb-1">Site URL</label>
                   <input
                     type="url"
                     name="siteUrl"
                     defaultValue={editingFeed.siteUrl || ''}
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                    className="w-full border border-muted rounded-md px-3 py-2 bg-background text-content focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Status</label>
+                  <label className="block text-sm font-medium text-content mb-1">Status</label>
                   <select
                     name="status"
                     defaultValue={editingFeed.status}
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                    className="w-full border border-muted rounded-md px-3 py-2 bg-background text-content focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                   >
                     <option value="ACTIVE">Active</option>
                     <option value="PAUSED">Paused</option>
@@ -431,9 +520,9 @@ export const FeedsManager: React.FC<FeedsManagerProps> = ({ className = '' }) =>
                       type="checkbox"
                       name="allowImages"
                       defaultChecked={editingFeed.allowImages}
-                      className="mr-2"
+                      className="mr-2 text-primary focus:ring-primary"
                     />
-                    <span className="text-sm text-gray-700">Allow images</span>
+                    <span className="text-sm text-content">Allow images</span>
                   </label>
                 </div>
               </div>
@@ -441,13 +530,13 @@ export const FeedsManager: React.FC<FeedsManagerProps> = ({ className = '' }) =>
                 <button
                   type="button"
                   onClick={() => setEditingFeed(null)}
-                  className="px-4 py-2 text-gray-600 border border-gray-300 rounded hover:bg-gray-50"
+                  className="px-4 py-2 text-content/70 border border-muted rounded-md hover:bg-muted/5 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                  className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
                 >
                   Update Feed
                 </button>

@@ -17,6 +17,7 @@ import { registerRedisChatHandlers } from './handlers/redisChatEventHandlers';
 import { registerModerationHandlers } from './handlers/moderationHandlers';
 import { registerStatisticsRedisHandlers } from './handlers/statisticsSocketHandlers';
 import { setupUnifiedActivityHandlers } from './handlers/unifiedActivityHandlers';
+import { registerTimelineHandlers } from './handlers/timelineHandlers';
 // import { registerRoomHandlers } from './handlers/roomHandlers'; // future rooms
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -100,6 +101,9 @@ export async function initSocket(httpServer: HTTPServer) {
   // Give the unified activity service access to Socket.IO for immediate broadcasts
   const { unifiedActivityService } = await import('./services/unifiedActivity.service');
   unifiedActivityService.setSocketIO(io);
+
+  // ── Timeline event handlers ───────────────────────────────────────────────
+  registerTimelineHandlers(io);
 
   // ── Chat event subscriptions ──────────────────────────────────────────────
   const chatSub = redisClient.duplicate();

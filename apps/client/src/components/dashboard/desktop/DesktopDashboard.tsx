@@ -1,5 +1,5 @@
 // apps/client/src/components/dashboard/desktop/DesktopDashboard.tsx
-import { Suspense, lazy, useState, memo, useMemo } from 'react';
+import { Suspense, lazy, useState, memo, useMemo, useEffect } from 'react';
 import { useAdvancedThemes } from '../../../theme/hooks/useUnifiedTheme';
 import { useMobileOptimization } from '../../../hooks/useMobileOptimization';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -26,6 +26,7 @@ const DesktopDashboard = memo(function DesktopDashboard({ className = '' }: Desk
   const [showSettings, setShowSettings] = useState(false);
   const [showQuickBetModal, setShowQuickBetModal] = useState(false);
   const [showCreatePredictionModal, setShowCreatePredictionModal] = useState(false);
+  const [pendingSourceData, setPendingSourceData] = useState<any>(null);
   const { preferences } = useAdvancedThemes();
   const { screenWidth } = useMobileOptimization();
   const { user } = useAuth();
@@ -68,6 +69,27 @@ const DesktopDashboard = memo(function DesktopDashboard({ className = '' }: Desk
   );
 
   const { is5K, is1440p, is1080p, isWide } = breakpoints;
+
+  // Check for pending source data from UseAsSourceModal
+  useEffect(() => {
+    const pendingData = localStorage.getItem('pendingPredictionSource');
+    if (pendingData) {
+      try {
+        const sourceData = JSON.parse(pendingData);
+        setPendingSourceData(sourceData);
+        setShowCreatePredictionModal(true);
+        localStorage.removeItem('pendingPredictionSource');
+      } catch (error) {
+        console.error('Failed to parse pending source data:', error);
+        localStorage.removeItem('pendingPredictionSource');
+      }
+    }
+  }, []);
+
+  const handleCloseCreatePredictionModal = () => {
+    setShowCreatePredictionModal(false);
+    setPendingSourceData(null);
+  };
 
   return (
     <div className={`min-h-screen bg-background ${className}`}>
@@ -368,7 +390,8 @@ const DesktopDashboard = memo(function DesktopDashboard({ className = '' }: Desk
       <QuickBetModal isOpen={showQuickBetModal} onClose={() => setShowQuickBetModal(false)} />
       <CreatePredictionModal
         isOpen={showCreatePredictionModal}
-        onClose={() => setShowCreatePredictionModal(false)}
+        onClose={handleCloseCreatePredictionModal}
+        sourceData={pendingSourceData}
       />
     </div>
   );

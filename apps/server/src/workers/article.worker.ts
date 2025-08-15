@@ -33,15 +33,15 @@ const articleWorker = new Worker(
   'article',
   async (job: Job<ArticleEnrichmentData | BulkTaggingData>) => {
     console.log(`[article-worker] Processing job ${job.name} with ID ${job.id}`);
-    
+
     try {
       switch (job.name) {
         case 'enrich':
           return await processArticleEnrichment(job as Job<ArticleEnrichmentData>);
-        
+
         case 'bulk-tag':
           return await processBulkTagging(job as Job<BulkTaggingData>);
-          
+
         default:
           throw new Error(`Unknown job type: ${job.name}`);
       }
@@ -52,10 +52,10 @@ const articleWorker = new Worker(
   },
   {
     connection: redisClient,
-    concurrency: 10, // Process multiple articles simultaneously  
-    removeOnComplete: 100,
-    removeOnFail: 200,
-  }
+    concurrency: 10, // Process multiple articles simultaneously
+    removeOnComplete: { count: 100 },
+    removeOnFail: { count: 200 },
+  },
 );
 
 /**
@@ -72,14 +72,14 @@ async function processArticleEnrichment(job: Job<ArticleEnrichmentData>): Promis
   const tagsAdded: string[] = [];
   let imageUrl: string | undefined;
   let enriched = false;
-  
+
   console.log(`[article-worker] Enriching article ${articleId}`);
-  
+
   try {
     // 1. Fetch article from database
     const article = await prisma.article.findUnique({
       where: { id: articleId },
-      include: { feed: true }
+      include: { feed: true },
     });
 
     if (!article) {
@@ -93,26 +93,28 @@ async function processArticleEnrichment(job: Job<ArticleEnrichmentData>): Promis
     if (extractImages || !article.leadImageUrl || !article.excerpt) {
       try {
         console.log(`[article-worker] Extracting OG data for: ${article.url}`);
-        
+
         const ogResult = await ogs({
           url: article.url,
           timeout: 15000,
-          headers: {
-            'User-Agent': 'elonmusksucks.net/1.0 Article Enricher (+https://elonmusksucks.net)'
+          fetchOptions: {
+            headers: {
+              'User-Agent': 'elonmusksucks.net/1.0 Article Enricher (+https://elonmusksucks.net)',
+            },
           },
           onlyGetOpenGraphInfo: false,
           customMetaTags: [
             {
               multiple: false,
               property: 'article:published_time',
-              fieldName: 'articlePublishedTime'
+              fieldName: 'articlePublishedTime',
             },
             {
               multiple: false,
               property: 'twitter:image',
-              fieldName: 'twitterImage'
-            }
-          ]
+              fieldName: 'twitterImage',
+            },
+          ],
         });
 
         if (ogResult.result) {
@@ -121,12 +123,14 @@ async function processArticleEnrichment(job: Job<ArticleEnrichmentData>): Promis
             title: ogData.ogTitle,
             description: ogData.ogDescription,
             image: ogData.ogImage?.[0]?.url,
-            siteName: ogData.ogSiteName
+            siteName: ogData.ogSiteName,
           });
         }
       } catch (ogError) {
         console.warn(`[article-worker] OG extraction failed for ${article.url}:`, ogError);
-        errors.push(`OG extraction failed: ${ogError instanceof Error ? ogError.message : 'Unknown error'}`);
+        errors.push(
+          `OG extraction failed: ${ogError instanceof Error ? ogError.message : 'Unknown error'}`,
+        );
       }
     }
 
@@ -164,7 +168,7 @@ async function processArticleEnrichment(job: Job<ArticleEnrichmentData>): Promis
         article.title,
         article.excerpt || updates.excerpt,
         article.url,
-        ogData
+        ogData,
       );
 
       // Add only new tags
@@ -187,7 +191,7 @@ async function processArticleEnrichment(job: Job<ArticleEnrichmentData>): Promis
     if (hasUpdates) {
       await prisma.article.update({
         where: { id: articleId },
-        data: updates
+        data: updates,
       });
       enriched = true;
       console.log(`[article-worker] Updated article ${articleId} with:`, Object.keys(updates));
@@ -195,18 +199,19 @@ async function processArticleEnrichment(job: Job<ArticleEnrichmentData>): Promis
 
     await job.updateProgress(100);
 
-    console.log(`[article-worker] Enriched article ${articleId}: ${tagsAdded.length} tags added, ${imageUrl ? 'image extracted' : 'no image'}`);
-
+    console.log(
+      `[article-worker] Enriched article ${articleId}: ${tagsAdded.length} tags added, ${imageUrl ? 'image extracted' : 'no image'}`,
+    );
   } catch (error) {
     console.error(`[article-worker] Error enriching article ${articleId}:`, error);
     errors.push(error instanceof Error ? error.message : 'Unknown enrichment error');
   }
-  
+
   return {
     enriched,
     tagsAdded,
     imageUrl,
-    errors
+    errors,
   };
 }
 
@@ -218,20 +223,20 @@ async function processBulkTagging(job: Job<BulkTaggingData>): Promise<{
   tagged: number;
   errors: string[];
 }> {
-  const { articleIds, rules } = job.data;
-  
+  const { articleIds } = job.data;
+
   console.log(`[article-worker] Bulk tagging ${articleIds.length} articles`);
-  
+
   // TODO: Implement bulk tagging
   // 1. Fetch articles by IDs
   // 2. Apply regex rules to title/excerpt/url
   // 3. Batch update articles with new tags
   // 4. Return statistics
-  
+
   return {
     processed: 0,
     tagged: 0,
-    errors: ['Bulk tagging not yet implemented']
+    errors: ['Bulk tagging not yet implemented'],
   };
 }
 
@@ -269,16 +274,21 @@ process.on('SIGINT', async () => {
  * Generate enhanced tags using article content and Open Graph data
  */
 function generateEnhancedTags(
-  title: string, 
-  excerpt?: string, 
+  title: string,
+  excerpt?: string,
   url?: string,
-  ogData?: any
+  ogData?: any,
 ): string[] {
   const tags: string[] = [];
-  const content = `${title} ${excerpt || ''} ${url || ''} ${ogData?.ogSiteName || ''}`.toLowerCase();
+  const content =
+    `${title} ${excerpt || ''} ${url || ''} ${ogData?.ogSiteName || ''}`.toLowerCase();
 
   // Tesla-related tags (more comprehensive)
-  if (/tesla|model [3sxy]|cybertruck|supercharger|autopilot|fsd|full self.driving|gigafactory|powerwall|solar roof/i.test(content)) {
+  if (
+    /tesla|model [3sxy]|cybertruck|supercharger|autopilot|fsd|full self.driving|gigafactory|powerwall|solar roof/i.test(
+      content,
+    )
+  ) {
     tags.push('tesla');
   }
 

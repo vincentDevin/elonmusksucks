@@ -38,28 +38,27 @@ export const OPMLManager: React.FC<OPMLManagerProps> = ({ className = '' }) => {
       // TODO: Implement OPML import
       // const formData = new FormData();
       // formData.append('opml', file);
-      // 
+      //
       // const response = await fetch('/api/admin/feeds/import-opml', {
       //   method: 'POST',
       //   body: formData
       // });
-      // 
+      //
       // if (!response.ok) {
       //   throw new Error('Failed to import OPML file');
       // }
-      // 
+      //
       // const result: OPMLImportResult = await response.json();
       // setImportResult(result);
 
       // Simulate import process
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
       setImportResult({
         imported: 0,
         duplicates: 0,
-        errors: [{ url: 'example.com/feed.xml', error: 'OPML import not yet implemented' }]
+        errors: [{ url: 'example.com/feed.xml', error: 'OPML import not yet implemented' }],
       });
-
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to import OPML');
     } finally {
@@ -76,11 +75,11 @@ export const OPMLManager: React.FC<OPMLManagerProps> = ({ className = '' }) => {
 
       // TODO: Implement OPML export
       // const response = await fetch('/api/admin/feeds/export-opml');
-      // 
+      //
       // if (!response.ok) {
       //   throw new Error('Failed to export OPML');
       // }
-      // 
+      //
       // const blob = await response.blob();
       // const url = window.URL.createObjectURL(blob);
       // const a = document.createElement('a');
@@ -92,7 +91,6 @@ export const OPMLManager: React.FC<OPMLManagerProps> = ({ className = '' }) => {
       // window.URL.revokeObjectURL(url);
 
       setError('OPML export not yet implemented');
-
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to export OPML');
     } finally {
@@ -104,11 +102,7 @@ export const OPMLManager: React.FC<OPMLManagerProps> = ({ className = '' }) => {
     <div className={`p-6 ${className}`}>
       <h2 className="text-2xl font-bold mb-6">OPML Import/Export</h2>
 
-      {error && (
-        <div className="mb-4 p-4 bg-red-100 text-red-700 rounded">
-          {error}
-        </div>
-      )}
+      {error && <div className="mb-4 p-4 bg-red-100 text-red-700 rounded">{error}</div>}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Import Section */}
@@ -117,13 +111,13 @@ export const OPMLManager: React.FC<OPMLManagerProps> = ({ className = '' }) => {
           <p className="text-gray-600 mb-4">
             Import RSS feeds from an OPML subscription file exported from other feed readers.
           </p>
-          
+
           <div className="mb-4">
-            <label 
-              htmlFor="opml-file" 
+            <label
+              htmlFor="opml-file"
               className={`block w-full p-3 border-2 border-dashed rounded-lg text-center cursor-pointer transition-colors ${
-                isImporting 
-                  ? 'border-gray-300 bg-gray-50 cursor-not-allowed' 
+                isImporting
+                  ? 'border-gray-300 bg-gray-50 cursor-not-allowed'
                   : 'border-blue-300 hover:border-blue-400 hover:bg-blue-50'
               }`}
             >
@@ -158,7 +152,7 @@ export const OPMLManager: React.FC<OPMLManagerProps> = ({ className = '' }) => {
                 <li className="text-yellow-600">⚠ {importResult.duplicates} duplicates skipped</li>
                 <li className="text-red-600">✗ {importResult.errors.length} errors</li>
               </ul>
-              
+
               {importResult.errors.length > 0 && (
                 <details className="mt-2">
                   <summary className="cursor-pointer text-red-600 text-sm">View Errors</summary>
@@ -179,9 +173,10 @@ export const OPMLManager: React.FC<OPMLManagerProps> = ({ className = '' }) => {
         <div className="bg-white p-6 rounded-lg shadow">
           <h3 className="text-lg font-semibold mb-4">Export OPML</h3>
           <p className="text-gray-600 mb-4">
-            Export your current active RSS feeds as an OPML file for backup or transfer to other feed readers.
+            Export your current active RSS feeds as an OPML file for backup or transfer to other
+            feed readers.
           </p>
-          
+
           <button
             onClick={handleExportOPML}
             disabled={isExporting}
@@ -200,7 +195,7 @@ export const OPMLManager: React.FC<OPMLManagerProps> = ({ className = '' }) => {
               '📥 Download OPML File'
             )}
           </button>
-          
+
           <p className="text-xs text-gray-500 mt-2">
             Only active feeds will be included in the export.
           </p>
@@ -211,9 +206,9 @@ export const OPMLManager: React.FC<OPMLManagerProps> = ({ className = '' }) => {
       <div className="mt-6 p-4 bg-blue-50 rounded-lg">
         <h4 className="font-medium text-blue-900 mb-2">About OPML</h4>
         <p className="text-sm text-blue-800">
-          OPML (Outline Processor Markup Language) is a standard format for sharing RSS feed subscriptions 
-          between different feed readers and services. You can import OPML files exported from popular 
-          readers like Feedly, Inoreader, NewsBlur, or RSS Guard.
+          OPML (Outline Processor Markup Language) is a standard format for sharing RSS feed
+          subscriptions between different feed readers and services. You can import OPML files
+          exported from popular readers like Feedly, Inoreader, NewsBlur, or RSS Guard.
         </p>
       </div>
 
@@ -222,8 +217,9 @@ export const OPMLManager: React.FC<OPMLManagerProps> = ({ className = '' }) => {
         <div className="flex">
           <div className="ml-3">
             <p className="text-sm text-orange-800">
-              <strong>🚧 Implementation Status:</strong> This component requires backend API integration 
-              for OPML parsing and feed creation. The UI framework is complete and ready for implementation.
+              <strong>🚧 Implementation Status:</strong> This component requires backend API
+              integration for OPML parsing and feed creation. The UI framework is complete and ready
+              for implementation.
             </p>
           </div>
         </div>

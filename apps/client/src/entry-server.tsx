@@ -7,7 +7,7 @@ import type { TimelineItem } from '@ems/types';
 
 /**
  * Server-side rendering entry point for Homepage Timeline SEO
- * 
+ *
  * This file is used by the Express server to render the homepage (`/` route)
  * with initial timeline data for better SEO and social media previews.
  */
@@ -30,7 +30,7 @@ export function render({ url, initialData }: SSRRenderOptions) {
     const html = renderToString(
       <StaticRouter location={url}>
         <App />
-      </StaticRouter>
+      </StaticRouter>,
     );
 
     // Generate meta tags based on content
@@ -42,17 +42,16 @@ export function render({ url, initialData }: SSRRenderOptions) {
     return {
       html,
       meta,
-      initialData: serializedData
+      initialData: serializedData,
     };
-
   } catch (error) {
     console.error('[SSR] Error rendering app:', error);
-    
+
     // Return minimal fallback for graceful degradation
     return {
       html: '<div id="root"></div>',
       meta: generateMetaTags(),
-      initialData: 'null'
+      initialData: 'null',
     };
   }
 }
@@ -60,15 +59,12 @@ export function render({ url, initialData }: SSRRenderOptions) {
 /**
  * Generate SEO meta tags for the homepage
  */
-function generateMetaTags(meta?: {
-  title?: string;
-  description?: string;
-  ogImage?: string;
-}) {
+function generateMetaTags(meta?: { title?: string; description?: string; ogImage?: string }) {
   const title = meta?.title || 'elonmusksucks.net - The Musk Timeline & Prediction Market';
-  const description = meta?.description || 
+  const description =
+    meta?.description ||
     'Track every Tesla breakthrough, SpaceX innovation, and X improvement in real-time. ' +
-    'Place your bets with MuskBucks™ and watch the chaos unfold.';
+      'Place your bets with MuskBucks™ and watch the chaos unfold.';
   const ogImage = meta?.ogImage || '/og-image.jpg';
   const siteUrl = process.env.SITE_URL || 'https://elonmusksucks.net';
 
@@ -80,7 +76,7 @@ function generateMetaTags(meta?: {
       `<meta name="description" content="${description}" />`,
       `<meta name="keywords" content="Elon Musk, Tesla, SpaceX, X, Twitter, prediction market, betting, news timeline" />`,
       `<meta name="author" content="elonmusksucks.net" />`,
-      
+
       // Open Graph tags for social media
       `<meta property="og:title" content="${title}" />`,
       `<meta property="og:description" content="${description}" />`,
@@ -88,18 +84,18 @@ function generateMetaTags(meta?: {
       `<meta property="og:url" content="${siteUrl}" />`,
       `<meta property="og:type" content="website" />`,
       `<meta property="og:site_name" content="elonmusksucks.net" />`,
-      
+
       // Twitter Card tags
       `<meta name="twitter:card" content="summary_large_image" />`,
       `<meta name="twitter:title" content="${title}" />`,
       `<meta name="twitter:description" content="${description}" />`,
       `<meta name="twitter:image" content="${siteUrl}${ogImage}" />`,
-      
+
       // Additional SEO tags
       `<meta name="robots" content="index, follow" />`,
       `<meta name="googlebot" content="index, follow" />`,
       `<link rel="canonical" href="${siteUrl}" />`,
-      
+
       // Schema.org structured data for search engines
       `<script type="application/ld+json">
         {
@@ -114,8 +110,8 @@ function generateMetaTags(meta?: {
           },
           "sameAs": []
         }
-      </script>`
-    ].join('\n      ')
+      </script>`,
+    ].join('\n      '),
   };
 }
 

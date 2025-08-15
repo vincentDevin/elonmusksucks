@@ -184,7 +184,7 @@ export function registerRedisEventHandlers(io: Server, eventSub: any) {
         // Notify public timeline of newly approved articles
         io.emit('timeline:articles:approved', payload);
         break;
-        
+
       default:
         console.warn('[socket] Unhandled Redis channel', channel);
     }

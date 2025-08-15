@@ -48,7 +48,7 @@ const AdminDashboard: React.FC = () => {
             className={`py-2 px-4 -mb-px cursor-pointer font-medium transition ${
               activeTab === tab.key
                 ? 'border-b-2 border-primary text-primary'
-                : 'text-muted hover:text-primary'
+                : 'text-content/70 hover:text-primary'
             }`}
           >
             {tab.label}

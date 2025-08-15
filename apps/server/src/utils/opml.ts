@@ -29,15 +29,15 @@ export async function parseOpmlString(opmlXml: string): Promise<OPMLFeed[]> {
     const result = await parseXml(opmlXml, {
       explicitArray: false,
       ignoreAttrs: false,
-      mergeAttrs: true
+      mergeAttrs: true,
     });
 
     if (!result.opml || !result.opml.body || !result.opml.body.outline) {
       throw new Error('Invalid OPML structure');
     }
 
-    const outlines = Array.isArray(result.opml.body.outline) 
-      ? result.opml.body.outline 
+    const outlines = Array.isArray(result.opml.body.outline)
+      ? result.opml.body.outline
       : [result.opml.body.outline];
 
     const feeds: OPMLFeed[] = [];
@@ -45,7 +45,7 @@ export async function parseOpmlString(opmlXml: string): Promise<OPMLFeed[]> {
     // Recursively extract feeds from outline structure
     function extractFeeds(outline: any, category?: string) {
       if (Array.isArray(outline)) {
-        outline.forEach(item => extractFeeds(item, category));
+        outline.forEach((item) => extractFeeds(item, category));
         return;
       }
 
@@ -55,7 +55,7 @@ export async function parseOpmlString(opmlXml: string): Promise<OPMLFeed[]> {
           name: outline.title || outline.text || 'Unnamed Feed',
           url: outline.xmlUrl,
           siteUrl: outline.htmlUrl,
-          category
+          category,
         });
       }
 
@@ -67,12 +67,13 @@ export async function parseOpmlString(opmlXml: string): Promise<OPMLFeed[]> {
     }
 
     extractFeeds(outlines);
-    
-    return feeds.filter(feed => feed.url); // Only return feeds with valid URLs
 
+    return feeds.filter((feed) => feed.url); // Only return feeds with valid URLs
   } catch (error) {
     console.error('[opml] Error parsing OPML:', error);
-    throw new Error(`Failed to parse OPML: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw new Error(
+      `Failed to parse OPML: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    );
   }
 }
 
@@ -81,12 +82,12 @@ export async function parseOpmlString(opmlXml: string): Promise<OPMLFeed[]> {
  */
 export function generateOpmlXml(document: OPMLDocument): string {
   const { title, dateCreated, feeds } = document;
-  
+
   // Group feeds by category
   const categorized = new Map<string, OPMLFeed[]>();
   const uncategorized: OPMLFeed[] = [];
 
-  feeds.forEach(feed => {
+  feeds.forEach((feed) => {
     if (feed.category) {
       if (!categorized.has(feed.category)) {
         categorized.set(feed.category, []);
@@ -103,20 +104,20 @@ export function generateOpmlXml(document: OPMLDocument): string {
   // Add categorized feeds
   for (const [category, categoryFeeds] of categorized.entries()) {
     outlineXml += `    <outline text="${escapeXml(category)}" title="${escapeXml(category)}">\n`;
-    
-    categoryFeeds.forEach(feed => {
+
+    categoryFeeds.forEach((feed) => {
       outlineXml += `      <outline text="${escapeXml(feed.name)}" title="${escapeXml(feed.name)}" type="rss" xmlUrl="${escapeXml(feed.url)}"`;
       if (feed.siteUrl) {
         outlineXml += ` htmlUrl="${escapeXml(feed.siteUrl)}"`;
       }
       outlineXml += '/>\n';
     });
-    
+
     outlineXml += '    </outline>\n';
   }
 
   // Add uncategorized feeds
-  uncategorized.forEach(feed => {
+  uncategorized.forEach((feed) => {
     outlineXml += `    <outline text="${escapeXml(feed.name)}" title="${escapeXml(feed.name)}" type="rss" xmlUrl="${escapeXml(feed.url)}"`;
     if (feed.siteUrl) {
       outlineXml += ` htmlUrl="${escapeXml(feed.siteUrl)}"`;

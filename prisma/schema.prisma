@@ -99,6 +99,8 @@ model User {
   bans               UserBan[]
   moderationActions  ModerationLog[] @relation("ModeratorActions")
   moderationReceived ModerationLog[] @relation("ModeratedUser")
+  articleReactions   ArticleReaction[]
+  articleComments    ArticleComment[]
 }
 
 model ChatRoom {
@@ -535,11 +537,41 @@ model Article {
   updatedAt            DateTime               @updatedAt
   feed                 FeedSource             @relation(fields: [feedId], references: [id], onDelete: Cascade)
   sourceLinks          PredictionSourceLink[]
+  articleReactions     ArticleReaction[]
+  articleComments      ArticleComment[]
 
   @@index([status, publishedAt(sort: Desc)])
   @@index([hash])
   @@index([feedId])
   @@index([createdAt(sort: Desc)])
+}
+
+model ArticleReaction {
+  id        Int      @id @default(autoincrement())
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  articleId Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int
+  type      String   @default("like") // "like", "dislike", "love", "laugh", "angry", etc.
+  createdAt DateTime @default(now())
+
+  @@unique([articleId, userId, type])
+  @@index([articleId, type])
+  @@index([userId])
+}
+
+model ArticleComment {
+  id        Int      @id @default(autoincrement())
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  articleId Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([articleId, createdAt])
+  @@index([userId])
 }
 
 model Tweet {

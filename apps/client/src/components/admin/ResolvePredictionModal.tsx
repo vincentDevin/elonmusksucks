@@ -55,7 +55,7 @@ const ResolvePredictionModal: React.FC<ResolvePredictionModalProps> = ({
           <h2 className="text-xl font-bold text-primary">Resolve Prediction</h2>
           <button
             onClick={onClose}
-            className="text-muted hover:text-content transition-colors text-xl"
+            className="text-content/70 hover:text-content transition-colors text-xl"
             disabled={isSubmitting}
           >
             ×
@@ -65,9 +65,9 @@ const ResolvePredictionModal: React.FC<ResolvePredictionModalProps> = ({
         {/* Prediction Details */}
         <div className="mb-6">
           <h3 className="text-lg font-semibold text-content mb-2">{prediction.title}</h3>
-          <p className="text-muted mb-4">{prediction.description}</p>
+          <p className="text-content/70 mb-4">{prediction.description}</p>
 
-          <div className="flex flex-wrap gap-4 text-sm text-muted">
+          <div className="flex flex-wrap gap-4 text-sm text-content/60">
             <span>
               Category: <span className="text-content">{prediction.category}</span>
             </span>
@@ -117,9 +117,11 @@ const ResolvePredictionModal: React.FC<ResolvePredictionModalProps> = ({
                     <div className="flex items-center justify-between">
                       <span className="font-medium text-content">{option.label}</span>
                       <div className="text-right">
-                        <div className="text-sm text-muted">Odds: {option.odds.toFixed(2)}x</div>
+                        <div className="text-sm text-content/60">
+                          Odds: {option.odds.toFixed(2)}x
+                        </div>
                         {option.betCount && (
-                          <div className="text-xs text-muted">{option.betCount} bets</div>
+                          <div className="text-xs text-content/60">{option.betCount} bets</div>
                         )}
                       </div>
                     </div>
@@ -153,7 +155,7 @@ const ResolvePredictionModal: React.FC<ResolvePredictionModalProps> = ({
         <div className="flex items-center justify-end gap-3">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-muted hover:text-content transition-colors"
+            className="px-4 py-2 text-content/70 hover:text-content transition-colors"
             disabled={isSubmitting}
           >
             Cancel

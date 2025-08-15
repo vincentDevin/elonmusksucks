@@ -64,7 +64,15 @@ export class PrismaAuthRepository implements IAuthRepository {
   }
 
   async deleteRefreshToken(token: string): Promise<void> {
-    await prisma.refreshToken.delete({ where: { token } });
+    try {
+      await prisma.refreshToken.delete({ where: { token } });
+    } catch (error: any) {
+      // If token doesn't exist (P2025), ignore the error
+      if (error.code === 'P2025') {
+        return;
+      }
+      throw error;
+    }
   }
 
   // --- Email verification ---

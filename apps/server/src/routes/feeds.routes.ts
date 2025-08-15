@@ -1,4 +1,4 @@
-// apps/server/src/routes/feeds.routes.ts  
+// apps/server/src/routes/feeds.routes.ts
 import { Router, Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { requireAdmin } from '../middleware/auth.middleware';
@@ -8,7 +8,7 @@ import type {
   CreateFeedRequest,
   UpdateFeedRequest,
   PublicFeedSource,
-  OPMLImportResult
+  OPMLImportResult,
 } from '@ems/types';
 import multer from 'multer';
 import { parseOpmlString, generateOpmlXml } from '../utils/opml';
@@ -23,18 +23,22 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 1024 * 1024 }, // 1MB limit
   fileFilter: (_req, file, cb) => {
-    if (file.mimetype === 'text/xml' || file.mimetype === 'application/xml' || file.originalname.endsWith('.opml')) {
+    if (
+      file.mimetype === 'text/xml' ||
+      file.mimetype === 'application/xml' ||
+      file.originalname.endsWith('.opml')
+    ) {
       cb(null, true);
     } else {
       cb(new Error('Only OPML/XML files are allowed'));
     }
-  }
+  },
 });
 
 /**
  * Admin Feed Management APIs
  * POST /api/admin/feeds - Create new feed
- * PATCH /api/admin/feeds/:id - Update feed (status, name, urls) 
+ * PATCH /api/admin/feeds/:id - Update feed (status, name, urls)
  * DELETE /api/admin/feeds/:id - Delete feed
  * GET /api/admin/feeds - List all feeds with health stats
  */
@@ -47,7 +51,7 @@ router.use(requireAdmin);
 router.post('/', async (req: Request, res: Response) => {
   try {
     const { name, url, siteUrl, allowImages = true } = req.body as CreateFeedRequest;
-    
+
     // Validate required fields
     if (!name || !url) {
       res.status(400).json({ error: 'Name and URL are required' });
@@ -64,17 +68,17 @@ router.post('/', async (req: Request, res: Response) => {
 
     // Check for duplicate feed URL
     const existingFeed = await prisma.feedSource.findFirst({
-      where: { url }
+      where: { url },
     });
 
     if (existingFeed) {
-      res.status(409).json({ 
+      res.status(409).json({
         error: 'Feed URL already exists',
         existingFeed: {
           id: existingFeed.id,
           name: existingFeed.name,
-          status: existingFeed.status
-        }
+          status: existingFeed.status,
+        },
       });
       return;
     }
@@ -86,15 +90,15 @@ router.post('/', async (req: Request, res: Response) => {
         url,
         siteUrl,
         allowImages,
-        status: 'ACTIVE'
-      }
+        status: 'ACTIVE',
+      },
     });
 
     // Queue initial feed fetch
     await feedQueue.add('fetch', {
       feedId: feed.id,
       url: feed.url,
-      forceRefresh: true
+      forceRefresh: true,
     });
 
     // Convert to PublicFeedSource format
@@ -112,12 +116,11 @@ router.post('/', async (req: Request, res: Response) => {
       fetchCount: feed.fetchCount,
       errorCount: feed.errorCount,
       createdAt: feed.createdAt.toISOString(),
-      updatedAt: feed.updatedAt.toISOString()
+      updatedAt: feed.updatedAt.toISOString(),
     };
 
     console.log(`[feeds] Created feed ${feed.id}: ${feed.name}`);
     res.status(201).json(publicFeed);
-
   } catch (error) {
     console.error('[feeds] Error creating feed:', error);
     res.status(500).json({ error: 'Failed to create feed' });
@@ -139,22 +142,25 @@ router.get('/', async (req: Request, res: Response) => {
     // Fetch feeds with optional article counts
     const feeds = await prisma.feedSource.findMany({
       where,
-      include: includeStats === 'true' ? {
-        _count: {
-          select: {
-            articles: {
-              where: { status: 'APPROVED' }
+      include:
+        includeStats === 'true'
+          ? {
+              _count: {
+                select: {
+                  articles: {
+                    where: { status: 'APPROVED' },
+                  },
+                },
+              },
             }
-          }
-        }
-      } : undefined,
+          : undefined,
       orderBy: {
-        createdAt: 'desc'
-      }
+        createdAt: 'desc',
+      },
     });
 
     // Convert to PublicFeedSource format with stats
-    const publicFeeds: (PublicFeedSource & { articleCount?: number })[] = feeds.map(feed => ({
+    const publicFeeds: (PublicFeedSource & { articleCount?: number })[] = feeds.map((feed) => ({
       id: feed.id,
       name: feed.name,
       url: feed.url,
@@ -169,11 +175,10 @@ router.get('/', async (req: Request, res: Response) => {
       errorCount: feed.errorCount,
       createdAt: feed.createdAt.toISOString(),
       updatedAt: feed.updatedAt.toISOString(),
-      articleCount: includeStats === 'true' ? (feed as any)._count?.articles || 0 : undefined
+      articleCount: includeStats === 'true' ? (feed as any)._count?.articles || 0 : undefined,
     }));
 
     res.json(publicFeeds);
-
   } catch (error) {
     console.error('[feeds] Error listing feeds:', error);
     res.status(500).json({ error: 'Failed to list feeds' });
@@ -205,17 +210,17 @@ router.patch('/:id', async (req: Request, res: Response) => {
       const existingFeed = await prisma.feedSource.findFirst({
         where: {
           url,
-          NOT: { id: feedId }
-        }
+          NOT: { id: feedId },
+        },
       });
 
       if (existingFeed) {
-        res.status(409).json({ 
+        res.status(409).json({
           error: 'Feed URL already exists',
           existingFeed: {
             id: existingFeed.id,
-            name: existingFeed.name
-          }
+            name: existingFeed.name,
+          },
         });
         return;
       }
@@ -223,7 +228,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
 
     // Get current feed for comparison
     const currentFeed = await prisma.feedSource.findUnique({
-      where: { id: feedId }
+      where: { id: feedId },
     });
 
     if (!currentFeed) {
@@ -242,7 +247,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
     // Update the feed
     const updatedFeed = await prisma.feedSource.update({
       where: { id: feedId },
-      data: updates
+      data: updates,
     });
 
     // Trigger re-fetch if URL changed
@@ -250,7 +255,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
       await feedQueue.add('fetch', {
         feedId: updatedFeed.id,
         url: updatedFeed.url,
-        forceRefresh: true
+        forceRefresh: true,
       });
     }
 
@@ -269,12 +274,11 @@ router.patch('/:id', async (req: Request, res: Response) => {
       fetchCount: updatedFeed.fetchCount,
       errorCount: updatedFeed.errorCount,
       createdAt: updatedFeed.createdAt.toISOString(),
-      updatedAt: updatedFeed.updatedAt.toISOString()
+      updatedAt: updatedFeed.updatedAt.toISOString(),
     };
 
     console.log(`[feeds] Updated feed ${feedId}:`, Object.keys(updates));
     res.json(publicFeed);
-
   } catch (error) {
     console.error('[feeds] Error updating feed:', error);
     res.status(500).json({ error: 'Failed to update feed' });
@@ -294,9 +298,9 @@ router.delete('/:id', async (req: Request, res: Response) => {
       where: { id: feedId },
       include: {
         _count: {
-          select: { articles: true }
-        }
-      }
+          select: { articles: true },
+        },
+      },
     });
 
     if (!feed) {
@@ -307,17 +311,16 @@ router.delete('/:id', async (req: Request, res: Response) => {
 
     // Delete feed (articles will be deleted via cascade)
     await prisma.feedSource.delete({
-      where: { id: feedId }
+      where: { id: feedId },
     });
 
     // TODO: Cancel any pending jobs for this feed in BullMQ
     // This would require tracking job IDs or implementing job cancellation
 
-    res.json({ 
+    res.json({
       message: 'Feed deleted successfully',
-      deletedArticles: feed._count.articles
+      deletedArticles: feed._count.articles,
     });
-
   } catch (error) {
     console.error('[feeds] Error deleting feed:', error);
     res.status(500).json({ error: 'Failed to delete feed' });
@@ -353,51 +356,60 @@ router.post('/moderate', async (req: Request, res: Response) => {
     const updateResult = await prisma.article.updateMany({
       where: {
         id: { in: ids },
-        status: 'PENDING' // Only update pending articles
+        status: 'PENDING', // Only update pending articles
       },
       data: {
         status: action,
         modNotes: notes || null,
-        updatedAt: new Date()
-      }
+        updatedAt: new Date(),
+      },
     });
 
     console.log(`[feeds] Bulk moderated ${updateResult.count} articles: ${action}`);
 
     // Publish Socket.IO event for real-time admin updates
-    await redisClient.publish('admin:moderation:bulk', JSON.stringify({
-      action,
-      articleIds: ids,
-      processed: updateResult.count,
-      notes,
-      timestamp: new Date().toISOString()
-    }));
+    await redisClient.publish(
+      'admin:moderation:bulk',
+      JSON.stringify({
+        action,
+        articleIds: ids,
+        processed: updateResult.count,
+        notes,
+        timestamp: new Date().toISOString(),
+      }),
+    );
 
     // If approved, publish articles to timeline
     if (action === 'APPROVED') {
-      await redisClient.publish('timeline:articles:new', JSON.stringify({
-        count: updateResult.count,
-        timestamp: new Date().toISOString()
-      }));
+      await redisClient.publish(
+        'timeline:articles:new',
+        JSON.stringify({
+          count: updateResult.count,
+          timestamp: new Date().toISOString(),
+        }),
+      );
     }
 
-    res.json({ 
+    res.json({
       processed: updateResult.count,
       action,
-      message: `${updateResult.count} articles ${action.toLowerCase()}` 
+      message: `${updateResult.count} articles ${action.toLowerCase()}`,
     });
-
   } catch (error) {
     console.error('[feeds] Error in bulk moderation:', error);
     res.status(500).json({ error: 'Failed to moderate articles' });
   }
 });
 
-// POST /api/admin/retag  
+// POST /api/admin/retag
 // Body: { ids: number[], add: string[], remove: string[] }
 router.post('/retag', async (req: Request, res: Response) => {
   try {
-    const { ids, add = [], remove = [] } = req.body as {
+    const {
+      ids,
+      add = [],
+      remove = [],
+    } = req.body as {
       ids: number[];
       add?: string[];
       remove?: string[];
@@ -423,11 +435,11 @@ router.post('/retag', async (req: Request, res: Response) => {
 
     for (let i = 0; i < ids.length; i += batchSize) {
       const batchIds = ids.slice(i, i + batchSize);
-      
+
       // Get current articles with their tags
       const articles = await prisma.article.findMany({
         where: { id: { in: batchIds } },
-        select: { id: true, tags: true }
+        select: { id: true, tags: true },
       });
 
       // Update each article's tags
@@ -454,7 +466,7 @@ router.post('/retag', async (req: Request, res: Response) => {
         if (hasChanges) {
           await prisma.article.update({
             where: { id: article.id },
-            data: { tags: Array.from(currentTags) }
+            data: { tags: Array.from(currentTags) },
           });
           tagged++;
         }
@@ -465,21 +477,23 @@ router.post('/retag', async (req: Request, res: Response) => {
     console.log(`[feeds] Bulk retagged ${tagged}/${processed} articles`);
 
     // Publish Socket.IO event for real-time updates
-    await redisClient.publish('admin:retagging:bulk', JSON.stringify({
-      articleIds: ids,
-      addedTags: add,
-      removedTags: remove,
-      processed,
-      tagged,
-      timestamp: new Date().toISOString()
-    }));
+    await redisClient.publish(
+      'admin:retagging:bulk',
+      JSON.stringify({
+        articleIds: ids,
+        addedTags: add,
+        removedTags: remove,
+        processed,
+        tagged,
+        timestamp: new Date().toISOString(),
+      }),
+    );
 
-    res.json({ 
+    res.json({
       processed,
       tagged,
-      message: `Processed ${processed} articles, updated tags on ${tagged}` 
+      message: `Processed ${processed} articles, updated tags on ${tagged}`,
     });
-
   } catch (error) {
     console.error('[feeds] Error in bulk retagging:', error);
     res.status(500).json({ error: 'Failed to retag articles' });
@@ -501,10 +515,10 @@ router.post('/import-opml', upload.single('opml'), async (req: Request, res: Res
     }
 
     const opmlContent = req.file.buffer.toString('utf-8');
-    
+
     // Parse OPML file
     const parsedFeeds = await parseOpmlString(opmlContent);
-    
+
     if (parsedFeeds.length === 0) {
       res.status(400).json({ error: 'No valid feeds found in OPML file' });
     }
@@ -519,7 +533,7 @@ router.post('/import-opml', upload.single('opml'), async (req: Request, res: Res
       try {
         // Check for existing feed
         const existing = await prisma.feedSource.findFirst({
-          where: { url: feedData.url }
+          where: { url: feedData.url },
         });
 
         if (existing) {
@@ -534,15 +548,15 @@ router.post('/import-opml', upload.single('opml'), async (req: Request, res: Res
             url: feedData.url,
             siteUrl: feedData.siteUrl,
             allowImages: true,
-            status: 'ACTIVE'
-          }
+            status: 'ACTIVE',
+          },
         });
 
         // Queue initial fetch
         await feedQueue.add('fetch', {
           feedId: feed.id,
           url: feed.url,
-          forceRefresh: true
+          forceRefresh: true,
         });
 
         createdFeeds.push({
@@ -559,27 +573,27 @@ router.post('/import-opml', upload.single('opml'), async (req: Request, res: Res
           fetchCount: 0,
           errorCount: 0,
           createdAt: feed.createdAt.toISOString(),
-          updatedAt: feed.updatedAt.toISOString()
+          updatedAt: feed.updatedAt.toISOString(),
         });
 
         created++;
-
       } catch (feedError) {
         const errorMsg = feedError instanceof Error ? feedError.message : 'Unknown error';
         errors.push(`Failed to create feed ${feedData.name}: ${errorMsg}`);
       }
     }
 
-    console.log(`[feeds] OPML import: ${created} created, ${skipped} skipped, ${errors.length} errors`);
+    console.log(
+      `[feeds] OPML import: ${created} created, ${skipped} skipped, ${errors.length} errors`,
+    );
 
     const result: OPMLImportResult = {
       imported: created,
       duplicates: skipped,
-      errors
+      errors,
     };
 
     res.json(result);
-
   } catch (error) {
     console.error('[feeds] Error importing OPML:', error);
     res.status(500).json({ error: 'Failed to import OPML file' });
@@ -596,9 +610,9 @@ router.get('/export-opml', async (_req: Request, res: Response) => {
       select: {
         name: true,
         url: true,
-        siteUrl: true
+        siteUrl: true,
       },
-      orderBy: { name: 'asc' }
+      orderBy: { name: 'asc' },
     });
 
     if (feeds.length === 0) {
@@ -609,24 +623,23 @@ router.get('/export-opml', async (_req: Request, res: Response) => {
     const opmlXml = generateOpmlXml({
       title: 'elonmusksucks.net RSS Feeds',
       dateCreated: new Date(),
-      feeds: feeds.map(feed => ({
+      feeds: feeds.map((feed) => ({
         name: feed.name,
         url: feed.url,
-        siteUrl: feed.siteUrl || undefined
-      }))
+        siteUrl: feed.siteUrl || undefined,
+      })),
     });
 
     // Set response headers for file download
     const timestamp = new Date().toISOString().slice(0, 10);
     const filename = `elonmusksucks-feeds-${timestamp}.opml`;
-    
+
     res.setHeader('Content-Type', 'application/xml');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Content-Length', Buffer.byteLength(opmlXml, 'utf8'));
 
     console.log(`[feeds] OPML export: ${feeds.length} feeds exported`);
     res.send(opmlXml);
-
   } catch (error) {
     console.error('[feeds] Error exporting OPML:', error);
     res.status(500).json({ error: 'Failed to export OPML file' });

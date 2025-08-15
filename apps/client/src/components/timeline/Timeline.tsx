@@ -4,6 +4,7 @@ import type { TimelineItem, TimelineResponse } from '@ems/types';
 import { timelineApi } from '../../api/timeline';
 import ArticleCard from './ArticleCard';
 import ArticleDrawer from './ArticleDrawer';
+import UseAsSourceModal from './UseAsSourceModal';
 import { useTimelineSocket } from '../../hooks/useTimelineSocket';
 
 interface TimelineProps {
@@ -20,10 +21,7 @@ interface TimelineProps {
  * - Filter integration
  * - "Use as Prediction Source" on every item
  */
-export const Timeline: React.FC<TimelineProps> = ({ 
-  className = '', 
-  initialTab = 'articles' 
-}) => {
+export const Timeline: React.FC<TimelineProps> = ({ className = '', initialTab = 'articles' }) => {
   const [activeTab, setActiveTab] = useState<'articles' | 'tweets'>(initialTab);
   const [articles, setArticles] = useState<TimelineItem[]>([]);
   const [tweets, setTweets] = useState<TimelineItem[]>([]);
@@ -33,6 +31,8 @@ export const Timeline: React.FC<TimelineProps> = ({
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [selectedItem, setSelectedItem] = useState<TimelineItem | null>(null);
   const [showArticleDrawer, setShowArticleDrawer] = useState(false);
+  const [showUseAsSourceModal, setShowUseAsSourceModal] = useState(false);
+  const [sourceItem, setSourceItem] = useState<TimelineItem | null>(null);
 
   // TODO: Implement timeline functionality
   useEffect(() => {
@@ -43,18 +43,19 @@ export const Timeline: React.FC<TimelineProps> = ({
     try {
       setLoading(true);
       setError(null);
-      
+
       // Use the actual API calls - simple routes are working
-      const data: TimelineResponse = activeTab === 'articles'
-        ? await timelineApi.getArticles({
-            cursor: !reset ? cursor : undefined,
-            limit: 30,
-            status: 'APPROVED'
-          })
-        : await timelineApi.getTweets({
-            cursor: !reset ? cursor : undefined,
-            limit: 50
-          });
+      const data: TimelineResponse =
+        activeTab === 'articles'
+          ? await timelineApi.getArticles({
+              cursor: !reset ? cursor : undefined,
+              limit: 30,
+              status: 'APPROVED',
+            })
+          : await timelineApi.getTweets({
+              cursor: !reset ? cursor : undefined,
+              limit: 50,
+            });
 
       if (reset) {
         if (activeTab === 'articles') {
@@ -64,19 +65,18 @@ export const Timeline: React.FC<TimelineProps> = ({
         }
       } else {
         if (activeTab === 'articles') {
-          setArticles(prev => [...prev, ...data.items]);
+          setArticles((prev) => [...prev, ...data.items]);
         } else {
-          setTweets(prev => [...prev, ...data.items]);
+          setTweets((prev) => [...prev, ...data.items]);
         }
       }
 
       setHasMore(data.pagination.hasMore);
       setCursor(data.pagination.cursor);
-
     } catch (err) {
       console.error('Timeline API error:', err);
       setError(err instanceof Error ? err.message : 'Failed to load timeline');
-      
+
       // Fallback to empty state on error
       if (reset) {
         if (activeTab === 'articles') {
@@ -94,7 +94,7 @@ export const Timeline: React.FC<TimelineProps> = ({
 
   const handleTabChange = (tab: 'articles' | 'tweets') => {
     if (tab === activeTab) return;
-    
+
     setActiveTab(tab);
     setCursor(undefined);
     setHasMore(true);
@@ -107,9 +107,8 @@ export const Timeline: React.FC<TimelineProps> = ({
   };
 
   const handleUseAsSource = useCallback((item: TimelineItem) => {
-    // TODO: Open UseAsSourceModal with item
-    console.log('Use as source:', item);
-    // This would typically open a modal to select which prediction to link to
+    setSourceItem(item);
+    setShowUseAsSourceModal(true);
   }, []);
 
   const handleViewDetails = useCallback((item: TimelineItem) => {
@@ -122,13 +121,18 @@ export const Timeline: React.FC<TimelineProps> = ({
     setSelectedItem(null);
   }, []);
 
+  const closeUseAsSourceModal = useCallback(() => {
+    setShowUseAsSourceModal(false);
+    setSourceItem(null);
+  }, []);
+
   // Handle real-time updates via Socket.IO
   const handleNewArticles = useCallback((newArticles: TimelineItem[]) => {
-    setArticles(prev => [...newArticles, ...prev]);
+    setArticles((prev) => [...newArticles, ...prev]);
   }, []);
 
   const handleNewTweets = useCallback((newTweets: TimelineItem[]) => {
-    setTweets(prev => [...newTweets, ...prev]);
+    setTweets((prev) => [...newTweets, ...prev]);
   }, []);
 
   const { isConnected } = useTimelineSocket({
@@ -138,10 +142,10 @@ export const Timeline: React.FC<TimelineProps> = ({
     onModerationUpdate: (data) => {
       console.log('Moderation update:', data);
       // Could show toast notification or update article status
-    }
+    },
   });
 
-  const currentItems = activeTab === 'articles' ? (articles || []) : (tweets || []);
+  const currentItems = activeTab === 'articles' ? articles || [] : tweets || [];
 
   return (
     <div className={`${className}`}>
@@ -149,45 +153,43 @@ export const Timeline: React.FC<TimelineProps> = ({
       <div className="flex justify-between items-center border-b border-gray-200 mb-6">
         <div className="flex">
           <button
-          onClick={() => handleTabChange('articles')}
-          className={`px-6 py-3 font-medium border-b-2 transition-colors ${
-            activeTab === 'articles'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          Articles
-          <span className="ml-2 px-2 py-1 text-xs rounded-full bg-gray-100">
-            {articles?.length || 0}
-          </span>
-        </button>
-        <button
-          onClick={() => handleTabChange('tweets')}
-          className={`px-6 py-3 font-medium border-b-2 transition-colors ${
-            activeTab === 'tweets'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          Tweets  
-          <span className="ml-2 px-2 py-1 text-xs rounded-full bg-gray-100">
-            {tweets?.length || 0}
-          </span>
-        </button>
+            onClick={() => handleTabChange('articles')}
+            className={`px-6 py-3 font-medium border-b-2 transition-colors ${
+              activeTab === 'articles'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Articles
+            <span className="ml-2 px-2 py-1 text-xs rounded-full bg-gray-100">
+              {articles?.length || 0}
+            </span>
+          </button>
+          <button
+            onClick={() => handleTabChange('tweets')}
+            className={`px-6 py-3 font-medium border-b-2 transition-colors ${
+              activeTab === 'tweets'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Tweets
+            <span className="ml-2 px-2 py-1 text-xs rounded-full bg-gray-100">
+              {tweets?.length || 0}
+            </span>
+          </button>
         </div>
 
         {/* Real-time connection status */}
         <div className="flex items-center text-xs text-gray-500">
-          <div className={`w-2 h-2 rounded-full mr-2 ${isConnected ? 'bg-green-400' : 'bg-red-400'}`} />
+          <div
+            className={`w-2 h-2 rounded-full mr-2 ${isConnected ? 'bg-green-400' : 'bg-red-400'}`}
+          />
           {isConnected ? 'Live updates' : 'Disconnected'}
         </div>
       </div>
 
-      {error && (
-        <div className="mb-4 p-4 bg-red-100 text-red-700 rounded">
-          {error}
-        </div>
-      )}
+      {error && <div className="mb-4 p-4 bg-red-100 text-red-700 rounded">{error}</div>}
 
       {/* Timeline Content */}
       <div className="space-y-4">
@@ -207,9 +209,9 @@ export const Timeline: React.FC<TimelineProps> = ({
         ) : (
           <>
             {/* Timeline Items */}
-            {currentItems?.map((item) => (
+            {currentItems?.map((item) =>
               item.type === 'article' ? (
-                <ArticleCard 
+                <ArticleCard
                   key={item.id}
                   item={item}
                   onUseAsSource={() => handleUseAsSource(item)}
@@ -231,7 +233,7 @@ export const Timeline: React.FC<TimelineProps> = ({
                           <span>💬 {item.engagement.comments}</span>
                           <span>{new Date(item.timestamp).toLocaleDateString()}</span>
                         </div>
-                        <button 
+                        <button
                           onClick={() => handleUseAsSource(item)}
                           className="text-xs bg-purple-100 text-purple-700 px-3 py-1 rounded-full hover:bg-purple-200 transition-colors"
                         >
@@ -241,8 +243,8 @@ export const Timeline: React.FC<TimelineProps> = ({
                     </div>
                   </div>
                 </div>
-              )
-            ))}
+              ),
+            )}
 
             {/* Load More Button */}
             {hasMore && (
@@ -272,7 +274,13 @@ export const Timeline: React.FC<TimelineProps> = ({
         onUseAsSource={handleUseAsSource}
       />
 
-      {/* TODO: Add UseAsSourceModal component */}
+      {/* Use As Source Modal */}
+      <UseAsSourceModal
+        item={sourceItem}
+        isOpen={showUseAsSourceModal}
+        onClose={closeUseAsSourceModal}
+      />
+
       {/* TODO: Add Socket.IO real-time updates */}
     </div>
   );

@@ -24,37 +24,49 @@ export const useTimelineSocket = ({
   onNewArticles,
   onNewTweets,
   onArticleUpdate,
-  onModerationUpdate
+  onModerationUpdate,
 }: UseTimelineSocketProps) => {
   const { socket, isConnected } = useSocket();
 
   // Handle new approved articles
-  const handleNewArticles = useCallback((data: any) => {
-    if (activeTab === 'articles' && onNewArticles && data.articles) {
-      onNewArticles(data.articles);
-    }
-  }, [activeTab, onNewArticles]);
+  const handleNewArticles = useCallback(
+    (data: any) => {
+      if (activeTab === 'articles' && onNewArticles && data.articles) {
+        onNewArticles(data.articles);
+      }
+    },
+    [activeTab, onNewArticles],
+  );
 
   // Handle new tweets
-  const handleNewTweets = useCallback((data: any) => {
-    if (activeTab === 'tweets' && onNewTweets && data.tweets) {
-      onNewTweets(data.tweets);
-    }
-  }, [activeTab, onNewTweets]);
+  const handleNewTweets = useCallback(
+    (data: any) => {
+      if (activeTab === 'tweets' && onNewTweets && data.tweets) {
+        onNewTweets(data.tweets);
+      }
+    },
+    [activeTab, onNewTweets],
+  );
 
   // Handle article updates
-  const handleArticleUpdate = useCallback((data: any) => {
-    if (onArticleUpdate && data.article) {
-      onArticleUpdate(data.article);
-    }
-  }, [onArticleUpdate]);
+  const handleArticleUpdate = useCallback(
+    (data: any) => {
+      if (onArticleUpdate && data.article) {
+        onArticleUpdate(data.article);
+      }
+    },
+    [onArticleUpdate],
+  );
 
   // Handle admin moderation updates
-  const handleModerationUpdate = useCallback((data: any) => {
-    if (onModerationUpdate) {
-      onModerationUpdate(data);
-    }
-  }, [onModerationUpdate]);
+  const handleModerationUpdate = useCallback(
+    (data: any) => {
+      if (onModerationUpdate) {
+        onModerationUpdate(data);
+      }
+    },
+    [onModerationUpdate],
+  );
 
   useEffect(() => {
     if (!socket || !isConnected) return;
@@ -77,12 +89,12 @@ export const useTimelineSocket = ({
     handleNewArticles,
     handleNewTweets,
     handleArticleUpdate,
-    handleModerationUpdate
+    handleModerationUpdate,
   ]);
 
   return {
     isConnected,
-    socket
+    socket,
   };
 };
 

@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import { PrismaClient, TransactionType, BetStatus } from '@prisma/client';
-import { SEED_ACHIEVEMENTS } from './achievement-catalog';
+import { SEED_ACHIEVEMENTS } from './achievement-catalog.ts';
 
 const prisma = new PrismaClient();
 
@@ -18,6 +18,8 @@ async function clear<Model>(name: string, fn: () => Promise<Model>) {
 
 async function main() {
   console.log('🧹 Clearing out old data...');
+  await clear('ArticleComment',   () => prisma.articleComment.deleteMany());
+  await clear('ArticleReaction',  () => prisma.articleReaction.deleteMany());
   await clear('Transaction',      () => prisma.transaction.deleteMany());
   await clear('ParlayLeg',        () => prisma.parlayLeg.deleteMany());
   await clear('Parlay',           () => prisma.parlay.deleteMany());
@@ -153,7 +155,7 @@ async function main() {
     ]},
   }});
   await prisma.transaction.create({ data: {
-    userId: bob.id, type: TransactionType.DEBIT, amount: 200, balanceAfter: bob.muskBucks - 200,
+    userId: bob.id, type: TransactionType.DEBIT, amount: 200, balanceAfter: bob.muskBucks - BigInt(200),
     relatedParlayId: parlayBob.id,
   }});
   await prisma.bet.create({ data: {

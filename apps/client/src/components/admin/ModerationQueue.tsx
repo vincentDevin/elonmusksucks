@@ -1,7 +1,8 @@
 // apps/client/src/components/admin/ModerationQueue.tsx
-import React, { useState, useEffect } from 'react';
-import type { ArticleModerationData, UpdateArticleRequest } from '@ems/types';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import type { ArticleModerationData } from '@ems/types';
 import { useSocket } from '../../contexts/SocketContext';
+import * as feedsAPI from '../../api/feeds';
 
 interface ModerationQueueProps {
   className?: string;
@@ -11,7 +12,7 @@ interface ModerationQueueProps {
  * Admin component for article moderation queue
  * Features:
  * - List pending articles with preview
- * - Bulk approve/reject operations  
+ * - Bulk approve/reject operations
  * - Individual article moderation
  * - Tag management and bulk retagging
  * - Moderation notes
@@ -23,11 +24,45 @@ export const ModerationQueue: React.FC<ModerationQueueProps> = ({ className = ''
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
+  const [bulkProcessing, setBulkProcessing] = useState(false);
+  const [expandedArticle, setExpandedArticle] = useState<number | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const [selectedFeed, setSelectedFeed] = useState<string>('all');
+  const [availableFeeds, setAvailableFeeds] = useState<{ id: number; name: string }[]>([]);
+  const searchTimeoutRef = useRef<NodeJS.Timeout>();
   const socket = useSocket();
 
   useEffect(() => {
+    setCurrentPage(1); // Reset to first page when filter changes
     loadArticles();
+    loadAvailableFeeds();
   }, [filter]);
+
+  useEffect(() => {
+    loadArticles();
+  }, [currentPage, pageSize, debouncedSearchQuery, selectedFeed]);
+
+  // Debounce search input
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    searchTimeoutRef.current = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+      setCurrentPage(1); // Reset to first page when search changes
+    }, 300);
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchQuery]);
 
   // Socket.IO integration for real-time admin updates
   useEffect(() => {
@@ -36,10 +71,9 @@ export const ModerationQueue: React.FC<ModerationQueueProps> = ({ className = ''
     // Listen for new articles requiring moderation
     const handleNewArticle = (data: any) => {
       console.log('[ModerationQueue] New article for moderation:', data);
-      
+
       // Only update if we're viewing pending articles
       if (filter === 'pending' || filter === 'all') {
-        // Refresh the articles list to include the new one
         loadArticles();
       }
     };
@@ -47,30 +81,30 @@ export const ModerationQueue: React.FC<ModerationQueueProps> = ({ className = ''
     // Listen for bulk moderation updates
     const handleBulkModeration = (data: any) => {
       console.log('[ModerationQueue] Bulk moderation completed:', data);
-      
-      // Clear selection and refresh list
+
+      // Clear selected articles and reload
       setSelectedArticles(new Set());
+      setBulkProcessing(false);
       loadArticles();
     };
 
     // Listen for bulk retagging updates
     const handleBulkRetagging = (data: any) => {
       console.log('[ModerationQueue] Bulk retagging completed:', data);
-      
-      // Clear selection and refresh list
-      setSelectedArticles(new Set());
+
+      // Reload articles to show updated tags
       loadArticles();
     };
 
-    // Register event listeners based on Redis events from redisEventHandlers.ts
-    socket.on('timeline:article:new', handleNewArticle);
-    socket.on('timeline:moderation:bulk', handleBulkModeration);
-    socket.on('timeline:retagging:bulk', handleBulkRetagging);
+    // Register event listeners
+    socket.on('feed:article:new', handleNewArticle);
+    socket.on('admin:moderation:bulk', handleBulkModeration);
+    socket.on('admin:retagging:bulk', handleBulkRetagging);
 
     return () => {
-      socket.off('timeline:article:new', handleNewArticle);
-      socket.off('timeline:moderation:bulk', handleBulkModeration);
-      socket.off('timeline:retagging:bulk', handleBulkRetagging);
+      socket.off('feed:article:new', handleNewArticle);
+      socket.off('admin:moderation:bulk', handleBulkModeration);
+      socket.off('admin:retagging:bulk', handleBulkRetagging);
     };
   }, [socket, filter]);
 
@@ -78,18 +112,24 @@ export const ModerationQueue: React.FC<ModerationQueueProps> = ({ className = ''
     try {
       setLoading(true);
       setError(null);
-      
-      const response = await fetch(`/api/admin/feeds/articles?status=${filter}&limit=50`, {
-        credentials: 'include'
+
+      const articlesData = await feedsAPI.getArticlesForModeration({
+        status: filter === 'all' ? undefined : filter.toUpperCase(),
+        limit: pageSize,
+        offset: (currentPage - 1) * pageSize,
+        search: debouncedSearchQuery.trim() || undefined,
+        feedId: selectedFeed === 'all' ? undefined : selectedFeed,
       });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch articles: ${response.status}`);
+
+      // If this is a paginated response, extract articles and pagination info
+      if (typeof articlesData === 'object' && 'articles' in articlesData) {
+        setArticles(articlesData.articles);
+        setTotalPages(Math.ceil(articlesData.total / pageSize));
+      } else {
+        // Fallback for non-paginated response
+        setArticles(articlesData);
+        setTotalPages(1);
       }
-      
-      const articlesData = await response.json();
-      setArticles(articlesData);
-      
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load articles');
     } finally {
@@ -97,83 +137,56 @@ export const ModerationQueue: React.FC<ModerationQueueProps> = ({ className = ''
     }
   };
 
-  const handleBulkModerate = async (action: 'APPROVED' | 'REJECTED', notes?: string) => {
+  const loadAvailableFeeds = async () => {
+    try {
+      const feeds = await feedsAPI.listFeeds();
+      setAvailableFeeds(feeds.map((feed) => ({ id: feed.id, name: feed.name })));
+    } catch (err) {
+      console.error('Failed to load feeds for filter:', err);
+      // Don't set error state for this, just log it
+    }
+  };
+
+  const handleBulkModeration = async (action: 'APPROVED' | 'REJECTED', notes?: string) => {
     if (selectedArticles.size === 0) return;
 
     try {
-      const response = await fetch('/api/admin/feeds/moderate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          ids: Array.from(selectedArticles),
-          action,
-          notes
-        })
+      setBulkProcessing(true);
+
+      await feedsAPI.bulkModerateArticles({
+        ids: Array.from(selectedArticles),
+        action,
+        notes,
       });
 
-      if (!response.ok) {
-        throw new Error(`Failed to moderate articles: ${response.status}`);
-      }
-
+      // Clear selected articles and reload immediately, don't wait for socket
       setSelectedArticles(new Set());
-      await loadArticles();
+      setBulkProcessing(false);
+      loadArticles();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to moderate articles');
+      setBulkProcessing(false);
     }
   };
 
-  const handleModerateArticle = async (articleId: number, action: 'APPROVED' | 'REJECTED', notes?: string) => {
-    try {
-      const response = await fetch('/api/admin/feeds/moderate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          ids: [articleId],
-          action,
-          notes
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to moderate article: ${response.status}`);
-      }
-
-      await loadArticles();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to moderate article');
-    }
-  };
-
-  const handleBulkRetag = async (addTags: string[], removeTags: string[]) => {
+  const handleBulkRetagging = async (addTags: string[], removeTags: string[]) => {
     if (selectedArticles.size === 0) return;
 
     try {
-      const response = await fetch('/api/admin/feeds/retag', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          ids: Array.from(selectedArticles),
-          add: addTags,
-          remove: removeTags
-        })
+      await feedsAPI.bulkRetagArticles({
+        ids: Array.from(selectedArticles),
+        add: addTags,
+        remove: removeTags,
       });
 
-      if (!response.ok) {
-        throw new Error(`Failed to retag articles: ${response.status}`);
-      }
-
-      setSelectedArticles(new Set());
-      await loadArticles();
+      // Socket.IO handler will reload articles
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to retag articles');
     }
   };
 
   const toggleArticleSelection = (articleId: number) => {
-    setSelectedArticles(prev => {
+    setSelectedArticles((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(articleId)) {
         newSet.delete(articleId);
@@ -185,17 +198,43 @@ export const ModerationQueue: React.FC<ModerationQueueProps> = ({ className = ''
   };
 
   const selectAll = () => {
-    setSelectedArticles(new Set(articles.map(a => a.id)));
+    setSelectedArticles(new Set(articles.map((a) => a.id)));
   };
 
   const clearSelection = () => {
     setSelectedArticles(new Set());
   };
 
+  const getStatusBadgeClasses = (status: string) => {
+    switch (status) {
+      case 'APPROVED':
+        return 'bg-success/10 text-success border border-success/20';
+      case 'REJECTED':
+        return 'bg-danger/10 text-danger border border-danger/20';
+      case 'PENDING':
+        return 'bg-warning/10 text-warning border border-warning/20';
+      default:
+        return 'bg-muted/10 text-muted border border-muted/20';
+    }
+  };
+
+  const formatDate = (dateString?: string | null) => {
+    if (!dateString) return 'Unknown';
+    return new Date(dateString).toLocaleString();
+  };
+
+  const truncateText = (text: string, maxLength: number) => {
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + '...';
+  };
+
   if (loading) {
     return (
       <div className={`p-6 ${className}`}>
-        <div className="text-center">Loading moderation queue...</div>
+        <div className="text-center text-content">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <p className="mt-2">Loading articles...</p>
+        </div>
       </div>
     );
   }
@@ -203,237 +242,356 @@ export const ModerationQueue: React.FC<ModerationQueueProps> = ({ className = ''
   return (
     <div className={`p-6 ${className}`}>
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold">Article Moderation Queue</h2>
-        
-        <div className="flex gap-2">
-          {/* Filter buttons */}
-          {(['all', 'pending', 'approved', 'rejected'] as const).map((status) => (
+        <h2 className="text-2xl font-bold text-content">Content Moderation Queue</h2>
+
+        {/* Filter Tabs */}
+        <div className="flex space-x-1 bg-muted/10 rounded-lg p-1">
+          {(['pending', 'approved', 'rejected', 'all'] as const).map((filterOption) => (
             <button
-              key={status}
-              onClick={() => setFilter(status)}
-              className={`px-3 py-1 rounded capitalize ${
-                filter === status 
-                  ? 'bg-blue-600 text-white' 
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              key={filterOption}
+              onClick={() => setFilter(filterOption)}
+              className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                filter === filterOption
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-content/70 hover:text-content hover:bg-muted/10'
               }`}
             >
-              {status}
+              {filterOption.charAt(0).toUpperCase() + filterOption.slice(1)}
             </button>
           ))}
         </div>
       </div>
 
       {error && (
-        <div className="mb-4 p-4 bg-red-100 text-red-700 rounded">
+        <div className="mb-4 p-4 bg-danger/10 text-danger border border-danger/20 rounded-md">
           {error}
         </div>
       )}
 
-      {/* Bulk actions bar */}
+      {/* Search and Filters */}
+      <div className="mb-4 space-y-4">
+        {/* Search Bar */}
+        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+          <div className="flex-1">
+            <input
+              type="text"
+              placeholder="Search articles by title, content, or feed name..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full border border-muted rounded-md px-3 py-2 bg-background text-content focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+            />
+          </div>
+          <div className="flex items-center space-x-2">
+            <label className="text-sm text-content/70">Show:</label>
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+              className="border border-muted rounded-md px-2 py-1 bg-background text-content focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+            <span className="text-sm text-content/70">per page</span>
+          </div>
+        </div>
+
+        {/* Feed Filter */}
+        <div className="flex items-center space-x-4">
+          <label className="text-sm font-medium text-content">Filter by RSS Feed:</label>
+          <select
+            value={selectedFeed}
+            onChange={(e) => {
+              setSelectedFeed(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="border border-muted rounded-md px-3 py-2 bg-background text-content focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent min-w-[200px]"
+          >
+            <option value="all">All Feeds</option>
+            {availableFeeds.map((feed) => (
+              <option key={feed.id} value={feed.id.toString()}>
+                {feed.name}
+              </option>
+            ))}
+          </select>
+          {selectedFeed !== 'all' && (
+            <button
+              onClick={() => setSelectedFeed('all')}
+              className="text-sm text-primary hover:text-primary/80 transition-colors"
+            >
+              Clear Filter
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Bulk Actions */}
       {selectedArticles.size > 0 && (
-        <div className="mb-4 p-3 bg-blue-50 rounded-lg flex items-center justify-between">
-          <span className="text-sm text-blue-800">
-            {selectedArticles.size} article{selectedArticles.size !== 1 ? 's' : ''} selected
-          </span>
-          <div className="flex gap-2">
-            <button
-              onClick={() => handleBulkModerate('APPROVED')}
-              className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
-            >
-              Approve Selected
-            </button>
-            <button
-              onClick={() => handleBulkModerate('REJECTED')}
-              className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
-            >
-              Reject Selected
-            </button>
-            <button
-              onClick={clearSelection}
-              className="px-3 py-1 bg-gray-600 text-white rounded text-sm hover:bg-gray-700"
-            >
-              Clear Selection
-            </button>
+        <div className="mb-4 p-4 bg-primary/10 border border-primary/20 rounded-md">
+          <div className="flex items-center justify-between">
+            <span className="text-content font-medium">
+              {selectedArticles.size} article{selectedArticles.size !== 1 ? 's' : ''} selected
+            </span>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => handleBulkModeration('APPROVED')}
+                disabled={bulkProcessing}
+                className="px-3 py-1 bg-success text-surface rounded-md hover:opacity-90 transition-colors disabled:opacity-50"
+              >
+                {bulkProcessing ? 'Processing...' : 'Approve All'}
+              </button>
+              <button
+                onClick={() => handleBulkModeration('REJECTED')}
+                disabled={bulkProcessing}
+                className="px-3 py-1 bg-danger text-surface rounded-md hover:opacity-90 transition-colors disabled:opacity-50"
+              >
+                {bulkProcessing ? 'Processing...' : 'Reject All'}
+              </button>
+              <button
+                onClick={() => {
+                  // Example: Add "Tesla" tag to selected articles
+                  handleBulkRetagging(['Tesla'], []);
+                }}
+                className="px-3 py-1 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+              >
+                Tag Tesla
+              </button>
+              <button
+                onClick={clearSelection}
+                className="px-3 py-1 text-content/70 border border-muted rounded-md hover:bg-muted/5 transition-colors"
+              >
+                Clear
+              </button>
+            </div>
           </div>
         </div>
       )}
 
-      <div className="bg-white shadow rounded-lg overflow-hidden">
+      <div className="bg-surface border border-muted rounded-lg overflow-hidden shadow-sm">
         {articles.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">
+          <div className="p-8 text-center text-content/70">
             <p className="text-lg mb-2">No articles found</p>
             <p>
-              {filter === 'pending' 
-                ? 'No articles pending moderation.' 
+              {filter === 'pending'
+                ? 'No articles are currently pending moderation.'
                 : `No ${filter} articles found.`}
             </p>
           </div>
         ) : (
-          <div>
-            {/* Bulk selection header */}
-            <div className="px-6 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
-              <div className="flex items-center space-x-3">
+          <div className="divide-y divide-muted">
+            {/* Header with select all */}
+            <div className="p-4 bg-muted/5 border-b border-muted">
+              <label className="flex items-center">
                 <input
                   type="checkbox"
                   checked={selectedArticles.size === articles.length && articles.length > 0}
-                  onChange={selectedArticles.size === articles.length ? clearSelection : selectAll}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  onChange={(e) => (e.target.checked ? selectAll() : clearSelection())}
+                  className="mr-2 text-primary focus:ring-primary"
                 />
-                <span className="text-sm text-gray-700">
-                  {selectedArticles.size > 0 
-                    ? `${selectedArticles.size} selected`
-                    : `${articles.length} articles`
-                  }
+                <span className="text-sm text-content/60">
+                  Select all ({articles.length} articles)
                 </span>
-              </div>
-              
-              {selectedArticles.size > 0 && (
-                <div className="flex items-center space-x-2 text-sm">
-                  <span className="text-gray-500">Bulk actions:</span>
-                  <button
-                    onClick={() => handleBulkModerate('APPROVED')}
-                    className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700"
-                  >
-                    Approve All
-                  </button>
-                  <button
-                    onClick={() => handleBulkModerate('REJECTED')}
-                    className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
-                  >
-                    Reject All
-                  </button>
-                </div>
-              )}
+              </label>
             </div>
 
-            {/* Articles list */}
-            <div className="divide-y divide-gray-200">
-              {articles.map((article) => (
-                <div key={article.id} className="p-6 hover:bg-gray-50">
-                  <div className="flex items-start space-x-4">
-                    {/* Selection checkbox */}
+            {/* Article List */}
+            {articles.map((article) => {
+              const isSelected = selectedArticles.has(article.id);
+              const isExpanded = expandedArticle === article.id;
+
+              return (
+                <div key={article.id} className="p-4 hover:bg-muted/5">
+                  <div className="flex items-start space-x-3">
+                    {/* Checkbox */}
                     <input
                       type="checkbox"
-                      checked={selectedArticles.has(article.id)}
+                      checked={isSelected}
                       onChange={() => toggleArticleSelection(article.id)}
-                      className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      className="mt-1 text-primary focus:ring-primary"
                     />
 
-                    {/* Article image */}
-                    {article.leadImageUrl && (
-                      <div className="flex-shrink-0">
-                        <img
-                          src={article.leadImageUrl}
-                          alt=""
-                          className="w-20 h-20 object-cover rounded-lg"
-                        />
-                      </div>
-                    )}
-
-                    {/* Article content */}
+                    {/* Article Content */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center space-x-2">
-                          <span className="text-sm font-medium text-gray-900">
-                            {article.feed.name}
-                          </span>
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            article.status === 'APPROVED' 
-                              ? 'bg-green-100 text-green-800'
-                              : article.status === 'REJECTED'
-                              ? 'bg-red-100 text-red-800'
-                              : 'bg-yellow-100 text-yellow-800'
-                          }`}>
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <h3 className="text-content font-medium leading-tight">
+                            {article.title}
+                          </h3>
+
+                          {/* Feed and Publication Date */}
+                          <div className="flex items-center space-x-2 mt-1 text-sm text-content/60">
+                            <span className="font-medium">{article.feedName}</span>
+                            <span>•</span>
+                            <span>{formatDate(article.publishedAt)}</span>
+                          </div>
+
+                          {/* Excerpt */}
+                          {article.excerpt && (
+                            <p className="mt-2 text-sm text-content/70">
+                              {isExpanded ? article.excerpt : truncateText(article.excerpt, 200)}
+                            </p>
+                          )}
+
+                          {/* Tags */}
+                          {article.tags && article.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-2">
+                              {article.tags.map((tag) => (
+                                <span
+                                  key={tag}
+                                  className="px-2 py-1 text-xs bg-primary/10 text-primary rounded-full"
+                                >
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Moderation Notes */}
+                          {article.modNotes && (
+                            <div className="mt-2 p-2 bg-warning/10 border border-warning/20 rounded text-sm">
+                              <strong>Mod Notes:</strong> {article.modNotes}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Status and Actions */}
+                        <div className="flex flex-col items-end space-y-2 ml-4">
+                          <span
+                            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadgeClasses(article.status)}`}
+                          >
                             {article.status}
                           </span>
-                        </div>
-                        <span className="text-sm text-gray-500">
-                          {article.publishedAt 
-                            ? new Date(article.publishedAt).toLocaleDateString()
-                            : new Date(article.fetchedAt).toLocaleDateString()
-                          }
-                        </span>
-                      </div>
 
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">
-                        <a 
-                          href={article.url} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="hover:text-blue-600"
-                        >
-                          {article.title}
-                        </a>
-                      </h3>
-
-                      {article.excerpt && (
-                        <p className="text-gray-600 text-sm mb-3 line-clamp-2">
-                          {article.excerpt}
-                        </p>
-                      )}
-
-                      {/* Tags */}
-                      {article.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mb-3">
-                          {article.tags.map((tag) => (
-                            <span
-                              key={tag}
-                              className="inline-flex px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded"
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={() => setExpandedArticle(isExpanded ? null : article.id)}
+                              className="text-primary hover:text-primary/80 text-sm"
                             >
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                      )}
+                              {isExpanded ? 'Collapse' : 'Expand'}
+                            </button>
 
-                      {/* Moderation notes */}
-                      {article.modNotes && (
-                        <div className="text-sm text-gray-600 bg-gray-100 p-2 rounded mb-3">
-                          <strong>Moderation notes:</strong> {article.modNotes}
-                        </div>
-                      )}
-
-                      {/* Actions */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                          {article.status === 'PENDING' && (
-                            <>
-                              <button
-                                onClick={() => handleModerateArticle(article.id, 'APPROVED')}
-                                className="text-green-600 hover:text-green-900 text-sm font-medium"
+                            {article.url && (
+                              <a
+                                href={article.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-primary hover:text-primary/80 text-sm"
                               >
-                                Approve
-                              </button>
-                              <button
-                                onClick={() => handleModerateArticle(article.id, 'REJECTED')}
-                                className="text-red-600 hover:text-red-900 text-sm font-medium"
-                              >
-                                Reject
-                              </button>
-                            </>
-                          )}
-                          <a
-                            href={article.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:text-blue-900 text-sm font-medium"
-                          >
-                            View Original
-                          </a>
-                        </div>
-                        
-                        <div className="text-xs text-gray-500">
-                          ID: {article.id} • Fetched: {new Date(article.fetchedAt).toLocaleDateString()}
+                                View
+                              </a>
+                            )}
+                          </div>
                         </div>
                       </div>
+
+                      {/* Expanded Details */}
+                      {isExpanded && (
+                        <div className="mt-4 pt-4 border-t border-muted">
+                          <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                              <strong className="text-content">URL:</strong>
+                              <div className="text-content/60 break-all">{article.url}</div>
+                            </div>
+                            <div>
+                              <strong className="text-content">Feed:</strong>
+                              <div className="text-content/60">{article.feedName}</div>
+                            </div>
+                            <div>
+                              <strong className="text-content">Status:</strong>
+                              <div className="text-content/60">{article.status}</div>
+                            </div>
+                            <div>
+                              <strong className="text-content">Published:</strong>
+                              <div className="text-content/60">
+                                {formatDate(article.publishedAt)}
+                              </div>
+                            </div>
+                            {article.leadImageUrl && (
+                              <div className="col-span-2">
+                                <strong className="text-content">Lead Image:</strong>
+                                <div className="mt-1">
+                                  <img
+                                    src={article.leadImageUrl}
+                                    alt="Article lead"
+                                    className="max-w-xs max-h-32 object-cover rounded border border-muted"
+                                    onError={(e) => {
+                                      e.currentTarget.style.display = 'none';
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
+              );
+            })}
           </div>
         )}
       </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="mt-6 flex items-center justify-between">
+          <div className="text-sm text-content/60">
+            Page {currentPage} of {totalPages}
+          </div>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-2 text-content/70 border border-muted rounded-md hover:bg-muted/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              ← Previous
+            </button>
+
+            {/* Page numbers */}
+            <div className="flex space-x-1">
+              {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                let pageNum;
+                if (totalPages <= 5) {
+                  pageNum = i + 1;
+                } else {
+                  // Show pages around current page
+                  const start = Math.max(1, currentPage - 2);
+                  const end = Math.min(totalPages, start + 4);
+                  pageNum = start + i;
+                  if (pageNum > end) return null;
+                }
+
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => setCurrentPage(pageNum)}
+                    className={`px-3 py-2 text-sm rounded-md transition-colors ${
+                      currentPage === pageNum
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-content/70 border border-muted hover:bg-muted/5'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-2 text-content/70 border border-muted rounded-md hover:bg-muted/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next →
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

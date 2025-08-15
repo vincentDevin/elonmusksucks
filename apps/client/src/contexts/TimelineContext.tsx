@@ -36,8 +36,14 @@ interface TimelineState {
 type TimelineAction =
   | { type: 'SET_LOADING'; payload: { content: 'articles' | 'tweets'; loading: boolean } }
   | { type: 'SET_ERROR'; payload: { content: 'articles' | 'tweets'; error: string | null } }
-  | { type: 'LOAD_ARTICLES_SUCCESS'; payload: { items: TimelineItem[]; cursor?: string; hasMore: boolean; reset?: boolean } }
-  | { type: 'LOAD_TWEETS_SUCCESS'; payload: { items: TimelineItem[]; cursor?: string; hasMore: boolean; reset?: boolean } }
+  | {
+      type: 'LOAD_ARTICLES_SUCCESS';
+      payload: { items: TimelineItem[]; cursor?: string; hasMore: boolean; reset?: boolean };
+    }
+  | {
+      type: 'LOAD_TWEETS_SUCCESS';
+      payload: { items: TimelineItem[]; cursor?: string; hasMore: boolean; reset?: boolean };
+    }
   | { type: 'SET_ACTIVE_TAB'; payload: 'articles' | 'tweets' }
   | { type: 'UPDATE_FILTERS'; payload: Partial<TimelineState['filters']> }
   | { type: 'SET_SELECTED_ARTICLE'; payload: TimelineItem | undefined }
@@ -60,8 +66,8 @@ const initialState: TimelineState = {
   activeTab: 'articles',
   filters: {
     tags: [],
-    sort: 'newest'
-  }
+    sort: 'newest',
+  },
 };
 
 // Reducer
@@ -70,75 +76,75 @@ function timelineReducer(state: TimelineState, action: TimelineAction): Timeline
     case 'SET_LOADING':
       return {
         ...state,
-        [`${action.payload.content}Loading`]: action.payload.loading
+        [`${action.payload.content}Loading`]: action.payload.loading,
       };
 
     case 'SET_ERROR':
       return {
         ...state,
-        [`${action.payload.content}Error`]: action.payload.error
+        [`${action.payload.content}Error`]: action.payload.error,
       };
 
     case 'LOAD_ARTICLES_SUCCESS':
       return {
         ...state,
-        articles: action.payload.reset 
-          ? action.payload.items 
+        articles: action.payload.reset
+          ? action.payload.items
           : [...state.articles, ...action.payload.items],
         articlesCursor: action.payload.cursor,
         articlesHasMore: action.payload.hasMore,
         articlesLoading: false,
-        articlesError: null
+        articlesError: null,
       };
 
     case 'LOAD_TWEETS_SUCCESS':
       return {
         ...state,
-        tweets: action.payload.reset 
-          ? action.payload.items 
+        tweets: action.payload.reset
+          ? action.payload.items
           : [...state.tweets, ...action.payload.items],
         tweetsCursor: action.payload.cursor,
         tweetsHasMore: action.payload.hasMore,
         tweetsLoading: false,
-        tweetsError: null
+        tweetsError: null,
       };
 
     case 'SET_ACTIVE_TAB':
       return {
         ...state,
-        activeTab: action.payload
+        activeTab: action.payload,
       };
 
     case 'UPDATE_FILTERS':
       return {
         ...state,
-        filters: { ...state.filters, ...action.payload }
+        filters: { ...state.filters, ...action.payload },
       };
 
     case 'SET_SELECTED_ARTICLE':
       return {
         ...state,
-        selectedArticle: action.payload
+        selectedArticle: action.payload,
       };
 
     case 'SET_USE_AS_SOURCE_ITEM':
       return {
         ...state,
-        useAsSourceItem: action.payload
+        useAsSourceItem: action.payload,
       };
 
     case 'ADD_NEW_ITEM':
       const itemsKey = action.payload.type;
       return {
         ...state,
-        [itemsKey]: [action.payload.item, ...state[itemsKey]]
+        [itemsKey]: [action.payload.item, ...state[itemsKey]],
       };
 
     case 'RESET_TIMELINE':
       return {
         ...initialState,
         activeTab: state.activeTab,
-        filters: state.filters
+        filters: state.filters,
       };
 
     default:
@@ -147,19 +153,22 @@ function timelineReducer(state: TimelineState, action: TimelineAction): Timeline
 }
 
 // Context
-const TimelineContext = createContext<{
-  state: TimelineState;
-  dispatch: React.Dispatch<TimelineAction>;
-  // Actions
-  loadArticles: (reset?: boolean) => Promise<void>;
-  loadTweets: (reset?: boolean) => Promise<void>;
-  setActiveTab: (tab: 'articles' | 'tweets') => void;
-  updateFilters: (filters: Partial<TimelineState['filters']>) => void;
-  openArticle: (article: TimelineItem) => void;
-  closeArticle: () => void;
-  openUseAsSource: (item: TimelineItem) => void;
-  closeUseAsSource: () => void;
-} | undefined>(undefined);
+const TimelineContext = createContext<
+  | {
+      state: TimelineState;
+      dispatch: React.Dispatch<TimelineAction>;
+      // Actions
+      loadArticles: (reset?: boolean) => Promise<void>;
+      loadTweets: (reset?: boolean) => Promise<void>;
+      setActiveTab: (tab: 'articles' | 'tweets') => void;
+      updateFilters: (filters: Partial<TimelineState['filters']>) => void;
+      openArticle: (article: TimelineItem) => void;
+      closeArticle: () => void;
+      openUseAsSource: (item: TimelineItem) => void;
+      closeUseAsSource: () => void;
+    }
+  | undefined
+>(undefined);
 
 // Provider component
 export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -179,17 +188,17 @@ export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         sort: state.filters.sort,
         ...(state.filters.tags.length > 0 ? { tag: state.filters.tags.join(',') } : {}),
         ...(state.filters.search ? { search: state.filters.search } : {}),
-        ...(state.articlesCursor && !reset ? { cursor: state.articlesCursor } : {})
+        ...(state.articlesCursor && !reset ? { cursor: state.articlesCursor } : {}),
       });
 
       const response = await fetch(`/api/timeline/articles?${params}`, {
-        credentials: 'include'
+        credentials: 'include',
       });
-      
+
       if (!response.ok) {
         throw new Error(`Failed to load articles: ${response.status}`);
       }
-      
+
       const data: TimelineResponse = await response.json();
 
       dispatch({
@@ -198,17 +207,16 @@ export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           items: data.items,
           cursor: data.pagination.cursor,
           hasMore: data.pagination.hasMore,
-          reset
-        }
+          reset,
+        },
       });
-
     } catch (error) {
       dispatch({
         type: 'SET_ERROR',
         payload: {
           content: 'articles',
-          error: error instanceof Error ? error.message : 'Failed to load articles'
-        }
+          error: error instanceof Error ? error.message : 'Failed to load articles',
+        },
       });
     }
   };
@@ -221,17 +229,17 @@ export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     try {
       const params = new URLSearchParams({
         limit: '50',
-        ...(state.tweetsCursor && !reset ? { cursor: state.tweetsCursor } : {})
+        ...(state.tweetsCursor && !reset ? { cursor: state.tweetsCursor } : {}),
       });
 
       const response = await fetch(`/api/timeline/tweets?${params}`, {
-        credentials: 'include'
+        credentials: 'include',
       });
-      
+
       if (!response.ok) {
         throw new Error(`Failed to load tweets: ${response.status}`);
       }
-      
+
       const data: TimelineResponse = await response.json();
 
       dispatch({
@@ -240,24 +248,23 @@ export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           items: data.items,
           cursor: data.pagination.cursor,
           hasMore: data.pagination.hasMore,
-          reset
-        }
+          reset,
+        },
       });
-
     } catch (error) {
       dispatch({
         type: 'SET_ERROR',
         payload: {
           content: 'tweets',
-          error: error instanceof Error ? error.message : 'Failed to load tweets'
-        }
+          error: error instanceof Error ? error.message : 'Failed to load tweets',
+        },
       });
     }
   };
 
   const setActiveTab = (tab: 'articles' | 'tweets') => {
     dispatch({ type: 'SET_ACTIVE_TAB', payload: tab });
-    
+
     // Load tweets on first access
     if (tab === 'tweets' && state.tweets.length === 0 && !state.tweetsLoading) {
       loadTweets(true);
@@ -266,7 +273,7 @@ export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const updateFilters = (filters: Partial<TimelineState['filters']>) => {
     dispatch({ type: 'UPDATE_FILTERS', payload: filters });
-    
+
     // Reload current tab with new filters
     if (state.activeTab === 'articles') {
       loadArticles(true);
@@ -301,7 +308,7 @@ export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     // Listen for newly approved articles
     const handleNewArticle = (data: any) => {
       console.log('[Timeline] New approved article:', data);
-      
+
       // Convert the approved article to TimelineItem format
       const timelineItem: TimelineItem = {
         id: data.id.toString(),
@@ -313,7 +320,7 @@ export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         leadImageUrl: data.leadImageUrl,
         tags: data.tags || [],
         publisher: data.feed?.name || 'Unknown',
-        publisherIconUrl: data.feed?.siteUrl ? `${data.feed.siteUrl}/favicon.ico` : undefined
+        publisherIconUrl: data.feed?.siteUrl ? `${data.feed.siteUrl}/favicon.ico` : undefined,
       };
 
       // Add to timeline if user is viewing articles
@@ -325,7 +332,7 @@ export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     // Listen for new tweets (if implemented)
     const handleNewTweet = (data: any) => {
       console.log('[Timeline] New tweet:', data);
-      
+
       const timelineItem: TimelineItem = {
         id: data.id,
         type: 'tweet',
@@ -337,8 +344,8 @@ export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           likes: data.counts?.likes || 0,
           replies: data.counts?.replies || 0,
           reposts: data.counts?.reposts || 0,
-          quotes: data.counts?.quotes || 0
-        }
+          quotes: data.counts?.quotes || 0,
+        },
       };
 
       // Add to timeline if user is viewing tweets
@@ -358,18 +365,20 @@ export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, [socket, state.activeTab]);
 
   return (
-    <TimelineContext.Provider value={{
-      state,
-      dispatch,
-      loadArticles,
-      loadTweets,
-      setActiveTab,
-      updateFilters,
-      openArticle,
-      closeArticle,
-      openUseAsSource,
-      closeUseAsSource
-    }}>
+    <TimelineContext.Provider
+      value={{
+        state,
+        dispatch,
+        loadArticles,
+        loadTweets,
+        setActiveTab,
+        updateFilters,
+        openArticle,
+        closeArticle,
+        openUseAsSource,
+        closeUseAsSource,
+      }}
+    >
       {children}
     </TimelineContext.Provider>
   );

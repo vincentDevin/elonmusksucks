@@ -87,7 +87,25 @@ export async function getRefreshToken(
 }
 
 export async function deleteRefreshToken(token: string): Promise<void> {
-  await repo.deleteRefreshToken(token);
+  // Similar to getRefreshToken, we need to find the token by comparing hashes
+  try {
+    const payload = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET!) as any;
+    if (!payload?.userId) return;
+
+    const storedTokens = await repo.getAllRefreshTokensForUser(payload.userId);
+
+    // Find the matching hashed token to delete
+    for (const storedToken of storedTokens) {
+      const isMatch = await bcrypt.compare(token, storedToken.token);
+      if (isMatch) {
+        await repo.deleteRefreshToken(storedToken.token);
+        return;
+      }
+    }
+  } catch (error) {
+    // If JWT is invalid/expired, just ignore silently for logout
+    console.warn('Delete refresh token: Invalid JWT during logout', error);
+  }
 }
 
 // --- User lookup ---

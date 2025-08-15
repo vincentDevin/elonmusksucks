@@ -43,13 +43,13 @@ export const FeedManager: React.FC<FeedManagerProps> = ({ className = '' }) => {
 
   const handleRefreshFeed = async (feedId: number) => {
     try {
-      setRefreshing(prev => new Set(prev).add(feedId));
+      setRefreshing((prev) => new Set(prev).add(feedId));
       await timelineAPIs.feeds.refreshFeed(feedId);
       await loadFeeds(); // Reload to get updated stats
     } catch (err) {
       console.error('Failed to refresh feed:', err);
     } finally {
-      setRefreshing(prev => {
+      setRefreshing((prev) => {
         const newSet = new Set(prev);
         newSet.delete(feedId);
         return newSet;
@@ -59,10 +59,14 @@ export const FeedManager: React.FC<FeedManagerProps> = ({ className = '' }) => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'ACTIVE': return 'bg-green-100 text-green-800';
-      case 'PAUSED': return 'bg-yellow-100 text-yellow-800';
-      case 'ERROR': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'ACTIVE':
+        return 'bg-green-100 text-green-800';
+      case 'PAUSED':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'ERROR':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
@@ -72,7 +76,7 @@ export const FeedManager: React.FC<FeedManagerProps> = ({ className = '' }) => {
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    
+
     if (diffHours < 1) return 'Just now';
     if (diffHours < 24) return `${diffHours}h ago`;
     return `${Math.floor(diffHours / 24)}d ago`;
@@ -105,11 +109,7 @@ export const FeedManager: React.FC<FeedManagerProps> = ({ className = '' }) => {
         </button>
       </div>
 
-      {error && (
-        <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-lg">
-          {error}
-        </div>
-      )}
+      {error && <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-lg">{error}</div>}
 
       {/* Stats Summary */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -120,13 +120,13 @@ export const FeedManager: React.FC<FeedManagerProps> = ({ className = '' }) => {
         <div className="bg-white p-4 rounded-lg shadow">
           <h3 className="text-sm font-medium text-gray-500">Active Feeds</h3>
           <p className="text-2xl font-bold text-green-600">
-            {feeds.filter(f => f.status === 'ACTIVE').length}
+            {feeds.filter((f) => f.status === 'ACTIVE').length}
           </p>
         </div>
         <div className="bg-white p-4 rounded-lg shadow">
           <h3 className="text-sm font-medium text-gray-500">Error Feeds</h3>
           <p className="text-2xl font-bold text-red-600">
-            {feeds.filter(f => f.status === 'ERROR').length}
+            {feeds.filter((f) => f.status === 'ERROR').length}
           </p>
         </div>
         <div className="bg-white p-4 rounded-lg shadow">
@@ -166,9 +166,7 @@ export const FeedManager: React.FC<FeedManagerProps> = ({ className = '' }) => {
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center">
                     <div>
-                      <div className="text-sm font-medium text-gray-900">
-                        {feed.name}
-                      </div>
+                      <div className="text-sm font-medium text-gray-900">{feed.name}</div>
                       <div className="text-sm text-gray-500 truncate max-w-xs">
                         {feed.siteUrl || feed.url}
                       </div>
@@ -176,7 +174,9 @@ export const FeedManager: React.FC<FeedManagerProps> = ({ className = '' }) => {
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(feed.status)}`}>
+                  <span
+                    className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(feed.status)}`}
+                  >
                     {feed.status}
                   </span>
                 </td>
@@ -207,12 +207,8 @@ export const FeedManager: React.FC<FeedManagerProps> = ({ className = '' }) => {
                     >
                       {refreshing.has(feed.id) ? '⏳' : '🔄'}
                     </button>
-                    <button className="text-gray-600 hover:text-gray-900">
-                      ✏️
-                    </button>
-                    <button className="text-red-600 hover:text-red-900">
-                      🗑️
-                    </button>
+                    <button className="text-gray-600 hover:text-gray-900">✏️</button>
+                    <button className="text-red-600 hover:text-red-900">🗑️</button>
                   </div>
                 </td>
               </tr>
@@ -235,9 +231,7 @@ export const FeedManager: React.FC<FeedManagerProps> = ({ className = '' }) => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full">
             <h3 className="text-lg font-semibold mb-4">Add RSS Feed</h3>
-            <p className="text-gray-600 mb-4">
-              Feed creation functionality coming soon...
-            </p>
+            <p className="text-gray-600 mb-4">Feed creation functionality coming soon...</p>
             <div className="flex justify-end">
               <button
                 onClick={() => setShowAddModal(false)}

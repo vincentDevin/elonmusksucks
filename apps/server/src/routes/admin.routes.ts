@@ -2,6 +2,7 @@
 import { Router } from 'express';
 import { requireAuth, requireAdmin } from '../middleware/auth.middleware';
 import * as adminController from '../controllers/admin.controller';
+import feedsRoutes from './feeds.routes.simple';
 
 const router = Router();
 
@@ -88,5 +89,9 @@ router.get('/stats/:userId', adminController.getUserStats);
 
 // — Miscellaneous —
 router.post('/aitweet', adminController.triggerAITweet);
+
+// — RSS Feeds Management —
+// Mount the feeds routes under /feeds (so they become /api/admin/feeds/*)
+router.use('/feeds', feedsRoutes);
 
 export default router;
