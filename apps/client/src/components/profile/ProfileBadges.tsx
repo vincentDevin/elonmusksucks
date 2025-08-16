@@ -22,13 +22,15 @@ export function ProfileBadges({ badges }: ProfileBadgesProps) {
   const [selectedRarity, setSelectedRarity] = useState<string>('all');
 
   // Get unique categories and rarities
-  const categories = ['all', ...Array.from(new Set(badges.map((b) => b.category)))];
-  const rarities = ['all', ...Array.from(new Set(badges.map((b) => b.rarity)))];
+  const categories = ['all', ...Array.from(new Set(badges.map((b) => b.category).filter(Boolean)))];
+  const rarities = ['all', ...Array.from(new Set(badges.map((b) => b.rarity).filter(Boolean)))];
 
   // Filter badges
   const filteredBadges = badges.filter((badge) => {
-    const categoryMatch = selectedCategory === 'all' || badge.category === selectedCategory;
-    const rarityMatch = selectedRarity === 'all' || badge.rarity === selectedRarity;
+    const categoryMatch =
+      selectedCategory === 'all' || (badge.category && badge.category === selectedCategory);
+    const rarityMatch =
+      selectedRarity === 'all' || (badge.rarity && badge.rarity === selectedRarity);
     return categoryMatch && rarityMatch;
   });
 
@@ -45,7 +47,9 @@ export function ProfileBadges({ badges }: ProfileBadgesProps) {
     return bDate - aDate;
   });
 
-  const getCategoryIcon = (category: string) => {
+  const getCategoryIcon = (category: string | undefined) => {
+    if (!category) return '🏅';
+
     switch (category.toLowerCase()) {
       case 'betting':
         return '💰';
@@ -67,34 +71,34 @@ export function ProfileBadges({ badges }: ProfileBadgesProps) {
   const getRarityStyles = (rarity: string) => {
     switch (rarity) {
       case 'legendary':
-        return 'bg-gradient-to-br from-purple-100 to-purple-200 border-purple-300 shadow-purple-100';
+        return 'bg-gradient-to-br from-primary/10 to-primary/20 border-primary/30 shadow-sm';
       case 'rare':
-        return 'bg-gradient-to-br from-blue-100 to-blue-200 border-blue-300 shadow-blue-100';
+        return 'bg-gradient-to-br from-secondary/10 to-secondary/20 border-secondary/30 shadow-sm';
       case 'uncommon':
-        return 'bg-gradient-to-br from-green-100 to-green-200 border-green-300 shadow-green-100';
+        return 'bg-gradient-to-br from-success/10 to-success/20 border-success/30 shadow-sm';
       case 'secret':
-        return 'bg-gradient-to-br from-indigo-100 to-indigo-200 border-indigo-300 shadow-indigo-100';
+        return 'bg-gradient-to-br from-accent/10 to-accent/20 border-accent/30 shadow-sm';
       case 'shame':
-        return 'bg-gradient-to-br from-red-100 to-red-200 border-red-300 shadow-red-100';
+        return 'bg-gradient-to-br from-danger/10 to-danger/20 border-danger/30 shadow-sm';
       default:
-        return 'bg-gradient-to-br from-gray-100 to-gray-200 border-gray-300 shadow-gray-100';
+        return 'bg-gradient-to-br from-muted/10 to-muted/20 border-muted/30 shadow-sm';
     }
   };
 
   const getRarityBadgeColor = (rarity: string) => {
     switch (rarity) {
       case 'legendary':
-        return 'bg-purple-500 text-white';
+        return 'bg-primary text-primary-foreground';
       case 'rare':
-        return 'bg-blue-500 text-white';
+        return 'bg-secondary text-secondary-foreground';
       case 'uncommon':
-        return 'bg-green-500 text-white';
+        return 'bg-success text-success-foreground';
       case 'secret':
-        return 'bg-indigo-500 text-white';
+        return 'bg-accent text-accent-foreground';
       case 'shame':
-        return 'bg-red-500 text-white';
+        return 'bg-danger text-danger-foreground';
       default:
-        return 'bg-gray-500 text-white';
+        return 'bg-muted text-muted-foreground';
     }
   };
 
@@ -148,7 +152,7 @@ export function ProfileBadges({ badges }: ProfileBadgesProps) {
       </div>
 
       {/* Achievement Summary - always visible */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 bg-secondary/10 rounded-xl">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 bg-muted/10 rounded-xl">
         <div className="text-center">
           <div className="text-lg font-bold text-primary">{badges.length}</div>
           <div className="text-xs text-tertiary">Total</div>
@@ -271,8 +275,8 @@ export function ProfileBadges({ badges }: ProfileBadgesProps) {
                         getCategoryIcon(badge.category)
                       )}
                     </div>
-                    <span className="text-xs px-2 py-1 bg-surface/70 rounded-full text-tertiary font-medium capitalize">
-                      {badge.category}
+                    <span className="text-xs px-2 py-1 bg-muted/20 rounded-full text-tertiary font-medium capitalize">
+                      {badge.category || 'general'}
                     </span>
                   </div>
 

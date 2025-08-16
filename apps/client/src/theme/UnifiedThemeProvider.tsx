@@ -97,7 +97,7 @@ export const UnifiedThemeProvider: React.FC<UnifiedThemeProviderProps> = ({ chil
         }
 
         // 4. Try to load theme from user context (no API call needed)
-        let userTheme: string | null = null;
+        // let userTheme: string | null = null;
         // Get theme from user context instead of making API call
         // The AuthContext has already loaded user data
         // We'll check for it after the component has user prop
