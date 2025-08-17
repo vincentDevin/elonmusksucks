@@ -13,6 +13,7 @@ import {
   refreshToken,
   logoutUser,
   me,
+  getBalance,
   verifyEmail,
   requestPasswordReset,
   performPasswordReset,
@@ -30,6 +31,7 @@ router.get('/verify-email', apiLimiter, verifyEmail);
 // Protected routes
 router.post('/logout', requireAuth, logoutUser);
 router.get('/me', requireAuth, me);
+router.get('/balance', requireAuth, getBalance);
 router.put('/theme', requireAuth, updateTheme);
 
 // Password reset flows (with aggressive rate limiting)

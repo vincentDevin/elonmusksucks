@@ -106,3 +106,11 @@ export async function updateTheme(themeId: string): Promise<{ success: boolean; 
   const res = await api.put<{ success: boolean; theme: string }>('/api/auth/theme', { themeId });
   return res.data;
 }
+
+/**
+ * Fetch only the user's current balance without affecting auth state
+ */
+export async function getBalance(): Promise<{ muskBucks: string }> {
+  const res = await api.get<{ muskBucks: string }>('/api/auth/balance');
+  return res.data;
+}

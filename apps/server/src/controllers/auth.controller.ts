@@ -130,6 +130,42 @@ export const me: RequestHandler = async (req, res, next) => {
 };
 
 /**
+ * GET /api/auth/balance
+ * Returns only the user's current balance without affecting auth state
+ */
+export const getBalance: RequestHandler = async (req, res, next) => {
+  try {
+    const userId = (req as any).user?.id;
+    if (!userId) {
+      return sendError(res, 401, 'Authentication required');
+    }
+
+    // Import prisma client for direct balance query
+    const { PrismaClient } = await import('@prisma/client');
+    const prisma = new PrismaClient();
+
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { muskBucks: true },
+      });
+
+      if (!user) {
+        return sendError(res, 404, 'User not found');
+      }
+
+      return res.json({
+        muskBucks: user.muskBucks.toString(),
+      });
+    } finally {
+      await prisma.$disconnect();
+    }
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
  * PUT /api/auth/theme
  */
 export const updateTheme: RequestHandler = async (req, res, next) => {

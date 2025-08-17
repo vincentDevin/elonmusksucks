@@ -5,6 +5,7 @@ import {
   refresh as refreshApi,
   logout as logoutApi,
   me as meApi,
+  getBalance as getBalanceApi,
 } from '../api/auth';
 import type { User } from '../api/auth';
 import type { ReactNode } from 'react';
@@ -19,6 +20,7 @@ interface AuthContextType {
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  refreshUserBalance: () => Promise<void>;
   clearAuth: () => void; // For use by axios interceptor
 }
 
@@ -79,6 +81,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setUser(currentUser);
   }, []);
 
+  // Refresh only user balance without affecting auth state
+  const refreshUserBalance = useCallback(async () => {
+    try {
+      if (!user?.id) return;
+      const balanceData = await getBalanceApi();
+      // Only update the balance, preserve other user data and avoid token refresh
+      // Convert string to number since server returns muskBucks as string
+      setUser((prevUser) =>
+        prevUser ? { ...prevUser, muskBucks: parseInt(balanceData.muskBucks) } : null,
+      );
+    } catch (error) {
+      // Silently fail for balance refresh to avoid breaking other functionality
+      console.warn('Failed to refresh user balance:', error);
+    }
+  }, [user?.id]);
+
   // Clear auth state without making API call (used by axios interceptor)
   const clearAuth = useCallback(() => {
     setToken(null);
@@ -105,6 +123,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Listen for balance-affecting events to update user balance in real-time
   useEffect(() => {
     if (!user?.id || !socket) return;
+
+    // Only refresh balance when user navigates back to the app (not during gameplay)
+    const handleVisibilityChange = () => {
+      if (!document.hidden && !window.location.pathname.includes('/pong')) {
+        // User returned to the app and is NOT on pong page, safe to refresh balance
+        setTimeout(() => refreshUserBalance(), 1000); // Small delay to ensure any transactions are complete
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     const handleUserBalanceUpdate = (data: { userId: number; newBalance: number }) => {
       // Only update if this balance change belongs to the current user
@@ -183,12 +211,46 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
     };
 
+    const handlePongWager = (data: { userId: number; amount: number }) => {
+      // Handle pong wager deduction (when games start)
+      if (data.userId === user.id) {
+        setUser((prevUser) =>
+          prevUser
+            ? {
+                ...prevUser,
+                muskBucks: prevUser.muskBucks - data.amount,
+              }
+            : null,
+        );
+        // Refresh from server to ensure accuracy
+        refreshUser();
+      }
+    };
+
+    const handlePongPayout = (data: { userId: number; payout: number }) => {
+      // Handle pong game payouts (when games end)
+      if (data.userId === user.id) {
+        setUser((prevUser) =>
+          prevUser
+            ? {
+                ...prevUser,
+                muskBucks: prevUser.muskBucks + data.payout,
+              }
+            : null,
+        );
+        // Refresh from server to ensure accuracy
+        refreshUser();
+      }
+    };
+
     // Listen for various balance-affecting events
     socket.on('userBalanceUpdate', handleUserBalanceUpdate);
     socket.on('betPlaced', handleBetPlaced);
     socket.on('parlayPlaced', handleParlayPlaced);
     socket.on('betResolved', handleBetResolved);
     socket.on('parlayResolved', handleParlayResolved);
+    socket.on('pongWager', handlePongWager);
+    socket.on('pongPayout', handlePongPayout);
 
     return () => {
       socket.off('userBalanceUpdate', handleUserBalanceUpdate);
@@ -196,12 +258,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       socket.off('parlayPlaced', handleParlayPlaced);
       socket.off('betResolved', handleBetResolved);
       socket.off('parlayResolved', handleParlayResolved);
+      socket.off('pongWager', handlePongWager);
+      socket.off('pongPayout', handlePongPayout);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [user?.id, user?.muskBucks, refreshUser]);
+  }, [user?.id, user?.muskBucks, refreshUser, refreshUserBalance]);
 
   return (
     <AuthContext.Provider
-      value={{ accessToken, user, loading, login, register, logout, refreshUser, clearAuth }}
+      value={{
+        accessToken,
+        user,
+        loading,
+        login,
+        register,
+        logout,
+        refreshUser,
+        refreshUserBalance,
+        clearAuth,
+      }}
     >
       {children}
     </AuthContext.Provider>

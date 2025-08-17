@@ -53,6 +53,9 @@ export default function UnifiedNavBar() {
                 <Link to="/leaderboard" className={linkClasses('/leaderboard')}>
                   Leaderboard
                 </Link>
+                <Link to="/pong" className={linkClasses('/pong')}>
+                  🏓 Pong
+                </Link>
                 <div className="relative">
                   <button
                     onClick={() => setDropdownOpen(!dropdownOpen)}
@@ -172,6 +175,13 @@ export default function UnifiedNavBar() {
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     Leaderboard
+                  </Link>
+                  <Link
+                    to="/pong"
+                    className={mobileLinkClasses('/pong')}
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    🏓 Pong
                   </Link>
 
                   <div className="border-t border-muted pt-2 mt-2">

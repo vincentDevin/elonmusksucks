@@ -1,8 +1,17 @@
+import { useEffect } from 'react';
 import { PongGameOptimized } from '../components/pong/PongGameOptimized';
 import { useAuth } from '../hooks/useAuth';
 
 export default function Pong() {
-  const { user } = useAuth();
+  const { user, refreshUserBalance } = useAuth();
+
+  // Refresh balance when component unmounts (user leaves pong page)
+  useEffect(() => {
+    return () => {
+      // User is leaving pong page, refresh their balance to catch any game payouts
+      refreshUserBalance();
+    };
+  }, [refreshUserBalance]);
 
   if (!user) {
     return (
