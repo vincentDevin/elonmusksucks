@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { usePongSocketOptimized } from '../../hooks/usePongSocketOptimized';
 import { usePongInputOptimized } from '../../hooks/usePongInputOptimized';
-import { PongCanvasOptimized } from './PongCanvasOptimized';
+import { PongCanvasEnhanced } from './PongCanvasEnhanced';
 import { PongLobbyOptimized } from './PongLobbyOptimized';
 import { PONG_PHYSICS } from '@ems/types';
 
@@ -69,10 +69,16 @@ export function PongGameOptimized() {
           <div className="space-y-6">
             {/* Game Header */}
             <div className="flex items-center justify-between p-4 bg-surface border border-muted rounded-lg">
-              <div className="flex items-center space-x-4">
-                <h2 className="text-xl font-semibold text-content">
-                  {currentGame.players[0]?.name} vs {currentGame.players[1]?.name || 'AI'}
-                </h2>
+              <div className="flex items-center space-x-6">
+                <div>
+                  <h2 className="text-xl font-semibold text-content">
+                    {currentGame.players[0]?.name} vs {currentGame.players[1]?.name || 'AI'}
+                  </h2>
+                  <div className="flex items-center space-x-4 mt-1 text-sm text-tertiary">
+                    <span>Game: {currentGame.gameId?.slice(-8)}</span>
+                    <span>You: Player {(currentGame.playerSlot || 0) + 1}</span>
+                  </div>
+                </div>
                 <div className="flex items-center space-x-2">
                   <span className="text-2xl font-bold text-accent">{currentGame.scores[0]}</span>
                   <span className="text-tertiary">-</span>
@@ -81,6 +87,36 @@ export function PongGameOptimized() {
               </div>
 
               <div className="flex items-center space-x-4">
+                {/* Status indicator */}
+                <div
+                  className={`px-3 py-1 rounded text-sm font-medium ${
+                    currentGame.status === 'active'
+                      ? 'bg-success/20 text-success'
+                      : currentGame.status === 'countdown'
+                        ? 'bg-warning/20 text-warning'
+                        : currentGame.status === 'ended'
+                          ? 'bg-info/20 text-info'
+                          : 'bg-muted/20 text-tertiary'
+                  }`}
+                >
+                  {(currentGame.status || 'waiting').toUpperCase()}
+                </div>
+
+                {/* Ping indicator */}
+                {lastPing > 0 && (
+                  <div
+                    className={`text-sm ${
+                      lastPing < 50
+                        ? 'text-success'
+                        : lastPing < 100
+                          ? 'text-warning'
+                          : 'text-error'
+                    }`}
+                  >
+                    {lastPing}ms
+                  </div>
+                )}
+
                 {/* Input indicator */}
                 {isInputActive && (
                   <div className="flex items-center space-x-2 text-success">
@@ -100,7 +136,7 @@ export function PongGameOptimized() {
 
             {/* Game Canvas */}
             <div className="flex justify-center">
-              <PongCanvasOptimized
+              <PongCanvasEnhanced
                 gameState={currentGame}
                 ping={lastPing}
                 className="max-w-4xl w-full"

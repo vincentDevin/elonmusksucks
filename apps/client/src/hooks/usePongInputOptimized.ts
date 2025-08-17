@@ -60,7 +60,7 @@ export function usePongInputOptimized(): PongInputHook {
       if ((currentState.up || currentState.down) && sendInputRef.current) {
         sendInputRef.current(currentState);
       }
-    }, 16); // Send input at ~60fps when keys are held
+    }, 8); // Send input at ~120fps when keys are held (1000/8 = 125fps)
 
     return () => clearInterval(interval);
   }, []);

@@ -19,6 +19,9 @@ interface OptimizedGameState {
   tick: number;
   timestamp: number;
   serverTick?: number; // For compatibility with interpolation hook
+  countdown?: number; // For countdown display
+  winner?: 0 | 1 | null; // Winner slot or null for draw
+  payout?: number; // MuskBucks won
 }
 
 interface PongSocketState {
@@ -198,7 +201,9 @@ export function usePongSocketOptimized(): PongSocketHook {
     // Game events
     newSocket.on('countdown', (data: ServerEvents['countdown']) => {
       console.log('🏓 Countdown:', data.seconds, data.message);
-      setCurrentGame((prev) => (prev ? { ...prev, status: 'countdown' } : null));
+      setCurrentGame((prev) =>
+        prev ? { ...prev, status: 'countdown', countdown: data.seconds } : null,
+      );
     });
 
     newSocket.on('game_state', (data: ServerEvents['game_state']) => {
@@ -242,7 +247,17 @@ export function usePongSocketOptimized(): PongSocketHook {
 
     newSocket.on('match_end', (data: ServerEvents['match_end']) => {
       console.log('🏓 Match ended:', data);
-      setCurrentGame((prev) => (prev ? { ...prev, status: 'ended' } : null));
+      setCurrentGame((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: 'ended',
+              winner: data.winner,
+              scores: data.scores,
+              payout: data.payout,
+            }
+          : null,
+      );
 
       // Auto-clear game state after 5 seconds
       setTimeout(() => {

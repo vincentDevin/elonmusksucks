@@ -303,8 +303,12 @@ class GameManager {
 
       this.updateGame(game);
 
-      // Broadcast every 4th tick (15fps network updates)
-      if (game.tick % 4 === 0) {
+      // Broadcast based on network update rate
+      const broadcastInterval = Math.max(
+        1,
+        Math.round(PONG_PHYSICS.TICK_RATE / PONG_PHYSICS.NETWORK_UPDATE_RATE),
+      );
+      if (game.tick % broadcastInterval === 0) {
         this.broadcastGameState(game);
       }
     }, 1000 / PONG_PHYSICS.TICK_RATE);

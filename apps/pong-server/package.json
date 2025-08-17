@@ -9,7 +9,6 @@
     "build": "tsc",
     "start": "node dist/server-optimized.js",
     "start:old": "node dist/server.js",
-    "worker": "ts-node src/workers/pong.worker.ts",
     "test": "jest",
     "lint": "eslint src/**/*.ts --max-warnings=0"
   },

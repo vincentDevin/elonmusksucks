@@ -753,11 +753,11 @@ export const PONG_PHYSICS = {
   PADDLE_HEIGHT: 80,
   PADDLE_SPEED: 300, // pixels per second
   BALL_SIZE: 10,
-  BALL_SPEED_INITIAL: 250,
-  BALL_SPEED_INCREMENT: 25,
+  BALL_SPEED_INITIAL: 384, // 384/128 = 3.0 pixels per frame (smooth whole pixel movement)
+  BALL_SPEED_INCREMENT: 32, // 32/128 = 0.25 pixels per frame increment
   WINNING_SCORE: 5,
-  TICK_RATE: 60, // FPS
-  NETWORK_UPDATE_RATE: 15, // Broadcast every 4th tick
+  TICK_RATE: 128, // FPS
+  NETWORK_UPDATE_RATE: 128, // Broadcast every tick for smoothest experience
 } as const;
 
 // AI difficulty settings

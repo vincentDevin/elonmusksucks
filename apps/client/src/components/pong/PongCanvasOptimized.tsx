@@ -10,6 +10,9 @@ interface OptimizedGameState {
   status: 'waiting' | 'countdown' | 'active' | 'paused' | 'ended';
   tick: number;
   timestamp: number;
+  countdown?: number;
+  winner?: 0 | 1 | null;
+  payout?: number;
 }
 
 interface PongCanvasOptimizedProps {
