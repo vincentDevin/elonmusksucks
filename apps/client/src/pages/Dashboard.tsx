@@ -1,12 +1,32 @@
-// adjust this import if your Chat component is in a different path
+// apps/client/src/pages/Dashboard.tsx
+import { useState } from 'react';
+import UnifiedDashboardSettings from '../components/dashboard/customization/UnifiedDashboardSettings';
+import MobileDashboard from '../components/dashboard/mobile/MobileDashboard';
+import DesktopDashboard from '../components/dashboard/desktop/DesktopDashboard';
+import { useMobileOptimization } from '../hooks/useMobileOptimization';
+
+/**
+ * Responsive Dashboard Layout
+ * ──────────────────────────────────────────────────────────────
+ * • Mobile  (<768px)   : Mobile-optimized tabbed interface
+ * • Tablet  (768-1024) : Adaptive layout based on orientation
+ * • Desktop (1024+)    : Sophisticated multi-column layout
+ * • Ultra-wide (1600+) : Advanced 3-4 column trading interface
+ */
 export default function Dashboard() {
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full">
-      <div>
-        <h2 className="text-2xl font-bold mb-4">Dashboard</h2>
-        {/* Add more dashboard widgets/info here in the future */}
-      </div>
-      <div></div>
-    </div>
-  );
+  const [showSettings, setShowSettings] = useState(false);
+  const { shouldUseCompactLayout } = useMobileOptimization();
+
+  // Use mobile layout for mobile devices and portrait tablets
+  if (shouldUseCompactLayout()) {
+    return (
+      <>
+        <MobileDashboard />
+        <UnifiedDashboardSettings isOpen={showSettings} onClose={() => setShowSettings(false)} />
+      </>
+    );
+  }
+
+  // Desktop layout - sophisticated multi-column design
+  return <DesktopDashboard />;
 }

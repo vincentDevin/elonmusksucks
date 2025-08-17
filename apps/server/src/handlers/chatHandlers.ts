@@ -1,4 +1,11 @@
 // apps/server/src/handlers/chatHandlers.ts
+// -----------------------------------------------------------------------------
+// Socket → Redis command handlers for chat domain
+// Channel naming rules:
+//   • Commands (client → server)  : present‑tense `chat:<action>`
+//   • Redis channel published     : same as command
+//   • Broadcasts (server → client): camelCase, handled in redisChatEventHandlers.ts
+// -----------------------------------------------------------------------------
 
 import { Socket } from 'socket.io';
 import type { AuthenticatedSocket } from '../middleware/socketAuthMiddleware';
@@ -11,12 +18,13 @@ const GLOBAL_CHAT_ROOM = 'global';
 const GLOBAL_ROOM_ID = 1;
 
 // Redis keys for online tracking
-const ONLINE_USERS_SET_KEY = 'global:chat:onlineUsers'; // Set of user IDs (strings)
-const USER_INFO_HASH_KEY = 'global:chat:userInfo'; // Hash: { [userId]: {name, avatarUrl, role} }
+const ONLINE_USERS_SET_KEY = 'global:chat:onlineUsers';
+const CONNECTIONS = 'global:chat:connections';
+const USER_INFO_HASH_KEY = 'global:chat:userInfo';
 
-// In-memory for per-process (not global, just for rate-limiting typing)
+// Per‑process typing debounce maps
 const typingUsers = new Set<number>();
-const typingTimeouts = new Map<number, NodeJS.Timeout>();
+const typingTimeout = new Map<number, NodeJS.Timeout>();
 
 export type ChatMessageDTO = {
   id: number;
@@ -33,46 +41,45 @@ export type ChatMessageDTO = {
 const userService = new UserService();
 
 export async function registerChatHandlers(socket: Socket) {
-  const authSocket = socket as AuthenticatedSocket;
+  const authSock = socket as AuthenticatedSocket;
   socket.join(GLOBAL_CHAT_ROOM);
 
-  // 1. Only add to Redis sets/hashes if authenticated user
-  if (authSocket.user) {
-    const userId = String(authSocket.user.id);
-
-    // Add user ID to Redis set
-    await redisClient.sadd(ONLINE_USERS_SET_KEY, userId);
-
-    // Add/update user info in Redis hash
-    await redisClient.hset(
-      USER_INFO_HASH_KEY,
-      userId,
-      JSON.stringify({
-        name: authSocket.user.name,
-        avatarUrl: authSocket.user.avatarUrl ?? null,
-        role: authSocket.user.role ?? 'USER',
-      }),
-    );
-
-    // Publish new online users list (for all)
+  // ────────────────────────────────────────────────────────────────────────────
+  // 1. Presence handling (join)
+  // ────────────────────────────────────────────────────────────────────────────
+  if (authSock.user) {
+    const uid = String(authSock.user.id);
+    const after = await redisClient.incr(CONNECTIONS + uid);
+    if (after === 1) {
+      await redisClient.sadd(ONLINE_USERS_SET_KEY, uid);
+      await redisClient.hset(
+        USER_INFO_HASH_KEY,
+        uid,
+        JSON.stringify({
+          name: authSock.user.name,
+          avatarUrl: authSock.user.avatarUrl ?? null,
+          role: authSock.user.role ?? 'USER',
+        }),
+      );
+    }
     await publishOnlineUsers();
 
-    // Still publish userJoined for UX (optional)
     await redisClient.publish(
-      'chat:userJoined',
+      'chat:join',
       JSON.stringify({
-        id: authSocket.user.id,
-        name: authSocket.user.name,
-        avatarUrl: authSocket.user.avatarUrl ?? null,
-        role: authSocket.user.role ?? 'USER',
+        id: authSock.user.id,
+        name: authSock.user.name,
+        avatarUrl: authSock.user.avatarUrl ?? null,
+        role: authSock.user.role ?? 'USER',
       }),
     );
   } else {
-    // Guests: do NOT add to online set/hash, but send current online count
-    await publishOnlineUsers();
+    await publishOnlineUsers(); // guest connects
   }
 
-  // --- 2. Send Chat History ---
+  // ────────────────────────────────────────────────────────────────────────────
+  // 2. History request (no Redis needed)
+  // ────────────────────────────────────────────────────────────────────────────
   socket.on('chat:history', async () => {
     try {
       const history: MessageWithUser[] = await getRecentMessages(GLOBAL_ROOM_ID, 50);
@@ -87,7 +94,7 @@ export async function registerChatHandlers(socket: Socket) {
                 3600,
               );
             } catch {
-              avatarUrl = null;
+              /* ignore */
             }
           } else if (msg.user?.avatarUrl) {
             avatarUrl = msg.user.avatarUrl;
@@ -113,123 +120,115 @@ export async function registerChatHandlers(socket: Socket) {
     }
   });
 
-  // --- 3. Handle Sending New Messages ---
-  socket.on('chat:sendMessage', async (payload: { message: string }) => {
+  // ────────────────────────────────────────────────────────────────────────────
+  // 3. Send message → publish `chat:message`
+  // ────────────────────────────────────────────────────────────────────────────
+  socket.on('chat:message', async (payload: { message: string }) => {
     try {
-      if (!authSocket.user) {
-        socket.emit('chat:error', { message: 'You must be logged in to send messages.' });
-        return;
-      }
+      if (!authSock.user) return socket.emit('chat:error', { message: 'NOT_AUTHENTICATED' });
       if (
         !payload.message ||
         typeof payload.message !== 'string' ||
         payload.message.length > 1000
       ) {
-        socket.emit('chat:error', { message: 'Invalid message' });
-        return;
+        return socket.emit('chat:error', { message: 'INVALID_MESSAGE' });
       }
-      const saved = await createMessage(authSocket.user.id, GLOBAL_ROOM_ID, payload.message);
+
+      const saved = await createMessage(authSock.user.id, GLOBAL_ROOM_ID, payload.message);
       const chatMsg: ChatMessageDTO = {
         id: saved.id,
         user: {
-          id: authSocket.user.id,
-          name: authSocket.user.name ?? `User ${authSocket.user.id}`,
-          avatarUrl: authSocket.user.avatarUrl ?? null,
-          role: authSocket.user.role ?? 'USER',
+          id: authSock.user.id,
+          name: authSock.user.name ?? `User ${authSock.user.id}`,
+          avatarUrl: authSock.user.avatarUrl ?? null,
+          role: authSock.user.role ?? 'USER',
         },
         message: saved.content,
         timestamp:
           saved.timestamp instanceof Date ? saved.timestamp.toISOString() : `${saved.timestamp}`,
       };
 
-      // ONLY publish to Redis. NO direct emit!
-      await redisClient.publish('chat:newMessage', JSON.stringify(chatMsg));
+      await redisClient.publish('chat:message', JSON.stringify(chatMsg));
 
-      // Remove typing state for this user when message sent (emit via Redis)
-      typingUsers.delete(authSocket.user.id);
-      await redisClient.publish('chat:stopTyping', JSON.stringify({ id: authSocket.user.id }));
+      // clear typing state
+      typingUsers.delete(authSock.user.id);
+      await redisClient.publish('chat:stopTyping', JSON.stringify({ id: authSock.user.id }));
     } catch (err) {
-      console.error('[chat] Error sending message:', err);
-      socket.emit('chat:error', { message: 'Failed to send message' });
+      console.error('[chat] send error:', err);
+      socket.emit('chat:error', { message: 'SEND_FAILED' });
     }
   });
 
-  // --- 4. Typing Indicator ---
+  // ────────────────────────────────────────────────────────────────────────────
+  // 4. Typing indicators
+  // ────────────────────────────────────────────────────────────────────────────
   socket.on('chat:typing', () => {
-    if (!authSocket.user) return;
-    const userId = authSocket.user.id;
-    const userName = authSocket.user.name;
+    if (!authSock.user) return;
+    const uid = authSock.user.id;
 
-    // Only broadcast typing if new
-    if (!typingUsers.has(userId)) {
-      typingUsers.add(userId);
-      redisClient.publish('chat:typing', JSON.stringify({ id: userId, name: userName }));
+    if (!typingUsers.has(uid)) {
+      typingUsers.add(uid);
+      redisClient.publish('chat:typing', JSON.stringify({ id: uid, name: authSock.user.name }));
     }
 
-    // Debounce: Reset timer for this user
-    if (typingTimeouts.has(userId)) {
-      clearTimeout(typingTimeouts.get(userId));
-    }
-    const timeout = setTimeout(() => {
-      typingUsers.delete(userId);
-      redisClient.publish('chat:stopTyping', JSON.stringify({ id: userId }));
-      typingTimeouts.delete(userId);
+    if (typingTimeout.has(uid)) clearTimeout(typingTimeout.get(uid));
+
+    const t = setTimeout(() => {
+      typingUsers.delete(uid);
+      redisClient.publish('chat:stopTyping', JSON.stringify({ id: uid }));
+      typingTimeout.delete(uid);
     }, 4000);
-    typingTimeouts.set(userId, timeout);
+
+    typingTimeout.set(uid, t);
   });
 
   socket.on('chat:stopTyping', () => {
-    if (!authSocket.user) return;
-    const userId = authSocket.user.id;
-    if (typingUsers.has(userId)) {
-      typingUsers.delete(userId);
-      redisClient.publish('chat:stopTyping', JSON.stringify({ id: userId }));
-      if (typingTimeouts.has(userId)) {
-        clearTimeout(typingTimeouts.get(userId));
-        typingTimeouts.delete(userId);
+    if (!authSock.user) return;
+    const uid = authSock.user.id;
+    if (typingUsers.has(uid)) {
+      typingUsers.delete(uid);
+      redisClient.publish('chat:stopTyping', JSON.stringify({ id: uid }));
+      if (typingTimeout.has(uid)) {
+        clearTimeout(typingTimeout.get(uid));
+        typingTimeout.delete(uid);
       }
     }
   });
 
-  // --- 5. User Left Notification ---
+  // ────────────────────────────────────────────────────────────────────────────
+  // 5. Disconnect → leave logic
+  // ────────────────────────────────────────────────────────────────────────────
   socket.on('disconnect', async () => {
-    if (authSocket.user) {
-      const userId = String(authSocket.user.id);
-
-      // 1. Remove from online set and hash
-      await redisClient.srem(ONLINE_USERS_SET_KEY, userId);
-      await redisClient.hdel(USER_INFO_HASH_KEY, userId);
-
-      // 2. Publish new online users list (for all)
-      await publishOnlineUsers();
-
-      // 3. Publish user left (for notification UX)
-      await redisClient.publish(
-        'chat:userLeft',
-        JSON.stringify({
-          id: authSocket.user.id,
-          name: authSocket.user.name,
-        }),
-      );
-
-      typingUsers.delete(authSocket.user.id);
-      if (typingTimeouts.has(authSocket.user.id)) {
-        clearTimeout(typingTimeouts.get(authSocket.user.id));
-        typingTimeouts.delete(authSocket.user.id);
-      }
-      redisClient.publish('chat:stopTyping', JSON.stringify({ id: authSocket.user.id }));
+    if (!authSock.user) return;
+    const uidStr = String(authSock.user.id);
+    const after = await redisClient.decr(CONNECTIONS + uidStr);
+    if (after <= 0) {
+      await redisClient.del(CONNECTIONS + uidStr);
+      await redisClient.srem(ONLINE_USERS_SET_KEY, uidStr);
+      await redisClient.hdel(USER_INFO_HASH_KEY, uidStr);
     }
+
+    await publishOnlineUsers();
+    await redisClient.publish(
+      'chat:leave',
+      JSON.stringify({ id: authSock.user.id, name: authSock.user.name }),
+    );
+
+    typingUsers.delete(authSock.user.id);
+    if (typingTimeout.has(authSock.user.id)) {
+      clearTimeout(typingTimeout.get(authSock.user.id));
+      typingTimeout.delete(authSock.user.id);
+    }
+    redisClient.publish('chat:stopTyping', JSON.stringify({ id: authSock.user.id }));
   });
 }
 
-// --- Helper: publish all online users to all sockets ---
+// Helper: broadcast current online list via Redis
 async function publishOnlineUsers() {
-  const ids: string[] = await redisClient.smembers(ONLINE_USERS_SET_KEY);
-  const userInfoArr: (string | null)[] = ids.length
-    ? await redisClient.hmget(USER_INFO_HASH_KEY, ...ids)
-    : [];
-  const usersParsed = ids.map((id, idx) => {
-    const info = userInfoArr[idx] ? JSON.parse(userInfoArr[idx]!) : {};
+  const ids = await redisClient.smembers(ONLINE_USERS_SET_KEY);
+  const infoArr = ids.length ? await redisClient.hmget(USER_INFO_HASH_KEY, ...ids) : [];
+  const parsed = ids.map((id, i) => {
+    const info = infoArr[i] ? JSON.parse(infoArr[i]!) : {};
     return {
       id: Number(id),
       name: info.name ?? `User ${id}`,
@@ -237,5 +236,5 @@ async function publishOnlineUsers() {
       role: info.role ?? 'USER',
     };
   });
-  await redisClient.publish('chat:usersOnline', JSON.stringify(usersParsed));
+  await redisClient.publish('chat:usersOnline', JSON.stringify(parsed));
 }

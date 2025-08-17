@@ -1,30 +1,46 @@
+// apps/client/src/App.tsx
 import { BrowserRouter } from 'react-router-dom';
 import { SocketProvider } from './contexts/SocketContext';
 import { AuthProvider } from './contexts/AuthContext';
+import { UnifiedThemeProvider } from './theme';
+import { PredictionProvider } from './contexts/PredictionContext';
 import { ParlayProvider } from './contexts/ParlayContext';
-import AppRoutes from './routes/AppRoutes';
-import MainLayout from './components/MainLayout';
-import { ThemeProvider } from './contexts/ThemeContext';
 import { ChatProvider } from './contexts/ChatContext';
+import { UnifiedActivityProvider } from './contexts/UnifiedActivityContext';
+import MainLayout from './components/MainLayout';
+import AppRoutes from './routes/AppRoutes';
+import { useAuth } from './contexts/AuthContext';
 
-function App() {
+// Inner component that has access to auth context
+function AppContent() {
+  const { user } = useAuth();
+
   return (
-    <AuthProvider>
-      <SocketProvider>
-        <ThemeProvider>
-          <ChatProvider>
-            <BrowserRouter>
-              <ParlayProvider>
+    <SocketProvider>
+      <UnifiedThemeProvider userId={user?.id}>
+        {/* domain state that depends on socket/auth */}
+        <UnifiedActivityProvider>
+          <PredictionProvider>
+            <ParlayProvider>
+              <ChatProvider>
                 <MainLayout>
                   <AppRoutes />
                 </MainLayout>
-              </ParlayProvider>
-            </BrowserRouter>
-          </ChatProvider>
-        </ThemeProvider>
-      </SocketProvider>
-    </AuthProvider>
+              </ChatProvider>
+            </ParlayProvider>
+          </PredictionProvider>
+        </UnifiedActivityProvider>
+      </UnifiedThemeProvider>
+    </SocketProvider>
   );
 }
 
-export default App;
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </BrowserRouter>
+  );
+}

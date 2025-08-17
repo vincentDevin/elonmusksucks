@@ -1,5 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import { UserService } from '../services/user.service';
+import { EnhancedUserStatsService } from '../services/enhancedUserStats.service';
+import { unifiedActivityService } from '../services/unifiedActivity.service';
+import { achievementService } from '../services/achievement.service';
+import { adminAchievementService } from '../services/adminAchievement.service';
 import type { PublicUserProfile, UserFeedPost, UserActivity, UserStatsDTO } from '@ems/types';
 
 // Define MulterFile type explicitly to avoid mismatched declarations
@@ -18,8 +22,9 @@ export type ReqWithUser = Request & {
   file?: MulterFile;
 };
 
-// Instantiate the service (uses Prisma-backed repository by default)
+// Instantiate the services (uses Prisma-backed repository by default)
 const userService = new UserService();
+const enhancedUserStatsService = new EnhancedUserStatsService();
 
 /**
  * GET /api/users/:userId
@@ -32,6 +37,12 @@ export async function getProfile(
 ): Promise<void> {
   try {
     const targetUserId = Number(req.params.userId);
+
+    if (isNaN(targetUserId)) {
+      res.status(400).json({ error: 'Invalid user ID' });
+      return;
+    }
+
     const viewerId = req.user?.id;
     const profileDTO: PublicUserProfile = await userService.getUserProfile(targetUserId, viewerId);
     res.json(profileDTO);
@@ -64,8 +75,8 @@ export async function uploadProfileImageHandler(
       return;
     }
 
-    const imageUrl = await userService.uploadUserProfileImage(targetUserId, file);
-    res.json({ imageUrl });
+    const result = await userService.uploadUserProfileImage(targetUserId, file);
+    res.json(result);
   } catch (err) {
     next(err);
   }
@@ -89,8 +100,41 @@ export async function followUserHandler(
     }
     await userService.followUser(followerId, followingId);
 
-    // Record activity
+    // Record activity (legacy)
     await userService.createUserActivity(followerId, 'USER_FOLLOWED', { followingId });
+
+    // Publish follow activity through unified system
+    const followedUser = await userService.getUserProfile(followingId);
+    const followerUser = await userService.getUserProfile(followerId);
+
+    if (followedUser && followerUser) {
+      await unifiedActivityService.publishActivity({
+        type: 'user_followed',
+        userId: followerId,
+        userName: followerUser.name,
+        title: `${followerUser.name} followed ${followedUser.name}`,
+        description: `New connection in the prediction community`,
+        icon: '👥',
+        color: 'text-blue-400',
+        priority: 'low',
+        isPersonal: false, // User follows are public social activities
+        isHighValue: false, // Low priority social activity
+        meta: {
+          followedUserId: followingId,
+          followedUserName: followedUser.name,
+        },
+      });
+    }
+
+    // Check for achievement unlocks
+    await achievementService.checkAndUpdateAchievements({
+      type: 'user_followed',
+      userId: followerId,
+      data: {
+        followedUserId: followingId,
+        followedUserName: followedUser?.name || 'Unknown',
+      },
+    });
 
     res.sendStatus(204);
   } catch (err) {
@@ -238,12 +282,178 @@ export async function getUserStatsHandler(
 ): Promise<void> {
   try {
     const userId = Number(req.params.userId);
+
+    if (isNaN(userId)) {
+      res.status(400).json({ error: 'Invalid user ID' });
+      return;
+    }
+
     const stats: UserStatsDTO | null = await userService.getUserStats(userId);
     if (!stats) {
       res.status(404).json({ error: 'Stats not found' });
       return;
     }
     res.json(stats);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * GET /api/users/:userId/bets
+ * Fetch user's active bets (only for own profile)
+ */
+export async function getUserBetsHandler(
+  req: ReqWithUser,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const targetUserId = Number(req.params.userId);
+    const viewerId = req.user?.id;
+
+    // Only allow users to view their own bets
+    if (targetUserId !== viewerId) {
+      res.status(403).json({ error: "Cannot view other users' bets" });
+      return;
+    }
+
+    const bets = await userService.getUserActiveBets(targetUserId);
+    res.json(bets);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * GET /api/users/:userId/parlays
+ * Fetch user's active parlays (only for own profile)
+ */
+export async function getUserParlaysHandler(
+  req: ReqWithUser,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const targetUserId = Number(req.params.userId);
+    const viewerId = req.user?.id;
+
+    // Only allow users to view their own parlays
+    if (targetUserId !== viewerId) {
+      res.status(403).json({ error: "Cannot view other users' parlays" });
+      return;
+    }
+
+    const parlays = await userService.getUserActiveParlays(targetUserId);
+    res.json(parlays);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * GET /api/users/:userId/predictions
+ * Fetch user's created predictions
+ */
+export async function getUserPredictionsHandler(
+  req: ReqWithUser,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const targetUserId = Number(req.params.userId);
+    const viewerId = req.user?.id;
+
+    // Only allow users to view their own predictions
+    if (targetUserId !== viewerId) {
+      res.status(403).json({ error: "Cannot view other users' predictions" });
+      return;
+    }
+
+    const predictions = await userService.getUserPredictions(targetUserId);
+    res.json(predictions);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * GET /api/users/:userId/enhanced-stats
+ * Get enhanced user statistics for dashboard
+ */
+export async function getEnhancedUserStatsHandler(
+  req: ReqWithUser,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const targetUserId = Number(req.params.userId);
+    const viewerId = req.user?.id;
+
+    // Only allow users to view their own enhanced stats
+    if (targetUserId !== viewerId) {
+      res.status(403).json({ error: "Cannot view other users' enhanced stats" });
+      return;
+    }
+
+    // Get enhanced stats using the new service with real data calculations
+    const enhancedStats = await enhancedUserStatsService.getEnhancedStats(targetUserId);
+
+    res.json(enhancedStats);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * GET /api/users/:userId/achievements
+ * Get user's achievement progress
+ */
+export async function getUserAchievementsHandler(
+  req: ReqWithUser,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const targetUserId = Number(req.params.userId);
+    const viewerId = req.user?.id;
+
+    // Only allow users to view their own achievements
+    if (targetUserId !== viewerId) {
+      res.status(403).json({ error: "Cannot view other users' achievements" });
+      return;
+    }
+
+    // Get user achievement progress
+    const achievements = await achievementService.getUserAchievementProgress(targetUserId);
+
+    res.json(achievements);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getRecentAchievementsHandler(
+  req: ReqWithUser,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const targetUserId = Number(req.params.userId);
+    const viewerId = req.user?.id;
+    const limit = parseInt(req.query.limit as string) || 5;
+
+    // Only allow users to view their own recent achievements
+    if (targetUserId !== viewerId) {
+      res.status(403).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    const recentAchievements = await adminAchievementService.getRecentAchievements(
+      targetUserId,
+      limit,
+    );
+    res.json(recentAchievements);
   } catch (err) {
     next(err);
   }

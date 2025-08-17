@@ -151,7 +151,21 @@ export class UserRepository implements IUserRepository {
     userId: number,
     data: Partial<Omit<DbUserStats, 'id' | 'userId'>>,
   ): Promise<void> {
-    await prisma.userStats.update({ where: { userId }, data });
+    // Convert string BigInt fields back to BigInt for Prisma
+    const prismaData: any = { ...data };
+    if (data.totalWagered && typeof data.totalWagered === 'string') {
+      prismaData.totalWagered = BigInt(data.totalWagered);
+    }
+    if (data.totalWon && typeof data.totalWon === 'string') {
+      prismaData.totalWon = BigInt(data.totalWon);
+    }
+    if (data.profit && typeof data.profit === 'string') {
+      prismaData.profit = BigInt(data.profit);
+    }
+    if (data.biggestWin && typeof data.biggestWin === 'string') {
+      prismaData.biggestWin = BigInt(data.biggestWin);
+    }
+    await prisma.userStats.update({ where: { userId }, data: prismaData });
   }
 
   async incrementUserStats(userId: number, data: Prisma.UserStatsUpdateInput): Promise<void> {

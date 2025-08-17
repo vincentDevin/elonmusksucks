@@ -1,20 +1,12 @@
 // apps/client/src/components/BetsList.tsx
 import { useState } from 'react';
-import type { PublicPredictionOption, BetWithUser } from '@ems/types';
+import type { PublicPredictionOption, BetWithUser, ParlayLegWithUser } from '@ems/types';
 import { PredictionType } from '@ems/types';
-
-interface FlattenedParlayLeg {
-  parlayId: number;
-  user: { id: number; name: string };
-  stake: number;
-  optionId: number;
-  createdAt: string;
-}
 
 interface BetsListProps {
   type: PredictionType;
   bets: BetWithUser[];
-  parlayLegs?: FlattenedParlayLeg[];
+  parlayLegs?: ParlayLegWithUser[];
   options: PublicPredictionOption[];
 }
 
@@ -29,7 +21,7 @@ export default function BetsList({ type, bets, parlayLegs = [], options }: BetsL
 
   // Combine bets + parlays into one timeline
   const combined: Array<
-    { kind: 'bet'; data: BetWithUser } | { kind: 'parlay'; data: FlattenedParlayLeg }
+    { kind: 'bet'; data: BetWithUser } | { kind: 'parlay'; data: ParlayLegWithUser }
   > = [
     ...bets.map((b) => ({ kind: 'bet' as const, data: b })),
     ...parlayLegs.map((l) => ({ kind: 'parlay' as const, data: l })),
@@ -93,7 +85,14 @@ export default function BetsList({ type, bets, parlayLegs = [], options }: BetsL
                 key={`parlay-${l.parlayId}-${l.optionId}`}
                 className="flex justify-between bg-[var(--color-surface)] border border-[var(--color-muted)] rounded-lg px-3 py-2 shadow-sm italic"
               >
-                <span>
+                <span className="flex items-center gap-2">
+                  {l.user.avatarUrl && (
+                    <img
+                      src={l.user.avatarUrl}
+                      alt={l.user.name}
+                      className="inline-block w-7 h-7 rounded-full border border-gray-300"
+                    />
+                  )}
                   <strong>{l.user.name}</strong> parlayed <em>{l.stake}</em> on{' '}
                   <strong className={colorClass}>{label}</strong>
                 </span>

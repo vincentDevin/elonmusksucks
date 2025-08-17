@@ -1,201 +1,217 @@
-import { createContext, useContext, useState, useEffect, useRef } from 'react';
+// apps/client/src/contexts/ChatContext.tsx
+// -----------------------------------------------------------------------------
+// React context for real-time chat, aligned with server event names.
+// -----------------------------------------------------------------------------
+
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+  type ReactNode,
+} from 'react';
 import { useSocket } from './SocketContext';
 import { useAuth } from './AuthContext';
-import type { ReactNode } from 'react';
 
-// ---- Types ----
-export type ChatMessage = {
-  user: {
-    id: number;
-    name: string;
-    role: string;
-    avatarUrl?: string | null;
-  };
+/* ---------- Types ---------- */
+export interface ChatMessage {
+  user: { id: number; name: string; role: string; avatarUrl: string | null };
   message: string;
-  timestamp: number | string;
+  timestamp: string | number;
   id?: number;
-};
+}
+export interface TypingUser {
+  id: number;
+  name: string;
+}
+export interface OnlineUser {
+  id: number;
+  name: string;
+  avatarUrl: string | null;
+  role: string;
+}
 
-type TypingUser = { id: number; name: string };
-type OnlineUser = { id: number; name: string; avatarUrl: string | null; role: string };
-
-type ChatContextType = {
+interface ChatCtx {
   messages: ChatMessage[];
-  sendMessage: (message: string) => void;
   loading: boolean;
   error: string | null;
+
   typingUsers: TypingUser[];
   onlineUsers: OnlineUser[];
   userEvents: { type: 'joined' | 'left'; id: number; name: string; timestamp: number }[];
+
+  sendMessage: (msg: string) => void;
   sendTyping: () => void;
   sendStopTyping: () => void;
-};
+}
 
-const ChatContext = createContext<ChatContextType | undefined>(undefined);
+const ChatContext = createContext<ChatCtx | undefined>(undefined);
 
-// ---- Provider ----
+/* ---------- Provider ---------- */
 export function ChatProvider({ children }: { children: ReactNode }) {
   const socket = useSocket();
   const { user } = useAuth();
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  // --- New State for Real-Time Features ---
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
   const [userEvents, setUserEvents] = useState<
     { type: 'joined' | 'left'; id: number; name: string; timestamp: number }[]
   >([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Used to debounce typing notifications
-  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const localStopTimer = useRef<NodeJS.Timeout | null>(null);
 
-  // Fetch chat history on mount or reconnect
+  /* ---------------------------------------------------------------------- */
+  /* 1. History bootstrap                                                   */
+  /* ---------------------------------------------------------------------- */
   useEffect(() => {
-    function fetchHistory() {
-      setLoading(true);
-      socket.emit('chat:history');
-    }
-    fetchHistory();
+    const fetchHistory = () => socket.emit('chat:history');
     socket.on('connect', fetchHistory);
+    fetchHistory();
+
+    const handleHistory = (hist: ChatMessage[]) => {
+      setMessages(hist.sort((a, b) => +new Date(a.timestamp) - +new Date(b.timestamp)));
+      setLoading(false);
+    };
+    socket.on('chat:history', handleHistory);
+
     return () => {
       socket.off('connect', fetchHistory);
-    };
-  }, [socket]);
-
-  // Listen for history
-  useEffect(() => {
-    function handleHistory(history: ChatMessage[]) {
-      setMessages(
-        history
-          .slice()
-          .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()),
-      );
-      setLoading(false);
-    }
-    socket.on('chat:history', handleHistory);
-    return () => {
       socket.off('chat:history', handleHistory);
     };
   }, [socket]);
 
-  // Listen for live messages
+  /* ---------------------------------------------------------------------- */
+  /* 2. Live message stream                                                 */
+  /* ---------------------------------------------------------------------- */
   useEffect(() => {
-    function handleNewMessage(msg: ChatMessage) {
-      setMessages((prev) => [...prev, msg]);
-    }
-    socket.on('chat:newMessage', handleNewMessage);
-
-    socket.on('chat:error', (err) => setError(err.message || 'Chat error'));
-
+    const onMsg = (m: ChatMessage) => setMessages((prev) => [...prev, m]);
+    socket.on('chatMessage', onMsg);
+    socket.on('chat:error', (e) => setError(e.message || 'Chat error'));
     return () => {
-      socket.off('chat:newMessage', handleNewMessage);
+      socket.off('chatMessage', onMsg);
       socket.off('chat:error');
     };
   }, [socket]);
 
-  // --- Typing Events ---
+  /* ---------------------------------------------------------------------- */
+  /* 3. Typing indicators                                                   */
+  /* ---------------------------------------------------------------------- */
   useEffect(() => {
-    function handleTyping({ id, name }: { id: number; name: string }) {
+    const addTyper = ({ id, name }: TypingUser) =>
       setTypingUsers((prev) => (prev.some((u) => u.id === id) ? prev : [...prev, { id, name }]));
-    }
-    function handleStopTyping({ id }: { id: number }) {
+    const removeTyper = ({ id }: { id: number }) =>
       setTypingUsers((prev) => prev.filter((u) => u.id !== id));
-    }
-    socket.on('chat:typing', handleTyping);
-    socket.on('chat:stopTyping', handleStopTyping);
+    socket.on('chatTyping', addTyper);
+    socket.on('chatStopTyping', removeTyper);
     return () => {
-      socket.off('chat:typing', handleTyping);
-      socket.off('chat:stopTyping', handleStopTyping);
+      socket.off('chatTyping', addTyper);
+      socket.off('chatStopTyping', removeTyper);
     };
   }, [socket]);
 
-  // --- Online Users (on join/leave/online change) ---
+  /* ---------------------------------------------------------------------- */
+  /* 4. Online-users list                                                   */
+  /* ---------------------------------------------------------------------- */
   useEffect(() => {
-    function handleUsersOnline(users: OnlineUser[] | number[]) {
-      if (Array.isArray(users) && users.length > 0 && typeof users[0] === 'object') {
-        setOnlineUsers(users as OnlineUser[]);
-      } else if (Array.isArray(users) && users.length > 0 && typeof users[0] === 'number') {
-        setOnlineUsers(
-          (users as number[]).map((id) => ({
-            id,
-            name: `User ${id}`,
-            avatarUrl: null,
-            role: 'USER',
-          })),
-        );
-      } else {
-        setOnlineUsers([]);
-      }
-    }
-    socket.on('chat:usersOnline', handleUsersOnline);
+    const update = (users: OnlineUser[]) => setOnlineUsers(users);
+    socket.on('chatUsersOnline', update);
     return () => {
-      socket.off('chat:usersOnline', handleUsersOnline);
+      socket.off('chatUsersOnline', update);
     };
   }, [socket]);
 
-  // --- User Joined/Left Events (for toasts/UX if desired) ---
+  /* ---------------------------------------------------------------------- */
+  /* 5. Join / leave toast events                                           */
+  /*      – deduplicated with seenEventsRef                                 */
+  /* ---------------------------------------------------------------------- */
+  const seenEventsRef = useRef<Set<string>>(new Set());
+
   useEffect(() => {
-    function handleUserJoined({ id, name }: { id: number; name: string }) {
-      // Only show if it's not the current user
-      if (!user || id !== user.id) {
-        setUserEvents((prev) => [...prev, { type: 'joined', id, name, timestamp: Date.now() }]);
+    const maybePush = (ev: { type: 'joined' | 'left'; id: number; name: string }) => {
+      const key = `${ev.type}-${ev.id}`;
+      if (seenEventsRef.current.has(key)) return;
+      seenEventsRef.current.add(key);
+      if (!user || ev.id !== user.id) {
+        setUserEvents((prev) => [...prev, { ...ev, timestamp: Date.now() }]);
       }
-    }
-    function handleUserLeft({ id, name }: { id: number; name: string }) {
-      if (!user || id !== user.id) {
-        setUserEvents((prev) => [...prev, { type: 'left', id, name, timestamp: Date.now() }]);
-      }
-    }
-    socket.on('chat:userJoined', handleUserJoined);
-    socket.on('chat:userLeft', handleUserLeft);
+    };
+
+    const joined = ({ id, name }: { id: number; name: string }) =>
+      maybePush({ type: 'joined', id, name });
+    const left = ({ id, name }: { id: number; name: string }) =>
+      maybePush({ type: 'left', id, name });
+
+    socket.on('chatUserJoined', joined);
+    socket.on('chatUserLeft', left);
     return () => {
-      socket.off('chat:userJoined', handleUserJoined);
-      socket.off('chat:userLeft', handleUserLeft);
+      socket.off('chatUserJoined', joined);
+      socket.off('chatUserLeft', left);
     };
   }, [socket, user?.id]);
 
-  // --- Send typing/stopTyping events ---
-  const sendTyping = () => {
+  /* ---------------------------------------------------------------------- */
+  /* 6. Emit helpers                                                        */
+  /* ---------------------------------------------------------------------- */
+  const sendTyping = useCallback(() => {
     socket.emit('chat:typing');
-    // Debounce: send stopTyping after 3s of inactivity
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    typingTimeoutRef.current = setTimeout(() => {
-      socket.emit('chat:stopTyping');
-    }, 3000);
-  };
-  const sendStopTyping = () => {
+    if (localStopTimer.current) clearTimeout(localStopTimer.current);
+    localStopTimer.current = setTimeout(() => socket.emit('chat:stopTyping'), 3000);
+  }, [socket]);
+
+  const sendStopTyping = useCallback(() => {
     socket.emit('chat:stopTyping');
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-  };
+    if (localStopTimer.current) clearTimeout(localStopTimer.current);
+  }, [socket]);
 
-  // --- Send messages ---
-  const sendMessage = (msg: string) => {
-    if (msg.trim()) {
-      socket.emit('chat:sendMessage', { message: msg });
-      sendStopTyping();
-    }
-  };
+  const sendMessage = useCallback(
+    (msg: string) => {
+      if (!msg.trim()) return;
+      socket.emit('chat:message', { message: msg });
+      sendStopTyping(); // stop indicator for myself immediately
+    },
+    [socket, sendStopTyping],
+  );
 
-  const value = {
-    messages,
-    sendMessage,
-    loading,
-    error,
-    typingUsers,
-    onlineUsers,
-    userEvents,
-    sendTyping,
-    sendStopTyping,
-  };
+  /* ---------------------------------------------------------------------- */
+  /* 7. Context value                                                       */
+  /* ---------------------------------------------------------------------- */
+  const value = useMemo<ChatCtx>(
+    () => ({
+      messages,
+      loading,
+      error,
+      typingUsers,
+      onlineUsers,
+      userEvents,
+      sendMessage,
+      sendTyping,
+      sendStopTyping,
+    }),
+    [
+      messages,
+      loading,
+      error,
+      typingUsers,
+      onlineUsers,
+      userEvents,
+      sendMessage,
+      sendTyping,
+      sendStopTyping,
+    ],
+  );
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
 }
 
-// ---- Hook ----
+/* ---------- Hook ---------- */
 export function useChat() {
   const ctx = useContext(ChatContext);
-  if (!ctx) throw new Error('useChat must be used within a ChatProvider');
+  if (!ctx) throw new Error('useChat must be used within ChatProvider');
   return ctx;
 }

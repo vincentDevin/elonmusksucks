@@ -119,10 +119,95 @@ export const me: RequestHandler = async (req, res, next) => {
       name: user.name,
       email: user.email,
       role: user.role,
-      muskBucks: user.muskBucks,
+      muskBucks: user.muskBucks.toString(),
       profileComplete: user.profileComplete,
       avatarUrl: user.avatarUrl,
+      theme: user.theme,
     });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * GET /api/auth/balance
+ * Returns only the user's current balance without affecting auth state
+ */
+export const getBalance: RequestHandler = async (req, res, next) => {
+  try {
+    const userId = (req as any).user?.id;
+    if (!userId) {
+      return sendError(res, 401, 'Authentication required');
+    }
+
+    // Import prisma client for direct balance query
+    const { PrismaClient } = await import('@prisma/client');
+    const prisma = new PrismaClient();
+
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { muskBucks: true },
+      });
+
+      if (!user) {
+        return sendError(res, 404, 'User not found');
+      }
+
+      return res.json({
+        muskBucks: user.muskBucks.toString(),
+      });
+    } finally {
+      await prisma.$disconnect();
+    }
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * PUT /api/auth/theme
+ */
+export const updateTheme: RequestHandler = async (req, res, next) => {
+  try {
+    const userId = (req as any).user?.id;
+    if (!userId) {
+      return sendError(res, 401, 'Authentication required');
+    }
+
+    const { themeId } = req.body as { themeId?: string };
+    if (!themeId || typeof themeId !== 'string') {
+      return sendError(res, 400, 'Theme ID is required and must be a string');
+    }
+
+    // Validate theme ID (basic check)
+    if (themeId.length > 50) {
+      return sendError(res, 400, 'Theme ID is too long');
+    }
+
+    // Import prisma client and user cache
+    const { PrismaClient } = await import('@prisma/client');
+    const { userCache } = await import('../utils/userCache');
+    const prisma = new PrismaClient();
+
+    try {
+      // Update user's theme preference
+      const updatedUser = await prisma.user.update({
+        where: { id: userId },
+        data: { theme: themeId },
+        select: { id: true, theme: true },
+      });
+
+      // Invalidate user cache since data changed
+      userCache.invalidate(userId);
+
+      return res.json({
+        success: true,
+        theme: updatedUser.theme,
+      });
+    } finally {
+      await prisma.$disconnect();
+    }
   } catch (err) {
     next(err);
   }

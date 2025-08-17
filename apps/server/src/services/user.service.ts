@@ -13,6 +13,9 @@ import type {
   DbUserActivity,
 } from '@ems/types';
 import type { PublicUserProfile, UserFeedPost, UserActivity, UserStatsDTO } from '@ems/types';
+import { unifiedActivityService } from './unifiedActivity.service';
+import { ImageProcessingService, ProcessedImageSizes } from './imageProcessing.service';
+import { DeleteObjectCommand } from '@aws-sdk/client-s3';
 
 // Define a minimal file interface matching Multer's in-memory buffer
 export type UploadedFile = {
@@ -42,27 +45,131 @@ export class UserService {
     this.bucket = process.env.TIGRIS_S3_BUCKET as string;
   }
 
-  // --- NEW: Upload profile image ---
-  async uploadUserProfileImage(userId: number, file: UploadedFile): Promise<string> {
+  // --- ENHANCED: Upload profile image with processing ---
+  async uploadUserProfileImage(
+    userId: number,
+    file: UploadedFile,
+  ): Promise<{
+    avatarUrl: string;
+    sizes: {
+      thumbnail: string;
+      profile: string;
+      full: string;
+    };
+  }> {
+    // Clear cached URLs
     await redisClient.del(`profileImageUrl:userId:${userId}`);
-    const key = `${userId}/${Date.now()}-${file.originalname}`;
-    // Upload to S3-compatible storage
+
+    // Get current user to check for existing profile picture
+    const user = await this.repo.findById(userId);
+    if (!user) throw new Error('User not found');
+
+    // Validate and process the image
+    const isValidImage = await ImageProcessingService.validateImage(file.buffer);
+    if (!isValidImage) {
+      throw new Error('Invalid image file. Please upload a valid JPEG, PNG, or WebP image.');
+    }
+
+    // Process image into multiple sizes
+    const processedImages: ProcessedImageSizes = await ImageProcessingService.processProfileImage(
+      file.buffer,
+      userId,
+    );
+
+    // Upload all sizes to storage
+    const uploadPromises = [
+      this.uploadImageToStorage(processedImages.thumbnail),
+      this.uploadImageToStorage(processedImages.profile),
+      this.uploadImageToStorage(processedImages.full),
+    ];
+
+    await Promise.all(uploadPromises);
+
+    // Clean up old profile images if they exist
+    if (user.profilePictureKey) {
+      await this.cleanupOldProfileImages(user.profilePictureKey);
+    }
+
+    // Update user profile with new primary (profile size) key
+    await this.repo.updateProfile(userId, {
+      profilePictureKey: processedImages.profile.filename,
+    });
+
+    // Generate signed URLs for immediate use (7-day expiry - AWS S3 maximum)
+    const urlPromises = [
+      this.getSignedAvatarUrl(processedImages.thumbnail.filename, 60 * 60 * 24 * 7),
+      this.getSignedAvatarUrl(processedImages.profile.filename, 60 * 60 * 24 * 7),
+      this.getSignedAvatarUrl(processedImages.full.filename, 60 * 60 * 24 * 7),
+    ];
+
+    const [thumbnailUrl, profileUrl, fullUrl] = await Promise.all(urlPromises);
+
+    return {
+      avatarUrl: profileUrl, // Primary avatar URL
+      sizes: {
+        thumbnail: thumbnailUrl,
+        profile: profileUrl,
+        full: fullUrl,
+      },
+    };
+  }
+
+  /**
+   * Upload a processed image to S3-compatible storage
+   */
+  private async uploadImageToStorage(image: {
+    buffer: Buffer;
+    filename: string;
+    contentType: string;
+  }): Promise<void> {
     await this.s3.send(
       new PutObjectCommand({
         Bucket: this.bucket,
-        Key: key,
-        Body: file.buffer,
-        ContentType: file.mimetype,
+        Key: image.filename,
+        Body: image.buffer,
+        ContentType: image.contentType,
+        CacheControl: 'public, max-age=2592000', // 30 days
+        Metadata: {
+          'uploaded-at': new Date().toISOString(),
+        },
       }),
     );
+  }
 
-    // Persist the key so we can re-generate a URL later
-    await this.repo.updateProfile(userId, { profilePictureKey: key });
+  /**
+   * Clean up old profile images when a new one is uploaded
+   */
+  private async cleanupOldProfileImages(oldKey: string): Promise<void> {
+    try {
+      // Extract the pattern to find all related sizes
+      // oldKey format: profiles/{userId}/profile-{uuid}.webp
+      const keyParts = oldKey.split('/');
+      if (keyParts.length >= 3) {
+        const userId = keyParts[1];
+        const fileName = keyParts[2];
+        const uuid = fileName.split('-')[1]?.split('.')[0];
 
-    // Return a signed URL (valid 7 days)
-    return getSignedUrl(this.s3, new GetObjectCommand({ Bucket: this.bucket, Key: key }), {
-      expiresIn: 60 * 60 * 24 * 7,
-    });
+        if (uuid) {
+          // Delete all sizes for this image set
+          const keysToDelete = [
+            `profiles/${userId}/thumbnail-${uuid}.webp`,
+            `profiles/${userId}/profile-${uuid}.webp`,
+            `profiles/${userId}/full-${uuid}.webp`,
+          ];
+
+          const deletePromises = keysToDelete.map((key) =>
+            this.s3
+              .send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }))
+              .catch((err) => console.warn(`Failed to delete old image ${key}:`, err.message)),
+          );
+
+          await Promise.all(deletePromises);
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to cleanup old profile images:', error);
+      // Don't throw - image upload should still succeed even if cleanup fails
+    }
   }
 
   /**
@@ -70,8 +177,12 @@ export class UserService {
    * Accepts a storage key (from user.profilePictureKey).
    */
   async getSignedAvatarUrl(key: string, expiresInSeconds = 3600): Promise<string> {
+    // AWS S3 presigned URLs can't exceed 7 days (604800 seconds)
+    const maxExpiry = 60 * 60 * 24 * 7; // 7 days
+    const safeExpiry = Math.min(expiresInSeconds, maxExpiry);
+
     return getSignedUrl(this.s3, new GetObjectCommand({ Bucket: this.bucket, Key: key }), {
-      expiresIn: expiresInSeconds,
+      expiresIn: safeExpiry,
     });
   }
 
@@ -152,7 +263,7 @@ export class UserService {
       id: user.id,
       name: user.name,
       role: user.role,
-      muskBucks: user.muskBucks,
+      muskBucks: user.muskBucks.toString(),
       profileComplete: user.profileComplete,
       rank,
       bio: user.bio,
@@ -235,11 +346,30 @@ export class UserService {
       content,
       parentId: typeof parentId === 'undefined' ? null : parentId,
     });
+    // Create legacy activity record (still needed for getUserActivity endpoint)
     await this.repo.createUserActivity({
       userId: authorId,
       type: parentId ? 'COMMENT_CREATED' : 'POST_CREATED',
       details: { postId: post.id },
     });
+
+    // Create unified activity event
+    const author = await this.getPublicSocketUser(authorId);
+    if (author) {
+      await unifiedActivityService.createPostActivity(
+        {
+          id: author.id,
+          name: author.name,
+          avatarUrl: author.avatarUrl,
+        },
+        {
+          id: post.id,
+          content,
+          isComment: Boolean(parentId),
+        },
+      );
+    }
+
     return toFeedPostDTO(post);
   }
 
@@ -266,11 +396,30 @@ export class UserService {
   }
 
   async createUserActivity(userId: number, type: string, details?: any): Promise<UserActivity> {
-    const activity: DbUserActivity = await this.repo.createUserActivity({
-      userId,
-      type,
-      details,
-    });
+    const activity = await this.repo.createUserActivity({ userId, type, details });
+
+    // Legacy ticker publishing removed - now handled by unified activity system
+    // The unified activity service broadcasts all activities globally
+    // if (
+    //   [
+    //     'PREDICTION_CREATED',
+    //     'PREDICTION_RESOLVED',
+    //     'BET_PLACED',
+    //     'PARLAY_PLACED',
+    //     'POST_CREATED',
+    //     'COMMENT_CREATED',
+    //     'BADGE_EARNED',
+    //   ].includes(type)
+    // ) {
+    //   publishTicker({
+    //     id: activity.id,
+    //     userId,
+    //     type,
+    //     details,
+    //     createdAt: new Date().toISOString(),
+    //   });
+    // }
+
     return toActivityDTO(activity);
   }
 
@@ -289,14 +438,14 @@ export class UserService {
       totalParlayLegs: stats.totalParlayLegs,
       parlayLegsWon: stats.parlayLegsWon,
       parlayLegsLost: stats.parlayLegsLost,
-      totalWagered: stats.totalWagered,
-      totalWon: stats.totalWon,
-      profit: stats.profit,
+      totalWagered: stats.totalWagered.toString(),
+      totalWon: stats.totalWon.toString(),
+      profit: stats.profit.toString(),
       roi: stats.roi,
       currentStreak: stats.currentStreak,
       longestStreak: stats.longestStreak,
       mostCommonBet: stats.mostCommonBet ?? null,
-      biggestWin: stats.biggestWin,
+      biggestWin: stats.biggestWin.toString(),
       updatedAt: stats.updatedAt instanceof Date ? stats.updatedAt.toISOString() : stats.updatedAt,
     };
   }
@@ -328,6 +477,165 @@ export class UserService {
   async setFeedPrivacy(userId: number, feedPrivate: boolean): Promise<void> {
     await this.repo.setFeedPrivacy(userId, feedPrivate);
   }
+
+  // --- USER ACTIVITY DATA FOR DASHBOARD ---
+
+  /**
+   * Get user's active bets (pending/open bets only)
+   */
+  async getUserActiveBets(userId: number): Promise<
+    Array<{
+      id: number;
+      predictionId: number;
+      predictionTitle: string;
+      amount: string;
+      odds: number;
+      optionLabel?: string;
+      status: string;
+      createdAt: string;
+    }>
+  > {
+    const bets = await prisma.bet.findMany({
+      where: {
+        userId,
+        status: 'PENDING', // Only active/pending bets
+      },
+      include: {
+        prediction: {
+          select: {
+            id: true,
+            title: true,
+            resolved: true,
+          },
+        },
+        optionOption: {
+          select: {
+            label: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      take: 10, // Limit to recent bets
+    });
+
+    return bets.map((bet) => ({
+      id: bet.id,
+      predictionId: bet.predictionId,
+      predictionTitle: bet.prediction.title,
+      amount: bet.amount.toString(),
+      odds: bet.oddsAtPlacement || 1.0,
+      optionLabel: bet.optionOption?.label,
+      status: bet.status,
+      createdAt: bet.createdAt.toISOString(),
+    }));
+  }
+
+  /**
+   * Get user's active parlays (pending parlays only)
+   */
+  async getUserActiveParlays(userId: number): Promise<
+    Array<{
+      id: number;
+      amount: string;
+      combinedOdds: number;
+      potentialPayout: string;
+      legCount: number;
+      status: string;
+      createdAt: string;
+      legs: Array<{
+        predictionTitle: string;
+        optionLabel: string;
+      }>;
+    }>
+  > {
+    const parlays = await prisma.parlay.findMany({
+      where: {
+        userId,
+        status: 'PENDING', // Only active/pending parlays
+      },
+      include: {
+        legs: {
+          include: {
+            option: {
+              include: {
+                prediction: {
+                  select: {
+                    title: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      take: 10, // Limit to recent parlays
+    });
+
+    return parlays.map((parlay) => ({
+      id: parlay.id,
+      amount: parlay.amount.toString(),
+      combinedOdds: parlay.combinedOdds,
+      potentialPayout: parlay.potentialPayout.toString(),
+      legCount: parlay.legs.length,
+      status: parlay.status,
+      createdAt: parlay.createdAt.toISOString(),
+      legs: parlay.legs.map((leg: any) => ({
+        predictionTitle: leg.option.prediction.title,
+        optionLabel: leg.option.label,
+      })),
+    }));
+  }
+
+  /**
+   * Get user's created predictions (approved and pending)
+   */
+  async getUserPredictions(userId: number): Promise<
+    Array<{
+      id: number;
+      title: string;
+      category: string;
+      type: string;
+      approved: boolean;
+      resolved: boolean;
+      expiresAt: string;
+      createdAt: string;
+      totalBets?: number;
+    }>
+  > {
+    const predictions = await prisma.prediction.findMany({
+      where: {
+        creatorId: userId,
+      },
+      include: {
+        _count: {
+          select: {
+            bets: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      take: 10, // Limit to recent predictions
+    });
+
+    return predictions.map((prediction) => ({
+      id: prediction.id,
+      title: prediction.title,
+      category: prediction.category,
+      type: prediction.type,
+      approved: prediction.approved,
+      resolved: prediction.resolved,
+      expiresAt: prediction.expiresAt.toISOString(),
+      createdAt: prediction.createdAt.toISOString(),
+      totalBets: prediction._count.bets,
+    }));
+  }
 }
 
 // --- Helpers: always map DB types to DTOs used on frontend ---
@@ -357,3 +665,8 @@ function toActivityDTO(a: DbUserActivity): UserActivity {
     createdAt: a.createdAt instanceof Date ? a.createdAt.toISOString() : a.createdAt,
   };
 }
+
+// Legacy ticker publishing removed - now handled by unified activity system
+// const TICKER_CHANNEL = 'activity:newsflash';
+// const TICKER_LIST = 'activity:ticker';
+// const TICKER_MAX = 100;

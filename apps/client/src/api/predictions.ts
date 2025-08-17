@@ -1,20 +1,8 @@
 import api from './axios';
-import type {
-  PublicPrediction,
-  PublicPredictionOption,
-  PredictionType,
-  BetWithUser,
-  ParlayLegWithUser, // <-- use from @ems/types!
-} from '@ems/types';
+import type { PredictionFull, PredictionType } from '@ems/types';
 
-/**
- * A prediction plus its dynamic options, single bets, and parlay legs.
- */
-export type PredictionFull = PublicPrediction & {
-  options: PublicPredictionOption[];
-  bets: BetWithUser[];
-  parlayLegs: ParlayLegWithUser[];
-};
+// Re-export for compatibility
+export type { PredictionFull } from '@ems/types';
 
 /**
  * Fetch all predictions (with their options, bets & parlay legs).

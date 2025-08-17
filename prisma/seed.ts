@@ -3,10 +3,9 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import { PrismaClient, TransactionType, BetStatus } from '@prisma/client';
-import { PayoutRepository } from '../apps/server/src/repositories/PayoutRepository.ts';
+import { SEED_ACHIEVEMENTS } from './achievement-catalog.ts';
 
 const prisma = new PrismaClient();
-const payoutRepo = new PayoutRepository();
 
 async function clear<Model>(name: string, fn: () => Promise<Model>) {
   try {
@@ -19,6 +18,8 @@ async function clear<Model>(name: string, fn: () => Promise<Model>) {
 
 async function main() {
   console.log('🧹 Clearing out old data...');
+  await clear('ArticleComment',   () => prisma.articleComment.deleteMany());
+  await clear('ArticleReaction',  () => prisma.articleReaction.deleteMany());
   await clear('Transaction',      () => prisma.transaction.deleteMany());
   await clear('ParlayLeg',        () => prisma.parlayLeg.deleteMany());
   await clear('Parlay',           () => prisma.parlay.deleteMany());
@@ -28,12 +29,15 @@ async function main() {
   await clear('UserPost',         () => prisma.userPost.deleteMany());
   await clear('PredictionOption', () => prisma.predictionOption.deleteMany());
   await clear('Prediction',       () => prisma.prediction.deleteMany());
+  await clear('UserAchievement',  () => prisma.userAchievement.deleteMany());
   await clear('UserBadge',        () => prisma.userBadge.deleteMany());
   await clear('Badge',            () => prisma.badge.deleteMany());
   await clear('Follow',           () => prisma.follow.deleteMany());
+  await clear('ModerationLog',    () => prisma.moderationLog.deleteMany());
+  await clear('UserBan',          () => prisma.userBan.deleteMany());
 
-  console.log('👥 Creating users Alice, Bob, and Carol…');
-  const [alice, bob, carol] = await Promise.all([
+  console.log('👥 Creating users Alice, Bob, Carol, and Admin…');
+  const [alice, bob, carol, admin] = await Promise.all([
     prisma.user.upsert({ where: { email: 'alice@example.com' }, update: {}, create: {
       email: 'alice@example.com', name: 'Alice', passwordHash: 'hash', emailVerified: true,
       bio: 'Space enthusiast', avatarUrl: 'https://i.pravatar.cc/150?img=1',
@@ -49,9 +53,53 @@ async function main() {
       bio: 'Crypto trader', avatarUrl: 'https://i.pravatar.cc/150?img=3',
       location: 'New York, NY', timezone: 'America/New_York', muskBucks: 8000,
     }}),
+    prisma.user.upsert({ where: { email: 'admin@example.com' }, update: {}, create: {
+      email: 'admin@example.com', name: 'Admin', passwordHash: 'hash', emailVerified: true,
+      role: 'ADMIN', bio: 'Site administrator', avatarUrl: 'https://i.pravatar.cc/150?img=4',
+      location: 'Server Room', timezone: 'UTC', muskBucks: 100000,
+    }}),
   ]);
 
-  console.log('🏅 Badges and follows…');
+  console.log('🏆 Seeding comprehensive achievement catalog...');
+  console.log(`Upserting ${SEED_ACHIEVEMENTS.length} achievements by slug...`);
+  
+  // Upsert all achievements by slug for idempotency
+  for (const achievement of SEED_ACHIEVEMENTS) {
+    await prisma.achievement.upsert({
+      where: { slug: achievement.slug },
+      update: {
+        name: achievement.name,
+        title: achievement.title,
+        description: achievement.description,
+        category: achievement.category,
+        rarity: achievement.rarity,
+        targetValue: achievement.targetValue,
+        autoAward: achievement.autoAward,
+        manualOnly: achievement.manualOnly,
+        isShame: achievement.isShame,
+        iconUrl: achievement.iconUrl,
+        sortOrder: achievement.sortOrder,
+        isActive: true,
+      },
+      create: {
+        slug: achievement.slug,
+        name: achievement.name,
+        title: achievement.title,
+        description: achievement.description,
+        category: achievement.category,
+        rarity: achievement.rarity,
+        targetValue: achievement.targetValue,
+        autoAward: achievement.autoAward,
+        manualOnly: achievement.manualOnly,
+        isShame: achievement.isShame,
+        iconUrl: achievement.iconUrl,
+        sortOrder: achievement.sortOrder,
+        isActive: true,
+      },
+    });
+  }
+  
+  console.log('🏅 Legacy badges and follows...');
   const [badgeFirstBet, badgeHighRoller] = await prisma.$transaction([
     prisma.badge.create({ data: { name: 'First Bet', description: 'Placed first bet', iconUrl: '' } }),
     prisma.badge.create({ data: { name: 'High Roller', description: 'Bet >1000', iconUrl: '' } }),
@@ -107,7 +155,7 @@ async function main() {
     ]},
   }});
   await prisma.transaction.create({ data: {
-    userId: bob.id, type: TransactionType.DEBIT, amount: 200, balanceAfter: bob.muskBucks - 200,
+    userId: bob.id, type: TransactionType.DEBIT, amount: 200, balanceAfter: bob.muskBucks - BigInt(200),
     relatedParlayId: parlayBob.id,
   }});
   await prisma.bet.create({ data: {
@@ -130,13 +178,54 @@ async function main() {
   await prisma.userActivity.create({ data: { userId: bob.id,     type: 'COMMENT_CREATED',details: { postId: bobComment.id } }});
   await prisma.userActivity.create({ data: { userId: carol.id,   type: 'COMMENT_CREATED',details: { postId: carolReply.id } }});
 
-  console.log('🔔 Resolving predictions…');
-  await payoutRepo.resolvePrediction(pMultiple.id, pMultiple.options[0].id);
-  await payoutRepo.resolvePrediction(pBinary.id, pBinary.options[1].id);
-  await payoutRepo.resolvePrediction(pOU.id, pOU.options[0].id);
+  console.log('🛡️ Seeding moderation data...');
+  // Create some sample chat room
+  const globalRoom = await prisma.chatRoom.upsert({
+    where: { name: 'global' },
+    update: {},
+    create: { name: 'global' }
+  });
 
-  console.log('🔄 Refreshing leaderboard_view...');
-  await prisma.$executeRaw`REFRESH MATERIALIZED VIEW leaderboard_view`;
+  // Create some sample messages
+  await prisma.message.createMany({
+    data: [
+      { roomId: globalRoom.id, userId: alice.id, content: 'Welcome to the chat!' },
+      { roomId: globalRoom.id, userId: bob.id, content: 'Hello everyone!' },
+      { roomId: globalRoom.id, userId: carol.id, content: 'Great to be here!' },
+    ]
+  });
+
+  // Add some sample moderation logs
+  await prisma.moderationLog.createMany({
+    data: [
+      {
+        moderatorId: admin.id,
+        action: 'MESSAGE_DELETE',
+        reason: 'Spam message removed',
+        details: { messageContent: 'Sample deleted message' },
+        ipAddress: '127.0.0.1',
+        userAgent: 'Test Browser'
+      },
+      {
+        moderatorId: admin.id,
+        action: 'USER_MUTE',
+        reason: 'Temporary mute for testing',
+        details: { duration: 60 },
+        ipAddress: '127.0.0.1',
+        userAgent: 'Test Browser'
+      }
+    ]
+  });
+
+  console.log('🔔 Setting predictions as approved…');
+  await prisma.prediction.updateMany({
+    where: { id: { in: [pMultiple.id, pBinary.id, pOU.id] } },
+    data: { approved: true }
+  });
+
+  // Note: leaderboard_view is now a regular table, not a materialized view
+  // console.log('🔄 Refreshing leaderboard_view...');
+  // await prisma.$executeRaw`REFRESH MATERIALIZED VIEW leaderboard_view`;
 
   console.log('✅ Seeding complete!');
 }

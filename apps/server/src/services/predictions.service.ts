@@ -1,41 +1,59 @@
 // apps/server/src/services/predictions.service.ts
-import type { DbPrediction, DbPredictionOption, DbBet, PublicPrediction } from '@ems/types';
+// -----------------------------------------------------------------------------
+// • Publishes present-tense Redis channels (prediction:create / …:resolve)
+// • Sanitises DB records and injects signed avatar URLs for bets & parlay legs
+// -----------------------------------------------------------------------------
+
+import type {
+  DbPrediction,
+  DbPredictionOption,
+  DbBet,
+  PublicPrediction,
+  ParlayLegWithUser,
+} from '@ems/types';
 import type { IPredictionRepository } from '../repositories/IPredictionRepository';
 import { PredictionRepository } from '../repositories/PredictionRepository';
 import { PredictionType } from '@prisma/client';
 import redisClient from '../lib/redis';
+import { UserService } from '../services/user.service';
+import { unifiedActivityService } from './unifiedActivity.service';
+import { achievementService } from './achievement.service';
+import { achievementEvaluatorService } from './achievementEvaluator.service';
 
-/** Matches what the client expects for a parlay leg’s user info */
-export type ParlayLegWithUser = {
-  parlayId: number;
-  user: { id: number; name: string };
-  stake: number;
-  optionId: number;
-  createdAt: Date;
-};
+// Using the global ParlayLegWithUser type from @ems/types
 
 export class PredictionService {
+  private userService = new UserService();
+
   constructor(private repo: IPredictionRepository = new PredictionRepository()) {}
 
-  /**
-   * List all predictions, sanitized.
-   */
+  /* ────────────────────────────────────────────────────────────────────────── */
+  /** Fetch **ALL** predictions (public safe shape) */
   async listAllPredictions(): Promise<
     Array<
       DbPrediction & {
         options: DbPredictionOption[];
-        bets: Array<DbBet & { user: { id: number; name: string } }>;
+        bets: Array<DbBet & { user: { id: number; name: string; avatarUrl: string | null } }>;
         parlayLegs: ParlayLegWithUser[];
+        sourceLinks: Array<{
+          id: number;
+          predictionId: number;
+          articleId: number | null;
+          tweetId: string | null;
+          url: string;
+          title: string | null;
+          publisher: string | null;
+          capturedAt: string;
+        }>;
       }
     >
   > {
     const raw = await this.repo.listAllPredictions();
-    return raw.map((pred) => this.sanitize(pred));
+    return Promise.all(raw.map((p) => this.enrichAvatars(p)));
   }
 
-  /**
-   * Create a new prediction, then publish real‐time event.
-   */
+  /* ────────────────────────────────────────────────────────────────────────── */
+  /** Create prediction then broadcast */
   async createPrediction(params: {
     title: string;
     description: string;
@@ -45,10 +63,17 @@ export class PredictionService {
     options: Array<{ label: string }>;
     type: PredictionType;
     threshold?: number;
-  }): Promise<PublicPrediction & { bets: DbBet[]; parlayLegs: ParlayLegWithUser[] }> {
+  }): Promise<
+    PublicPrediction & {
+      options: DbPredictionOption[];
+      bets: DbBet[];
+      parlayLegs: ParlayLegWithUser[];
+    }
+  > {
     const pred = await this.repo.createPrediction(params);
 
-    const publicPred: PublicPrediction & {
+    const dto: PublicPrediction & {
+      options: DbPredictionOption[];
       bets: DbBet[];
       parlayLegs: ParlayLegWithUser[];
     } = {
@@ -64,62 +89,149 @@ export class PredictionService {
       resolvedAt: pred.resolvedAt,
       winningOptionId: pred.winningOptionId,
       creatorId: pred.creatorId,
-
-      // **test expectations**
+      options: pred.options || [],
       bets: [],
       parlayLegs: [],
+      createdAt: pred.createdAt,
     };
 
-    await redisClient.publish('prediction:created', JSON.stringify(publicPred));
+    // Publish legacy format
+    await redisClient.publish('prediction:create', JSON.stringify(dto));
 
-    return publicPred;
+    // Publish to unified activity system
+    const creator = await this.userService.getPublicSocketUser(params.creatorId);
+    if (creator) {
+      await unifiedActivityService.createPredictionActivity(
+        {
+          id: creator.id,
+          name: creator.name,
+          avatarUrl: creator.avatarUrl,
+        },
+        {
+          id: pred.id,
+          title: pred.title,
+          category: pred.category,
+        },
+      );
+
+      // Activity already published by unifiedActivityService above
+      // No need for duplicate ActivityRecorder call
+
+      // Check for achievement unlocks (legacy system)
+      await achievementService.checkAndUpdateAchievements({
+        type: 'prediction_created',
+        userId: params.creatorId,
+        data: {
+          predictionId: pred.id,
+          title: pred.title,
+          category: pred.category,
+        },
+      });
+
+      // Check for achievement unlocks (advanced evaluator)
+      await achievementEvaluatorService.processAchievementEvent({
+        type: 'prediction_created',
+        userId: params.creatorId,
+        timestamp: new Date().toISOString(),
+        data: {
+          predictionId: pred.id,
+          title: pred.title,
+          category: pred.category,
+        },
+      });
+    }
+
+    return dto;
   }
 
-  /**
-   * Fetch one prediction, sanitized.
-   */
-  async getPrediction(id: number): Promise<
-    | (DbPrediction & {
-        options: DbPredictionOption[];
-        bets: Array<DbBet & { user: { id: number; name: string } }>;
-        parlayLegs: ParlayLegWithUser[];
-      })
-    | null
-  > {
+  /* ────────────────────────────────────────────────────────────────────────── */
+  /** Fetch ONE prediction (public safe shape) */
+  async getPrediction(id: number) {
     const pred = await this.repo.findPredictionById(id);
-    if (!pred) return null;
-    return this.sanitize(pred);
+    return pred ? this.enrichAvatars(pred) : null;
   }
 
-  /** Utility to sanitize DB return into public shape */
-  private sanitize(
+  /* ────────────────────────────────────────────────────────────────────────── */
+  /** Helper: convert & add avatar URLs */
+  private async enrichAvatars(
     pred: DbPrediction & {
       options: DbPredictionOption[];
-      bets: Array<DbBet & { user: { id: number; name: string } }>;
+      bets: Array<
+        DbBet & {
+          user: {
+            id: number;
+            name: string;
+            avatarUrl?: string | null;
+            profilePictureKey?: string | null;
+          };
+        }
+      >;
       parlayLegs: ParlayLegWithUser[];
+      sourceLinks?: Array<{
+        id: number;
+        predictionId: number;
+        articleId: number | null;
+        tweetId: string | null;
+        url: string;
+        title: string | null;
+        publisher: string | null;
+        capturedAt: Date;
+      }>;
     },
   ) {
-    return {
-      ...pred,
-      options: pred.options.map(({ id, label, odds, predictionId, createdAt }) => ({
-        id,
-        label,
-        odds,
-        predictionId,
-        createdAt,
-      })),
-      bets: pred.bets.map((b) => ({
+    // --- quick helper to resolve a final URL --------------------------------
+    const avatarFor = async (u: {
+      id: number;
+      avatarUrl?: string | null;
+      profilePictureKey?: string | null;
+    }): Promise<string | null> =>
+      u.profilePictureKey
+        ? this.userService.getCachedProfileImageUrl(u.id, u.profilePictureKey, 3600)
+        : (u.avatarUrl ?? null);
+
+    // --- bets (user avatar enrichment) --------------------------------------
+    const bets = await Promise.all(
+      pred.bets.map(async (b) => ({
         ...b,
-        user: { id: b.user.id, name: b.user.name },
+        user: {
+          id: b.user.id,
+          name: b.user.name,
+          avatarUrl: await avatarFor(b.user),
+        },
       })),
-      parlayLegs: pred.parlayLegs.map((leg) => ({
+    );
+
+    // --- parlay legs (user avatar enrichment) -------------------------------
+    const parlayLegs: ParlayLegWithUser[] = await Promise.all(
+      pred.parlayLegs.map(async (leg) => ({
         parlayId: leg.parlayId,
-        user: { id: leg.user.id, name: leg.user.name },
         stake: leg.stake,
         optionId: leg.optionId,
         createdAt: leg.createdAt,
+        user: {
+          id: leg.user.id,
+          name: leg.user.name,
+          avatarUrl: await avatarFor(leg.user),
+        },
       })),
-    };
+    );
+
+    // --- options (strip prisma internals) -----------------------------------
+    const options = pred.options.map(({ id, label, odds, predictionId, createdAt }) => ({
+      id,
+      label,
+      odds,
+      predictionId,
+      createdAt,
+    }));
+
+    // --- sourceLinks (convert Date to string) -------------------------------
+    const sourceLinks = (pred.sourceLinks || []).map((link) => ({
+      ...link,
+      capturedAt: link.capturedAt.toISOString(),
+    }));
+
+    return { ...pred, options, bets, parlayLegs, sourceLinks };
   }
 }
 

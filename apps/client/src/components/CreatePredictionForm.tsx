@@ -1,16 +1,46 @@
 // apps/client/src/components/CreatePredictionForm.tsx
-import React, { useState } from 'react';
+// -----------------------------------------------------------------------------
+// Form component used by admins/moderators to create a new prediction.
+// Relies on shared @ems/types enum + DTO from '@/api/predictions'.
+// -----------------------------------------------------------------------------
+
+import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import type { CreatePredictionPayload } from '../api/predictions';
 import { PredictionType } from '@ems/types';
 
 interface CreatePredictionFormProps {
-  /** Called with the new-prediction payload when the user submits */
+  /** Called with the payload when the user submits. */
   onCreated: (input: CreatePredictionPayload) => Promise<void> | void;
-  /** Called when the user cancels creating */
+  /** Called when the user cancels creating. */
   onCancel: () => void;
+  /** Source data for prediction creation */
+  sourceData?: {
+    type: 'article' | 'tweet';
+    id: string;
+    title: string;
+    url: string;
+    publisher: string;
+  } | null;
+  /** Whether the form is disabled (submitting) */
+  disabled?: boolean;
 }
 
-export default function CreatePredictionForm({ onCreated, onCancel }: CreatePredictionFormProps) {
+interface SourceData {
+  type: 'article' | 'tweet';
+  id: string;
+  title: string;
+  url: string;
+  publisher: string;
+}
+
+export default function CreatePredictionForm({
+  onCreated,
+  onCancel,
+  sourceData: propSourceData,
+  disabled,
+}: CreatePredictionFormProps) {
+  const location = useLocation();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('');
@@ -18,16 +48,51 @@ export default function CreatePredictionForm({ onCreated, onCancel }: CreatePred
   const [type, setType] = useState<PredictionType>(PredictionType.MULTIPLE);
   const [threshold, setThreshold] = useState<number | ''>('');
   const [options, setOptions] = useState<string[]>(['']);
+  const [sourceData, setSourceData] = useState<SourceData | null>(propSourceData || null);
+
+  // Parse URL parameters for source data (only if no prop source data)
+  useEffect(() => {
+    if (propSourceData) return; // Use prop data instead
+
+    const searchParams = new URLSearchParams(location.search);
+    const sourceType = searchParams.get('sourceType');
+    const sourceId = searchParams.get('sourceId');
+    const sourceTitle = searchParams.get('sourceTitle');
+    const sourceUrl = searchParams.get('sourceUrl');
+    const sourcePublisher = searchParams.get('sourcePublisher');
+
+    if (sourceType && sourceId && sourceTitle) {
+      setSourceData({
+        type: sourceType as 'article' | 'tweet',
+        id: sourceId,
+        title: sourceTitle,
+        url: sourceUrl || '',
+        publisher: sourcePublisher || 'Unknown',
+      });
+    }
+  }, [location.search, propSourceData]);
+
+  // Pre-populate fields when source data changes
+  useEffect(() => {
+    if (sourceData && sourceData.title && !title) {
+      // Suggest a prediction title based on the article
+      setTitle(`Will ${sourceData.title.split(' ').slice(0, 8).join(' ')}...?`);
+    }
+  }, [sourceData, title]);
 
   const isBinary = type === PredictionType.BINARY;
   const isOU = type === PredictionType.OVER_UNDER;
   const isMultiple = type === PredictionType.MULTIPLE;
+
+  // Validate that expiration date is in the future
+  const isExpirationValid = expiresAt && new Date(expiresAt) > new Date();
 
   const canSubmit =
     Boolean(title) &&
     Boolean(description) &&
     Boolean(category) &&
     Boolean(expiresAt) &&
+    isExpirationValid &&
     ((isMultiple && options.every((o) => o.trim().length > 0)) ||
       isBinary ||
       (isOU && threshold !== ''));
@@ -51,25 +116,58 @@ export default function CreatePredictionForm({ onCreated, onCancel }: CreatePred
       options: isMultiple ? options.map((label) => ({ label })) : undefined,
     };
 
+    // Create the prediction - parent component handles source linking
     await onCreated(payload);
   };
 
   const inputBase =
-    'w-full border rounded-lg px-3 py-2 bg-[var(--color-surface)] ' +
-    'text-[var(--color-content)] placeholder:text-[var(--color-tertiary)] ' +
-    'focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] ' +
-    'border-[var(--color-muted)]';
+    'w-full border rounded-lg px-3 py-2 bg-surface text-content placeholder:text-tertiary ' +
+    'focus:outline-none focus:ring-2 focus:ring-primary border-muted';
 
   return (
-    <form
-      onSubmit={submit}
-      className="bg-[var(--color-surface)] shadow-lg rounded-lg p-6 space-y-6"
-    >
+    <form onSubmit={submit} className="bg-surface shadow-lg rounded-lg p-6 space-y-6">
       <h2 className="text-2xl font-bold">New Prediction</h2>
+
+      {/* Source Information */}
+      {sourceData && (
+        <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-semibold text-content flex items-center">
+              <span className="mr-2">📰</span>
+              Prediction Source
+            </h3>
+            <button
+              type="button"
+              onClick={() => setSourceData(null)}
+              className="text-content/60 hover:text-content text-sm"
+            >
+              Remove
+            </button>
+          </div>
+          <div className="bg-background/50 rounded p-3">
+            <h4 className="font-medium text-content text-sm line-clamp-2">{sourceData.title}</h4>
+            <p className="text-xs text-content/60 mt-1">
+              {sourceData.publisher} • {sourceData.type === 'article' ? 'Article' : 'Tweet'}
+            </p>
+            {sourceData.url && (
+              <a
+                href={sourceData.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-primary hover:text-primary/80 mt-1 inline-block"
+              >
+                View Original →
+              </a>
+            )}
+          </div>
+          <p className="text-xs text-content/60 mt-2">
+            This source will be automatically linked to your prediction as supporting evidence.
+          </p>
+        </div>
+      )}
 
       {/* Title / Category / Description / Expires At / Type / Threshold */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Title */}
         <div>
           <label htmlFor="title" className="block mb-1 text-sm">
             Title
@@ -83,7 +181,6 @@ export default function CreatePredictionForm({ onCreated, onCancel }: CreatePred
           />
         </div>
 
-        {/* Category */}
         <div>
           <label htmlFor="category" className="block mb-1 text-sm">
             Category
@@ -97,7 +194,6 @@ export default function CreatePredictionForm({ onCreated, onCancel }: CreatePred
           />
         </div>
 
-        {/* Description */}
         <div className="md:col-span-2">
           <label htmlFor="description" className="block mb-1 text-sm">
             Terms of Prediction
@@ -111,7 +207,6 @@ export default function CreatePredictionForm({ onCreated, onCancel }: CreatePred
           />
         </div>
 
-        {/* Expires At */}
         <div>
           <label htmlFor="expiresAt" className="block mb-1 text-sm">
             Expires At
@@ -121,11 +216,13 @@ export default function CreatePredictionForm({ onCreated, onCancel }: CreatePred
             type="date"
             value={expiresAt}
             onChange={(e) => setExpiresAt(e.target.value)}
-            className={inputBase}
+            className={`${inputBase} ${expiresAt && !isExpirationValid ? 'border-red-500 focus:ring-red-500' : ''}`}
           />
+          {expiresAt && !isExpirationValid && (
+            <p className="text-red-500 text-xs mt-1">Expiration date must be in the future</p>
+          )}
         </div>
 
-        {/* Prediction Type */}
         <div>
           <label htmlFor="type" className="block mb-1 text-sm">
             Prediction Type
@@ -142,7 +239,6 @@ export default function CreatePredictionForm({ onCreated, onCancel }: CreatePred
           </select>
         </div>
 
-        {/* Threshold for Over/Under */}
         {isOU && (
           <div>
             <label htmlFor="threshold" className="block mb-1 text-sm">
@@ -160,7 +256,6 @@ export default function CreatePredictionForm({ onCreated, onCancel }: CreatePred
         )}
       </div>
 
-      {/* Options list for Multiple */}
       {isMultiple && (
         <div className="space-y-3">
           <label className="block mb-1 text-sm">Options</label>
@@ -184,33 +279,24 @@ export default function CreatePredictionForm({ onCreated, onCancel }: CreatePred
               )}
             </div>
           ))}
-          <button
-            type="button"
-            onClick={addOption}
-            className="text-[var(--color-primary)] text-sm font-medium"
-          >
+          <button type="button" onClick={addOption} className="text-primary text-sm font-medium">
             + Add another option
           </button>
         </div>
       )}
 
-      {/* Actions */}
       <div className="pt-4 border-t flex justify-end space-x-4">
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2 rounded-lg bg-[var(--color-muted)] hover:bg-[var(--color-tertiary)]"
+          className="px-4 py-2 rounded-lg bg-muted hover:bg-tertiary"
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={!canSubmit}
-          className={`px-6 py-2 rounded-lg font-medium transition ${
-            canSubmit
-              ? 'bg-[var(--color-primary)] text-white hover:bg-[var(--color-secondary)]'
-              : 'bg-[var(--color-muted)] text-[var(--color-tertiary)] cursor-not-allowed'
-          }`}
+          className={`px-6 py-2 rounded-lg font-medium transition ${canSubmit ? 'bg-primary text-white hover:bg-secondary' : 'bg-muted text-tertiary cursor-not-allowed'}`}
         >
           Create Prediction
         </button>

@@ -1,0 +1,21 @@
+# Build stage
+FROM node:24-alpine AS builder
+WORKDIR /app
+
+# 1) Copy manifests
+COPY package.json package-lock.json ./
+
+# 2) Copy everything for workspaces
+COPY . .
+
+# 3) Install, build types & client
+RUN npm ci \
+  && npm run build --workspace=packages/types \
+  && npm run build --workspace=apps/client
+
+# Production: serve static via nginx
+FROM nginx:stable-alpine
+COPY --from=builder /app/apps/client/dist /usr/share/nginx/html
+
+EXPOSE 3000
+CMD ["nginx", "-g", "daemon off;"]

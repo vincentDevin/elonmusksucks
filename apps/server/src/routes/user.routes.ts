@@ -1,6 +1,5 @@
 // apps/server/src/routes/user.routes.ts
 import { Router } from 'express';
-import multer from 'multer';
 import {
   getProfile,
   followUserHandler,
@@ -11,11 +10,15 @@ import {
   getUserActivityHandler,
   getUserStatsHandler,
   uploadProfileImageHandler,
+  getUserBetsHandler,
+  getUserParlaysHandler,
+  getUserPredictionsHandler,
+  getEnhancedUserStatsHandler,
+  getUserAchievementsHandler,
+  getRecentAchievementsHandler,
 } from '../controllers/user.controller';
 import { requireAuth } from '../middleware/auth.middleware';
-
-// Configure Multer for in-memory storage
-const upload = multer({ storage: multer.memoryStorage() });
+import { uploadConfig, validateFileContent } from '../middleware/fileValidation.middleware';
 
 const router = Router();
 
@@ -25,11 +28,12 @@ router.get('/profile/:userId', requireAuth, getProfile);
 // Update profile fields
 router.put('/:userId', requireAuth, updateProfileHandler);
 
-// Upload profile picture
+// Upload profile picture with enhanced validation
 router.post(
   '/:userId/profile-picture',
   requireAuth,
-  upload.single('image'),
+  uploadConfig.single('image'),
+  validateFileContent,
   uploadProfileImageHandler,
 );
 
@@ -46,5 +50,13 @@ router.delete('/:userId/follow', requireAuth, unfollowUserHandler);
 
 // User stats
 router.get('/:userId/stats', requireAuth, getUserStatsHandler);
+router.get('/:userId/enhanced-stats', requireAuth, getEnhancedUserStatsHandler);
+router.get('/:userId/achievements', requireAuth, getUserAchievementsHandler);
+router.get('/:userId/achievements/recent', requireAuth, getRecentAchievementsHandler);
+
+// User activity data for dashboard
+router.get('/:userId/bets', requireAuth, getUserBetsHandler);
+router.get('/:userId/parlays', requireAuth, getUserParlaysHandler);
+router.get('/:userId/predictions', requireAuth, getUserPredictionsHandler);
 
 export default router;

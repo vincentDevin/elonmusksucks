@@ -1,9 +1,11 @@
 import bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
+import jwt from 'jsonwebtoken';
 
 import type { User } from '@prisma/client';
 import type { IAuthRepository } from '../repositories/IAuthRepository';
 import { PrismaAuthRepository } from '../repositories/AuthRepository';
+import { userCache } from '../utils/userCache';
 
 const SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS) || 12;
 const DUMMY_HASH = '$2b$10$KIXh1g4myh5j9hFSUVjdaeQXG7q3NDy4W8P4Y8XxYQCEhiqbz0R4e';
@@ -52,23 +54,76 @@ export async function validateUser(email: string, password: string): Promise<Use
 
 export async function saveRefreshToken(userId: number, token: string): Promise<void> {
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-  await repo.saveRefreshToken(userId, token, expiresAt);
+  // Hash the refresh token before storing it
+  const salt = await bcrypt.genSalt(10); // Faster rounds for refresh tokens
+  const hashedToken = await bcrypt.hash(token, salt);
+  await repo.saveRefreshToken(userId, hashedToken, expiresAt);
 }
 
 export async function getRefreshToken(
   token: string,
 ): Promise<import('@prisma/client').RefreshToken | null> {
-  return repo.getRefreshToken(token);
+  // This function now needs to compare against hashed tokens
+  // We need the userId from the JWT payload to look up candidate tokens
+  const payload = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET!) as any;
+  if (!payload?.userId) return null;
+
+  const storedTokens = await repo.getAllRefreshTokensForUser(payload.userId);
+
+  // Compare the provided token against all stored hashed tokens for this user
+  for (const storedToken of storedTokens) {
+    const isMatch = await bcrypt.compare(token, storedToken.token);
+    if (isMatch) {
+      // Check if token is expired
+      if (storedToken.expiresAt < new Date()) {
+        await repo.deleteRefreshToken(storedToken.token);
+        return null;
+      }
+      return storedToken;
+    }
+  }
+
+  return null;
 }
 
 export async function deleteRefreshToken(token: string): Promise<void> {
-  await repo.deleteRefreshToken(token);
+  // Similar to getRefreshToken, we need to find the token by comparing hashes
+  try {
+    const payload = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET!) as any;
+    if (!payload?.userId) return;
+
+    const storedTokens = await repo.getAllRefreshTokensForUser(payload.userId);
+
+    // Find the matching hashed token to delete
+    for (const storedToken of storedTokens) {
+      const isMatch = await bcrypt.compare(token, storedToken.token);
+      if (isMatch) {
+        await repo.deleteRefreshToken(storedToken.token);
+        return;
+      }
+    }
+  } catch (error) {
+    // If JWT is invalid/expired, just ignore silently for logout
+    console.warn('Delete refresh token: Invalid JWT during logout', error);
+  }
 }
 
 // --- User lookup ---
 
 export async function getUserById(userId: number): Promise<User | null> {
-  return repo.findById(userId);
+  // Check cache first
+  const cachedUser = userCache.get(userId);
+  if (cachedUser) {
+    return cachedUser;
+  }
+
+  // Fetch from database and cache result
+  const user = await repo.findById(userId);
+  if (user) {
+    userCache.set(userId, user);
+  }
+
+  return user;
 }
 
 // --- Email verification ---

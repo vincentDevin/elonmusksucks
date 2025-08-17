@@ -2,6 +2,9 @@
 import { PrismaClient, Prisma } from '@prisma/client';
 import type { IPayoutRepository } from './IPayoutRepository';
 import type { PublicPrediction, DbUserStats } from '@ems/types';
+import redisClient from '../lib/redis';
+import { achievementService } from '../services/achievement.service';
+import { achievementEvaluatorService } from '../services/achievementEvaluator.service';
 
 const prisma = new PrismaClient();
 
@@ -55,16 +58,34 @@ export class PayoutRepository implements IPayoutRepository {
             },
           });
 
+          // Publish bet status change event for real-time updates
+          try {
+            const betStatusPayload = {
+              betId: b.id,
+              userId: b.userId,
+              predictionId,
+              status: isWinner ? 'WON' : 'LOST',
+              amount: b.amount,
+              payout: isWinner ? (b.potentialPayout ?? 0) : 0,
+              timestamp: new Date().toISOString(),
+            };
+
+            // Publish to single channel - handler will route to user room
+            await redisClient.publish('bet:status_change', JSON.stringify(betStatusPayload));
+          } catch (error) {
+            console.error('[payout] Error publishing bet status change:', error);
+          }
+
           if (isWinner) {
             const user = await tx.user.findUnique({ where: { id: b.userId } });
             if (user) {
-              const newBal = user.muskBucks + payoutAmount;
+              const newBal = user.muskBucks + BigInt(payoutAmount);
               await tx.user.update({ where: { id: user.id }, data: { muskBucks: newBal } });
               await tx.transaction.create({
                 data: {
                   userId: user.id,
                   type: 'CREDIT',
-                  amount: payoutAmount,
+                  amount: BigInt(payoutAmount),
                   balanceAfter: newBal,
                   relatedBetId: b.id,
                   relatedParlayId: null,
@@ -88,24 +109,29 @@ export class PayoutRepository implements IPayoutRepository {
               parlayLegsWon: 0,
               parlayLegsLost: 0,
               totalWagered: b.amount,
-              totalWon: payoutAmount,
-              profit: payoutAmount - b.amount,
+              totalWon: BigInt(payoutAmount),
+              profit: BigInt(payoutAmount) - b.amount,
               roi: 0,
               currentStreak: isWinner ? (statsBefore?.currentStreak ?? 0) + 1 : 0,
               longestStreak: isWinner
                 ? Math.max(statsBefore?.longestStreak ?? 0, (statsBefore?.currentStreak ?? 0) + 1)
                 : (statsBefore?.longestStreak ?? 0),
               mostCommonBet: null,
-              biggestWin: payoutAmount,
+              biggestWin: BigInt(payoutAmount),
             },
             update: {
               totalBets: { increment: 1 },
               betsWon: isWinner ? { increment: 1 } : undefined,
               betsLost: !isWinner ? { increment: 1 } : undefined,
               totalWagered: { increment: b.amount },
-              totalWon: { increment: payoutAmount },
-              profit: { increment: payoutAmount - b.amount },
-              biggestWin: { set: Math.max(statsBefore?.biggestWin ?? 0, payoutAmount) },
+              totalWon: { increment: BigInt(payoutAmount) },
+              profit: { increment: BigInt(payoutAmount) - b.amount },
+              biggestWin: {
+                set:
+                  BigInt(payoutAmount) > (statsBefore?.biggestWin ?? BigInt(0))
+                    ? BigInt(payoutAmount)
+                    : (statsBefore?.biggestWin ?? BigInt(0)),
+              },
               currentStreak: isWinner ? { set: (statsBefore?.currentStreak ?? 0) + 1 } : { set: 0 },
               longestStreak: isWinner
                 ? {
@@ -122,10 +148,123 @@ export class PayoutRepository implements IPayoutRepository {
             where: { userId: b.userId },
             data: {
               roi:
-                (prevStats.profit + (payoutAmount - b.amount)) /
-                (prevStats.totalWagered + b.amount),
+                Number(prevStats.profit + (BigInt(payoutAmount) - b.amount)) /
+                Number(prevStats.totalWagered + b.amount),
             },
           });
+
+          // Trigger enhanced stats update after basic stats are updated
+          try {
+            const statsUpdatePayload = {
+              userId: b.userId,
+              reason: 'bet_resolved',
+              betId: b.id,
+              predictionId,
+              status: isWinner ? 'WON' : 'LOST',
+              timestamp: new Date().toISOString(),
+            };
+
+            await redisClient.publish('user:stats_update', JSON.stringify(statsUpdatePayload));
+          } catch (error) {
+            console.error('[payout] Error publishing stats update event:', error);
+          }
+
+          // Trigger achievement checks for bet resolution
+          try {
+            // Check bet won/lost achievements
+            await achievementService.checkAndUpdateAchievements({
+              type: isWinner ? 'bet_won' : 'bet_lost',
+              userId: b.userId,
+              data: {
+                betId: b.id,
+                predictionId,
+                amount: Number(b.amount),
+                payout: Number(payoutAmount),
+                category: updatedPrediction.category,
+              },
+            });
+
+            // Check streak achievements (only if this was a win/loss that affected streak)
+            const updatedStats = await tx.userStats.findUnique({ where: { userId: b.userId } });
+            if (updatedStats) {
+              await achievementService.checkAndUpdateAchievements({
+                type: 'streak_updated',
+                userId: b.userId,
+                data: {
+                  currentStreak: updatedStats.currentStreak,
+                  longestStreak: updatedStats.longestStreak,
+                },
+              });
+
+              // Check accuracy achievements
+              const winRate =
+                updatedStats.totalBets > 0
+                  ? (updatedStats.betsWon / updatedStats.totalBets) * 100
+                  : 0;
+              await achievementService.checkAndUpdateAchievements({
+                type: 'accuracy_updated',
+                userId: b.userId,
+                data: {
+                  winRate,
+                  totalBets: updatedStats.totalBets,
+                  betsWon: updatedStats.betsWon,
+                },
+              });
+
+              // Check volume achievements
+              await achievementService.checkAndUpdateAchievements({
+                type: 'volume_updated',
+                userId: b.userId,
+                data: {
+                  totalWagered: Number(updatedStats.totalWagered),
+                  totalBets: updatedStats.totalBets,
+                  biggestWin: Number(updatedStats.biggestWin),
+                },
+              });
+
+              // Check profit achievements
+              await achievementService.checkAndUpdateAchievements({
+                type: 'profit_updated',
+                userId: b.userId,
+                data: {
+                  profit: Number(updatedStats.profit),
+                  totalWon: Number(updatedStats.totalWon),
+                  roi: updatedStats.roi,
+                },
+              });
+            }
+
+            // Advanced achievement evaluator for bet resolution
+            await achievementEvaluatorService.processAchievementEvent({
+              type: isWinner ? 'bet_won' : 'bet_lost',
+              userId: b.userId,
+              timestamp: new Date().toISOString(),
+              data: {
+                betId: b.id,
+                predictionId,
+                amount: Number(b.amount),
+                payout: Number(payoutAmount),
+                category: updatedPrediction.category,
+                odds: Number(b.oddsAtPlacement),
+              },
+            });
+
+            // Advanced achievement evaluator for streak updates
+            if (updatedStats) {
+              await achievementEvaluatorService.processAchievementEvent({
+                type: 'streak_updated',
+                userId: b.userId,
+                timestamp: new Date().toISOString(),
+                data: {
+                  currentStreak: updatedStats.currentStreak,
+                  longestStreak: updatedStats.longestStreak,
+                  previousStreak: statsBefore?.currentStreak || 0,
+                },
+              });
+            }
+          } catch (error) {
+            console.error('[payout] Error checking achievements for bet resolution:', error);
+          }
         }
 
         // --- STEP 3: process parlays ---
@@ -158,14 +297,33 @@ export class PayoutRepository implements IPayoutRepository {
             data: { status: lost ? 'LOST' : 'WON' },
           });
 
+          // Publish parlay status change event for real-time updates
+          try {
+            const parlayStatusPayload = {
+              parlayId,
+              userId: parlay.userId,
+              status: lost ? 'LOST' : 'WON',
+              amount: parlay.amount,
+              payout: lost ? 0 : payoutAmount,
+              legCount,
+              legsWon,
+              timestamp: new Date().toISOString(),
+            };
+
+            // Publish to single channel - handler will route to user room
+            await redisClient.publish('parlay:status_change', JSON.stringify(parlayStatusPayload));
+          } catch (error) {
+            console.error('[payout] Error publishing parlay status change:', error);
+          }
+
           if (!lost) {
-            const newBal = parlay.user.muskBucks + payoutAmount;
+            const newBal = parlay.user.muskBucks + BigInt(payoutAmount);
             await tx.user.update({ where: { id: parlay.userId }, data: { muskBucks: newBal } });
             await tx.transaction.create({
               data: {
                 userId: parlay.userId,
                 type: 'CREDIT',
-                amount: payoutAmount,
+                amount: BigInt(payoutAmount),
                 balanceAfter: newBal,
                 relatedBetId: null,
                 relatedParlayId: parlay.id,
@@ -188,15 +346,15 @@ export class PayoutRepository implements IPayoutRepository {
               parlayLegsWon: legsWon,
               parlayLegsLost: legCount - legsWon,
               totalWagered: parlay.amount,
-              totalWon: payoutAmount,
-              profit: payoutAmount - parlay.amount,
+              totalWon: BigInt(payoutAmount),
+              profit: BigInt(payoutAmount) - parlay.amount,
               roi: 0,
               currentStreak: lost ? 0 : (statsBefore?.currentStreak ?? 0) + 1,
               longestStreak: lost
                 ? (statsBefore?.longestStreak ?? 0)
                 : Math.max(statsBefore?.longestStreak ?? 0, (statsBefore?.currentStreak ?? 0) + 1),
               mostCommonBet: null,
-              biggestWin: payoutAmount,
+              biggestWin: BigInt(payoutAmount),
             },
             update: {
               totalParlays: { increment: 1 },
@@ -206,9 +364,14 @@ export class PayoutRepository implements IPayoutRepository {
               parlayLegsWon: { increment: legsWon },
               parlayLegsLost: { increment: legCount - legsWon },
               totalWagered: { increment: parlay.amount },
-              totalWon: { increment: payoutAmount },
-              profit: { increment: payoutAmount - parlay.amount },
-              biggestWin: { set: Math.max(statsBefore?.biggestWin ?? 0, payoutAmount) },
+              totalWon: { increment: BigInt(payoutAmount) },
+              profit: { increment: BigInt(payoutAmount) - parlay.amount },
+              biggestWin: {
+                set:
+                  BigInt(payoutAmount) > (statsBefore?.biggestWin ?? BigInt(0))
+                    ? BigInt(payoutAmount)
+                    : (statsBefore?.biggestWin ?? BigInt(0)),
+              },
               currentStreak: lost ? { set: 0 } : { set: (statsBefore?.currentStreak ?? 0) + 1 },
               longestStreak: lost
                 ? undefined
@@ -225,10 +388,100 @@ export class PayoutRepository implements IPayoutRepository {
             where: { userId: parlay.userId },
             data: {
               roi:
-                (prevP.profit + (payoutAmount - parlay.amount)) /
-                (prevP.totalWagered + parlay.amount),
+                Number(prevP.profit + (BigInt(payoutAmount) - parlay.amount)) /
+                Number(prevP.totalWagered + parlay.amount),
             },
           });
+
+          // Trigger enhanced stats update after parlay stats are updated
+          try {
+            const statsUpdatePayload = {
+              userId: parlay.userId,
+              reason: 'parlay_resolved',
+              parlayId,
+              status: lost ? 'LOST' : 'WON',
+              legCount,
+              legsWon,
+              timestamp: new Date().toISOString(),
+            };
+
+            await redisClient.publish('user:stats_update', JSON.stringify(statsUpdatePayload));
+          } catch (error) {
+            console.error('[payout] Error publishing parlay stats update event:', error);
+          }
+
+          // Trigger achievement checks for parlay resolution
+          try {
+            // Parlay achievements are already triggered in betting.service when parlay is placed
+            // Here we check win/loss related achievements after resolution
+
+            // Check streak achievements for parlays
+            const updatedStats = await tx.userStats.findUnique({
+              where: { userId: parlay.userId },
+            });
+            if (updatedStats) {
+              await achievementService.checkAndUpdateAchievements({
+                type: 'streak_updated',
+                userId: parlay.userId,
+                data: {
+                  currentStreak: updatedStats.currentStreak,
+                  longestStreak: updatedStats.longestStreak,
+                },
+              });
+
+              // Check volume achievements (parlays contribute to volume)
+              await achievementService.checkAndUpdateAchievements({
+                type: 'volume_updated',
+                userId: parlay.userId,
+                data: {
+                  totalWagered: Number(updatedStats.totalWagered),
+                  totalBets: updatedStats.totalBets + updatedStats.totalParlays,
+                  biggestWin: Number(updatedStats.biggestWin),
+                },
+              });
+
+              // Check profit achievements
+              await achievementService.checkAndUpdateAchievements({
+                type: 'profit_updated',
+                userId: parlay.userId,
+                data: {
+                  profit: Number(updatedStats.profit),
+                  totalWon: Number(updatedStats.totalWon),
+                  roi: updatedStats.roi,
+                },
+              });
+            }
+
+            // Advanced achievement evaluator for parlay resolution
+            await achievementEvaluatorService.processAchievementEvent({
+              type: lost ? 'parlay_lost' : 'parlay_won',
+              userId: parlay.userId,
+              timestamp: new Date().toISOString(),
+              data: {
+                parlayId,
+                legCount,
+                legsWon,
+                payout: lost ? 0 : Number(payoutAmount),
+                amount: Number(parlay.amount),
+              },
+            });
+
+            // Advanced achievement evaluator for streak updates (parlay)
+            if (updatedStats) {
+              await achievementEvaluatorService.processAchievementEvent({
+                type: 'streak_updated',
+                userId: parlay.userId,
+                timestamp: new Date().toISOString(),
+                data: {
+                  currentStreak: updatedStats.currentStreak,
+                  longestStreak: updatedStats.longestStreak,
+                  previousStreak: statsBefore?.currentStreak || 0,
+                },
+              });
+            }
+          } catch (error) {
+            console.error('[payout] Error checking achievements for parlay resolution:', error);
+          }
         }
 
         return updatedPrediction;

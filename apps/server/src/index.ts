@@ -13,10 +13,15 @@ import { initSocket } from './socket';
 import authRoutes from './routes/auth.routes';
 import predictionRoutes from './routes/predictions.routes';
 import userRoutes from './routes/user.routes';
-import bettingRoutes from './routes/betting.routes';
 import payoutRoutes from './routes/payout.routes';
 import adminRoutes from './routes/admin.routes';
 import leaderboardRoutes from './routes/leaderboard.routes';
+import moderationRoutes from './routes/moderation.routes';
+import activityRoutes from './routes/activity.routes';
+import marketRoutes from './routes/market.routes';
+import shameWallRoutes from './routes/shameWall.routes';
+import monitoringRoutes from './routes/monitoring.routes';
+import timelineRoutes from './routes/timeline.routes.simple';
 
 const app = express();
 
@@ -42,7 +47,7 @@ app.use(
 app.use(express.json());
 app.use(cookieParser());
 
-// Health check endpoint
+// Health check endpoint (legacy - kept for backwards compatibility)
 app.get('/health', (_req, res) => {
   res.status(200).json({ ok: true });
 });
@@ -52,9 +57,16 @@ app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/predictions', predictionRoutes);
 app.use('/api/users', userRoutes);
-app.use('/api/betting', bettingRoutes);
 app.use('/api/payout', payoutRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
+app.use('/api/moderation', moderationRoutes);
+app.use('/api/activity', activityRoutes);
+app.use('/api/market', marketRoutes);
+app.use('/api/shame-wall', shameWallRoutes);
+app.use('/api/monitoring', monitoringRoutes);
+app.use('/api/timeline', timelineRoutes);
+
+// Note: feedsRoutes are mounted under /api/admin/feeds and already include requireAdmin middleware
 
 // Global error handler
 app.use((err: any, _req: any, res: any, _next: any) => {

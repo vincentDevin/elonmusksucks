@@ -12,7 +12,8 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "concurrently \"npm run dev --workspace=apps/client\" \"npm run dev --workspace=apps/server\" \"npm run worker\"",
+    "dev": "concurrently \"npm run dev --workspace=apps/client\" \"npm run dev --workspace=apps/server\" \"npm run worker\" \"npm run dev --workspace=apps/pong-server\"",
+    "dev:with-pong": "concurrently \"npm run dev --workspace=apps/client\" \"npm run dev --workspace=apps/server\" \"npm run worker\" \"npm run dev --workspace=apps/pong-server\" \"npm run pong:worker\"",
     "build": "npm run prisma:generate && cd packages/types && npm run build && cd ../../ && npm run build --workspace=apps/client && npm run build --workspace=apps/server",
     "lint": "eslint apps/**/*.{ts,tsx} --max-warnings=0",
     "format": "prettier --write \"apps/**/*.{ts,tsx,js,jsx,json,css,md}\"",
@@ -20,15 +21,20 @@
     "prisma:generate": "dotenv -e .env -- prisma generate --schema prisma/schema.prisma",
     "prisma:migrate:dev": "dotenv -e .env -- prisma migrate reset --force --skip-generate --schema prisma/schema.prisma",
     "seed:dev": "ts-node --transpile-only prisma/seed.ts",
+    "seed:prod": "ts-node --transpile-only scripts/prod-seed.ts",
+    "seed:achievements": "node scripts/seed-achievements.cjs",
     "test": "jest",
     "test:server": "dotenv -e .env.test jest --selectProjects=server",
-    "worker": "npm run worker --workspace=apps/server"
+    "worker": "npm run worker --workspace=apps/server",
+    "pong": "npm run dev --workspace=apps/pong-server",
+    "pong:worker": "npm run worker --workspace=apps/pong-server"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
     "@types/supertest": "^6.0.3",
     "@typescript-eslint/eslint-plugin": "^8.33.1",
     "@typescript-eslint/parser": "^8.33.1",
+    "axios": "^1.11.0",
     "concurrently": "^8.2.2",
     "cross-env": "^7.0.3",
     "dotenv-cli": "^8.0.0",
@@ -44,5 +50,8 @@
     "testcontainers": "^11.2.1",
     "ts-jest": "^29.4.0",
     "ts-node": "^10.9.2"
+  },
+  "dependencies": {
+    "recharts": "^3.1.0"
   }
 }

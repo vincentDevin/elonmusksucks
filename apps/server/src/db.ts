@@ -1,18 +1,158 @@
 import dotenv from 'dotenv';
 import path from 'path';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 
 // Load environment variables based on NODE_ENV
 const envFile = process.env.NODE_ENV === 'test' ? '.env.test' : '.env';
 dotenv.config({ path: path.resolve(__dirname, '../../../', envFile) });
 
-// Instantiate PrismaClient, picking up DATABASE_URL from loaded env
+// ── DATABASE CONNECTION POOLING CONFIGURATION ─────────────────────────────────
+// Optimized connection pool settings for production performance
+const connectionLimit = process.env.DATABASE_CONNECTION_LIMIT
+  ? parseInt(process.env.DATABASE_CONNECTION_LIMIT)
+  : 10;
+
+// Build connection URL with pooling parameters
+const getDatabaseUrl = () => {
+  const baseUrl = process.env.DATABASE_URL;
+  if (!baseUrl) throw new Error('DATABASE_URL is not set');
+
+  // Add connection pooling parameters to the URL
+  const url = new URL(baseUrl);
+  url.searchParams.set('connection_limit', connectionLimit.toString());
+  url.searchParams.set('pool_timeout', '10'); // 10 seconds timeout
+  url.searchParams.set('connect_timeout', '10'); // 10 seconds connection timeout
+  url.searchParams.set('pgbouncer', 'true'); // Enable PgBouncer mode if available
+
+  return url.toString();
+};
+
+// ── PRISMA CLIENT CONFIGURATION ───────────────────────────────────────────────
+// Configure Prisma with optimal settings for production
+const prismaLogLevel: Prisma.LogLevel[] =
+  process.env.NODE_ENV === 'production' ? ['error', 'warn'] : ['query', 'info', 'warn', 'error'];
+
 const prisma = new PrismaClient({
   datasources: {
     db: {
-      url: process.env.DATABASE_URL,
+      url: getDatabaseUrl(),
     },
   },
+  log: prismaLogLevel,
+  errorFormat: 'colorless',
 });
+
+// ── QUERY PERFORMANCE MONITORING ──────────────────────────────────────────────
+// Track slow queries and log performance metrics
+interface QueryMetrics {
+  model?: string;
+  action?: string;
+  duration: number;
+  timestamp: Date;
+}
+
+const SLOW_QUERY_THRESHOLD = parseInt(process.env.SLOW_QUERY_MS || '100'); // 100ms default
+const queryMetrics: QueryMetrics[] = [];
+const MAX_METRICS_HISTORY = 1000; // Keep last 1000 queries for analysis
+
+// Performance monitoring middleware
+prisma.$use(async (params, next) => {
+  const before = Date.now();
+
+  try {
+    const result = await next(params);
+    const duration = Date.now() - before;
+
+    // Track metrics
+    const metric: QueryMetrics = {
+      model: params.model,
+      action: params.action,
+      duration,
+      timestamp: new Date(),
+    };
+
+    // Store metrics (circular buffer)
+    queryMetrics.push(metric);
+    if (queryMetrics.length > MAX_METRICS_HISTORY) {
+      queryMetrics.shift();
+    }
+
+    // Log slow queries
+    if (duration > SLOW_QUERY_THRESHOLD) {
+      console.warn(`[SLOW QUERY] ${params.model}.${params.action} took ${duration}ms`);
+
+      // In production, you might want to send this to monitoring service
+      if (process.env.NODE_ENV === 'production') {
+        // TODO: Send to Sentry, DataDog, or other monitoring service
+        console.error('[SLOW QUERY ALERT]', {
+          model: params.model,
+          action: params.action,
+          duration,
+          // Don't log args in production for security reasons
+          args: undefined,
+        });
+      }
+    }
+
+    // Log all queries in development
+    if (process.env.NODE_ENV === 'development' && process.env.LOG_QUERIES === 'true') {
+      console.log(`[QUERY] ${params.model}.${params.action} - ${duration}ms`);
+    }
+
+    return result;
+  } catch (error) {
+    const duration = Date.now() - before;
+    console.error(
+      `[QUERY ERROR] ${params.model}.${params.action} failed after ${duration}ms`,
+      error,
+    );
+    throw error;
+  }
+});
+
+// ── CONNECTION HEALTH MONITORING ──────────────────────────────────────────────
+// Monitor connection pool health and database connectivity
+let isConnected = false;
+
+// Verify database connection on startup
+prisma
+  .$connect()
+  .then(() => {
+    isConnected = true;
+    console.log('[DATABASE] Successfully connected to PostgreSQL');
+    console.log(`[DATABASE] Connection pool size: ${connectionLimit}`);
+  })
+  .catch((error) => {
+    console.error('[DATABASE] Failed to connect:', error);
+    process.exit(1);
+  });
+
+// Graceful shutdown handling
+const gracefulShutdown = async () => {
+  console.log('[DATABASE] Closing database connections...');
+  await prisma.$disconnect();
+  console.log('[DATABASE] Database connections closed');
+};
+
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);
+
+// ── EXPORTED UTILITIES ────────────────────────────────────────────────────────
+// Export performance monitoring utilities
+export const getQueryMetrics = () => ({
+  totalQueries: queryMetrics.length,
+  averageDuration:
+    queryMetrics.length > 0
+      ? queryMetrics.reduce((sum, m) => sum + m.duration, 0) / queryMetrics.length
+      : 0,
+  slowQueries: queryMetrics.filter((m) => m.duration > SLOW_QUERY_THRESHOLD).length,
+  recentQueries: queryMetrics.slice(-10),
+});
+
+export const clearQueryMetrics = () => {
+  queryMetrics.length = 0;
+};
+
+export const isDbConnected = () => isConnected;
 
 export default prisma;

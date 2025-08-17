@@ -2,6 +2,9 @@
 import { Request, Response, NextFunction } from 'express';
 import * as adminService from '../services/admin.service';
 import { payoutService } from '../services/payout.service';
+import { adminAchievementService } from '../services/adminAchievement.service';
+import { shameWallService } from '../services/shameWall.service';
+import { serializeBigInt } from '../utils/bigintSerializer';
 import type {
   PublicUser,
   PublicPrediction,
@@ -10,18 +13,91 @@ import type {
   PublicBadge,
   PublicUserBadge,
   PublicAITweet,
-  AdminBet,
   AdminTransaction,
 } from '@ems/types';
-import { PredictionType } from '@ems/types';
 import type { Role } from '@prisma/client';
-import type { QueryParams } from '../repositories/IAdminRepository';
+import type {
+  QueryParams,
+  UserSearchParams,
+  BulkUserOperation,
+  PredictionSearchParams,
+  BulkPredictionOperation,
+} from '../repositories/IAdminRepository';
 
-// -- User Management --
+// -- Enhanced User Management --
 export async function getUsers(_req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
+    // Legacy endpoint - kept for backward compatibility
     const users: PublicUser[] = await adminService.listUsers();
-    res.json(users);
+    res.json(serializeBigInt(users));
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function searchUsers(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const params: UserSearchParams = {
+      search: req.query.search as string,
+      role: req.query.role
+        ? ((Array.isArray(req.query.role) ? req.query.role : [req.query.role]) as any)
+        : undefined,
+      active: req.query.active !== undefined ? req.query.active === 'true' : undefined,
+      bannedOnly: req.query.bannedOnly === 'true',
+      page: parseInt(req.query.page as string) || 0,
+      limit: parseInt(req.query.limit as string) || 25,
+      sortBy: (req.query.sortBy as any) || 'createdAt',
+      sortOrder: (req.query.sortOrder as any) || 'desc',
+    };
+
+    const result = await adminService.searchUsers(params);
+    res.json(serializeBigInt(result));
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getUserDetails(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const userId = parseInt(req.params.userId);
+    const user = await adminService.getUserDetails(userId);
+
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    res.json(user);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function bulkUpdateUsers(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const operation: BulkUserOperation = req.body;
+
+    // Validate the operation
+    if (!operation.userIds || !Array.isArray(operation.userIds) || operation.userIds.length === 0) {
+      res.status(400).json({ error: 'userIds array is required and cannot be empty' });
+      return;
+    }
+
+    if (operation.userIds.length > 100) {
+      res.status(400).json({ error: 'Cannot update more than 100 users at once' });
+      return;
+    }
+
+    const result = await adminService.bulkUpdateUsers(operation);
+    res.json(serializeBigInt(result));
   } catch (err) {
     next(err);
   }
@@ -68,7 +144,7 @@ export async function updateUserBalance(
   }
 }
 
-// -- Prediction Management --
+// -- Enhanced Prediction Management --
 export async function getPredictions(
   req: Request,
   res: Response,
@@ -78,6 +154,100 @@ export async function getPredictions(
     const filters = req.query as unknown as QueryParams;
     const preds: PublicPrediction[] = await adminService.listPredictions(filters);
     res.json(preds);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function searchPredictions(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const params: PredictionSearchParams = {
+      search: req.query.search as string,
+      category: req.query.category
+        ? ((Array.isArray(req.query.category)
+            ? req.query.category
+            : [req.query.category]) as string[])
+        : undefined,
+      status: req.query.status
+        ? ((Array.isArray(req.query.status) ? req.query.status : [req.query.status]) as any)
+        : undefined,
+      creatorId: req.query.creatorId ? parseInt(req.query.creatorId as string) : undefined,
+      dateRange:
+        req.query.startDate || req.query.endDate
+          ? {
+              start: req.query.startDate ? new Date(req.query.startDate as string) : undefined,
+              end: req.query.endDate ? new Date(req.query.endDate as string) : undefined,
+            }
+          : undefined,
+      bettingVolume:
+        req.query.minVolume || req.query.maxVolume
+          ? {
+              min: req.query.minVolume ? parseFloat(req.query.minVolume as string) : undefined,
+              max: req.query.maxVolume ? parseFloat(req.query.maxVolume as string) : undefined,
+            }
+          : undefined,
+      page: parseInt(req.query.page as string) || 0,
+      limit: parseInt(req.query.limit as string) || 25,
+      sortBy: (req.query.sortBy as any) || 'createdAt',
+      sortOrder: (req.query.sortOrder as any) || 'desc',
+    };
+
+    const result = await adminService.searchPredictions(params);
+    res.json(serializeBigInt(result));
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getPredictionDetails(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const predictionId = parseInt(req.params.predictionId);
+    const prediction = await adminService.getPredictionDetails(predictionId);
+
+    if (!prediction) {
+      res.status(404).json({ error: 'Prediction not found' });
+      return;
+    }
+
+    res.json(prediction);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function bulkUpdatePredictions(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const operation: BulkPredictionOperation = req.body;
+
+    // Validate the operation
+    if (
+      !operation.predictionIds ||
+      !Array.isArray(operation.predictionIds) ||
+      operation.predictionIds.length === 0
+    ) {
+      res.status(400).json({ error: 'predictionIds array is required and cannot be empty' });
+      return;
+    }
+
+    if (operation.predictionIds.length > 100) {
+      res.status(400).json({ error: 'Cannot update more than 100 predictions at once' });
+      return;
+    }
+
+    const result = await adminService.bulkUpdatePredictions(operation);
+    res.json(serializeBigInt(result));
   } catch (err) {
     next(err);
   }
@@ -132,33 +302,8 @@ export async function resolvePrediction(
 export async function getBets(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const filters = req.query as unknown as QueryParams;
-    const bets: PublicBet[] = await adminService.listBets(filters);
-    const preds: PublicPrediction[] = await adminService.listPredictions(filters);
-    const users: PublicUser[] = await adminService.listUsers();
-
-    const detailed: AdminBet[] = bets.map((b) => {
-      const matching = preds.find((p) => p.id === b.predictionId);
-      return {
-        ...b,
-        userName: users.find((u) => u.id === b.userId)?.name ?? 'Unknown',
-        prediction:
-          matching ??
-          ({
-            id: b.predictionId,
-            title: 'Unknown prediction',
-            description: '',
-            category: '',
-            expiresAt: new Date(),
-            approved: false,
-            resolved: false,
-            type: PredictionType.MULTIPLE,
-            threshold: null,
-            creatorId: 0,
-          } as PublicPrediction),
-      };
-    });
-
-    res.json(detailed);
+    const bets = await adminService.listBets(filters);
+    res.json(serializeBigInt(bets));
   } catch (err) {
     next(err);
   }
@@ -189,13 +334,327 @@ export async function getTransactions(
       userName: users.find((u) => u.id === t.userId)?.name ?? 'Unknown',
     }));
 
-    res.json(detailedTxns);
+    res.json(serializeBigInt(detailedTxns));
   } catch (err) {
     next(err);
   }
 }
 
-// -- Badge & Content Moderation --
+// -- Enhanced Financial Operations Dashboard --
+export async function searchFinancialData(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const params = req.query as unknown as any; // Will be typed properly in service
+    const data = await adminService.searchFinancialData(params);
+    res.json(serializeBigInt(data));
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getFinancialAnalytics(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const params = req.query as unknown as any;
+    const analytics = await adminService.getFinancialAnalytics(params);
+    res.json(serializeBigInt(analytics));
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function bulkFinancialOperation(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const operation = req.body;
+    const result = await adminService.bulkFinancialOperation(operation);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function exportFinancialData(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const params = req.query as unknown as any;
+    const result = await adminService.exportFinancialData(params);
+
+    // Set appropriate headers for file download
+    const format = params.format || 'csv';
+    const dataType = params.dataType || 'bets';
+    const filename = `financial_${dataType}_${new Date().toISOString().split('T')[0]}.${format}`;
+
+    res.setHeader(
+      'Content-Type',
+      format === 'csv'
+        ? 'text/csv'
+        : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// -- Enhanced Badge & Achievement System --
+export async function searchBadges(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const params = req.query as unknown as any;
+    const badges = await adminService.searchBadges(params);
+    res.json(badges);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getBadgeDetails(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const badgeId = Number(req.params.badgeId);
+    const badge = await adminService.getBadgeWithDetails(badgeId);
+    if (!badge) {
+      res.status(404).json({ error: 'Badge not found' });
+      return;
+    }
+    res.json(badge);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function createBadgeWithCategories(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const data = req.body;
+    const badge = await adminService.createBadgeWithCategories(data);
+    res.status(201).json(badge);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function updateBadge(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const badgeId = Number(req.params.badgeId);
+    const data = req.body;
+    const badge = await adminService.updateBadge(badgeId, data);
+    res.json(badge);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function deleteBadge(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const badgeId = Number(req.params.badgeId);
+    await adminService.deleteBadge(badgeId);
+    res.status(204).end();
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getBadgeAnalytics(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const badgeId = req.query.badgeId ? Number(req.query.badgeId) : undefined;
+    const analytics = await adminService.getBadgeAnalytics(badgeId);
+    res.json(analytics);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function bulkBadgeOperation(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const operation = req.body;
+    const result = await adminService.bulkBadgeOperation(operation);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getBadgeCategories(
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const categories = await adminService.getBadgeCategories();
+    res.json(categories);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function createBadgeCategory(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const data = req.body;
+    const category = await adminService.createBadgeCategory(data);
+    res.status(201).json(category);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// -- Advanced Analytics & Reporting --
+export async function getExecutiveDashboard(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const params = {
+      startDate: req.query.startDate ? new Date(req.query.startDate as string) : undefined,
+      endDate: req.query.endDate ? new Date(req.query.endDate as string) : undefined,
+      category: req.query.category as string,
+      userId: req.query.userId ? parseInt(req.query.userId as string) : undefined,
+      granularity: req.query.granularity as 'day' | 'week' | 'month',
+    };
+
+    const dashboard = await adminService.getExecutiveDashboard(params);
+    res.json(dashboard);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getUserBehaviorAnalytics(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const params = {
+      startDate: req.query.startDate ? new Date(req.query.startDate as string) : undefined,
+      endDate: req.query.endDate ? new Date(req.query.endDate as string) : undefined,
+      category: req.query.category as string,
+      userId: req.query.userId ? parseInt(req.query.userId as string) : undefined,
+      granularity: req.query.granularity as 'day' | 'week' | 'month',
+    };
+
+    const analytics = await adminService.getUserBehaviorAnalytics(params);
+    res.json(analytics);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getPredictiveAnalytics(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const params = {
+      startDate: req.query.startDate ? new Date(req.query.startDate as string) : undefined,
+      endDate: req.query.endDate ? new Date(req.query.endDate as string) : undefined,
+      category: req.query.category as string,
+      userId: req.query.userId ? parseInt(req.query.userId as string) : undefined,
+      granularity: req.query.granularity as 'day' | 'week' | 'month',
+    };
+
+    const analytics = await adminService.getPredictiveAnalytics(params);
+    res.json(analytics);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function generateCustomReport(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { reportType } = req.params;
+    const params = req.query as Record<string, any>;
+
+    const report = await adminService.generateCustomReport(reportType, params);
+    res.json(report);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getRealtimeMetrics(
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const metrics = await adminService.getRealtimeMetrics();
+    res.json(metrics);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function exportAnalyticsData(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { reportType, format } = req.query;
+    const filters = req.query.filters ? JSON.parse(req.query.filters as string) : {};
+
+    const data = await adminService.exportAnalyticsData({
+      reportType: reportType as string,
+      format: format as 'csv' | 'excel' | 'pdf',
+      filters,
+    });
+
+    // Set appropriate headers for file download
+    const filename = `analytics_${reportType}_${new Date().toISOString().split('T')[0]}.${format}`;
+    const contentType =
+      format === 'csv'
+        ? 'text/csv'
+        : format === 'excel'
+          ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+          : 'application/pdf';
+
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(data);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// -- Legacy Badge & Content Moderation (deprecated) --
 export async function getPosts(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const filters = req.query as unknown as QueryParams;
@@ -316,6 +775,245 @@ export async function triggerAITweet(
   try {
     const tweet: PublicAITweet = await adminService.generateAITweet();
     res.status(201).json(tweet);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// -- Achievement Management System --
+
+export async function getAllAchievements(
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const achievements = await adminAchievementService.getAllAchievements();
+    res.json(serializeBigInt(achievements));
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getAchievementById(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const achievementId = parseInt(req.params.id);
+    const achievement = await adminAchievementService.getAchievementById(achievementId);
+
+    if (!achievement) {
+      res.status(404).json({ error: 'Achievement not found' });
+      return;
+    }
+
+    res.json(serializeBigInt(achievement));
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function createAchievement(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const data = req.body;
+    const achievement = await adminAchievementService.createAchievement(data);
+    res.status(201).json(serializeBigInt(achievement));
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function updateAchievement(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const achievementId = parseInt(req.params.id);
+    const data = req.body;
+    const achievement = await adminAchievementService.updateAchievement(achievementId, data);
+    res.json(serializeBigInt(achievement));
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function deleteAchievement(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const achievementId = parseInt(req.params.id);
+    await adminAchievementService.deleteAchievement(achievementId);
+    res.status(204).send();
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function grantAchievement(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const achievementId = parseInt(req.params.id);
+    const userId = parseInt(req.params.userId);
+    await adminAchievementService.grantAchievement(achievementId, userId);
+    res.status(200).json({ message: 'Achievement granted successfully' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function revokeAchievement(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const achievementId = parseInt(req.params.id);
+    const userId = parseInt(req.params.userId);
+    await adminAchievementService.revokeAchievement(achievementId, userId);
+    res.status(200).json({ message: 'Achievement revoked successfully' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function bulkGrantAchievement(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const achievementId = parseInt(req.params.id);
+    const { userIds } = req.body;
+
+    if (!Array.isArray(userIds)) {
+      res.status(400).json({ error: 'userIds must be an array' });
+      return;
+    }
+
+    const result = await adminAchievementService.bulkGrantAchievement(achievementId, userIds);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getUsersWithAchievement(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const achievementId = parseInt(req.params.id);
+    const users = await adminAchievementService.getUsersWithAchievement(achievementId);
+    res.json(serializeBigInt(users));
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getAchievementAnalytics(
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const analytics = await adminAchievementService.getAchievementAnalytics();
+    res.json(serializeBigInt(analytics));
+  } catch (err) {
+    next(err);
+  }
+}
+
+// -- Shame Wall Management System --
+
+export async function issueBan(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { userId, reason, durationDays } = req.body;
+    const moderatorId = (req as any).user?.id; // From auth middleware
+
+    if (!moderatorId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    if (!userId || !reason) {
+      res.status(400).json({ error: 'userId and reason are required' });
+      return;
+    }
+
+    const banHistory = await shameWallService.issueBan({
+      userId: parseInt(userId),
+      reason,
+      durationDays: durationDays ? parseInt(durationDays) : undefined,
+      moderatorId,
+    });
+
+    res.status(201).json(serializeBigInt(banHistory));
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function liftBan(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const banId = parseInt(req.params.banId);
+    const moderatorId = (req as any).user?.id;
+    const { reason } = req.body;
+
+    if (!moderatorId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    await shameWallService.liftBan(banId, moderatorId, reason);
+    res.status(200).json({ message: 'Ban lifted successfully' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getBanHistory(
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const history = await shameWallService.getBanHistory();
+    res.json(serializeBigInt(history));
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function awardShameAchievement(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { userId, slug, reason } = req.body;
+    const moderatorId = (req as any).user?.id;
+
+    if (!moderatorId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    await shameWallService.awardShameAchievement(parseInt(userId), slug, moderatorId, reason);
+
+    res.status(200).json({ message: 'Shame achievement awarded' });
   } catch (err) {
     next(err);
   }
