@@ -13,6 +13,7 @@ import Home from '../pages/Home';
 import Profile from '../pages/Profile';
 import ProfileSetup from '../pages/ProfileSetup';
 import AdminDashboard from '../pages/AdminDashboard';
+import Pong from '../pages/Pong';
 import { AdminProvider } from '../contexts/AdminContext';
 
 export default function AppRoutes() {
@@ -35,6 +36,9 @@ export default function AppRoutes() {
         <Route path="/leaderboard" element={<EnhancedLeaderboard />} />
         <Route path="/leaderboard/classic" element={<Leaderboard />} />
         <Route path="/profile/:userId" element={<Profile />} />
+
+        {/* Pong route - enabled by default */}
+        <Route path="/pong" element={<Pong />} />
 
         {/* Admin-only route */}
         <Route

@@ -639,3 +639,133 @@ export type ArticleProcessingJob = {
   extractImages?: boolean;
   generateTags?: boolean;
 };
+
+// ——— Pong Game Types ——————————————————————————————————————————————
+
+// ——— Optimized Pong Game Types ——————————————————————————————————————————————
+// Designed for minimal memory usage and fast operations
+
+export interface Player {
+  id: number;
+  name: string;
+  paddleY: number;
+  score: number;
+  ping: number;
+  lastInputTime: number;
+}
+
+export interface Ball {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+}
+
+export type GameStatus = 'waiting' | 'countdown' | 'active' | 'paused' | 'ended';
+export type MatchType = 'ai' | 'pvp';
+export type LobbyStatus = 'waiting' | 'full';
+
+export interface GameState {
+  id: string;
+  players: [Player, Player | null]; // Always exactly 2 slots
+  ball: Ball;
+  status: GameStatus;
+  tick: number;
+  wager: number;
+  isAI: boolean;
+  startTime: number;
+}
+
+export interface LobbyEntry {
+  id: string;
+  creatorId: number;
+  creatorName: string;
+  wager: number;
+  type: MatchType;
+  status: LobbyStatus;
+  createdAt: number;
+}
+
+export interface PlayerInput {
+  up: boolean;
+  down: boolean;
+  paddleY: number; // Client's authoritative paddle position
+  seq: number; // Sequence number for input ordering
+  timestamp: number;
+}
+
+// Socket Event Types (Client → Server)
+export interface ClientEvents {
+  auth: { token: string };
+  join_lobby: {};
+  create_match: { wager: number; type: MatchType; aiDifficulty?: string };
+  join_match: { matchId: string };
+  player_input: PlayerInput;
+  leave_match: {};
+  spectate_match: { matchId: string };
+}
+
+// Socket Event Types (Server → Client)
+export interface ServerEvents {
+  auth_result: { success: boolean; player?: Player; error?: string };
+  lobby_state: { lobbies: LobbyEntry[] };
+  match_joined: { gameId: string; playerSlot: 0 | 1; opponent?: Player };
+  match_waiting: { gameId: string; message: string };
+  countdown: { seconds: number; message?: string };
+  game_state: {
+    ball: Ball;
+    opponentPaddleY: number; // Only the opponent's paddle position
+    scores: [number, number];
+    tick: number;
+    timestamp: number;
+  };
+  score_update: { scores: [number, number]; scorer: 0 | 1 };
+  match_end: { 
+    winner: 0 | 1 | null; 
+    scores: [number, number];
+    reason: string;
+    duration: number;
+    payout?: number;
+  };
+  player_disconnected: { playerSlot: 0 | 1; reconnectTime: number };
+  error: { code: string; message: string };
+}
+
+// Database result types
+export interface MatchResult {
+  matchId: string;
+  winnerId: number | null;
+  winnerSlot: 0 | 1 | null;
+  playerOneId: number;
+  playerTwoId: number | null;
+  finalScores: [number, number];
+  duration: number;
+  wagerAmount: number;
+  payoutAmount: number;
+  reason: 'completed' | 'forfeit' | 'disconnect' | 'error';
+}
+
+// Physics constants (same as before but grouped for clarity)
+export const PONG_PHYSICS = {
+  FIELD_WIDTH: 800,
+  FIELD_HEIGHT: 400,
+  PADDLE_WIDTH: 10,
+  PADDLE_HEIGHT: 80,
+  PADDLE_SPEED: 300, // pixels per second
+  BALL_SIZE: 10,
+  BALL_SPEED_INITIAL: 250,
+  BALL_SPEED_INCREMENT: 25,
+  WINNING_SCORE: 5,
+  TICK_RATE: 60, // FPS
+  NETWORK_UPDATE_RATE: 15, // Broadcast every 4th tick
+} as const;
+
+// AI difficulty settings
+export const AI_DIFFICULTIES = {
+  easy: { reactionTime: 200, accuracy: 0.7, speed: 0.6 },
+  medium: { reactionTime: 100, accuracy: 0.85, speed: 0.8 },
+  hard: { reactionTime: 50, accuracy: 0.95, speed: 1.0 },
+  impossible: { reactionTime: 10, accuracy: 1.0, speed: 1.2 },
+} as const;
+
+export type AIDifficulty = keyof typeof AI_DIFFICULTIES;

@@ -101,6 +101,11 @@ model User {
   moderationReceived ModerationLog[] @relation("ModeratedUser")
   articleReactions   ArticleReaction[]
   articleComments    ArticleComment[]
+  // Pong relations
+  pongMatchesAsP1    PongMatch[]     @relation("PlayerOne")
+  pongMatchesAsP2    PongMatch[]     @relation("PlayerTwo")
+  pongWins           PongMatch[]     @relation("PongWinner")
+  pongStats          PongStats?
 }
 
 model ChatRoom {
@@ -354,6 +359,9 @@ model Transaction {
   relatedBetId    Int? // single bet
   relatedParlayId Int? // parlay bet
   createdAt       DateTime        @default(now())
+  // Pong relations
+  pongEscrowMatches PongMatch[]    @relation("PongEscrowTransaction")
+  pongPayoutMatches PongMatch[]    @relation("PongPayoutTransaction")
 
   @@index([userId, createdAt(sort: Desc)])
   @@index([type, createdAt(sort: Desc)])
@@ -394,6 +402,8 @@ model UserActivity {
   relatedUser      User?       @relation("RelatedUserActivity", fields: [relatedUserId], references: [id])
   prediction       Prediction? @relation(fields: [predictionId], references: [id])
   bet              Bet?        @relation(fields: [betId], references: [id])
+  pongMatch        PongMatch?  @relation(fields: [pongMatchId], references: [id])
+  pongMatchId      String?     @map("pong_match_id")
 
   // Indexes for optimal query performance
   @@index([userId, createdAt(sort: Desc)], name: "idx_user_activities_user_time")
@@ -609,4 +619,106 @@ model PredictionSourceLink {
   @@index([predictionId])
   @@index([articleId])
   @@index([tweetId])
+}
+
+// ============================================
+// PONG GAME MODELS - Added for Pong feature
+// ============================================
+
+enum PongMatchStatus {
+  WAITING     // Waiting for opponent
+  ACTIVE      // Game in progress
+  COMPLETED   // Game finished normally
+  ABANDONED   // Player disconnected
+  DISPUTED    // Under admin review
+}
+
+enum PongDifficulty {
+  EASY
+  MEDIUM
+  HARD
+  IMPOSSIBLE
+}
+
+model PongMatch {
+  id              String          @id @default(cuid())
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  status          PongMatchStatus @default(WAITING)
+  
+  // Players
+  playerOneId     Int
+  playerOne       User            @relation("PlayerOne", fields: [playerOneId], references: [id])
+  playerTwoId     Int?            // NULL for AI matches
+  playerTwo       User?           @relation("PlayerTwo", fields: [playerTwoId], references: [id])
+  aiDifficulty    PongDifficulty? // Set when playing against AI
+  
+  // Wager & Economy
+  wagerAmount     BigInt          @default(0) // 0 for practice matches
+  escrowTxId      Int?            // Reference to escrow transaction
+  escrowTx        Transaction?    @relation("PongEscrowTransaction", fields: [escrowTxId], references: [id])
+  payoutTxId      Int?            // Reference to payout transaction
+  payoutTx        Transaction?    @relation("PongPayoutTransaction", fields: [payoutTxId], references: [id])
+  
+  // Game State
+  playerOneScore  Int             @default(0)
+  playerTwoScore  Int             @default(0)
+  winnerId        Int?
+  winner          User?           @relation("PongWinner", fields: [winnerId], references: [id])
+  winningScore    Int             @default(11) // First to 11
+  
+  // Performance & Anti-cheat
+  startedAt       DateTime?
+  completedAt     DateTime?
+  gameDuration    Int?            // Seconds
+  tickLog         Json?           // Compressed replay data for disputes
+  playerOnePing   Int             @default(0) // Average ping in ms
+  playerTwoPing   Int             @default(0)
+  
+  // Integration Points
+  activities      UserActivity[]
+  
+  @@index([status, createdAt(sort: Desc)])
+  @@index([playerOneId, status])
+  @@index([playerTwoId, status])
+  @@index([winnerId, completedAt(sort: Desc)])
+}
+
+model PongStats {
+  id              Int      @id @default(autoincrement())
+  userId          Int      @unique
+  user            User     @relation(fields: [userId], references: [id])
+  
+  // Match Statistics
+  totalMatches    Int      @default(0)
+  wins            Int      @default(0)
+  losses          Int      @default(0)
+  draws           Int      @default(0)
+  winStreak       Int      @default(0)
+  bestWinStreak   Int      @default(0)
+  
+  // Economy Statistics
+  totalWagered    BigInt   @default(0)
+  totalWon        BigInt   @default(0)
+  totalLost       BigInt   @default(0)
+  biggestWin      BigInt   @default(0)
+  biggestLoss     BigInt   @default(0)
+  
+  // Performance Statistics
+  avgPing         Float    @default(0)
+  avgGameDuration Int      @default(0) // Seconds
+  perfectGames    Int      @default(0) // Won 11-0
+  comebacks       Int      @default(0) // Won after being down 5+ points
+  
+  // AI Statistics
+  aiWins          Int      @default(0)
+  aiLosses        Int      @default(0)
+  hardestAiBeaten PongDifficulty?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([wins(sort: Desc)])
+  @@index([winStreak(sort: Desc)])
+  @@index([totalWon(sort: Desc)])
 }

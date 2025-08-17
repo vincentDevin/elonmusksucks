@@ -65,6 +65,7 @@ app.use('/api/market', marketRoutes);
 app.use('/api/shame-wall', shameWallRoutes);
 app.use('/api/monitoring', monitoringRoutes);
 app.use('/api/timeline', timelineRoutes);
+
 // Note: feedsRoutes are mounted under /api/admin/feeds and already include requireAdmin middleware
 
 // Global error handler

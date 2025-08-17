@@ -13,13 +13,13 @@ export default defineConfig(() => {
       proxy: {
         // REST API requests
         '/api': {
-          target: 'http://127.0.0.1:5001',
+          target: 'http://127.0.0.1:5000',
           changeOrigin: true,
           secure: false,
         },
-        // Socket.IO long polling/WebSocket
+        // Socket.IO long polling/WebSocket (main server)
         '/socket.io': {
-          target: 'http://127.0.0.1:5001',
+          target: 'http://127.0.0.1:5000',
           ws: true, // <--- IMPORTANT! This enables WebSocket proxying
           changeOrigin: true,
           secure: false,
