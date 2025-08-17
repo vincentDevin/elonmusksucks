@@ -8,18 +8,28 @@ interface OptimizedGameState {
   players: [any, any];
   ball: { x: number; y: number; vx: number; vy: number };
   scores: [number, number];
-  status: 'waiting' | 'countdown' | 'active' | 'paused' | 'ended';
+  status:
+    | 'waiting'
+    | 'waiting_for_opponent'
+    | 'waiting_for_ready'
+    | 'countdown'
+    | 'active'
+    | 'paused'
+    | 'ended';
   tick: number;
   timestamp: number;
   countdown?: number;
   winner?: 0 | 1 | null;
   payout?: number;
+  readyStates?: [boolean, boolean];
 }
 
 interface PongCanvasEnhancedProps {
   gameState?: OptimizedGameState;
   className?: string;
   ping?: number;
+  onSetReady?: (ready: boolean) => void;
+  isSpectating?: boolean;
 }
 
 interface Particle {
@@ -68,6 +78,8 @@ export function PongCanvasEnhanced({
   gameState,
   className = '',
   ping = 0,
+  onSetReady,
+  isSpectating = false,
 }: PongCanvasEnhancedProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>();
@@ -338,15 +350,6 @@ export function PongCanvasEnhanced({
     drawEnhancedBackground(ctx, width, height);
     drawGameField(ctx, width, height);
 
-    // Debug FPS counter
-    frameCount.current++;
-    const now = Date.now();
-    if (now - lastFpsTime.current >= 1000) {
-      console.log(`Client FPS: ${frameCount.current}`);
-      frameCount.current = 0;
-      lastFpsTime.current = now;
-    }
-
     if (!gameState) return;
 
     const scaleX = (width - 40) / PONG_PHYSICS.FIELD_WIDTH;
@@ -363,14 +366,26 @@ export function PongCanvasEnhanced({
               : width - 20 - paddleWidth; // Right paddle ends at field edge
           const y = 20 + player.paddleY * scaleY; // paddleY is the TOP of the paddle (server treats it this way)
 
+          // For spectators, use different colors for each player
+          // For players, use player/opponent colors based on their slot
+          const paddleColor = isSpectating
+            ? index === 0
+              ? VISUAL_CONFIG.PADDLE.PLAYER
+              : VISUAL_CONFIG.PADDLE.OPPONENT
+            : index === gameState.playerSlot
+              ? VISUAL_CONFIG.PADDLE.PLAYER
+              : VISUAL_CONFIG.PADDLE.OPPONENT;
+
+          const isPlayerPaddle = isSpectating ? false : index === gameState.playerSlot;
+
           drawEnhancedPaddle(
             ctx,
             x,
             y,
             paddleWidth,
             PONG_PHYSICS.PADDLE_HEIGHT * scaleY,
-            index === 0 ? VISUAL_CONFIG.PADDLE.PLAYER : VISUAL_CONFIG.PADDLE.OPPONENT,
-            index === 0,
+            paddleColor,
+            isPlayerPaddle,
           );
         }
       });
@@ -436,6 +451,71 @@ export function PongCanvasEnhanced({
           </div>
         </div>
       )}
+
+      {/* Waiting for opponent overlay - on canvas */}
+      {gameState?.status === 'waiting_for_opponent' && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+          <div className="bg-surface/90 p-8 rounded-2xl shadow-2xl text-center">
+            <div className="text-4xl font-bold mb-4 text-secondary">Waiting for Opponent...</div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent mx-auto mb-4"></div>
+            <div className="text-lg text-tertiary">Share your match to invite players!</div>
+          </div>
+        </div>
+      )}
+
+      {/* Spectator mode indicator */}
+      {isSpectating && (
+        <div className="absolute top-4 left-4 z-30">
+          <div className="bg-accent/90 text-accent-foreground px-3 py-1 rounded-lg text-sm font-medium flex items-center space-x-2">
+            <span>👁️</span>
+            <span>Spectating</span>
+          </div>
+        </div>
+      )}
+
+      {/* Waiting for ready overlay - on canvas */}
+      {gameState?.status === 'waiting_for_ready' &&
+        gameState.readyStates &&
+        onSetReady &&
+        !isSpectating && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-auto z-20">
+            <div className="bg-surface/90 p-8 rounded-2xl shadow-2xl text-center">
+              <div className="text-3xl font-bold mb-6 text-content">Ready to Play?</div>
+
+              {/* Ready states display */}
+              <div className="flex justify-center space-x-8 mb-6">
+                <div className="text-center">
+                  <div className="text-lg font-medium text-content">You</div>
+                  <div
+                    className={`text-2xl ${gameState.readyStates[gameState.playerSlot] ? 'text-success' : 'text-tertiary'}`}
+                  >
+                    {gameState.readyStates[gameState.playerSlot] ? '✅' : '⏳'}
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="text-lg font-medium text-content">Opponent</div>
+                  <div
+                    className={`text-2xl ${gameState.readyStates[gameState.playerSlot === 0 ? 1 : 0] ? 'text-success' : 'text-tertiary'}`}
+                  >
+                    {gameState.readyStates[gameState.playerSlot === 0 ? 1 : 0] ? '✅' : '⏳'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Ready button */}
+              <button
+                onClick={() => onSetReady(!gameState.readyStates![gameState.playerSlot])}
+                className={`px-8 py-4 text-xl font-bold rounded-lg transition-colors cursor-pointer ${
+                  gameState.readyStates[gameState.playerSlot]
+                    ? 'bg-error text-error-foreground hover:bg-error/90'
+                    : 'bg-success text-success-foreground hover:bg-success/90'
+                }`}
+              >
+                {gameState.readyStates[gameState.playerSlot] ? 'Not Ready' : 'Ready Up!'}
+              </button>
+            </div>
+          </div>
+        )}
 
       {/* Game ended overlay - on canvas */}
       {gameState?.status === 'ended' && (

@@ -9,10 +9,12 @@ import {
   Player,
   GameState,
   LobbyEntry,
+  ActiveGameEntry,
   PlayerInput,
   ClientEvents,
   MatchResult,
   PONG_PHYSICS,
+  AI_DIFFICULTIES,
 } from '@ems/types';
 
 // ——————————————————————————————————————————————————————————————————————————————————
@@ -64,6 +66,61 @@ class DatabaseManager {
     }
   }
 
+  async processWagerTransaction(
+    playerOneId: number,
+    playerTwoId: number | null,
+    wagerAmount: number,
+  ): Promise<{ success: boolean; error?: string }> {
+    // Skip transaction for free games
+    if (wagerAmount === 0) {
+      return { success: true };
+    }
+
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        // Deduct wager from player one
+        console.log(`💸 Deducting ${wagerAmount} MB from player ${playerOneId}`);
+        const playerOneUpdate = await tx.user.update({
+          where: { id: playerOneId },
+          data: { muskBucks: { decrement: BigInt(wagerAmount) } },
+          select: { muskBucks: true },
+        });
+
+        console.log(`💰 Player ${playerOneId} new balance: ${playerOneUpdate.muskBucks}`);
+        if (playerOneUpdate.muskBucks < 0) {
+          throw new Error('Player one insufficient funds');
+        }
+
+        // Deduct wager from player two (if not AI)
+        if (playerTwoId && playerTwoId !== 0) {
+          console.log(`💸 Deducting ${wagerAmount} MB from player ${playerTwoId}`);
+          const playerTwoUpdate = await tx.user.update({
+            where: { id: playerTwoId },
+            data: { muskBucks: { decrement: BigInt(wagerAmount) } },
+            select: { muskBucks: true },
+          });
+
+          console.log(`💰 Player ${playerTwoId} new balance: ${playerTwoUpdate.muskBucks}`);
+          if (playerTwoUpdate.muskBucks < 0) {
+            throw new Error('Player two insufficient funds');
+          }
+        }
+
+        console.log(
+          `💰 Wager transaction processed: ${wagerAmount} MuskBucks from players ${playerOneId}, ${playerTwoId}`,
+        );
+      });
+
+      return { success: true };
+    } catch (error) {
+      console.error('Wager transaction error:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Transaction failed',
+      };
+    }
+  }
+
   async recordMatchResult(result: MatchResult): Promise<void> {
     try {
       // Create match record
@@ -83,27 +140,21 @@ class DatabaseManager {
         },
       });
 
-      // Handle payouts in a transaction
+      // Handle payouts - wagers were already deducted when game started
       if (result.winnerId && result.payoutAmount > 0) {
-        await this.prisma.$transaction(async (tx) => {
-          // Deduct wager from loser
-          const loserId =
-            result.winnerId === result.playerOneId ? result.playerTwoId : result.playerOneId;
-          if (loserId) {
-            await tx.user.update({
-              where: { id: loserId },
-              data: { muskBucks: { decrement: BigInt(result.wagerAmount) } },
-            });
-          }
-
-          // Credit payout to winner
-          if (result.winnerId) {
-            await tx.user.update({
-              where: { id: result.winnerId },
-              data: { muskBucks: { increment: BigInt(result.payoutAmount) } },
-            });
-          }
+        console.log(`🏆 Processing payout: ${result.payoutAmount} MB to winner ${result.winnerId}`);
+        const winnerUpdate = await this.prisma.user.update({
+          where: { id: result.winnerId },
+          data: { muskBucks: { increment: BigInt(result.payoutAmount) } },
+          select: { muskBucks: true },
         });
+        console.log(
+          `🏆 Payout completed: Winner ${result.winnerId} new balance: ${winnerUpdate.muskBucks}`,
+        );
+      } else {
+        console.log(
+          `🏆 No payout processed (winnerId: ${result.winnerId}, payoutAmount: ${result.payoutAmount})`,
+        );
       }
     } catch (error) {
       console.error('Error recording match result:', error);
@@ -149,6 +200,43 @@ class AuthManager {
       this.playerSockets.delete(player.id);
       this.authenticatedPlayers.delete(socketId);
     }
+  }
+}
+
+// ——————————————————————————————————————————————————————————————————————————————————
+// STATISTICS MANAGER (Real-time stats tracking)
+// ——————————————————————————————————————————————————————————————————————————————————
+
+class StatisticsManager {
+  private connectedPlayers = new Set<number>(); // Track unique connected player IDs
+  private activeGames = new Set<string>(); // Track active game IDs
+
+  addConnectedPlayer(playerId: number): void {
+    this.connectedPlayers.add(playerId);
+    console.log(`📊 Player ${playerId} connected. Total online: ${this.connectedPlayers.size}`);
+  }
+
+  removeConnectedPlayer(playerId: number): void {
+    this.connectedPlayers.delete(playerId);
+    console.log(`📊 Player ${playerId} disconnected. Total online: ${this.connectedPlayers.size}`);
+  }
+
+  addActiveGame(gameId: string): void {
+    this.activeGames.add(gameId);
+    console.log(`📊 Game ${gameId} started. Total active: ${this.activeGames.size}`);
+  }
+
+  removeActiveGame(gameId: string): void {
+    this.activeGames.delete(gameId);
+    console.log(`📊 Game ${gameId} ended. Total active: ${this.activeGames.size}`);
+  }
+
+  getStats(availableMatches: number) {
+    return {
+      playersOnline: this.connectedPlayers.size,
+      activeGames: this.activeGames.size,
+      availableMatches,
+    };
   }
 }
 
@@ -234,13 +322,47 @@ class GameManager {
   private games = new Map<string, GameState>();
   private playerGames = new Map<number, string>(); // playerId -> gameId
   private gameIntervals = new Map<string, NodeJS.Timeout>();
+  private gameSpectators = new Map<string, Set<string>>(); // gameId -> Set<socketId>
+  private spectatorGames = new Map<string, string>(); // socketId -> gameId
 
   constructor(
     private io: SocketIOServer,
     private db: DatabaseManager,
+    private auth: AuthManager,
+    private stats: StatisticsManager,
   ) {}
 
-  startGame(gameId: string, players: [Player, Player | null], wager: number, isAI: boolean): void {
+  async startGame(
+    gameId: string,
+    players: [Player, Player | null],
+    wager: number,
+    isAI: boolean,
+    aiDifficulty?: keyof typeof AI_DIFFICULTIES,
+  ): Promise<{ success: boolean; error?: string }> {
+    // Reset player scores for new game
+    players[0].score = 0;
+    if (players[1]) {
+      players[1].score = 0;
+    }
+
+    // Process wager transaction if there's a wager (only for AI games or PVP with both players)
+    if (wager > 0 && (isAI || players[1] !== null)) {
+      const transaction = await this.db.processWagerTransaction(
+        players[0].id,
+        players[1]?.id || null,
+        wager,
+      );
+
+      if (!transaction.success) {
+        console.error(`💸 Wager transaction failed for game ${gameId}: ${transaction.error}`);
+        return { success: false, error: transaction.error };
+      }
+    } else if (wager > 0 && !isAI && players[1] === null) {
+      console.log(
+        `💰 Deferring wager transaction for PVP game ${gameId} until second player joins`,
+      );
+    }
+
     const gameState: GameState = {
       id: gameId,
       players,
@@ -250,10 +372,23 @@ class GameManager {
         vx: 0,
         vy: 0,
       },
-      status: 'countdown',
+      status: isAI
+        ? 'waiting_for_ready'
+        : players[1]
+          ? 'waiting_for_ready'
+          : 'waiting_for_opponent',
       tick: 0,
       wager,
       isAI,
+      aiDifficulty: isAI ? aiDifficulty || 'medium' : undefined,
+      aiState: isAI
+        ? {
+            targetY: PONG_PHYSICS.FIELD_HEIGHT / 2,
+            lastReactionTime: 0,
+            errorBias: (Math.random() - 0.5) * 50, // Random bias between -25 and +25 pixels
+          }
+        : undefined,
+      readyStates: isAI ? [false, true] : [false, false], // AI is always ready
       startTime: Date.now(),
     };
 
@@ -263,8 +398,13 @@ class GameManager {
       this.playerGames.set(players[1].id, gameId);
     }
 
-    // Start countdown then game
-    this.startCountdown(gameState);
+    // Track active game in statistics (add to stats when created)
+    this.stats.addActiveGame(gameId);
+
+    // Broadcast active games update when game is created
+    this.broadcastActiveGamesUpdate();
+
+    return { success: true };
   }
 
   private startCountdown(game: GameState): void {
@@ -336,30 +476,68 @@ class GameManager {
 
   private updateAI(game: GameState): void {
     const ai = game.players[1];
-    if (!ai) return;
+    if (!ai || !game.aiDifficulty || !game.aiState) return;
 
-    // Simple AI: move towards ball Y position
-    const ballY = game.ball.y;
+    const difficulty = AI_DIFFICULTIES[game.aiDifficulty];
+    const currentTime = Date.now();
+
+    // Check if it's time for AI to react (reaction time delay)
+    if (currentTime - game.aiState.lastReactionTime < difficulty.reactionTime) {
+      // AI hasn't "seen" the ball change yet, don't update target
+    } else {
+      // AI can react now - update target position with accuracy errors
+      const ballY = game.ball.y;
+
+      // Apply accuracy error - AI doesn't track perfectly
+      const accuracyError = (1 - difficulty.accuracy) * 80; // Max error in pixels
+      const randomError = (Math.random() - 0.5) * 2 * accuracyError;
+
+      // On easier difficulties, AI sometimes "loses track" of the ball
+      let targetY = ballY;
+      if (difficulty.accuracy < 0.8 && Math.random() < 0.05) {
+        // 5% chance on easier difficulties to target old position
+        targetY = game.aiState.targetY;
+      }
+
+      // Target the ball position with error and bias
+      game.aiState.targetY = targetY + randomError + game.aiState.errorBias;
+      game.aiState.lastReactionTime = currentTime;
+
+      // Occasionally update error bias for more realistic play
+      if (Math.random() < 0.03) {
+        // 3% chance per update
+        game.aiState.errorBias = (Math.random() - 0.5) * 60;
+      }
+
+      // On easier difficulties, sometimes AI "hesitates"
+      if (difficulty.speed < 0.7 && Math.random() < 0.02) {
+        game.aiState.lastReactionTime = currentTime + 100; // Add extra delay
+      }
+    }
+
+    // Move paddle toward target with speed modifier
     const paddleCenter = ai.paddleY + PONG_PHYSICS.PADDLE_HEIGHT / 2;
-    const diff = ballY - paddleCenter;
+    const diff = game.aiState.targetY - paddleCenter;
 
     if (Math.abs(diff) > 5) {
-      const moveSpeed = PONG_PHYSICS.PADDLE_SPEED / PONG_PHYSICS.TICK_RATE;
+      const baseSpeed = PONG_PHYSICS.PADDLE_SPEED / PONG_PHYSICS.TICK_RATE;
+      const aiSpeed = baseSpeed * difficulty.speed;
+
       const oldPaddleY = ai.paddleY;
 
       if (diff > 0) {
         ai.paddleY = Math.min(
           PONG_PHYSICS.FIELD_HEIGHT - PONG_PHYSICS.PADDLE_HEIGHT,
-          ai.paddleY + moveSpeed,
+          ai.paddleY + aiSpeed,
         );
       } else {
-        ai.paddleY = Math.max(0, ai.paddleY - moveSpeed);
+        ai.paddleY = Math.max(0, ai.paddleY - aiSpeed);
       }
 
-      // Debug log if there's a big change
+      // Debug log for significant changes
       if (Math.abs(oldPaddleY - ai.paddleY) > 50) {
         console.log(
-          `🏓 AI paddle jump: ${oldPaddleY} -> ${ai.paddleY} (ball: ${ballY}, diff: ${diff})`,
+          `🏓 AI (${game.aiDifficulty}) paddle: ${oldPaddleY.toFixed(1)} -> ${ai.paddleY.toFixed(1)} (target: ${game.aiState.targetY.toFixed(1)}, ball: ${game.ball.y.toFixed(1)})`,
         );
       }
     }
@@ -387,7 +565,23 @@ class GameManager {
     if (ballLeft <= PONG_PHYSICS.PADDLE_WIDTH && game.ball.vx < 0) {
       const paddle = game.players[0];
       if (ballBottom >= paddle.paddleY && ballTop <= paddle.paddleY + PONG_PHYSICS.PADDLE_HEIGHT) {
-        game.ball.vx = -game.ball.vx * 1.05; // Slight speed increase
+        // Calculate hit position relative to paddle center (-1 to 1)
+        const paddleCenter = paddle.paddleY + PONG_PHYSICS.PADDLE_HEIGHT / 2;
+        const hitPosition = (game.ball.y - paddleCenter) / (PONG_PHYSICS.PADDLE_HEIGHT / 2);
+        const clampedHit = Math.max(-1, Math.min(1, hitPosition));
+
+        // Calculate angle modification (up to ±45 degrees)
+        const maxAngle = Math.PI / 4; // 45 degrees
+        const angleModifier = clampedHit * maxAngle;
+
+        // Current ball speed
+        const currentSpeed = Math.sqrt(game.ball.vx ** 2 + game.ball.vy ** 2);
+        const newSpeed = currentSpeed * 1.05; // Speed increase
+
+        // Apply angle-based bounce - ensure ball always goes back to the right
+        game.ball.vx = Math.abs(Math.cos(angleModifier)) * newSpeed; // Always positive (going right)
+        game.ball.vy = Math.sin(angleModifier) * newSpeed;
+
         game.ball.x = PONG_PHYSICS.PADDLE_WIDTH + PONG_PHYSICS.BALL_SIZE / 2;
       }
     }
@@ -400,7 +594,23 @@ class GameManager {
         ballBottom >= paddle.paddleY &&
         ballTop <= paddle.paddleY + PONG_PHYSICS.PADDLE_HEIGHT
       ) {
-        game.ball.vx = -game.ball.vx * 1.05; // Slight speed increase
+        // Calculate hit position relative to paddle center (-1 to 1)
+        const paddleCenter = paddle.paddleY + PONG_PHYSICS.PADDLE_HEIGHT / 2;
+        const hitPosition = (game.ball.y - paddleCenter) / (PONG_PHYSICS.PADDLE_HEIGHT / 2);
+        const clampedHit = Math.max(-1, Math.min(1, hitPosition));
+
+        // Calculate angle modification (up to ±45 degrees)
+        const maxAngle = Math.PI / 4; // 45 degrees
+        const angleModifier = clampedHit * maxAngle;
+
+        // Current ball speed
+        const currentSpeed = Math.sqrt(game.ball.vx ** 2 + game.ball.vy ** 2);
+        const newSpeed = currentSpeed * 1.05; // Speed increase
+
+        // Apply angle-based bounce - ensure ball always goes back to the left
+        game.ball.vx = -Math.abs(Math.cos(angleModifier)) * newSpeed; // Always negative (going left)
+        game.ball.vy = Math.sin(angleModifier) * newSpeed;
+
         game.ball.x =
           PONG_PHYSICS.FIELD_WIDTH - PONG_PHYSICS.PADDLE_WIDTH - PONG_PHYSICS.BALL_SIZE / 2;
       }
@@ -462,10 +672,10 @@ class GameManager {
     const maxPaddleY = PONG_PHYSICS.FIELD_HEIGHT - PONG_PHYSICS.PADDLE_HEIGHT;
     const validatedPaddleY = Math.max(0, Math.min(maxPaddleY, input.paddleY));
 
-    // Debug log if there's a big change
-    if (Math.abs(player.paddleY - validatedPaddleY) > 50) {
+    // Debug log for paddle updates
+    if (Math.abs(player.paddleY - validatedPaddleY) > 10) {
       console.log(
-        `🏓 Player ${playerId} paddle jump: ${player.paddleY} -> ${validatedPaddleY} (input: ${input.paddleY}, max: ${maxPaddleY})`,
+        `🏓 Player ${playerId} (slot ${playerSlot}) paddle: ${player.paddleY.toFixed(1)} -> ${validatedPaddleY.toFixed(1)}`,
       );
     }
 
@@ -474,17 +684,6 @@ class GameManager {
     // Update ping
     player.ping = Math.max(0, Date.now() - input.timestamp);
     player.lastInputTime = Date.now();
-  }
-
-  private broadcastGameState(game: GameState): void {
-    // For now, use the simple room-based approach since we need access to auth
-    this.io.to(`game:${game.id}`).emit('game_state', {
-      ball: game.ball,
-      opponentPaddleY: game.players[1]?.paddleY || 0, // Always send player 1's position (AI or human opponent)
-      scores: [game.players[0].score, game.players[1]?.score || 0],
-      tick: game.tick,
-      timestamp: Date.now(),
-    });
   }
 
   private async endGame(game: GameState, reason: string, winnerSlot?: 0 | 1): Promise<void> {
@@ -517,14 +716,57 @@ class GameManager {
 
     await this.db.recordMatchResult(result);
 
-    // Broadcast result
-    this.io.to(`game:${game.id}`).emit('match_end', {
-      winner: winnerSlot || null,
-      scores: result.finalScores,
-      reason,
-      duration,
-      payout: result.payoutAmount,
-    });
+    // Send individual match_end events to each player with correct payout info
+    if (game.players[0]) {
+      const player1SocketId = this.auth.getSocketId(game.players[0].id);
+      if (player1SocketId) {
+        const player1Payout =
+          winnerSlot === 0 ? result.payoutAmount : game.wager > 0 ? -game.wager : 0;
+        this.io.to(player1SocketId).emit('match_end', {
+          winner: winnerSlot !== undefined ? winnerSlot : null,
+          scores: result.finalScores,
+          reason,
+          duration,
+          payout: player1Payout,
+        });
+      }
+    }
+
+    if (game.players[1]) {
+      const player2SocketId = this.auth.getSocketId(game.players[1].id);
+      if (player2SocketId) {
+        const player2Payout =
+          winnerSlot === 1 ? result.payoutAmount : game.wager > 0 ? -game.wager : 0;
+        this.io.to(player2SocketId).emit('match_end', {
+          winner: winnerSlot !== undefined ? winnerSlot : null,
+          scores: result.finalScores,
+          reason,
+          duration,
+          payout: player2Payout,
+        });
+      }
+    }
+
+    // Send to spectators (they don't get payout info)
+    const spectators = this.gameSpectators.get(game.id);
+    if (spectators && spectators.size > 0) {
+      const spectatorSocketIds = Array.from(spectators);
+      spectatorSocketIds.forEach((socketId) => {
+        this.io.to(socketId).emit('match_end', {
+          winner: winnerSlot !== undefined ? winnerSlot : null,
+          scores: result.finalScores,
+          reason,
+          duration,
+          payout: 0, // Spectators don't get payout info
+        });
+      });
+    }
+
+    // Remove from active games tracking
+    this.stats.removeActiveGame(game.id);
+
+    // Broadcast active games update when game ends
+    this.broadcastActiveGamesUpdate();
 
     // Cleanup
     this.playerGames.delete(game.players[0].id);
@@ -549,8 +791,224 @@ class GameManager {
     this.endGame(game, 'forfeit', winnerSlot as 0 | 1);
   }
 
+  async setPlayerReady(playerId: number, ready: boolean): Promise<void> {
+    const gameId = this.playerGames.get(playerId);
+    if (!gameId) return;
+
+    const game = this.games.get(gameId);
+    if (!game || !game.readyStates) return;
+
+    // Find player slot
+    let playerSlot: 0 | 1 | null = null;
+    if (game.players[0]?.id === playerId) {
+      playerSlot = 0;
+    } else if (game.players[1]?.id === playerId) {
+      playerSlot = 1;
+    }
+
+    if (playerSlot === null) return;
+
+    // Update ready state
+    game.readyStates[playerSlot] = ready;
+    console.log(
+      `🏓 Player ${playerId} ready: ${ready} (${game.readyStates[0] ? '✅' : '❌'}, ${game.readyStates[1] ? '✅' : '❌'})`,
+    );
+
+    // Broadcast ready state update
+    this.io.to(`game:${gameId}`).emit('ready_state_update', { readyStates: game.readyStates });
+
+    // Check if both players are ready
+    if (game.readyStates[0] && game.readyStates[1] && game.status === 'waiting_for_ready') {
+      console.log(
+        `🏓 Both players ready in game ${gameId}, processing wagers and starting countdown!`,
+      );
+
+      // Process wager transaction now that both players are committed
+      if (game.wager > 0 && !game.isAI && game.players[0] && game.players[1]) {
+        const transaction = await this.db.processWagerTransaction(
+          game.players[0].id,
+          game.players[1].id,
+          game.wager,
+        );
+
+        if (!transaction.success) {
+          console.error(
+            `💸 Wager transaction failed when both players ready: ${transaction.error}`,
+          );
+          // Notify both players of the failure and return them to lobby
+          this.io.to(`game:${gameId}`).emit('error', {
+            code: 'WAGER_FAILED',
+            message: transaction.error || 'Wager transaction failed',
+          });
+
+          // End the game due to wager failure
+          this.endGame(game, 'wager_failed');
+          return;
+        }
+        console.log(
+          `💸 Both players committed - wagers processed: ${game.wager} MB deducted from each`,
+        );
+      }
+
+      game.status = 'countdown';
+      this.startCountdown(game);
+      // Broadcast active games update when game starts countdown
+      this.broadcastActiveGamesUpdate();
+    }
+  }
+
   getGame(gameId: string): GameState | null {
     return this.games.get(gameId) || null;
+  }
+
+  // ——————————————————————————————————————————————————————————————————————————————————
+  // SPECTATOR FUNCTIONALITY
+  // ——————————————————————————————————————————————————————————————————————————————————
+
+  private broadcastActiveGamesUpdate(): void {
+    const activeGames = this.getActiveGames();
+    this.io.to('lobby').emit('active_games', { games: activeGames });
+    console.log(`📡 Broadcasting ${activeGames.length} active games to lobby`);
+  }
+
+  addSpectator(gameId: string, socketId: string): boolean {
+    const game = this.games.get(gameId);
+    if (!game || game.status === 'ended') {
+      return false;
+    }
+
+    // Initialize spectators set if it doesn't exist
+    if (!this.gameSpectators.has(gameId)) {
+      this.gameSpectators.set(gameId, new Set());
+    }
+
+    // Add spectator
+    this.gameSpectators.get(gameId)!.add(socketId);
+    this.spectatorGames.set(socketId, gameId);
+
+    console.log(
+      `👁️ Spectator ${socketId} joined game ${gameId}. Total spectators: ${this.gameSpectators.get(gameId)!.size}`,
+    );
+
+    // Broadcast active games update when spectator joins
+    this.broadcastActiveGamesUpdate();
+
+    return true;
+  }
+
+  removeSpectator(socketId: string): void {
+    const gameId = this.spectatorGames.get(socketId);
+    if (gameId) {
+      const spectators = this.gameSpectators.get(gameId);
+      if (spectators) {
+        spectators.delete(socketId);
+        if (spectators.size === 0) {
+          this.gameSpectators.delete(gameId);
+        }
+      }
+      this.spectatorGames.delete(socketId);
+      console.log(`👁️ Spectator ${socketId} left game ${gameId}`);
+
+      // Broadcast active games update when spectator leaves
+      this.broadcastActiveGamesUpdate();
+    }
+  }
+
+  getSpectatorCount(gameId: string): number {
+    return this.gameSpectators.get(gameId)?.size || 0;
+  }
+
+  getSpectatorGameId(socketId: string): string | undefined {
+    return this.spectatorGames.get(socketId);
+  }
+
+  getActiveGames(): ActiveGameEntry[] {
+    const activeGames: ActiveGameEntry[] = [];
+
+    for (const [gameId, game] of this.games.entries()) {
+      // Only include games that have started or are about to start
+      if (game.status === 'waiting_for_opponent') {
+        continue; // Skip games waiting for players
+      }
+
+      const pot = game.isAI ? game.wager : game.wager * 2; // AI games: wager, PvP: double wager
+
+      activeGames.push({
+        id: gameId,
+        player1Name: game.players[0]?.name || 'Unknown',
+        player2Name: game.isAI ? 'AI' : game.players[1]?.name || 'Waiting...',
+        type: game.isAI ? 'ai' : 'pvp',
+        wager: game.wager,
+        pot,
+        scores: [game.players[0]?.score || 0, game.players[1]?.score || 0],
+        status: game.status,
+        spectatorCount: this.getSpectatorCount(gameId),
+        startedAt: game.startTime,
+        canSpectate:
+          game.status === 'active' ||
+          game.status === 'countdown' ||
+          game.status === 'waiting_for_ready',
+      });
+    }
+
+    return activeGames.sort((a, b) => b.startedAt - a.startedAt);
+  }
+
+  // Broadcast game state to both players and spectators
+  broadcastGameState(game: GameState): void {
+    // Get player paddle positions
+    const player1PaddleY = game.players[0]?.paddleY || 0;
+    const player2PaddleY = game.players[1]?.paddleY || 0;
+    const pot = game.isAI ? game.wager : game.wager * 2;
+
+    // Broadcast to each player individually (they only see opponent paddle)
+    if (game.players[0]) {
+      const player1SocketId = this.auth.getSocketId(game.players[0].id);
+      if (player1SocketId) {
+        this.io.to(player1SocketId).emit('game_state', {
+          ball: game.ball,
+          opponentPaddleY: player2PaddleY,
+          scores: [game.players[0].score, game.players[1]?.score || 0],
+          tick: game.tick,
+          timestamp: Date.now(),
+          wager: game.wager,
+          pot,
+        });
+      }
+    }
+
+    if (game.players[1]) {
+      const player2SocketId = this.auth.getSocketId(game.players[1].id);
+      if (player2SocketId) {
+        this.io.to(player2SocketId).emit('game_state', {
+          ball: game.ball,
+          opponentPaddleY: player1PaddleY,
+          scores: [game.players[0]?.score || 0, game.players[1].score],
+          tick: game.tick,
+          timestamp: Date.now(),
+          wager: game.wager,
+          pot,
+        });
+      }
+    }
+
+    // Broadcast to spectators (they see both paddles)
+    const spectators = this.gameSpectators.get(game.id);
+    if (spectators && spectators.size > 0) {
+      const spectatorSocketIds = Array.from(spectators);
+      spectatorSocketIds.forEach((socketId) => {
+        this.io.to(socketId).emit('game_state', {
+          ball: game.ball,
+          player1PaddleY,
+          player2PaddleY,
+          scores: [game.players[0]?.score || 0, game.players[1]?.score || 0],
+          tick: game.tick,
+          timestamp: Date.now(),
+          wager: game.wager,
+          pot,
+        });
+      });
+    }
   }
 }
 
@@ -574,11 +1032,13 @@ export class PongGameServer {
   private db = new DatabaseManager();
   private auth = new AuthManager(this.db);
   private lobby = new LobbyManager();
-  private game = new GameManager(this.io, this.db);
+  private stats = new StatisticsManager();
+  private game = new GameManager(this.io, this.db, this.auth, this.stats);
 
   constructor() {
     this.setupMiddleware();
     this.setupSocketHandlers();
+    this.setupStatsBroadcasting();
   }
 
   private setupMiddleware(): void {
@@ -600,7 +1060,21 @@ export class PongGameServer {
         const player = await this.auth.authenticateSocket(socket.id, data.token);
         if (player) {
           console.log(`✅ Player ${player.name} (${player.id}) authenticated`);
+
+          // Auto-join lobby room for PvP lobby updates
+          socket.join('lobby');
+          console.log(`🏓 Player ${player.name} auto-joined lobby room`);
+
           socket.emit('auth_result', { success: true, player });
+
+          // Track connected player in statistics
+          this.stats.addConnectedPlayer(player.id);
+
+          // Send current lobby state immediately
+          socket.emit('lobby_state', { lobbies: this.lobby.getAvailableLobbies() });
+
+          // Broadcast updated stats to all lobby users
+          this.broadcastStatsUpdate();
         } else {
           console.log(`❌ Authentication failed for socket ${socket.id}`);
           socket.emit('auth_result', { success: false, error: 'Invalid token' });
@@ -614,6 +1088,7 @@ export class PongGameServer {
 
         socket.join('lobby');
         socket.emit('lobby_state', { lobbies: this.lobby.getAvailableLobbies() });
+        socket.emit('active_games', { games: this.game.getActiveGames() });
       });
 
       // Create match
@@ -632,6 +1107,9 @@ export class PongGameServer {
 
         // Create lobby
         const lobbyId = this.lobby.createLobby(player, data.wager, data.type);
+        console.log(
+          `🏓 Created ${data.type} lobby ${lobbyId} by ${player.name} with wager ${data.wager}`,
+        );
 
         if (data.type === 'ai') {
           // Start AI game immediately
@@ -647,14 +1125,57 @@ export class PongGameServer {
           const gameId = `game-${Date.now()}`;
           socket.join(`game:${gameId}`);
 
-          socket.emit('match_joined', { gameId, playerSlot: 0, opponent: aiPlayer });
+          socket.emit('match_joined', {
+            gameId,
+            playerSlot: 0,
+            opponent: aiPlayer,
+            wager: data.wager,
+            pot: data.wager,
+          });
 
-          this.game.startGame(gameId, [player, aiPlayer], data.wager, true);
+          const gameResult = await this.game.startGame(
+            gameId,
+            [player, aiPlayer],
+            data.wager,
+            true,
+            data.aiDifficulty as keyof typeof AI_DIFFICULTIES,
+          );
+          if (!gameResult.success) {
+            socket.emit('error', {
+              code: 'GAME_START_FAILED',
+              message: gameResult.error || 'Failed to start game',
+            });
+            return;
+          }
           this.lobby.deleteLobby(lobbyId);
         } else {
-          // Wait for opponent
-          socket.emit('match_waiting', { gameId: lobbyId, message: 'Waiting for opponent...' });
-          this.io.to('lobby').emit('lobby_state', { lobbies: this.lobby.getAvailableLobbies() });
+          // PvP: Create game immediately and put creator in waiting state
+          const gameId = `game-${Date.now()}`;
+          socket.join(`game:${gameId}`);
+
+          // Notify creator they've joined the match
+          socket.emit('match_joined', {
+            gameId,
+            playerSlot: 0,
+            opponent: undefined,
+            wager: data.wager,
+            pot: data.wager * 2,
+          });
+
+          // Start game in waiting_for_opponent state (no wager deduction yet for PVP)
+          const gameResult = await this.game.startGame(gameId, [player, null], data.wager, false);
+          if (!gameResult.success) {
+            socket.emit('error', {
+              code: 'GAME_START_FAILED',
+              message: gameResult.error || 'Failed to create lobby',
+            });
+            return;
+          }
+
+          // Keep lobby available for others to join
+          const availableLobbies = this.lobby.getAvailableLobbies();
+          console.log(`🏓 Broadcasting ${availableLobbies.length} available lobbies to lobby room`);
+          this.io.to('lobby').emit('lobby_state', { lobbies: availableLobbies });
         }
       });
 
@@ -684,33 +1205,60 @@ export class PongGameServer {
           return;
         }
 
-        // Create game
-        const gameId = `game-${Date.now()}`;
+        // Find existing game for this lobby
         const creator = this.auth.getPlayerByUserId(lobby.creatorId);
-
-        if (creator) {
-          const creatorSocketId = this.auth['playerSockets'].get(creator.id);
-          if (creatorSocketId) {
-            this.io.sockets.sockets.get(creatorSocketId)?.join(`game:${gameId}`);
-          }
+        if (!creator) {
+          socket.emit('error', { code: 'CREATOR_NOT_FOUND', message: 'Match creator not found' });
+          return;
         }
 
-        socket.join(`game:${gameId}`);
-
-        // Notify both players
-        socket.emit('match_joined', { gameId, playerSlot: 1, opponent: creator });
-        if (creator) {
-          this.io
-            .to(`game:${gameId}`)
-            .emit('match_joined', { gameId, playerSlot: 0, opponent: player });
+        // Find the game created by the lobby creator
+        const existingGameId = this.game['playerGames'].get(creator.id);
+        if (!existingGameId) {
+          socket.emit('error', { code: 'GAME_NOT_FOUND', message: 'Game not found' });
+          return;
         }
 
-        // Start game
-        this.game.startGame(gameId, [creator!, player], lobby.wager, false);
+        const game = this.game.getGame(existingGameId);
+        if (!game || game.players[1] !== null) {
+          socket.emit('error', { code: 'GAME_FULL', message: 'Game is already full' });
+          return;
+        }
+
+        // Don't process wager yet - wait until both players are ready
+
+        // Join the existing game
+        socket.join(`game:${existingGameId}`);
+
+        // Update game state with second player
+        game.players[1] = player;
+        game.status = 'waiting_for_ready';
+        this.game['playerGames'].set(player.id, existingGameId);
+
+        // Notify joiner
+        const pot = lobby.wager * 2;
+        socket.emit('match_joined', {
+          gameId: existingGameId,
+          playerSlot: 1,
+          opponent: creator,
+          wager: lobby.wager,
+          pot,
+        });
+
+        // Notify creator that opponent joined
+        this.io.to(`game:${existingGameId}`).emit('opponent_joined', { opponent: player });
+
+        // Remove lobby and update lobby list
         this.lobby.deleteLobby(data.matchId);
-
-        // Update lobby for others
         this.io.to('lobby').emit('lobby_state', { lobbies: this.lobby.getAvailableLobbies() });
+      });
+
+      // Player ready
+      socket.on('player_ready', async (data: ClientEvents['player_ready']) => {
+        const player = this.auth.getPlayer(socket.id);
+        if (!player) return;
+
+        await this.game.setPlayerReady(player.id, data.ready);
       });
 
       // Player input
@@ -726,11 +1274,61 @@ export class PongGameServer {
         const player = this.auth.getPlayer(socket.id);
         if (!player) return;
 
-        this.game.forfeitGame(player.id);
+        // Check if this is a spectator leaving
+        const spectatorGameId = this.game.getSpectatorGameId(socket.id);
+        if (spectatorGameId) {
+          console.log(`👁️ Spectator ${socket.id} leaving game ${spectatorGameId}`);
+          socket.leave(`game:${spectatorGameId}`);
+          this.game.removeSpectator(socket.id);
+        } else {
+          // Regular player leaving
+          this.game.forfeitGame(player.id);
+        }
+
         this.lobby.leaveLobby(player.id);
 
         // Update lobby
         this.io.to('lobby').emit('lobby_state', { lobbies: this.lobby.getAvailableLobbies() });
+      });
+
+      // Spectate match
+      socket.on('spectate_match', (data: ClientEvents['spectate_match']) => {
+        const player = this.auth.getPlayer(socket.id);
+        if (!player) return;
+
+        const gameId = data.gameId;
+        const success = this.game.addSpectator(gameId, socket.id);
+
+        if (success) {
+          const game = this.game.getGame(gameId);
+          if (game) {
+            // Join the game room so spectator receives match_end events
+            socket.join(`game:${gameId}`);
+            console.log(`👁️ Spectator ${socket.id} joined room game:${gameId}`);
+
+            socket.emit('spectator_joined', {
+              gameId,
+              spectatorCount: this.game.getSpectatorCount(gameId),
+            });
+
+            // Send initial game state for spectators immediately
+            if (
+              game.status === 'active' ||
+              game.status === 'countdown' ||
+              game.status === 'waiting_for_ready'
+            ) {
+              // Force a game state update to the new spectator
+              setTimeout(() => {
+                this.game.broadcastGameState(game);
+              }, 100); // Small delay to ensure spectator is properly set up
+            }
+          }
+        } else {
+          socket.emit('error', {
+            code: 'SPECTATE_FAILED',
+            message: 'Cannot spectate this game',
+          });
+        }
       });
 
       // Disconnect
@@ -738,15 +1336,46 @@ export class PongGameServer {
         const player = this.auth.getPlayer(socket.id);
         if (player) {
           console.log(`🏓 Player ${player.name} disconnected`);
+
+          // Handle game forfeit
           this.game.forfeitGame(player.id);
-          this.lobby.leaveLobby(player.id);
+
+          // Handle spectator cleanup
+          this.game.removeSpectator(socket.id);
+
+          // Handle lobby cleanup
+          const leftLobbyId = this.lobby.leaveLobby(player.id);
+          if (leftLobbyId) {
+            console.log(`🏓 Player ${player.name} left lobby ${leftLobbyId}`);
+          }
+
+          // Track disconnected player in statistics
+          this.stats.removeConnectedPlayer(player.id);
+
+          // Clean up authentication
           this.auth.disconnectSocket(socket.id);
 
-          // Update lobby
+          // Update lobby for remaining players
           this.io.to('lobby').emit('lobby_state', { lobbies: this.lobby.getAvailableLobbies() });
+
+          // Broadcast updated stats
+          this.broadcastStatsUpdate();
         }
       });
     });
+  }
+
+  private setupStatsBroadcasting(): void {
+    // Broadcast stats every 5 seconds to all lobby users
+    setInterval(() => {
+      const stats = this.stats.getStats(this.lobby.getAvailableLobbies().length);
+      this.io.to('lobby').emit('stats_update', stats);
+    }, 5000);
+  }
+
+  private broadcastStatsUpdate(): void {
+    const stats = this.stats.getStats(this.lobby.getAvailableLobbies().length);
+    this.io.to('lobby').emit('stats_update', stats);
   }
 
   start(port: number = 5001): void {

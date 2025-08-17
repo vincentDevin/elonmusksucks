@@ -1,12 +1,19 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
-import type { Player, LobbyEntry, PlayerInput, ClientEvents, ServerEvents } from '@ems/types';
+import type {
+  Player,
+  LobbyEntry,
+  ActiveGameEntry,
+  PlayerInput,
+  ClientEvents,
+  ServerEvents,
+} from '@ems/types';
 import { PONG_PHYSICS } from '@ems/types';
 import { useAuth } from './useAuth';
 
-// Global singleton to prevent multiple connections
-let globalSocket: Socket | null = null;
-let globalIsConnecting = false;
+// Per-user socket management to prevent duplicate connections within same user session
+const userSockets = new Map<number, Socket>(); // userId -> Socket
+const userConnecting = new Set<number>(); // Set of userIds currently connecting
 
 // Client-side game state (different from server GameState)
 interface OptimizedGameState {
@@ -15,13 +22,23 @@ interface OptimizedGameState {
   players: [Player, Player | null];
   ball: { x: number; y: number; vx: number; vy: number };
   scores: [number, number];
-  status: 'waiting' | 'countdown' | 'active' | 'paused' | 'ended';
+  status:
+    | 'waiting'
+    | 'waiting_for_opponent'
+    | 'waiting_for_ready'
+    | 'countdown'
+    | 'active'
+    | 'paused'
+    | 'ended';
   tick: number;
   timestamp: number;
   serverTick?: number; // For compatibility with interpolation hook
   countdown?: number; // For countdown display
   winner?: 0 | 1 | null; // Winner slot or null for draw
   payout?: number; // MuskBucks won
+  readyStates?: [boolean, boolean]; // Ready status for each player
+  wager?: number; // Wager amount per player
+  pot?: number; // Total pot amount
 }
 
 interface PongSocketState {
@@ -30,8 +47,14 @@ interface PongSocketState {
   isAuthenticated: boolean;
   currentGame: OptimizedGameState | null;
   lobbies: LobbyEntry[];
+  activeGames: ActiveGameEntry[];
   connectionError: string | null;
   lastPing: number;
+  stats: {
+    playersOnline: number;
+    activeGames: number;
+    availableMatches: number;
+  };
 }
 
 interface PongSocketActions {
@@ -41,6 +64,7 @@ interface PongSocketActions {
   createMatch: (wager: number, type: 'ai' | 'pvp', aiDifficulty?: string) => void;
   joinMatch: (matchId: string) => void;
   sendInput: (input: PlayerInput) => void;
+  setReady: (ready: boolean) => void;
   leaveMatch: () => void;
 }
 
@@ -55,8 +79,14 @@ export function usePongSocketOptimized(): PongSocketHook {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentGame, setCurrentGame] = useState<OptimizedGameState | null>(null);
   const [lobbies, setLobbies] = useState<LobbyEntry[]>([]);
+  const [activeGames, setActiveGames] = useState<ActiveGameEntry[]>([]);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [lastPing, setLastPing] = useState(0);
+  const [stats, setStats] = useState({
+    playersOnline: 0,
+    activeGames: 0,
+    availableMatches: 0,
+  });
 
   // Refs for stable references
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
@@ -70,31 +100,32 @@ export function usePongSocketOptimized(): PongSocketHook {
       return;
     }
 
-    // Use global singleton to prevent duplicate connections
-    if (globalSocket?.connected) {
-      console.log('🏓 Using existing global connection');
-      setSocket(globalSocket);
+    // Use per-user socket to prevent duplicate connections for same user
+    const existingSocket = userSockets.get(user.id);
+    if (existingSocket?.connected) {
+      console.log(`🏓 Using existing connection for user ${user.id}`);
+      setSocket(existingSocket);
       setIsConnected(true);
       return;
     }
 
-    if (globalIsConnecting) {
-      console.log('🏓 Already connecting globally');
+    if (userConnecting.has(user.id)) {
+      console.log(`🏓 Already connecting for user ${user.id}`);
       return;
     }
 
     // Close any existing socket before creating new one
-    if (globalSocket) {
-      console.log('🏓 Closing existing global socket before reconnect');
-      globalSocket.disconnect();
-      globalSocket = null;
+    if (existingSocket) {
+      console.log(`🏓 Closing existing socket for user ${user.id} before reconnect`);
+      existingSocket.disconnect();
+      userSockets.delete(user.id);
     }
 
-    globalIsConnecting = true;
+    userConnecting.add(user.id);
     isConnectingRef.current = true;
     setConnectionError(null);
 
-    console.log('🏓 Connecting to optimized Pong server...');
+    console.log(`🏓 Connecting to Pong server for user ${user.id}...`);
 
     const newSocket = io('http://127.0.0.1:5001', {
       transports: ['websocket', 'polling'],
@@ -105,10 +136,10 @@ export function usePongSocketOptimized(): PongSocketHook {
 
     // Connection events
     newSocket.on('connect', () => {
-      console.log('✅ Connected to Pong server, authenticating...');
+      console.log(`✅ User ${user.id} connected to Pong server, authenticating...`);
       setIsConnected(true);
       reconnectAttemptsRef.current = 0;
-      globalIsConnecting = false;
+      userConnecting.delete(user.id);
       isConnectingRef.current = false;
 
       // Authenticate immediately
@@ -134,21 +165,21 @@ export function usePongSocketOptimized(): PongSocketHook {
     });
 
     newSocket.on('connect_error', (error) => {
-      console.error('❌ Connection error:', error);
+      console.error(`❌ User ${user.id} connection error:`, error);
       setConnectionError(`Connection failed: ${error.message}`);
       setIsConnected(false);
-      globalIsConnecting = false;
+      userConnecting.delete(user.id);
       isConnectingRef.current = false;
     });
 
     // Authentication response
     newSocket.on('auth_result', (data: ServerEvents['auth_result']) => {
       if (data.success && data.player) {
-        console.log(`✅ Authenticated as ${data.player.name}`);
+        console.log(`✅ User ${user.id} authenticated as ${data.player.name}`);
         setIsAuthenticated(true);
         setConnectionError(null);
       } else {
-        console.error('❌ Authentication failed:', data.error);
+        console.error(`❌ User ${user.id} authentication failed:`, data.error);
         setConnectionError(data.error || 'Authentication failed');
         setIsAuthenticated(false);
       }
@@ -160,9 +191,21 @@ export function usePongSocketOptimized(): PongSocketHook {
       setLobbies(data.lobbies);
     });
 
+    // Stats events
+    newSocket.on('stats_update', (data: ServerEvents['stats_update']) => {
+      console.log('🏓 Stats updated:', data);
+      setStats(data);
+    });
+
+    // Active games list
+    newSocket.on('active_games', (data: ServerEvents['active_games']) => {
+      console.log('🏓 Active games updated:', data.games.length, 'games');
+      setActiveGames(data.games);
+    });
+
     // Match events
     newSocket.on('match_joined', (data: ServerEvents['match_joined']) => {
-      console.log('🏓 Joined match:', data.gameId, 'as player', data.playerSlot);
+      console.log(`🏓 User ${user.id} joined match:`, data.gameId, 'as player', data.playerSlot);
       // Create proper player objects with initial paddle positions
       const initialPaddleY = PONG_PHYSICS.FIELD_HEIGHT / 2 - PONG_PHYSICS.PADDLE_HEIGHT / 2;
       const userPlayer = {
@@ -187,15 +230,48 @@ export function usePongSocketOptimized(): PongSocketHook {
           vy: 0,
         },
         scores: [0, 0],
-        status: 'waiting',
+        status: data.opponent ? 'waiting_for_ready' : 'waiting_for_opponent',
         tick: 0,
         timestamp: Date.now(),
+        readyStates: data.opponent ? [false, false] : undefined,
+        wager: data.wager,
+        pot: data.pot,
       });
     });
 
     newSocket.on('match_waiting', (data: ServerEvents['match_waiting']) => {
       console.log('🏓 Waiting for opponent:', data.message);
       // Could show a waiting indicator in UI
+    });
+
+    newSocket.on('opponent_joined', (data: ServerEvents['opponent_joined']) => {
+      console.log('🏓 Opponent joined:', data.opponent.name);
+      setCurrentGame((prev) => {
+        if (!prev) return null;
+
+        const updatedPlayers = [...prev.players] as [any, any];
+        const opponentSlot = prev.playerSlot === 0 ? 1 : 0;
+        updatedPlayers[opponentSlot] = data.opponent;
+
+        return {
+          ...prev,
+          players: updatedPlayers,
+          status: 'waiting_for_ready',
+          readyStates: [false, false],
+        };
+      });
+    });
+
+    newSocket.on('ready_state_update', (data: ServerEvents['ready_state_update']) => {
+      console.log('🏓 Ready states updated:', data.readyStates);
+      setCurrentGame((prev) => {
+        if (!prev) return null;
+
+        return {
+          ...prev,
+          readyStates: data.readyStates,
+        };
+      });
     });
 
     // Game events
@@ -207,8 +283,20 @@ export function usePongSocketOptimized(): PongSocketHook {
     });
 
     newSocket.on('game_state', (data: ServerEvents['game_state']) => {
+      // Handle player mode only
       setCurrentGame((prev) => {
         if (!prev) return null;
+
+        // Only process game_state if we're actually in an active game
+        // Ignore game_state events if we're still waiting for ready-up
+        if (prev.status === 'waiting_for_ready' || prev.status === 'waiting_for_opponent') {
+          console.log(`🏓 User ${user.id} ignoring game_state while waiting for ready/opponent`);
+          return prev; // Don't update anything
+        }
+
+        console.log(
+          `🏓 User ${user.id} received game_state for game ${prev.gameId}, slot ${prev.playerSlot}`,
+        );
 
         return {
           ...prev,
@@ -218,14 +306,20 @@ export function usePongSocketOptimized(): PongSocketHook {
           tick: data.tick,
           timestamp: data.timestamp,
           serverTick: data.tick, // Add for compatibility
+          wager: data.wager || prev.wager,
+          pot: data.pot || prev.pot,
           players:
             prev.playerSlot === 0
               ? ([
                   prev.players[0], // Keep our own paddle position unchanged
-                  prev.players[1] ? { ...prev.players[1], paddleY: data.opponentPaddleY } : null,
+                  prev.players[1] && data.opponentPaddleY !== undefined
+                    ? { ...prev.players[1], paddleY: data.opponentPaddleY }
+                    : prev.players[1],
                 ] as [any, any])
               : ([
-                  prev.players[0] ? { ...prev.players[0], paddleY: data.opponentPaddleY } : null,
+                  prev.players[0] && data.opponentPaddleY !== undefined
+                    ? { ...prev.players[0], paddleY: data.opponentPaddleY }
+                    : prev.players[0],
                   prev.players[1], // Keep our own paddle position unchanged
                 ] as [any, any]),
         };
@@ -276,8 +370,8 @@ export function usePongSocketOptimized(): PongSocketHook {
       setConnectionError(data.message);
     });
 
-    // Store as global singleton and local state
-    globalSocket = newSocket;
+    // Store as user-specific socket and local state
+    userSockets.set(user.id, newSocket);
     setSocket(newSocket);
   }, [user, accessToken]);
 
@@ -286,11 +380,15 @@ export function usePongSocketOptimized(): PongSocketHook {
       clearTimeout(reconnectTimeoutRef.current);
     }
 
-    // Disconnect global socket if it exists
-    if (globalSocket) {
-      console.log('🏓 Disconnecting from Pong server...');
-      globalSocket.disconnect();
-      globalSocket = null;
+    // Disconnect user-specific socket if it exists
+    if (user) {
+      const userSocket = userSockets.get(user.id);
+      if (userSocket) {
+        console.log(`🏓 Disconnecting user ${user.id} from Pong server...`);
+        userSocket.disconnect();
+        userSockets.delete(user.id);
+      }
+      userConnecting.delete(user.id);
     }
 
     setSocket(null);
@@ -298,10 +396,11 @@ export function usePongSocketOptimized(): PongSocketHook {
     setIsAuthenticated(false);
     setCurrentGame(null);
     setLobbies([]);
+    setActiveGames([]);
+    setStats({ playersOnline: 0, activeGames: 0, availableMatches: 0 });
     setConnectionError(null);
-    globalIsConnecting = false;
     isConnectingRef.current = false;
-  }, []);
+  }, [user]);
 
   const joinLobby = useCallback(() => {
     if (!socket || !isAuthenticated) {
@@ -380,10 +479,18 @@ export function usePongSocketOptimized(): PongSocketHook {
 
             const updatedPlayers = [...prev.players];
             if (updatedPlayers[userPlayerSlot]) {
+              const oldY = updatedPlayers[userPlayerSlot].paddleY;
               updatedPlayers[userPlayerSlot] = {
                 ...updatedPlayers[userPlayerSlot],
                 paddleY: newPaddleY,
               };
+
+              // Debug log for significant moves
+              if (Math.abs(oldY - newPaddleY) > 10) {
+                console.log(
+                  `🏓 Client: Moving my paddle (slot ${userPlayerSlot}): ${oldY.toFixed(1)} -> ${newPaddleY.toFixed(1)}`,
+                );
+              }
             }
 
             return {
@@ -406,6 +513,19 @@ export function usePongSocketOptimized(): PongSocketHook {
     [socket, isAuthenticated, currentGame],
   );
 
+  const setReady = useCallback(
+    (ready: boolean) => {
+      if (!socket || !isAuthenticated || !currentGame) {
+        console.log('🏓 Cannot set ready: not connected, authenticated, or in game');
+        return;
+      }
+
+      console.log('🏓 Setting ready state:', ready);
+      socket.emit('player_ready', { ready } as ClientEvents['player_ready']);
+    },
+    [socket, isAuthenticated, currentGame],
+  );
+
   const leaveMatch = useCallback(() => {
     if (!socket || !isAuthenticated) {
       console.log('🏓 Cannot leave match: not connected or authenticated');
@@ -419,8 +539,8 @@ export function usePongSocketOptimized(): PongSocketHook {
 
   // Auto-connect when user and token are available
   useEffect(() => {
-    if (user && accessToken && !globalSocket && !globalIsConnecting) {
-      console.log('🏓 Auto-connecting to Pong server...');
+    if (user && accessToken && !userSockets.has(user.id) && !userConnecting.has(user.id)) {
+      console.log(`🏓 Auto-connecting user ${user.id} to Pong server...`);
       connect();
     }
 
@@ -435,12 +555,14 @@ export function usePongSocketOptimized(): PongSocketHook {
   useEffect(() => {
     return () => {
       console.log('🏓 Cleaning up socket on unmount');
-      globalIsConnecting = false; // Reset global connecting flag
+      if (user) {
+        userConnecting.delete(user.id); // Reset user connecting flag
+      }
       isConnectingRef.current = false; // Reset local connecting flag
-      // Note: We don't disconnect the global socket on unmount
+      // Note: We don't disconnect the user socket on unmount
       // as other components might still be using it
     };
-  }, []);
+  }, [user]);
 
   return {
     socket,
@@ -448,14 +570,17 @@ export function usePongSocketOptimized(): PongSocketHook {
     isAuthenticated,
     currentGame,
     lobbies,
+    activeGames,
     connectionError,
     lastPing,
+    stats,
     connect,
     disconnect,
     joinLobby,
     createMatch,
     joinMatch,
     sendInput,
+    setReady,
     leaveMatch,
   };
 }

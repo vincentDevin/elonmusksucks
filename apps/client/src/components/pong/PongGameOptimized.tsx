@@ -1,8 +1,9 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { usePongSocketOptimized } from '../../hooks/usePongSocketOptimized';
 import { usePongInputOptimized } from '../../hooks/usePongInputOptimized';
 import { PongCanvasEnhanced } from './PongCanvasEnhanced';
 import { PongLobbyOptimized } from './PongLobbyOptimized';
+import { PongSpectator } from './PongSpectator';
 import { PONG_PHYSICS } from '@ems/types';
 
 export function PongGameOptimized() {
@@ -12,16 +13,22 @@ export function PongGameOptimized() {
     isAuthenticated,
     currentGame,
     lobbies,
+    activeGames,
     connectionError,
     lastPing,
+    stats,
     connect,
     disconnect,
     joinLobby,
     createMatch,
     joinMatch,
     sendInput,
+    setReady,
     leaveMatch,
   } = usePongSocketOptimized();
+
+  // Local state for spectator mode
+  const [spectatingGameId, setSpectatingGameId] = useState<string | null>(null);
 
   const { inputState, setSendInput, isInputActive } = usePongInputOptimized();
 
@@ -46,13 +53,19 @@ export function PongGameOptimized() {
     };
   }, [disconnect]);
 
-  const handleBackToLobby = () => {
-    leaveMatch();
-    joinLobby();
-  };
-
   const handleCreateMatch = (wager: number, type: 'ai' | 'pvp', aiDifficulty?: string) => {
     createMatch(wager, type, aiDifficulty);
+  };
+
+  const handleSpectateGame = (gameId: string) => {
+    setSpectatingGameId(gameId);
+  };
+
+  const handleBackToLobby = () => {
+    console.log('🏓 Main handleBackToLobby called, clearing spectatingGameId');
+    setSpectatingGameId(null);
+    leaveMatch();
+    joinLobby();
   };
 
   return (
@@ -60,12 +73,17 @@ export function PongGameOptimized() {
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-content mb-2">🏓 Pong Arena</h1>
+          <h1 className="text-3xl font-bold text-content mb-2">🏓 Elon Musk Sucks Pong</h1>
           <p className="text-secondary">Real-time multiplayer Pong with MuskBucks wagering</p>
         </div>
 
-        {/* Game or Lobby */}
-        {currentGame ? (
+        {/* Show spectator if spectating */}
+        {spectatingGameId ? (
+          <>
+            {console.log('🏓 Rendering PongSpectator for gameId:', spectatingGameId)}
+            <PongSpectator gameId={spectatingGameId} onBackToLobby={handleBackToLobby} />
+          </>
+        ) : currentGame ? (
           <div className="space-y-6">
             {/* Game Header */}
             <div className="flex items-center justify-between p-4 bg-surface border border-muted rounded-lg">
@@ -79,10 +97,24 @@ export function PongGameOptimized() {
                     <span>You: Player {(currentGame.playerSlot || 0) + 1}</span>
                   </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <span className="text-2xl font-bold text-accent">{currentGame.scores[0]}</span>
-                  <span className="text-tertiary">-</span>
-                  <span className="text-2xl font-bold text-accent">{currentGame.scores[1]}</span>
+                <div className="text-center">
+                  {/* Score Display */}
+                  <div className="flex items-center space-x-2">
+                    <span className="text-2xl font-bold text-accent">{currentGame.scores[0]}</span>
+                    <span className="text-tertiary">-</span>
+                    <span className="text-2xl font-bold text-accent">{currentGame.scores[1]}</span>
+                  </div>
+                  {/* Wager/Pot Display */}
+                  {currentGame.wager !== undefined && (
+                    <div className="mt-1 text-sm text-warning">
+                      💰 Pot:{' '}
+                      {currentGame.pot ||
+                        (currentGame.players[1]?.name === 'AI'
+                          ? currentGame.wager
+                          : currentGame.wager * 2)}{' '}
+                      MB
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -96,10 +128,18 @@ export function PongGameOptimized() {
                         ? 'bg-warning/20 text-warning'
                         : currentGame.status === 'ended'
                           ? 'bg-info/20 text-info'
-                          : 'bg-muted/20 text-tertiary'
+                          : currentGame.status === 'waiting_for_opponent'
+                            ? 'bg-secondary/20 text-secondary'
+                            : currentGame.status === 'waiting_for_ready'
+                              ? 'bg-accent/20 text-accent'
+                              : 'bg-muted/20 text-tertiary'
                   }`}
                 >
-                  {(currentGame.status || 'waiting').toUpperCase()}
+                  {currentGame.status === 'waiting_for_opponent'
+                    ? 'WAITING FOR OPPONENT'
+                    : currentGame.status === 'waiting_for_ready'
+                      ? 'WAITING FOR READY'
+                      : (currentGame.status || 'waiting').toUpperCase()}
                 </div>
 
                 {/* Ping indicator */}
@@ -127,7 +167,7 @@ export function PongGameOptimized() {
 
                 <button
                   onClick={handleBackToLobby}
-                  className="px-4 py-2 bg-muted text-content rounded-lg hover:bg-muted/80 transition-colors"
+                  className="px-4 py-2 bg-muted text-content rounded-lg hover:bg-muted/80 transition-colors cursor-pointer"
                 >
                   Back to Lobby
                 </button>
@@ -139,6 +179,8 @@ export function PongGameOptimized() {
               <PongCanvasEnhanced
                 gameState={currentGame}
                 ping={lastPing}
+                onSetReady={setReady}
+                isSpectating={false}
                 className="max-w-4xl w-full"
               />
             </div>
@@ -182,16 +224,22 @@ export function PongGameOptimized() {
           </div>
         ) : (
           /* Lobby */
-          <PongLobbyOptimized
-            lobbies={lobbies}
-            isConnected={isConnected}
-            isAuthenticated={isAuthenticated}
-            connectionError={connectionError}
-            onConnect={connect}
-            onJoinLobby={joinLobby}
-            onCreateMatch={handleCreateMatch}
-            onJoinMatch={joinMatch}
-          />
+          <>
+            {console.log('🏓 Rendering PongLobby')}
+            <PongLobbyOptimized
+              lobbies={lobbies}
+              activeGames={activeGames}
+              isConnected={isConnected}
+              isAuthenticated={isAuthenticated}
+              connectionError={connectionError}
+              stats={stats}
+              onConnect={connect}
+              onJoinLobby={joinLobby}
+              onCreateMatch={handleCreateMatch}
+              onJoinMatch={joinMatch}
+              onSpectateGame={handleSpectateGame}
+            />
+          </>
         )}
 
         {/* Debug Info (development only) */}
@@ -204,6 +252,7 @@ export function PongGameOptimized() {
               <div>Socket ID: {socket?.id || 'None'}</div>
               <div>Game ID: {currentGame?.gameId || 'None'}</div>
               <div>Player Slot: {currentGame?.playerSlot ?? 'None'}</div>
+              <div>Spectating Game ID: {spectatingGameId || 'None'}</div>
               <div>Input State: {JSON.stringify(inputState)}</div>
               <div>Last Ping: {lastPing}ms</div>
               <div>Available Lobbies: {lobbies.length}</div>

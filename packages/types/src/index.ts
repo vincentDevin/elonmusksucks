@@ -661,7 +661,7 @@ export interface Ball {
   vy: number;
 }
 
-export type GameStatus = 'waiting' | 'countdown' | 'active' | 'paused' | 'ended';
+export type GameStatus = 'waiting' | 'waiting_for_opponent' | 'waiting_for_ready' | 'countdown' | 'active' | 'paused' | 'ended';
 export type MatchType = 'ai' | 'pvp';
 export type LobbyStatus = 'waiting' | 'full';
 
@@ -673,6 +673,13 @@ export interface GameState {
   tick: number;
   wager: number;
   isAI: boolean;
+  aiDifficulty?: keyof typeof AI_DIFFICULTIES;
+  aiState?: {
+    targetY: number;
+    lastReactionTime: number;
+    errorBias: number; // Random bias for imperfect play
+  };
+  readyStates?: [boolean, boolean]; // Ready status for each player [player0, player1]
   startTime: number;
 }
 
@@ -684,6 +691,20 @@ export interface LobbyEntry {
   type: MatchType;
   status: LobbyStatus;
   createdAt: number;
+}
+
+export interface ActiveGameEntry {
+  id: string;
+  player1Name: string;
+  player2Name: string | null; // null for AI
+  type: MatchType;
+  wager: number;
+  pot: number;
+  scores: [number, number];
+  status: GameStatus;
+  spectatorCount: number;
+  startedAt: number;
+  canSpectate: boolean;
 }
 
 export interface PlayerInput {
@@ -701,23 +722,33 @@ export interface ClientEvents {
   create_match: { wager: number; type: MatchType; aiDifficulty?: string };
   join_match: { matchId: string };
   player_input: PlayerInput;
+  player_ready: { ready: boolean };
   leave_match: {};
-  spectate_match: { matchId: string };
+  spectate_match: { gameId: string };
 }
 
 // Socket Event Types (Server → Client)
 export interface ServerEvents {
   auth_result: { success: boolean; player?: Player; error?: string };
   lobby_state: { lobbies: LobbyEntry[] };
-  match_joined: { gameId: string; playerSlot: 0 | 1; opponent?: Player };
+  active_games: { games: ActiveGameEntry[] };
+  stats_update: { playersOnline: number; activeGames: number; availableMatches: number };
+  match_joined: { gameId: string; playerSlot: 0 | 1; opponent?: Player; wager: number; pot: number };
   match_waiting: { gameId: string; message: string };
+  opponent_joined: { opponent: Player };
+  ready_state_update: { readyStates: [boolean, boolean] };
   countdown: { seconds: number; message?: string };
+  spectator_joined: { gameId: string; spectatorCount: number };
   game_state: {
     ball: Ball;
-    opponentPaddleY: number; // Only the opponent's paddle position
+    opponentPaddleY?: number; // Only for players, not spectators
+    player1PaddleY?: number; // For spectators
+    player2PaddleY?: number; // For spectators
     scores: [number, number];
     tick: number;
     timestamp: number;
+    wager?: number;
+    pot?: number;
   };
   score_update: { scores: [number, number]; scorer: 0 | 1 };
   match_end: { 
@@ -751,7 +782,7 @@ export const PONG_PHYSICS = {
   FIELD_HEIGHT: 400,
   PADDLE_WIDTH: 10,
   PADDLE_HEIGHT: 80,
-  PADDLE_SPEED: 300, // pixels per second
+  PADDLE_SPEED: 640, // pixels per second (640/128 = 5.0 pixels per frame - much more responsive)
   BALL_SIZE: 10,
   BALL_SPEED_INITIAL: 384, // 384/128 = 3.0 pixels per frame (smooth whole pixel movement)
   BALL_SPEED_INCREMENT: 32, // 32/128 = 0.25 pixels per frame increment
@@ -760,12 +791,12 @@ export const PONG_PHYSICS = {
   NETWORK_UPDATE_RATE: 128, // Broadcast every tick for smoothest experience
 } as const;
 
-// AI difficulty settings
+// AI difficulty settings - Balanced for fair gameplay
 export const AI_DIFFICULTIES = {
-  easy: { reactionTime: 200, accuracy: 0.7, speed: 0.6 },
-  medium: { reactionTime: 100, accuracy: 0.85, speed: 0.8 },
-  hard: { reactionTime: 50, accuracy: 0.95, speed: 1.0 },
-  impossible: { reactionTime: 10, accuracy: 1.0, speed: 1.2 },
+  easy: { reactionTime: 400, accuracy: 0.5, speed: 0.4 },        // Very beatable - slow reactions, lots of errors
+  medium: { reactionTime: 250, accuracy: 0.75, speed: 0.7 },     // Moderate challenge - human-like performance
+  hard: { reactionTime: 150, accuracy: 0.9, speed: 0.95 },       // Challenging but fair - good reflexes
+  impossible: { reactionTime: 50, accuracy: 0.98, speed: 1.1 },  // Expert level - near perfect but not unbeatable
 } as const;
 
 export type AIDifficulty = keyof typeof AI_DIFFICULTIES;
