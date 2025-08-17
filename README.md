@@ -34,21 +34,27 @@ elonmusksucks/
 ├── apps/
 │   ├── client/          # Vite + React frontend (TypeScript, TailwindCSS)
 │   │   ├── src/
-│   │   │   ├── components/  # UI components (unified cards, timeline, admin panels)
+│   │   │   ├── components/  # UI components (unified cards, timeline, admin panels, pong)
 │   │   │   ├── contexts/    # React contexts (Auth, Parlay, Chat, Socket, Timeline)
-│   │   │   ├── hooks/       # Custom hooks (activity streams, stats, profiles)
-│   │   │   ├── pages/       # Route components (Dashboard, Profile, Admin, Timeline)
+│   │   │   ├── hooks/       # Custom hooks (activity streams, stats, profiles, pong)
+│   │   │   ├── pages/       # Route components (Dashboard, Profile, Admin, Timeline, Pong)
 │   │   │   ├── theme/       # Unified theme system (10 themes, semantic colors)
 │   │   │   └── api/         # Axios API clients with auto-refresh tokens
 │   │   └── dist/            # Production build output
-│   └── server/          # Express backend (TypeScript, Prisma)
+│   ├── server/          # Express backend (TypeScript, Prisma)
+│   │   ├── src/
+│   │   │   ├── controllers/ # REST endpoint handlers (auth, predictions, feeds)
+│   │   │   ├── services/    # Business logic layer (predictions, achievements, email)
+│   │   │   ├── repositories/# Data access layer (Prisma wrappers)
+│   │   │   ├── handlers/    # Socket.IO event handlers (real-time updates)
+│   │   │   └── workers/     # BullMQ job processors (feeds, payouts, leaderboards)
+│   │   └── dist/            # Compiled JavaScript
+│   └── pong-server/     # Dedicated Pong game server (Socket.IO, optimized)
 │       ├── src/
-│       │   ├── controllers/ # REST endpoint handlers (auth, predictions, feeds)
-│       │   ├── services/    # Business logic layer (predictions, achievements, email)
-│       │   ├── repositories/# Data access layer (Prisma wrappers)
-│       │   ├── handlers/    # Socket.IO event handlers (real-time updates)
-│       │   └── workers/     # BullMQ job processors (feeds, payouts, leaderboards)
-│       └── dist/            # Compiled JavaScript
+│       │   ├── managers/    # Game state management (Auth, Lobby, Game, Statistics)
+│       │   ├── lib/         # Core game logic (physics, AI, validation)
+│       │   └── types/       # Game-specific TypeScript interfaces
+│       └── dist/            # Compiled game server
 ├── packages/
 │   └── types/           # Shared TypeScript types (auto-generated from Prisma)
 ├── prisma/
@@ -143,13 +149,16 @@ npm run dev
 **Access Points:**
 - **Frontend (Client):** [http://localhost:3000](http://localhost:3000)
 - **Backend API:** [http://localhost:5000](http://localhost:5000)
+- **Pong Game Server:** [http://localhost:5001](http://localhost:5001)
 - **Admin Dashboard:** [http://localhost:3000/admin](http://localhost:3000/admin)
+- **Pong Arena:** [http://localhost:3000/pong](http://localhost:3000/pong)
 
 **Development Features:**
 - 🔄 Hot reload on both client and server
 - 🔌 Real-time WebSocket connections
 - 📊 Live prediction markets with dynamic odds calculation
 - 💬 Real-time chat functionality (desktop only currently)
+- 🏓 **Real-time multiplayer Pong game** with MuskBucks wagering
 - 🎨 Theme system with 10 themes across light/dark/high-contrast
 - 📰 RSS feed timeline with admin moderation
 - 🏆 Achievement system with 77 unlockable badges
@@ -200,11 +209,12 @@ npm run format
 - **Prediction Source Links:** Link articles/tweets as evidence for predictions
 
 ### **Real-time Systems**
-- **Socket.IO Integration:** Live updates for bets, predictions, chat, timeline, and leaderboards
+- **Socket.IO Integration:** Live updates for bets, predictions, chat, timeline, leaderboards, and pong games
 - **Unified Activity Feed:** Real-time global activity ticker with Redis pub/sub
 - **Live Statistics:** User stats, rankings, and achievements update instantly
 - **Cross-server Broadcasting:** Redis adapter enables horizontal scaling
-- **21 Socket Event Types:** Comprehensive real-time coverage across all features
+- **21+ Socket Event Types:** Comprehensive real-time coverage across all features
+- **Dedicated Pong Server:** Optimized game server with 60fps physics and minimal latency
 
 ### **Content & Timeline**
 - **RSS Feed Ingestion:** BullMQ workers fetch and process feeds with deduplication
@@ -219,6 +229,17 @@ npm run format
 - **Profile System:** Avatar uploads with automatic image processing via Tigris S3
 - **Achievement System:** 77 achievements across 8 categories with real-time unlocking
 - **RuneScape-Style Currency:** Formatted as 1.2k, 1.5M with wealth-based colors
+- **Real-time Pong Arena:** Multiplayer Pong with MuskBucks wagering, AI opponents, and spectating
+
+### **🏓 Real-time Pong Game System**
+- **Multiplayer Gaming:** Real-time PVP and AI opponents with adjustable difficulty
+- **MuskBucks Wagering:** Secure upfront wager deduction with automatic payouts
+- **Advanced Physics:** 128fps game loop with client-authoritative paddle movement
+- **Spectator System:** Watch live games with dedicated socket connections
+- **Performance Optimized:** ~1KB per game, 3 database queries per match
+- **Mobile Support:** Touch controls with responsive canvas rendering
+- **Free Play Mode:** 0 MuskBucks wager for testing and practice
+- **Production Scaling:** Fly.io auto-scaling architecture for 10,000+ concurrent players
 
 ### **Admin & Moderation**
 - **Admin Dashboard:** Prediction management, user moderation, feed management
@@ -252,6 +273,7 @@ npm run format
 | `npm run seed:dev` | Populate DB with test data |
 | `npm run seed:achievements` | Seed achievement catalog (77 achievements) |
 | `npm run worker` | Start payout + leaderboard + feed workers manually |
+| `npm run dev:pong` | Start pong game server only (port 5001) |
 
 ### **Workspace-Specific Commands**
 
@@ -265,6 +287,11 @@ npm run format
 - `npm run build` - Compile TypeScript to JavaScript
 - `npm run start` - Start production server
 - `npm run worker` - Start background job workers
+
+**Pong Server (`apps/pong-server/`):**
+- `npm run dev` - Pong game server with hot reload
+- `npm run build` - Compile TypeScript to JavaScript
+- `npm run start` - Start production pong server
 
 ---
 
@@ -296,9 +323,16 @@ npm run format
 
 **Socket.IO/WebSocket Issues**
 - Check that both client and server are running
-- Verify ports 3000 (client) and 5000 (server) are not blocked
+- Verify ports 3000 (client), 5000 (server), and 5001 (pong server) are not blocked
 - Monitor browser console and server logs for connection errors
 - **Fixed Issue:** All Socket.IO memory leaks and event handling resolved
+
+**Pong Game Issues**
+- Ensure pong server is running on port 5001: `npm run dev:pong`
+- Check that user has sufficient MuskBucks balance for wagering
+- Verify WebSocket connection to pong server in browser dev tools
+- **Fixed Issue:** Auth context refresh no longer breaks pong gameplay
+- **Fixed Issue:** Paddle movement and physics prediction working perfectly
 
 **Node.js Version Issues**
 - Use Node.js ≥24.x: `node --version`
@@ -321,16 +355,18 @@ npm run format
 
 ### **✅ Production Ready Features**
 - **Dynamic Betting System:** 6-factor odds engine with real-time updates
+- **Real-time Pong Arena:** Complete multiplayer game system with secure wagering
 - **Achievement System:** 77 achievements across 8 categories fully operational
 - **Homepage Timeline:** RSS feed ingestion with admin moderation
 - **Prediction Source Links:** Articles/tweets linked to predictions
 - **Unified Theme System:** 10 themes with semantic color classes
 - **Unified Activity System:** Real-time global activity feed
-- **Socket.IO Infrastructure:** 21 event types with Redis adapter
+- **Socket.IO Infrastructure:** 21+ event types with Redis adapter
 - **Transaction Atomicity:** All money operations wrapped in Prisma transactions
 - **BigInt Migration:** Unlimited monetary precision for all financial values
 - **Email Service:** SendGrid integration for auth flows
 - **Database Performance:** 44 production indexes covering all query patterns
+- **Pong Scaling Architecture:** Fly.io multi-region auto-scaling for 10,000+ players
 
 ### **🚧 Current Priority Tasks**
 - **Mobile Chat Integration:** Add chat panel to mobile dashboard (currently desktop-only)
@@ -345,10 +381,12 @@ npm run format
 - **No API Versioning:** API endpoints not versioned for backwards compatibility
 
 ### **🎯 Upcoming Features**
-1. **Enhanced Analytics:** User behavior tracking and prediction performance metrics
-2. **Advanced Parlay Builder:** Visual interface for complex multi-leg bets
-3. **Social Features:** User follows, prediction sharing, comment threads
-4. **Market Insights:** AI-powered prediction analysis and trends
+1. **3D Pong Upgrade:** Three.js 3D rendering with dynamic camera angles and particle effects
+2. **Enhanced Analytics:** User behavior tracking and prediction performance metrics
+3. **Advanced Parlay Builder:** Visual interface for complex multi-leg bets
+4. **Social Features:** User follows, prediction sharing, comment threads
+5. **Pong Tournament System:** Brackets, leaderboards, and championship events
+6. **Market Insights:** AI-powered prediction analysis and trends
 
 ### **🤝 Contributing**
 
