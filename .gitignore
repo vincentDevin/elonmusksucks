@@ -48,3 +48,4 @@ Thumbs.db
 .eslintcache
 .env.test
 .env.docker
+CLAUDE.md

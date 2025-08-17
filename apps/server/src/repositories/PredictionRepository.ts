@@ -7,17 +7,16 @@
 
 import prisma from '../db';
 import type { IPredictionRepository } from './IPredictionRepository';
-import type { DbPrediction, DbPredictionOption, DbBet, DbUser } from '@ems/types';
+import type {
+  DbPrediction,
+  DbPredictionOption,
+  DbBet,
+  DbUser,
+  ParlayLegWithUser,
+} from '@ems/types';
 import type { PredictionType } from '@ems/types';
 
-/** Shape for a parlay leg that already contains user meta (no avatar needed) */
-export type ParlayLegWithUser = {
-  parlayId: number;
-  user: Pick<DbUser, 'id' | 'name'>;
-  stake: number;
-  optionId: number;
-  createdAt: Date;
-};
+// Using the global ParlayLegWithUser type from @ems/types
 
 export class PredictionRepository implements IPredictionRepository {
   async createPrediction(data: {
@@ -37,6 +36,16 @@ export class PredictionRepository implements IPredictionRepository {
           user: Pick<DbUser, 'id' | 'name' | 'avatarUrl' | 'profilePictureKey'>;
         }
       >;
+      sourceLinks: Array<{
+        id: number;
+        predictionId: number;
+        articleId: number | null;
+        tweetId: string | null;
+        url: string;
+        title: string | null;
+        publisher: string | null;
+        capturedAt: Date;
+      }>;
     }
   > {
     return prisma.prediction.create({
@@ -48,7 +57,7 @@ export class PredictionRepository implements IPredictionRepository {
         creatorId: data.creatorId,
         type: data.type,
         threshold: data.threshold,
-        options: { create: data.options.map((o) => ({ label: o.label, odds: 1.0 })) },
+        options: { create: data.options.map((o) => ({ label: o.label, odds: 2.0 })) },
       },
       include: {
         options: {
@@ -72,6 +81,18 @@ export class PredictionRepository implements IPredictionRepository {
             },
           },
         },
+        sourceLinks: {
+          select: {
+            id: true,
+            predictionId: true,
+            articleId: true,
+            tweetId: true,
+            url: true,
+            title: true,
+            publisher: true,
+            capturedAt: true,
+          },
+        },
       },
     });
   }
@@ -86,6 +107,16 @@ export class PredictionRepository implements IPredictionRepository {
           }
         >;
         parlayLegs: ParlayLegWithUser[];
+        sourceLinks: Array<{
+          id: number;
+          predictionId: number;
+          articleId: number | null;
+          tweetId: string | null;
+          url: string;
+          title: string | null;
+          publisher: string | null;
+          capturedAt: Date;
+        }>;
       }
     >
   > {
@@ -95,7 +126,20 @@ export class PredictionRepository implements IPredictionRepository {
         options: {
           include: {
             parlayLegs: {
-              include: { parlay: { include: { user: true } } },
+              include: {
+                parlay: {
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        name: true,
+                        avatarUrl: true,
+                        profilePictureKey: true,
+                      },
+                    },
+                  },
+                },
+              },
             },
           },
         },
@@ -111,11 +155,23 @@ export class PredictionRepository implements IPredictionRepository {
             },
           },
         },
+        sourceLinks: {
+          select: {
+            id: true,
+            predictionId: true,
+            articleId: true,
+            tweetId: true,
+            url: true,
+            title: true,
+            publisher: true,
+            capturedAt: true,
+          },
+        },
       },
     });
 
     return preds.map((pred) => {
-      const { options, bets, ...rest } = pred;
+      const { options, bets, sourceLinks, ...rest } = pred;
 
       // --- flatten parlay legs ---
       const parlayLegs: ParlayLegWithUser[] = [];
@@ -123,15 +179,22 @@ export class PredictionRepository implements IPredictionRepository {
         opt.parlayLegs.forEach((leg) => {
           parlayLegs.push({
             parlayId: leg.parlay.id,
-            user: { id: leg.parlay.user.id, name: leg.parlay.user.name },
-            stake: leg.parlay.amount,
+            user: {
+              id: leg.parlay.user.id,
+              name: leg.parlay.user.name,
+              avatarUrl: leg.parlay.user.avatarUrl,
+              ...(leg.parlay.user.profilePictureKey && {
+                profilePictureKey: leg.parlay.user.profilePictureKey,
+              }),
+            },
+            stake: leg.parlay.amount.toString(),
             optionId: opt.id,
             createdAt: leg.createdAt,
           });
         }),
       );
 
-      return { ...rest, options, bets, parlayLegs } as any;
+      return { ...rest, options, bets, parlayLegs, sourceLinks } as any;
     });
   }
 
@@ -144,6 +207,16 @@ export class PredictionRepository implements IPredictionRepository {
           }
         >;
         parlayLegs: ParlayLegWithUser[];
+        sourceLinks: Array<{
+          id: number;
+          predictionId: number;
+          articleId: number | null;
+          tweetId: string | null;
+          url: string;
+          title: string | null;
+          publisher: string | null;
+          capturedAt: Date;
+        }>;
       })
     | null
   > {
@@ -153,7 +226,20 @@ export class PredictionRepository implements IPredictionRepository {
         options: {
           include: {
             parlayLegs: {
-              include: { parlay: { include: { user: true } } },
+              include: {
+                parlay: {
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        name: true,
+                        avatarUrl: true,
+                        profilePictureKey: true,
+                      },
+                    },
+                  },
+                },
+              },
             },
           },
         },
@@ -169,25 +255,44 @@ export class PredictionRepository implements IPredictionRepository {
             },
           },
         },
+        sourceLinks: {
+          select: {
+            id: true,
+            predictionId: true,
+            articleId: true,
+            tweetId: true,
+            url: true,
+            title: true,
+            publisher: true,
+            capturedAt: true,
+          },
+        },
       },
     });
 
     if (!pred) return null;
 
-    const { options, bets, ...rest } = pred;
+    const { options, bets, sourceLinks, ...rest } = pred;
     const parlayLegs: ParlayLegWithUser[] = [];
     options.forEach((opt) =>
       opt.parlayLegs.forEach((leg) => {
         parlayLegs.push({
           parlayId: leg.parlay.id,
-          user: { id: leg.parlay.user.id, name: leg.parlay.user.name },
-          stake: leg.parlay.amount,
+          user: {
+            id: leg.parlay.user.id,
+            name: leg.parlay.user.name,
+            avatarUrl: leg.parlay.user.avatarUrl,
+            ...(leg.parlay.user.profilePictureKey && {
+              profilePictureKey: leg.parlay.user.profilePictureKey,
+            }),
+          },
+          stake: leg.parlay.amount.toString(),
           optionId: opt.id,
           createdAt: leg.createdAt,
         });
       }),
     );
 
-    return { ...rest, options, bets, parlayLegs } as any;
+    return { ...rest, options, bets, parlayLegs, sourceLinks } as any;
   }
 }

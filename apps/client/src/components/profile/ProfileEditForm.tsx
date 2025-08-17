@@ -1,9 +1,6 @@
 import React, { useState } from 'react';
 import type { UpdateProfilePayload } from '../../api/users';
-import { uploadProfileImage } from '../../api/users';
-
-const fallbackAvatar =
-  'https://ui-avatars.com/api/?name=Unknown&background=64748b&color=fff&size=96';
+import { ProfileImageUpload } from './ProfileImageUpload';
 
 export function ProfileEditForm({
   userId,
@@ -18,23 +15,23 @@ export function ProfileEditForm({
   handleSave: (e: React.FormEvent) => void;
   saving: boolean;
 }) {
-  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // -- Image upload handler --
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // -- Image upload handlers --
+  const handleUploadSuccess = (result: {
+    avatarUrl: string;
+    sizes: {
+      thumbnail: string;
+      profile: string;
+      full: string;
+    };
+  }) => {
+    setFormData((prev) => ({ ...prev, avatarUrl: result.avatarUrl }));
     setError(null);
-    setUploading(true);
-    try {
-      const url = await uploadProfileImage(userId, file);
-      setFormData((prev) => ({ ...prev, avatarUrl: url }));
-    } catch (err: any) {
-      setError(err.message || 'Image upload failed');
-    } finally {
-      setUploading(false);
-    }
+  };
+
+  const handleUploadError = (errorMessage: string) => {
+    setError(errorMessage);
   };
 
   // -- General field change handler --
@@ -52,43 +49,16 @@ export function ProfileEditForm({
     <div className="bg-surface p-6 rounded-lg shadow space-y-4">
       {error && <p className="text-red-500">{error}</p>}
       <form onSubmit={handleSave} className="space-y-4">
-        <label className="block">
-          <span className="text-sm font-medium">Profile Picture</span>
-          <div className="mt-2 flex items-center">
-            <div className="h-24 w-24 rounded-full bg-gray-100 overflow-hidden flex-shrink-0 border border-gray-300">
-              {formData.avatarUrl ? (
-                <img
-                  src={formData.avatarUrl}
-                  alt="Avatar preview"
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <img
-                  src={fallbackAvatar}
-                  alt="No avatar"
-                  className="h-full w-full object-cover opacity-50"
-                />
-              )}
-            </div>
-            <div className="ml-4">
-              <label
-                htmlFor="avatar"
-                className="inline-flex items-center px-3 py-2 bg-white text-gray-700 shadow-sm border border-gray-300 rounded-md cursor-pointer hover:bg-gray-50"
-              >
-                {uploading ? 'Uploading…' : 'Change'}
-              </label>
-              <input
-                id="avatar"
-                type="file"
-                accept="image/*"
-                className="sr-only"
-                onChange={handleFileChange}
-                disabled={uploading || saving}
-              />
-              {uploading && <p className="mt-1 text-sm text-gray-500">Uploading...</p>}
-            </div>
-          </div>
-        </label>
+        <div>
+          <label className="block text-sm font-medium mb-2">Profile Picture</label>
+          <ProfileImageUpload
+            userId={userId}
+            currentAvatarUrl={formData.avatarUrl}
+            onUploadSuccess={handleUploadSuccess}
+            onUploadError={handleUploadError}
+            disabled={saving}
+          />
+        </div>
 
         <label className="block">
           <span className="text-sm font-medium">Bio</span>
@@ -157,7 +127,7 @@ export function ProfileEditForm({
 
         <button
           type="submit"
-          disabled={saving || uploading}
+          disabled={saving}
           className="px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-50"
         >
           {saving ? 'Saving…' : 'Save Changes'}

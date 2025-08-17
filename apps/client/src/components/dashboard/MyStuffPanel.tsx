@@ -1,46 +1,156 @@
 // apps/client/src/components/dashboard/MyStuffPanel.tsx
-import { useMyBets, useMyParlays, useMyPredictions } from '../../hooks/useMeStubs';
+import { useState, memo } from 'react';
+import { useEnhancedUserStats } from '../../hooks/useEnhancedUserStats';
+import { useEnhancedLeaderboard } from '../../hooks/useEnhancedLeaderboard';
+import PerformanceMetricsCard from './analytics/PerformanceMetricsCard';
+import QuickStatsGrid from './analytics/QuickStatsGrid';
+import SmartInsights from './analytics/SmartInsights';
+import AchievementProgress from './analytics/AchievementProgress';
 
-export default function MyStuffPanel() {
-  const myBets = useMyBets();
-  const myParlays = useMyParlays();
-  const myPredictions = useMyPredictions();
+type ViewMode = 'analytics' | 'activity';
+
+const MyStuffPanel = memo(function MyStuffPanel() {
+  const [viewMode, setViewMode] = useState<ViewMode>('analytics');
+  const { stats, loading, error, smartInsights } = useEnhancedUserStats();
+  const { userRank } = useEnhancedLeaderboard('all-time');
+
+  if (loading) {
+    return (
+      <section className="bg-surface border border-muted rounded-2xl p-6 shadow-lg">
+        <h2 className="text-xl font-bold mb-4 text-content">Personal Command Center</h2>
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          <span className="ml-3 text-tertiary">Loading your analytics...</span>
+        </div>
+      </section>
+    );
+  }
+
+  if (error || !stats) {
+    return (
+      <section className="bg-surface border border-muted rounded-2xl p-6 shadow-lg">
+        <h2 className="text-xl font-bold mb-4 text-content">Personal Command Center</h2>
+        <div className="text-center py-8">
+          <div className="text-4xl mb-4">⚠️</div>
+          <p className="text-red-500 mb-4">{error || 'Failed to load analytics'}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </section>
+    );
+  }
 
   return (
-    <section className="bg-surface border border-muted rounded-2xl p-4 shadow">
-      <h2 className="text-lg font-semibold mb-3">My Activity</h2>
+    <section className="bg-surface border border-muted rounded-2xl p-6 shadow-lg">
+      {/* Header with View Toggle */}
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-xl font-bold text-content flex items-center">
+          <span className="mr-2">🏛️</span>
+          Personal Command Center
+        </h2>
 
-      <h3 className="font-medium">Open Bets</h3>
-      <ul className="text-sm mb-4">
-        {myBets.data?.slice(0, 5).map((b) => (
-          <li key={b.id} className="flex justify-between">
-            <span>#{b.predictionId}</span>
-            <span>
-              {b.amount}🪙 @ {b.odds.toFixed(2)}×
-            </span>
-          </li>
-        ))}
-      </ul>
+        <div className="flex bg-background rounded-lg p-1 border border-muted">
+          <button
+            onClick={() => setViewMode('analytics')}
+            className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+              viewMode === 'analytics'
+                ? 'bg-primary text-white shadow-sm'
+                : 'text-tertiary hover:text-content'
+            }`}
+          >
+            Analytics
+          </button>
+          <button
+            onClick={() => setViewMode('activity')}
+            className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+              viewMode === 'activity'
+                ? 'bg-primary text-white shadow-sm'
+                : 'text-tertiary hover:text-content'
+            }`}
+          >
+            Activity
+          </button>
+        </div>
+      </div>
 
-      <h3 className="font-medium">Active Parlays</h3>
-      <ul className="text-sm mb-4">
-        {myParlays.data?.slice(0, 5).map((p) => (
-          <li key={p.id} className="flex justify-between">
-            <span>{p.legs.length} legs</span>
-            <span>Stake {p.amount}🪙</span>
-          </li>
-        ))}
-      </ul>
+      {viewMode === 'analytics' ? (
+        /* Analytics View */
+        <div className="space-y-6">
+          {/* Performance Metrics - Full Width */}
+          <PerformanceMetricsCard stats={stats} />
 
-      <h3 className="font-medium">My Predictions</h3>
-      <ul className="text-sm">
-        {myPredictions.data?.slice(0, 5).map((p) => (
-          <li key={p.id} className="flex justify-between">
-            <span>{p.title}</span>
-            <span className="text-xs italic">{p.approved ? 'live' : 'pending'}</span>
-          </li>
-        ))}
-      </ul>
+          {/* Quick Stats Grid - Full Width */}
+          <QuickStatsGrid stats={stats} userRank={userRank} />
+
+          {/* Smart Insights - Full Width */}
+          <SmartInsights insights={smartInsights} />
+
+          {/* Achievement Progress - Full Width */}
+          <AchievementProgress stats={stats} />
+        </div>
+      ) : (
+        /* Legacy Activity View */
+        <div className="space-y-4">
+          <div>
+            <h3 className="font-medium mb-2 text-content">Open Bets</h3>
+            {stats.portfolio.activeBetsValue === 0 ? (
+              <p className="text-tertiary text-sm italic">No open bets</p>
+            ) : (
+              <div className="bg-background/50 rounded-lg p-3 border border-muted">
+                <div className="text-sm text-content">
+                  You have active bets worth{' '}
+                  <span className="font-bold text-primary">
+                    {stats.portfolio.activeBetsValue}🪙
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div>
+            <h3 className="font-medium mb-2 text-content">Active Parlays</h3>
+            {stats.portfolio.activeParlaysValue === 0 ? (
+              <p className="text-tertiary text-sm italic">No active parlays</p>
+            ) : (
+              <div className="bg-background/50 rounded-lg p-3 border border-muted">
+                <div className="text-sm text-content">
+                  Active parlays worth{' '}
+                  <span className="font-bold text-primary">
+                    {stats.portfolio.activeParlaysValue}🪙
+                  </span>
+                  <br />
+                  <span className="text-tertiary">
+                    Potential winnings: {stats.portfolio.potentialWinnings}🪙
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div>
+            <h3 className="font-medium mb-2 text-content">My Predictions</h3>
+            {stats.portfolio.pendingPredictions === 0 ? (
+              <p className="text-tertiary text-sm italic">No pending predictions</p>
+            ) : (
+              <div className="bg-background/50 rounded-lg p-3 border border-muted">
+                <div className="text-sm text-content">
+                  {stats.portfolio.pendingPredictions} predictions pending approval
+                  <br />
+                  <span className="text-tertiary">
+                    Approval rate: {(stats.portfolio.approvalRate * 100).toFixed(0)}%
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </section>
   );
-}
+});
+
+export default MyStuffPanel;

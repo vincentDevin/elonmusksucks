@@ -1,15 +1,14 @@
 // apps/server/src/repositories/IPredictionRepository.ts
-import type { DbPrediction, DbPredictionOption, DbBet, DbUser } from '@ems/types';
+import type {
+  DbPrediction,
+  DbPredictionOption,
+  DbBet,
+  DbUser,
+  ParlayLegWithUser,
+} from '@ems/types';
 import type { PredictionType } from '@ems/types';
 
-/** A single leg in a parlay, with its user and stake info */
-export type ParlayLegWithUser = {
-  parlayId: number;
-  user: Pick<DbUser, 'id' | 'name'>;
-  stake: number;
-  optionId: number;
-  createdAt: Date;
-};
+// Using the global ParlayLegWithUser type from @ems/types
 
 export interface IPredictionRepository {
   /** Create a prediction along with its options */

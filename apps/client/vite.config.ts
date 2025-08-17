@@ -17,7 +17,7 @@ export default defineConfig(() => {
           changeOrigin: true,
           secure: false,
         },
-        // Socket.IO long polling/WebSocket
+        // Socket.IO long polling/WebSocket (main server)
         '/socket.io': {
           target: 'http://127.0.0.1:5000',
           ws: true, // <--- IMPORTANT! This enables WebSocket proxying

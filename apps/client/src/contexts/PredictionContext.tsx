@@ -22,6 +22,7 @@ import {
 import type { BetWithUser, ParlayLegWithUser } from '@ems/types';
 import { socketRequest } from '../lib/socketRequest';
 import { useSocket } from './SocketContext';
+import { useAuth } from './AuthContext';
 
 // ---- Context shape ----
 interface Ctx {
@@ -42,6 +43,7 @@ const PredictionCtx = createContext<Ctx | undefined>(undefined);
 
 export function PredictionProvider({ children }: { children: ReactNode }) {
   const socket = useSocket();
+  const { refreshUser } = useAuth();
   const [predictions, setPredictions] = useState<PredictionFull[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -90,16 +92,47 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
       );
     };
 
+    // 🎮 Enhanced odds updates with excitement data
+    const onEnhancedOddsUpdate = (data: {
+      predictionId: number;
+      hotMarket: boolean;
+      options: Array<{
+        id: number;
+        odds: number;
+        label: string;
+        change: number;
+        changePercent: number;
+      }>;
+    }) => {
+      console.log('🎯 Enhanced odds updated for prediction:', data.predictionId, data);
+
+      // Update the specific prediction with new odds and market status
+      setPredictions((prev) =>
+        prev.map((p) => {
+          if (p.id === data.predictionId) {
+            const updatedOptions = p.options.map((option: any) => {
+              const updatedOption = data.options.find((opt: any) => opt.id === option.id);
+              return updatedOption ? { ...option, odds: updatedOption.odds } : option;
+            });
+            return { ...p, options: updatedOptions, hotMarket: data.hotMarket };
+          }
+          return p;
+        }),
+      );
+    };
+
     socket.on('predictionCreated', onCreated);
     socket.on('predictionResolved', onResolved);
     socket.on('betPlaced', onBet);
     socket.on('parlayPlaced', onParlay);
+    socket.on('oddsUpdatedEnhanced', onEnhancedOddsUpdate);
 
     return () => {
       socket.off('predictionCreated', onCreated);
       socket.off('predictionResolved', onResolved);
       socket.off('betPlaced', onBet);
       socket.off('parlayPlaced', onParlay);
+      socket.off('oddsUpdatedEnhanced', onEnhancedOddsUpdate);
     };
   }, [socket]);
 
@@ -120,15 +153,38 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
   );
 
   // ── Bet/parlay helpers via socketRequest ──────────────────────────────────
-  const placeBet = useCallback(async (payload: { optionId: number; amount: number }) => {
-    await socketRequest('bet:place', payload);
-  }, []);
+  const placeBet = useCallback(
+    async (payload: { optionId: number; amount: number }) => {
+      console.log('PredictionContext placeBet called', payload);
+      try {
+        await socketRequest('bet:place', payload);
+        console.log('PredictionContext placeBet success');
+
+        // Trigger user refresh to update balance and stats
+        // Note: AuthContext already handles optimistic updates via Socket.IO events
+        setTimeout(() => refreshUser(), 100);
+      } catch (error) {
+        console.error('PredictionContext placeBet error', error);
+        throw error;
+      }
+    },
+    [refreshUser],
+  );
 
   const placeParlay = useCallback(
     async (payload: { legs: { optionId: number }[]; amount: number }) => {
-      await socketRequest('parlay:place', payload);
+      try {
+        await socketRequest('parlay:place', payload);
+
+        // Trigger user refresh to update balance and stats
+        // Note: AuthContext already handles optimistic updates via Socket.IO events
+        setTimeout(() => refreshUser(), 100);
+      } catch (error) {
+        console.error('PredictionContext placeParlay error', error);
+        throw error;
+      }
     },
-    [],
+    [refreshUser],
   );
 
   const value = useMemo<Ctx>(

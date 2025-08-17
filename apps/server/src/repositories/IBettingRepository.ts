@@ -10,14 +10,23 @@ export type OptionWithPrediction = {
   label: string;
   odds: number;
   predictionId: number;
-  prediction: { id: number; title: string; resolved: boolean; expiresAt: Date };
+  prediction: {
+    id: number;
+    title: string;
+    category: string;
+    resolved: boolean;
+    expiresAt: Date;
+  };
 };
 
 export interface IBettingRepository {
   findOptionWithPrediction(optionId: number): Promise<OptionWithPrediction | null>;
   findUserById(
     userId: number,
-  ): Promise<Pick<import('@prisma/client').User, 'id' | 'muskBucks' | 'name' | 'avatarUrl'> | null>;
+  ): Promise<Pick<
+    import('@prisma/client').User,
+    'id' | 'muskBucks' | 'name' | 'avatarUrl' | 'profilePictureKey'
+  > | null>;
 
   /**
    * Persist a single bet and all related updates in one transaction.
@@ -28,7 +37,7 @@ export interface IBettingRepository {
     optionId: number,
     amount: number,
     oddsAtPlacement: number,
-    potentialPayout: number,
+    potentialPayout: bigint,
   ): Promise<DbBet>;
 
   /**
@@ -38,11 +47,18 @@ export interface IBettingRepository {
     userId: number,
     legs: Array<{ predictionId: number; optionId: number; oddsAtPlacement: number }>,
     amount: number,
-    potentialPayout: number,
+    potentialPayout: bigint,
   ): Promise<DbParlay>;
 
   /**
    * Recalculate odds for a resolved prediction.
    */
   recalculateOdds(predictionId: number): Promise<void>;
+
+  /**
+   * Get current prediction options for odds comparison.
+   */
+  getPredictionOptions(
+    predictionId: number,
+  ): Promise<Array<{ id: number; label: string; odds: number }>>;
 }

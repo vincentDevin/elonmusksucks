@@ -4,25 +4,23 @@
 // • Sanitises DB records and injects signed avatar URLs for bets & parlay legs
 // -----------------------------------------------------------------------------
 
-import type { DbPrediction, DbPredictionOption, DbBet, PublicPrediction } from '@ems/types';
+import type {
+  DbPrediction,
+  DbPredictionOption,
+  DbBet,
+  PublicPrediction,
+  ParlayLegWithUser,
+} from '@ems/types';
 import type { IPredictionRepository } from '../repositories/IPredictionRepository';
 import { PredictionRepository } from '../repositories/PredictionRepository';
 import { PredictionType } from '@prisma/client';
 import redisClient from '../lib/redis';
 import { UserService } from '../services/user.service';
+import { unifiedActivityService } from './unifiedActivity.service';
+import { achievementService } from './achievement.service';
+import { achievementEvaluatorService } from './achievementEvaluator.service';
 
-/** Final shape the **client** expects for each parlay leg */
-export type ParlayLegWithUser = {
-  parlayId: number;
-  stake: number;
-  optionId: number;
-  createdAt: Date;
-  user: {
-    id: number;
-    name: string;
-    avatarUrl: string | null;
-  };
-};
+// Using the global ParlayLegWithUser type from @ems/types
 
 export class PredictionService {
   private userService = new UserService();
@@ -37,6 +35,16 @@ export class PredictionService {
         options: DbPredictionOption[];
         bets: Array<DbBet & { user: { id: number; name: string; avatarUrl: string | null } }>;
         parlayLegs: ParlayLegWithUser[];
+        sourceLinks: Array<{
+          id: number;
+          predictionId: number;
+          articleId: number | null;
+          tweetId: string | null;
+          url: string;
+          title: string | null;
+          publisher: string | null;
+          capturedAt: string;
+        }>;
       }
     >
   > {
@@ -57,6 +65,7 @@ export class PredictionService {
     threshold?: number;
   }): Promise<
     PublicPrediction & {
+      options: DbPredictionOption[];
       bets: DbBet[];
       parlayLegs: ParlayLegWithUser[];
     }
@@ -64,6 +73,7 @@ export class PredictionService {
     const pred = await this.repo.createPrediction(params);
 
     const dto: PublicPrediction & {
+      options: DbPredictionOption[];
       bets: DbBet[];
       parlayLegs: ParlayLegWithUser[];
     } = {
@@ -79,11 +89,58 @@ export class PredictionService {
       resolvedAt: pred.resolvedAt,
       winningOptionId: pred.winningOptionId,
       creatorId: pred.creatorId,
+      options: pred.options || [],
       bets: [],
       parlayLegs: [],
+      createdAt: pred.createdAt,
     };
 
+    // Publish legacy format
     await redisClient.publish('prediction:create', JSON.stringify(dto));
+
+    // Publish to unified activity system
+    const creator = await this.userService.getPublicSocketUser(params.creatorId);
+    if (creator) {
+      await unifiedActivityService.createPredictionActivity(
+        {
+          id: creator.id,
+          name: creator.name,
+          avatarUrl: creator.avatarUrl,
+        },
+        {
+          id: pred.id,
+          title: pred.title,
+          category: pred.category,
+        },
+      );
+
+      // Activity already published by unifiedActivityService above
+      // No need for duplicate ActivityRecorder call
+
+      // Check for achievement unlocks (legacy system)
+      await achievementService.checkAndUpdateAchievements({
+        type: 'prediction_created',
+        userId: params.creatorId,
+        data: {
+          predictionId: pred.id,
+          title: pred.title,
+          category: pred.category,
+        },
+      });
+
+      // Check for achievement unlocks (advanced evaluator)
+      await achievementEvaluatorService.processAchievementEvent({
+        type: 'prediction_created',
+        userId: params.creatorId,
+        timestamp: new Date().toISOString(),
+        data: {
+          predictionId: pred.id,
+          title: pred.title,
+          category: pred.category,
+        },
+      });
+    }
+
     return dto;
   }
 
@@ -109,17 +166,16 @@ export class PredictionService {
           };
         }
       >;
-      parlayLegs: Array<{
-        parlayId: number;
-        stake: number;
-        optionId: number;
-        createdAt: Date;
-        user: {
-          id: number;
-          name: string;
-          avatarUrl?: string | null;
-          profilePictureKey?: string | null;
-        };
+      parlayLegs: ParlayLegWithUser[];
+      sourceLinks?: Array<{
+        id: number;
+        predictionId: number;
+        articleId: number | null;
+        tweetId: string | null;
+        url: string;
+        title: string | null;
+        publisher: string | null;
+        capturedAt: Date;
       }>;
     },
   ) {
@@ -169,7 +225,13 @@ export class PredictionService {
       createdAt,
     }));
 
-    return { ...pred, options, bets, parlayLegs };
+    // --- sourceLinks (convert Date to string) -------------------------------
+    const sourceLinks = (pred.sourceLinks || []).map((link) => ({
+      ...link,
+      capturedAt: link.capturedAt.toISOString(),
+    }));
+
+    return { ...pred, options, bets, parlayLegs, sourceLinks };
   }
 }
 

@@ -1,37 +1,32 @@
 // apps/client/src/pages/Dashboard.tsx
-import { Suspense, lazy } from 'react';
-import PredictionsPanel from '../components/dashboard/PredictionPanel';
-import ParlayPanel from '../components/dashboard/ParlayPanel';
-import MyStuffPanel from '../components/dashboard/MyStuffPanel';
-const ChatPanel = lazy(() => import('../components/dashboard/ChatPanel'));
+import { useState } from 'react';
+import UnifiedDashboardSettings from '../components/dashboard/customization/UnifiedDashboardSettings';
+import MobileDashboard from '../components/dashboard/mobile/MobileDashboard';
+import DesktopDashboard from '../components/dashboard/desktop/DesktopDashboard';
+import { useMobileOptimization } from '../hooks/useMobileOptimization';
 
 /**
- * Layout notes
+ * Responsive Dashboard Layout
  * ──────────────────────────────────────────────────────────────
- * • Mobile  (<lg) : single column
- * • Desktop (lg)  : fluid left column + sidebar min 22rem, max 32rem
- * • XL      (xl)  : give sidebar even more room (min 26rem, max 36rem)
+ * • Mobile  (<768px)   : Mobile-optimized tabbed interface
+ * • Tablet  (768-1024) : Adaptive layout based on orientation
+ * • Desktop (1024+)    : Sophisticated multi-column layout
+ * • Ultra-wide (1600+) : Advanced 3-4 column trading interface
  */
 export default function Dashboard() {
-  return (
-    <div
-      className="grid gap-8
-                    lg:grid-cols-[1fr_minmax(22rem,_32rem)]
-                    xl:grid-cols-[1fr_minmax(26rem,_36rem)]"
-    >
-      {/* LEFT column – scrollable main feed */}
-      <div className="space-y-8">
-        <PredictionsPanel />
-        <MyStuffPanel />
-      </div>
+  const [showSettings, setShowSettings] = useState(false);
+  const { shouldUseCompactLayout } = useMobileOptimization();
 
-      {/* RIGHT column – sticky on desktop */}
-      <aside className="lg:sticky lg:top-24 space-y-8">
-        <ParlayPanel />
-        <Suspense fallback={null}>
-          <ChatPanel />
-        </Suspense>
-      </aside>
-    </div>
-  );
+  // Use mobile layout for mobile devices and portrait tablets
+  if (shouldUseCompactLayout()) {
+    return (
+      <>
+        <MobileDashboard />
+        <UnifiedDashboardSettings isOpen={showSettings} onClose={() => setShowSettings(false)} />
+      </>
+    );
+  }
+
+  // Desktop layout - sophisticated multi-column design
+  return <DesktopDashboard />;
 }

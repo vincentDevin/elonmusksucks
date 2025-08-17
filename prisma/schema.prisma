@@ -37,9 +37,20 @@ enum TransactionType {
   CREDIT
 }
 
-enum Theme {
-  LIGHT
-  DARK
+
+enum BanType {
+  TEMPORARY
+  PERMANENT
+}
+
+enum ModerationAction {
+  USER_BAN
+  USER_UNBAN
+  USER_MUTE
+  USER_UNMUTE
+  MESSAGE_DELETE
+  POST_DELETE
+  USER_KICK
 }
 
 model User {
@@ -53,7 +64,7 @@ model User {
   profileComplete    Boolean             @default(false)
   role               Role                @default(USER)
   active             Boolean             @default(true)
-  muskBucks          Int                 @default(1000)
+  muskBucks          BigInt              @default(1000)
   bets               Bet[]
   refreshTokens      RefreshToken[]
   userBadges         UserBadge[]         @relation("UserToUserBadge")
@@ -71,7 +82,7 @@ model User {
   longestStreak      Int                 @default(0)
   // user settings
   notifyOnResolve    Boolean             @default(true)
-  theme              Theme               @default(LIGHT)
+  theme              String              @default("light-clean")  // Unified theme system ID
   twoFactorEnabled   Boolean             @default(false)
   createdAt          DateTime            @default(now())
   parlayes           Parlay[]
@@ -80,9 +91,21 @@ model User {
   posts              UserPost[]          @relation("OwnerToPost")
   comments           UserPost[]          @relation("AuthorToPost")
   activities         UserActivity[]
+  relatedActivities  UserActivity[] @relation("RelatedUserActivity")
+  achievements       UserAchievement[]
   stats              UserStats?
   Prediction         Prediction[]
   messages           Message[]
+  bans               UserBan[]
+  moderationActions  ModerationLog[] @relation("ModeratorActions")
+  moderationReceived ModerationLog[] @relation("ModeratedUser")
+  articleReactions   ArticleReaction[]
+  articleComments    ArticleComment[]
+  // Pong relations
+  pongMatchesAsP1    PongMatch[]     @relation("PlayerOne")
+  pongMatchesAsP2    PongMatch[]     @relation("PlayerTwo")
+  pongWins           PongMatch[]     @relation("PongWinner")
+  pongStats          PongStats?
 }
 
 model ChatRoom {
@@ -136,9 +159,15 @@ model Prediction {
   options         PredictionOption[]
   createdAt       DateTime           @default(now())
   creatorId       Int
-  creator         User               @relation(fields: [creatorId], references: [id])
+  creator         User                   @relation(fields: [creatorId], references: [id])
+  activities      UserActivity[]
+  sourceLinks     PredictionSourceLink[]
 
   @@index([expiresAt, resolved])
+  @@index([creatorId, createdAt(sort: Desc)])
+  @@index([category, createdAt(sort: Desc)])
+  @@index([approved, resolved, createdAt(sort: Desc)])
+  @@index([category, approved])
 }
 
 model PredictionOption {
@@ -158,15 +187,22 @@ model Bet {
   userId          Int
   prediction      Prediction        @relation(fields: [predictionId], references: [id])
   predictionId    Int
-  amount          Int
+  amount          BigInt
   oddsAtPlacement Float? // snapshot of odds when placing the bet
-  potentialPayout Int? // computed at placement: amount * oddsAtPlacement
+  potentialPayout BigInt? // computed at placement: amount * oddsAtPlacement
   status          BetStatus         @default(PENDING)
   optionOption    PredictionOption? @relation("OptionToBet", fields: [optionId], references: [id])
   optionId        Int?
   won             Boolean? // null until resolved
-  payout          Int? // null until resolved
+  payout          BigInt? // null until resolved
   createdAt       DateTime          @default(now())
+  activities      UserActivity[]
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([predictionId, createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
+  @@index([userId, status])
+  @@index([userId, predictionId, createdAt(sort: Desc)])
 }
 
 model AITweet {
@@ -189,12 +225,12 @@ model LeaderboardEntry {
   userId    Int     @id @map("user_id")
   userName  String  @map("user_name")
   avatarUrl String? @map("avatar_url")
-  balance   Int     @map("balance")
+  balance   BigInt  @map("balance")
 
-  totalBets    Int   @map("total_bets")
-  winRate      Float @map("win_rate")
-  profitAll    Int   @map("profit_all")
-  profitPeriod Int   @map("profit_period")
+  totalBets    Int     @map("total_bets")
+  winRate      Float   @map("win_rate")
+  profitAll    BigInt  @map("profit_all")
+  profitPeriod BigInt  @map("profit_period")
   roi          Float @map("roi")
 
   longestStreak Int @map("longest_streak")
@@ -218,6 +254,51 @@ model Badge {
   iconUrl     String?
   users       UserBadge[] @relation("BadgeToUserBadge")
   createdAt   DateTime    @default(now())
+}
+
+model Achievement {
+  id            Int                 @id @default(autoincrement())
+  name          String              @unique
+  slug          String?             @unique // Kebab-case unique identifier for seeds/lookups
+  title         String              // Display title
+  description   String              // Achievement description
+  category      String              // Category: betting, prediction, chat, leaderboard, event, secret, participation, shame
+  rarity        String              @default("common") // common, uncommon, rare, legendary, secret, shame
+  targetValue   Int                 // Target value to achieve (e.g., 10 for "Win 10 bets")
+  iconUrl       String?             // Icon URL for display
+  isActive      Boolean             @default(true) // Whether this achievement is currently active
+  autoAward     Boolean             @default(true) // Whether this achievement is auto-awarded via triggers
+  manualOnly    Boolean             @default(false) // Whether this achievement can only be manually granted
+  isShame       Boolean             @default(false) // Whether this is a shame achievement for banned users
+  sortOrder     Int                 @default(0) // Display order
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @default(now()) @updatedAt
+  
+  // Relations
+  userProgress  UserAchievement[]
+  
+  @@index([category, sortOrder])
+  @@index([isActive, category])
+  @@index([rarity])
+  @@index([autoAward])
+  @@index([isShame])
+  @@index([category, rarity])
+}
+
+model UserAchievement {
+  id            Int         @id @default(autoincrement())
+  user          User        @relation(fields: [userId], references: [id])
+  userId        Int
+  achievement   Achievement @relation(fields: [achievementId], references: [id])
+  achievementId Int
+  progress      Int         @default(0) // Current progress towards target
+  completedAt   DateTime?   // When achievement was completed (null if not completed)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @default(now()) @updatedAt
+  
+  @@unique([userId, achievementId])
+  @@index([userId, progress])
+  @@index([achievementId, completedAt])
 }
 
 model UserBadge {
@@ -247,12 +328,15 @@ model Parlay {
   id              Int         @id @default(autoincrement())
   user            User        @relation(fields: [userId], references: [id])
   userId          Int
-  amount          Int
+  amount          BigInt
   combinedOdds    Float
-  potentialPayout Int
+  potentialPayout BigInt
   status          BetStatus   @default(PENDING)
   legs            ParlayLeg[]
   createdAt       DateTime    @default(now())
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
 }
 
 model ParlayLeg {
@@ -270,11 +354,19 @@ model Transaction {
   user            User            @relation(fields: [userId], references: [id])
   userId          Int
   type            TransactionType
-  amount          Int
-  balanceAfter    Int
+  amount          BigInt
+  balanceAfter    BigInt
   relatedBetId    Int? // single bet
   relatedParlayId Int? // parlay bet
   createdAt       DateTime        @default(now())
+  // Pong relations
+  pongEscrowMatches PongMatch[]    @relation("PongEscrowTransaction")
+  pongPayoutMatches PongMatch[]    @relation("PongPayoutTransaction")
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([type, createdAt(sort: Desc)])
+  @@index([relatedBetId])
+  @@index([relatedParlayId])
 }
 
 model UserPost {
@@ -292,12 +384,34 @@ model UserPost {
 }
 
 model UserActivity {
-  id        Int      @id @default(autoincrement())
-  user      User     @relation(fields: [userId], references: [id])
-  userId    Int
-  type      String // e.g. "BET_PLACED", "BET_WON", "POST_CREATED", etc.
-  details   Json? // Store event metadata (e.g., betId, predictionId, badgeId, postId)
-  createdAt DateTime @default(now())
+  id               Int         @id @default(autoincrement())
+  user             User        @relation(fields: [userId], references: [id])
+  userId           Int
+  type             String // e.g. "BET_PLACED", "BET_WON", "POST_CREATED", etc.
+  title            String? // Activity title for display
+  description      String? // Activity description for display
+  details          Json? // Store event metadata (e.g., betId, predictionId, badgeId, postId)
+  isPersonal       Boolean     @default(false) @map("is_personal") // Whether this is personal or public activity
+  priority         String      @default("medium") // Priority level: low, medium, high
+  relatedUserId    Int?        @map("related_user_id") // Reference to another user involved
+  predictionId     Int?        @map("prediction_id") // Reference to related prediction
+  betId            Int?        @map("bet_id") // Reference to related bet
+  createdAt        DateTime    @default(now())
+  
+  // Relations
+  relatedUser      User?       @relation("RelatedUserActivity", fields: [relatedUserId], references: [id])
+  prediction       Prediction? @relation(fields: [predictionId], references: [id])
+  bet              Bet?        @relation(fields: [betId], references: [id])
+  pongMatch        PongMatch?  @relation(fields: [pongMatchId], references: [id])
+  pongMatchId      String?     @map("pong_match_id")
+
+  // Indexes for optimal query performance
+  @@index([userId, createdAt(sort: Desc)], name: "idx_user_activities_user_time")
+  @@index([type, priority, createdAt(sort: Desc)], name: "idx_user_activities_type_priority")
+  @@index([isPersonal, createdAt(sort: Desc)], name: "idx_user_activities_public")
+  @@index([relatedUserId, createdAt(sort: Desc)], name: "idx_user_activities_related_user")
+  @@index([predictionId, createdAt(sort: Desc)], name: "idx_user_activities_prediction")
+  @@index([betId, createdAt(sort: Desc)], name: "idx_user_activities_bet")
 }
 
 model UserStats {
@@ -319,10 +433,11 @@ model UserStats {
   parlayLegsLost  Int @default(0)
 
   // combined‐order metrics
-  totalWagered Int   @default(0) // bets+parlays
-  totalWon     Int   @default(0) // sum of payouts
-  profit       Int   @default(0) // totalWon – totalWagered
+  totalWagered BigInt @default(0) // bets+parlays
+  totalWon     BigInt @default(0) // sum of payouts
+  profit       BigInt @default(0) // totalWon – totalWagered
   roi          Float @default(0) // profit / totalWagered
+  winRate      Float @default(0) // (betsWon + parlaysWon) / (totalBets + totalParlays)
 
   // streak tracking
   currentStreak Int @default(0)
@@ -330,7 +445,280 @@ model UserStats {
 
   // extras
   mostCommonBet String?
-  biggestWin    Int     @default(0)
+  biggestWin    BigInt  @default(0)
 
   updatedAt DateTime @default(now()) @updatedAt
+
+  // Performance indexes for leaderboard queries
+  @@index([totalWon(sort: Desc)])
+  @@index([winRate(sort: Desc)])
+  @@index([totalWagered(sort: Desc)])
+}
+
+model UserBan {
+  id          Int       @id @default(autoincrement())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      Int
+  banType     BanType
+  reason      String
+  expiresAt   DateTime? // null for permanent bans
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
+
+  @@index([userId, isActive])
+  @@index([expiresAt])
+}
+
+model ModerationLog {
+  id            Int              @id @default(autoincrement())
+  moderator     User             @relation("ModeratorActions", fields: [moderatorId], references: [id])
+  moderatorId   Int
+  targetUser    User?            @relation("ModeratedUser", fields: [targetUserId], references: [id])
+  targetUserId  Int?
+  action        ModerationAction
+  reason        String?
+  details       Json? // Additional context (messageId, postId, duration, etc.)
+  ipAddress     String?
+  userAgent     String?
+  createdAt     DateTime         @default(now())
+
+  @@index([moderatorId])
+  @@index([targetUserId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+// ============================================
+// Homepage Timeline Models
+// ============================================
+
+enum FeedStatus {
+  ACTIVE
+  PAUSED
+  BLOCKED
+}
+
+enum ArticleStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model FeedSource {
+  id            Int        @id @default(autoincrement())
+  name          String
+  url           String     @unique
+  siteUrl       String?
+  status        FeedStatus @default(ACTIVE)
+  allowImages   Boolean    @default(true)
+  lastFetchedAt DateTime?
+  lastSuccessAt DateTime?
+  lastErrorAt   DateTime?
+  lastErrorMsg  String?
+  fetchCount    Int        @default(0)
+  errorCount    Int        @default(0)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  articles      Article[]
+  
+  @@index([status])
+  @@index([lastFetchedAt])
+}
+
+model Article {
+  id                   Int                    @id @default(autoincrement())
+  feedId               Int
+  guid                 String?
+  url                  String                 @unique
+  canonicalUrl         String?
+  title                String
+  excerpt              String?                @db.Text
+  leadImageUrl         String?
+  publishedAt          DateTime?
+  fetchedAt            DateTime               @default(now())
+  hash                 String                 @unique
+  status               ArticleStatus          @default(PENDING)
+  tags                 String[]               @default([])
+  modNotes             String?
+  reactions            Int                    @default(0)
+  comments             Int                    @default(0)
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  feed                 FeedSource             @relation(fields: [feedId], references: [id], onDelete: Cascade)
+  sourceLinks          PredictionSourceLink[]
+  articleReactions     ArticleReaction[]
+  articleComments      ArticleComment[]
+
+  @@index([status, publishedAt(sort: Desc)])
+  @@index([hash])
+  @@index([feedId])
+  @@index([createdAt(sort: Desc)])
+}
+
+model ArticleReaction {
+  id        Int      @id @default(autoincrement())
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  articleId Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int
+  type      String   @default("like") // "like", "dislike", "love", "laugh", "angry", etc.
+  createdAt DateTime @default(now())
+
+  @@unique([articleId, userId, type])
+  @@index([articleId, type])
+  @@index([userId])
+}
+
+model ArticleComment {
+  id        Int      @id @default(autoincrement())
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  articleId Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([articleId, createdAt])
+  @@index([userId])
+}
+
+model Tweet {
+  id                   String                 @id // Twitter snowflake ID
+  postedAt             DateTime
+  text                 String                 @db.Text
+  permalink            String                 @unique
+  authorHandle         String
+  likeCount            Int                    @default(0)
+  replyCount           Int                    @default(0)
+  repostCount          Int                    @default(0)
+  quotesCount          Int                    @default(0)
+  status               String                 @default("VISIBLE")
+  fetchedAt            DateTime               @default(now())
+  sourceLinks          PredictionSourceLink[]
+
+  @@index([postedAt(sort: Desc)])
+  @@index([authorHandle])
+  @@index([status])
+}
+
+model PredictionSourceLink {
+  id           Int         @id @default(autoincrement())
+  predictionId Int
+  articleId    Int?
+  tweetId      String?
+  url          String
+  title        String?
+  publisher    String?
+  capturedAt   DateTime    @default(now())
+  prediction   Prediction  @relation(fields: [predictionId], references: [id], onDelete: Cascade)
+  article      Article?    @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  tweet        Tweet?      @relation(fields: [tweetId], references: [id], onDelete: Cascade)
+  
+  @@index([predictionId])
+  @@index([articleId])
+  @@index([tweetId])
+}
+
+// ============================================
+// PONG GAME MODELS - Added for Pong feature
+// ============================================
+
+enum PongMatchStatus {
+  WAITING     // Waiting for opponent
+  ACTIVE      // Game in progress
+  COMPLETED   // Game finished normally
+  ABANDONED   // Player disconnected
+  DISPUTED    // Under admin review
+}
+
+enum PongDifficulty {
+  EASY
+  MEDIUM
+  HARD
+  IMPOSSIBLE
+}
+
+model PongMatch {
+  id              String          @id @default(cuid())
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  status          PongMatchStatus @default(WAITING)
+  
+  // Players
+  playerOneId     Int
+  playerOne       User            @relation("PlayerOne", fields: [playerOneId], references: [id])
+  playerTwoId     Int?            // NULL for AI matches
+  playerTwo       User?           @relation("PlayerTwo", fields: [playerTwoId], references: [id])
+  aiDifficulty    PongDifficulty? // Set when playing against AI
+  
+  // Wager & Economy
+  wagerAmount     BigInt          @default(0) // 0 for practice matches
+  escrowTxId      Int?            // Reference to escrow transaction
+  escrowTx        Transaction?    @relation("PongEscrowTransaction", fields: [escrowTxId], references: [id])
+  payoutTxId      Int?            // Reference to payout transaction
+  payoutTx        Transaction?    @relation("PongPayoutTransaction", fields: [payoutTxId], references: [id])
+  
+  // Game State
+  playerOneScore  Int             @default(0)
+  playerTwoScore  Int             @default(0)
+  winnerId        Int?
+  winner          User?           @relation("PongWinner", fields: [winnerId], references: [id])
+  winningScore    Int             @default(11) // First to 11
+  
+  // Performance & Anti-cheat
+  startedAt       DateTime?
+  completedAt     DateTime?
+  gameDuration    Int?            // Seconds
+  tickLog         Json?           // Compressed replay data for disputes
+  playerOnePing   Int             @default(0) // Average ping in ms
+  playerTwoPing   Int             @default(0)
+  
+  // Integration Points
+  activities      UserActivity[]
+  
+  @@index([status, createdAt(sort: Desc)])
+  @@index([playerOneId, status])
+  @@index([playerTwoId, status])
+  @@index([winnerId, completedAt(sort: Desc)])
+}
+
+model PongStats {
+  id              Int      @id @default(autoincrement())
+  userId          Int      @unique
+  user            User     @relation(fields: [userId], references: [id])
+  
+  // Match Statistics
+  totalMatches    Int      @default(0)
+  wins            Int      @default(0)
+  losses          Int      @default(0)
+  draws           Int      @default(0)
+  winStreak       Int      @default(0)
+  bestWinStreak   Int      @default(0)
+  
+  // Economy Statistics
+  totalWagered    BigInt   @default(0)
+  totalWon        BigInt   @default(0)
+  totalLost       BigInt   @default(0)
+  biggestWin      BigInt   @default(0)
+  biggestLoss     BigInt   @default(0)
+  
+  // Performance Statistics
+  avgPing         Float    @default(0)
+  avgGameDuration Int      @default(0) // Seconds
+  perfectGames    Int      @default(0) // Won 11-0
+  comebacks       Int      @default(0) // Won after being down 5+ points
+  
+  // AI Statistics
+  aiWins          Int      @default(0)
+  aiLosses        Int      @default(0)
+  hardestAiBeaten PongDifficulty?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([wins(sort: Desc)])
+  @@index([winStreak(sort: Desc)])
+  @@index([totalWon(sort: Desc)])
 }

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
 import { performPasswordReset } from '../api/auth';
 
 function useQuery() {
@@ -9,6 +10,7 @@ function useQuery() {
 export default function ResetPassword() {
   const query = useQuery();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const token = query.get('token') || '';
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -18,6 +20,12 @@ export default function ResetPassword() {
   const isPasswordValid = password === '' ? true : password.length >= 8;
   const isConfirmValid = confirm === '' ? true : password === confirm;
   const isFormValid = password !== '' && isPasswordValid && confirm !== '' && isConfirmValid;
+
+  useEffect(() => {
+    if (user) {
+      navigate('/dashboard');
+    }
+  }, [user, navigate]);
 
   useEffect(() => {
     if (!token) {

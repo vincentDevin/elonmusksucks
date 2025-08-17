@@ -1,14 +1,43 @@
 // apps/server/src/services/admin.service.ts
 import type { Role } from '@prisma/client';
-import type { IAdminRepository, QueryParams } from '../repositories/IAdminRepository';
+import type {
+  IAdminRepository,
+  QueryParams,
+  UserSearchParams,
+  PaginatedUsers,
+  DetailedUser,
+  BulkUserOperation,
+  BulkOperationResult,
+  PredictionSearchParams,
+  PaginatedPredictions,
+  DetailedPrediction,
+  BulkPredictionOperation,
+  BulkPredictionResult,
+} from '../repositories/IAdminRepository';
 import { PrismaAdminRepository } from '../repositories/AdminRepository';
 import type { UserStatsDTO } from '@ems/types';
+import redisClient from '../lib/redis';
 
 const repo: IAdminRepository = new PrismaAdminRepository();
 
-// -- User Management --
+// -- Enhanced User Management --
 export const listUsers = async () => {
+  // Legacy method - kept for backward compatibility
   return repo.findAllUsers();
+};
+
+export const searchUsers = async (params: UserSearchParams): Promise<PaginatedUsers> => {
+  return repo.searchUsers(params);
+};
+
+export const getUserDetails = async (userId: number): Promise<DetailedUser | null> => {
+  return repo.getUserWithDetails(userId);
+};
+
+export const bulkUpdateUsers = async (
+  operation: BulkUserOperation,
+): Promise<BulkOperationResult> => {
+  return repo.bulkUpdateUsers(operation);
 };
 
 export const changeUserRole = async (userId: number, role: Role) => {
@@ -23,16 +52,84 @@ export const adjustUserBalance = async (userId: number, amount: number) => {
   return repo.updateUserBalance(userId, amount);
 };
 
-// -- Prediction Management --
+// -- Enhanced Prediction Management --
 export const listPredictions = async (filters?: QueryParams) => {
   return repo.findPredictions(filters);
+};
+
+export const searchPredictions = async (
+  params: PredictionSearchParams,
+): Promise<PaginatedPredictions> => {
+  return repo.searchPredictions(params);
+};
+
+export const getPredictionDetails = async (
+  predictionId: number,
+): Promise<DetailedPrediction | null> => {
+  return repo.getPredictionWithDetails(predictionId);
+};
+
+export const bulkUpdatePredictions = async (
+  operation: BulkPredictionOperation,
+): Promise<BulkPredictionResult> => {
+  const result = await repo.bulkUpdatePredictions(operation);
+
+  // Broadcast events for successful operations
+  if (result.successCount > 0) {
+    const redisClient = require('../lib/redis').default;
+
+    for (const prediction of result.updatedPredictions) {
+      if (operation.operation === 'approve') {
+        await redisClient.publish(
+          'prediction:approved',
+          JSON.stringify({
+            id: prediction.id,
+            title: prediction.title,
+            category: prediction.category,
+            timestamp: new Date().toISOString(),
+          }),
+        );
+      } else if (operation.operation === 'resolve') {
+        await redisClient.publish(
+          'prediction:resolved',
+          JSON.stringify({
+            id: prediction.id,
+            title: prediction.title,
+            winningOptionId: prediction.resolutionData?.winningOptionId,
+            timestamp: new Date().toISOString(),
+          }),
+        );
+      }
+    }
+  }
+
+  return result;
 };
 
 export const setPredictionStatus = async (
   predictionId: number,
   status: 'approved' | 'rejected',
 ) => {
-  return repo.updatePredictionStatus(predictionId, status);
+  const updated = await repo.updatePredictionStatus(predictionId, status);
+
+  // 🎊 Broadcast prediction approval/rejection event
+  if (status === 'approved') {
+    const redisClient = require('../lib/redis').default;
+    await redisClient.publish(
+      'prediction:approved',
+      JSON.stringify({
+        id: updated.id,
+        title: updated.title,
+        description: updated.description,
+        category: updated.category,
+        type: updated.type,
+        approved: true,
+        timestamp: new Date().toISOString(),
+      }),
+    );
+  }
+
+  return updated;
 };
 
 // -- Bet & Transaction Oversight --
@@ -41,14 +138,79 @@ export const listBets = async (filters?: QueryParams) => {
 };
 
 export const refundBet = async (betId: number) => {
-  return repo.refundBet(betId);
+  const bet = await repo.refundBet(betId);
+  return {
+    ...bet,
+    amount: bet.amount.toString(),
+    potentialPayout: bet.potentialPayout?.toString() || null,
+    payout: bet.payout?.toString() || null,
+  };
 };
 
 export const listTransactions = async (filters?: QueryParams) => {
-  return repo.findTransactions(filters);
+  const transactions = await repo.findTransactions(filters);
+  return transactions.map((tx) => ({
+    ...tx,
+    amount: tx.amount.toString(),
+    balanceAfter: tx.balanceAfter.toString(),
+  }));
 };
 
-// -- Badge & Content Moderation --
+// -- Enhanced Financial Operations Dashboard --
+export const searchFinancialData = async (params: any) => {
+  return repo.searchFinancialData(params);
+};
+
+export const getFinancialAnalytics = async (params: any) => {
+  return repo.getFinancialAnalytics(params);
+};
+
+export const bulkFinancialOperation = async (operation: any) => {
+  return repo.bulkFinancialOperation(operation);
+};
+
+export const exportFinancialData = async (params: any) => {
+  return repo.exportFinancialData(params);
+};
+
+// -- Enhanced Badge & Achievement System --
+export const searchBadges = async (params: any) => {
+  return repo.searchBadges(params);
+};
+
+export const getBadgeWithDetails = async (badgeId: number) => {
+  return repo.getBadgeWithDetails(badgeId);
+};
+
+export const createBadgeWithCategories = async (data: any) => {
+  return repo.createBadgeWithCategories(data);
+};
+
+export const updateBadge = async (badgeId: number, data: any) => {
+  return repo.updateBadge(badgeId, data);
+};
+
+export const deleteBadge = async (badgeId: number) => {
+  return repo.deleteBadge(badgeId);
+};
+
+export const getBadgeAnalytics = async (badgeId?: number) => {
+  return repo.getBadgeAnalytics(badgeId);
+};
+
+export const bulkBadgeOperation = async (operation: any) => {
+  return repo.bulkBadgeOperation(operation);
+};
+
+export const getBadgeCategories = async () => {
+  return repo.getBadgeCategories();
+};
+
+export const createBadgeCategory = async (data: any) => {
+  return repo.createBadgeCategory(data);
+};
+
+// -- Legacy Badge & Content Moderation (deprecated) --
 export const listPosts = async (filters?: QueryParams) => {
   return repo.findPosts(filters);
 };
@@ -99,19 +261,74 @@ export const getUserStats = async (userId: number): Promise<UserStatsDTO | null>
     totalParlayLegs: raw.totalParlayLegs,
     parlayLegsWon: raw.parlayLegsWon,
     parlayLegsLost: raw.parlayLegsLost,
-    totalWagered: raw.totalWagered,
-    totalWon: raw.totalWon,
-    profit: raw.profit,
+    totalWagered: raw.totalWagered.toString(),
+    totalWon: raw.totalWon.toString(),
+    profit: raw.profit.toString(),
     roi: raw.roi,
     currentStreak: raw.currentStreak,
     longestStreak: raw.longestStreak,
     mostCommonBet: raw.mostCommonBet,
-    biggestWin: raw.biggestWin,
+    biggestWin: raw.biggestWin.toString(),
     updatedAt: raw.updatedAt.toISOString(),
   };
+};
+
+// -- Advanced Analytics & Reporting --
+export const getExecutiveDashboard = async (params: any) => {
+  return repo.getExecutiveDashboard(params);
+};
+
+export const getUserBehaviorAnalytics = async (params: any) => {
+  return repo.getUserBehaviorAnalytics(params);
+};
+
+export const getPredictiveAnalytics = async (params: any) => {
+  return repo.getPredictiveAnalytics(params);
+};
+
+export const generateCustomReport = async (reportType: string, params: Record<string, any>) => {
+  return repo.generateCustomReport(reportType, params);
+};
+
+export const getRealtimeMetrics = async () => {
+  return repo.getRealtimeMetrics();
+};
+
+export const exportAnalyticsData = async (params: {
+  reportType: string;
+  format: 'csv' | 'excel' | 'pdf';
+  filters?: Record<string, any>;
+}) => {
+  return repo.exportAnalyticsData(params);
 };
 
 // -- Miscellaneous --
 export const generateAITweet = async () => {
   return repo.triggerAITweet();
+};
+
+// -- Real-time Metrics Broadcasting --
+/**
+ * Broadcast real-time metrics update to admin dashboard
+ * Call this whenever significant events occur (bet placed, user registered, etc.)
+ */
+export const broadcastRealtimeMetrics = async () => {
+  try {
+    // Get current real-time metrics
+    const metrics = await repo.getRealtimeMetrics();
+
+    // Publish to Redis for Socket.IO broadcasting
+    await redisClient.publish(
+      'admin:metrics:update',
+      JSON.stringify({
+        metrics,
+        timestamp: new Date().toISOString(),
+        type: 'realtime_update',
+      }),
+    );
+
+    console.log('[admin-service] Broadcast real-time metrics update');
+  } catch (error) {
+    console.error('[admin-service] Error broadcasting metrics:', error);
+  }
 };

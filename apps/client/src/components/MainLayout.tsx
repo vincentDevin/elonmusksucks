@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
-import NavBar from './NavBar';
+import UnifiedNavBar from './UnifiedNavBar';
 import ChatBar from './ChatBar';
-import ActivityTicker from './ActivityTicker';
+import UnifiedActivityFeed from './UnifiedActivityFeed';
+import { QuickThemeSwitcher } from '../theme';
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -14,13 +15,15 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
   return (
     <div className="flex flex-col min-h-screen bg-background text-content transition-colors duration-300">
-      <NavBar />
-      <ActivityTicker />
+      <UnifiedNavBar />
+      {!inDashboard && <UnifiedActivityFeed />}
 
       {/* Main content is below NavBar, but above fixed ChatBar */}
       <div className="relative flex-1">
-        {/* Main page content; add padding-bottom for chatbar space */}
-        <main className="container mx-auto px-4 py-6 pb-32">{children}</main>
+        {/* Dashboard gets full-width treatment, other pages get container */}
+        <main className={inDashboard ? 'w-full' : 'container mx-auto px-4 py-6 pb-32'}>
+          {children}
+        </main>
       </div>
 
       {!inDashboard && (
@@ -30,6 +33,9 @@ export default function MainLayout({ children }: MainLayoutProps) {
           </div>
         </div>
       )}
+
+      {/* Quick Theme Switcher - Available on all pages */}
+      <QuickThemeSwitcher position="bottom-right" hideOnMobile={false} />
     </div>
   );
 }

@@ -49,82 +49,109 @@ export function useUserProfile(userId?: number | null): UseUserProfileResult {
   const [stats, setStats] = useState<UserStatsDTO | null>(null);
 
   // --- Fetch Handlers ---
-  const fetchProfile = useCallback(async () => {
-    if (userId == null) {
-      setProfile(null);
-      setFormData({
-        bio: null,
-        avatarUrl: null,
-        location: null,
-        timezone: null,
-        notifyOnResolve: true,
-        theme: 'LIGHT',
-        twoFactorEnabled: false,
-        profileComplete: false,
-      });
-      setFeed([]);
-      setActivity([]);
-      setStats(null);
-      return;
-    }
+  const fetchProfile = useCallback(
+    async (retryCount = 0) => {
+      if (userId == null) {
+        setProfile(null);
+        setFormData({
+          bio: null,
+          avatarUrl: null,
+          location: null,
+          timezone: null,
+          notifyOnResolve: true,
+          theme: 'LIGHT',
+          twoFactorEnabled: false,
+          profileComplete: false,
+        });
+        setFeed([]);
+        setActivity([]);
+        setStats(null);
+        return;
+      }
 
-    setLoading(true);
-    setError(null);
-    try {
-      // Fetch all user info in parallel
-      const [profileData, feedData, activityData, statsData] = await Promise.all([
-        getUserProfile(userId),
-        getUserFeed(userId),
-        getUserActivity(userId),
-        getUserStats(userId).catch((err) => {
-          if (err?.response?.status === 404) {
-            // Provide empty stats fallback
-            return {
-              totalBets: 0,
-              betsWon: 0,
-              betsLost: 0,
-              totalParlays: 0,
-              parlaysWon: 0,
-              parlaysLost: 0,
-              totalParlayLegs: 0,
-              parlayLegsWon: 0,
-              parlayLegsLost: 0,
-              totalWagered: 0,
-              totalWon: 0,
-              profit: 0,
-              roi: 0,
-              currentStreak: 0,
-              longestStreak: 0,
-              mostCommonBet: null,
-              biggestWin: 0,
-              updatedAt: new Date().toISOString(),
-            };
-          }
-          throw err;
-        }),
-      ]);
+      setLoading(true);
+      setError(null);
+      try {
+        // Fetch all user info in parallel with individual error handling
+        const [profileData, feedData, activityData, statsData] = await Promise.all([
+          getUserProfile(userId),
+          getUserFeed(userId).catch((err) => {
+            console.warn('Failed to load user feed:', err);
+            return []; // Return empty array on feed error
+          }),
+          getUserActivity(userId).catch((err) => {
+            console.warn('Failed to load user activity:', err);
+            return []; // Return empty array on activity error
+          }),
+          getUserStats(userId).catch((err) => {
+            if (err?.response?.status === 404) {
+              // Provide empty stats fallback for 404
+              return {
+                totalBets: 0,
+                betsWon: 0,
+                betsLost: 0,
+                totalParlays: 0,
+                parlaysWon: 0,
+                parlaysLost: 0,
+                totalParlayLegs: 0,
+                parlayLegsWon: 0,
+                parlayLegsLost: 0,
+                totalWagered: 0,
+                totalWon: 0,
+                profit: 0,
+                roi: 0,
+                currentStreak: 0,
+                longestStreak: 0,
+                mostCommonBet: null,
+                biggestWin: 0,
+                updatedAt: new Date().toISOString(),
+              };
+            }
+            console.warn('Failed to load user stats:', err);
+            return null; // Return null on other stats errors
+          }),
+        ]);
 
-      setProfile(profileData);
-      setFeed(feedData);
-      setActivity(activityData);
-      setStats(statsData);
+        setProfile(profileData);
+        setFeed(feedData);
+        setActivity(activityData);
+        setStats(statsData);
 
-      setFormData({
-        bio: profileData.bio ?? null,
-        avatarUrl: profileData.avatarUrl ?? null,
-        location: profileData.location ?? null,
-        timezone: profileData.timezone ?? null,
-        notifyOnResolve: profileData.notifyOnResolve,
-        theme: profileData.theme,
-        twoFactorEnabled: profileData.twoFactorEnabled,
-        profileComplete: profileData.profileComplete,
-      });
-    } catch (err: any) {
-      setError(err?.message ?? err?.toString() ?? 'Failed to load user');
-    } finally {
-      setLoading(false);
-    }
-  }, [userId]);
+        setFormData({
+          bio: profileData.bio ?? null,
+          avatarUrl: profileData.avatarUrl ?? null,
+          location: profileData.location ?? null,
+          timezone: profileData.timezone ?? null,
+          notifyOnResolve: profileData.notifyOnResolve,
+          theme: profileData.theme,
+          twoFactorEnabled: profileData.twoFactorEnabled,
+          profileComplete: profileData.profileComplete,
+        });
+      } catch (err: any) {
+        // If it's an auth error and we haven't retried yet, try once more
+        if (err?.response?.status === 401 && retryCount === 0) {
+          console.log('Authentication error on profile load, retrying...');
+          // Wait a brief moment for token refresh to complete
+          setTimeout(() => fetchProfile(1), 100);
+          return;
+        }
+
+        const errorMessage =
+          err?.response?.status === 401
+            ? 'Authentication required. Please log in again.'
+            : err?.response?.status === 403
+              ? 'You do not have permission to view this profile.'
+              : err?.response?.status === 404
+                ? 'User profile not found.'
+                : (err?.message ?? err?.toString() ?? 'Failed to load user profile');
+
+        setError(errorMessage);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [userId],
+  );
 
   // Re-fetch on mount or when userId changes
   useEffect(() => {
@@ -150,7 +177,13 @@ export function useUserProfile(userId?: number | null): UseUserProfileResult {
         profileComplete: updated.profileComplete,
       });
     } catch (err: any) {
-      setError(err?.message ?? err?.toString() ?? 'Failed to save profile');
+      const errorMessage =
+        err?.response?.status === 401
+          ? 'Authentication required. Please log in again.'
+          : err?.response?.status === 403
+            ? 'You do not have permission to update this profile.'
+            : (err?.message ?? err?.toString() ?? 'Failed to save profile');
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -164,7 +197,13 @@ export function useUserProfile(userId?: number | null): UseUserProfileResult {
       await createUserPost(userId, payload);
       await fetchProfile(); // Re-fetch feed
     } catch (err: any) {
-      setError(err?.message ?? err?.toString() ?? 'Failed to post');
+      const errorMessage =
+        err?.response?.status === 401
+          ? 'Authentication required. Please log in again.'
+          : err?.response?.status === 403
+            ? 'You do not have permission to post to this profile.'
+            : (err?.message ?? err?.toString() ?? 'Failed to create post');
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
