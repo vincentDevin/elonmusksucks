@@ -1010,6 +1010,20 @@ class GameManager {
       });
     }
   }
+
+  cleanup(): void {
+    // Clear all game intervals
+    this.gameIntervals.forEach((interval) => clearInterval(interval));
+    this.gameIntervals.clear();
+
+    // Clear all game data
+    this.games.clear();
+    this.playerGames.clear();
+    this.gameSpectators.clear();
+    this.spectatorGames.clear();
+
+    console.log('🧹 Game manager cleanup complete');
+  }
 }
 
 // ——————————————————————————————————————————————————————————————————————————————————
@@ -1034,6 +1048,7 @@ export class PongGameServer {
   private lobby = new LobbyManager();
   private stats = new StatisticsManager();
   private game = new GameManager(this.io, this.db, this.auth, this.stats);
+  private statsInterval: NodeJS.Timeout | null = null;
 
   constructor() {
     this.setupMiddleware();
@@ -1367,7 +1382,7 @@ export class PongGameServer {
 
   private setupStatsBroadcasting(): void {
     // Broadcast stats every 5 seconds to all lobby users
-    setInterval(() => {
+    this.statsInterval = setInterval(() => {
       const stats = this.stats.getStats(this.lobby.getAvailableLobbies().length);
       this.io.to('lobby').emit('stats_update', stats);
     }, 5000);
@@ -1390,17 +1405,60 @@ export class PongGameServer {
 
   async stop(): Promise<void> {
     console.log('🛑 Shutting down Pong Game Server...');
-    this.server.close();
+
+    // Clear the stats broadcasting interval
+    if (this.statsInterval) {
+      clearInterval(this.statsInterval);
+      this.statsInterval = null;
+    }
+
+    // Clear all game intervals and data
+    this.game.cleanup();
+
+    // Disconnect all sockets
+    this.io.disconnectSockets();
+
+    // Close the HTTP server with callback
+    await new Promise<void>((resolve) => {
+      this.server.close(() => {
+        console.log('🔌 HTTP server closed');
+        resolve();
+      });
+    });
+
+    // Disconnect from database
     await this.db['prisma'].$disconnect();
+    console.log('🗄️ Database disconnected');
+
+    console.log('✅ Pong Game Server shutdown complete');
   }
 }
 
 // Start server if this file is run directly
 if (require.main === module) {
   const server = new PongGameServer();
+  let isShuttingDown = false;
 
-  process.on('SIGTERM', () => server.stop());
-  process.on('SIGINT', () => server.stop());
+  const gracefulShutdown = async (signal: string) => {
+    if (isShuttingDown) return;
+    isShuttingDown = true;
+
+    console.log(`\n📡 Received ${signal}, starting graceful shutdown...`);
+    try {
+      await server.stop();
+      process.exit(0);
+    } catch (error) {
+      console.error('❌ Error during shutdown:', error);
+      process.exit(1);
+    }
+  };
+
+  process.on('SIGTERM', async () => {
+    await gracefulShutdown('SIGTERM');
+  });
+  process.on('SIGINT', async () => {
+    await gracefulShutdown('SIGINT');
+  });
 
   server.start();
 }
