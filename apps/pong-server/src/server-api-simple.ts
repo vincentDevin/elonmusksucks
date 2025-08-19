@@ -421,14 +421,44 @@ class GameManager {
       // AI can react now - update target position with accuracy errors
       const ballY = game.ball.y;
 
-      // Apply accuracy error - AI doesn't track perfectly
-      const accuracyError = (1 - difficulty.accuracy) * 80; // Max error in pixels
+      // HIT COUNT SCALING: AI gets worse as rally continues (gets "tired" or loses focus)
+      // Use ball speed as proxy for rally length since faster ball = more hits
+      const currentSpeed = Math.sqrt(game.ball.vx ** 2 + game.ball.vy ** 2);
+      const baseSpeed = PONG_PHYSICS.BALL_SPEED_INITIAL;
+      const speedIncrements = Math.max(
+        0,
+        (currentSpeed - baseSpeed) / PONG_PHYSICS.BALL_SPEED_INCREMENT,
+      );
+      const rallyLength = Math.min(speedIncrements, 15); // Cap at 15 increments for scaling
+
+      // Difficulty degrades over time - easier AI degrades faster
+      const difficultyDropoff = {
+        easy: 0.15, // Loses 15% effectiveness per 5 hits
+        medium: 0.08, // Loses 8% effectiveness per 5 hits
+        hard: 0.04, // Loses 4% effectiveness per 5 hits
+        impossible: 0.02, // Loses 2% effectiveness per 5 hits
+      };
+
+      const degradationFactor = Math.max(
+        0.3,
+        1 - (rallyLength / 5) * difficultyDropoff[game.aiDifficulty],
+      );
+
+      // Apply degraded difficulty
+      const adjustedAccuracy = difficulty.accuracy * degradationFactor;
+
+      // Early rally bonus - first few hits are more accurate to avoid embarrassing misses
+      const earlyGameBonus = rallyLength < 3 ? 1.3 : 1.0; // 30% bonus for first 3 exchanges
+      const finalAccuracy = Math.min(0.95, adjustedAccuracy * earlyGameBonus);
+
+      // Apply accuracy error based on adjusted difficulty
+      const accuracyError = (1 - finalAccuracy) * 80; // Max error in pixels
       const randomError = (Math.random() - 0.5) * 2 * accuracyError;
 
-      // On easier difficulties, AI sometimes "loses track" of the ball
+      // On easier difficulties, AI sometimes "loses track" of the ball (but not in early game)
       let targetY = ballY;
-      if (difficulty.accuracy < 0.8 && Math.random() < 0.05) {
-        // 5% chance on easier difficulties to target old position
+      if (finalAccuracy < 0.8 && rallyLength > 2 && Math.random() < 0.05) {
+        // 5% chance on easier difficulties to target old position (only after rally starts)
         targetY = game.aiState.targetY;
       }
 
@@ -453,8 +483,30 @@ class GameManager {
     const diff = game.aiState.targetY - paddleCenter;
 
     if (Math.abs(diff) > 5) {
-      const baseSpeed = PONG_PHYSICS.PADDLE_SPEED / PONG_PHYSICS.TICK_RATE;
-      const aiSpeed = baseSpeed * difficulty.speed;
+      const basePaddleSpeed = PONG_PHYSICS.PADDLE_SPEED / PONG_PHYSICS.TICK_RATE;
+
+      // Use adjusted speed based on rally length
+      const currentBallSpeed = Math.sqrt(game.ball.vx ** 2 + game.ball.vy ** 2);
+      const baseBallSpeed = PONG_PHYSICS.BALL_SPEED_INITIAL;
+      const speedIncrements = Math.max(
+        0,
+        (currentBallSpeed - baseBallSpeed) / PONG_PHYSICS.BALL_SPEED_INCREMENT,
+      );
+      const rallyLength = Math.min(speedIncrements, 15);
+
+      const difficultyDropoff = {
+        easy: 0.15,
+        medium: 0.08,
+        hard: 0.04,
+        impossible: 0.02,
+      };
+      const degradationFactor = Math.max(
+        0.5,
+        1 - (rallyLength / 5) * difficultyDropoff[game.aiDifficulty],
+      );
+      const adjustedSpeed = difficulty.speed * degradationFactor;
+
+      const aiSpeed = basePaddleSpeed * adjustedSpeed;
 
       const oldPaddleY = ai.paddleY;
 
@@ -482,29 +534,42 @@ class GameManager {
   }
 
   private checkCollisions(game: GameState): void {
-    // Wall collisions
-    if (game.ball.y <= 0 || game.ball.y >= PONG_PHYSICS.FIELD_HEIGHT) {
-      game.ball.vy = -game.ball.vy;
-      game.ball.y = Math.max(0, Math.min(PONG_PHYSICS.FIELD_HEIGHT, game.ball.y));
-    }
-
-    // Paddle collisions
-    const ballLeft = game.ball.x - PONG_PHYSICS.BALL_SIZE / 2;
-    const ballRight = game.ball.x + PONG_PHYSICS.BALL_SIZE / 2;
+    // Calculate ball boundaries once
     const ballTop = game.ball.y - PONG_PHYSICS.BALL_SIZE / 2;
     const ballBottom = game.ball.y + PONG_PHYSICS.BALL_SIZE / 2;
+    const ballLeft = game.ball.x - PONG_PHYSICS.BALL_SIZE / 2;
+    const ballRight = game.ball.x + PONG_PHYSICS.BALL_SIZE / 2;
 
-    // Left paddle (player 0)
+    // Wall collisions - Fixed to use ball edges instead of center
+    if (ballTop <= 0 || ballBottom >= PONG_PHYSICS.FIELD_HEIGHT) {
+      game.ball.vy = -game.ball.vy;
+      // Keep ball within bounds accounting for its radius
+      if (ballTop <= 0) {
+        game.ball.y = PONG_PHYSICS.BALL_SIZE / 2;
+      } else {
+        game.ball.y = PONG_PHYSICS.FIELD_HEIGHT - PONG_PHYSICS.BALL_SIZE / 2;
+      }
+    }
+
+    // Hitbox extension for better game feel (more forgiving at paddle edges)
+    const PADDLE_HITBOX_EXTENSION = 5; // Extends paddle hitbox by 5px on top and bottom
+
+    // Left paddle (player 0) - Simple X check at paddle front edge
     if (ballLeft <= PONG_PHYSICS.PADDLE_WIDTH && game.ball.vx < 0) {
       const paddle = game.players[0];
-      if (ballBottom >= paddle.paddleY && ballTop <= paddle.paddleY + PONG_PHYSICS.PADDLE_HEIGHT) {
+      // Check Y collision with extended hitbox
+      // The visual paddle is 80px, but the hitbox is 90px (5px extra on each end)
+      const paddleTop = paddle.paddleY - PADDLE_HITBOX_EXTENSION;
+      const paddleBottom = paddle.paddleY + PONG_PHYSICS.PADDLE_HEIGHT + PADDLE_HITBOX_EXTENSION;
+
+      if (ballBottom >= paddleTop && ballTop <= paddleBottom) {
         // Calculate hit position relative to paddle center (-1 to 1)
         const paddleCenter = paddle.paddleY + PONG_PHYSICS.PADDLE_HEIGHT / 2;
         const hitPosition = (game.ball.y - paddleCenter) / (PONG_PHYSICS.PADDLE_HEIGHT / 2);
         const clampedHit = Math.max(-1, Math.min(1, hitPosition));
 
-        // Calculate angle modification (up to ±45 degrees)
-        const maxAngle = Math.PI / 4; // 45 degrees
+        // Calculate angle modification (up to ±60 degrees for easier angled shots)
+        const maxAngle = Math.PI / 3; // 60 degrees (increased from 45 degrees)
         const angleModifier = clampedHit * maxAngle;
 
         // Current ball speed
@@ -515,37 +580,42 @@ class GameManager {
         game.ball.vx = Math.abs(Math.cos(angleModifier)) * newSpeed; // Always positive (going right)
         game.ball.vy = Math.sin(angleModifier) * newSpeed;
 
+        // Position ball just outside the paddle to prevent multiple collisions
         game.ball.x = PONG_PHYSICS.PADDLE_WIDTH + PONG_PHYSICS.BALL_SIZE / 2;
       }
     }
 
-    // Right paddle (player 1)
+    // Right paddle (player 1) - Simple X check at paddle front edge
     if (ballRight >= PONG_PHYSICS.FIELD_WIDTH - PONG_PHYSICS.PADDLE_WIDTH && game.ball.vx > 0) {
       const paddle = game.players[1];
-      if (
-        paddle &&
-        ballBottom >= paddle.paddleY &&
-        ballTop <= paddle.paddleY + PONG_PHYSICS.PADDLE_HEIGHT
-      ) {
-        // Calculate hit position relative to paddle center (-1 to 1)
-        const paddleCenter = paddle.paddleY + PONG_PHYSICS.PADDLE_HEIGHT / 2;
-        const hitPosition = (game.ball.y - paddleCenter) / (PONG_PHYSICS.PADDLE_HEIGHT / 2);
-        const clampedHit = Math.max(-1, Math.min(1, hitPosition));
+      // Check Y collision with extended hitbox
+      // The visual paddle is 80px, but the hitbox is 90px (5px extra on each end)
+      if (paddle) {
+        const paddleTop = paddle.paddleY - PADDLE_HITBOX_EXTENSION;
+        const paddleBottom = paddle.paddleY + PONG_PHYSICS.PADDLE_HEIGHT + PADDLE_HITBOX_EXTENSION;
 
-        // Calculate angle modification (up to ±45 degrees)
-        const maxAngle = Math.PI / 4; // 45 degrees
-        const angleModifier = clampedHit * maxAngle;
+        if (ballBottom >= paddleTop && ballTop <= paddleBottom) {
+          // Calculate hit position relative to paddle center (-1 to 1)
+          const paddleCenter = paddle.paddleY + PONG_PHYSICS.PADDLE_HEIGHT / 2;
+          const hitPosition = (game.ball.y - paddleCenter) / (PONG_PHYSICS.PADDLE_HEIGHT / 2);
+          const clampedHit = Math.max(-1, Math.min(1, hitPosition));
 
-        // Current ball speed
-        const currentSpeed = Math.sqrt(game.ball.vx ** 2 + game.ball.vy ** 2);
-        const newSpeed = currentSpeed * 1.05; // Speed increase
+          // Calculate angle modification (up to ±60 degrees for easier angled shots)
+          const maxAngle = Math.PI / 3; // 60 degrees (increased from 45 degrees)
+          const angleModifier = clampedHit * maxAngle;
 
-        // Apply angle-based bounce - ensure ball always goes back to the left
-        game.ball.vx = -Math.abs(Math.cos(angleModifier)) * newSpeed; // Always negative (going left)
-        game.ball.vy = Math.sin(angleModifier) * newSpeed;
+          // Current ball speed
+          const currentSpeed = Math.sqrt(game.ball.vx ** 2 + game.ball.vy ** 2);
+          const newSpeed = currentSpeed * 1.05; // Speed increase
 
-        game.ball.x =
-          PONG_PHYSICS.FIELD_WIDTH - PONG_PHYSICS.PADDLE_WIDTH - PONG_PHYSICS.BALL_SIZE / 2;
+          // Apply angle-based bounce - ensure ball always goes back to the left
+          game.ball.vx = -Math.abs(Math.cos(angleModifier)) * newSpeed; // Always negative (going left)
+          game.ball.vy = Math.sin(angleModifier) * newSpeed;
+
+          // Position ball just outside the paddle to prevent multiple collisions
+          game.ball.x =
+            PONG_PHYSICS.FIELD_WIDTH - PONG_PHYSICS.PADDLE_WIDTH - PONG_PHYSICS.BALL_SIZE / 2;
+        }
       }
     }
   }
@@ -573,10 +643,22 @@ class GameManager {
     if (scoringPlayer && scoringPlayer.score >= PONG_PHYSICS.WINNING_SCORE) {
       this.endGame(game, 'completed', scorer);
     } else {
-      // Reset ball for next serve
+      // Stop ball movement immediately
+      game.ball.vx = 0;
+      game.ball.vy = 0;
+
+      // Reset ball position to center
       game.ball.x = PONG_PHYSICS.FIELD_WIDTH / 2;
       game.ball.y = PONG_PHYSICS.FIELD_HEIGHT / 2;
-      this.serveBall(game);
+
+      // Add 2-second delay before serving again
+      setTimeout(() => {
+        // Check if game still exists and is active
+        const currentGame = this.games.get(game.id);
+        if (currentGame && currentGame.status === 'active') {
+          this.serveBall(currentGame);
+        }
+      }, 2000); // 2 second pause
     }
   }
 

@@ -160,16 +160,57 @@ export function usePongInputOptimized(): PongInputHook {
     [updateInput],
   );
 
-  // Auto-bind keyboard events
+  // Mouse movement handler for precise control
+  const handleMouseMove = useCallback(
+    (event: MouseEvent) => {
+      if (!touchPositionRef.current.isActive) return;
+
+      const deltaY = event.clientY - touchPositionRef.current.startY;
+      const threshold = 5; // Smaller threshold for mouse precision
+
+      if (Math.abs(deltaY) > threshold) {
+        const up = deltaY < -threshold;
+        const down = deltaY > threshold;
+        updateInput({ up, down });
+      } else {
+        updateInput({ up: false, down: false });
+      }
+    },
+    [updateInput],
+  );
+
+  const handleMouseDown = useCallback((event: MouseEvent) => {
+    if (event.button === 0) {
+      // Left mouse button
+      touchPositionRef.current = {
+        startY: event.clientY,
+        currentY: event.clientY,
+        isActive: true,
+      };
+    }
+  }, []);
+
+  const handleMouseUp = useCallback(() => {
+    touchPositionRef.current.isActive = false;
+    updateInput({ up: false, down: false });
+  }, [updateInput]);
+
+  // Auto-bind keyboard and mouse events
   useEffect(() => {
     document.addEventListener('keydown', handleKeyDown);
     document.addEventListener('keyup', handleKeyUp);
+    document.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
 
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
       document.removeEventListener('keyup', handleKeyUp);
+      document.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [handleKeyDown, handleKeyUp]);
+  }, [handleKeyDown, handleKeyUp, handleMouseDown, handleMouseMove, handleMouseUp]);
 
   // Bind touch events to document for mobile
   useEffect(() => {

@@ -782,7 +782,7 @@ export const PONG_PHYSICS = {
   FIELD_HEIGHT: 400,
   PADDLE_WIDTH: 10,
   PADDLE_HEIGHT: 80,
-  PADDLE_SPEED: 640, // pixels per second (640/128 = 5.0 pixels per frame - much more responsive)
+  PADDLE_SPEED: 960, // pixels per second (960/128 = 7.5 pixels per frame - faster for accelerating ball)
   BALL_SIZE: 10,
   BALL_SPEED_INITIAL: 384, // 384/128 = 3.0 pixels per frame (smooth whole pixel movement)
   BALL_SPEED_INCREMENT: 32, // 32/128 = 0.25 pixels per frame increment
@@ -793,10 +793,10 @@ export const PONG_PHYSICS = {
 
 // AI difficulty settings - Balanced for fair gameplay
 export const AI_DIFFICULTIES = {
-  easy: { reactionTime: 400, accuracy: 0.5, speed: 0.4 },        // Very beatable - slow reactions, lots of errors
-  medium: { reactionTime: 250, accuracy: 0.75, speed: 0.7 },     // Moderate challenge - human-like performance
-  hard: { reactionTime: 150, accuracy: 0.9, speed: 0.95 },       // Challenging but fair - good reflexes
-  impossible: { reactionTime: 50, accuracy: 0.98, speed: 1.1 },  // Expert level - near perfect but not unbeatable
+  easy: { reactionTime: 450, accuracy: 0.45, speed: 0.35 },      // Very beatable - slow reactions, many errors
+  medium: { reactionTime: 200, accuracy: 0.82, speed: 0.85 },    // Moderate challenge - more competitive but fair
+  hard: { reactionTime: 120, accuracy: 0.88, speed: 0.92 },      // Challenging but beatable - skilled play required
+  impossible: { reactionTime: 80, accuracy: 0.95, speed: 1.0 },  // Expert level - very difficult but humanly possible
 } as const;
 
 export type AIDifficulty = keyof typeof AI_DIFFICULTIES;

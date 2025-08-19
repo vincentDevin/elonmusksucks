@@ -5,8 +5,6 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "nodemon --watch src --ext ts --exec \"ts-node src/server-api-simple.ts\"",
-    "dev:db": "nodemon --watch src --ext ts --exec \"ts-node src/server-optimized.ts\"",
-    "dev:old": "nodemon --watch src --ext ts --exec \"ts-node src/server.ts\"",
     "build": "tsc",
     "start": "node dist/server-api.js",
     "start:db": "node dist/server-optimized.js",

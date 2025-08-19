@@ -62,19 +62,21 @@ const ChatBar: React.FC = () => {
       </div>
       {/* Chat content */}
       <div
-        className="transition-all duration-200 overflow-hidden"
+        className="transition-all duration-200"
         style={{
-          maxHeight: expanded ? 420 : 0,
+          maxHeight: expanded ? 460 : 0,
           minHeight: expanded ? 320 : 0,
           background: 'var(--color-surface)',
           boxShadow: expanded ? '0 -6px 24px 0 rgb(0 0 0 / 0.14)' : undefined,
           borderBottomLeftRadius: 14,
           borderBottomRightRadius: 14,
           width: '100%',
+          overflow: expanded ? 'visible' : 'hidden',
+          paddingBottom: expanded ? 14 : 0,
         }}
       >
         {expanded && (
-          <div className="relative h-full flex flex-col">
+          <div className="relative flex flex-col pb-3">
             <ChatWidget />
             {!user && (
               <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-surface via-transparent p-5 flex flex-col items-center justify-end z-10">

@@ -119,6 +119,27 @@ export function PongGameOptimized() {
               </div>
 
               <div className="flex items-center space-x-4">
+                {/* Input indicator */}
+                {isInputActive && (
+                  <div className="flex items-center space-x-2 text-success">
+                    <div className="w-2 h-2 bg-success rounded-full animate-pulse"></div>
+                    <span className="text-sm">Input Active</span>
+                  </div>
+                )}
+                {/* Ping indicator */}
+                {lastPing > 0 && (
+                  <div
+                    className={`text-sm ${
+                      lastPing < 50
+                        ? 'text-success'
+                        : lastPing < 100
+                          ? 'text-warning'
+                          : 'text-error'
+                    }`}
+                  >
+                    {lastPing}ms
+                  </div>
+                )}
                 {/* Status indicator */}
                 <div
                   className={`px-3 py-1 rounded text-sm font-medium ${
@@ -141,29 +162,6 @@ export function PongGameOptimized() {
                       ? 'WAITING FOR READY'
                       : (currentGame.status || 'waiting').toUpperCase()}
                 </div>
-
-                {/* Ping indicator */}
-                {lastPing > 0 && (
-                  <div
-                    className={`text-sm ${
-                      lastPing < 50
-                        ? 'text-success'
-                        : lastPing < 100
-                          ? 'text-warning'
-                          : 'text-error'
-                    }`}
-                  >
-                    {lastPing}ms
-                  </div>
-                )}
-
-                {/* Input indicator */}
-                {isInputActive && (
-                  <div className="flex items-center space-x-2 text-success">
-                    <div className="w-2 h-2 bg-success rounded-full animate-pulse"></div>
-                    <span className="text-sm">Input Active</span>
-                  </div>
-                )}
 
                 <button
                   onClick={handleBackToLobby}

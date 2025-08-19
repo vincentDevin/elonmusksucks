@@ -77,37 +77,73 @@ const VISUAL_CONFIG = {
 export function PongCanvasEnhanced({
   gameState,
   className = '',
-  ping = 0,
   onSetReady,
   isSpectating = false,
 }: PongCanvasEnhancedProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animationRef = useRef<number>();
+  const animationRef = useRef<number>(0);
   const [particles, setParticles] = useState<Particle[]>([]);
-  const ballTrail = useRef<Array<{ x: number; y: number; alpha: number }>>([]);
   const lastBallPos = useRef({ x: 0, y: 0 });
+  const lastScores = useRef<[number, number]>([0, 0]);
+  const lastGameBallPos = useRef({ x: 0, y: 0 }); // Track ball position in game coordinates
   const paintedLines = useRef<
     Array<{ x1: number; y1: number; x2: number; y2: number; timestamp: number; alpha: number }>
   >([]);
-  const frameCount = useRef(0);
-  const lastFpsTime = useRef(Date.now());
 
-  const createParticles = useCallback((x: number, y: number, color: string, count: number = 8) => {
-    const newParticles: Particle[] = [];
-    for (let i = 0; i < count; i++) {
-      newParticles.push({
-        x,
-        y,
-        vx: (Math.random() - 0.5) * 4,
-        vy: (Math.random() - 0.5) * 4,
-        life: 1,
-        maxLife: 1,
-        size: Math.random() * 3 + 1,
-        color,
-      });
-    }
-    setParticles((prev) => [...prev.slice(-20), ...newParticles]); // Keep only recent particles
-  }, []);
+  const createParticles = useCallback(
+    (x: number, y: number, color: string, count: number = 8, isGoal: boolean = false) => {
+      const newParticles: Particle[] = [];
+
+      if (isGoal) {
+        // Goal explosion - much more dramatic!
+        for (let i = 0; i < count; i++) {
+          const angle = (i / count) * Math.PI * 2;
+          const speed = Math.random() * 8 + 4; // Faster particles
+          newParticles.push({
+            x,
+            y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: 1,
+            maxLife: 1,
+            size: Math.random() * 8 + 3, // Larger particles
+            color,
+          });
+        }
+
+        // Add extra random particles for chaos
+        for (let i = 0; i < count / 2; i++) {
+          newParticles.push({
+            x: x + (Math.random() - 0.5) * 20,
+            y: y + (Math.random() - 0.5) * 20,
+            vx: (Math.random() - 0.5) * 12,
+            vy: (Math.random() - 0.5) * 12,
+            life: 1,
+            maxLife: 1,
+            size: Math.random() * 6 + 2,
+            color: '#ffffff', // White sparks
+          });
+        }
+      } else {
+        // Regular particles
+        for (let i = 0; i < count; i++) {
+          newParticles.push({
+            x,
+            y,
+            vx: (Math.random() - 0.5) * 4,
+            vy: (Math.random() - 0.5) * 4,
+            life: 1,
+            maxLife: 1,
+            size: Math.random() * 3 + 1,
+            color,
+          });
+        }
+      }
+
+      setParticles((prev) => [...prev.slice(-50), ...newParticles]); // Keep more particles for goals
+    },
+    [],
+  );
 
   const updateParticles = useCallback(() => {
     setParticles((prev) =>
@@ -116,13 +152,58 @@ export function PongCanvasEnhanced({
           ...particle,
           x: particle.x + particle.vx,
           y: particle.y + particle.vy,
-          life: particle.life - 0.02,
+          life: particle.life - 0.015, // Slower decay for goal particles
           vx: particle.vx * 0.98,
           vy: particle.vy * 0.98,
         }))
         .filter((particle) => particle.life > 0),
     );
   }, []);
+
+  // Detect goals and trigger particle explosions
+  useEffect(() => {
+    if (!gameState?.scores || !gameState?.ball) return;
+
+    const [leftScore, rightScore] = gameState.scores;
+    const [lastLeftScore, lastRightScore] = lastScores.current;
+
+    // Update ball position continuously (but only when game is active)
+    if (gameState.status === 'active') {
+      lastGameBallPos.current = { x: gameState.ball.x, y: gameState.ball.y };
+    }
+
+    // Check if someone scored
+    if (leftScore > lastLeftScore) {
+      // Left player scored (ball hit right wall)
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const scaleY = (canvas.height - 40) / PONG_PHYSICS.FIELD_HEIGHT;
+
+        // For right wall goal, clamp X to the wall position but use actual Y
+        const goalX = canvas.width - 20; // Always at right wall
+        const goalY = 20 + lastGameBallPos.current.y * scaleY; // Use ball's Y position
+
+        // Green explosion for left player score
+        createParticles(goalX, goalY, VISUAL_CONFIG.PADDLE.PLAYER, 20, true);
+      }
+    } else if (rightScore > lastRightScore) {
+      // Right player scored (ball hit left wall)
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const scaleY = (canvas.height - 40) / PONG_PHYSICS.FIELD_HEIGHT;
+
+        // For left wall goal, clamp X to the wall position but use actual Y
+        const goalX = 20; // Always at left wall
+        const goalY = 20 + lastGameBallPos.current.y * scaleY; // Use ball's Y position
+
+        // Red explosion for right player score
+        createParticles(goalX, goalY, VISUAL_CONFIG.PADDLE.OPPONENT, 20, true);
+      }
+    }
+
+    // Update last scores
+    lastScores.current = [leftScore, rightScore];
+  }, [gameState?.scores, gameState?.ball, gameState?.status, createParticles]);
 
   const drawEnhancedBackground = useCallback(
     (ctx: CanvasRenderingContext2D, width: number, height: number) => {
@@ -197,6 +278,30 @@ export function PongCanvasEnhanced({
       color: string,
       isPlayer: boolean,
     ) => {
+      // Calculate extended hitbox for visual indication (5px extension like server)
+      const HITBOX_EXTENSION = 5 * (height / 80); // Scale extension based on rendered size
+      const hitboxY = y - HITBOX_EXTENSION;
+      const hitboxHeight = height + HITBOX_EXTENSION * 2;
+
+      // Draw subtle hitbox indicator (only for player paddle)
+      if (isPlayer) {
+        ctx.save();
+        ctx.globalAlpha = 0.15;
+        ctx.fillStyle = color;
+        ctx.fillRect(x - 1, hitboxY, width + 2, hitboxHeight);
+        ctx.restore();
+
+        // Draw hitbox border
+        ctx.save();
+        ctx.globalAlpha = 0.3;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1;
+        ctx.setLineDash([2, 2]);
+        ctx.strokeRect(x - 1, hitboxY, width + 2, hitboxHeight);
+        ctx.setLineDash([]);
+        ctx.restore();
+      }
+
       // Glow effect
       drawGlow(ctx, x + width / 2, y + height / 2, VISUAL_CONFIG.GLOW_RADIUS, color, 0.3);
 
@@ -215,6 +320,14 @@ export function PongCanvasEnhanced({
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 2;
       ctx.strokeRect(x, y, width, height);
+
+      // Add center line for better visual reference
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x, y + height / 2);
+      ctx.lineTo(x + width, y + height / 2);
+      ctx.stroke();
 
       ctx.shadowBlur = 0;
     },
@@ -273,17 +386,35 @@ export function PongCanvasEnhanced({
         ctx.restore();
       });
 
+      // Draw subtle collision area indicator
+      ctx.save();
+      ctx.globalAlpha = 0.2;
+      ctx.strokeStyle = VISUAL_CONFIG.BALL.CORE;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([1, 1]);
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+
       // Main ball - solid and clean
       ctx.fillStyle = VISUAL_CONFIG.BALL.CORE;
       ctx.beginPath();
-      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.arc(x, y, radius * 0.8, 0, Math.PI * 2); // Slightly smaller visual core
       ctx.fill();
 
-      // Simple border for definition
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 1;
+      // Bright center dot for precise center reference
+      ctx.fillStyle = '#ffffff';
       ctx.beginPath();
-      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.arc(x, y, radius * 0.3, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Border for definition
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(x, y, radius * 0.8, 0, Math.PI * 2);
       ctx.stroke();
     },
     [],
@@ -399,12 +530,23 @@ export function PongCanvasEnhanced({
 
       drawEnhancedBall(ctx, ballX, ballY, 8);
     }
-  }, [gameState, drawEnhancedBackground, drawGameField, drawEnhancedPaddle, drawEnhancedBall]);
+
+    // Draw particles (goal explosions, etc.)
+    drawParticles(ctx);
+  }, [
+    gameState,
+    drawEnhancedBackground,
+    drawGameField,
+    drawEnhancedPaddle,
+    drawEnhancedBall,
+    drawParticles,
+  ]);
 
   const animate = useCallback(() => {
+    updateParticles(); // Update particle physics
     draw();
     animationRef.current = requestAnimationFrame(animate);
-  }, [draw]);
+  }, [draw, updateParticles]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
