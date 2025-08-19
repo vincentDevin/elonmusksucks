@@ -675,6 +675,15 @@ model PongMatch {
   playerOnePing   Int             @default(0) // Average ping in ms
   playerTwoPing   Int             @default(0)
   
+  // Elo Tracking per Match
+  player1EloStart Int?
+  player2EloStart Int?
+  player1EloEnd   Int?
+  player2EloEnd   Int?
+  eloChange       Int?            // Absolute change amount
+  skillComponent  Int?            // Skill portion of Elo change
+  economyComponent Int?           // Economy portion of Elo change
+  
   // Integration Points
   activities      UserActivity[]
   
@@ -688,6 +697,19 @@ model PongStats {
   id              Int      @id @default(autoincrement())
   userId          Int      @unique
   user            User     @relation(fields: [userId], references: [id])
+  
+  // Hybrid Elo Rating System
+  eloRating       Int      @default(1200)
+  peakElo         Int      @default(1200)
+  eloHistory      Json?    // Array of {date, rating, matchId, change}
+  tier            String   @default("SILVER") // BRONZE|SILVER|GOLD|PLATINUM|DIAMOND|MASTER|GRANDMASTER
+  
+  // Elo Economy Tracking
+  lastEloChange   Int      @default(0)
+  totalEloGained  Int      @default(0)
+  totalEloLost    Int      @default(0)
+  highestWagerWin BigInt   @default(0) // Biggest single win amount
+  riskTaker       Boolean  @default(false) // Flags players who bet >1k regularly
   
   // Match Statistics
   totalMatches    Int      @default(0)
@@ -718,6 +740,8 @@ model PongStats {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   
+  @@index([eloRating(sort: Desc)])
+  @@index([tier, eloRating(sort: Desc)])
   @@index([wins(sort: Desc)])
   @@index([winStreak(sort: Desc)])
   @@index([totalWon(sort: Desc)])

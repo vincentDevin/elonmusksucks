@@ -19,8 +19,12 @@ import {
 } from '../controllers/user.controller';
 import { requireAuth } from '../middleware/auth.middleware';
 import { uploadConfig, validateFileContent } from '../middleware/fileValidation.middleware';
+import { getUserPongStats, getUserPongHistory } from '../controllers/pong.controller';
 
 const router = Router();
+
+// IMPORTANT: All /me routes MUST come first before any /:userId routes
+router.get('/me/pong-stats', requireAuth, getUserPongStats);
 
 // Fetch a user's public profile
 router.get('/profile/:userId', requireAuth, getProfile);
@@ -58,5 +62,9 @@ router.get('/:userId/achievements/recent', requireAuth, getRecentAchievementsHan
 router.get('/:userId/bets', requireAuth, getUserBetsHandler);
 router.get('/:userId/parlays', requireAuth, getUserParlaysHandler);
 router.get('/:userId/predictions', requireAuth, getUserPredictionsHandler);
+
+// More Pong-specific user endpoints
+router.get('/:userId/pong-stats', requireAuth, getUserPongStats);
+router.get('/:userId/pong-history', requireAuth, getUserPongHistory);
 
 export default router;

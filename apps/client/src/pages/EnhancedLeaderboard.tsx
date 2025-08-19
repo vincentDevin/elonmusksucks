@@ -9,6 +9,7 @@ import {
   UsersIcon,
   CalendarIcon,
   ExclamationTriangleIcon,
+  PuzzlePieceIcon,
 } from '@heroicons/react/24/outline';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -21,7 +22,7 @@ import AchievementNotification from '../components/leaderboard/AchievementNotifi
 import { getShameWall, getShameWallStats } from '../api/shameWall';
 import type { ShameWallEntry, ShameWallStats } from '../api/shameWall';
 
-type TabType = 'leaderboard' | 'shame-wall';
+type TabType = 'leaderboard' | 'shame-wall' | 'pong';
 
 export default function EnhancedLeaderboard() {
   const { user } = useAuth();
@@ -35,6 +36,12 @@ export default function EnhancedLeaderboard() {
   const [shameWallStats, setShameWallStats] = useState<ShameWallStats | null>(null);
   const [shameWallLoading, setShameWallLoading] = useState(false);
   const [shameWallError, setShameWallError] = useState<string | null>(null);
+
+  // Pong state
+  const [pongLeaderboard, setPongLeaderboard] = useState<any[]>([]);
+  const [pongMetric, setPongMetric] = useState<string>('elo');
+  const [pongLoading, setPongLoading] = useState(false);
+  const [pongError, setPongError] = useState<string | null>(null);
 
   const {
     data: leaderboard,
@@ -79,6 +86,30 @@ export default function EnhancedLeaderboard() {
     }
   }, [activeTab]);
 
+  // Fetch Pong leaderboard data when tab is selected
+  useEffect(() => {
+    if (activeTab === 'pong') {
+      const fetchPongLeaderboard = async () => {
+        setPongLoading(true);
+        setPongError(null);
+        try {
+          const response = await fetch(`/api/leaderboard/pong/${pongMetric}?limit=50`);
+          if (!response.ok) {
+            throw new Error('Failed to fetch Pong leaderboard');
+          }
+          const data = await response.json();
+          setPongLeaderboard(data);
+        } catch (err) {
+          setPongError(err instanceof Error ? err.message : 'Failed to load Pong leaderboard');
+        } finally {
+          setPongLoading(false);
+        }
+      };
+
+      fetchPongLeaderboard();
+    }
+  }, [activeTab, pongMetric]);
+
   const periods: { key: LeaderboardPeriod; label: string; icon: any }[] = [
     { key: 'all-time', label: 'All-Time', icon: TrophyIcon },
     { key: 'daily', label: 'Daily', icon: CalendarIcon },
@@ -91,13 +122,25 @@ export default function EnhancedLeaderboard() {
     { key: 'roi', label: 'ROI', description: 'Return on investment' },
   ];
 
-  // Handle initial loading states for both tabs
+  const pongMetrics: { key: string; label: string; description: string }[] = [
+    { key: 'elo', label: 'Elo Rating', description: 'Hybrid skill & economy ranking' },
+    { key: 'wins', label: 'Wins', description: 'Total victories' },
+    { key: 'winStreak', label: 'Win Streak', description: 'Current winning streak' },
+    { key: 'totalWon', label: 'Earnings', description: 'Total MuskBucks won' },
+    { key: 'totalWagered', label: 'Volume', description: 'Total MuskBucks wagered' },
+    { key: 'perfectGames', label: 'Perfect Games', description: '11-0 victories' },
+  ];
+
+  // Handle initial loading states for all tabs
   const isInitialLoading =
     activeTab === 'leaderboard'
       ? loading && leaderboard.length === 0
-      : shameWallLoading && shameWall.length === 0;
+      : activeTab === 'shame-wall'
+        ? shameWallLoading && shameWall.length === 0
+        : pongLoading && pongLeaderboard.length === 0;
 
-  const hasError = activeTab === 'leaderboard' ? error : shameWallError;
+  const hasError =
+    activeTab === 'leaderboard' ? error : activeTab === 'shame-wall' ? shameWallError : pongError;
 
   if (isInitialLoading) {
     return (
@@ -105,7 +148,13 @@ export default function EnhancedLeaderboard() {
         <div className="text-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-tertiary">
-            Loading {activeTab === 'leaderboard' ? 'leaderboard' : 'shame wall'}…
+            Loading{' '}
+            {activeTab === 'leaderboard'
+              ? 'leaderboard'
+              : activeTab === 'shame-wall'
+                ? 'shame wall'
+                : 'Pong leaderboard'}
+            …
           </p>
         </div>
       </div>
@@ -149,6 +198,17 @@ export default function EnhancedLeaderboard() {
           <span>Leaderboard</span>
         </button>
         <button
+          onClick={() => setActiveTab('pong')}
+          className={`flex items-center space-x-3 px-6 py-3 rounded-xl font-bold text-lg transition-all duration-200 ${
+            activeTab === 'pong'
+              ? 'bg-blue-500 text-white shadow-xl scale-105'
+              : 'bg-surface text-content hover:bg-blue-50 hover:text-blue-600 hover:scale-105'
+          }`}
+        >
+          <PuzzlePieceIcon className="w-6 h-6" />
+          <span>Pong</span>
+        </button>
+        <button
           onClick={() => setActiveTab('shame-wall')}
           className={`flex items-center space-x-3 px-6 py-3 rounded-xl font-bold text-lg transition-all duration-200 ${
             activeTab === 'shame-wall'
@@ -170,6 +230,12 @@ export default function EnhancedLeaderboard() {
               <span>Live Leaderboard</span>
               <TrophyIcon className="w-10 h-10" />
             </>
+          ) : activeTab === 'pong' ? (
+            <>
+              <PuzzlePieceIcon className="w-10 h-10 text-blue-500" />
+              <span className="text-blue-500">Pong Champions</span>
+              <PuzzlePieceIcon className="w-10 h-10 text-blue-500" />
+            </>
           ) : (
             <>
               <ExclamationTriangleIcon className="w-10 h-10 text-red-500" />
@@ -188,6 +254,16 @@ export default function EnhancedLeaderboard() {
             {stats.lastRefresh && (
               <p>Last updated: {new Date(stats.lastRefresh).toLocaleTimeString()}</p>
             )}
+          </div>
+        )}
+
+        {activeTab === 'pong' && pongLeaderboard.length > 0 && (
+          <div className="text-sm text-tertiary space-y-1">
+            <p>
+              {pongLeaderboard.length} Pong players • Top Elo:{' '}
+              {pongLeaderboard[0]?.eloRating || 'N/A'}
+            </p>
+            <p>Viewing: {pongMetrics.find((m) => m.key === pongMetric)?.label} rankings</p>
           </div>
         )}
 
@@ -269,6 +345,65 @@ export default function EnhancedLeaderboard() {
             >
               <ChartBarIcon className="w-4 h-4" />
               <span>{showStats ? 'Hide' : 'Show'} Stats</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Pong Controls */}
+      {activeTab === 'pong' && (
+        <div className="bg-surface rounded-xl p-4 space-y-4">
+          {/* Metric Selection */}
+          <div className="flex flex-wrap justify-center space-x-2">
+            {pongMetrics.map(({ key, label, description }) => (
+              <button
+                key={key}
+                onClick={() => setPongMetric(key)}
+                title={description}
+                className={`
+                  px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200
+                  ${
+                    pongMetric === key
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-muted/50 text-content hover:bg-blue-100 hover:text-blue-600'
+                  }
+                `}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex justify-center space-x-4">
+            <button
+              onClick={() => {
+                if (activeTab === 'pong') {
+                  const fetchPongLeaderboard = async () => {
+                    setPongLoading(true);
+                    try {
+                      const response = await fetch(`/api/leaderboard/pong/${pongMetric}?limit=50`);
+                      if (!response.ok) {
+                        throw new Error('Failed to fetch Pong leaderboard');
+                      }
+                      const data = await response.json();
+                      setPongLeaderboard(data);
+                    } catch (err) {
+                      setPongError(
+                        err instanceof Error ? err.message : 'Failed to load Pong leaderboard',
+                      );
+                    } finally {
+                      setPongLoading(false);
+                    }
+                  };
+                  fetchPongLeaderboard();
+                }
+              }}
+              disabled={pongLoading}
+              className="flex items-center space-x-2 bg-accent text-content px-3 py-2 rounded-lg hover:bg-accent/80 transition-colors disabled:opacity-50"
+            >
+              <ArrowPathIcon className={`w-4 h-4 ${pongLoading ? 'animate-spin' : ''}`} />
+              <span>Refresh</span>
             </button>
           </div>
         </div>
@@ -497,6 +632,117 @@ export default function EnhancedLeaderboard() {
         </>
       )}
 
+      {/* Pong Leaderboard Entries */}
+      {activeTab === 'pong' && pongLeaderboard.length > 0 && (
+        <ul className="space-y-4">
+          {pongLeaderboard.map((entry, idx) => (
+            <li
+              key={entry.user.id}
+              className={`bg-surface rounded-xl shadow-sm hover:shadow-md transition border-l-4 border-blue-500 ${
+                user?.id === entry.user.id ? 'ring-2 ring-blue-500/50' : ''
+              }`}
+            >
+              <div className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <div className="text-2xl font-bold text-blue-500">#{idx + 1}</div>
+                    {entry.user.avatarUrl ? (
+                      <img
+                        src={entry.user.avatarUrl}
+                        alt={`${entry.user.name}'s avatar`}
+                        className="w-12 h-12 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                        <span className="text-blue-500 font-bold">
+                          {entry.user.name.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                    )}
+                    <div>
+                      <h3 className="text-lg font-bold text-content">{entry.user.name}</h3>
+                      <div className="flex items-center space-x-2">
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs font-bold ${
+                            entry.tier === 'GRANDMASTER'
+                              ? 'bg-purple-100 text-purple-800'
+                              : entry.tier === 'MASTER'
+                                ? 'bg-red-100 text-red-800'
+                                : entry.tier === 'DIAMOND'
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : entry.tier === 'PLATINUM'
+                                    ? 'bg-green-100 text-green-800'
+                                    : entry.tier === 'GOLD'
+                                      ? 'bg-yellow-100 text-yellow-800'
+                                      : entry.tier === 'SILVER'
+                                        ? 'bg-gray-100 text-gray-800'
+                                        : 'bg-orange-100 text-orange-800'
+                          }`}
+                        >
+                          {entry.tier}
+                        </span>
+                        {entry.riskTaker && (
+                          <span className="px-2 py-1 bg-red-100 text-red-600 rounded-full text-xs font-medium">
+                            🎲 High Roller
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-2xl font-bold text-blue-500">
+                      {pongMetric === 'elo'
+                        ? entry.eloRating
+                        : pongMetric === 'wins'
+                          ? entry.wins
+                          : pongMetric === 'winStreak'
+                            ? entry.winStreak
+                            : pongMetric === 'totalWon'
+                              ? `${(Number(entry.totalWon) / 1000).toFixed(1)}k`
+                              : pongMetric === 'totalWagered'
+                                ? `${(Number(entry.totalWagered) / 1000).toFixed(1)}k`
+                                : entry.perfectGames}
+                    </div>
+                    <div className="text-sm text-tertiary">
+                      {pongMetrics.find((m) => m.key === pongMetric)?.label}
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                  <div className="text-center">
+                    <div className="font-bold text-blue-500">{entry.eloRating}</div>
+                    <div className="text-tertiary">Elo Rating</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="font-bold text-green-500">{entry.wins}</div>
+                    <div className="text-tertiary">Wins</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="font-bold text-orange-500">{entry.winRate?.toFixed(1)}%</div>
+                    <div className="text-tertiary">Win Rate</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="font-bold text-purple-500">
+                      {(Number(entry.totalWon) / 1000).toFixed(1)}k
+                    </div>
+                    <div className="text-tertiary">Earnings</div>
+                  </div>
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {/* Pong Empty State */}
+      {activeTab === 'pong' && pongLeaderboard.length === 0 && !pongLoading && (
+        <div className="text-center py-12">
+          <div className="text-6xl mb-4">🏓</div>
+          <h3 className="text-xl font-semibold text-content mb-2">No Pong champions yet!</h3>
+          <p className="text-tertiary">Be the first to dominate the Pong leaderboard.</p>
+        </div>
+      )}
+
       {/* Leaderboard Entries */}
       {activeTab === 'leaderboard' && leaderboard.length > 0 ? (
         <ul className="space-y-4">
@@ -572,12 +818,21 @@ export default function EnhancedLeaderboard() {
 
       {/* Loading overlay */}
       {((activeTab === 'leaderboard' && loading && leaderboard.length > 0) ||
-        (activeTab === 'shame-wall' && shameWallLoading && shameWall.length > 0)) && (
+        (activeTab === 'shame-wall' && shameWallLoading && shameWall.length > 0) ||
+        (activeTab === 'pong' && pongLoading && pongLeaderboard.length > 0)) && (
         <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-40">
           <div className="bg-surface rounded-lg p-4 shadow-lg">
             <div className="flex items-center space-x-3">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-              <span>Updating {activeTab === 'leaderboard' ? 'leaderboard' : 'shame wall'}...</span>
+              <span>
+                Updating{' '}
+                {activeTab === 'leaderboard'
+                  ? 'leaderboard'
+                  : activeTab === 'shame-wall'
+                    ? 'shame wall'
+                    : 'Pong leaderboard'}
+                ...
+              </span>
             </div>
           </div>
         </div>

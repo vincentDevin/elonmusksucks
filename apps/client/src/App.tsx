@@ -10,6 +10,7 @@ import { UnifiedActivityProvider } from './contexts/UnifiedActivityContext';
 import MainLayout from './components/MainLayout';
 import AppRoutes from './routes/AppRoutes';
 import { useAuth } from './contexts/AuthContext';
+import PongEloNotification from './components/pong/PongEloNotification';
 
 // Inner component that has access to auth context
 function AppContent() {
@@ -25,6 +26,8 @@ function AppContent() {
               <ChatProvider>
                 <MainLayout>
                   <AppRoutes />
+                  {/* Global Pong Elo notifications */}
+                  <PongEloNotification />
                 </MainLayout>
               </ChatProvider>
             </ParlayProvider>

@@ -14,6 +14,7 @@ import { ProfileBadges } from '../components/profile/ProfileBadges';
 import { CreatePostForm } from '../components/profile/CreatePostForm';
 import { ProfileFeed } from '../components/profile/ProfileFeed';
 import { ProfileActivity } from '../components/profile/ProfileActivity';
+import ProfilePongStats from '../components/profile/ProfilePongStats';
 
 export default function Profile() {
   const { user: currentUser } = useAuth();
@@ -174,6 +175,9 @@ export default function Profile() {
           />
 
           <ProfileActivity activity={activity ?? []} />
+
+          {/* Pong Statistics Section */}
+          <ProfilePongStats userId={profile.id} isOwn={isOwn} userName={profile.name} />
 
           {isOwn ? (
             <CreatePostForm onSubmit={handlePost} disabled={loading} />

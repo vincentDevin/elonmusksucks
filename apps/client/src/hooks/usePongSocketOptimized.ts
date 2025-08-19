@@ -294,10 +294,6 @@ export function usePongSocketOptimized(): PongSocketHook {
           return prev; // Don't update anything
         }
 
-        console.log(
-          `🏓 User ${user.id} received game_state for game ${prev.gameId}, slot ${prev.playerSlot}`,
-        );
-
         return {
           ...prev,
           ball: data.ball,
@@ -479,18 +475,10 @@ export function usePongSocketOptimized(): PongSocketHook {
 
             const updatedPlayers = [...prev.players];
             if (updatedPlayers[userPlayerSlot]) {
-              const oldY = updatedPlayers[userPlayerSlot].paddleY;
               updatedPlayers[userPlayerSlot] = {
                 ...updatedPlayers[userPlayerSlot],
                 paddleY: newPaddleY,
               };
-
-              // Debug log for significant moves
-              if (Math.abs(oldY - newPaddleY) > 10) {
-                console.log(
-                  `🏓 Client: Moving my paddle (slot ${userPlayerSlot}): ${oldY.toFixed(1)} -> ${newPaddleY.toFixed(1)}`,
-                );
-              }
             }
 
             return {

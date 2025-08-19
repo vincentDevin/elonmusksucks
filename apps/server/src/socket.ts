@@ -18,6 +18,7 @@ import { registerModerationHandlers } from './handlers/moderationHandlers';
 import { registerStatisticsRedisHandlers } from './handlers/statisticsSocketHandlers';
 import { setupUnifiedActivityHandlers } from './handlers/unifiedActivityHandlers';
 import { registerTimelineHandlers } from './handlers/timelineHandlers';
+import { registerPongHandlers, registerPongRedisHandlers } from './handlers/pongSocketHandlers';
 // import { registerRoomHandlers } from './handlers/roomHandlers'; // future rooms
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -83,8 +84,14 @@ export async function initSocket(httpServer: HTTPServer) {
     'admin:retagging:bulk',
     'admin:feed:refresh',
     'timeline:articles:new',
+    // Pong events
+    'pong:elo:update',
+    'pong:tier:change',
+    'pong:stats:update',
+    'pong:leaderboard:update',
   );
   registerRedisEventHandlers(io, eventSub);
+  registerPongRedisHandlers(io, eventSub);
   // registerNormalizedActivityRedisHandlers(io, eventSub); // Now handled by main handler
 
   // ── Statistics event subscriptions ────────────────────────────────────────
@@ -135,6 +142,7 @@ export async function initSocket(httpServer: HTTPServer) {
       registerChatHandlers(socket);
       registerBetHandlers(socket);
       registerModerationHandlers(socket);
+      registerPongHandlers(socket);
       setupUnifiedActivityHandlers(socket);
     } catch (err) {
       console.error('[socket] handler error:', err);

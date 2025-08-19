@@ -2,6 +2,13 @@ import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
+import { requireAuth } from '../middleware/auth.middleware';
+import {
+  recordMatch,
+  getEloDistribution,
+  getPlayerEloHistory,
+  predictEloChange,
+} from '../controllers/pong.controller';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -185,73 +192,19 @@ router.post('/process-wager', verifyGameServerAuth, async (req, res) => {
 });
 
 // POST /api/pong/record-match - Record match result and process payouts
-router.post('/record-match', verifyGameServerAuth, async (req, res) => {
-  try {
-    const { matchId, winnerId, loserId, wagerAmount, payoutAmount, duration, isAI } =
-      recordMatchSchema.parse(req.body);
-
-    // Record match
-    await prisma.pongMatch.create({
-      data: {
-        id: matchId,
-        playerOneId: winnerId || loserId || 0,
-        playerTwoId: isAI ? null : loserId || winnerId || 0,
-        winnerId,
-        wagerAmount: BigInt(wagerAmount),
-        aiDifficulty: isAI ? 'MEDIUM' : null,
-        playerOneScore: 0,
-        playerTwoScore: 0,
-        startedAt: new Date(Date.now() - duration * 1000),
-        completedAt: new Date(),
-        status: 'COMPLETED',
-      },
-    });
-
-    // Process payout if there's a winner and payout amount
-    let finalBalances = {};
-
-    if (winnerId && payoutAmount > 0) {
-      const winnerUpdate = await prisma.user.update({
-        where: { id: winnerId },
-        data: { muskBucks: { increment: BigInt(payoutAmount) } },
-        select: { muskBucks: true },
-      });
-
-      // Create payout transaction
-      await prisma.transaction.create({
-        data: {
-          userId: winnerId,
-          type: 'CREDIT',
-          amount: BigInt(payoutAmount),
-          balanceAfter: winnerUpdate.muskBucks,
-        },
-      });
-
-      finalBalances = { [winnerId]: Number(winnerUpdate.muskBucks) };
-
-      if (loserId) {
-        const loser = await prisma.user.findUnique({
-          where: { id: loserId },
-          select: { muskBucks: true },
-        });
-        if (loser) {
-          finalBalances = {
-            ...finalBalances,
-            [loserId]: Number(loser.muskBucks),
-          };
-        }
-      }
+router.post(
+  '/record-match',
+  verifyGameServerAuth,
+  (req, res, next) => {
+    try {
+      req.body = recordMatchSchema.parse(req.body);
+      next();
+    } catch (error) {
+      res.status(400).json({ error: 'Invalid request data' });
     }
-
-    res.json({
-      success: true,
-      finalBalances,
-    });
-  } catch (error) {
-    console.error('Pong record match error:', error);
-    res.status(500).json({ error: 'Failed to record match' });
-  }
-});
+  },
+  recordMatch,
+);
 
 // GET /api/pong/health - Health check for game servers
 router.get('/health', verifyGameServerAuth, async (_req, res) => {
@@ -269,5 +222,21 @@ router.get('/health', verifyGameServerAuth, async (_req, res) => {
     });
   }
 });
+
+// ============================================
+// PONG STATS & ELO ENDPOINTS
+// ============================================
+
+// Note: Pong leaderboards are handled by leaderboard.routes.ts at /api/leaderboard/pong/*
+// Note: User Pong stats are handled by user.routes.ts at /api/users/:userId/pong-stats
+
+// GET /api/pong/elo-distribution - Global tier distribution
+router.get('/elo-distribution', getEloDistribution);
+
+// GET /api/pong/elo-history/:userId - Player's Elo progression
+router.get('/elo-history/:userId', requireAuth, getPlayerEloHistory);
+
+// GET /api/pong/predict-elo - Predict Elo change for potential wager
+router.get('/predict-elo', requireAuth, predictEloChange);
 
 export default router;

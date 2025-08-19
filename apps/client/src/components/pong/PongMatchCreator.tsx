@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import EloPredictionCard from './EloPredictionCard';
 
 interface PongMatchCreatorProps {
   onCreateMatch: (wager: number, type: 'ai' | 'pvp', aiDifficulty?: string) => void;
@@ -168,6 +169,9 @@ export function PongMatchCreator({ onCreateMatch }: PongMatchCreatorProps) {
             </div>
           </div>
 
+          {/* Elo Prediction */}
+          <EloPredictionCard wagerAmount={aiWager} opponentType="ai" aiDifficulty={aiDifficulty} />
+
           {/* Action Buttons */}
           <div className="flex space-x-3">
             <button
@@ -244,6 +248,9 @@ export function PongMatchCreator({ onCreateMatch }: PongMatchCreatorProps) {
               </div>
             </div>
           </div>
+
+          {/* Elo Prediction */}
+          <EloPredictionCard wagerAmount={pvpWager} opponentType="pvp" />
 
           {/* Action Buttons */}
           <div className="flex space-x-3">
