@@ -16,6 +16,21 @@ import {
   AI_DIFFICULTIES,
 } from '@ems/types';
 
+// AI Player ID mapping - matches our database seed
+const AI_PLAYER_IDS = {
+  easy: -1, // Grimes' Laptop
+  medium: -2, // Zuck's Metaverse
+  hard: -3, // Bezos' Rocket
+  impossible: -4, // X Æ A-XII
+} as const;
+
+const AI_PLAYER_NAMES = {
+  easy: "Grimes' Laptop",
+  medium: "Zuck's Metaverse",
+  hard: "Bezos' Rocket",
+  impossible: 'X Æ A-XII',
+} as const;
+
 // ——————————————————————————————————————————————————————————————————————————————————
 // DATABASE MANAGER (Minimal DB usage)
 // ——————————————————————————————————————————————————————————————————————————————————
@@ -57,10 +72,11 @@ class DatabaseManager {
     wagerAmount: number,
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      const isAI = playerTwoId === null || playerTwoId === 0;
+      // Check if player two is an AI player (negative ID)
+      const isAI = playerTwoId !== null && playerTwoId < 0;
       const result = await this.api.processWagerTransaction(
         playerOneId,
-        isAI ? null : playerTwoId,
+        isAI ? playerTwoId : playerTwoId, // Pass the actual AI player ID
         wagerAmount,
         isAI,
       );
@@ -713,7 +729,7 @@ class GameManager {
 
     const duration = Math.floor((Date.now() - game.startTime) / 1000);
     const winnerPlayer = winnerSlot !== undefined ? game.players[winnerSlot] : null;
-    const winnerId = winnerPlayer?.id === 0 ? null : winnerPlayer?.id || null; // AI wins (id: 0) become null
+    const winnerId = winnerPlayer?.id || null; // Keep the actual ID (including negative AI IDs)
 
     // Record result in database
     const result: MatchResult = {
@@ -721,7 +737,7 @@ class GameManager {
       winnerId,
       winnerSlot: winnerSlot ?? null,
       playerOneId: game.players[0].id,
-      playerTwoId: game.players[1]?.id === 0 ? null : game.players[1]?.id || null, // AI players (id: 0) become null
+      playerTwoId: game.players[1]?.id || null, // Keep the actual ID (including negative AI IDs)
       finalScores: [game.players[0].score, game.players[1]?.score || 0],
       duration,
       wagerAmount: game.wager,
@@ -1143,9 +1159,13 @@ export class PongGameServer {
 
         if (data.type === 'ai') {
           // Start AI game immediately
+          const difficulty = (data.aiDifficulty || 'medium') as keyof typeof AI_PLAYER_IDS;
+          const aiPlayerId = AI_PLAYER_IDS[difficulty];
+          const aiPlayerName = AI_PLAYER_NAMES[difficulty];
+
           const aiPlayer: Player = {
-            id: 0, // Use 0 to indicate AI player (will be filtered out for database)
-            name: 'AI',
+            id: aiPlayerId,
+            name: aiPlayerName,
             paddleY: PONG_PHYSICS.FIELD_HEIGHT / 2 - PONG_PHYSICS.PADDLE_HEIGHT / 2,
             score: 0,
             ping: 0,

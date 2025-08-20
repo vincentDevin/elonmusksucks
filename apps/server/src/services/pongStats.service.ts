@@ -56,6 +56,27 @@ export interface MatchStatsCalculation {
 
 export class PongStatsService {
   /**
+   * Map AI player ID to difficulty
+   */
+  private static getAIDifficultyFromId(
+    playerId: number | null,
+  ): 'EASY' | 'MEDIUM' | 'HARD' | 'IMPOSSIBLE' | undefined {
+    if (!playerId || playerId >= 0) return undefined;
+
+    switch (playerId) {
+      case -1:
+        return 'EASY'; // Grimes' Laptop
+      case -2:
+        return 'MEDIUM'; // Zuck's Metaverse
+      case -3:
+        return 'HARD'; // Bezos' Rocket
+      case -4:
+        return 'IMPOSSIBLE'; // X Æ A-XII
+      default:
+        return 'MEDIUM';
+    }
+  }
+  /**
    * Get user Pong stats, creating default stats if they don't exist
    */
   static async getUserStatsWithDefaults(userId: number, repository: any): Promise<any> {
@@ -79,10 +100,14 @@ export class PongStatsService {
     wagerAmount: number,
     payoutAmount: number,
     duration: number,
-    isAI: boolean,
     repository: any,
     socketEmitter?: any,
   ): Promise<{ isLossOnly: boolean; winnerId?: number; loserId?: number; socketEvents?: any }> {
+    // Check if AI won (negative winner ID means AI player won)
+    const aiWon = winnerId !== null && winnerId < 0;
+    const humanPlayerId = aiWon ? loserId : loserId && loserId < 0 ? winnerId : winnerId || loserId;
+    const aiPlayerId = aiWon ? winnerId : loserId && loserId < 0 ? loserId : null;
+
     // 1. Get current player stats for calculations
     const [winnerStats, loserStats] = await Promise.all([
       winnerId ? repository.findStatsByUserId(winnerId) : null,
@@ -92,11 +117,11 @@ export class PongStatsService {
     // 2. Prepare match data
     const matchData = {
       id: matchId,
-      playerOneId: winnerId || loserId || 0,
-      playerTwoId: isAI ? undefined : loserId || winnerId || 0,
+      playerOneId: humanPlayerId || 0,
+      playerTwoId: aiPlayerId,
       winnerId,
       wagerAmount: BigInt(wagerAmount),
-      aiDifficulty: isAI ? ('MEDIUM' as const) : undefined,
+      aiDifficulty: aiPlayerId ? this.getAIDifficultyFromId(aiPlayerId) : undefined,
       playerOneScore: 11, // Assuming standard pong victory
       playerTwoScore: 0, // Will be updated with actual scores later
       startedAt: new Date(Date.now() - duration * 1000),
@@ -126,7 +151,7 @@ export class PongStatsService {
       loserScore: 0,
       wagerAmount: BigInt(wagerAmount),
       payoutAmount: BigInt(payoutAmount),
-      aiDifficulty: isAI ? ('MEDIUM' as const) : undefined,
+      aiDifficulty: aiPlayerId ? this.getAIDifficultyFromId(aiPlayerId) : undefined,
       gameDuration: duration,
     };
 
@@ -139,44 +164,58 @@ export class PongStatsService {
     // 6. Prepare enhanced match data with Elo calculations
     const enhancedMatchData = {
       ...matchData,
-      player1EloStart: winnerStats?.eloRating || PongEloService.getDefaultElo(),
-      player2EloStart:
-        loserStats?.eloRating ||
-        (isAI ? PongEloService.getAiElo('MEDIUM') : PongEloService.getDefaultElo()),
-      player1EloEnd: calculations.winnerEloChange.newRating,
-      player2EloEnd:
-        calculations.loserEloChange?.newRating ||
-        loserStats?.eloRating ||
-        PongEloService.getDefaultElo(),
-      eloChange: Math.abs(calculations.winnerEloChange.totalChange),
-      skillComponent: calculations.winnerEloChange.skillChange,
-      economyComponent: calculations.winnerEloChange.economyComponent,
+      player1EloStart: aiWon
+        ? loserStats?.eloRating || PongEloService.getDefaultElo() // Human player's start Elo
+        : winnerStats?.eloRating || PongEloService.getDefaultElo(), // Human winner's start Elo
+      player2EloStart: aiWon
+        ? PongEloService.getAiElo(this.getAIDifficultyFromId(winnerId) || 'MEDIUM') // AI's Elo
+        : loserStats?.eloRating || PongEloService.getDefaultElo(), // Human loser's start Elo
+      player1EloEnd: aiWon
+        ? calculations.loserEloChange?.newRating || PongEloService.getDefaultElo() // Human loser's end Elo
+        : calculations.winnerEloChange.newRating, // Human winner's end Elo
+      player2EloEnd: aiWon
+        ? PongEloService.getAiElo(this.getAIDifficultyFromId(winnerId) || 'MEDIUM') // AI Elo stays same
+        : calculations.loserEloChange?.newRating || PongEloService.getDefaultElo(), // Human loser's end Elo
+      eloChange: aiWon
+        ? Math.abs(calculations.loserEloChange?.totalChange || 0)
+        : Math.abs(calculations.winnerEloChange.totalChange),
+      skillComponent: aiWon
+        ? calculations.loserEloChange?.skillChange || 0
+        : calculations.winnerEloChange.skillChange,
+      economyComponent: aiWon
+        ? calculations.loserEloChange?.economyComponent || 0
+        : calculations.winnerEloChange.economyComponent,
     };
 
-    // 7. Prepare winner stats data
-    const winnerStatsData = {
-      ...calculations.winnerStatsUpdate.calculatedFields,
-      eloRating: calculations.winnerEloChange.newRating,
-      peakElo: PongEloService.calculatePeakElo(
-        winnerStats?.peakElo || PongEloService.getDefaultElo(),
-        calculations.winnerEloChange.newRating,
-      ),
-      tier: calculations.winnerEloChange.newTier,
-      lastEloChange: calculations.winnerEloChange.totalChange,
-      eloHistory: PongEloService.updateEloHistory(
-        (winnerStats?.eloHistory as any[]) || [],
-        PongEloService.generateEloHistoryEntry(calculations.winnerEloChange, matchId),
-      ),
-      ...PongEloService.calculateEloTracking(
-        winnerStats?.totalEloGained || 0,
-        winnerStats?.totalEloLost || 0,
-        calculations.winnerEloChange.totalChange,
-      ),
-    };
-
-    // 8. Prepare loser stats data (if human opponent)
+    // 7. Prepare stats data - only for human players
+    let winnerStatsData: Partial<PongStatsData> | undefined;
     let loserStatsData: Partial<PongStatsData> | undefined;
-    if (loserId && calculations.loserEloChange && calculations.loserStatsUpdate) {
+
+    // Prepare winner stats (only if winner is human)
+    if (winnerId && winnerId > 0 && calculations.winnerEloChange) {
+      winnerStatsData = {
+        ...calculations.winnerStatsUpdate.calculatedFields,
+        eloRating: calculations.winnerEloChange.newRating,
+        peakElo: PongEloService.calculatePeakElo(
+          winnerStats?.peakElo || PongEloService.getDefaultElo(),
+          calculations.winnerEloChange.newRating,
+        ),
+        tier: calculations.winnerEloChange.newTier,
+        lastEloChange: calculations.winnerEloChange.totalChange,
+        eloHistory: PongEloService.updateEloHistory(
+          (winnerStats?.eloHistory as any[]) || [],
+          PongEloService.generateEloHistoryEntry(calculations.winnerEloChange, matchId),
+        ),
+        ...PongEloService.calculateEloTracking(
+          winnerStats?.totalEloGained || 0,
+          winnerStats?.totalEloLost || 0,
+          calculations.winnerEloChange.totalChange,
+        ),
+      };
+    }
+
+    // Prepare loser stats (only if loser is human)
+    if (loserId && loserId > 0 && calculations.loserEloChange && calculations.loserStatsUpdate) {
       loserStatsData = {
         ...calculations.loserStatsUpdate.calculatedFields,
         eloRating: calculations.loserEloChange.newRating,
@@ -293,16 +332,17 @@ export class PongStatsService {
       isPerfectGame,
     });
 
-    // Calculate Elo changes for loser (if human opponent)
+    // Calculate Elo changes for loser (if human loser exists)
     let loserEloChange: EloChangeComponents | undefined;
-    if (loserId && !aiDifficulty) {
+    if (loserId && loserId > 0) {
+      // Human loser (positive ID)
       loserEloChange = PongEloService.calculateEloChange({
         playerElo: loserElo,
         opponentElo: winnerElo,
         playerWon: false,
         wagerAmount,
         amountWon: 0n,
-        isAiOpponent: false,
+        isAiOpponent: !!aiDifficulty,
         isPerfectGame: false,
       });
     }
@@ -328,7 +368,8 @@ export class PongStatsService {
     let loserStatsUpdate:
       | (PongStatsUpdate & { calculatedFields: Partial<PongStatsData> })
       | undefined;
-    if (loserId && !aiDifficulty) {
+    if (loserId && loserId > 0) {
+      // Human loser (positive ID)
       loserStatsUpdate = this.calculatePlayerStatsUpdate(
         {
           userId: loserId,
@@ -337,6 +378,7 @@ export class PongStatsService {
           amountWon: 0n,
           opponentId: winnerId,
           opponentElo: winnerElo,
+          aiDifficulty, // Include AI difficulty for proper stat tracking
           isPerfectGame: false,
           isComeback: false,
           gameDuration: result.gameDuration,
@@ -357,27 +399,33 @@ export class PongStatsService {
       economyComponent: winnerEloChange.economyComponent,
     };
 
-    // Prepare socket events data
+    // Prepare socket events data - only for human players
     const socketEvents = {
-      winnerElo: {
-        userId: winnerId,
-        oldElo: winnerElo,
-        newElo: winnerEloChange.newRating,
-        change: winnerEloChange.totalChange,
-        newTier: winnerEloChange.newTier,
-        matchId,
-      },
-      loserElo: loserEloChange
-        ? {
-            userId: loserId,
-            oldElo: loserElo,
-            newElo: loserEloChange.newRating,
-            change: loserEloChange.totalChange,
-            newTier: loserEloChange.newTier,
-            matchId,
-          }
-        : undefined,
+      winnerElo:
+        winnerId && winnerId > 0 // Only emit for human winners
+          ? {
+              userId: winnerId,
+              oldElo: winnerElo,
+              newElo: winnerEloChange.newRating,
+              change: winnerEloChange.totalChange,
+              newTier: winnerEloChange.newTier,
+              matchId,
+            }
+          : undefined,
+      loserElo:
+        loserEloChange && loserId && loserId > 0 // Only emit for human losers
+          ? {
+              userId: loserId,
+              oldElo: loserElo,
+              newElo: loserEloChange.newRating,
+              change: loserEloChange.totalChange,
+              newTier: loserEloChange.newTier,
+              matchId,
+            }
+          : undefined,
       winnerTierChange:
+        winnerId &&
+        winnerId > 0 && // Only for human winners
         (winnerStats?.tier || PongEloService.getDefaultTier()) !== winnerEloChange.newTier
           ? {
               userId: winnerId,
@@ -388,6 +436,8 @@ export class PongStatsService {
           : undefined,
       loserTierChange:
         loserEloChange &&
+        loserId &&
+        loserId > 0 && // Only for human losers
         (loserStats?.tier || PongEloService.getDefaultTier()) !== loserEloChange.newTier
           ? {
               userId: loserId,

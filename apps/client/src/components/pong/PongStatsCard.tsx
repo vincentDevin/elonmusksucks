@@ -110,7 +110,7 @@ export default function PongStatsCard({
   if (error || !stats) {
     return (
       <div className={`bg-surface rounded-xl shadow-sm border border-accent/20 p-6 ${className}`}>
-        <div className="text-center text-red-500">
+        <div className="text-center text-error">
           <p>{error || 'No stats available'}</p>
         </div>
       </div>
@@ -121,24 +121,24 @@ export default function PongStatsCard({
     return (
       <div className={`bg-surface rounded-xl shadow-sm border border-accent/20 p-4 ${className}`}>
         <div className="flex items-center space-x-3 mb-3">
-          <ChartBarIcon className="w-5 h-5 text-blue-500" />
+          <ChartBarIcon className="w-5 h-5 text-primary" />
           <span className="font-semibold text-content">Pong Stats</span>
         </div>
         <div className="grid grid-cols-2 gap-3 text-sm">
           <div className="text-center">
-            <div className="font-bold text-blue-500">{stats.wins}</div>
+            <div className="font-bold text-primary">{stats.wins}</div>
             <div className="text-tertiary">Wins</div>
           </div>
           <div className="text-center">
-            <div className="font-bold text-green-500">{stats.winRate.toFixed(1)}%</div>
+            <div className="font-bold text-success">{stats.winRate.toFixed(1)}%</div>
             <div className="text-tertiary">Win Rate</div>
           </div>
           <div className="text-center">
-            <div className="font-bold text-orange-500">{formatCurrency(stats.totalWon)}</div>
+            <div className="font-bold text-success">{formatCurrency(stats.totalWon)}</div>
             <div className="text-tertiary">Earned</div>
           </div>
           <div className="text-center">
-            <div className="font-bold text-purple-500">{stats.winStreak}</div>
+            <div className="font-bold text-primary">{stats.winStreak}</div>
             <div className="text-tertiary">Streak</div>
           </div>
         </div>
@@ -150,10 +150,10 @@ export default function PongStatsCard({
     <div className={`bg-surface rounded-xl shadow-sm border border-accent/20 p-6 ${className}`}>
       {/* Header */}
       <div className="flex items-center space-x-3 mb-6">
-        <ChartBarIcon className="w-6 h-6 text-blue-500" />
+        <ChartBarIcon className="w-6 h-6 text-primary" />
         <span className="font-semibold text-content text-lg">Pong Statistics</span>
         {stats.riskTaker && (
-          <span className="px-2 py-1 bg-red-100 text-red-600 rounded-full text-xs font-medium">
+          <span className="px-2 py-1 bg-warning/10 text-warning rounded-full text-xs font-medium">
             🎲 High Roller
           </span>
         )}
@@ -162,7 +162,7 @@ export default function PongStatsCard({
       {/* Core Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <div className="text-center p-3 bg-muted/30 rounded-lg">
-          <TrophyIcon className="w-6 h-6 text-yellow-500 mx-auto mb-1" />
+          <TrophyIcon className="w-6 h-6 text-accent mx-auto mb-1" />
           <div className="font-bold text-lg text-content">{stats.wins}</div>
           <div className="text-sm text-tertiary">Wins</div>
         </div>
@@ -172,12 +172,12 @@ export default function PongStatsCard({
           <div className="text-sm text-tertiary">Win Rate</div>
         </div>
         <div className="text-center p-3 bg-muted/30 rounded-lg">
-          <FireIcon className="w-6 h-6 text-orange-500 mx-auto mb-1" />
+          <FireIcon className="w-6 h-6 text-warning mx-auto mb-1" />
           <div className="font-bold text-lg text-content">{stats.winStreak}</div>
           <div className="text-sm text-tertiary">Current Streak</div>
         </div>
         <div className="text-center p-3 bg-muted/30 rounded-lg">
-          <CurrencyDollarIcon className="w-6 h-6 text-green-500 mx-auto mb-1" />
+          <CurrencyDollarIcon className="w-6 h-6 text-success mx-auto mb-1" />
           <div className="font-bold text-lg text-content">{formatCurrency(stats.totalWon)}</div>
           <div className="text-sm text-tertiary">Total Earned</div>
         </div>
@@ -218,22 +218,20 @@ export default function PongStatsCard({
             </div>
             <div className="flex justify-between">
               <span className="text-tertiary">Profit/Loss</span>
-              <span
-                className={`font-medium ${stats.profit >= 0n ? 'text-green-500' : 'text-red-500'}`}
-              >
+              <span className={`font-medium ${stats.profit >= 0n ? 'text-success' : 'text-error'}`}>
                 {stats.profit >= 0n ? '+' : ''}
                 {formatCurrency(stats.profit)}
               </span>
             </div>
             <div className="flex justify-between">
               <span className="text-tertiary">ROI</span>
-              <span className={`font-medium ${stats.roi >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+              <span className={`font-medium ${stats.roi >= 0 ? 'text-success' : 'text-error'}`}>
                 {stats.roi.toFixed(1)}%
               </span>
             </div>
             <div className="flex justify-between">
               <span className="text-tertiary">Biggest Win</span>
-              <span className="font-medium text-green-500">{formatCurrency(stats.biggestWin)}</span>
+              <span className="font-medium text-success">{formatCurrency(stats.biggestWin)}</span>
             </div>
           </div>
         </div>

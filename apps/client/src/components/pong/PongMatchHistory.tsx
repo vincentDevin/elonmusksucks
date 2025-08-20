@@ -97,7 +97,7 @@ export default function PongMatchHistory({
   if (error) {
     return (
       <div className={`bg-surface rounded-xl shadow-sm border border-accent/20 p-6 ${className}`}>
-        <div className="text-center text-red-500">
+        <div className="text-center text-error">
           <p>{error}</p>
         </div>
       </div>
@@ -108,7 +108,7 @@ export default function PongMatchHistory({
     <div className={`bg-surface rounded-xl shadow-sm border border-accent/20 p-6 ${className}`}>
       {/* Header */}
       <div className="flex items-center space-x-3 mb-6">
-        <ClockIcon className="w-6 h-6 text-blue-500" />
+        <ClockIcon className="w-6 h-6 text-primary" />
         <span className="font-semibold text-content text-lg">Recent Matches</span>
       </div>
 
@@ -119,7 +119,7 @@ export default function PongMatchHistory({
             <div
               key={match.id}
               className={`p-4 rounded-lg border-l-4 transition-all duration-200 hover:shadow-sm ${
-                match.playerWon ? 'bg-green-50 border-green-500' : 'bg-red-50 border-red-500'
+                match.playerWon ? 'bg-success/10 border-success' : 'bg-error/10 border-error'
               }`}
             >
               <div className="flex items-center justify-between">
@@ -128,35 +128,35 @@ export default function PongMatchHistory({
                   {/* Result Icon */}
                   <div
                     className={`p-2 rounded-full ${
-                      match.playerWon ? 'bg-green-100' : 'bg-red-100'
+                      match.playerWon ? 'bg-success/20' : 'bg-error/20'
                     }`}
                   >
                     <TrophyIcon
-                      className={`w-4 h-4 ${match.playerWon ? 'text-green-600' : 'text-red-600'}`}
+                      className={`w-4 h-4 ${match.playerWon ? 'text-success' : 'text-error'}`}
                     />
                   </div>
 
                   {/* Opponent Info */}
                   <div>
                     <div className="flex items-center space-x-2">
-                      {match.isAiMatch ? (
-                        <>
-                          <ComputerDesktopIcon className="w-4 h-4 text-gray-500" />
-                          <span className="font-medium text-content">
-                            AI ({match.aiDifficulty})
-                          </span>
-                        </>
-                      ) : match.opponent ? (
+                      {match.opponent ? (
                         <>
                           {match.opponent.avatarUrl ? (
-                            <img
-                              src={match.opponent.avatarUrl}
-                              alt={match.opponent.name}
-                              className="w-6 h-6 rounded-full"
-                            />
+                            // Check if avatar is an emoji (single character or short string)
+                            match.opponent.avatarUrl.length <= 2 ? (
+                              <div className="w-6 h-6 flex items-center justify-center text-lg">
+                                {match.opponent.avatarUrl}
+                              </div>
+                            ) : (
+                              <img
+                                src={match.opponent.avatarUrl}
+                                alt={match.opponent.name}
+                                className="w-6 h-6 rounded-full"
+                              />
+                            )
                           ) : (
-                            <div className="w-6 h-6 bg-gray-200 rounded-full flex items-center justify-center">
-                              <UserIcon className="w-3 h-3 text-gray-500" />
+                            <div className="w-6 h-6 bg-muted rounded-full flex items-center justify-center">
+                              <UserIcon className="w-3 h-3 text-tertiary" />
                             </div>
                           )}
                           <span className="font-medium text-content">{match.opponent.name}</span>
@@ -179,7 +179,7 @@ export default function PongMatchHistory({
                 <div className="text-right">
                   <div
                     className={`flex items-center space-x-1 text-sm font-medium ${
-                      match.eloChange > 0 ? 'text-green-600' : 'text-red-600'
+                      match.eloChange > 0 ? 'text-success' : 'text-error'
                     }`}
                   >
                     {match.eloChange > 0 ? (

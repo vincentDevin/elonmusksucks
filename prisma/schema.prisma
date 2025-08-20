@@ -65,6 +65,7 @@ model User {
   role               Role                @default(USER)
   active             Boolean             @default(true)
   muskBucks          BigInt              @default(1000)
+  isSystemAccount    Boolean             @default(false)
   bets               Bet[]
   refreshTokens      RefreshToken[]
   userBadges         UserBadge[]         @relation("UserToUserBadge")

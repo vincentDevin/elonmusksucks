@@ -46,13 +46,13 @@ interface NotificationData extends EloUpdateEvent {
 }
 
 const TIER_COLORS = {
-  BRONZE: 'from-orange-500 to-orange-600',
-  SILVER: 'from-gray-500 to-gray-600',
-  GOLD: 'from-yellow-500 to-yellow-600',
-  PLATINUM: 'from-green-500 to-green-600',
-  DIAMOND: 'from-blue-500 to-blue-600',
-  MASTER: 'from-red-500 to-red-600',
-  GRANDMASTER: 'from-purple-500 to-purple-600',
+  BRONZE: 'from-muted to-tertiary',
+  SILVER: 'from-surface to-content',
+  GOLD: 'from-accent/50 to-accent',
+  PLATINUM: 'from-success/50 to-success',
+  DIAMOND: 'from-primary/50 to-primary',
+  MASTER: 'from-error/50 to-error',
+  GRANDMASTER: 'from-accent/70 to-accent',
 };
 
 const TIER_EMOJIS = {
@@ -66,24 +66,24 @@ const TIER_EMOJIS = {
 };
 
 const ACHIEVEMENT_COLORS = {
-  pong_streak: 'from-orange-500/20 to-red-600/20 border-orange-400/50',
-  pong_skill: 'from-blue-500/20 to-blue-600/20 border-blue-400/50',
-  pong_earnings: 'from-green-500/20 to-green-600/20 border-green-400/50',
-  pong_milestone: 'from-yellow-500/20 to-yellow-600/20 border-yellow-400/50',
+  pong_streak: 'from-warning/20 to-error/20 border-warning/50',
+  pong_skill: 'from-primary/20 to-primary/20 border-primary/50',
+  pong_earnings: 'from-success/20 to-success/20 border-success/50',
+  pong_milestone: 'from-accent/20 to-accent/20 border-accent/50',
 };
 
 const getAchievementIcon = (type: PongAchievementEvent['type']) => {
   switch (type) {
     case 'pong_streak':
-      return <FireIcon className="w-5 h-5 text-orange-400" />;
+      return <FireIcon className="w-5 h-5 text-warning" />;
     case 'pong_skill':
-      return <ChartBarIcon className="w-5 h-5 text-blue-400" />;
+      return <ChartBarIcon className="w-5 h-5 text-primary" />;
     case 'pong_earnings':
-      return <StarIcon className="w-5 h-5 text-green-400" />;
+      return <StarIcon className="w-5 h-5 text-success" />;
     case 'pong_milestone':
-      return <TrophyIcon className="w-5 h-5 text-yellow-400" />;
+      return <TrophyIcon className="w-5 h-5 text-accent" />;
     default:
-      return <TrophyIcon className="w-5 h-5 text-yellow-400" />;
+      return <TrophyIcon className="w-5 h-5 text-accent" />;
   }
 };
 

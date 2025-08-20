@@ -201,8 +201,8 @@ export default function EnhancedLeaderboard() {
           onClick={() => setActiveTab('pong')}
           className={`flex items-center space-x-3 px-6 py-3 rounded-xl font-bold text-lg transition-all duration-200 ${
             activeTab === 'pong'
-              ? 'bg-blue-500 text-white shadow-xl scale-105'
-              : 'bg-surface text-content hover:bg-blue-50 hover:text-blue-600 hover:scale-105'
+              ? 'bg-primary text-white shadow-xl scale-105'
+              : 'bg-surface text-content hover:bg-primary/10 hover:text-primary hover:scale-105'
           }`}
         >
           <PuzzlePieceIcon className="w-6 h-6" />
@@ -232,9 +232,9 @@ export default function EnhancedLeaderboard() {
             </>
           ) : activeTab === 'pong' ? (
             <>
-              <PuzzlePieceIcon className="w-10 h-10 text-blue-500" />
-              <span className="text-blue-500">Pong Champions</span>
-              <PuzzlePieceIcon className="w-10 h-10 text-blue-500" />
+              <PuzzlePieceIcon className="w-10 h-10 text-primary" />
+              <span className="text-primary">Pong Champions</span>
+              <PuzzlePieceIcon className="w-10 h-10 text-primary" />
             </>
           ) : (
             <>
@@ -364,8 +364,8 @@ export default function EnhancedLeaderboard() {
                   px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200
                   ${
                     pongMetric === key
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-muted/50 text-content hover:bg-blue-100 hover:text-blue-600'
+                      ? 'bg-primary text-white'
+                      : 'bg-muted/50 text-content hover:bg-primary/10 hover:text-primary'
                   }
                 `}
               >
@@ -487,13 +487,13 @@ export default function EnhancedLeaderboard() {
               <div className="text-sm text-tertiary">Active Users</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-blue-400">
+              <div className="text-2xl font-bold text-primary">
                 {stats.totalBets.toLocaleString()}
               </div>
               <div className="text-sm text-tertiary">Total Bets</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-yellow-400">
+              <div className="text-2xl font-bold text-accent">
                 {stats.totalVolume.toLocaleString()}
               </div>
               <div className="text-sm text-tertiary">Total Volume</div>
@@ -638,14 +638,14 @@ export default function EnhancedLeaderboard() {
           {pongLeaderboard.map((entry, idx) => (
             <li
               key={entry.user.id}
-              className={`bg-surface rounded-xl shadow-sm hover:shadow-md transition border-l-4 border-blue-500 ${
-                user?.id === entry.user.id ? 'ring-2 ring-blue-500/50' : ''
+              className={`bg-surface rounded-xl shadow-sm hover:shadow-md transition border-l-4 border-primary ${
+                user?.id === entry.user.id ? 'ring-2 ring-primary/50' : ''
               }`}
             >
               <div className="p-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-4">
-                    <div className="text-2xl font-bold text-blue-500">#{idx + 1}</div>
+                    <div className="text-2xl font-bold text-primary">#{idx + 1}</div>
                     {entry.user.avatarUrl ? (
                       <img
                         src={entry.user.avatarUrl}
@@ -653,8 +653,8 @@ export default function EnhancedLeaderboard() {
                         className="w-12 h-12 rounded-full object-cover"
                       />
                     ) : (
-                      <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                        <span className="text-blue-500 font-bold">
+                      <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
+                        <span className="text-primary font-bold">
                           {entry.user.name.charAt(0).toUpperCase()}
                         </span>
                       </div>
@@ -669,7 +669,7 @@ export default function EnhancedLeaderboard() {
                               : entry.tier === 'MASTER'
                                 ? 'bg-red-100 text-red-800'
                                 : entry.tier === 'DIAMOND'
-                                  ? 'bg-blue-100 text-blue-800'
+                                  ? 'bg-primary/10 text-primary'
                                   : entry.tier === 'PLATINUM'
                                     ? 'bg-green-100 text-green-800'
                                     : entry.tier === 'GOLD'
@@ -690,7 +690,7 @@ export default function EnhancedLeaderboard() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-2xl font-bold text-blue-500">
+                    <div className="text-2xl font-bold text-primary">
                       {pongMetric === 'elo'
                         ? entry.eloRating
                         : pongMetric === 'wins'
@@ -710,19 +710,19 @@ export default function EnhancedLeaderboard() {
                 </div>
                 <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                   <div className="text-center">
-                    <div className="font-bold text-blue-500">{entry.eloRating}</div>
+                    <div className="font-bold text-primary">{entry.eloRating}</div>
                     <div className="text-tertiary">Elo Rating</div>
                   </div>
                   <div className="text-center">
-                    <div className="font-bold text-green-500">{entry.wins}</div>
+                    <div className="font-bold text-success">{entry.wins}</div>
                     <div className="text-tertiary">Wins</div>
                   </div>
                   <div className="text-center">
-                    <div className="font-bold text-orange-500">{entry.winRate?.toFixed(1)}%</div>
+                    <div className="font-bold text-warning">{entry.winRate?.toFixed(1)}%</div>
                     <div className="text-tertiary">Win Rate</div>
                   </div>
                   <div className="text-center">
-                    <div className="font-bold text-purple-500">
+                    <div className="font-bold text-accent">
                       {(Number(entry.totalWon) / 1000).toFixed(1)}k
                     </div>
                     <div className="text-tertiary">Earnings</div>

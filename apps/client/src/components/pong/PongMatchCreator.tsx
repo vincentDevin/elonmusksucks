@@ -24,10 +24,30 @@ export function PongMatchCreator({ onCreateMatch }: PongMatchCreatorProps) {
   };
 
   const aiDifficultyInfo = {
-    easy: { emoji: '🟢', desc: 'Perfect for beginners', multiplier: '1.2x' },
-    medium: { emoji: '🟡', desc: 'Balanced challenge', multiplier: '1.5x' },
-    hard: { emoji: '🔴', desc: 'Skilled players only', multiplier: '2.0x' },
-    impossible: { emoji: '💀', desc: 'Good luck...', multiplier: '3.0x' },
+    easy: {
+      emoji: '🎹',
+      name: "Grimes' Laptop",
+      desc: 'Just a MacBook Pro making techno beats',
+      multiplier: '1.2x',
+    },
+    medium: {
+      emoji: '🥽',
+      name: "Zuck's Metaverse",
+      desc: 'No legs, moderate Pong skills',
+      multiplier: '1.5x',
+    },
+    hard: {
+      emoji: '🚀',
+      name: "Bezos' Rocket",
+      desc: 'Compensating with superior skills',
+      multiplier: '2.0x',
+    },
+    impossible: {
+      emoji: '🤖',
+      name: 'X Æ A-XII',
+      desc: "Elon's child has chosen violence",
+      multiplier: '3.0x',
+    },
   };
 
   return (
@@ -127,12 +147,15 @@ export function PongMatchCreator({ onCreateMatch }: PongMatchCreatorProps) {
                   <div className="text-left">
                     <div className="flex items-center space-x-2 mb-1">
                       <span className="text-lg">{info.emoji}</span>
-                      <span className="font-medium text-content capitalize">{level}</span>
+                      <span className="font-medium text-content">{info.name}</span>
+                    </div>
+                    <div className="text-xs text-secondary mb-1">{info.desc}</div>
+                    <div className="flex items-center space-x-1">
                       <span className="text-xs bg-accent/20 text-accent px-2 py-1 rounded">
                         {info.multiplier}
                       </span>
+                      <span className="text-xs text-tertiary capitalize">({level})</span>
                     </div>
-                    <div className="text-xs text-secondary">{info.desc}</div>
                   </div>
                 </button>
               ))}

@@ -86,7 +86,7 @@ export default function EloProgressBar({
           />
         </div>
         {showDetails && (
-          <div className="text-center text-xs text-purple-600 font-medium mt-1">
+          <div className="text-center text-xs text-accent font-medium mt-1">
             🌟 Maximum Tier Reached
           </div>
         )}

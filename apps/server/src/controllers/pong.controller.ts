@@ -19,7 +19,7 @@ export const recordMatch = async (
   next: NextFunction,
 ): Promise<void> => {
   try {
-    const { matchId, winnerId, loserId, wagerAmount, payoutAmount, duration, isAI } = req.body;
+    const { matchId, winnerId, loserId, wagerAmount, payoutAmount, duration } = req.body;
 
     // Use service layer for all business logic (including socket emissions)
     const result = await PongStatsService.processMatchRecording(
@@ -29,7 +29,6 @@ export const recordMatch = async (
       wagerAmount,
       payoutAmount,
       duration,
-      isAI,
       pongRepository,
       PongSocketEmitter, // Pass socket emitter to service layer
     );

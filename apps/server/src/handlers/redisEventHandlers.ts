@@ -34,7 +34,10 @@ export type RedisChannel =
   | 'admin:moderation:bulk'
   | 'admin:retagging:bulk'
   | 'admin:feed:refresh'
-  | 'timeline:articles:new';
+  | 'timeline:articles:new'
+  | 'pong:elo:update'
+  | 'pong:tier:change'
+  | 'pong:stats:update';
 
 export function registerRedisEventHandlers(io: Server, eventSub: any) {
   eventSub.on('message', (channel: RedisChannel, message: string) => {
@@ -183,6 +186,28 @@ export function registerRedisEventHandlers(io: Server, eventSub: any) {
       case 'timeline:articles:new':
         // Notify public timeline of newly approved articles
         io.emit('timeline:articles:approved', payload);
+        break;
+
+      // Pong events
+      case 'pong:elo:update':
+        const pongEloPayload = payload as any;
+        if (pongEloPayload.userId) {
+          io.to(`user:${pongEloPayload.userId}`).emit('pong:elo:update', payload);
+        }
+        io.emit('pong:elo:update', payload); // Also broadcast globally for leaderboard
+        break;
+      case 'pong:tier:change':
+        const pongTierPayload = payload as any;
+        if (pongTierPayload.userId) {
+          io.to(`user:${pongTierPayload.userId}`).emit('pong:tier:change', payload);
+        }
+        io.emit('pong:tier:change', payload); // Also broadcast globally
+        break;
+      case 'pong:stats:update':
+        const pongStatsPayload = payload as any;
+        if (pongStatsPayload.userId) {
+          io.to(`user:${pongStatsPayload.userId}`).emit('pong:stats:update', payload);
+        }
         break;
 
       default:

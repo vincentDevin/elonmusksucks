@@ -105,11 +105,11 @@ export default function EloPredictionCard({
   if (wagerAmount === 0) {
     return (
       <div className={`bg-blue-50 border border-blue-200 rounded-lg p-4 ${className}`}>
-        <div className="flex items-center space-x-2 text-blue-700">
+        <div className="flex items-center space-x-2 text-info">
           <InformationCircleIcon className="w-5 h-5" />
           <span className="text-sm font-medium">Free Practice Mode</span>
         </div>
-        <p className="text-xs text-blue-600 mt-1">
+        <p className="text-xs text-info mt-1">
           This is a free match - no Elo changes or MuskBucks at stake. Perfect for practice!
         </p>
       </div>
@@ -130,11 +130,11 @@ export default function EloPredictionCard({
   if (error || !prediction) {
     return (
       <div className={`bg-red-50 border border-red-200 rounded-lg p-4 ${className}`}>
-        <div className="flex items-center space-x-2 text-red-700">
+        <div className="flex items-center space-x-2 text-error">
           <InformationCircleIcon className="w-5 h-5" />
           <span className="text-sm font-medium">Prediction Unavailable</span>
         </div>
-        <p className="text-xs text-red-600 mt-1">{error || 'Unable to calculate Elo changes'}</p>
+        <p className="text-xs text-error mt-1">{error || 'Unable to calculate Elo changes'}</p>
       </div>
     );
   }
@@ -142,13 +142,13 @@ export default function EloPredictionCard({
   const getConfidenceColor = (level: string) => {
     switch (level) {
       case 'high':
-        return 'text-green-600';
+        return 'text-success';
       case 'medium':
-        return 'text-yellow-600';
+        return 'text-warning';
       case 'low':
-        return 'text-red-600';
+        return 'text-error';
       default:
-        return 'text-gray-600';
+        return 'text-tertiary';
     }
   };
 
@@ -170,7 +170,7 @@ export default function EloPredictionCard({
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center space-x-2">
-          <TrophyIcon className="w-5 h-5 text-blue-500" />
+          <TrophyIcon className="w-5 h-5 text-primary" />
           <span className="font-medium text-content text-sm">Elo Impact Preview</span>
         </div>
         <div className={`text-xs font-medium ${getConfidenceColor(prediction.confidenceLevel)}`}>
@@ -182,7 +182,7 @@ export default function EloPredictionCard({
       <div className="grid grid-cols-3 gap-3 mb-4 text-center text-xs">
         <div>
           <div className="text-tertiary">Your Elo</div>
-          <div className="font-bold text-blue-500">{playerElo}</div>
+          <div className="font-bold text-primary">{playerElo}</div>
         </div>
         <div>
           <div className="text-tertiary">Opponent</div>
@@ -192,7 +192,7 @@ export default function EloPredictionCard({
         </div>
         <div>
           <div className="text-tertiary">Wager</div>
-          <div className="font-bold text-purple-500">{wagerAmount}</div>
+          <div className="font-bold text-accent">{wagerAmount}</div>
         </div>
       </div>
 
@@ -201,11 +201,11 @@ export default function EloPredictionCard({
         {/* Win Scenario */}
         <div className="bg-green-50 border border-green-200 rounded-lg p-3">
           <div className="flex items-center space-x-2 mb-2">
-            <ArrowTrendingUpIcon className="w-4 h-4 text-green-600" />
-            <span className="text-sm font-medium text-green-800">If You Win</span>
+            <ArrowTrendingUpIcon className="w-4 h-4 text-success" />
+            <span className="text-sm font-medium text-success">If You Win</span>
           </div>
-          <div className="text-lg font-bold text-green-600 mb-1">+{prediction.winChange} Elo</div>
-          <div className="text-xs text-green-700 space-y-1">
+          <div className="text-lg font-bold text-success mb-1">+{prediction.winChange} Elo</div>
+          <div className="text-xs text-success space-y-1">
             <div>Skill: +{prediction.skillComponent.win}</div>
             <div>Economy: +{prediction.economyComponent.win}</div>
           </div>
@@ -214,11 +214,11 @@ export default function EloPredictionCard({
         {/* Loss Scenario */}
         <div className="bg-red-50 border border-red-200 rounded-lg p-3">
           <div className="flex items-center space-x-2 mb-2">
-            <ArrowTrendingDownIcon className="w-4 h-4 text-red-600" />
-            <span className="text-sm font-medium text-red-800">If You Lose</span>
+            <ArrowTrendingDownIcon className="w-4 h-4 text-error" />
+            <span className="text-sm font-medium text-error">If You Lose</span>
           </div>
-          <div className="text-lg font-bold text-red-600 mb-1">{prediction.lossChange} Elo</div>
-          <div className="text-xs text-red-700 space-y-1">
+          <div className="text-lg font-bold text-error mb-1">{prediction.lossChange} Elo</div>
+          <div className="text-xs text-error space-y-1">
             <div>Skill: {prediction.skillComponent.loss}</div>
             <div>Economy: {prediction.economyComponent.loss}</div>
           </div>
@@ -231,7 +231,7 @@ export default function EloPredictionCard({
           💡 Elo changes are based on skill difference and wager size
         </div>
         {opponentType === 'pvp' && !opponentElo && (
-          <div className="text-xs text-yellow-600 text-center mt-1">
+          <div className="text-xs text-warning text-center mt-1">
             ⚠️ Opponent Elo unknown - using estimated values
           </div>
         )}

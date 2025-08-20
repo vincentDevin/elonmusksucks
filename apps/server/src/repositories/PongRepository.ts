@@ -340,6 +340,12 @@ export class PongRepository implements IPongRepository {
         return { isLossOnly: true, loserId: matchData.playerTwoId };
       }
 
+      // Determine the human loser ID (could be playerOneId or playerTwoId)
+      const humanLoserId =
+        matchData.winnerId && matchData.winnerId < 0
+          ? matchData.playerOneId // AI won, human is playerOne
+          : matchData.playerTwoId; // Human won, loser is playerTwo (could be AI or human)
+
       // Normal case with a winner - update match with Elo data
       if (matchData.winnerId) {
         await tx.pongMatch.update({
@@ -355,8 +361,8 @@ export class PongRepository implements IPongRepository {
           },
         });
 
-        // Update/create winner stats
-        if (winnerStatsData) {
+        // Update/create winner stats (only for human winners)
+        if (winnerStatsData && matchData.winnerId && matchData.winnerId > 0) {
           const existingWinnerStats = await tx.pongStats.findUnique({
             where: { userId: matchData.winnerId },
           });
@@ -376,29 +382,29 @@ export class PongRepository implements IPongRepository {
           }
         }
 
-        // Update/create loser stats (if human opponent)
-        if (matchData.playerTwoId && loserStatsData) {
+        // Update/create loser stats (only for human losers)
+        if (humanLoserId && humanLoserId > 0 && loserStatsData) {
           const existingLoserStats = await tx.pongStats.findUnique({
-            where: { userId: matchData.playerTwoId },
+            where: { userId: humanLoserId },
           });
 
           if (existingLoserStats) {
             await tx.pongStats.update({
-              where: { userId: matchData.playerTwoId },
+              where: { userId: humanLoserId },
               data: loserStatsData,
             });
           } else {
             await tx.pongStats.create({
               data: {
-                userId: matchData.playerTwoId,
+                userId: humanLoserId,
                 ...loserStatsData,
               },
             });
           }
         }
 
-        // Process payout if there's a winner and payout amount
-        if (payoutAmount && payoutAmount > 0n) {
+        // Process payout if there's a winner and payout amount (only for human winners)
+        if (payoutAmount && payoutAmount > 0n && matchData.winnerId && matchData.winnerId > 0) {
           const winnerUpdate = await tx.user.update({
             where: { id: matchData.winnerId },
             data: { muskBucks: { increment: payoutAmount } },
@@ -420,7 +426,7 @@ export class PongRepository implements IPongRepository {
       return {
         isLossOnly: false,
         winnerId: matchData.winnerId,
-        loserId: matchData.playerTwoId,
+        loserId: humanLoserId,
       };
     });
   }

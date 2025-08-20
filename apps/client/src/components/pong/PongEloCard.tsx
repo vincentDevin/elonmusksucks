@@ -17,13 +17,13 @@ interface PongEloCardProps {
 }
 
 const TIER_COLORS = {
-  BRONZE: 'bg-orange-100 text-orange-800 border-orange-200',
-  SILVER: 'bg-gray-100 text-gray-800 border-gray-200',
-  GOLD: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-  PLATINUM: 'bg-green-100 text-green-800 border-green-200',
-  DIAMOND: 'bg-blue-100 text-blue-800 border-blue-200',
-  MASTER: 'bg-red-100 text-red-800 border-red-200',
-  GRANDMASTER: 'bg-purple-100 text-purple-800 border-purple-200',
+  BRONZE: 'bg-muted text-tertiary border-muted',
+  SILVER: 'bg-surface text-content border-accent/20',
+  GOLD: 'bg-accent/10 text-accent border-accent/30',
+  PLATINUM: 'bg-success/10 text-success border-success/30',
+  DIAMOND: 'bg-primary/10 text-primary border-primary/30',
+  MASTER: 'bg-error/10 text-error border-error/30',
+  GRANDMASTER: 'bg-accent/20 text-accent border-accent/50',
 };
 
 const TIER_REQUIREMENTS = {
@@ -95,13 +95,13 @@ export default function PongEloCard({
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center space-x-3">
-          <TrophyIcon className="w-6 h-6 text-blue-500" />
+          <TrophyIcon className="w-6 h-6 text-primary" />
           <span className="font-semibold text-content">Elo Rating</span>
         </div>
         {lastEloChange !== 0 && (
           <div
             className={`flex items-center space-x-1 px-2 py-1 rounded-full text-sm font-medium ${
-              lastEloChange > 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+              lastEloChange > 0 ? 'bg-success/10 text-success' : 'bg-error/10 text-error'
             }`}
           >
             {lastEloChange > 0 ? (
@@ -119,7 +119,7 @@ export default function PongEloCard({
 
       {/* Main Elo Display */}
       <div className="text-center mb-4">
-        <div className="text-4xl font-bold text-blue-500 mb-2">{eloRating.toLocaleString()}</div>
+        <div className="text-4xl font-bold text-primary mb-2">{eloRating.toLocaleString()}</div>
         <div
           className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-bold border ${
             TIER_COLORS[tier as keyof typeof TIER_COLORS] || TIER_COLORS.SILVER
@@ -138,7 +138,7 @@ export default function PongEloCard({
           </div>
           <div className="w-full bg-muted rounded-full h-2">
             <div
-              className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+              className="bg-primary h-2 rounded-full transition-all duration-300"
               style={{ width: `${Math.min(progressToNextTier, 100)}%` }}
             />
           </div>
@@ -170,7 +170,7 @@ export default function PongEloCard({
           </div>
           {userStats.riskTaker && (
             <div className="flex items-center justify-center pt-2">
-              <span className="px-2 py-1 bg-red-100 text-red-600 rounded-full text-xs font-medium">
+              <span className="px-2 py-1 bg-warning/10 text-warning rounded-full text-xs font-medium">
                 🎲 High Roller
               </span>
             </div>
@@ -180,7 +180,7 @@ export default function PongEloCard({
 
       {loading && showDetails && (
         <div className="mt-4 pt-4 border-t border-accent/20 text-center">
-          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mx-auto"></div>
+          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mx-auto"></div>
         </div>
       )}
     </div>

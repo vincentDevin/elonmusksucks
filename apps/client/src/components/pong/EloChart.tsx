@@ -122,11 +122,9 @@ export default function EloChart({
             minute: '2-digit',
           })}
         </p>
-        <p className="text-lg font-bold text-blue-500">{rating} Elo</p>
+        <p className="text-lg font-bold text-primary">{rating} Elo</p>
         {data.change && (
-          <p
-            className={`text-sm font-medium ${data.change > 0 ? 'text-green-500' : 'text-red-500'}`}
-          >
+          <p className={`text-sm font-medium ${data.change > 0 ? 'text-success' : 'text-error'}`}>
             Change: {data.change > 0 ? '+' : ''}
             {data.change}
           </p>
@@ -151,7 +149,7 @@ export default function EloChart({
     return (
       <div className={`bg-surface rounded-xl shadow-sm border border-accent/20 p-6 ${className}`}>
         <div className="flex items-center space-x-3 mb-4">
-          <ChartBarIcon className="w-6 h-6 text-blue-500" />
+          <ChartBarIcon className="w-6 h-6 text-primary" />
           <span className="font-semibold text-content">Elo Progression</span>
         </div>
         <div className="text-center py-12">
@@ -183,7 +181,7 @@ export default function EloChart({
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center space-x-3">
-          <ChartBarIcon className="w-6 h-6 text-blue-500" />
+          <ChartBarIcon className="w-6 h-6 text-primary" />
           <span className="font-semibold text-content">Elo Progression</span>
         </div>
 
@@ -208,13 +206,13 @@ export default function EloChart({
       <div className="grid grid-cols-3 gap-4 mb-4 text-center">
         <div>
           <div className="text-sm text-tertiary">Current</div>
-          <div className="text-lg font-bold text-blue-500">
+          <div className="text-lg font-bold text-primary">
             {eloHistory[eloHistory.length - 1]?.rating || 'N/A'}
           </div>
         </div>
         <div>
           <div className="text-sm text-tertiary">Peak</div>
-          <div className="text-lg font-bold text-green-500">{maxRating}</div>
+          <div className="text-lg font-bold text-success">{maxRating}</div>
         </div>
         <div>
           <div className="text-sm text-tertiary">Change</div>
@@ -222,8 +220,8 @@ export default function EloChart({
             className={`text-lg font-bold ${
               eloHistory.length > 1
                 ? eloHistory[eloHistory.length - 1].rating - eloHistory[0].rating >= 0
-                  ? 'text-green-500'
-                  : 'text-red-500'
+                  ? 'text-success'
+                  : 'text-error'
                 : 'text-tertiary'
             }`}
           >
