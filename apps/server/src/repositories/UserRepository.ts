@@ -2,6 +2,8 @@
 
 import { PrismaClient, Prisma } from '@prisma/client';
 import type { IUserRepository } from './IUserRepository';
+
+export type { IUserRepository };
 import type {
   DbUser,
   DbUserBadge,
@@ -16,6 +18,10 @@ const prisma = new PrismaClient();
 export class UserRepository implements IUserRepository {
   async findById(id: number): Promise<DbUser | null> {
     return prisma.user.findUnique({ where: { id } }) as Promise<DbUser | null>;
+  }
+
+  async getUserStats(userId: number): Promise<DbUserStats | null> {
+    return prisma.userStats.findUnique({ where: { userId } }) as Promise<DbUserStats | null>;
   }
 
   async getFollowersCount(userId: number): Promise<number> {
@@ -141,10 +147,6 @@ export class UserRepository implements IUserRepository {
 
     const activity = await prisma.userActivity.create({ data: payload });
     return activity as DbUserActivity;
-  }
-
-  async getUserStats(userId: number): Promise<DbUserStats | null> {
-    return prisma.userStats.findUnique({ where: { userId } }) as Promise<DbUserStats | null>;
   }
 
   async updateUserStats(

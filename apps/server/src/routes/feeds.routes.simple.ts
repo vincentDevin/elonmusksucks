@@ -4,6 +4,7 @@ import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import redisClient from '../lib/redis';
 import { Queue } from 'bullmq';
+import { listFeeds, getFeedStats } from '../controllers/feeds.controller';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -12,84 +13,10 @@ const feedQueue = new Queue('feed', { connection: redisClient });
 // Note: Admin auth is handled by parent admin routes
 
 // GET /api/admin/feeds - List feeds
-router.get('/', async (_req: any, res: any) => {
-  try {
-    const feeds = await prisma.feedSource.findMany({
-      orderBy: { createdAt: 'desc' },
-    });
-
-    const publicFeeds = feeds.map((feed) => ({
-      id: feed.id,
-      name: feed.name,
-      url: feed.url,
-      siteUrl: feed.siteUrl,
-      status: feed.status,
-      allowImages: feed.allowImages,
-      lastFetchedAt: feed.lastFetchedAt?.toISOString() || null,
-      lastSuccessAt: feed.lastSuccessAt?.toISOString() || null,
-      lastErrorAt: feed.lastErrorAt?.toISOString() || null,
-      lastErrorMsg: feed.lastErrorMsg,
-      fetchCount: feed.fetchCount,
-      errorCount: feed.errorCount,
-      createdAt: feed.createdAt.toISOString(),
-      updatedAt: feed.updatedAt.toISOString(),
-    }));
-
-    res.json(publicFeeds);
-  } catch (error) {
-    console.error('[feeds] Error listing feeds:', error);
-    res.status(500).json({ error: 'Failed to list feeds' });
-  }
-});
+router.get('/', listFeeds);
 
 // GET /api/admin/feeds/stats - Get feed statistics
-router.get('/stats', async (_req: any, res: any) => {
-  try {
-    const feeds = await prisma.feedSource.findMany();
-    const stats = [];
-
-    for (const feed of feeds) {
-      // Calculate stats for each feed
-      const totalArticles = await prisma.article.count({
-        where: { feedId: feed.id },
-      });
-
-      // Recent articles (last 7 days)
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-      const recentArticles = await prisma.article.count({
-        where: {
-          feedId: feed.id,
-          createdAt: { gte: sevenDaysAgo },
-        },
-      });
-
-      // Error rate calculation
-      const errorRate = feed.fetchCount > 0 ? (feed.errorCount / feed.fetchCount) * 100 : 0;
-
-      // Average fetch time (mock for now - would need to track actual fetch times)
-      const avgFetchTime = Math.random() * 2000 + 500; // 500-2500ms
-
-      const feedStats = {
-        feedId: feed.id,
-        totalArticles,
-        recentArticles,
-        errorRate: Math.round(errorRate * 100) / 100, // Round to 2 decimal places
-        avgFetchTime: Math.round(avgFetchTime),
-        lastSuccess: feed.lastSuccessAt?.toISOString() || null,
-        lastError: feed.lastErrorAt?.toISOString() || null,
-      };
-
-      stats.push(feedStats);
-    }
-
-    res.json(stats);
-  } catch (error) {
-    console.error('[feeds] Error fetching feed stats:', error);
-    res.status(500).json({ error: 'Failed to fetch feed statistics' });
-  }
-});
+router.get('/stats', getFeedStats);
 
 // POST /api/admin/feeds - Create feed (basic implementation)
 router.post('/', async (req: any, res: any) => {

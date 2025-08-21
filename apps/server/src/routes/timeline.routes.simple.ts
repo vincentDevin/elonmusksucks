@@ -3,6 +3,7 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { requireAuth, type AuthRequest } from '../middleware/auth.middleware';
+import { getArticles } from '../controllers/timeline.controller';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -12,77 +13,7 @@ const prisma = new PrismaClient();
  */
 
 // GET /api/timeline/articles - Basic article listing
-router.get('/articles', async (req: any, res: any) => {
-  try {
-    const { limit = '30', cursor } = req.query;
-    const pageLimit = Math.min(parseInt(limit) || 30, 100);
-
-    const where: any = { status: 'APPROVED' };
-
-    if (cursor) {
-      const cursorDate = new Date(cursor);
-      if (!isNaN(cursorDate.getTime())) {
-        where.publishedAt = { lt: cursorDate };
-      }
-    }
-
-    const articles = await prisma.article.findMany({
-      where,
-      include: {
-        feed: {
-          select: {
-            id: true,
-            name: true,
-            siteUrl: true,
-          },
-        },
-      },
-      orderBy: { publishedAt: 'desc' },
-      take: pageLimit + 1,
-    });
-
-    const hasMore = articles.length > pageLimit;
-    const items = articles.slice(0, pageLimit);
-
-    const timelineItems = items.map((article) => ({
-      id: `article-${article.id}`,
-      type: 'article' as const,
-      timestamp: article.publishedAt?.toISOString() || article.createdAt.toISOString(),
-      content: {
-        title: article.title,
-        excerpt: article.excerpt || undefined,
-        url: article.url,
-        imageUrl: article.leadImageUrl,
-        author: article.feed?.name || 'Unknown',
-        source: article.feed?.siteUrl ? new URL(article.feed.siteUrl).hostname : 'Unknown',
-      },
-      engagement: {
-        reactions: article.reactions,
-        comments: article.comments,
-      },
-      tags: article.tags,
-      sourceLinks: [],
-    }));
-
-    const nextCursor =
-      hasMore && items.length > 0
-        ? items[items.length - 1].publishedAt?.toISOString() ||
-          items[items.length - 1].createdAt.toISOString()
-        : undefined;
-
-    res.json({
-      items: timelineItems,
-      pagination: {
-        cursor: nextCursor,
-        hasMore,
-        total: undefined,
-      },
-    });
-  } catch (error) {
-    console.error('[timeline] Error fetching articles:', error);
-    res.status(500).json({ error: 'Failed to fetch articles' });
-  }
-});
+router.get('/articles', getArticles);
 
 // GET /api/timeline/tweets - Placeholder for tweets
 router.get('/tweets', async (_req: any, res: any) => {

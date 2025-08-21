@@ -4,6 +4,11 @@
 import { PrismaClient } from '@prisma/client';
 import redisClient from '../lib/redis';
 import { unifiedActivityService } from './unifiedActivity.service';
+import {
+  AchievementRepository,
+  IAchievementRepository,
+} from '../repositories/AchievementRepository';
+import { UserRepository, IUserRepository } from '../repositories/UserRepository';
 
 const prisma = new PrismaClient();
 
@@ -87,6 +92,13 @@ interface UserAggregates {
 
 class AchievementEvaluatorService {
   private redis = redisClient;
+  private achievementRepository: IAchievementRepository;
+  private userRepository: IUserRepository;
+
+  constructor(achievementRepository?: IAchievementRepository, userRepository?: IUserRepository) {
+    this.achievementRepository = achievementRepository || new AchievementRepository(prisma);
+    this.userRepository = userRepository || new UserRepository();
+  }
 
   // Redis keys for user aggregates
   private getUserAggregateKey(userId: number): string {
@@ -251,8 +263,8 @@ class AchievementEvaluatorService {
     }
 
     // Initialize from database if not cached
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    const stats = await prisma.userStats.findUnique({ where: { userId } });
+    const user = await this.userRepository.findById(userId);
+    const stats = await this.userRepository.getUserStats(userId);
 
     const defaults: UserAggregates = {
       totalBets: stats?.totalBets || 0,
@@ -302,7 +314,7 @@ class AchievementEvaluatorService {
     const awarded: string[] = [];
 
     // Get all auto-award achievements that user doesn't have yet
-    const achievements = await prisma.achievement.findMany({
+    const achievements = await this.achievementRepository.findMany({
       where: {
         autoAward: true,
         isActive: true,
@@ -543,9 +555,7 @@ class AchievementEvaluatorService {
   ): Promise<boolean> {
     try {
       // Get achievement by slug
-      const achievement = await prisma.achievement.findUnique({
-        where: { slug },
-      });
+      const achievement = await this.achievementRepository.findBySlug(slug);
 
       if (!achievement) {
         console.warn(`[achievement-evaluator] Achievement not found: ${slug}`);
@@ -553,7 +563,7 @@ class AchievementEvaluatorService {
       }
 
       // Attempt to create user achievement (will fail if already exists due to unique constraint)
-      await prisma.userAchievement.upsert({
+      await this.achievementRepository.updateUserAchievement({
         where: {
           userId_achievementId: {
             userId,
@@ -573,10 +583,7 @@ class AchievementEvaluatorService {
       });
 
       // Get user info for activity
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { id: true, name: true, avatarUrl: true },
-      });
+      const user = await this.userRepository.findById(userId);
 
       if (user) {
         // Create activity event

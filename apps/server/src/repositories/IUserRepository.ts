@@ -12,6 +12,7 @@ import type { Prisma } from '@prisma/client';
 
 export interface IUserRepository {
   findById(id: number): Promise<DbUser | null>;
+  getUserStats(userId: number): Promise<DbUserStats | null>;
 
   getFollowersCount(userId: number): Promise<number>;
   getFollowingCount(userId: number): Promise<number>;

@@ -1,5 +1,9 @@
 import { PrismaClient } from '@prisma/client';
 import { unifiedActivityService } from './unifiedActivity.service';
+import {
+  AchievementRepository,
+  IAchievementRepository,
+} from '../repositories/AchievementRepository';
 
 const prisma = new PrismaClient();
 
@@ -77,22 +81,30 @@ export interface AchievementAnalytics {
 }
 
 class AdminAchievementService {
+  private achievementRepository: IAchievementRepository;
+
+  constructor(achievementRepository?: IAchievementRepository) {
+    this.achievementRepository = achievementRepository || new AchievementRepository(prisma);
+  }
+
   /**
    * Get all achievements with statistics
    */
   async getAllAchievements(): Promise<AchievementWithStats[]> {
-    const achievements = await prisma.achievement.findMany({
+    const achievements = await this.achievementRepository.findMany({
       orderBy: [{ category: 'asc' }, { sortOrder: 'asc' }],
     });
 
     const achievementsWithStats = await Promise.all(
       achievements.map(async (achievement) => {
-        const userProgress = await prisma.userAchievement.findMany({
-          where: { achievementId: achievement.id },
-          include: { user: true },
-          orderBy: { completedAt: 'desc' },
-          take: 5,
-        });
+        const userProgress = await this.achievementRepository.findUserAchievementsByAchievementId(
+          achievement.id,
+          {
+            include: { user: true },
+            orderBy: { completedAt: 'desc' },
+            take: 5,
+          },
+        );
 
         const totalUsers = userProgress.length;
         const completedUsers = userProgress.filter((p) => p.completedAt !== null).length;
@@ -120,17 +132,17 @@ class AdminAchievementService {
    * Get single achievement with detailed stats
    */
   async getAchievementById(achievementId: number): Promise<AchievementWithStats | null> {
-    const achievement = await prisma.achievement.findUnique({
-      where: { id: achievementId },
-    });
+    const achievement = await this.achievementRepository.findById(achievementId);
 
     if (!achievement) return null;
 
-    const userProgress = await prisma.userAchievement.findMany({
-      where: { achievementId },
-      include: { user: true },
-      orderBy: { completedAt: 'desc' },
-    });
+    const userProgress = await this.achievementRepository.findUserAchievementsByAchievementId(
+      achievementId,
+      {
+        include: { user: true },
+        orderBy: { completedAt: 'desc' },
+      },
+    );
 
     const totalUsers = userProgress.length;
     const completedUsers = userProgress.filter((p) => p.completedAt !== null).length;
