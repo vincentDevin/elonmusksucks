@@ -2,10 +2,11 @@
 // Single source of truth for ALL activity events in the system
 // Handles both database storage and Redis publishing for real-time updates
 
-import { PrismaClient } from '@prisma/client';
 import redisClient from '../lib/redis';
 import { randomUUID } from 'crypto';
 import type { ActivityEventType } from '@ems/types';
+import type { IActivityRepository } from '../repositories/IActivityRepository';
+import { ActivityRepository } from '../repositories/ActivityRepository';
 
 export interface UnifiedActivityEvent {
   id: string;
@@ -48,7 +49,7 @@ export interface UnifiedActivityEvent {
 }
 
 export class UnifiedActivityService {
-  private prisma: PrismaClient;
+  private repo: IActivityRepository;
   private redis = redisClient;
   // private io: any = null; // Removed - using Redis pub/sub only to avoid duplicates
 
@@ -59,8 +60,8 @@ export class UnifiedActivityService {
   private readonly ACTIVITY_LIST = 'unified:activity:recent';
   private readonly ACTIVITY_MAX = 100;
 
-  constructor() {
-    this.prisma = new PrismaClient();
+  constructor(repo: IActivityRepository = new ActivityRepository()) {
+    this.repo = repo;
   }
 
   /**
@@ -109,31 +110,27 @@ export class UnifiedActivityService {
    * Store activity in database
    */
   private async storeActivityInDB(activity: UnifiedActivityEvent): Promise<void> {
-    await this.prisma.userActivity.create({
-      data: {
-        userId: activity.userId,
-        type: activity.type as string,
-        title: activity.title,
-        description: activity.description,
-        details: {
-          icon: activity.icon,
-          color: activity.color,
-          amount: activity.amount,
-          odds: activity.odds,
-          predictionTitle: activity.predictionTitle,
-          category: activity.category,
-          optionLabel: activity.optionLabel,
-          isHighValue: activity.isHighValue,
-          isWin: activity.isWin,
-          streak: activity.streak,
-          ...activity.meta,
-        },
-        isPersonal: activity.isPersonal,
-        priority: activity.priority,
-        relatedUserId: undefined, // Can be extended if needed
-        predictionId: activity.predictionId,
-        betId: undefined, // Can be extended if needed
+    await this.repo.createActivity({
+      userId: activity.userId,
+      type: activity.type as string,
+      title: activity.title,
+      description: activity.description,
+      details: {
+        icon: activity.icon,
+        color: activity.color,
+        amount: activity.amount,
+        odds: activity.odds,
+        predictionTitle: activity.predictionTitle,
+        category: activity.category,
+        optionLabel: activity.optionLabel,
+        isHighValue: activity.isHighValue,
+        isWin: activity.isWin,
+        streak: activity.streak,
+        ...activity.meta,
       },
+      isPersonal: activity.isPersonal,
+      priority: activity.priority,
+      predictionId: activity.predictionId,
     });
   }
 
@@ -166,49 +163,7 @@ export class UnifiedActivityService {
    * Returns data in unified Redis format for consistency
    */
   async getPublicActivities(limit = 50): Promise<UnifiedActivityEvent[]> {
-    const activities = await this.prisma.userActivity.findMany({
-      where: {
-        isPersonal: false,
-        // Only include activities with proper unified service formatting
-        OR: [
-          { type: 'bet_placed' },
-          { type: 'parlay_started' },
-          { type: 'prediction_created' },
-          { type: 'prediction_resolved' },
-          { type: 'post_created' },
-          { type: 'comment_created' },
-          { type: 'big_win' },
-          { type: 'achievement_unlocked' },
-          { type: 'user_followed' },
-        ],
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-      take: limit,
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            avatarUrl: true,
-          },
-        },
-        prediction: {
-          select: {
-            id: true,
-            title: true,
-            category: true,
-          },
-        },
-        bet: {
-          select: {
-            id: true,
-            amount: true,
-          },
-        },
-      },
-    });
+    const activities = await this.repo.getPublicActivities(limit);
 
     // Transform to unified Redis format for consistency
     return activities.map((activity) => {

@@ -48,4 +48,34 @@ export interface IPredictionRepository {
       })
     | null
   >;
+
+  /** Get source links for a prediction */
+  getSourceLinks(predictionId: number): Promise<
+    Array<{
+      id: number;
+      predictionId: number;
+      articleId: number | null;
+      tweetId: string | null;
+      url: string;
+      title: string | null;
+      publisher: string | null;
+      capturedAt: Date;
+      article: {
+        id: number;
+        title: string;
+        url: string;
+        leadImageUrl: string | null;
+        feed: {
+          name: string;
+          siteUrl: string | null;
+        };
+      } | null;
+      tweet: {
+        id: string;
+        text: string;
+        permalink: string;
+        authorHandle: string;
+      } | null;
+    }>
+  >;
 }

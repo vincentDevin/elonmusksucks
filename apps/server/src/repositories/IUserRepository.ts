@@ -66,4 +66,48 @@ export interface IUserRepository {
   incrementUserStats(userId: number, data: Prisma.UserStatsUpdateInput): Promise<void>;
 
   setFeedPrivacy(userId: number, feedPrivate: boolean): Promise<void>;
+
+  getUserRank(userId: number): Promise<number | undefined>;
+  getUserActiveBets(userId: number): Promise<
+    Array<{
+      id: number;
+      predictionId: number;
+      predictionTitle: string;
+      amount: string;
+      odds: number;
+      optionLabel?: string;
+      status: string;
+      createdAt: string;
+    }>
+  >;
+  getUserActiveParlays(userId: number): Promise<
+    Array<{
+      id: number;
+      amount: string;
+      combinedOdds: number;
+      potentialPayout: string;
+      legCount: number;
+      status: string;
+      createdAt: string;
+      legs: Array<{ predictionTitle: string; optionLabel: string }>;
+    }>
+  >;
+  getUserPredictions(userId: number): Promise<
+    Array<{
+      id: number;
+      title: string;
+      category: string;
+      type: string;
+      approved: boolean;
+      resolved: boolean;
+      expiresAt: string;
+      createdAt: string;
+      totalBets?: number;
+    }>
+  >;
+
+  // Achievement-related methods
+  getUserTotalBetsCount(userId: number): Promise<number>;
+  getUserCategoryWinsCount(userId: number, category: string): Promise<number>;
+  getUserParlayWinsCount(userId: number): Promise<number>;
 }

@@ -27,6 +27,32 @@ export class PredictionService {
 
   constructor(private repo: IPredictionRepository = new PredictionRepository()) {}
 
+  async findPredictionBasicById(id: number) {
+    return (this.repo as any).findPredictionBasicById(id);
+  }
+
+  async findExistingSourceLink(predictionId: number, articleId?: number, tweetId?: string) {
+    return (this.repo as any).findExistingSourceLink(predictionId, articleId, tweetId);
+  }
+
+  async createSourceLink(
+    predictionId: number,
+    articleId: number | null,
+    tweetId: string | null,
+    url: string,
+    title: string | null,
+    publisher: string | null,
+  ) {
+    return (this.repo as any).createSourceLink(
+      predictionId,
+      articleId,
+      tweetId,
+      url,
+      title,
+      publisher,
+    );
+  }
+
   /* ────────────────────────────────────────────────────────────────────────── */
   /** Fetch **ALL** predictions (public safe shape) */
   async listAllPredictions(): Promise<
@@ -232,6 +258,44 @@ export class PredictionService {
     }));
 
     return { ...pred, options, bets, parlayLegs, sourceLinks };
+  }
+
+  async getSourceLinks(predictionId: number): Promise<
+    Array<{
+      id: number;
+      predictionId: number;
+      url: string;
+      title: string | null;
+      publisher: string | null;
+      capturedAt: string;
+      type: 'article' | 'tweet';
+      source: {
+        id: number | string;
+        title?: string;
+        text?: string;
+        url?: string;
+        leadImageUrl?: string | null;
+        permalink?: string;
+        authorHandle?: string;
+        feed?: {
+          name: string;
+          siteUrl: string | null;
+        };
+      } | null;
+    }>
+  > {
+    const sourceLinks = await this.repo.getSourceLinks(predictionId);
+
+    return sourceLinks.map((link) => ({
+      id: link.id,
+      predictionId: link.predictionId,
+      url: link.url,
+      title: link.title,
+      publisher: link.publisher,
+      capturedAt: link.capturedAt.toISOString(),
+      type: link.articleId ? 'article' : 'tweet',
+      source: link.article || link.tweet || null,
+    }));
   }
 }
 

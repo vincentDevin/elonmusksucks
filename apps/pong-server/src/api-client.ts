@@ -36,13 +36,19 @@ export class PongApiClient {
       console.log(`🔐 Authenticating user via API: ${this.baseUrl}/auth`);
       console.log(`🔑 Token preview: ${token.substring(0, 20)}...`);
 
-      const result = await this.request<{ id: number; name: string; muskBucks: number }>(
-        '/auth',
-        'POST',
-        { token },
-      );
-      console.log(`✅ API auth successful:`, result);
-      return result;
+      const response = await axios({
+        method: 'POST',
+        url: `${this.baseUrl}/auth`,
+        headers: {
+          'Content-Type': 'application/json',
+          'x-game-server-secret': this.gameServerSecret,
+          Authorization: `Bearer ${token}`,
+        },
+        timeout: 5000,
+      });
+
+      console.log(`✅ API auth successful:`, response.data);
+      return response.data;
     } catch (error: any) {
       console.error(`❌ API auth failed:`, error.response?.data || error.message);
       return null;

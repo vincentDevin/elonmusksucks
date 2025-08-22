@@ -190,3 +190,7 @@ export async function resetPassword(token: string, newPassword: string): Promise
 export async function getUserByEmail(email: string): Promise<User | null> {
   return repo.findByEmail(email.trim().toLowerCase());
 }
+
+export async function getUserBalance(userId: number) {
+  return repo.findUserBalance(userId);
+}

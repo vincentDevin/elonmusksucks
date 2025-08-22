@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, FeedStatus } from '@prisma/client';
 import { FeedRepository } from '../repositories/FeedRepository';
 
 const prisma = new PrismaClient();
@@ -48,5 +48,48 @@ export class FeedService {
     }
 
     return stats;
+  }
+
+  async createFeed(data: {
+    name: string;
+    url: string;
+    siteUrl?: string | null;
+    allowImages?: boolean;
+  }) {
+    const feedData = { ...data, allowImages: data.allowImages ?? true, status: FeedStatus.ACTIVE };
+    const feed = await this.repository.createFeed(feedData);
+    return feed;
+  }
+
+  async deleteFeed(id: number) {
+    return this.repository.deleteFeed(id);
+  }
+
+  async updateFeed(id: number, updates: any) {
+    return this.repository.updateFeed(id, updates);
+  }
+
+  async bulkModerateArticles(ids: number[], action: string, notes?: string) {
+    return this.repository.bulkModerateArticles(ids, action, notes);
+  }
+
+  async refreshFeed(feedId: number) {
+    return this.repository.findFeedById(feedId);
+  }
+
+  async findArticleById(articleId: number) {
+    return this.repository.findArticleById(articleId);
+  }
+
+  async updateArticleTags(articleId: number, tags: string[]) {
+    return this.repository.updateArticleTags(articleId, tags);
+  }
+
+  async getArticleCountWithFilters(where: any) {
+    return this.repository.getArticleCountWithFilters(where);
+  }
+
+  async getArticlesWithFilters(where: any, orderBy: any, take: number, skip: number) {
+    return this.repository.getArticlesWithFilters(where, orderBy, take, skip);
   }
 }

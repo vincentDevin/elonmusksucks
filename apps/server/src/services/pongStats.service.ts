@@ -55,6 +55,11 @@ export interface MatchStatsCalculation {
 }
 
 export class PongStatsService {
+  constructor(
+    private repository?: any,
+    private socketEmitter?: any,
+  ) {}
+
   /**
    * Map AI player ID to difficulty
    */
@@ -88,6 +93,32 @@ export class PongStatsService {
 
     // Calculate enriched metrics
     return this.calculatePlayerStatsMetrics(stats);
+  }
+
+  /**
+   * Instance method using injected dependencies
+   */
+  async processMatchRecording(
+    matchId: string,
+    winnerId: number | null,
+    loserId: number | null,
+    wagerAmount: number,
+    payoutAmount: number,
+    duration: number,
+  ): Promise<{ isLossOnly: boolean; winnerId?: number; loserId?: number; socketEvents?: any }> {
+    const repository = this.repository!;
+    const socketEmitter = this.socketEmitter;
+
+    return PongStatsService.processMatchRecording(
+      matchId,
+      winnerId,
+      loserId,
+      wagerAmount,
+      payoutAmount,
+      duration,
+      repository,
+      socketEmitter,
+    );
   }
 
   /**
@@ -666,5 +697,30 @@ export class PongStatsService {
    */
   static calculateRiskTakerStatus(recentWagers: bigint[]): boolean {
     return PongEloService.shouldFlagAsRiskTaker(recentWagers);
+  }
+
+  /**
+   * Process wager transaction for pong match
+   */
+  async processWagerTransaction(
+    playerOneId: number,
+    playerTwoId: number | null,
+    wagerAmount: number,
+    isAI: boolean,
+  ): Promise<{ transactionId: string }> {
+    return await this.repository.processWagerTransaction(
+      playerOneId,
+      playerTwoId,
+      wagerAmount,
+      isAI,
+    );
+  }
+
+  async validateWager(userId: number): Promise<{ muskBucks: bigint } | null> {
+    return await this.repository.validateWager(userId);
+  }
+
+  async healthCheck(): Promise<void> {
+    return await this.repository.healthCheck();
   }
 }

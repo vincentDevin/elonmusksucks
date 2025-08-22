@@ -4,6 +4,7 @@ export interface IAuthRepository {
   // --- Users ---
   findByEmail(email: string): Promise<User | null>;
   findById(id: number): Promise<User | null>;
+  findUserBalance(userId: number): Promise<{ muskBucks: bigint } | null>;
   createUser(data: {
     name: string;
     email: string;

@@ -7,6 +7,7 @@ import { PongSocketEmitter } from '../handlers/pongSocketHandlers';
 import { serializeBigInt } from '../utils/bigintSerializer';
 
 const pongRepository = new PongRepository();
+const pongStatsService = new PongStatsService(pongRepository);
 
 /**
  * POST /api/pong/record-match
@@ -19,18 +20,48 @@ export const recordMatch = async (
   next: NextFunction,
 ): Promise<void> => {
   try {
-    const { matchId, winnerId, loserId, wagerAmount, payoutAmount, duration } = req.body;
+    const { matchId, winnerId, loserId, wagerAmount, payoutAmount, duration, isAI } = req.body;
 
-    // Use service layer for all business logic (including socket emissions)
-    const result = await PongStatsService.processMatchRecording(
+    // Validation
+    if (typeof matchId !== 'string') {
+      res.status(400).json({ error: 'matchId must be a string' });
+      return;
+    }
+    if (winnerId !== null && typeof winnerId !== 'number') {
+      res.status(400).json({ error: 'winnerId must be a number or null' });
+      return;
+    }
+    if (loserId !== null && typeof loserId !== 'number') {
+      res.status(400).json({ error: 'loserId must be a number or null' });
+      return;
+    }
+    if (typeof wagerAmount !== 'number' || wagerAmount < 0) {
+      res.status(400).json({ error: 'wagerAmount must be a non-negative number' });
+      return;
+    }
+    if (typeof payoutAmount !== 'number' || payoutAmount < 0) {
+      res.status(400).json({ error: 'payoutAmount must be a non-negative number' });
+      return;
+    }
+    if (typeof duration !== 'number') {
+      res.status(400).json({ error: 'duration must be a number' });
+      return;
+    }
+    if (typeof isAI !== 'boolean') {
+      res.status(400).json({ error: 'isAI must be a boolean' });
+      return;
+    }
+
+    // Create service with injected socket emitter
+    const pongStatsService = new PongStatsService(pongRepository, PongSocketEmitter);
+
+    const result = await pongStatsService.processMatchRecording(
       matchId,
       winnerId,
       loserId,
       wagerAmount,
       payoutAmount,
       duration,
-      pongRepository,
-      PongSocketEmitter, // Pass socket emitter to service layer
     );
 
     // Get final balances for response using repository
@@ -271,5 +302,126 @@ export const getUserPongHistory = async (
   } catch (error) {
     console.error('Get user Pong history error:', error);
     next(error);
+  }
+};
+
+export const processWager = async (req: Request, res: Response) => {
+  try {
+    const { playerOneId, playerTwoId, wagerAmount, isAI } = req.body;
+
+    // Validation
+    if (typeof playerOneId !== 'number') {
+      res.status(400).json({ error: 'playerOneId must be a number' });
+      return;
+    }
+    if (playerTwoId !== null && typeof playerTwoId !== 'number') {
+      res.status(400).json({ error: 'playerTwoId must be a number or null' });
+      return;
+    }
+    if (typeof wagerAmount !== 'number' || wagerAmount < 0) {
+      res.status(400).json({ error: 'wagerAmount must be a non-negative number' });
+      return;
+    }
+    if (typeof isAI !== 'boolean') {
+      res.status(400).json({ error: 'isAI must be a boolean' });
+      return;
+    }
+
+    if (wagerAmount === 0) {
+      res.json({ success: true, transactionId: 'free-play' });
+      return;
+    }
+
+    const result = await pongStatsService.processWagerTransaction(
+      playerOneId,
+      playerTwoId,
+      wagerAmount,
+      isAI,
+    );
+    res.json({ success: true, transactionId: result.transactionId });
+  } catch (error: any) {
+    console.error('Pong process wager error:', error);
+
+    if (error.message?.includes('Insufficient funds')) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
+
+    res.status(500).json({ error: 'Failed to process wager' });
+  }
+};
+
+export const validateWager = async (req: Request, res: Response) => {
+  try {
+    const { userId, amount } = req.body;
+
+    // Validation
+    if (typeof userId !== 'number') {
+      res.status(400).json({ error: 'userId must be a number' });
+      return;
+    }
+    if (typeof amount !== 'number' || amount < 0) {
+      res.status(400).json({ error: 'amount must be a non-negative number' });
+      return;
+    }
+
+    const user = await pongStatsService.validateWager(userId);
+
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    const currentBalance = Number(user.muskBucks);
+    const valid = currentBalance >= amount;
+
+    res.json({
+      valid,
+      currentBalance,
+    });
+  } catch (error) {
+    console.error('Pong validate wager error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const healthCheck = async (_req: Request, res: Response) => {
+  try {
+    await pongStatsService.healthCheck();
+    res.json({
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    res.status(503).json({
+      status: 'unhealthy',
+      error: 'Database connection failed',
+    });
+  }
+};
+
+export const authenticateUser = async (req: AuthRequest, res: Response) => {
+  try {
+    // User is already authenticated by requireAuth middleware
+    if (!req.user) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+
+    const user = await pongRepository.findUserForAuth(req.user.id);
+
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    res.json({
+      id: user.id,
+      name: user.name,
+      muskBucks: Number(user.muskBucks),
+    });
+  } catch (error) {
+    console.error('Pong auth error:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };

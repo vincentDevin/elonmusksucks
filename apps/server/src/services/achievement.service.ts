@@ -1,6 +1,8 @@
 import { PrismaClient } from '@prisma/client';
 import { StatisticsEventEmitter } from '../handlers/statisticsSocketHandlers';
 import { unifiedActivityService } from './unifiedActivity.service';
+import { bettingStatsService } from './bettingStats.service';
+import { socialStatsService } from './socialStats.service';
 
 export interface AchievementTrigger {
   type:
@@ -498,35 +500,27 @@ export class AchievementService {
 
   // Helper methods for data retrieval
   private async getUserTotalBets(userId: number): Promise<number> {
-    return await this.prisma.bet.count({ where: { userId } });
+    return bettingStatsService.getUserTotalBets(userId);
   }
 
   private async getCategoryWins(userId: number, category: string): Promise<number> {
-    return await this.prisma.bet.count({
-      where: {
-        userId,
-        status: 'WON',
-        prediction: { category },
-      },
-    });
+    return bettingStatsService.getCategoryWins(userId, category);
   }
 
   private async getUserParlayWins(userId: number): Promise<number> {
-    return await this.prisma.parlay.count({
-      where: { userId, status: 'WON' },
-    });
+    return bettingStatsService.getUserParlayWins(userId);
   }
 
   private async getUserFollowingCount(userId: number): Promise<number> {
-    return await this.prisma.follow.count({ where: { followerId: userId } });
+    return socialStatsService.getUserFollowingCount(userId);
   }
 
   private async getUserFollowersCount(userId: number): Promise<number> {
-    return await this.prisma.follow.count({ where: { followingId: userId } });
+    return socialStatsService.getUserFollowersCount(userId);
   }
 
   private async getUserPredictionCount(userId: number): Promise<number> {
-    return await this.prisma.prediction.count({ where: { creatorId: userId } });
+    return bettingStatsService.getUserPredictionCount(userId);
   }
 }
 

@@ -2,7 +2,7 @@
 import { Router } from 'express';
 import { requireAuth, requireAdmin } from '../middleware/auth.middleware';
 import * as adminController from '../controllers/admin.controller';
-import feedsRoutes from './feeds.routes.simple';
+import feedsRoutes from './feeds.routes';
 
 const router = Router();
 

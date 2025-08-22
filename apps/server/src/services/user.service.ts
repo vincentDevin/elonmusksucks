@@ -1,4 +1,3 @@
-import { PrismaClient } from '@prisma/client';
 import redisClient from '../lib/redis';
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -23,8 +22,6 @@ export type UploadedFile = {
   buffer: Buffer;
   mimetype: string;
 };
-
-const prisma = new PrismaClient();
 
 export class UserService {
   private repo: IUserRepository;
@@ -240,14 +237,7 @@ export class UserService {
       this.repo.findUserBadges(userId),
     ]);
 
-    const rawRank = (await prisma.$queryRawUnsafe(
-      `SELECT rank FROM (
-         SELECT id, RANK() OVER (ORDER BY "muskBucks" DESC) AS rank
-         FROM "User"
-       ) u WHERE u.id = $1;`,
-      userId,
-    )) as { rank: bigint }[];
-    const rank = Array.isArray(rawRank) && rawRank.length > 0 ? Number(rawRank[0].rank) : undefined;
+    const rank = await this.repo.getUserRank(userId);
     const isFollowing = viewerId ? await this.repo.existsFollow(viewerId, userId) : false;
 
     // Generate signed avatar URL if we have a storage key
@@ -483,158 +473,22 @@ export class UserService {
   /**
    * Get user's active bets (pending/open bets only)
    */
-  async getUserActiveBets(userId: number): Promise<
-    Array<{
-      id: number;
-      predictionId: number;
-      predictionTitle: string;
-      amount: string;
-      odds: number;
-      optionLabel?: string;
-      status: string;
-      createdAt: string;
-    }>
-  > {
-    const bets = await prisma.bet.findMany({
-      where: {
-        userId,
-        status: 'PENDING', // Only active/pending bets
-      },
-      include: {
-        prediction: {
-          select: {
-            id: true,
-            title: true,
-            resolved: true,
-          },
-        },
-        optionOption: {
-          select: {
-            label: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-      take: 10, // Limit to recent bets
-    });
-
-    return bets.map((bet) => ({
-      id: bet.id,
-      predictionId: bet.predictionId,
-      predictionTitle: bet.prediction.title,
-      amount: bet.amount.toString(),
-      odds: bet.oddsAtPlacement || 1.0,
-      optionLabel: bet.optionOption?.label,
-      status: bet.status,
-      createdAt: bet.createdAt.toISOString(),
-    }));
+  async getUserActiveBets(userId: number) {
+    return this.repo.getUserActiveBets(userId);
   }
 
   /**
    * Get user's active parlays (pending parlays only)
    */
-  async getUserActiveParlays(userId: number): Promise<
-    Array<{
-      id: number;
-      amount: string;
-      combinedOdds: number;
-      potentialPayout: string;
-      legCount: number;
-      status: string;
-      createdAt: string;
-      legs: Array<{
-        predictionTitle: string;
-        optionLabel: string;
-      }>;
-    }>
-  > {
-    const parlays = await prisma.parlay.findMany({
-      where: {
-        userId,
-        status: 'PENDING', // Only active/pending parlays
-      },
-      include: {
-        legs: {
-          include: {
-            option: {
-              include: {
-                prediction: {
-                  select: {
-                    title: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-      take: 10, // Limit to recent parlays
-    });
-
-    return parlays.map((parlay) => ({
-      id: parlay.id,
-      amount: parlay.amount.toString(),
-      combinedOdds: parlay.combinedOdds,
-      potentialPayout: parlay.potentialPayout.toString(),
-      legCount: parlay.legs.length,
-      status: parlay.status,
-      createdAt: parlay.createdAt.toISOString(),
-      legs: parlay.legs.map((leg: any) => ({
-        predictionTitle: leg.option.prediction.title,
-        optionLabel: leg.option.label,
-      })),
-    }));
+  async getUserActiveParlays(userId: number) {
+    return this.repo.getUserActiveParlays(userId);
   }
 
   /**
    * Get user's created predictions (approved and pending)
    */
-  async getUserPredictions(userId: number): Promise<
-    Array<{
-      id: number;
-      title: string;
-      category: string;
-      type: string;
-      approved: boolean;
-      resolved: boolean;
-      expiresAt: string;
-      createdAt: string;
-      totalBets?: number;
-    }>
-  > {
-    const predictions = await prisma.prediction.findMany({
-      where: {
-        creatorId: userId,
-      },
-      include: {
-        _count: {
-          select: {
-            bets: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-      take: 10, // Limit to recent predictions
-    });
-
-    return predictions.map((prediction) => ({
-      id: prediction.id,
-      title: prediction.title,
-      category: prediction.category,
-      type: prediction.type,
-      approved: prediction.approved,
-      resolved: prediction.resolved,
-      expiresAt: prediction.expiresAt.toISOString(),
-      createdAt: prediction.createdAt.toISOString(),
-      totalBets: prediction._count.bets,
-    }));
+  async getUserPredictions(userId: number) {
+    return this.repo.getUserPredictions(userId);
   }
 }
 

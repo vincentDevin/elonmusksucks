@@ -198,6 +198,69 @@ export class PredictionRepository implements IPredictionRepository {
     });
   }
 
+  async findPredictionBasicById(id: number) {
+    return prisma.prediction.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        creatorId: true,
+        resolved: true,
+      },
+    });
+  }
+
+  async findExistingSourceLink(predictionId: number, articleId?: number, tweetId?: string) {
+    return prisma.predictionSourceLink.findFirst({
+      where: {
+        predictionId,
+        ...(articleId ? { articleId } : { tweetId }),
+      },
+    });
+  }
+
+  async createSourceLink(
+    predictionId: number,
+    articleId: number | null,
+    tweetId: string | null,
+    url: string,
+    title: string | null,
+    publisher: string | null,
+  ) {
+    return prisma.predictionSourceLink.create({
+      data: {
+        predictionId,
+        articleId,
+        tweetId,
+        url,
+        title,
+        publisher,
+      },
+      include: {
+        article: {
+          select: {
+            id: true,
+            title: true,
+            url: true,
+            feed: {
+              select: {
+                name: true,
+                siteUrl: true,
+              },
+            },
+          },
+        },
+        tweet: {
+          select: {
+            id: true,
+            text: true,
+            permalink: true,
+            authorHandle: true,
+          },
+        },
+      },
+    });
+  }
+
   async findPredictionById(id: number): Promise<
     | (DbPrediction & {
         options: DbPredictionOption[];
@@ -294,5 +357,63 @@ export class PredictionRepository implements IPredictionRepository {
     );
 
     return { ...rest, options, bets, parlayLegs, sourceLinks } as any;
+  }
+
+  async getSourceLinks(predictionId: number): Promise<
+    Array<{
+      id: number;
+      predictionId: number;
+      articleId: number | null;
+      tweetId: string | null;
+      url: string;
+      title: string | null;
+      publisher: string | null;
+      capturedAt: Date;
+      article: {
+        id: number;
+        title: string;
+        url: string;
+        leadImageUrl: string | null;
+        feed: {
+          name: string;
+          siteUrl: string | null;
+        };
+      } | null;
+      tweet: {
+        id: string;
+        text: string;
+        permalink: string;
+        authorHandle: string;
+      } | null;
+    }>
+  > {
+    return prisma.predictionSourceLink.findMany({
+      where: { predictionId },
+      include: {
+        article: {
+          select: {
+            id: true,
+            title: true,
+            url: true,
+            leadImageUrl: true,
+            feed: {
+              select: {
+                name: true,
+                siteUrl: true,
+              },
+            },
+          },
+        },
+        tweet: {
+          select: {
+            id: true,
+            text: true,
+            permalink: true,
+            authorHandle: true,
+          },
+        },
+      },
+      orderBy: { capturedAt: 'desc' },
+    });
   }
 }

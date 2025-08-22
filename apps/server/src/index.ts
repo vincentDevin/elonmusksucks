@@ -21,7 +21,7 @@ import activityRoutes from './routes/activity.routes';
 import marketRoutes from './routes/market.routes';
 import shameWallRoutes from './routes/shameWall.routes';
 import monitoringRoutes from './routes/monitoring.routes';
-import timelineRoutes from './routes/timeline.routes.simple';
+import timelineRoutes from './routes/timeline.routes';
 import pongRoutes from './routes/pong.routes';
 
 const app = express();

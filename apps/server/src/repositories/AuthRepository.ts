@@ -12,6 +12,13 @@ export class PrismaAuthRepository implements IAuthRepository {
     return prisma.user.findUnique({ where: { id } });
   }
 
+  async findUserBalance(userId: number): Promise<{ muskBucks: bigint } | null> {
+    return prisma.user.findUnique({
+      where: { id: userId },
+      select: { muskBucks: true },
+    });
+  }
+
   async createUser(data: {
     name: string;
     email: string;

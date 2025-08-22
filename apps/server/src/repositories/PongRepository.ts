@@ -525,4 +525,78 @@ export class PongRepository implements IPongRepository {
       economyComponent: match.economyComponent,
     };
   }
+
+  async findUserForAuth(userId: number) {
+    return prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, name: true, muskBucks: true },
+    });
+  }
+
+  async processWagerTransaction(
+    playerOneId: number,
+    playerTwoId: number | null,
+    wagerAmount: number,
+    isAI: boolean,
+  ): Promise<{ transactionId: string }> {
+    return await this.executeInTransaction(async (tx) => {
+      // Deduct from player one
+      const playerOneUpdate = await tx.user.update({
+        where: { id: playerOneId },
+        data: { muskBucks: { decrement: BigInt(wagerAmount) } },
+        select: { muskBucks: true },
+      });
+
+      if (playerOneUpdate.muskBucks < 0) {
+        throw new Error('Insufficient funds for player one');
+      }
+
+      // Deduct from player two if not AI
+      if (!isAI && playerTwoId) {
+        const playerTwoUpdate = await tx.user.update({
+          where: { id: playerTwoId },
+          data: { muskBucks: { decrement: BigInt(wagerAmount) } },
+          select: { muskBucks: true },
+        });
+
+        if (playerTwoUpdate.muskBucks < 0) {
+          throw new Error('Insufficient funds for player two');
+        }
+      }
+
+      // Create transaction record
+      const transaction = await tx.transaction.create({
+        data: {
+          userId: playerOneId,
+          type: 'DEBIT',
+          amount: BigInt(-wagerAmount),
+          balanceAfter: playerOneUpdate.muskBucks,
+        },
+      });
+
+      if (!isAI && playerTwoId) {
+        await tx.transaction.create({
+          data: {
+            userId: playerTwoId,
+            type: 'DEBIT',
+            amount: BigInt(-wagerAmount),
+            balanceAfter: BigInt(0), // Will be updated with actual balance
+          },
+        });
+      }
+
+      return { transactionId: transaction.id };
+    });
+  }
+
+  async validateWager(userId: number): Promise<{ muskBucks: bigint } | null> {
+    return await prisma.user.findUnique({
+      where: { id: userId },
+      select: { muskBucks: true },
+    });
+  }
+
+  async healthCheck(): Promise<void> {
+    await prisma.$queryRaw`SELECT 1`;
+  }
 }

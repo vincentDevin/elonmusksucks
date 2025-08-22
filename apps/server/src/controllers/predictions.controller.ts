@@ -133,3 +133,57 @@ export const createPrediction = async (
     next(err);
   }
 };
+
+/**
+ * GET /api/predictions/:id/source-links
+ * Get source links for a prediction
+ */
+export const getSourceLinks = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const predictionId = parseInt(req.params.id);
+
+    if (isNaN(predictionId)) {
+      res.status(400).json({ error: 'Invalid prediction ID' });
+      return;
+    }
+
+    const sourceLinks = await predictionService.getSourceLinks(predictionId);
+    res.json(sourceLinks);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const findPredictionById = async (id: number) => {
+  return predictionService.findPredictionBasicById(id);
+};
+
+export const findExistingSourceLink = async (
+  predictionId: number,
+  articleId?: number,
+  tweetId?: string,
+) => {
+  return predictionService.findExistingSourceLink(predictionId, articleId, tweetId);
+};
+
+export const createSourceLink = async (
+  predictionId: number,
+  articleId: number | null,
+  tweetId: string | null,
+  url: string,
+  title: string | null,
+  publisher: string | null,
+) => {
+  return predictionService.createSourceLink(
+    predictionId,
+    articleId || null,
+    tweetId || null,
+    url,
+    title || null,
+    publisher || null,
+  );
+};

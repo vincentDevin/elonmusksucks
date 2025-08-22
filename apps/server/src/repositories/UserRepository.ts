@@ -197,6 +197,149 @@ export class UserRepository implements IUserRepository {
   async setFeedPrivacy(userId: number, feedPrivate: boolean): Promise<void> {
     await prisma.user.update({ where: { id: userId }, data: { feedPrivate } });
   }
+
+  async getUserRank(userId: number): Promise<number | undefined> {
+    const rawRank = (await prisma.$queryRawUnsafe(
+      `SELECT rank FROM (
+         SELECT id, RANK() OVER (ORDER BY "muskBucks" DESC) AS rank
+         FROM "User"
+       ) u WHERE u.id = $1;`,
+      userId,
+    )) as { rank: bigint }[];
+    return Array.isArray(rawRank) && rawRank.length > 0 ? Number(rawRank[0].rank) : undefined;
+  }
+
+  async getUserActiveBets(userId: number): Promise<
+    Array<{
+      id: number;
+      predictionId: number;
+      predictionTitle: string;
+      amount: string;
+      odds: number;
+      optionLabel?: string;
+      status: string;
+      createdAt: string;
+    }>
+  > {
+    const bets = await prisma.bet.findMany({
+      where: { userId, status: 'PENDING' },
+      include: {
+        prediction: { select: { id: true, title: true, resolved: true } },
+        optionOption: { select: { label: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+    });
+
+    return bets.map((bet) => ({
+      id: bet.id,
+      predictionId: bet.predictionId,
+      predictionTitle: bet.prediction.title,
+      amount: bet.amount.toString(),
+      odds: bet.oddsAtPlacement || 1.0,
+      optionLabel: bet.optionOption?.label,
+      status: bet.status,
+      createdAt: bet.createdAt.toISOString(),
+    }));
+  }
+
+  async getUserActiveParlays(userId: number): Promise<
+    Array<{
+      id: number;
+      amount: string;
+      combinedOdds: number;
+      potentialPayout: string;
+      legCount: number;
+      status: string;
+      createdAt: string;
+      legs: Array<{ predictionTitle: string; optionLabel: string }>;
+    }>
+  > {
+    const parlays = await prisma.parlay.findMany({
+      where: { userId, status: 'PENDING' },
+      include: {
+        legs: {
+          include: {
+            option: {
+              include: {
+                prediction: { select: { title: true } },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+    });
+
+    return parlays.map((parlay) => ({
+      id: parlay.id,
+      amount: parlay.amount.toString(),
+      combinedOdds: parlay.combinedOdds,
+      potentialPayout: parlay.potentialPayout.toString(),
+      legCount: parlay.legs.length,
+      status: parlay.status,
+      createdAt: parlay.createdAt.toISOString(),
+      legs: parlay.legs.map((leg: any) => ({
+        predictionTitle: leg.option.prediction.title,
+        optionLabel: leg.option.label,
+      })),
+    }));
+  }
+
+  async getUserPredictions(userId: number): Promise<
+    Array<{
+      id: number;
+      title: string;
+      category: string;
+      type: string;
+      approved: boolean;
+      resolved: boolean;
+      expiresAt: string;
+      createdAt: string;
+      totalBets?: number;
+    }>
+  > {
+    const predictions = await prisma.prediction.findMany({
+      where: { creatorId: userId },
+      include: { _count: { select: { bets: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+    });
+
+    return predictions.map((prediction) => ({
+      id: prediction.id,
+      title: prediction.title,
+      category: prediction.category,
+      type: prediction.type,
+      approved: prediction.approved,
+      resolved: prediction.resolved,
+      expiresAt: prediction.expiresAt.toISOString(),
+      createdAt: prediction.createdAt.toISOString(),
+      totalBets: prediction._count.bets,
+    }));
+  }
+
+  // Achievement-related methods
+  async getUserTotalBetsCount(userId: number): Promise<number> {
+    return prisma.bet.count({ where: { userId } });
+  }
+
+  async getUserCategoryWinsCount(userId: number, category: string): Promise<number> {
+    return prisma.bet.count({
+      where: {
+        userId,
+        status: 'WON',
+        prediction: { category },
+      },
+    });
+  }
+
+  async getUserParlayWinsCount(userId: number): Promise<number> {
+    return prisma.parlay.count({
+      where: { userId, status: 'WON' },
+    });
+  }
 }
 
 function mapUserPost(post: any): DbUserPost {
