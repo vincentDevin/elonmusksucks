@@ -6,6 +6,7 @@ import {
 } from '../repositories/AchievementRepository';
 
 const prisma = new PrismaClient();
+const achievementRepository = new AchievementRepository(prisma);
 
 export interface CreateAchievementData {
   name: string;
@@ -168,39 +169,34 @@ class AdminAchievementService {
    */
   async createAchievement(data: CreateAchievementData): Promise<AchievementWithStats> {
     // Validate unique name
-    const existing = await prisma.achievement.findUnique({
-      where: { name: data.name },
-    });
+    const existing = await achievementRepository.findByName(data.name);
 
     if (existing) {
       throw new Error(`Achievement with name "${data.name}" already exists`);
     }
 
-    const achievement = await prisma.achievement.create({
-      data: {
-        name: data.name,
-        title: data.title,
-        description: data.description,
-        category: data.category,
-        targetValue: data.targetValue,
-        iconUrl: data.iconUrl || null,
-        isActive: data.isActive ?? true,
-        sortOrder: data.sortOrder ?? 999,
-      },
+    const achievement = await achievementRepository.create({
+      name: data.name,
+      title: data.title,
+      description: data.description,
+      category: data.category,
+      targetValue: data.targetValue,
+      iconUrl: data.iconUrl || null,
+      isActive: data.isActive ?? true,
+      sortOrder: data.sortOrder ?? 999,
     });
 
     // Initialize progress for all existing users if this is an automatic achievement
     if (data.targetValue > 0) {
-      const users = await prisma.user.findMany({ select: { id: true } });
+      const users = await achievementRepository.findAllUserIds();
 
-      await prisma.userAchievement.createMany({
-        data: users.map((user) => ({
+      await achievementRepository.createManyUserAchievements(
+        users.map((user) => ({
           userId: user.id,
           achievementId: achievement.id,
           progress: 0,
         })),
-        skipDuplicates: true,
-      });
+      );
     }
 
     return {
@@ -219,18 +215,15 @@ class AdminAchievementService {
     achievementId: number,
     data: UpdateAchievementData,
   ): Promise<AchievementWithStats> {
-    await prisma.achievement.update({
-      where: { id: achievementId },
-      data: {
-        title: data.title,
-        description: data.description,
-        category: data.category,
-        targetValue: data.targetValue,
-        iconUrl: data.iconUrl,
-        isActive: data.isActive,
-        sortOrder: data.sortOrder,
-        updatedAt: new Date(),
-      },
+    await achievementRepository.update(achievementId, {
+      title: data.title,
+      description: data.description,
+      category: data.category,
+      targetValue: data.targetValue,
+      iconUrl: data.iconUrl,
+      isActive: data.isActive,
+      sortOrder: data.sortOrder,
+      updatedAt: new Date(),
     });
 
     return this.getAchievementById(achievementId) as Promise<AchievementWithStats>;
@@ -241,52 +234,40 @@ class AdminAchievementService {
    */
   async deleteAchievement(achievementId: number): Promise<void> {
     // Delete all user progress first
-    await prisma.userAchievement.deleteMany({
-      where: { achievementId },
-    });
+    await achievementRepository.deleteUserAchievementsByAchievementId(achievementId);
 
     // Delete the achievement
-    await prisma.achievement.delete({
-      where: { id: achievementId },
-    });
+    await achievementRepository.delete(achievementId);
   }
 
   /**
    * Manually grant an achievement to a user
    */
   async grantAchievement(achievementId: number, userId: number): Promise<void> {
-    const achievement = await prisma.achievement.findUnique({
-      where: { id: achievementId },
-    });
+    const achievement = await achievementRepository.findById(achievementId);
 
     if (!achievement) {
       throw new Error('Achievement not found');
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-    });
+    const user = await achievementRepository.findUserById(userId);
 
     if (!user) {
       throw new Error('User not found');
     }
 
     // Check if already granted
-    const existing = await prisma.userAchievement.findUnique({
-      where: {
-        userId_achievementId: {
-          userId,
-          achievementId,
-        },
-      },
-    });
+    const existing = await achievementRepository.findUserAchievementByUserAndAchievementId(
+      userId,
+      achievementId,
+    );
 
     if (existing?.completedAt) {
       throw new Error('User already has this achievement');
     }
 
     // Grant the achievement
-    await prisma.userAchievement.upsert({
+    await achievementRepository.updateUserAchievement({
       where: {
         userId_achievementId: {
           userId,
@@ -326,28 +307,30 @@ class AdminAchievementService {
    * Revoke an achievement from a user
    */
   async revokeAchievement(achievementId: number, userId: number): Promise<void> {
-    const existing = await prisma.userAchievement.findUnique({
-      where: {
-        userId_achievementId: {
-          userId,
-          achievementId,
-        },
-      },
-    });
+    const existing = await achievementRepository.findUserAchievementByUserAndAchievementId(
+      userId,
+      achievementId,
+    );
 
     if (!existing) {
       throw new Error('User does not have this achievement');
     }
 
     // Reset progress and completion
-    await prisma.userAchievement.update({
+    await achievementRepository.updateUserAchievement({
       where: {
         userId_achievementId: {
           userId,
           achievementId,
         },
       },
-      data: {
+      create: {
+        userId,
+        achievementId,
+        progress: 0,
+        completedAt: null,
+      },
+      update: {
         progress: 0,
         completedAt: null,
       },
@@ -365,9 +348,7 @@ class AdminAchievementService {
     failureCount: number;
     errors: Array<{ userId: number; error: string }>;
   }> {
-    const achievement = await prisma.achievement.findUnique({
-      where: { id: achievementId },
-    });
+    const achievement = await achievementRepository.findById(achievementId);
 
     if (!achievement) {
       throw new Error('Achievement not found');
@@ -404,13 +385,15 @@ class AdminAchievementService {
       completedAt: Date | null;
     }>
   > {
-    const userProgress = await prisma.userAchievement.findMany({
-      where: { achievementId },
-      include: { user: true },
-      orderBy: { completedAt: 'desc' },
-    });
+    const userProgress = await achievementRepository.findUserAchievementsByAchievementId(
+      achievementId,
+      {
+        include: { user: true },
+        orderBy: { completedAt: 'desc' },
+      },
+    );
 
-    return userProgress.map((p) => ({
+    return userProgress.map((p: any) => ({
       userId: p.userId,
       userName: p.user.name,
       progress: p.progress,
@@ -422,13 +405,8 @@ class AdminAchievementService {
    * Get system-wide achievement analytics
    */
   async getAchievementAnalytics(): Promise<AchievementAnalytics> {
-    const achievements = await prisma.achievement.findMany();
-    const userAchievements = await prisma.userAchievement.findMany({
-      include: {
-        user: true,
-        achievement: true,
-      },
-    });
+    const achievements = await achievementRepository.findAllAchievements();
+    const userAchievements = await achievementRepository.findAllUserAchievementsWithDetails();
 
     // Calculate overview stats
     const totalAchievements = achievements.length;

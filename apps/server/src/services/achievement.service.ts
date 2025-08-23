@@ -3,6 +3,7 @@ import { StatisticsEventEmitter } from '../handlers/statisticsSocketHandlers';
 import { unifiedActivityService } from './unifiedActivity.service';
 import { bettingStatsService } from './bettingStats.service';
 import { socialStatsService } from './socialStats.service';
+import { AchievementRepository } from '../repositories/AchievementRepository';
 
 export interface AchievementTrigger {
   type:
@@ -48,9 +49,11 @@ export interface Achievement {
 
 export class AchievementService {
   private prisma: PrismaClient;
+  private achievementRepository: AchievementRepository;
 
   constructor() {
     this.prisma = new PrismaClient();
+    this.achievementRepository = new AchievementRepository(this.prisma);
   }
 
   /**
@@ -192,7 +195,7 @@ export class AchievementService {
 
     if (!achievement) return null;
 
-    const userAchievement = await this.prisma.userAchievement.upsert({
+    const userAchievement = await this.achievementRepository.updateUserAchievement({
       where: {
         userId_achievementId: {
           userId,

@@ -4,6 +4,7 @@ export interface IAchievementRepository {
   findMany(params?: any): Promise<any[]>;
   findById(id: number): Promise<any | null>;
   findBySlug(slug: string): Promise<any | null>;
+  findByName(name: string): Promise<any | null>;
   create(data: any): Promise<any>;
   update(id: number, data: any): Promise<any>;
   delete(id: number): Promise<void>;
@@ -11,6 +12,18 @@ export interface IAchievementRepository {
   findUserAchievementsByAchievementId(achievementId: number, params?: any): Promise<any[]>;
   createUserAchievement(data: any): Promise<any>;
   updateUserAchievement(params: any): Promise<any>;
+  findAllUserIds(): Promise<{ id: number }[]>;
+  createManyUserAchievements(
+    data: { userId: number; achievementId: number; progress: number }[],
+  ): Promise<void>;
+  deleteUserAchievementsByAchievementId(achievementId: number): Promise<void>;
+  findUserById(userId: number): Promise<any | null>;
+  findUserAchievementByUserAndAchievementId(
+    userId: number,
+    achievementId: number,
+  ): Promise<any | null>;
+  findAllAchievements(): Promise<any[]>;
+  findAllUserAchievementsWithDetails(): Promise<any[]>;
   // Idempotency methods
   recordEventIdempotency(
     idempotencyKey: string,
@@ -43,7 +56,20 @@ export class AchievementRepository implements IAchievementRepository {
 
   async create(data: any) {
     return this.prisma.achievement.create({
-      data,
+      data: {
+        name: data.name,
+        title: data.title,
+        description: data.description,
+        category: data.category,
+        targetValue: data.targetValue,
+        iconUrl: data.iconUrl ?? null,
+        isActive: data.isActive ?? true,
+        sortOrder: data.sortOrder ?? 999,
+        slug: data.slug,
+        autoAward: data.autoAward,
+        manualOnly: data.manualOnly,
+        ruleData: data.ruleData,
+      },
     });
   }
 
@@ -263,5 +289,60 @@ export class AchievementRepository implements IAchievementRepository {
       console.error('Failed to backfill achievement rules:', error);
       return 0;
     }
+  }
+
+  async findByName(name: string) {
+    return this.prisma.achievement.findUnique({
+      where: { name },
+    });
+  }
+
+  async findAllUserIds() {
+    return this.prisma.user.findMany({ select: { id: true } });
+  }
+
+  async createManyUserAchievements(
+    data: { userId: number; achievementId: number; progress: number }[],
+  ) {
+    await this.prisma.userAchievement.createMany({
+      data,
+      skipDuplicates: true,
+    });
+  }
+
+  async deleteUserAchievementsByAchievementId(achievementId: number) {
+    await this.prisma.userAchievement.deleteMany({
+      where: { achievementId },
+    });
+  }
+
+  async findUserById(userId: number) {
+    return this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+  }
+
+  async findUserAchievementByUserAndAchievementId(userId: number, achievementId: number) {
+    return this.prisma.userAchievement.findUnique({
+      where: {
+        userId_achievementId: {
+          userId,
+          achievementId,
+        },
+      },
+    });
+  }
+
+  async findAllAchievements() {
+    return this.prisma.achievement.findMany();
+  }
+
+  async findAllUserAchievementsWithDetails() {
+    return this.prisma.userAchievement.findMany({
+      include: {
+        user: true,
+        achievement: true,
+      },
+    });
   }
 }
