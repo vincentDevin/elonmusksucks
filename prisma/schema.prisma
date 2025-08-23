@@ -272,6 +272,7 @@ model Achievement {
   manualOnly    Boolean             @default(false) // Whether this achievement can only be manually granted
   isShame       Boolean             @default(false) // Whether this is a shame achievement for banned users
   sortOrder     Int                 @default(0) // Display order
+  ruleData      Json?               // JSON rules for event-driven achievement evaluation
   createdAt     DateTime            @default(now())
   updatedAt     DateTime            @default(now()) @updatedAt
   
@@ -300,6 +301,16 @@ model UserAchievement {
   @@unique([userId, achievementId])
   @@index([userId, progress])
   @@index([achievementId, completedAt])
+}
+
+model AchievementEventLog {
+  idempotencyKey String   @id // Unique per event to prevent duplicates
+  userId         Int
+  eventKey       String   // Achievement event type
+  createdAt      DateTime @default(now())
+  
+  @@index([userId, eventKey])
+  @@index([createdAt])
 }
 
 model UserBadge {

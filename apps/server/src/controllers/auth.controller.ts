@@ -174,29 +174,14 @@ export const updateTheme: RequestHandler = async (req, res, next) => {
       return sendError(res, 400, 'Theme ID is too long');
     }
 
-    // Import prisma client and user cache
-    const { PrismaClient } = await import('@prisma/client');
-    const { userCache } = await import('../utils/userCache');
-    const prisma = new PrismaClient();
+    // Update user's theme preference using auth service
+    const authService = await import('../services/auth.service');
+    const updatedUser = await authService.updateUserTheme(userId, themeId);
 
-    try {
-      // Update user's theme preference
-      const updatedUser = await prisma.user.update({
-        where: { id: userId },
-        data: { theme: themeId },
-        select: { id: true, theme: true },
-      });
-
-      // Invalidate user cache since data changed
-      userCache.invalidate(userId);
-
-      return res.json({
-        success: true,
-        theme: updatedUser.theme,
-      });
-    } finally {
-      await prisma.$disconnect();
-    }
+    return res.json({
+      success: true,
+      theme: updatedUser.theme,
+    });
   } catch (err) {
     next(err);
   }

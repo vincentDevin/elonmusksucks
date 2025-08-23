@@ -800,3 +800,137 @@ export const AI_DIFFICULTIES = {
 } as const;
 
 export type AIDifficulty = keyof typeof AI_DIFFICULTIES;
+
+// ——— Achievement Events ————————————————————————————————————
+export type AchievementEventKey =
+  | 'bet:placed'
+  | 'bet:resolved'
+  | 'prediction:resolved'
+  | 'payout:completed'
+  | 'parlay:won'
+  | 'pong:match:recorded'
+  | 'pong:elo:update'
+  | 'user:login'
+  | 'user:follow'
+  | 'prediction:created';
+
+export interface AchievementEvent {
+  key: AchievementEventKey;
+  userId: number;
+  occurredAt: string; // ISO 8601
+  idempotencyKey: string;
+  payload: Record<string, unknown>;
+}
+
+// Typed payloads for each event
+export interface BetPlacedPayload {
+  betId: number;
+  predictionId: number;
+  amount: number;
+  odds: number;
+  category: string;
+  optionLabel: string;
+}
+
+export interface BetResolvedPayload {
+  betId: number;
+  predictionId: number;
+  won: boolean;
+  payout: number;
+  profit: number;
+}
+
+export interface PredictionResolvedPayload {
+  predictionId: number;
+  category: string;
+  winningOptionId: number;
+  totalPool: number;
+}
+
+export interface PayoutCompletedPayload {
+  userId: number;
+  betId?: number;
+  parlayId?: number;
+  amount: number;
+  profit: number;
+  roi: number;
+  isBiggestWin?: boolean;
+}
+
+export interface ParlayWonPayload {
+  parlayId: number;
+  legs: number;
+  combinedOdds: number;
+  stake: number;
+  payout: number;
+  profit: number;
+}
+
+export interface PongMatchRecordedPayload {
+  matchId: number;
+  opponentId: number | null; // null for AI
+  aiDifficulty?: 'easy' | 'medium' | 'hard' | 'impossible';
+  result: 'win' | 'loss';
+  playerScore: number;
+  opponentScore: number;
+  wager?: number;
+  isPerfectGame: boolean;
+  isComeback: boolean;
+  rageQuit: boolean;
+  duration: number; // seconds
+}
+
+export interface PongEloUpdatePayload {
+  userId: number;
+  oldElo: number;
+  newElo: number;
+  delta: number;
+  matchId: number;
+}
+
+export interface UserLoginPayload {
+  userId: number;
+  consecutiveDays: number;
+  isFirstLogin: boolean;
+}
+
+export interface UserFollowPayload {
+  followerId: number;
+  followingId: number;
+}
+
+export interface PredictionCreatedPayload {
+  predictionId: number;
+  category: string;
+  type: PredictionType;
+  creatorId: number;
+}
+
+// Achievement rule types
+export type AchievementProgressKind = 'count' | 'streak' | 'threshold' | 'binary';
+
+export interface AchievementRule {
+  eventKeys: AchievementEventKey[];
+  progress: {
+    kind: AchievementProgressKind;
+    incrementIf?: Record<string, unknown>;
+    setIf?: Record<string, unknown>;
+    resetIf?: Record<string, unknown>;
+  };
+  unlockWhen: Record<string, unknown>;
+  counters?: string[];
+}
+
+// Achievement categories and rarity
+export type AchievementCategory = 'betting' | 'pong' | 'social' | 'system';
+export type AchievementRarity = 'common' | 'rare' | 'epic' | 'legendary' | 'shame';
+
+// User achievement progress
+export interface UserAchievementProgress {
+  userId: number;
+  achievementId: number;
+  progress: number;
+  progressMax: number;
+  unlockedAt: string | null;
+  meta?: Record<string, unknown>;
+}
