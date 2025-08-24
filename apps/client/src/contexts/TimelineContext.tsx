@@ -1,7 +1,10 @@
 // apps/client/src/contexts/TimelineContext.tsx
-import React, { createContext, useContext, useReducer, useEffect } from 'react';
+// Rollback: Remove AbortController integration and revert to original fetch calls
+// Rollback: Remove sessionStorage caching and restore direct API fetching
+import React, { createContext, useContext, useReducer, useEffect, useRef } from 'react';
 import type { TimelineItem, TimelineResponse } from '@ems/types';
 import { useSocket } from './SocketContext';
+import { sessionCache } from '../lib/sessionCache';
 
 // State interface
 interface TimelineState {
@@ -175,11 +178,48 @@ export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [state, dispatch] = useReducer(timelineReducer, initialState);
   const socket = useSocket();
 
+  // Cache keys for timeline data
+  const getCacheKey = (type: 'articles' | 'tweets', filters: any) => {
+    const filterStr = JSON.stringify({
+      tags: filters.tags?.sort() || [],
+      sort: filters.sort || 'newest',
+      search: filters.search || '',
+    });
+    return `timeline_${type}_${filterStr}`;
+  };
+
+  // AbortController refs for cancelling requests
+  const articlesAbortController = useRef<AbortController | null>(null);
+  const tweetsAbortController = useRef<AbortController | null>(null);
+
   // Actions
   const loadArticles = async (reset = false) => {
     if (state.articlesLoading) return;
 
+    // Try to load from cache first (only on reset/initial load)
+    if (reset) {
+      const cacheKey = getCacheKey('articles', state.filters);
+      const cachedData = sessionCache.get<{
+        items: TimelineItem[];
+        cursor?: string;
+        hasMore: boolean;
+      }>(cacheKey);
+      if (cachedData) {
+        dispatch({ type: 'LOAD_ARTICLES_SUCCESS', payload: { ...cachedData, reset: true } });
+        return;
+      }
+    }
+
+    // Abort any pending articles request
+    if (articlesAbortController.current) {
+      articlesAbortController.current.abort();
+    }
+
     dispatch({ type: 'SET_LOADING', payload: { content: 'articles', loading: true } });
+
+    // Create new abort controller
+    const controller = new AbortController();
+    articlesAbortController.current = controller;
 
     try {
       const params = new URLSearchParams({
@@ -193,6 +233,7 @@ export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
       const response = await fetch(`/api/timeline/articles?${params}`, {
         credentials: 'include',
+        signal: controller.signal,
       });
 
       if (!response.ok) {
@@ -200,6 +241,16 @@ export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       }
 
       const data: TimelineResponse = await response.json();
+
+      // Cache the successful response (only for reset loads)
+      if (reset) {
+        const cacheKey = getCacheKey('articles', state.filters);
+        sessionCache.set(
+          cacheKey,
+          { items: data.items, cursor: data.pagination.cursor, hasMore: data.pagination.hasMore },
+          300000,
+        );
+      }
 
       dispatch({
         type: 'LOAD_ARTICLES_SUCCESS',
@@ -211,6 +262,11 @@ export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         },
       });
     } catch (error) {
+      // Don't set error state if request was aborted
+      if (error instanceof Error && error.name === 'AbortError') {
+        return;
+      }
+
       dispatch({
         type: 'SET_ERROR',
         payload: {
@@ -218,13 +274,38 @@ export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           error: error instanceof Error ? error.message : 'Failed to load articles',
         },
       });
+    } finally {
+      articlesAbortController.current = null;
     }
   };
 
   const loadTweets = async (reset = false) => {
     if (state.tweetsLoading) return;
 
+    // Try to load from cache first (only on reset/initial load)
+    if (reset) {
+      const cacheKey = getCacheKey('tweets', {});
+      const cachedData = sessionCache.get<{
+        items: TimelineItem[];
+        cursor?: string;
+        hasMore: boolean;
+      }>(cacheKey);
+      if (cachedData) {
+        dispatch({ type: 'LOAD_TWEETS_SUCCESS', payload: { ...cachedData, reset: true } });
+        return;
+      }
+    }
+
+    // Abort any pending tweets request
+    if (tweetsAbortController.current) {
+      tweetsAbortController.current.abort();
+    }
+
     dispatch({ type: 'SET_LOADING', payload: { content: 'tweets', loading: true } });
+
+    // Create new abort controller
+    const controller = new AbortController();
+    tweetsAbortController.current = controller;
 
     try {
       const params = new URLSearchParams({
@@ -234,6 +315,7 @@ export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
       const response = await fetch(`/api/timeline/tweets?${params}`, {
         credentials: 'include',
+        signal: controller.signal,
       });
 
       if (!response.ok) {
@@ -241,6 +323,16 @@ export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       }
 
       const data: TimelineResponse = await response.json();
+
+      // Cache the successful response (only for reset loads)
+      if (reset) {
+        const cacheKey = getCacheKey('tweets', {});
+        sessionCache.set(
+          cacheKey,
+          { items: data.items, cursor: data.pagination.cursor, hasMore: data.pagination.hasMore },
+          300000,
+        );
+      }
 
       dispatch({
         type: 'LOAD_TWEETS_SUCCESS',
@@ -252,6 +344,11 @@ export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         },
       });
     } catch (error) {
+      // Don't set error state if request was aborted
+      if (error instanceof Error && error.name === 'AbortError') {
+        return;
+      }
+
       dispatch({
         type: 'SET_ERROR',
         payload: {
@@ -259,6 +356,8 @@ export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           error: error instanceof Error ? error.message : 'Failed to load tweets',
         },
       });
+    } finally {
+      tweetsAbortController.current = null;
     }
   };
 
@@ -273,6 +372,10 @@ export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const updateFilters = (filters: Partial<TimelineState['filters']>) => {
     dispatch({ type: 'UPDATE_FILTERS', payload: filters });
+
+    // Clear cache when filters change
+    const oldCacheKey = getCacheKey('articles', state.filters);
+    sessionCache.delete(oldCacheKey);
 
     // Reload current tab with new filters
     if (state.activeTab === 'articles') {
@@ -363,6 +466,18 @@ export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       socket.off('feed:tweet:new', handleNewTweet);
     };
   }, [socket, state.activeTab]);
+
+  // Cleanup: abort any pending requests on unmount
+  useEffect(() => {
+    return () => {
+      if (articlesAbortController.current) {
+        articlesAbortController.current.abort();
+      }
+      if (tweetsAbortController.current) {
+        tweetsAbortController.current.abort();
+      }
+    };
+  }, []);
 
   return (
     <TimelineContext.Provider

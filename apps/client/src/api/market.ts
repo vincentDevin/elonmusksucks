@@ -1,10 +1,6 @@
 // apps/client/src/api/market.ts
-import axios from 'axios';
-
-const api = axios.create({
-  baseURL: '/api',
-  withCredentials: false, // No authentication needed for public market data
-});
+// Rollback: Remove axios import change and restore original API configuration
+import api from './axios';
 
 export interface MarketStats {
   totalVolume: number;
@@ -45,8 +41,13 @@ export interface MarketHealth {
  * Get real-time market overview statistics
  */
 export const getMarketOverview = async (): Promise<MarketStats> => {
-  const response = await api.get<MarketStats>('/market/overview');
-  return response.data;
+  try {
+    const response = await api.get<MarketStats>('/api/market/overview');
+    return response.data;
+  } catch (error) {
+    console.error('Failed to fetch market overview:', error);
+    throw new Error('Failed to load market overview');
+  }
 };
 
 /**

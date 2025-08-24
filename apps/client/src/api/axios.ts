@@ -1,5 +1,8 @@
 // apps/client/src/api/axios.ts
+// Rollback: Remove metrics imports and interceptors, restore original axios config
 import axios from 'axios';
+import { requestManager } from '../lib/requestManager';
+import { devMetrics } from '../lib/metrics';
 // CSRF Note: SPA uses JWT Bearer tokens for authentication, providing equivalent CSRF protection
 
 const api = axios.create({
@@ -45,25 +48,93 @@ const processQueue = (error: any, token: string | null = null) => {
   failedQueue = [];
 };
 
-// Attach Authorization header if token is set
+// Attach Authorization header if token is set and add request deduplication
 api.interceptors.request.use((config) => {
   if (accessToken && config.headers) {
     config.headers.Authorization = `Bearer ${accessToken}`;
   }
+
+  // Start timing for dev metrics
+  const requestId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  config.metadata = { ...config.metadata, requestId, startTime: Date.now() };
+
+  devMetrics.startRequest(requestId, config.method?.toUpperCase() || 'GET', config.url || '');
 
   // CSRF Protection: Bearer tokens in Authorization header provide CSRF protection
   // as they cannot be sent by malicious sites via simple form submissions
   return config;
 });
 
+// Add request deduplication interceptor (before response interceptor)
+api.interceptors.request.use(
+  (config) => {
+    // Skip deduplication for non-GET requests to avoid side effects
+    if (config.method?.toLowerCase() !== 'get') {
+      return config;
+    }
+
+    // Mark this request for potential deduplication
+    config.metadata = { ...config.metadata, shouldDedupe: true };
+    return config;
+  },
+  (error) => Promise.reject(error),
+);
+
+// Create deduplicated version of axios instance with AbortController support
+// Rollback: Remove AbortController integration and revert to original axios methods
+const originalGet = api.get.bind(api);
+api.get = function (url, config = {}) {
+  return requestManager.dedupe('get', url, () => originalGet(url, config), config.params);
+};
+
+// Helper to create requests with AbortController support
+export const createAbortableRequest = () => {
+  const controller = new AbortController();
+
+  const request = {
+    get: (url: string, config: any = {}) => api.get(url, { ...config, signal: controller.signal }),
+    post: (url: string, data?: any, config: any = {}) =>
+      api.post(url, data, { ...config, signal: controller.signal }),
+    put: (url: string, data?: any, config: any = {}) =>
+      api.put(url, data, { ...config, signal: controller.signal }),
+    delete: (url: string, config: any = {}) =>
+      api.delete(url, { ...config, signal: controller.signal }),
+    abort: () => controller.abort(),
+  };
+
+  return request;
+};
+
 // Handle 401 responses and automatically refresh tokens
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // End timing for dev metrics
+    if (response.config.metadata) {
+      const { requestId } = response.config.metadata;
+      devMetrics.endRequest(
+        requestId,
+        response.config.method?.toUpperCase() || 'GET',
+        response.config.url || '',
+        response.status,
+      );
+    }
+    return response;
+  },
   async (error) => {
     const originalRequest = error.config;
 
     // If error is not 401 or request has already been retried, reject immediately
     if (error.response?.status !== 401 || originalRequest._retry) {
+      // End timing for dev metrics even on error
+      if (error.config?.metadata) {
+        const { requestId } = error.config.metadata;
+        devMetrics.endRequest(
+          requestId,
+          error.config.method?.toUpperCase() || 'GET',
+          error.config.url || '',
+          error.response?.status,
+        );
+      }
       return Promise.reject(error);
     }
 
@@ -107,6 +178,17 @@ api.interceptors.response.use(
       // Refresh failed, clear token and handle auth failure
       processQueue(refreshError, null);
       setAccessToken('');
+
+      // End timing for dev metrics on refresh failure
+      if (originalRequest?.metadata) {
+        const { requestId } = originalRequest.metadata;
+        devMetrics.endRequest(
+          requestId,
+          originalRequest.method?.toUpperCase() || 'GET',
+          originalRequest.url || '',
+          401,
+        );
+      }
 
       // Call the auth failure callback if it exists (clears auth context)
       if (authFailureCallback) {

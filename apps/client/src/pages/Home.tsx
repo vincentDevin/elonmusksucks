@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+// Rollback: Remove useMarketOverview hook and restore raw fetch usage
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { TimelineProvider } from '../contexts/TimelineContext';
 import Timeline from '../components/timeline/Timeline';
 import { useAuth } from '../hooks/useAuth';
+import { useMarketOverview } from '../hooks/useMarketOverview';
 
 interface HomeStats {
   totalPredictions: number;
@@ -12,50 +14,32 @@ interface HomeStats {
 
 export default function Home() {
   const { user } = useAuth();
+  const { data: marketData, loading: loadingStats, error } = useMarketOverview();
+
   const [stats, setStats] = useState<HomeStats>({
     totalPredictions: 0,
     activeUsers: 0,
     muskBucksInCirculation: '0',
   });
-  const [loadingStats, setLoadingStats] = useState(true);
 
   useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        // Fetch real stats from market overview API
-        const response = await fetch('/api/market/overview');
-        if (response.ok) {
-          const data = await response.json();
-          setStats({
-            totalPredictions: data.totalPredictions || 0,
-            activeUsers: data.totalUsers || 0,
-            muskBucksInCirculation: data.totalVolume
-              ? `${(data.totalVolume / 1000000).toFixed(1)}M`
-              : '0',
-          });
-        } else {
-          // Fallback to placeholder values
-          setStats({
-            totalPredictions: 247,
-            activeUsers: 1423,
-            muskBucksInCirculation: '12.8M',
-          });
-        }
-      } catch (error) {
-        console.error('Failed to fetch market stats:', error);
-        // Fallback to placeholder values
-        setStats({
-          totalPredictions: 247,
-          activeUsers: 1423,
-          muskBucksInCirculation: '12.8M',
-        });
-      } finally {
-        setLoadingStats(false);
-      }
-    };
-
-    fetchStats();
-  }, []);
+    if (marketData) {
+      setStats({
+        totalPredictions: marketData.activeMarkets || 0,
+        activeUsers: marketData.totalUsers || 0,
+        muskBucksInCirculation: marketData.totalVolume
+          ? `${(marketData.totalVolume / 1000000).toFixed(1)}M`
+          : '0',
+      });
+    } else if (error) {
+      // Fallback to placeholder values on error
+      setStats({
+        totalPredictions: 247,
+        activeUsers: 1423,
+        muskBucksInCirculation: '12.8M',
+      });
+    }
+  }, [marketData, error]);
 
   // If user is logged in, redirect to dashboard or show different layout
   if (user) {

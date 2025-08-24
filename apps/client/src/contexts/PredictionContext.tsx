@@ -1,4 +1,5 @@
 // apps/client/src/contexts/PredictionContext.tsx
+// Rollback: Remove optimistic UI updates and restore original bet placement behavior
 // -----------------------------------------------------------------------------
 // Unified context for predictions list + live betting/parlay actions.
 // Replaces previous usePredictions / useBetting hooks.
@@ -11,6 +12,7 @@ import {
   useCallback,
   useState,
   useMemo,
+  useRef,
   type ReactNode,
 } from 'react';
 import {
@@ -44,6 +46,7 @@ const PredictionCtx = createContext<Ctx | undefined>(undefined);
 export function PredictionProvider({ children }: { children: ReactNode }) {
   const socket = useSocket();
   const { refreshUser } = useAuth();
+  const optimisticBetsRef = useRef<Map<string, any>>(new Map());
   const [predictions, setPredictions] = useState<PredictionFull[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -156,15 +159,74 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
   const placeBet = useCallback(
     async (payload: { optionId: number; amount: number }) => {
       console.log('PredictionContext placeBet called', payload);
+
+      // Create optimistic bet for immediate UI feedback
+      const optimisticBetId = `optimistic_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const optimisticBet = {
+        id: optimisticBetId,
+        amount: payload.amount,
+        status: 'pending' as const,
+        createdAt: new Date().toISOString(),
+        optionId: payload.optionId,
+        isOptimistic: true,
+      };
+
+      // Store optimistic bet for rollback if needed
+      optimisticBetsRef.current.set(optimisticBetId, optimisticBet);
+
+      // Optimistically update predictions state
+      setPredictions((prev) =>
+        prev.map((pred) => ({
+          ...pred,
+          options:
+            pred.options?.map((opt) =>
+              opt.id === payload.optionId
+                ? { ...opt, userBet: optimisticBet, totalBets: (opt.totalBets || 0) + 1 }
+                : opt,
+            ) || [],
+        })),
+      );
+
       try {
-        await socketRequest('bet:place', payload);
-        console.log('PredictionContext placeBet success');
+        const result = await socketRequest('bet:place', payload);
+        console.log('PredictionContext placeBet success', result);
+
+        // Clean up optimistic bet and replace with real data
+        optimisticBetsRef.current.delete(optimisticBetId);
+
+        // Replace optimistic bet with real bet data if available
+        if (result && typeof result === 'object' && 'bet' in result) {
+          setPredictions((prev) =>
+            prev.map((pred) => ({
+              ...pred,
+              options:
+                pred.options?.map((opt) =>
+                  opt.id === payload.optionId ? { ...opt, userBet: result.bet } : opt,
+                ) || [],
+            })),
+          );
+        }
 
         // Trigger user refresh to update balance and stats
         // Note: AuthContext already handles optimistic updates via Socket.IO events
         setTimeout(() => refreshUser(), 100);
       } catch (error) {
         console.error('PredictionContext placeBet error', error);
+
+        // Clean up optimistic bet and rollback optimistic update on error
+        optimisticBetsRef.current.delete(optimisticBetId);
+        setPredictions((prev) =>
+          prev.map((pred) => ({
+            ...pred,
+            options:
+              pred.options?.map((opt) =>
+                opt.id === payload.optionId && opt.userBet?.isOptimistic
+                  ? { ...opt, userBet: undefined, totalBets: Math.max(0, (opt.totalBets || 0) - 1) }
+                  : opt,
+              ) || [],
+          })),
+        );
+
         throw error;
       }
     },
@@ -173,14 +235,44 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
 
   const placeParlay = useCallback(
     async (payload: { legs: { optionId: number }[]; amount: number }) => {
+      // Create optimistic parlay for immediate UI feedback
+      const optimisticParlayId = `optimistic_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const optimisticParlay = {
+        id: optimisticParlayId,
+        legs: payload.legs,
+        totalAmount: payload.amount,
+        status: 'pending' as const,
+        createdAt: new Date().toISOString(),
+        isOptimistic: true,
+      };
+
+      // Store for potential rollback
+      optimisticBetsRef.current.set(optimisticParlayId, optimisticParlay);
+
+      // Set latest parlay optimistically
+      setLatestParlay(optimisticParlay as any);
+
       try {
-        await socketRequest('parlay:place', payload);
+        const result = await socketRequest('parlay:place', payload);
+
+        // Clean up optimistic parlay
+        optimisticBetsRef.current.delete(optimisticParlayId);
+
+        // Replace with real parlay data if available
+        if (result && typeof result === 'object' && 'parlay' in result) {
+          setLatestParlay(result.parlay);
+        }
 
         // Trigger user refresh to update balance and stats
         // Note: AuthContext already handles optimistic updates via Socket.IO events
         setTimeout(() => refreshUser(), 100);
       } catch (error) {
         console.error('PredictionContext placeParlay error', error);
+
+        // Clean up optimistic parlay and rollback
+        optimisticBetsRef.current.delete(optimisticParlayId);
+        setLatestParlay(null);
+
         throw error;
       }
     },

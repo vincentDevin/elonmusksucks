@@ -1,3 +1,100 @@
+// Rollback: Remove StatsSocketEvents, TimelineSocketEvents, and payload types
+// Socket Event Constants - centralized type-safe event names
+export const SocketEvents = {
+  // Core connection events
+  Connect: 'connect',
+  Disconnect: 'disconnect',
+  Error: 'error',
+  
+  // Betting events
+  BetPlace: 'bet:place',
+  BetPlaced: 'betPlaced',
+  BetUpdate: 'betUpdate',
+  
+  // Parlay events
+  ParlayPlace: 'parlay:place',
+  ParlayPlaced: 'parlayPlaced',
+  
+  // Stats events
+  StatsUpdate: 'stats:update',
+  StatsUpdated: 'stats:updated',
+  RankingChanged: 'ranking:changed',
+  
+  // Activity events
+  ActivityUpdate: 'unified:activity:update',
+  ActivityResponse: 'unified:activity:response',
+  
+  // Leaderboard events
+  LeaderboardAllTime: 'leaderboardAllTime',
+  LeaderboardDaily: 'leaderboardDaily',
+  LeaderboardRankChange: 'leaderboard:rankChange',
+} as const;
+
+// Stats socket events with typed payloads
+export const StatsSocketEvents = {
+  StatsUpdate: 'stats:update',
+  RankingUpdate: 'ranking:update',
+  AchievementUnlock: 'achievement:unlock',
+  CURRENT: 'stats:current',
+  ERROR: 'stats:error',
+  UPDATED: 'stats:updated',
+  RANKING: 'stats:ranking',
+  ACHIEVEMENT: 'stats:achievement',
+  REFRESHED: 'stats:refreshed',
+  RANKING_CHANGED: 'ranking:changed',
+  ACHIEVEMENT_UNLOCKED: 'achievement:unlocked'
+} as const;
+
+export type StatsSocketEvent = typeof StatsSocketEvents[keyof typeof StatsSocketEvents];
+
+// Timeline socket events with typed payloads
+export const TimelineSocketEvents = {
+  ArticleAdded: 'timeline:article:added',
+  ArticleUpdated: 'timeline:article:updated',
+  ArticleRemoved: 'timeline:article:removed',
+} as const;
+
+export type TimelineSocketEvent = typeof TimelineSocketEvents[keyof typeof TimelineSocketEvents];
+
+// Socket payload interfaces
+export interface StatsUpdatePayload {
+  userId: number;
+  stats?: {
+    totalBets?: number;
+    winRate?: number;
+    totalWinnings?: number;
+    currentStreak?: number;
+  };
+  changes?: {
+    winRate?: number;
+    profit?: number;
+    rank?: number;
+    streak?: number;
+    totalBets?: number;
+  };
+  achievements?: Array<{
+    id: string;
+    title: string;
+    description: string;
+    isUnlocked: boolean;
+  }>;
+  timestamp?: string;
+}
+
+export interface TimelineUpdatePayload {
+  articleId: string;
+  action: 'added' | 'updated' | 'removed';
+  data?: {
+    title?: string;
+    url?: string;
+    publishedAt?: string;
+    feedName?: string;
+  };
+}
+
+// Event-specific payload types can be added here as needed
+export type SocketEventMap = typeof SocketEvents;
+
 import type {
   User as PrismaUser,
   EmailVerification as PrismaEmailVerification,
@@ -1308,36 +1405,11 @@ export enum AchievementSocketEvents {
   BATCH_UNLOCKED = 'achievement:batch_unlocked'
 }
 
-export enum StatsSocketEvents {
-  CURRENT = 'stats:current',
-  ERROR = 'stats:error',
-  UPDATED = 'stats:updated',
-  RANKING = 'stats:ranking',
-  ACHIEVEMENT = 'stats:achievement',
-  REFRESHED = 'stats:refreshed',
-  RANKING_CHANGED = 'ranking:changed',
-  ACHIEVEMENT_UNLOCKED = 'achievement:unlocked'
-}
+// Removed duplicate StatsSocketEvents enum - using const object instead
 
 // ——— Socket Payloads ——————————————————————————————————————
 
-export interface StatsUpdatePayload {
-  userId: number;
-  changes: {
-    winRate?: number;
-    profit?: number;
-    rank?: number;
-    streak?: number;
-    totalBets?: number;
-  };
-  achievements?: Array<{
-    id: string;
-    title: string;
-    description: string;
-    isUnlocked: boolean;
-  }>;
-  timestamp: string;
-}
+// Removed duplicate StatsUpdatePayload interface - using the one defined earlier
 
 export interface RankingChangePayload {
   userId: number;

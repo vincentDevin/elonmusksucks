@@ -1,3 +1,4 @@
+// Rollback: Restore any type for form submission error handling
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
@@ -79,8 +80,9 @@ export default function ProfileSetup() {
       await updateUserProfile(currentUser!.id, { ...formData, profileComplete: true });
       await refreshUser();
       navigate('/');
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      const errorMessage = e instanceof Error ? e.message : 'Failed to update profile';
+      setError(errorMessage);
     }
   };
 

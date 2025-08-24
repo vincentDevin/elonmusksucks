@@ -1,4 +1,6 @@
+// Rollback: Remove Suspense boundaries and restore direct route rendering
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { Suspense } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import Login from '../pages/Login';
 import Register from '../pages/Register';
@@ -16,6 +18,13 @@ import AdminDashboard from '../pages/AdminDashboard';
 import Pong from '../pages/Pong';
 import { AdminProvider } from '../contexts/AdminContext';
 
+// Suspense fallback component
+const RouteFallback = () => (
+  <div className="flex items-center justify-center min-h-screen">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+  </div>
+);
+
 export default function AppRoutes() {
   const { accessToken, user } = useAuth();
 
@@ -31,9 +40,30 @@ export default function AppRoutes() {
 
       {/* Protected */}
       <Route element={<PrivateRoute />}>
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/predictions" element={<Predictions />} />
-        <Route path="/leaderboard" element={<EnhancedLeaderboard />} />
+        <Route
+          path="/dashboard"
+          element={
+            <Suspense fallback={<RouteFallback />}>
+              <Dashboard />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/predictions"
+          element={
+            <Suspense fallback={<RouteFallback />}>
+              <Predictions />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/leaderboard"
+          element={
+            <Suspense fallback={<RouteFallback />}>
+              <EnhancedLeaderboard />
+            </Suspense>
+          }
+        />
         <Route path="/leaderboard/classic" element={<Leaderboard />} />
         <Route path="/profile/:userId" element={<Profile />} />
 

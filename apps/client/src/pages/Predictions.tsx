@@ -1,4 +1,5 @@
 // apps/client/src/pages/Predictions.tsx
+// Rollback: Remove route-level Suspense handling
 // -----------------------------------------------------------------------------
 // Main predictions list page with enhanced betting experience.
 // Uses PredictionCard components with the new BetModal system.

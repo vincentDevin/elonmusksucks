@@ -1,9 +1,12 @@
 // apps/client/src/pages/Dashboard.tsx
+// Rollback: Remove UserDataProvider wrapper and restore direct hook usage
+// Rollback: Remove Suspense usage - handled at route level
 import { useState } from 'react';
 import UnifiedDashboardSettings from '../components/dashboard/customization/UnifiedDashboardSettings';
 import MobileDashboard from '../components/dashboard/mobile/MobileDashboard';
 import DesktopDashboard from '../components/dashboard/desktop/DesktopDashboard';
 import { useMobileOptimization } from '../hooks/useMobileOptimization';
+import { UserDataProvider } from '../contexts/UserDataContext';
 
 /**
  * Responsive Dashboard Layout
@@ -20,13 +23,17 @@ export default function Dashboard() {
   // Use mobile layout for mobile devices and portrait tablets
   if (shouldUseCompactLayout()) {
     return (
-      <>
+      <UserDataProvider>
         <MobileDashboard />
         <UnifiedDashboardSettings isOpen={showSettings} onClose={() => setShowSettings(false)} />
-      </>
+      </UserDataProvider>
     );
   }
 
   // Desktop layout - sophisticated multi-column design
-  return <DesktopDashboard />;
+  return (
+    <UserDataProvider>
+      <DesktopDashboard />
+    </UserDataProvider>
+  );
 }

@@ -1,4 +1,5 @@
 // apps/client/src/pages/EnhancedLeaderboard.tsx
+// Rollback: Remove route-level Suspense handling
 import { useState, useEffect } from 'react';
 import {
   ChevronLeftIcon,

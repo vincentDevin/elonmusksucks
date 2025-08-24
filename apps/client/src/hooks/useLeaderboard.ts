@@ -1,8 +1,10 @@
 // apps/client/src/hooks/useLeaderboard.ts
+// Rollback: Remove debouncing and restore direct socket handlers
 import { useState, useEffect, useCallback } from 'react';
 import { useSocket } from '../contexts/SocketContext';
 import type { PublicLeaderboardEntry } from '@ems/types';
 import { getTopAllTime, getTopDaily } from '../api/leaderboard';
+import { debounce } from '../lib/debouncer';
 
 export type LeaderboardPeriod = 'all-time' | 'daily';
 
@@ -30,16 +32,26 @@ export function useLeaderboard(period: LeaderboardPeriod = 'all-time', limit: nu
     fetchLeaderboard();
   }, [fetchLeaderboard]);
 
+  // Debounced refresh function to batch rapid updates
+  const debouncedRefresh = useCallback(
+    debounce(() => {
+      fetchLeaderboard();
+    }, 500),
+    [fetchLeaderboard],
+  );
+
   // Real-time updates via Socket.IO
   useEffect(() => {
     const handleAllTime = (entries: PublicLeaderboardEntry[]) => {
+      console.log('[useLeaderboard] All-time update (debounced):', entries);
       if (period === 'all-time') {
-        setData(entries);
+        debouncedRefresh();
       }
     };
     const handleDaily = (entries: PublicLeaderboardEntry[]) => {
+      console.log('[useLeaderboard] Daily update (debounced):', entries);
       if (period === 'daily') {
-        setData(entries);
+        debouncedRefresh();
       }
     };
 
@@ -48,6 +60,9 @@ export function useLeaderboard(period: LeaderboardPeriod = 'all-time', limit: nu
     return () => {
       socket.off('leaderboardAllTime', handleAllTime);
       socket.off('leaderboardDaily', handleDaily);
+
+      // Cancel any pending debounced updates
+      debouncedRefresh.cancel();
     };
   }, [socket, period]);
 

@@ -1,7 +1,9 @@
 // apps/client/src/hooks/useEnhancedLeaderboard.ts
+// Rollback: Remove debouncing and restore direct socket handlers
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSocket } from '../contexts/SocketContext';
 import { useAuth } from '../contexts/AuthContext';
+import { debounce } from '../lib/debouncer';
 import type { PublicLeaderboardEntry } from '@ems/types';
 import {
   getTopAllTimePaginated,
@@ -289,6 +291,14 @@ export function useEnhancedLeaderboard(
     fetchUserData();
   }, [fetchLeaderboard, fetchUserData]);
 
+  // Debounced update function to batch rapid socket updates
+  const debouncedUpdate = useCallback(
+    debounce(() => {
+      fetchLeaderboard(currentPage, true);
+    }, 500),
+    [fetchLeaderboard, currentPage],
+  );
+
   // Real-time updates via Socket.IO with enhanced change detection
   useEffect(() => {
     const handleLeaderboardUpdate = (entries: PublicLeaderboardEntry[]) => {
@@ -322,11 +332,13 @@ export function useEnhancedLeaderboard(
     };
 
     const handleAllTime = (entries: PublicLeaderboardEntry[]) => {
-      if (period === 'all-time') handleLeaderboardUpdate(entries);
+      console.log('[useEnhancedLeaderboard] All-time update (debounced):', entries);
+      if (period === 'all-time') debouncedUpdate();
     };
 
     const handleDaily = (entries: PublicLeaderboardEntry[]) => {
-      if (period === 'daily') handleLeaderboardUpdate(entries);
+      console.log('[useEnhancedLeaderboard] Daily update (debounced):', entries);
+      if (period === 'daily') debouncedUpdate();
     };
 
     // Enhanced Socket.IO events for individual rank changes
@@ -336,18 +348,8 @@ export function useEnhancedLeaderboard(
       newRank: number;
       metric: string;
     }) => {
-      const change: RankChange = {
-        userId: data.userId,
-        oldRank: data.oldRank,
-        newRank: data.newRank,
-        change: data.oldRank - data.newRank,
-        timestamp: new Date(),
-      };
-
-      setState((prev) => ({
-        ...prev,
-        recentChanges: [...prev.recentChanges, change].slice(-50),
-      }));
+      console.log('[useEnhancedLeaderboard] Rank change (debounced):', data);
+      debouncedUpdate();
     };
 
     socket.on('leaderboardAllTime', handleAllTime);
@@ -358,6 +360,10 @@ export function useEnhancedLeaderboard(
       socket.off('leaderboardAllTime', handleAllTime);
       socket.off('leaderboardDaily', handleDaily);
       socket.off('leaderboard:rankChange', handleRankChange);
+
+      // Cancel any pending debounced updates
+      debouncedUpdate.cancel();
+
       if (achievementTimeoutRef.current) {
         clearTimeout(achievementTimeoutRef.current);
       }
@@ -371,6 +377,7 @@ export function useEnhancedLeaderboard(
     detectRankChanges,
     generateAchievements,
     clearAchievements,
+    debouncedUpdate,
   ]);
 
   return {

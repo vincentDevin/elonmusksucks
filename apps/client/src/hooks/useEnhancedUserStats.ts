@@ -1,10 +1,14 @@
 // apps/client/src/hooks/useEnhancedUserStats.ts
-import { useState, useEffect, useCallback, useMemo } from 'react';
+// Rollback: Restore any types in socket handlers and error handling
+import { useUserData } from '../contexts/UserDataContext';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { SocketEvents, StatsSocketEvents, type StatsUpdatePayload } from '@ems/types';
 import { useAuth } from '../contexts/AuthContext';
+import { useVisibilityGuard } from '../lib/visibilityGuard';
 import { useSocket } from '../contexts/SocketContext';
 import { useMyBets, useMyParlays, useMyPredictions } from './useMeStubs';
 import { useEnhancedLeaderboard } from './useEnhancedLeaderboard';
-import api from '../api/axios';
+import api, { createAbortableRequest } from '../api/axios';
 import { cache, CACHE_KEYS, CACHE_TTL } from '../utils/cache';
 
 export interface CategoryAccuracy {
@@ -128,15 +132,36 @@ export function useEnhancedUserStats() {
   const myPredictions = useMyPredictions();
   const leaderboard = useEnhancedLeaderboard('all-time', { enableAchievements: true });
 
+  const { shouldRefresh, updateLastFetch } = useVisibilityGuard(5 * 60 * 1000); // 5 minutes
+
+  // Use centralized user data instead of individual fetches
+  const userData = useUserData();
+  if (userData.stats && userData.achievements && userData.activities) {
+    return { ...userData, enhancedStats: userData.stats };
+  }
+
   const [stats, setStats] = useState<EnhancedUserStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
 
-  // Fetch enhanced user statistics with advanced caching
+  // Rollback: Remove AbortController ref and revert to original request handling
+  const abortControllerRef = useRef<ReturnType<typeof createAbortableRequest> | null>(null);
+
+  // Fetch enhanced user statistics with advanced caching and abort support
   const fetchEnhancedStats = useCallback(
     async (force = false) => {
       if (!user?.id) return;
+
+      // Skip refresh if tab was hidden and data isn't stale
+      if (!force && !shouldRefresh()) {
+        return;
+      }
+
+      // Abort any pending request
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
 
       // Check cache first unless forcing refresh
       const cacheKey = CACHE_KEYS.USER_STATS(user.id);
@@ -152,8 +177,13 @@ export function useEnhancedUserStats() {
       setLoading(true);
       setError(null);
 
+      // Create new abortable request
+      const request = createAbortableRequest();
+      abortControllerRef.current = request;
+
       try {
-        // Try enhanced stats endpoint first, fallback to basic stats
+        // These 6 parallel API calls with AbortController support
+        // Requests will be cancelled if component unmounts or new request starts
         const [
           enhancedStatsResponse,
           activityResponse,
@@ -161,21 +191,25 @@ export function useEnhancedUserStats() {
           recentAchievementsResponse,
           allAchievementsResponse,
         ] = await Promise.all([
-          api
+          request
             .get(`/api/users/${user.id}/enhanced-stats`)
-            .catch(() => api.get(`/api/users/${user.id}/stats`).catch(() => ({ data: null }))),
-          api.get(`/api/users/${user.id}/activity`).catch(() => ({ data: [] })),
-          api.get(`/api/users/${user.id}/achievements`).catch(() => ({ data: [] })),
-          api.get(`/api/users/${user.id}/achievements/recent?limit=5`).catch(() => ({ data: [] })),
-          api.get('/api/admin/achievements').catch(() => ({ data: [] })), // Get all available achievements
+            .catch(() => request.get(`/api/users/${user.id}/stats`).catch(() => ({ data: null }))),
+          request.get(`/api/users/${user.id}/activity`).catch(() => ({ data: [] })),
+          request.get(`/api/users/${user.id}/achievements`).catch(() => ({ data: [] })),
+          request
+            .get(`/api/users/${user.id}/achievements/recent?limit=5`)
+            .catch(() => ({ data: [] })),
+          request.get('/api/admin/achievements').catch(() => ({ data: [] })), // Get all available achievements
         ]);
 
         // Calculate enhanced stats from available data
-        const activeBetsValue = myBets.data?.reduce((sum, bet) => sum + bet.amount, 0) || 0;
+        const activeBetsValue =
+          myBets.data?.reduce((sum, bet) => sum + Number(bet.amount || 0), 0) || 0;
         const activeParlaysValue =
-          myParlays.data?.reduce((sum, parlay) => sum + parlay.amount, 0) || 0;
+          myParlays.data?.reduce((sum, parlay) => sum + Number(parlay.amount || 0), 0) || 0;
         const potentialWinnings =
-          myParlays.data?.reduce((sum, parlay) => sum + parlay.potentialPayout, 0) || 0;
+          myParlays.data?.reduce((sum, parlay) => sum + Number(parlay.potentialPayout || 0), 0) ||
+          0;
         const pendingPredictions = myPredictions.data?.filter((p) => !p.approved).length || 0;
         const approvalRate = calculateApprovalRate(myPredictions.data || []);
 
@@ -245,12 +279,15 @@ export function useEnhancedUserStats() {
           achievements: {
             recentBadges: recentAchievementsResponse.data || [],
             progressToNext: achievementsResponse.data || [],
-            totalBadges: achievementsResponse.data?.filter((a: any) => a.isCompleted).length || 0,
+            totalBadges:
+              achievementsResponse.data?.filter((a: { isCompleted?: boolean }) => a.isCompleted)
+                .length || 0,
             totalAvailable: allAchievementsResponse.data?.length || 0,
             completionRate:
               allAchievementsResponse.data?.length > 0
-                ? (achievementsResponse.data?.filter((a: any) => a.isCompleted).length || 0) /
-                  allAchievementsResponse.data.length
+                ? (achievementsResponse.data?.filter(
+                    (a: { isCompleted?: boolean }) => a.isCompleted,
+                  ).length || 0) / allAchievementsResponse.data.length
                 : 0,
           },
           trends: {
@@ -286,7 +323,13 @@ export function useEnhancedUserStats() {
 
         setStats(enhancedStats);
         setRecentActivity(activityResponse.data || []);
+        updateLastFetch();
       } catch (err: unknown) {
+        // Don't set error state if request was aborted (component unmounted)
+        if (err instanceof Error && err.name === 'AbortError') {
+          return;
+        }
+
         console.error('Failed to fetch enhanced user stats:', err);
         const errorMessage = err instanceof Error ? err.message : 'Failed to load stats';
         setError(errorMessage);
@@ -296,10 +339,13 @@ export function useEnhancedUserStats() {
         setStats(fallbackStats);
       } finally {
         setLoading(false);
+        abortControllerRef.current = null;
       }
     },
     [
       user?.id,
+      shouldRefresh,
+      updateLastFetch,
       myBets.data,
       myParlays.data,
       myPredictions.data,
@@ -311,8 +357,10 @@ export function useEnhancedUserStats() {
   // Create fallback stats from existing data
   const createFallbackStats = useCallback((): EnhancedUserStats => {
     const totalBets = myBets.data?.length || 0;
-    const activeBetsValue = myBets.data?.reduce((sum, bet) => sum + bet.amount, 0) || 0;
-    const activeParlaysValue = myParlays.data?.reduce((sum, parlay) => sum + parlay.amount, 0) || 0;
+    const activeBetsValue =
+      myBets.data?.reduce((sum, bet) => sum + Number(bet.amount || 0), 0) || 0;
+    const activeParlaysValue =
+      myParlays.data?.reduce((sum, parlay) => sum + Number(parlay.amount || 0), 0) || 0;
     const pendingPredictions = myPredictions.data?.filter((p) => !p.approved).length || 0;
 
     return {
@@ -333,7 +381,8 @@ export function useEnhancedUserStats() {
         approvalRate: calculateApprovalRate(myPredictions.data || []),
         totalPortfolioValue: activeBetsValue + activeParlaysValue,
         potentialWinnings:
-          myParlays.data?.reduce((sum, parlay) => sum + parlay.potentialPayout, 0) || 0,
+          myParlays.data?.reduce((sum, parlay) => sum + Number(parlay.potentialPayout || 0), 0) ||
+          0,
       },
       ranking: {
         currentPosition: 0,
@@ -435,52 +484,57 @@ export function useEnhancedUserStats() {
     return insights.slice(0, 3); // Limit to 3 insights
   }, [stats]);
 
-  // Listen for real-time updates with throttling
-  useEffect(() => {
-    if (!user?.id || !socket) return;
-
-    // Throttle stats updates to avoid excessive API calls
-    let updateTimeout: NodeJS.Timeout | null = null;
-
-    const throttledRefresh = () => {
-      if (updateTimeout) return; // Already scheduled
-      updateTimeout = setTimeout(() => {
-        fetchEnhancedStats(true); // Force refresh
-        updateTimeout = null;
-      }, 1000); // Throttle to max 1 update per second
-    };
-
-    const handleStatsUpdate = (data: any) => {
+  // Rollback: Remove useCallback wrappers and revert to inline handlers
+  // Stable socket handlers using useCallback to prevent recreation
+  const handleStatsUpdate = useCallback(
+    (data: StatsUpdatePayload) => {
       console.log('[useEnhancedUserStats] Received stats:update', data);
-      if (data.userId === user.id) {
-        throttledRefresh();
+      if (data.userId === user?.id) {
+        fetchEnhancedStats(true);
       }
-    };
+    },
+    [user?.id, fetchEnhancedStats],
+  );
 
-    const handleStatsRefresh = (data: any) => {
+  const handleStatsRefresh = useCallback(
+    (data: unknown) => {
       console.log('[useEnhancedUserStats] Received stats:refresh', data);
-      if (data.userId === user.id) {
-        throttledRefresh();
+      if (
+        typeof data === 'object' &&
+        data &&
+        'userId' in data &&
+        (data as { userId?: number }).userId === user?.id
+      ) {
+        fetchEnhancedStats(true);
       }
-    };
+    },
+    [user?.id, fetchEnhancedStats],
+  );
 
-    const handleUserStatsUpdate = (data: any) => {
+  const handleUserStatsUpdate = useCallback(
+    (data: { userId?: number }) => {
       console.log('[useEnhancedUserStats] Received user:stats_update', data);
-      if (data.userId === user.id) {
-        throttledRefresh();
+      if (data.userId === user?.id) {
+        fetchEnhancedStats(true);
       }
-    };
+    },
+    [user?.id, fetchEnhancedStats],
+  );
 
-    const handleRankingChange = (data: any) => {
+  const handleRankingChange = useCallback(
+    (data: StatsUpdatePayload) => {
       console.log('[useEnhancedUserStats] Received ranking:change', data);
-      if (data.userId === user.id) {
-        throttledRefresh();
+      if (data.userId === user?.id) {
+        fetchEnhancedStats(true);
       }
-    };
+    },
+    [user?.id, fetchEnhancedStats],
+  );
 
-    const handleAchievementUnlocked = (data: any) => {
+  const handleAchievementUnlocked = useCallback(
+    (data: StatsUpdatePayload) => {
       console.log('[useEnhancedUserStats] Received achievement:unlocked', data);
-      if (data.userId === user.id || data.achievement?.userId === user.id) {
+      if (data.userId === user?.id) {
         // Add to recent activity
         const achievement = data.achievement || data;
         const newActivity: ActivityItem = {
@@ -496,32 +550,48 @@ export function useEnhancedUserStats() {
         // Refresh full stats
         fetchEnhancedStats();
       }
-    };
+    },
+    [user?.id, fetchEnhancedStats],
+  );
+
+  const handleBetEvent = useCallback(() => {
+    fetchEnhancedStats(true);
+  }, [fetchEnhancedStats]);
+
+  // Listen for real-time updates with stable handlers
+  useEffect(() => {
+    if (!user?.id || !socket) return;
 
     // Listen to new event names from backend
-    socket.on('stats:update', handleStatsUpdate);
+    socket.on(StatsSocketEvents.StatsUpdate, handleStatsUpdate);
     socket.on('stats:refresh', handleStatsRefresh);
     socket.on('user:stats_update', handleUserStatsUpdate);
-    socket.on('ranking:change', handleRankingChange);
-    socket.on('achievement:unlocked', handleAchievementUnlocked);
+    socket.on(StatsSocketEvents.RankingUpdate, handleRankingChange);
+    socket.on(StatsSocketEvents.AchievementUnlock, handleAchievementUnlocked);
 
-    // Keep some legacy events for backward compatibility with throttling
-    socket.on('betPlaced', throttledRefresh);
-    socket.on('betResolved', throttledRefresh);
+    // Keep some legacy events for backward compatibility
+    socket.on(SocketEvents.BetPlaced, handleBetEvent);
+    socket.on('betResolved', handleBetEvent);
 
     return () => {
-      if (updateTimeout) {
-        clearTimeout(updateTimeout);
-      }
-      socket.off('stats:update', handleStatsUpdate);
+      socket.off(StatsSocketEvents.StatsUpdate, handleStatsUpdate);
       socket.off('stats:refresh', handleStatsRefresh);
       socket.off('user:stats_update', handleUserStatsUpdate);
-      socket.off('ranking:change', handleRankingChange);
-      socket.off('achievement:unlocked', handleAchievementUnlocked);
-      socket.off('betPlaced');
-      socket.off('betResolved');
+      socket.off(StatsSocketEvents.RankingUpdate, handleRankingChange);
+      socket.off(StatsSocketEvents.AchievementUnlock, handleAchievementUnlocked);
+      socket.off(SocketEvents.BetPlaced, handleBetEvent);
+      socket.off('betResolved', handleBetEvent);
     };
-  }, [user?.id, socket, fetchEnhancedStats]);
+  }, [
+    socket,
+    user?.id,
+    handleStatsUpdate,
+    handleStatsRefresh,
+    handleUserStatsUpdate,
+    handleRankingChange,
+    handleAchievementUnlocked,
+    handleBetEvent,
+  ]);
 
   // Initial fetch with cache check
   useEffect(() => {
@@ -537,6 +607,16 @@ export function useEnhancedUserStats() {
     }
   }, [user?.id, fetchEnhancedStats]);
 
+  // Cleanup: abort any pending requests on unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+    };
+  }, []);
+
   return {
     stats,
     loading,
@@ -549,7 +629,7 @@ export function useEnhancedUserStats() {
 }
 
 // Helper functions
-function calculateApprovalRate(predictions: any[]): number {
+function calculateApprovalRate(predictions: { approved?: boolean }[]): number {
   if (predictions.length === 0) return 0;
   const approved = predictions.filter((p) => p.approved).length;
   return approved / predictions.length;

@@ -1,3 +1,4 @@
+// Rollback: Remove refreshUserData call from login/logout handlers
 import React, { createContext, useState, useEffect, useCallback, useContext } from 'react';
 import {
   login as loginApi,
@@ -22,6 +23,7 @@ interface AuthContextType {
   refreshUser: () => Promise<void>;
   refreshUserBalance: () => Promise<void>;
   clearAuth: () => void; // For use by axios interceptor
+  onUserDataRefresh?: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -30,6 +32,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [accessToken, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [onUserDataRefresh, setOnUserDataRefresh] = useState<(() => Promise<void>) | undefined>();
 
   // Refresh token and load current user on mount
   useEffect(() => {
@@ -51,13 +54,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   // Login user and load profile
-  const login = useCallback(async (email: string, password: string) => {
-    const token = await loginApi({ email, password });
-    setToken(token);
-    setAccessToken(token);
-    const currentUser = await meApi();
-    setUser(currentUser);
-  }, []);
+  const login = useCallback(
+    async (email: string, password: string) => {
+      const token = await loginApi({ email, password });
+      setToken(token);
+      setAccessToken(token);
+      const currentUser = await meApi();
+      setUser(currentUser);
+      if (onUserDataRefresh) {
+        await onUserDataRefresh();
+      }
+    },
+    [onUserDataRefresh],
+  );
 
   // Register user (does not auto-login)
   const register = useCallback(async (name: string, email: string, password: string) => {
@@ -276,6 +285,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         refreshUser,
         refreshUserBalance,
         clearAuth,
+        onUserDataRefresh,
       }}
     >
       {children}

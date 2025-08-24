@@ -1,6 +1,9 @@
 // apps/client/src/contexts/UnifiedActivityContext.tsx
+// Rollback: Remove socket event constants import and restore string literals
 import React, { createContext, useContext, useState, useRef, useEffect, useCallback } from 'react';
 import { useSocket } from './SocketContext';
+import { SocketEvents } from '@ems/types';
+import { useVisibilityGuard } from '../lib/visibilityGuard';
 import { getRecentActivities } from '../api/activity';
 import type { ActivityEventType } from '@ems/types';
 
@@ -137,6 +140,7 @@ let globalHasInitialized = getStoredHasInitialized();
 
 export function UnifiedActivityProvider({ children }: { children: React.ReactNode }) {
   const socket = useSocket();
+  const { shouldRefresh, updateLastFetch } = useVisibilityGuard(5 * 60 * 1000); // 5 minutes
   const [activities, setActivities] = useState<UnifiedActivity[]>(globalActivities);
   const [loading, setLoading] = useState(!globalHasInitialized);
   const [error, setError] = useState<string | null>(null);
@@ -252,6 +256,11 @@ export function UnifiedActivityProvider({ children }: { children: React.ReactNod
     if (globalHasRequestedInitialData) return; // Prevent duplicate requests
     globalHasRequestedInitialData = true;
 
+    // Skip refresh if tab was hidden and data isn't stale
+    if (!shouldRefresh()) {
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -345,12 +354,14 @@ export function UnifiedActivityProvider({ children }: { children: React.ReactNod
 
         setActivities(transformedActivities);
         setHasInitialized(true);
+        updateLastFetch();
       } else {
         console.log(
           '[UnifiedActivityContext] No initial activities found, waiting for real-time events',
         );
         globalHasInitialized = true;
         setHasInitialized(true);
+        updateLastFetch();
       }
     } catch (error) {
       console.error('[UnifiedActivityContext] Error loading initial activities:', error);
@@ -368,7 +379,7 @@ export function UnifiedActivityProvider({ children }: { children: React.ReactNod
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [shouldRefresh, updateLastFetch]);
 
   // Handle connection events
   const handleConnect = useCallback(() => {
@@ -403,11 +414,11 @@ export function UnifiedActivityProvider({ children }: { children: React.ReactNod
     setIsConnected(socket.connected);
 
     // Register Socket.IO listeners
-    socket.on('connect', handleConnect);
-    socket.on('disconnect', handleDisconnect);
-    socket.on('error', handleError);
-    socket.on('unified:activity:response', handleActivityFeedResponse);
-    socket.on('unified:activity:update', handleActivityUpdate);
+    socket.on(SocketEvents.Connect, handleConnect);
+    socket.on(SocketEvents.Disconnect, handleDisconnect);
+    socket.on(SocketEvents.Error, handleError);
+    socket.on(SocketEvents.ActivityResponse, handleActivityFeedResponse);
+    socket.on(SocketEvents.ActivityUpdate, handleActivityUpdate);
 
     // Just set connected state if already connected
     if (socket.connected) {
@@ -415,11 +426,11 @@ export function UnifiedActivityProvider({ children }: { children: React.ReactNod
     }
 
     return () => {
-      socket.off('connect', handleConnect);
-      socket.off('disconnect', handleDisconnect);
-      socket.off('error', handleError);
-      socket.off('unified:activity:response', handleActivityFeedResponse);
-      socket.off('unified:activity:update', handleActivityUpdate);
+      socket.off(SocketEvents.Connect, handleConnect);
+      socket.off(SocketEvents.Disconnect, handleDisconnect);
+      socket.off(SocketEvents.Error, handleError);
+      socket.off(SocketEvents.ActivityResponse, handleActivityFeedResponse);
+      socket.off(SocketEvents.ActivityUpdate, handleActivityUpdate);
     };
   }, [
     socket,

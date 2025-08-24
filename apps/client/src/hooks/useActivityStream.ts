@@ -283,6 +283,7 @@ export function useActivityStream() {
   );
 
   // Listen for real-time events and initial data
+  // Rollback: Remove handler stability fixes and revert to inline handlers
   useEffect(() => {
     if (!socket) return;
 
@@ -296,26 +297,8 @@ export function useActivityStream() {
       }
     };
 
-    // Handle initial activity stream response
-    socket.on('activity:response', handleActivityResponse);
-
-    // Handle connection events
-    socket.on('connect', initializeActivityStream);
-    socket.on('reconnect', initializeActivityStream);
-
-    // Real-time activity events with enhanced data
-    socket.on('bet:placed', handleActivity('betPlaced'));
-    socket.on('bet:resolved', handleActivity('betResolved'));
-    socket.on('parlay:placed', handleActivity('parlayPlaced'));
-    socket.on('parlay:resolved', handleActivity('parlayResolved'));
-    socket.on('prediction:created', handleActivity('predictionCreated'));
-    socket.on('prediction:resolved', handleActivity('predictionResolved'));
-    socket.on('achievement:unlocked', handleActivity('achievementUnlocked'));
-    socket.on('leaderboard:rankChange', handleActivity('leaderboard:rankChange'));
-    socket.on('activity:update', handleActivity('activityUpdate'));
-
-    // Platform-wide events (filtered by relevance)
-    socket.on('bigBetAlert', (data: any) => {
+    // Stable handlers for inline events to ensure proper cleanup
+    const handleBigBetAlert = (data: any) => {
       if (data.amount >= 1000) {
         // Only show really big bets
         const activity = createActivityFromEvent('betPlaced', { ...data, type: 'big_bet' });
@@ -330,9 +313,9 @@ export function useActivityStream() {
           }));
         }
       }
-    });
+    };
 
-    socket.on('predictionTrending', (data: any) => {
+    const handlePredictionTrending = (data: any) => {
       const activity: ActivityItem = {
         id: `trending_${data.id}_${Date.now()}`,
         type: 'trending_prediction',
@@ -353,17 +336,52 @@ export function useActivityStream() {
         ...prev,
         activities: [activity, ...prev.activities].slice(0, 100),
       }));
-    });
+    };
 
-    // Handle errors
-    socket.on('activity:error', (error: any) => {
+    const handleActivityError = (error: any) => {
       console.error('[activity-stream] Socket error:', error);
       setState((prev) => ({
         ...prev,
         error: error.message || 'Failed to load activity stream',
         loading: false,
       }));
-    });
+    };
+
+    // Store handlers for cleanup
+    const betPlacedHandler = handleActivity('betPlaced');
+    const betResolvedHandler = handleActivity('betResolved');
+    const parlayPlacedHandler = handleActivity('parlayPlaced');
+    const parlayResolvedHandler = handleActivity('parlayResolved');
+    const predictionCreatedHandler = handleActivity('predictionCreated');
+    const predictionResolvedHandler = handleActivity('predictionResolved');
+    const achievementUnlockedHandler = handleActivity('achievementUnlocked');
+    const leaderboardRankChangeHandler = handleActivity('leaderboard:rankChange');
+    const activityUpdateHandler = handleActivity('activityUpdate');
+
+    // Handle initial activity stream response
+    socket.on('activity:response', handleActivityResponse);
+
+    // Handle connection events
+    socket.on('connect', initializeActivityStream);
+    socket.on('reconnect', initializeActivityStream);
+
+    // Real-time activity events with enhanced data
+    socket.on('bet:placed', betPlacedHandler);
+    socket.on('bet:resolved', betResolvedHandler);
+    socket.on('parlay:placed', parlayPlacedHandler);
+    socket.on('parlay:resolved', parlayResolvedHandler);
+    socket.on('prediction:created', predictionCreatedHandler);
+    socket.on('prediction:resolved', predictionResolvedHandler);
+    socket.on('achievement:unlocked', achievementUnlockedHandler);
+    socket.on('leaderboard:rankChange', leaderboardRankChangeHandler);
+    socket.on('activity:update', activityUpdateHandler);
+
+    // Platform-wide events (filtered by relevance)
+    socket.on('bigBetAlert', handleBigBetAlert);
+    socket.on('predictionTrending', handlePredictionTrending);
+
+    // Handle errors
+    socket.on('activity:error', handleActivityError);
 
     // Initialize if already connected
     if (socket.connected) {
@@ -371,21 +389,22 @@ export function useActivityStream() {
     }
 
     return () => {
-      socket.off('activity:response');
-      socket.off('connect');
-      socket.off('reconnect');
-      socket.off('bet:placed');
-      socket.off('bet:resolved');
-      socket.off('parlay:placed');
-      socket.off('parlay:resolved');
-      socket.off('prediction:created');
-      socket.off('prediction:resolved');
-      socket.off('achievement:unlocked');
-      socket.off('leaderboard:rankChange');
-      socket.off('activity:update');
-      socket.off('bigBetAlert');
-      socket.off('predictionTrending');
-      socket.off('activity:error');
+      // Clean up with same handler references
+      socket.off('activity:response', handleActivityResponse);
+      socket.off('connect', initializeActivityStream);
+      socket.off('reconnect', initializeActivityStream);
+      socket.off('bet:placed', betPlacedHandler);
+      socket.off('bet:resolved', betResolvedHandler);
+      socket.off('parlay:placed', parlayPlacedHandler);
+      socket.off('parlay:resolved', parlayResolvedHandler);
+      socket.off('prediction:created', predictionCreatedHandler);
+      socket.off('prediction:resolved', predictionResolvedHandler);
+      socket.off('achievement:unlocked', achievementUnlockedHandler);
+      socket.off('leaderboard:rankChange', leaderboardRankChangeHandler);
+      socket.off('activity:update', activityUpdateHandler);
+      socket.off('bigBetAlert', handleBigBetAlert);
+      socket.off('predictionTrending', handlePredictionTrending);
+      socket.off('activity:error', handleActivityError);
     };
   }, [socket, createActivityFromEvent, handleActivityResponse, initializeActivityStream]);
 

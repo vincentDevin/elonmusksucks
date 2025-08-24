@@ -1,14 +1,15 @@
 // apps/client/src/hooks/useTimelineSocket.ts
+// Rollback: Revert to string literals in socket handlers, remove typed imports
 import { useEffect, useCallback } from 'react';
 import { useSocket } from '../contexts/SocketContext';
-import type { TimelineItem } from '@ems/types';
+import { TimelineSocketEvents, type TimelineUpdatePayload } from '@ems/types';
 
 interface UseTimelineSocketProps {
   activeTab: 'articles' | 'tweets';
-  onNewArticles?: (articles: TimelineItem[]) => void;
-  onNewTweets?: (tweets: TimelineItem[]) => void;
-  onArticleUpdate?: (article: TimelineItem) => void;
-  onModerationUpdate?: (data: any) => void;
+  onNewArticles?: (articles: TimelineUpdatePayload) => void;
+  onNewTweets?: (tweets: TimelineUpdatePayload) => void;
+  onArticleUpdate?: (article: TimelineUpdatePayload) => void;
+  onModerationUpdate?: (data: TimelineUpdatePayload) => void;
 }
 
 /**
@@ -30,9 +31,9 @@ export const useTimelineSocket = ({
 
   // Handle new approved articles
   const handleNewArticles = useCallback(
-    (data: any) => {
-      if (activeTab === 'articles' && onNewArticles && data.articles) {
-        onNewArticles(data.articles);
+    (data: TimelineUpdatePayload) => {
+      if (activeTab === 'articles' && onNewArticles) {
+        onNewArticles(data);
       }
     },
     [activeTab, onNewArticles],
@@ -40,9 +41,9 @@ export const useTimelineSocket = ({
 
   // Handle new tweets
   const handleNewTweets = useCallback(
-    (data: any) => {
-      if (activeTab === 'tweets' && onNewTweets && data.tweets) {
-        onNewTweets(data.tweets);
+    (data: TimelineUpdatePayload) => {
+      if (activeTab === 'tweets' && onNewTweets) {
+        onNewTweets(data);
       }
     },
     [activeTab, onNewTweets],
@@ -50,9 +51,9 @@ export const useTimelineSocket = ({
 
   // Handle article updates
   const handleArticleUpdate = useCallback(
-    (data: any) => {
-      if (onArticleUpdate && data.article) {
-        onArticleUpdate(data.article);
+    (data: TimelineUpdatePayload) => {
+      if (onArticleUpdate) {
+        onArticleUpdate(data);
       }
     },
     [onArticleUpdate],
@@ -60,7 +61,7 @@ export const useTimelineSocket = ({
 
   // Handle admin moderation updates
   const handleModerationUpdate = useCallback(
-    (data: any) => {
+    (data: TimelineUpdatePayload) => {
       if (onModerationUpdate) {
         onModerationUpdate(data);
       }
@@ -72,16 +73,16 @@ export const useTimelineSocket = ({
     if (!socket || !isConnected) return;
 
     // Subscribe to timeline events
-    socket.on('timeline:articles:approved', handleNewArticles);
+    socket.on(TimelineSocketEvents.ArticleAdded, handleNewArticles);
     socket.on('timeline:tweets:new', handleNewTweets);
-    socket.on('timeline:article:update', handleArticleUpdate);
-    socket.on('timeline:moderation:bulk', handleModerationUpdate);
+    socket.on(TimelineSocketEvents.ArticleUpdated, handleArticleUpdate);
+    socket.on(TimelineSocketEvents.ArticleRemoved, handleModerationUpdate);
 
     return () => {
-      socket.off('timeline:articles:approved', handleNewArticles);
+      socket.off(TimelineSocketEvents.ArticleAdded, handleNewArticles);
       socket.off('timeline:tweets:new', handleNewTweets);
-      socket.off('timeline:article:update', handleArticleUpdate);
-      socket.off('timeline:moderation:bulk', handleModerationUpdate);
+      socket.off(TimelineSocketEvents.ArticleUpdated, handleArticleUpdate);
+      socket.off(TimelineSocketEvents.ArticleRemoved, handleModerationUpdate);
     };
   }, [
     socket,

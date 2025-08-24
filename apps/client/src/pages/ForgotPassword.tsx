@@ -1,3 +1,4 @@
+// Rollback: Restore any type for form error handling
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
@@ -33,8 +34,9 @@ export default function ForgotPassword() {
     try {
       await requestPasswordReset(email);
       setStatus('sent');
-    } catch (err: any) {
-      setError(err.message || 'Something went wrong');
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Something went wrong';
+      setError(errorMessage);
       setStatus('error');
     }
   };
