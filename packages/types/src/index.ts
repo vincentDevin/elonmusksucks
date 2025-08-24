@@ -1085,11 +1085,21 @@ export interface RedisPoolConfig {
   idleTimeoutMs: number;
 }
 
+export interface RedisPoolHealth {
+  totalConnections: number;
+  activeConnections: number;
+  idleConnections: number;
+  failedAcquisitions: number;
+  avgAcquisitionTime: number;
+  lastHealthCheck: number;
+}
+
 export interface IRedisPool {
   getConnection(): Promise<any>;
   releaseConnection(connection: any): Promise<void>;
   destroy(): Promise<void>;
   getStats(): { active: number; idle: number; total: number };
+  getHealthStats?(): RedisPoolHealth;
 }
 
 // Socket.IO rate limiting interfaces
@@ -1759,6 +1769,64 @@ export interface ActivityEventData {
   relatedUserId?: number;
   predictionId?: number;
   betId?: number;
+}
+
+// Socket Handler Metrics
+export interface SocketHandlerMetrics {
+  handlerName: string;
+  count: number;
+  avgDuration: number;
+  p95Duration: number;
+  p99Duration: number;
+  errorCount: number;
+  errorRate: number;
+}
+
+// BullMQ Queue Metrics
+export interface BullMQMetrics {
+  queueName: string;
+  depth: number;
+  ageMs: number;
+  processed: number;
+  failed: number;
+  successRate: number;
+  lastUpdated: number;
+}
+
+// Distributed Tracing
+export interface TraceSpan {
+  traceId: string;
+  spanId: string;
+  operationName: string;
+  metadata: Record<string, any>;
+}
+
+export interface TraceContext {
+  traceId: string;
+  parentSpanId: string;
+}
+
+// Structured Error Handling
+export interface StructuredError {
+  code: string;
+  message: string;
+  context: Record<string, any>;
+  statusCode: number;
+  timestamp: string;
+}
+
+export interface ErrorContext {
+  [key: string]: any;
+}
+
+// Alert Thresholds
+export interface AlertThreshold {
+  type: string;
+  severity: 'critical' | 'warning' | 'info';
+  metric: string;
+  currentValue: number;
+  threshold: number;
+  message: string;
 }
 
 export interface ActivityStreamQuery {

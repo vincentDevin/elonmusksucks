@@ -9,6 +9,8 @@ import type { AckCallback } from '@ems/types';
 import { bettingService } from '../services/betting.service';
 import { betRateLimiter, createRateLimitMiddleware } from '../middleware/rateLimitMiddleware';
 import { betOperationQueue } from '../lib/BackpressureQueue';
+import { metricsCollector } from '../lib/metrics';
+import { tracingCollector } from '../lib/tracing';
 
 // TEMP: Re-export for backwards compatibility during migration
 type Ack = AckCallback;
@@ -18,30 +20,40 @@ export function registerBetHandlers(socket: Socket) {
 
   /* ───────────── bet:place ───────────── */
   socket.on('bet:place', async (p: { optionId: number; amount: number }, ack?: Ack) => {
-    try {
-      if (!auth.user) return ack?.('NOT_AUTHENTICATED');
+    await tracingCollector.trace(
+      'bet_place_handler',
+      async () => {
+        await metricsCollector.timeHandler('bet_place', async () => {
+          try {
+            if (!auth.user) return ack?.('NOT_AUTHENTICATED');
 
-      // Apply rate limiting
-      const rateLimitCheck = createRateLimitMiddleware(betRateLimiter, 'bet:place');
-      await new Promise<void>((resolve, reject) => {
-        rateLimitCheck(auth.user!.id, (error?: string) => {
-          if (error) reject(new Error(error));
-          else resolve();
+            // Apply rate limiting
+            const rateLimitCheck = createRateLimitMiddleware(betRateLimiter, 'bet:place');
+            await new Promise<void>((resolve, reject) => {
+              rateLimitCheck(auth.user!.id, (error?: string) => {
+                if (error) reject(new Error(error));
+                else resolve();
+              });
+            });
+
+            if (!p || typeof p.optionId !== 'number' || p.amount <= 0)
+              return ack?.('INVALID_PAYLOAD');
+
+            // Queue heavy betting operation to prevent system overload
+            await betOperationQueue.enqueue(async () => {
+              return bettingService.placeBet(auth.user!.id, p.optionId, p.amount);
+            }, 2); // High priority for single bets
+
+            return ack?.(null);
+          } catch (e: any) {
+            console.error('[bet] place error', e);
+            return ack?.(mapBetError(e));
+            throw e; // Re-throw for metrics error tracking
+          }
         });
-      });
-
-      if (!p || typeof p.optionId !== 'number' || p.amount <= 0) return ack?.('INVALID_PAYLOAD');
-
-      // Queue heavy betting operation to prevent system overload
-      await betOperationQueue.enqueue(async () => {
-        return bettingService.placeBet(auth.user!.id, p.optionId, p.amount);
-      }, 2); // High priority for single bets
-
-      return ack?.(null);
-    } catch (e: any) {
-      console.error('[bet] place error', e);
-      return ack?.(mapBetError(e));
-    }
+      },
+      { userId: auth.user?.id, optionId: p?.optionId, amount: p?.amount },
+    );
   });
 
   /* ───────────── parlay:place ─────────── */

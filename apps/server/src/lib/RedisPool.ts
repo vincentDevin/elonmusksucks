@@ -4,7 +4,7 @@
 // -----------------------------------------------------------------------------
 
 import IORedis, { type RedisOptions } from 'ioredis';
-import type { IRedisPool, RedisPoolConfig } from '@ems/types';
+import type { IRedisPool, RedisPoolConfig, RedisPoolHealth } from '@ems/types';
 
 export class RedisPool implements IRedisPool {
   private connections: IORedis[] = [];
@@ -16,6 +16,14 @@ export class RedisPool implements IRedisPool {
   private config: RedisPoolConfig;
   private redisOptions: RedisOptions;
   private destroyed = false;
+  private healthStats: RedisPoolHealth = {
+    totalConnections: 0,
+    activeConnections: 0,
+    idleConnections: 0,
+    failedAcquisitions: 0,
+    avgAcquisitionTime: 0,
+    lastHealthCheck: Date.now(),
+  };
 
   constructor(redisOptions: RedisOptions, config: Partial<RedisPoolConfig> = {}) {
     this.config = {
@@ -70,13 +78,18 @@ export class RedisPool implements IRedisPool {
   }
 
   async getConnection(): Promise<IORedis> {
+    const startTime = Date.now();
+
     if (this.destroyed) {
       throw new Error('Pool has been destroyed');
     }
 
     // If we have available connections, use one
     if (this.availableConnections.length > 0) {
-      return this.availableConnections.pop()!;
+      const connection = this.availableConnections.pop()!;
+      const acquisitionTime = Date.now() - startTime;
+      this.updateAcquisitionTime(acquisitionTime);
+      return connection;
     }
 
     // If we can create more connections, do so
@@ -84,6 +97,8 @@ export class RedisPool implements IRedisPool {
       try {
         const connection = await this.createConnection();
         this.connections.push(connection);
+        const acquisitionTime = Date.now() - startTime;
+        this.updateAcquisitionTime(acquisitionTime);
         return connection;
       } catch (error) {
         console.error('[redis-pool] Failed to create connection:', error);
@@ -97,12 +112,15 @@ export class RedisPool implements IRedisPool {
         if (index > -1) {
           this.pendingRequests.splice(index, 1);
         }
+        this.healthStats.failedAcquisitions++;
         reject(new Error('Pool acquire timeout'));
       }, this.config.acquireTimeoutMs);
 
       this.pendingRequests.push({
         resolve: (conn) => {
           clearTimeout(timeout);
+          const acquisitionTime = Date.now() - startTime;
+          this.updateAcquisitionTime(acquisitionTime);
           resolve(conn);
         },
         reject: (err) => {
@@ -135,6 +153,24 @@ export class RedisPool implements IRedisPool {
       idle: this.availableConnections.length,
       active: this.connections.length - this.availableConnections.length,
     };
+  }
+
+  getHealthStats(): RedisPoolHealth {
+    this.updateHealthStats();
+    return { ...this.healthStats };
+  }
+
+  private updateHealthStats(): void {
+    this.healthStats.totalConnections = this.connections.length;
+    this.healthStats.activeConnections = this.connections.length - this.availableConnections.length;
+    this.healthStats.idleConnections = this.availableConnections.length;
+    this.healthStats.lastHealthCheck = Date.now();
+  }
+
+  private updateAcquisitionTime(acquisitionTimeMs: number): void {
+    // Exponential moving average for acquisition time
+    this.healthStats.avgAcquisitionTime =
+      this.healthStats.avgAcquisitionTime * 0.9 + acquisitionTimeMs * 0.1;
   }
 
   async destroy(): Promise<void> {

@@ -1,14 +1,18 @@
 // apps/server/src/workers/leaderboard.worker.ts
 import 'dotenv/config';
-import { Worker } from 'bullmq';
+import { Worker, Queue } from 'bullmq';
 import { RefreshJobData, IncrementalUpdateData, BatchUserUpdateData } from '@ems/types';
 import redisClient from '../lib/redis';
 import { LeaderboardRepository } from '../repositories/LeaderboardRepository';
 import type { Job } from 'bullmq';
 import type { LeaderboardMetrics } from '@ems/types';
 import { achievementService } from '../services/achievement.service';
+import { metricsCollector } from '../lib/metrics';
 
 const repo = new LeaderboardRepository();
+
+// Create queue instance for metrics collection
+const leaderboardQueue = new Queue('leaderboard-refresh', { connection: redisClient });
 
 // Note: Job data interfaces now imported from @ems/types
 
@@ -27,6 +31,11 @@ const refreshWorker = new Worker(
     });
 
     const startTime = Date.now();
+
+    // Update queue depth before processing
+    const waiting = await leaderboardQueue.getWaiting();
+    const oldestWaiting = waiting.length > 0 ? Date.now() - waiting[0].timestamp : 0;
+    metricsCollector.updateQueueDepth('leaderboard-refresh', waiting.length, oldestWaiting);
 
     try {
       // Get previous rankings before refresh (for comparison)
@@ -98,8 +107,13 @@ const refreshWorker = new Worker(
           entriesUpdated: Math.max(topAllTime.length, topDaily.length),
         }),
       );
+
+      // Record successful job completion
+      metricsCollector.recordJobComplete('leaderboard-refresh', true);
     } catch (error) {
       console.error('[leaderboard] Refresh failed:', error);
+      // Record failed job completion
+      metricsCollector.recordJobComplete('leaderboard-refresh', false);
       throw error;
     }
   },

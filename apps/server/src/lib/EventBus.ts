@@ -51,6 +51,10 @@ export class EventBus implements IEventBus {
   getPoolStats() {
     return this.redisPool?.getStats() || { active: 0, idle: 0, total: 1 };
   }
+
+  getPoolHealthStats() {
+    return this.redisPool?.getHealthStats?.() || null;
+  }
 }
 
 /**

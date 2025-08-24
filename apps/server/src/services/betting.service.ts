@@ -22,6 +22,7 @@ import { UserService } from './user.service';
 import { achievementService } from './achievement.service';
 import { achievementEvaluatorService } from './achievementEvaluator.service';
 import { broadcastRealtimeMetrics } from './admin.service';
+import { tracingCollector } from '../lib/tracing';
 
 export class BettingService {
   private userService = new UserService();
@@ -69,134 +70,140 @@ export class BettingService {
    * Place a single bet with full transaction atomicity for all money operations.
    */
   async placeBet(userId: number, optionId: number, amount: number): Promise<DbBet> {
-    // 1) Pre-validation outside transaction (read-only operations)
-    const opt = await this.repo.findOptionWithPrediction(optionId);
-    if (!opt) throw new Error('OPTION_NOT_FOUND');
-    if (opt.prediction.resolved || opt.prediction.expiresAt < new Date()) {
-      throw new Error('PREDICTION_CLOSED');
-    }
+    return tracingCollector.trace(
+      'betting_service_place_bet',
+      async () => {
+        // 1) Pre-validation outside transaction (read-only operations)
+        const opt = await this.repo.findOptionWithPrediction(optionId);
+        if (!opt) throw new Error('OPTION_NOT_FOUND');
+        if (opt.prediction.resolved || opt.prediction.expiresAt < new Date()) {
+          throw new Error('PREDICTION_CLOSED');
+        }
 
-    const user = await this.repo.findUserById(userId);
-    if (!user || Number(user.muskBucks) < amount) throw new Error('INSUFFICIENT_FUNDS');
+        const user = await this.repo.findUserById(userId);
+        if (!user || Number(user.muskBucks) < amount) throw new Error('INSUFFICIENT_FUNDS');
 
-    // 2) Calculate enhanced odds (before transaction)
-    let finalOdds = opt.odds;
-    let allInBonus = 1.0;
-    if (amount >= Number(user.muskBucks) * 0.95) {
-      allInBonus = 2.5; // 🚀 MASSIVE 150% ALL-IN BONUS!
-      finalOdds = opt.odds * allInBonus;
-    }
+        // 2) Calculate enhanced odds (before transaction)
+        let finalOdds = opt.odds;
+        let allInBonus = 1.0;
+        if (amount >= Number(user.muskBucks) * 0.95) {
+          allInBonus = 2.5; // 🚀 MASSIVE 150% ALL-IN BONUS!
+          finalOdds = opt.odds * allInBonus;
+        }
 
-    const potentialPayout = BigInt(Math.floor(amount * finalOdds));
+        const potentialPayout = BigInt(Math.floor(amount * finalOdds));
 
-    // 3) Execute all money operations atomically
-    const bet = await this.repo.placeBet(
-      userId,
-      opt.prediction.id,
-      optionId,
-      amount,
-      finalOdds,
-      potentialPayout,
-    );
+        // 3) Execute all money operations atomically
+        const bet = await this.repo.placeBet(
+          userId,
+          opt.prediction.id,
+          optionId,
+          amount,
+          finalOdds,
+          potentialPayout,
+        );
 
-    // 4) Post-transaction operations (safe to fail without data corruption)
-    try {
-      // Generate proper signed avatar URL
-      const avatarUrl = user.profilePictureKey
-        ? await this.userService.getCachedProfileImageUrl(user.id, user.profilePictureKey, 3600)
-        : user.avatarUrl;
+        // 4) Post-transaction operations (safe to fail without data corruption)
+        try {
+          // Generate proper signed avatar URL
+          const avatarUrl = user.profilePictureKey
+            ? await this.userService.getCachedProfileImageUrl(user.id, user.profilePictureKey, 3600)
+            : user.avatarUrl;
 
-      // Compose bet event payload
-      const betWithUser: BetWithUser = {
-        ...bet,
-        amount: bet.amount.toString(),
-        potentialPayout: bet.potentialPayout?.toString() || null,
-        payout: bet.payout?.toString() || null,
-        user: {
-          id: user.id,
-          name: user.name,
-          avatarUrl,
-        },
-        optionLabel: opt.label,
-        predictionTitle: opt.prediction.title,
-      };
-
-      // Execute all post-transaction operations in parallel for performance
-      await Promise.allSettled([
-        // Publish real‑time event
-        this.eventBus.publish('bet:place', betWithUser),
-
-        // Recalculate odds after bet placement
-        this.recalculateOdds(opt.prediction.id),
-
-        // Publish to unified activity system
-        unifiedActivityService.createBetActivity(
-          {
-            id: user.id,
-            name: user.name,
-            avatarUrl,
-          },
-          {
-            id: bet.id,
-            amount,
-            odds: finalOdds,
-            predictionId: opt.prediction.id,
-            predictionTitle: opt.prediction.title,
+          // Compose bet event payload
+          const betWithUser: BetWithUser = {
+            ...bet,
+            amount: bet.amount.toString(),
+            potentialPayout: bet.potentialPayout?.toString() || null,
+            payout: bet.payout?.toString() || null,
+            user: {
+              id: user.id,
+              name: user.name,
+              avatarUrl,
+            },
             optionLabel: opt.label,
-            category: opt.prediction.category,
-          },
-        ),
+            predictionTitle: opt.prediction.title,
+          };
 
-        // Check for achievement unlocks (legacy system)
-        achievementService.checkAndUpdateAchievements({
-          type: 'bet_placed',
-          userId,
-          data: {
-            betId: bet.id,
-            predictionId: opt.prediction.id,
-            amount,
-            category: opt.prediction.category,
-          },
-        }),
+          // Execute all post-transaction operations in parallel for performance
+          await Promise.allSettled([
+            // Publish real‑time event
+            this.eventBus.publish('bet:place', betWithUser),
 
-        // Check for achievement unlocks (advanced evaluator)
-        achievementEvaluatorService.processAchievementEvent({
-          type: 'bet_placed',
-          userId,
-          timestamp: new Date().toISOString(),
-          data: {
-            betId: bet.id,
-            predictionId: opt.prediction.id,
-            amount,
-            category: opt.prediction.category,
-            wasAllIn: false, // We'll need to calculate this
-          },
-        }),
+            // Recalculate odds after bet placement
+            this.recalculateOdds(opt.prediction.id),
 
-        // Trigger stats update (coalesced)
-        this.eventCoalescer.addEvent(
-          'user:stats_update',
-          {
-            userId,
-            reason: 'bet_placed',
-            betId: bet.id,
-            predictionId: opt.prediction.id,
-            amount,
-            category: opt.prediction.category,
-            timestamp: new Date().toISOString(),
-          },
-          userId,
-        ),
+            // Publish to unified activity system
+            unifiedActivityService.createBetActivity(
+              {
+                id: user.id,
+                name: user.name,
+                avatarUrl,
+              },
+              {
+                id: bet.id,
+                amount,
+                odds: finalOdds,
+                predictionId: opt.prediction.id,
+                predictionTitle: opt.prediction.title,
+                optionLabel: opt.label,
+                category: opt.prediction.category,
+              },
+            ),
 
-        // Broadcast real-time metrics
-        broadcastRealtimeMetrics(),
-      ]);
-    } catch (error) {
-      console.error('[betting] Error in post-transaction operations for bet:', bet.id, error);
-      // Don't throw - bet was successfully placed, these are just notifications
-    }
+            // Check for achievement unlocks (legacy system)
+            achievementService.checkAndUpdateAchievements({
+              type: 'bet_placed',
+              userId,
+              data: {
+                betId: bet.id,
+                predictionId: opt.prediction.id,
+                amount,
+                category: opt.prediction.category,
+              },
+            }),
 
-    return bet;
+            // Check for achievement unlocks (advanced evaluator)
+            achievementEvaluatorService.processAchievementEvent({
+              type: 'bet_placed',
+              userId,
+              timestamp: new Date().toISOString(),
+              data: {
+                betId: bet.id,
+                predictionId: opt.prediction.id,
+                amount,
+                category: opt.prediction.category,
+                wasAllIn: false, // We'll need to calculate this
+              },
+            }),
+
+            // Trigger stats update (coalesced)
+            this.eventCoalescer.addEvent(
+              'user:stats_update',
+              {
+                userId,
+                reason: 'bet_placed',
+                betId: bet.id,
+                predictionId: opt.prediction.id,
+                amount,
+                category: opt.prediction.category,
+                timestamp: new Date().toISOString(),
+              },
+              userId,
+            ),
+
+            // Broadcast real-time metrics
+            broadcastRealtimeMetrics(),
+          ]);
+        } catch (error) {
+          console.error('[betting] Error in post-transaction operations for bet:', bet.id, error);
+          // Don't throw - bet was successfully placed, these are just notifications
+        }
+
+        return bet;
+      },
+      { userId, optionId, amount },
+    );
   }
 
   /**
