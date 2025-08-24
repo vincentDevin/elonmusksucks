@@ -3,15 +3,26 @@ import { Router } from 'express';
 import { requireAuth, requireAdmin } from '../middleware/auth.middleware';
 import * as adminController from '../controllers/admin.controller';
 import feedsRoutes from './feeds.routes';
+import { AdminActions } from '@ems/types';
 
 const router = Router();
+
+/**
+ * Middleware to log admin action attempts for RBAC audit
+ */
+function logAdminAction(action: string) {
+  return (req: any, _res: any, next: any) => {
+    console.log(`[admin-rbac] Route ${req.method} ${req.path} maps to action: ${action}`);
+    next();
+  };
+}
 
 // All admin routes require a valid access token and ADMIN role
 router.use(requireAuth, requireAdmin);
 
 // — Enhanced User Management —
-router.get('/users', adminController.getUsers); // Legacy endpoint
-router.get('/users/search', adminController.searchUsers); // New enhanced search
+router.get('/users', logAdminAction(AdminActions.ManageUsers), adminController.getUsers); // Legacy endpoint
+router.get('/users/search', logAdminAction(AdminActions.ManageUsers), adminController.searchUsers); // New enhanced search
 router.get('/users/:userId/details', adminController.getUserDetails); // User details
 router.post('/users/bulk', adminController.bulkUpdateUsers); // Bulk operations
 router.patch('/users/:id/role', adminController.updateUserRole);
@@ -25,7 +36,11 @@ router.get('/predictions/:predictionId/details', adminController.getPredictionDe
 router.post('/predictions/bulk', adminController.bulkUpdatePredictions); // Bulk operations
 router.patch('/predictions/:id/approve', adminController.approvePrediction);
 router.patch('/predictions/:id/reject', adminController.rejectPrediction);
-router.patch('/predictions/:id/resolve', adminController.resolvePrediction);
+router.patch(
+  '/predictions/:id/resolve',
+  logAdminAction(AdminActions.ManagePredictions),
+  adminController.resolvePrediction,
+);
 
 // — Enhanced Financial Operations Dashboard —
 router.get('/financial/search', adminController.searchFinancialData);
@@ -34,7 +49,7 @@ router.post('/financial/bulk', adminController.bulkFinancialOperation);
 router.get('/financial/export', adminController.exportFinancialData);
 
 // — Legacy Bet & Transaction Oversight (deprecated) —
-router.get('/bets', adminController.getBets);
+router.get('/bets', logAdminAction(AdminActions.ManageBets), adminController.getBets);
 router.patch('/bets/:id/refund', adminController.refundBet);
 router.get('/transactions', adminController.getTransactions);
 
@@ -93,5 +108,8 @@ router.post('/aitweet', adminController.triggerAITweet);
 // — RSS Feeds Management —
 // Mount the feeds routes under /feeds (so they become /api/admin/feeds/*)
 router.use('/feeds', feedsRoutes);
+
+// RBAC Audit Note: All routes currently require ADMIN role via requireAdmin middleware
+// Future enhancement: Implement granular permissions per action type
 
 export default router;

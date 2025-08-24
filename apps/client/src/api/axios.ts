@@ -1,5 +1,6 @@
 // apps/client/src/api/axios.ts
 import axios from 'axios';
+// CSRF Note: SPA uses JWT Bearer tokens for authentication, providing equivalent CSRF protection
 
 const api = axios.create({
   baseURL: '', // ← purely relative
@@ -49,6 +50,9 @@ api.interceptors.request.use((config) => {
   if (accessToken && config.headers) {
     config.headers.Authorization = `Bearer ${accessToken}`;
   }
+
+  // CSRF Protection: Bearer tokens in Authorization header provide CSRF protection
+  // as they cannot be sent by malicious sites via simple form submissions
   return config;
 });
 

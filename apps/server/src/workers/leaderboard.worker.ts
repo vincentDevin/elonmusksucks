@@ -3,6 +3,10 @@ import 'dotenv/config';
 import { Worker, Queue } from 'bullmq';
 import { RefreshJobData, IncrementalUpdateData, BatchUserUpdateData } from '@ems/types';
 import redisClient from '../lib/redis';
+
+// Configurable concurrency to keep CPU saturation <70%
+const REFRESH_CONCURRENCY = parseInt(process.env.WORKER_LEADERBOARD_REFRESH_CONCURRENCY || '1');
+const EVENT_CONCURRENCY = parseInt(process.env.WORKER_LEADERBOARD_EVENT_CONCURRENCY || '3');
 import { LeaderboardRepository } from '../repositories/LeaderboardRepository';
 import type { Job } from 'bullmq';
 import type { LeaderboardMetrics } from '@ems/types';
@@ -119,7 +123,7 @@ const refreshWorker = new Worker(
   },
   {
     connection: redisClient,
-    concurrency: 1,
+    concurrency: REFRESH_CONCURRENCY,
   },
 );
 
@@ -143,7 +147,7 @@ const eventWorker = new Worker(
   },
   {
     connection: redisClient,
-    concurrency: 5, // Allow multiple incremental updates
+    concurrency: EVENT_CONCURRENCY, // Allow multiple incremental updates
   },
 );
 
@@ -199,6 +203,11 @@ async function handleBatchUserUpdate(data: BatchUserUpdateData): Promise<void> {
     timestamp: data.timestamp,
   });
 }
+
+// Log configured concurrency on startup
+console.log(
+  `[leaderboard-worker] Configured concurrency - Refresh: ${REFRESH_CONCURRENCY}, Events: ${EVENT_CONCURRENCY}`,
+);
 
 // Event handlers
 refreshWorker.on('completed', (job) => {

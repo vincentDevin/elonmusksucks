@@ -1,4 +1,62 @@
 // apps/server/src/services/leaderboard.service.ts
+// -----------------------------------------------------------------------------
+// Leaderboard Service - Drift Detection and Reconciliation
+// -----------------------------------------------------------------------------
+
+import type { ReconciliationResult, DriftDetail } from '@ems/types';
+
+/**
+ * Detect leaderboard drift by comparing expected vs actual rankings
+ */
+export async function detectLeaderboardDrift(repository: any): Promise<DriftDetail[]> {
+  // Get current leaderboard from database
+  const currentLeaderboard = await repository.getLeaderboard({ limit: 100 });
+
+  // Sort by Elo rating to get expected order
+  const expectedOrder = [...currentLeaderboard].sort((a: any, b: any) => b.eloRating - a.eloRating);
+
+  const driftDetails: DriftDetail[] = [];
+
+  // Check each user's position vs expected position
+  currentLeaderboard.forEach((user: any, actualIndex: number) => {
+    const expectedIndex = expectedOrder.findIndex((u: any) => u.userId === user.userId);
+    if (expectedIndex !== actualIndex) {
+      driftDetails.push({
+        userId: user.userId,
+        expectedRank: expectedIndex + 1,
+        actualRank: actualIndex + 1,
+        eloRating: user.eloRating,
+      });
+    }
+  });
+
+  return driftDetails;
+}
+
+/**
+ * Reconcile leaderboard by fixing drift
+ */
+export async function reconcileLeaderboard(
+  repository: any,
+  dryRun: boolean = true,
+): Promise<ReconciliationResult> {
+  const driftDetails = await detectLeaderboardDrift(repository);
+
+  let fixesApplied = 0;
+  if (!dryRun && driftDetails.length > 0) {
+    await repository.refreshLeaderboard();
+    fixesApplied = driftDetails.length;
+    console.log(`[leaderboard-reconcile] Applied ${fixesApplied} drift fixes`);
+  }
+
+  return {
+    usersDrifted: driftDetails.length,
+    driftDetails,
+    fixesApplied,
+    dryRun,
+  };
+}
+
 import { Queue } from 'bullmq';
 import redisClient from '../lib/redis';
 import type { PublicLeaderboardEntry } from '@ems/types';

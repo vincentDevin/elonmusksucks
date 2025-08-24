@@ -32,7 +32,15 @@ export class BettingService {
     private repo: IBettingRepository = new BettingRepository(),
     private eventBus: IEventBus = new EventBus(),
   ) {
-    this.eventCoalescer = new EventCoalescer(this.eventBus);
+    // Optimized coalescing windows: stats updates 1s (vs default 2s) for better p95 latency
+    this.eventCoalescer = new EventCoalescer(this.eventBus, {
+      windowMs: 2000, // Default 2s for general events
+      topicWindows: {
+        'user:stats_update': 1000, // 1s for stats (50% reduction for better responsiveness)
+        'stats:update': 1000, // 1s for global stats
+        'leaderboard:refresh': 1500, // 1.5s for leaderboard (balanced)
+      },
+    });
   }
 
   /**

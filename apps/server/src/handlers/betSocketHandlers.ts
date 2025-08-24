@@ -11,6 +11,8 @@ import { betRateLimiter, createRateLimitMiddleware } from '../middleware/rateLim
 import { betOperationQueue } from '../lib/BackpressureQueue';
 import { metricsCollector } from '../lib/metrics';
 import { tracingCollector } from '../lib/tracing';
+import { checkPayloadSize } from '../middleware/payloadSizeGuard';
+import { ACKConfigs } from '../lib/ackPolicy';
 
 // TEMP: Re-export for backwards compatibility during migration
 type Ack = AckCallback;
@@ -20,12 +22,20 @@ export function registerBetHandlers(socket: Socket) {
 
   /* ───────────── bet:place ───────────── */
   socket.on('bet:place', async (p: { optionId: number; amount: number }, ack?: Ack) => {
+    const ackConfig = ACKConfigs['bet:place'];
     await tracingCollector.trace(
       'bet_place_handler',
       async () => {
         await metricsCollector.timeHandler('bet_place', async () => {
           try {
             if (!auth.user) return ack?.('NOT_AUTHENTICATED');
+
+            // Check payload size (64KB hard limit)
+            const sizeCheck = checkPayloadSize(p);
+            if (sizeCheck.exceedsHard) {
+              console.error(`[bet] Payload too large: ${sizeCheck.size} bytes`);
+              return ack?.('PAYLOAD_TOO_LARGE');
+            }
 
             // Apply rate limiting
             const rateLimitCheck = createRateLimitMiddleware(betRateLimiter, 'bet:place');
@@ -44,9 +54,12 @@ export function registerBetHandlers(socket: Socket) {
               return bettingService.placeBet(auth.user!.id, p.optionId, p.amount);
             }, 2); // High priority for single bets
 
+            // Acknowledge success with ACK policy compliance
+            console.log(`[ack-policy] bet:place responding within ${ackConfig.timeoutMs}ms window`);
             return ack?.(null);
           } catch (e: any) {
             console.error('[bet] place error', e);
+            console.error(`[ack-policy] bet:place failed, client should retry within policy`);
             return ack?.(mapBetError(e));
             throw e; // Re-throw for metrics error tracking
           }
@@ -62,6 +75,13 @@ export function registerBetHandlers(socket: Socket) {
     async (p: { legs: { optionId: number }[]; amount: number }, ack?: Ack) => {
       try {
         if (!auth.user) return ack?.('NOT_AUTHENTICATED');
+
+        // Check payload size (64KB hard limit)
+        const sizeCheck = checkPayloadSize(p);
+        if (sizeCheck.exceedsHard) {
+          console.error(`[parlay] Payload too large: ${sizeCheck.size} bytes`);
+          return ack?.('PAYLOAD_TOO_LARGE');
+        }
 
         // Apply rate limiting
         const rateLimitCheck = createRateLimitMiddleware(betRateLimiter, 'parlay:place');

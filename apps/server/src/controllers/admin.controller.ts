@@ -5,6 +5,7 @@ import { payoutService } from '../services/payout.service';
 import { adminAchievementService } from '../services/adminAchievement.service';
 import { shameWallService } from '../services/shameWall.service';
 import { serializeBigInt } from '../utils/bigintSerializer';
+import { AdminActions } from '@ems/types';
 import type {
   PublicUser,
   PublicPrediction,
@@ -26,9 +27,16 @@ import type {
 } from '../repositories/IAdminRepository';
 
 // -- Enhanced User Management --
-export async function getUsers(_req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function getUsers(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    // Legacy endpoint - kept for backward compatibility
+    // Log permission check for audit trail
+    const authReq = req as any;
+    console.log(
+      `[admin-rbac] ${AdminActions.ManageUsers} requested by user ${authReq.user?.id} (role: ${authReq.user?.role})`,
+    );
+
+    // RBAC: Only ADMIN role can manage users
+    // This is enforced by requireAdmin middleware, but logged here for audit
     const users: PublicUser[] = await adminService.listUsers();
     res.json(serializeBigInt(users));
   } catch (err) {
@@ -288,11 +296,15 @@ export async function resolvePrediction(
   next: NextFunction,
 ): Promise<void> {
   try {
+    console.log(
+      `[admin-rbac] ${AdminActions.ManagePredictions} requested by user ${(req as any).user?.id} (role: ${(req as any).user?.role})`,
+    );
+
     const id = Number(req.params.id);
     const { winningOptionId } = req.body as ResolvePredictionPayload;
     // enqueue the payout job (no return value)
     await payoutService.resolvePrediction(id, winningOptionId);
-    // 202 Accepted indicates “we got it, working in background”
+    // 202 Accepted indicates "we got it, working in background"
     res.status(202).json({ message: 'Payout job enqueued' });
   } catch (err) {
     next(err);
@@ -302,6 +314,10 @@ export async function resolvePrediction(
 // -- Bet & Transaction Oversight --
 export async function getBets(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
+    console.log(
+      `[admin-rbac] ${AdminActions.ManageBets} requested by user ${(req as any).user?.id} (role: ${(req as any).user?.role})`,
+    );
+
     const filters = req.query as unknown as QueryParams;
     const bets = await adminService.listBets(filters);
     res.json(serializeBigInt(bets));

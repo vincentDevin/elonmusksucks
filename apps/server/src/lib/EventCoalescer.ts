@@ -15,8 +15,9 @@ export class EventCoalescer implements IEventCoalescer {
     config: Partial<EventCoalescerConfig> = {},
   ) {
     this.config = {
-      windowMs: config.windowMs || 2000, // 2 second batching window
+      windowMs: config.windowMs || 2000, // 2 second batching window (default)
       maxBatchSize: config.maxBatchSize || 10, // Max 10 events per batch
+      topicWindows: config.topicWindows || {}, // Per-topic windows
     };
   }
 
@@ -49,9 +50,11 @@ export class EventCoalescer implements IEventCoalescer {
       clearTimeout(existingTimeout);
     }
 
+    // Use per-topic window if configured, otherwise default
+    const windowMs = this.getWindowForChannel(channel);
     const timeout = setTimeout(() => {
       this.flushBatch(batchKey);
-    }, this.config.windowMs);
+    }, windowMs);
 
     this.timeouts.set(batchKey, timeout);
   }
@@ -95,5 +98,17 @@ export class EventCoalescer implements IEventCoalescer {
 
   private getBatchKey(channel: string, userId?: number): string {
     return userId ? `${channel}:${userId}` : channel;
+  }
+
+  private getWindowForChannel(channel: string): number {
+    // Check for per-topic override
+    const topicWindow = this.config.topicWindows?.[channel];
+    if (topicWindow !== undefined) {
+      console.log(
+        `[EventCoalescer] Using ${topicWindow}ms window for ${channel} (vs default ${this.config.windowMs}ms)`,
+      );
+      return topicWindow;
+    }
+    return this.config.windowMs;
   }
 }

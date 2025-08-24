@@ -4,6 +4,9 @@ import { Worker } from 'bullmq';
 import { FeedFetchJobData, FeedHealthCheckData } from '@ems/types';
 import { PrismaClient } from '@prisma/client';
 import redisClient from '../lib/redis';
+
+// Configurable concurrency to keep CPU saturation <70%
+const FEED_CONCURRENCY = parseInt(process.env.WORKER_FEED_CONCURRENCY || '3');
 import type { Job } from 'bullmq';
 import Parser from 'rss-parser';
 import { createHash } from 'crypto';
@@ -39,7 +42,7 @@ const feedWorker = new Worker(
   },
   {
     connection: redisClient,
-    concurrency: 5, // Process up to 5 feeds simultaneously
+    concurrency: FEED_CONCURRENCY, // Process feeds with controlled concurrency
     removeOnComplete: { count: 50 }, // Keep last 50 successful jobs
     removeOnFail: { count: 100 }, // Keep last 100 failed jobs for debugging
   },
@@ -230,6 +233,9 @@ async function processFeedHealthCheck(job: Job<FeedHealthCheckData>): Promise<{
     errors: ['Health check not yet implemented'],
   };
 }
+
+// Log configured concurrency on startup
+console.log(`[feed-worker] Configured concurrency: ${FEED_CONCURRENCY}`);
 
 // Error handling
 feedWorker.on('completed', (job) => {

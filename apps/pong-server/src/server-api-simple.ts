@@ -273,6 +273,8 @@ class GameManager {
   private gameIntervals = new Map<string, NodeJS.Timeout>();
   private gameSpectators = new Map<string, Set<string>>(); // gameId -> Set<socketId>
   private spectatorGames = new Map<string, string>(); // socketId -> gameId
+  private lastEmitTime = new Map<string, number>(); // Track last emit time per game
+  private droppedFrames = new Map<string, number>(); // Track dropped frames per game
 
   constructor(
     private io: SocketIOServer,
@@ -384,25 +386,52 @@ class GameManager {
   }
 
   private startGameLoop(game: GameState): void {
+    // Initialize frame tracking for this game
+    this.lastEmitTime.set(game.id, 0);
+    this.droppedFrames.set(game.id, 0);
+
     const interval = setInterval(() => {
       if (game.status !== 'active') {
         clearInterval(interval);
+        this.cleanupGameTracking(game.id);
         return;
       }
 
       this.updateGame(game);
 
-      // Broadcast based on network update rate
-      const broadcastInterval = Math.max(
-        1,
-        Math.round(PONG_PHYSICS.TICK_RATE / PONG_PHYSICS.NETWORK_UPDATE_RATE),
-      );
-      if (game.tick % broadcastInterval === 0) {
+      // Frequency governor: Emit at max 60 Hz (16.67ms intervals)
+      const now = Date.now();
+      const lastEmit = this.lastEmitTime.get(game.id) || 0;
+      const timeSinceLastEmit = now - lastEmit;
+      const minEmitInterval = 1000 / PONG_PHYSICS.NETWORK_UPDATE_RATE; // ~16.67ms for 60 Hz
+
+      if (timeSinceLastEmit >= minEmitInterval) {
         this.broadcastGameState(game);
+        this.lastEmitTime.set(game.id, now);
+      } else {
+        // Frame dropped due to frequency governor
+        const dropped = this.droppedFrames.get(game.id) || 0;
+        this.droppedFrames.set(game.id, dropped + 1);
+      }
+
+      // Log dropped frames every 5 seconds for monitoring
+      if (game.tick % (PONG_PHYSICS.TICK_RATE * 5) === 0) {
+        const dropped = this.droppedFrames.get(game.id) || 0;
+        if (dropped > 0) {
+          console.log(
+            `[pong-freq] Game ${game.id}: ${dropped} frames dropped in 5s (${PONG_PHYSICS.NETWORK_UPDATE_RATE}Hz governor)`,
+          );
+          this.droppedFrames.set(game.id, 0); // Reset counter
+        }
       }
     }, 1000 / PONG_PHYSICS.TICK_RATE);
 
     this.gameIntervals.set(game.id, interval);
+  }
+
+  private cleanupGameTracking(gameId: string): void {
+    this.lastEmitTime.delete(gameId);
+    this.droppedFrames.delete(gameId);
   }
 
   private updateGame(game: GameState): void {
@@ -720,12 +749,13 @@ class GameManager {
   private async endGame(game: GameState, reason: string, winnerSlot?: 0 | 1): Promise<void> {
     game.status = 'ended';
 
-    // Clear game loop
+    // Clear game loop and cleanup tracking
     const interval = this.gameIntervals.get(game.id);
     if (interval) {
       clearInterval(interval);
       this.gameIntervals.delete(game.id);
     }
+    this.cleanupGameTracking(game.id);
 
     const duration = Math.floor((Date.now() - game.startTime) / 1000);
     const winnerPlayer = winnerSlot !== undefined ? game.players[winnerSlot] : null;

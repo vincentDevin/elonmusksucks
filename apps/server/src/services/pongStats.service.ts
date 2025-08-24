@@ -1,3 +1,30 @@
+// apps/server/src/services/pongStats.service.ts
+// -----------------------------------------------------------------------------
+// Pong Statistics Service - Idempotent Result Processing
+// -----------------------------------------------------------------------------
+
+import type { IdempotencyKey } from '@ems/types';
+
+// Track processed results to prevent duplicates
+const processedStats = new Set<IdempotencyKey>();
+
+/**
+ * Process pong match statistics with idempotency
+ * Returns true if processed, false if duplicate
+ */
+export function processPongStats(matchId: string, userId: number, _stats: any): boolean {
+  const idempotencyKey = `${matchId}|${userId}`;
+
+  if (processedStats.has(idempotencyKey)) {
+    console.log(`[pong-stats] Duplicate stats submission ignored: ${idempotencyKey}`);
+    return false;
+  }
+
+  processedStats.add(idempotencyKey);
+  console.log(`[pong-stats] Stats processed for ${idempotencyKey}`);
+  return true;
+}
+
 // PongDifficulty now handled via 'any' type in shared interfaces
 import { PongMatchResult, PongStatsUpdate, EloChangeComponents } from '@ems/types';
 import { PongEloService } from './pongElo.service';

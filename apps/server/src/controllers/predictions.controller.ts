@@ -2,7 +2,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import { predictionService } from '../services/predictions.service';
 import { UserService } from '../services/user.service';
-import { PredictionType, CreatePredictionPayload } from '@ems/types';
+import { PredictionType, CreatePredictionPayload, InputSizeLimits } from '@ems/types';
 
 const userService = new UserService();
 
@@ -89,6 +89,60 @@ export const createPrediction = async (
     if (!creatorId) {
       res.status(401).json({ error: 'Not authenticated' });
       return;
+    }
+
+    // Input size validation
+    if (!title || typeof title !== 'string') {
+      res.status(400).json({ error: 'Prediction title is required' });
+      return;
+    }
+    if (title.length > InputSizeLimits.PredictionTitle) {
+      console.warn(
+        `[input-caps] Prediction title rejected: ${title.length} chars (limit: ${InputSizeLimits.PredictionTitle})`,
+      );
+      res.status(413).json({
+        error: 'Prediction title too long',
+        limit: InputSizeLimits.PredictionTitle,
+        actual: title.length,
+      });
+      return;
+    }
+
+    if (
+      description &&
+      typeof description === 'string' &&
+      description.length > InputSizeLimits.PredictionDescription
+    ) {
+      console.warn(
+        `[input-caps] Prediction description rejected: ${description.length} chars (limit: ${InputSizeLimits.PredictionDescription})`,
+      );
+      res.status(413).json({
+        error: 'Prediction description too long',
+        limit: InputSizeLimits.PredictionDescription,
+        actual: description.length,
+      });
+      return;
+    }
+
+    // Validate option text lengths
+    if (Array.isArray(options)) {
+      for (const option of options) {
+        if (
+          option.label &&
+          typeof option.label === 'string' &&
+          option.label.length > InputSizeLimits.PredictionOptionText
+        ) {
+          console.warn(
+            `[input-caps] Prediction option rejected: ${option.label.length} chars (limit: ${InputSizeLimits.PredictionOptionText})`,
+          );
+          res.status(413).json({
+            error: 'Prediction option text too long',
+            limit: InputSizeLimits.PredictionOptionText,
+            actual: option.label.length,
+          });
+          return;
+        }
+      }
     }
 
     // Determine final options

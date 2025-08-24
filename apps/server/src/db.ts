@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 import path from 'path';
 import { PrismaClient, Prisma } from '@prisma/client';
+import type { SlowQueryRecord } from '@ems/types';
 
 // Load environment variables based on NODE_ENV
 const envFile = process.env.NODE_ENV === 'test' ? '.env.test' : '.env';
@@ -54,6 +55,8 @@ interface QueryMetrics {
 const SLOW_QUERY_THRESHOLD = parseInt(process.env.SLOW_QUERY_MS || '100'); // 100ms default
 const queryMetrics: QueryMetrics[] = [];
 const MAX_METRICS_HISTORY = 1000; // Keep last 1000 queries for analysis
+const topSlowQueries: SlowQueryRecord[] = []; // Track top 5 slowest queries
+const MAX_SLOW_QUERIES = 5;
 
 // Performance monitoring middleware
 prisma.$use(async (params, next) => {
@@ -79,12 +82,34 @@ prisma.$use(async (params, next) => {
 
     // Log slow queries
     if (duration > SLOW_QUERY_THRESHOLD) {
-      console.warn(`[SLOW QUERY] ${params.model}.${params.action} took ${duration}ms`);
+      const traceId = `trace_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      console.warn(`[SLOW QUERY] ${params.model}.${params.action} took ${duration}ms [${traceId}]`);
+
+      // Track top slow queries
+      const slowQuery: SlowQueryRecord = {
+        traceId,
+        model: params.model || 'unknown',
+        action: params.action || 'unknown',
+        duration,
+        timestamp: new Date().toISOString(),
+        params:
+          process.env.NODE_ENV === 'development'
+            ? JSON.stringify(params.args).substring(0, 200)
+            : undefined,
+      };
+
+      // Add to top slow queries (keep top 5 slowest)
+      topSlowQueries.push(slowQuery);
+      topSlowQueries.sort((a, b) => b.duration - a.duration);
+      if (topSlowQueries.length > MAX_SLOW_QUERIES) {
+        topSlowQueries.pop();
+      }
 
       // In production, you might want to send this to monitoring service
       if (process.env.NODE_ENV === 'production') {
         // TODO: Send to Sentry, DataDog, or other monitoring service
         console.error('[SLOW QUERY ALERT]', {
+          traceId,
           model: params.model,
           action: params.action,
           duration,
@@ -151,6 +176,10 @@ export const getQueryMetrics = () => ({
 
 export const clearQueryMetrics = () => {
   queryMetrics.length = 0;
+};
+
+export const getTopSlowQueries = (): SlowQueryRecord[] => {
+  return [...topSlowQueries]; // Return copy to prevent external modification
 };
 
 export const isDbConnected = () => isConnected;

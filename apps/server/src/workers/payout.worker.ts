@@ -10,6 +10,9 @@ import { Worker, Job } from 'bullmq';
 import { PayoutJobData } from '@ems/types';
 // TODO: Use QUEUE_NAMES and QueueOptions from @ems/types once imports resolve
 import redisClient from '../lib/redis';
+
+// Configurable concurrency to keep CPU saturation <70%
+const PAYOUT_CONCURRENCY = parseInt(process.env.WORKER_PAYOUT_CONCURRENCY || '2');
 import { PayoutRepository } from '../repositories/PayoutRepository';
 import type { PublicPrediction } from '@ems/types';
 import { leaderboardService } from '../services/leaderboard.service';
@@ -67,9 +70,12 @@ const payoutWorker = new Worker<PayoutJobData>(
   },
   {
     connection: redisClient,
-    concurrency: 5,
+    concurrency: PAYOUT_CONCURRENCY,
   },
 );
+
+// Log configured concurrency on startup
+console.log(`[payout-worker] Configured concurrency: ${PAYOUT_CONCURRENCY}`);
 
 payoutWorker.on('completed', (job) => {
   console.log(`[worker] Job ${job.id} completed`);

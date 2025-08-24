@@ -1070,11 +1070,158 @@ export interface CoalescedEvent<T = any> {
 export interface EventCoalescerConfig {
   windowMs: number; // Time window for batching
   maxBatchSize: number; // Maximum events per batch
+  topicWindows?: Record<string, number>; // Per-topic window overrides in ms
 }
 
 export interface IEventCoalescer {
   addEvent<T>(channel: string, payload: T, userId?: number): Promise<void>;
   flush(): Promise<void>;
+}
+
+// Socket.IO heartbeat configuration
+export interface SocketHeartbeatConfig {
+  pingInterval: number; // How often to send a ping packet (ms)
+  pingTimeout: number; // How long to wait for pong before disconnect (ms)
+}
+
+// Slow query tracking
+export interface SlowQueryRecord {
+  traceId: string;
+  model: string;
+  action: string;
+  duration: number;
+  timestamp: string;
+  params?: string; // Sanitized params (no PII)
+}
+
+// Payload size guardrails
+export interface PayloadSizeConfig {
+  softLimitBytes: number; // Warn threshold
+  hardLimitBytes: number; // Reject threshold
+  enforceMode: 'warn' | 'strict'; // Enforcement level
+}
+
+// JWT Rotation & Dual-Key Support
+export interface JWTKeyConfig {
+  keyId: string; // Key identifier (kid header)
+  secret: string; // JWT secret
+  algorithm: string; // Signing algorithm
+  createdAt: Date; // Key creation timestamp
+  expiresAt?: Date; // Optional key expiration
+}
+
+export interface JWTRotationConfig {
+  currentKeyId: string; // Active signing key
+  keys: Record<string, JWTKeyConfig>; // All valid keys (current + previous)
+  overlapPeriodMs: number; // How long to accept old keys during rotation
+}
+
+// ACK Timeout/Retry Policy Standardization
+export interface ACKTimeoutConfig {
+  timeoutMs: number; // Base timeout for ACK response
+  maxRetries: number; // Maximum retry attempts
+  backoffMultiplier: number; // Exponential backoff multiplier
+  maxBackoffMs: number; // Cap on backoff delay
+}
+
+export interface ACKRetryPolicy {
+  attempt: number; // Current attempt number (1-based)
+  nextRetryDelayMs: number; // Delay before next retry
+}
+
+// Admin RBAC Audit
+export const AdminActions = {
+  ManageUsers: 'manage_users',
+  ManagePredictions: 'manage_predictions',
+  ManageBets: 'manage_bets',
+  ViewAnalytics: 'view_analytics',
+  ManageFeeds: 'manage_feeds',
+  SystemMaintenance: 'system_maintenance',
+} as const;
+export type AdminAction = typeof AdminActions[keyof typeof AdminActions];
+
+export interface AdminPermissionCheck {
+  action: AdminAction;
+  userRole: string;
+  userId?: number;
+  allowed: boolean;
+  reason?: string;
+}
+
+// Input Size Caps for Chat/Predictions
+export const InputSizeLimits = {
+  ChatMessage: 1000, // Characters
+  PredictionTitle: 200, // Characters
+  PredictionDescription: 2000, // Characters
+  PredictionOptionText: 100, // Characters per option
+} as const;
+export type InputSizeLimit = typeof InputSizeLimits[keyof typeof InputSizeLimits];
+
+// CSRF Protection Configuration
+export interface CSRFConfig {
+  enabled: boolean; // Enable CSRF protection
+  tokenHeader: string; // Header name for CSRF token
+  cookieName: string; // Cookie name for CSRF token
+  exemptPaths: string[]; // Paths exempt from CSRF protection
+}
+
+// Feature Flag Configuration
+export const FeatureFlags = {
+  PONG_BETA: 'pong_beta',
+  ENHANCED_CHAT: 'enhanced_chat',
+  ADVANCED_ANALYTICS: 'advanced_analytics',
+  EXPERIMENTAL_UI: 'experimental_ui',
+} as const;
+export type FeatureFlag = typeof FeatureFlags[keyof typeof FeatureFlags];
+
+export interface FeatureFlagConfig {
+  [key: string]: boolean;
+}
+
+// Beta Cohort Configuration
+export interface BetaCohortConfig {
+  enabled: boolean;
+  percentage: number; // 1-5% of users
+  features: string[]; // which features require beta cohort
+}
+
+export interface BetaCohortInfo {
+  inBetaCohort: boolean;
+  cohortPercentage: number;
+}
+
+// Pong Match Result Idempotency
+export interface MatchResultSubmission {
+  matchId: string;
+  userId: number;
+  score: number;
+  won: boolean;
+  idempotencyKey: string; // format: matchId|userId
+  submittedAt: Date;
+}
+
+export type IdempotencyKey = string; // matchId|userId format
+
+// Leaderboard Reconciliation
+export interface ReconciliationResult {
+  usersDrifted: number;
+  driftDetails: DriftDetail[];
+  fixesApplied: number;
+  dryRun: boolean;
+}
+
+export interface DriftDetail {
+  userId: number;
+  expectedRank: number;
+  actualRank: number;
+  eloRating: number;
+}
+
+export interface PayloadSizeResult {
+  size: number;
+  exceedsSoft: boolean;
+  exceedsHard: boolean;
+  message?: string;
 }
 
 // Redis connection pooling interfaces
@@ -1596,8 +1743,8 @@ export const PONG_PHYSICS = {
   BALL_SPEED_INITIAL: 384, // 384/128 = 3.0 pixels per frame (smooth whole pixel movement)
   BALL_SPEED_INCREMENT: 32, // 32/128 = 0.25 pixels per frame increment
   WINNING_SCORE: 5,
-  TICK_RATE: 128, // FPS
-  NETWORK_UPDATE_RATE: 128, // Broadcast every tick for smoothest experience
+  TICK_RATE: 128, // FPS - Internal game simulation rate
+  NETWORK_UPDATE_RATE: 60, // Hz - Network broadcast frequency (30-60 Hz optimized)
 } as const;
 
 // AI difficulty settings - Balanced for fair gameplay

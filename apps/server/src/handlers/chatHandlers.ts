@@ -13,6 +13,9 @@ import { createMessage, getRecentMessages } from '../services/message.service';
 import type { MessageWithUser } from '../repositories/IMessageRepository';
 import { UserService } from '../services/user.service';
 import redisClient from '../lib/redis';
+import { socketCleanupManager } from '../lib/SocketCleanupManager';
+import { chatRateLimiter, createRateLimitMiddleware } from '../middleware/rateLimitMiddleware';
+import { InputSizeLimits } from '@ems/types';
 
 const GLOBAL_CHAT_ROOM = 'global';
 const GLOBAL_ROOM_ID = 1;
@@ -43,6 +46,9 @@ const userService = new UserService();
 export async function registerChatHandlers(socket: Socket) {
   const authSock = socket as AuthenticatedSocket;
   socket.join(GLOBAL_CHAT_ROOM);
+
+  // Track listeners for memory leak prevention
+  let listenerCount = 0;
 
   // ────────────────────────────────────────────────────────────────────────────
   // 1. Presence handling (join)
@@ -80,7 +86,7 @@ export async function registerChatHandlers(socket: Socket) {
   // ────────────────────────────────────────────────────────────────────────────
   // 2. History request (no Redis needed)
   // ────────────────────────────────────────────────────────────────────────────
-  socket.on('chat:history', async () => {
+  const historyHandler = async () => {
     try {
       const history: MessageWithUser[] = await getRecentMessages(GLOBAL_ROOM_ID, 50);
       const messages: ChatMessageDTO[] = await Promise.all(
@@ -118,20 +124,46 @@ export async function registerChatHandlers(socket: Socket) {
       console.error('[chat] Failed to fetch history:', err);
       socket.emit('chat:error', { message: 'Failed to fetch chat history' });
     }
-  });
+  };
+  socket.on('chat:history', historyHandler);
+  socketCleanupManager.registerHandler(socket.id, 'chat:history', historyHandler);
+  listenerCount++;
 
   // ────────────────────────────────────────────────────────────────────────────
   // 3. Send message → publish `chat:message`
   // ────────────────────────────────────────────────────────────────────────────
-  socket.on('chat:message', async (payload: { message: string }) => {
+  const messageHandler = async (payload: { message: string }) => {
     try {
       if (!authSock.user) return socket.emit('chat:error', { message: 'NOT_AUTHENTICATED' });
-      if (
-        !payload.message ||
-        typeof payload.message !== 'string' ||
-        payload.message.length > 1000
-      ) {
+
+      // Apply rate limiting
+      const rateLimitCheck = createRateLimitMiddleware(chatRateLimiter, 'chat:message');
+      await new Promise<void>((resolve, reject) => {
+        rateLimitCheck(authSock.user!.id, (error?: string) => {
+          if (error) {
+            console.warn(`[chat] Rate limit exceeded for user ${authSock.user!.id}: ${error}`);
+            socket.emit('chat:error', { message: error });
+            reject(new Error(error));
+          } else {
+            resolve();
+          }
+        });
+      });
+
+      if (!payload.message || typeof payload.message !== 'string') {
         return socket.emit('chat:error', { message: 'INVALID_MESSAGE' });
+      }
+
+      // Input size validation
+      if (payload.message.length > InputSizeLimits.ChatMessage) {
+        console.warn(
+          `[input-caps] Chat message rejected: ${payload.message.length} chars (limit: ${InputSizeLimits.ChatMessage})`,
+        );
+        return socket.emit('chat:error', {
+          message: 'MESSAGE_TOO_LONG',
+          limit: InputSizeLimits.ChatMessage,
+          actual: payload.message.length,
+        });
       }
 
       const saved = await createMessage(authSock.user.id, GLOBAL_ROOM_ID, payload.message);
@@ -157,12 +189,15 @@ export async function registerChatHandlers(socket: Socket) {
       console.error('[chat] send error:', err);
       socket.emit('chat:error', { message: 'SEND_FAILED' });
     }
-  });
+  };
+  socket.on('chat:message', messageHandler);
+  socketCleanupManager.registerHandler(socket.id, 'chat:message', messageHandler);
+  listenerCount++;
 
   // ────────────────────────────────────────────────────────────────────────────
   // 4. Typing indicators
   // ────────────────────────────────────────────────────────────────────────────
-  socket.on('chat:typing', () => {
+  const typingHandler = () => {
     if (!authSock.user) return;
     const uid = authSock.user.id;
 
@@ -180,9 +215,12 @@ export async function registerChatHandlers(socket: Socket) {
     }, 4000);
 
     typingTimeout.set(uid, t);
-  });
+  };
+  socket.on('chat:typing', typingHandler);
+  socketCleanupManager.registerHandler(socket.id, 'chat:typing', typingHandler);
+  listenerCount++;
 
-  socket.on('chat:stopTyping', () => {
+  const stopTypingHandler = () => {
     if (!authSock.user) return;
     const uid = authSock.user.id;
     if (typingUsers.has(uid)) {
@@ -193,7 +231,10 @@ export async function registerChatHandlers(socket: Socket) {
         typingTimeout.delete(uid);
       }
     }
-  });
+  };
+  socket.on('chat:stopTyping', stopTypingHandler);
+  socketCleanupManager.registerHandler(socket.id, 'chat:stopTyping', stopTypingHandler);
+  listenerCount++;
 
   // ────────────────────────────────────────────────────────────────────────────
   // 5. Disconnect → leave logic
@@ -221,6 +262,11 @@ export async function registerChatHandlers(socket: Socket) {
     }
     redisClient.publish('chat:stopTyping', JSON.stringify({ id: authSock.user.id }));
   });
+
+  // Log total registered listeners for monitoring
+  console.log(
+    `[chat] Registered ${listenerCount} listeners for socket ${socket.id} (heap monitoring)`,
+  );
 }
 
 // Helper: broadcast current online list via Redis
