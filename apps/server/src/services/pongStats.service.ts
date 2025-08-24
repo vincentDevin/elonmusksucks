@@ -1,34 +1,10 @@
-import type { PongDifficulty } from '@prisma/client';
-import { PongEloService, type EloChangeComponents } from './pongElo.service';
+// PongDifficulty now handled via 'any' type in shared interfaces
+import { PongMatchResult, PongStatsUpdate, EloChangeComponents } from '@ems/types';
+import { PongEloService } from './pongElo.service';
 import type { PongStatsData } from '../repositories/IPongRepository';
 
-export interface MatchResult {
-  matchId: string;
-  winnerId: number;
-  loserId?: number;
-  winnerScore: number;
-  loserScore: number;
-  wagerAmount: bigint;
-  payoutAmount: bigint;
-  aiDifficulty?: PongDifficulty;
-  gameDuration?: number;
-  winnerPing?: number;
-  loserPing?: number;
-}
-
-export interface PongStatsUpdate {
-  userId: number;
-  won: boolean;
-  wagerAmount: bigint;
-  amountWon: bigint;
-  opponentId?: number;
-  opponentElo?: number;
-  aiDifficulty?: PongDifficulty;
-  isPerfectGame: boolean;
-  isComeback: boolean;
-  gameDuration?: number;
-  avgPing?: number;
-}
+// Note: Pong service interfaces now imported from @ems/types
+// MatchResult -> PongMatchResult, other interfaces imported directly
 
 export interface MatchStatsCalculation {
   winnerId: number;
@@ -174,7 +150,7 @@ export class PongStatsService {
     }
 
     // 5. Normal case with a winner - calculate all stats
-    const matchResult: MatchResult = {
+    const matchResult: PongMatchResult = {
       matchId,
       winnerId: winnerId!,
       loserId: loserId || undefined,
@@ -328,7 +304,7 @@ export class PongStatsService {
    * Calculate comprehensive match statistics for winner and loser
    */
   static calculateMatchStats(
-    result: MatchResult,
+    result: PongMatchResult,
     winnerStats: PongStatsData | null,
     loserStats: PongStatsData | null,
   ): MatchStatsCalculation {
@@ -585,8 +561,10 @@ export class PongStatsService {
         newAiWins++;
         // Update hardest AI beaten
         const difficultyRank = { EASY: 1, MEDIUM: 2, HARD: 3, IMPOSSIBLE: 4 };
-        const currentRank = newHardestAiBeaten ? difficultyRank[newHardestAiBeaten] : 0;
-        if (difficultyRank[aiDifficulty] > currentRank) {
+        const currentRank = newHardestAiBeaten
+          ? difficultyRank[newHardestAiBeaten as keyof typeof difficultyRank]
+          : 0;
+        if (difficultyRank[aiDifficulty as keyof typeof difficultyRank] > currentRank) {
           newHardestAiBeaten = aiDifficulty;
         }
       } else {

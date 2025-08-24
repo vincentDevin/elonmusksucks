@@ -11,6 +11,7 @@ import type {
   DbUserPost,
   DbUserActivity,
 } from '@ems/types';
+// TODO: Branded types available: UserId, PredictionId, ISODateString, TimestampMs
 import type { PublicUserProfile, UserFeedPost, UserActivity, UserStatsDTO } from '@ems/types';
 import { unifiedActivityService } from './unifiedActivity.service';
 import { ImageProcessingService, ProcessedImageSizes } from './imageProcessing.service';
@@ -44,7 +45,7 @@ export class UserService {
 
   // --- ENHANCED: Upload profile image with processing ---
   async uploadUserProfileImage(
-    userId: number,
+    userId: number, // TODO: Use UserId branded type when call sites are updated
     file: UploadedFile,
   ): Promise<{
     avatarUrl: string;
@@ -211,6 +212,7 @@ export class UserService {
    * Used for socket auth and chat events.
    */
   async getPublicSocketUser(userId: number): Promise<{
+    // TODO: Use UserId branded type when call sites are updated
     id: number;
     name: string;
     role: string;

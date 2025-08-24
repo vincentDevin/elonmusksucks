@@ -14,6 +14,7 @@ import type {
   PublicUserBadge,
   PublicAITweet,
   AdminTransaction,
+  ResolvePredictionPayload,
 } from '@ems/types';
 import type { Role } from '@prisma/client';
 import type {
@@ -288,7 +289,7 @@ export async function resolvePrediction(
 ): Promise<void> {
   try {
     const id = Number(req.params.id);
-    const { winningOptionId } = req.body as { winningOptionId: number };
+    const { winningOptionId } = req.body as ResolvePredictionPayload;
     // enqueue the payout job (no return value)
     await payoutService.resolvePrediction(id, winningOptionId);
     // 202 Accepted indicates “we got it, working in background”

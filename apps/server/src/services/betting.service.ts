@@ -6,9 +6,17 @@
 // -----------------------------------------------------------------------------
 
 import type { IBettingRepository, OptionWithPrediction } from '../repositories/IBettingRepository';
-import type { DbBet, DbParlay, BetWithUser, ParlayLegWithUser } from '@ems/types';
+import type {
+  DbBet,
+  DbParlay,
+  BetWithUser,
+  ParlayLegWithUser,
+  IEventBus,
+  IEventCoalescer,
+} from '@ems/types';
 import { BettingRepository } from '../repositories/BettingRepository';
-import redisClient from '../lib/redis';
+import { EventBus } from '../lib/EventBus';
+import { EventCoalescer } from '../lib/EventCoalescer';
 import { unifiedActivityService } from './unifiedActivity.service';
 import { UserService } from './user.service';
 import { achievementService } from './achievement.service';
@@ -17,8 +25,14 @@ import { broadcastRealtimeMetrics } from './admin.service';
 
 export class BettingService {
   private userService = new UserService();
+  private eventCoalescer: IEventCoalescer;
 
-  constructor(private repo: IBettingRepository = new BettingRepository()) {}
+  constructor(
+    private repo: IBettingRepository = new BettingRepository(),
+    private eventBus: IEventBus = new EventBus(),
+  ) {
+    this.eventCoalescer = new EventCoalescer(this.eventBus);
+  }
 
   /**
    * Calculate enhanced parlay odds with exciting leg bonuses
@@ -110,7 +124,7 @@ export class BettingService {
       // Execute all post-transaction operations in parallel for performance
       await Promise.allSettled([
         // Publish real‑time event
-        redisClient.publish('bet:place', JSON.stringify(betWithUser)),
+        this.eventBus.publish('bet:place', betWithUser),
 
         // Recalculate odds after bet placement
         this.recalculateOdds(opt.prediction.id),
@@ -159,10 +173,10 @@ export class BettingService {
           },
         }),
 
-        // Trigger stats update
-        redisClient.publish(
+        // Trigger stats update (coalesced)
+        this.eventCoalescer.addEvent(
           'user:stats_update',
-          JSON.stringify({
+          {
             userId,
             reason: 'bet_placed',
             betId: bet.id,
@@ -170,7 +184,8 @@ export class BettingService {
             amount,
             category: opt.prediction.category,
             timestamp: new Date().toISOString(),
-          }),
+          },
+          userId,
         ),
 
         // Broadcast real-time metrics
@@ -256,7 +271,7 @@ export class BettingService {
       // Execute all post-transaction operations in parallel for performance
       await Promise.allSettled([
         // Publish legacy leg events
-        ...legsPayload.map((leg) => redisClient.publish('parlay:place', JSON.stringify(leg))),
+        ...legsPayload.map((leg) => this.eventBus.publish('parlay:place', leg)),
 
         // Recalculate odds for all affected predictions
         ...affectedPredictions.map((predId) => this.recalculateOdds(predId)),
@@ -301,10 +316,10 @@ export class BettingService {
           },
         }),
 
-        // Trigger stats update
-        redisClient.publish(
+        // Trigger stats update (coalesced)
+        this.eventCoalescer.addEvent(
           'user:stats_update',
-          JSON.stringify({
+          {
             userId,
             reason: 'parlay_placed',
             parlayId: parlay.id,
@@ -316,7 +331,8 @@ export class BettingService {
               category: leg.prediction.category,
             })),
             timestamp: new Date().toISOString(),
-          }),
+          },
+          userId,
         ),
 
         // Broadcast real-time metrics
@@ -352,26 +368,23 @@ export class BettingService {
     });
 
     // 🔥 Broadcast enhanced odds update with excitement data
-    await redisClient.publish(
-      'odds:update:enhanced',
-      JSON.stringify({
-        predictionId,
-        timestamp: new Date().toISOString(),
-        significantChanges: significantChanges.length,
-        hotMarket: significantChanges.length >= 2, // Multiple options changed significantly
-        options: afterOdds.map((option, index) => {
-          const before = beforeOdds[index];
-          return {
-            id: option.id,
-            label: option.label,
-            odds: option.odds,
-            previousOdds: before?.odds || option.odds,
-            change: before ? option.odds - before.odds : 0,
-            changePercent: before ? ((option.odds - before.odds) / before.odds) * 100 : 0,
-          };
-        }),
+    await this.eventBus.publish('odds:update:enhanced', {
+      predictionId,
+      timestamp: new Date().toISOString(),
+      significantChanges: significantChanges.length,
+      hotMarket: significantChanges.length >= 2, // Multiple options changed significantly
+      options: afterOdds.map((option, index) => {
+        const before = beforeOdds[index];
+        return {
+          id: option.id,
+          label: option.label,
+          odds: option.odds,
+          previousOdds: before?.odds || option.odds,
+          change: before ? option.odds - before.odds : 0,
+          changePercent: before ? ((option.odds - before.odds) / before.odds) * 100 : 0,
+        };
       }),
-    );
+    });
   }
 }
 

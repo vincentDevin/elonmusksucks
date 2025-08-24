@@ -20,6 +20,13 @@ export class UserRepository implements IUserRepository {
     return prisma.user.findUnique({ where: { id } }) as Promise<DbUser | null>;
   }
 
+  async findUserBasicById(id: number): Promise<{ id: number; name: string } | null> {
+    return prisma.user.findUnique({
+      where: { id },
+      select: { id: true, name: true },
+    });
+  }
+
   async getUserStats(userId: number): Promise<DbUserStats | null> {
     return prisma.userStats.findUnique({ where: { userId } }) as Promise<DbUserStats | null>;
   }

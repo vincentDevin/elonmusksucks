@@ -4,22 +4,12 @@
 // -----------------------------------------------------------------------------
 
 import { Server } from 'socket.io';
+import { SOCKET_ROOMS, REDIS_CHANNELS } from '@ems/types';
+import type { RedisChannel } from '@ems/types';
 
-export type RedisChannel =
-  | 'prediction:create'
-  | 'prediction:resolve'
-  | 'bet:place'
-  | 'parlay:place'
-  | 'odds:update:enhanced'
-  | 'leaderboard:allTime'
-  | 'leaderboard:daily'
-  | 'leaderboard:rankChange'
-  | 'leaderboard:milestone'
-  | 'stats:update'
-  | 'stats:refresh'
-  | 'ranking:change'
-  | 'achievement:unlocked'
-  | 'user:stats_update'
+// TEMP: Additional channels not yet moved to shared types
+type ExtendedRedisChannel =
+  | RedisChannel
   | 'bet:status_change'
   | 'parlay:status_change'
   | 'admin:metrics:update'
@@ -40,7 +30,7 @@ export type RedisChannel =
   | 'pong:stats:update';
 
 export function registerRedisEventHandlers(io: Server, eventSub: any) {
-  eventSub.on('message', (channel: RedisChannel, message: string) => {
+  eventSub.on('message', (channel: ExtendedRedisChannel, message: string) => {
     let payload: unknown;
     try {
       payload = JSON.parse(message);
@@ -50,32 +40,32 @@ export function registerRedisEventHandlers(io: Server, eventSub: any) {
     }
 
     switch (channel) {
-      case 'prediction:create':
-        io.emit('predictionCreated', payload);
+      case REDIS_CHANNELS.PREDICTION_CREATE:
+        io.to(SOCKET_ROOMS.PREDICTIONS).emit('predictionCreated', payload);
         break;
-      case 'prediction:resolve':
-        io.emit('predictionResolved', payload);
+      case REDIS_CHANNELS.PREDICTION_RESOLVE:
+        io.to(SOCKET_ROOMS.PREDICTIONS).emit('predictionResolved', payload);
         break;
-      case 'bet:place':
-        io.emit('betPlaced', payload);
+      case REDIS_CHANNELS.BET_PLACE:
+        io.to(SOCKET_ROOMS.BETTING).emit('betPlaced', payload);
         break;
-      case 'parlay:place':
-        io.emit('parlayPlaced', payload);
+      case REDIS_CHANNELS.PARLAY_PLACE:
+        io.to(SOCKET_ROOMS.BETTING).emit('parlayPlaced', payload);
         break;
-      case 'odds:update:enhanced':
-        io.emit('oddsUpdatedEnhanced', payload);
+      case REDIS_CHANNELS.ODDS_UPDATE_ENHANCED:
+        io.to(SOCKET_ROOMS.PREDICTIONS).emit('oddsUpdatedEnhanced', payload);
         break;
-      case 'leaderboard:allTime':
-        io.emit('leaderboardAllTime', payload);
+      case REDIS_CHANNELS.LEADERBOARD_ALL_TIME:
+        io.to(SOCKET_ROOMS.LEADERBOARD).emit('leaderboardAllTime', payload);
         break;
-      case 'leaderboard:daily':
-        io.emit('leaderboardDaily', payload);
+      case REDIS_CHANNELS.LEADERBOARD_DAILY:
+        io.to(SOCKET_ROOMS.LEADERBOARD).emit('leaderboardDaily', payload);
         break;
-      case 'leaderboard:rankChange':
-        io.emit('leaderboard:rankChange', payload);
+      case REDIS_CHANNELS.LEADERBOARD_RANK_CHANGE:
+        io.to(SOCKET_ROOMS.LEADERBOARD).emit('leaderboard:rankChange', payload);
         break;
-      case 'leaderboard:milestone':
-        io.emit('leaderboard:milestone', payload);
+      case REDIS_CHANNELS.LEADERBOARD_MILESTONE:
+        io.to(SOCKET_ROOMS.LEADERBOARD).emit('leaderboard:milestone', payload);
         break;
 
       // Stats and achievements events

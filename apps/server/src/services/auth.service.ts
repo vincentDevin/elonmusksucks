@@ -2,6 +2,14 @@ import bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
 import jwt from 'jsonwebtoken';
 
+// TEMP: Re-export shared auth payload types for backwards compatibility during migration
+export type {
+  RegisterPayload,
+  LoginPayload,
+  PasswordResetRequestPayload,
+  PasswordResetPayload,
+} from '@ems/types';
+
 import type { User } from '@prisma/client';
 import type { IAuthRepository } from '../repositories/IAuthRepository';
 import { PrismaAuthRepository } from '../repositories/AuthRepository';

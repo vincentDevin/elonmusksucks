@@ -325,4 +325,22 @@ export class BettingRepository implements IBettingRepository {
       orderBy: { id: 'asc' },
     });
   }
+
+  async getRecentBetsForStreak(
+    userId: number,
+    limit: number,
+  ): Promise<Array<{ status: string; createdAt: Date }>> {
+    return await prisma.bet.findMany({
+      where: {
+        userId,
+        status: { in: ['WON', 'LOST'] },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      select: {
+        status: true,
+        createdAt: true,
+      },
+    });
+  }
 }

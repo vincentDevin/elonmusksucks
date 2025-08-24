@@ -61,4 +61,12 @@ export interface IBettingRepository {
   getPredictionOptions(
     predictionId: number,
   ): Promise<Array<{ id: number; label: string; odds: number }>>;
+
+  /**
+   * Get recent bets for streak calculation.
+   */
+  getRecentBetsForStreak(
+    userId: number,
+    limit: number,
+  ): Promise<Array<{ status: string; createdAt: Date }>>;
 }

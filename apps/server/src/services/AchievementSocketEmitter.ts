@@ -1,4 +1,5 @@
 import type { Server as SocketServer } from 'socket.io';
+import { AchievementSocketEvents } from '@ems/types';
 import type { IAchievementSocketEmitter } from './AchievementEngine';
 
 /**
@@ -22,16 +23,16 @@ export class AchievementSocketEmitter implements IAchievementSocketEmitter {
   ): Promise<void> {
     try {
       // Emit to user-specific room
-      this.io.to(`user:${userId}`).emit('achievement:unlocked', {
-        type: 'achievement:unlocked',
+      this.io.to(`user:${userId}`).emit(AchievementSocketEvents.UNLOCKED, {
+        type: AchievementSocketEvents.UNLOCKED,
         userId,
         timestamp: new Date().toISOString(),
         data: payload,
       });
 
       // Also emit to general achievement room for celebration effects
-      this.io.to('achievements').emit('achievement:celebration', {
-        type: 'achievement:celebration',
+      this.io.to('achievements').emit(AchievementSocketEvents.CELEBRATION, {
+        type: AchievementSocketEvents.CELEBRATION,
         userId,
         achievementName: payload.achievement.name,
         rarity: payload.achievement.rarity,
@@ -56,8 +57,8 @@ export class AchievementSocketEmitter implements IAchievementSocketEmitter {
     },
   ): Promise<void> {
     try {
-      this.io.to(`user:${userId}`).emit('achievement:progress', {
-        type: 'achievement:progress',
+      this.io.to(`user:${userId}`).emit(AchievementSocketEvents.PROGRESS, {
+        type: AchievementSocketEvents.PROGRESS,
         userId,
         timestamp: new Date().toISOString(),
         data: payload,
@@ -74,8 +75,8 @@ export class AchievementSocketEmitter implements IAchievementSocketEmitter {
     try {
       if (achievements.length === 0) return;
 
-      this.io.to(`user:${userId}`).emit('achievement:batch_unlocked', {
-        type: 'achievement:batch_unlocked',
+      this.io.to(`user:${userId}`).emit(AchievementSocketEvents.BATCH_UNLOCKED, {
+        type: AchievementSocketEvents.BATCH_UNLOCKED,
         userId,
         count: achievements.length,
         achievements,

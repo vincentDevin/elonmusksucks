@@ -1,10 +1,21 @@
 import { Request, Response, NextFunction } from 'express';
 import { UserService } from '../services/user.service';
 import { EnhancedUserStatsService } from '../services/enhancedUserStats.service';
+import { UserRepository } from '../repositories/UserRepository';
+import { BettingRepository } from '../repositories/BettingRepository';
+import { StatsRepository } from '../repositories/StatsRepository';
+import { PrismaClient } from '@prisma/client';
 import { unifiedActivityService } from '../services/unifiedActivity.service';
 import { achievementService } from '../services/achievement.service';
 import { adminAchievementService } from '../services/adminAchievement.service';
-import type { PublicUserProfile, UserFeedPost, UserActivity, UserStatsDTO } from '@ems/types';
+import type {
+  PublicUserProfile,
+  UserFeedPost,
+  UserActivity,
+  UserStatsDTO,
+  UpdateProfilePayload,
+  CreateUserPostPayload,
+} from '@ems/types';
 
 // Define MulterFile type explicitly to avoid mismatched declarations
 export type MulterFile = {
@@ -24,7 +35,15 @@ export type ReqWithUser = Request & {
 
 // Instantiate the services (uses Prisma-backed repository by default)
 const userService = new UserService();
-const enhancedUserStatsService = new EnhancedUserStatsService();
+const userRepository = new UserRepository();
+const bettingRepository = new BettingRepository();
+const prisma = new PrismaClient();
+const statsRepository = new StatsRepository(prisma);
+const enhancedUserStatsService = new EnhancedUserStatsService(
+  userRepository,
+  bettingRepository,
+  statsRepository,
+);
 
 /**
  * GET /api/users/:userId
@@ -187,7 +206,11 @@ export async function updateProfileHandler(
       return;
     }
 
-    const updated: PublicUserProfile = await userService.updateUserProfile(targetUserId, req.body);
+    const updateData = req.body as UpdateProfilePayload;
+    const updated: PublicUserProfile = await userService.updateUserProfile(
+      targetUserId,
+      updateData,
+    );
     res.json(updated);
   } catch (err) {
     next(err);
@@ -225,7 +248,7 @@ export async function createUserPostHandler(
   try {
     const profileUserId = Number(req.params.userId); // whose profile
     const authUserId = req.user?.id; // who is posting
-    const { content, parentId } = req.body;
+    const { content, parentId } = req.body as CreateUserPostPayload;
     if (!authUserId) {
       res.status(401).json({ error: 'Not authenticated' });
       return;

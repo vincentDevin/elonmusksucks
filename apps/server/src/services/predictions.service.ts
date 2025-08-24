@@ -4,6 +4,9 @@
 // • Sanitises DB records and injects signed avatar URLs for bets & parlay legs
 // -----------------------------------------------------------------------------
 
+// TEMP: Re-export shared prediction payload types for backwards compatibility during migration
+export type { CreatePredictionPayload, ResolvePredictionPayload } from '@ems/types';
+
 import type {
   DbPrediction,
   DbPredictionOption,

@@ -1,80 +1,32 @@
-import { PrismaClient } from '@prisma/client';
+import {
+  CategoryAccuracy,
+  Streak,
+  TrendData,
+  CategoryStats,
+  UserRanking,
+  EnhancedUserStats,
+} from '@ems/types';
 import { leaderboardService } from './leaderboard.service';
 import redisClient from '../lib/redis';
+import { UserRepository } from '../repositories/UserRepository';
+import { BettingRepository } from '../repositories/BettingRepository';
+import { StatsRepository } from '../repositories/StatsRepository';
 
-export interface CategoryAccuracy {
-  category: string;
-  accuracy: number;
-  totalBets: number;
-  wins: number;
-}
-
-export interface Streak {
-  type: 'win' | 'lose';
-  count: number;
-  isActive: boolean;
-}
-
-export interface TrendData {
-  date: string;
-  value: number;
-}
-
-export interface CategoryStats {
-  category: string;
-  betCount: number;
-  winRate: number;
-  profitLoss: number;
-  avgBetSize: number;
-}
-
-export interface UserRanking {
-  rank: number | null;
-  percentile: number;
-  rankChange: number | null;
-  totalUsers: number;
-  category: 'allTime' | 'daily';
-}
-
-export interface EnhancedUserStats {
-  // Performance metrics
-  totalBets: number;
-  winRate: number;
-  profitLoss: number;
-  categoryAccuracy: CategoryAccuracy[];
-  currentStreak: Streak;
-  bestCategory: string;
-  totalWagered: number;
-  avgBetSize: number;
-
-  // Ranking data
-  ranking: {
-    allTime: UserRanking;
-    daily: UserRanking;
-  };
-
-  // Achievement progress
-  achievementProgress: Array<{
-    id: string;
-    title: string;
-    description: string;
-    progress: number;
-    target: number;
-    isCompleted: boolean;
-  }>;
-  achievementCompletionRate: number;
-
-  // Trend data
-  weeklyVolume: TrendData[];
-  monthlyProfitLoss: TrendData[];
-  categoryStats: CategoryStats[];
-}
+// Note: User stats service interfaces now imported from @ems/types
 
 export class EnhancedUserStatsService {
-  private prisma: PrismaClient;
+  private userRepository: UserRepository;
+  private bettingRepository: BettingRepository;
+  private statsRepository: StatsRepository;
 
-  constructor() {
-    this.prisma = new PrismaClient();
+  constructor(
+    userRepository: UserRepository,
+    bettingRepository: BettingRepository,
+    statsRepository: StatsRepository,
+  ) {
+    this.userRepository = userRepository;
+    this.bettingRepository = bettingRepository;
+    this.statsRepository = statsRepository;
   }
 
   async getEnhancedStats(userId: number): Promise<EnhancedUserStats> {
@@ -181,9 +133,7 @@ export class EnhancedUserStatsService {
   }
 
   private async getBasicStats(userId: number) {
-    const stats = await this.prisma.userStats.findUnique({
-      where: { userId },
-    });
+    const stats = await this.userRepository.getUserStats(userId);
 
     return (
       stats || {
@@ -200,26 +150,7 @@ export class EnhancedUserStatsService {
   }
 
   async calculateCategoryAccuracy(userId: number): Promise<CategoryAccuracy[]> {
-    const categoryStats = await this.prisma.$queryRaw<
-      Array<{
-        category: string;
-        totalBets: bigint;
-        wins: bigint;
-        accuracy: number;
-      }>
-    >`
-      SELECT 
-        p.category,
-        COUNT(*)::bigint as "totalBets",
-        SUM(CASE WHEN b.status = 'WON' THEN 1 ELSE 0 END)::bigint as wins,
-        AVG(CASE WHEN b.status = 'WON' THEN 1.0 ELSE 0.0 END) as accuracy
-      FROM "Bet" b 
-      JOIN "Prediction" p ON b."predictionId" = p.id 
-      WHERE b."userId" = ${userId} AND b.status IN ('WON', 'LOST')
-      GROUP BY p.category
-      HAVING COUNT(*) >= 3
-      ORDER BY accuracy DESC
-    `;
+    const categoryStats = await this.statsRepository.getCategoryAccuracy(userId);
 
     return categoryStats.map((stat) => ({
       category: stat.category,
@@ -230,18 +161,7 @@ export class EnhancedUserStatsService {
   }
 
   async calculateCurrentStreak(userId: number): Promise<Streak> {
-    const recentBets = await this.prisma.bet.findMany({
-      where: {
-        userId,
-        status: { in: ['WON', 'LOST'] },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 50,
-      select: {
-        status: true,
-        createdAt: true,
-      },
-    });
+    const recentBets = await this.bettingRepository.getRecentBetsForStreak(userId, 50);
 
     if (recentBets.length === 0) {
       return { type: 'win', count: 0, isActive: false };
@@ -273,50 +193,10 @@ export class EnhancedUserStatsService {
     monthlyProfitLoss: TrendData[];
   }> {
     // Get bet volume for the last 7 days
-    const weeklyVolume = await this.prisma.$queryRaw<
-      Array<{
-        date: string;
-        volume: bigint;
-      }>
-    >`
-      SELECT 
-        dates.date::text as date,
-        COALESCE(SUM(b.amount), 0)::bigint as volume
-      FROM generate_series(
-        CURRENT_DATE - INTERVAL '6 days',
-        CURRENT_DATE,
-        INTERVAL '1 day'
-      ) as dates(date)
-      LEFT JOIN "Bet" b ON DATE(b."createdAt") = dates.date AND b."userId" = ${userId}
-      GROUP BY dates.date
-      ORDER BY dates.date
-    `;
+    const weeklyVolume = await this.statsRepository.getWeeklyVolume(userId);
 
     // Get profit/loss for the last 30 days
-    const monthlyProfitLoss = await this.prisma.$queryRaw<
-      Array<{
-        date: string;
-        profit: bigint;
-      }>
-    >`
-      SELECT 
-        dates.date::text as date,
-        COALESCE(SUM(
-          CASE 
-            WHEN b.status = 'WON' THEN COALESCE(b.payout, 0) - b.amount
-            WHEN b.status = 'LOST' THEN -b.amount
-            ELSE 0
-          END
-        ), 0)::bigint as profit
-      FROM generate_series(
-        CURRENT_DATE - INTERVAL '29 days',
-        CURRENT_DATE,
-        INTERVAL '1 day'
-      ) as dates(date)
-      LEFT JOIN "Bet" b ON DATE(b."createdAt") = dates.date AND b."userId" = ${userId}
-      GROUP BY dates.date
-      ORDER BY dates.date
-    `;
+    const monthlyProfitLoss = await this.statsRepository.getMonthlyProfitLoss(userId);
 
     return {
       weeklyVolume: weeklyVolume.map((item) => ({

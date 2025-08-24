@@ -12,53 +12,35 @@ import type {
   AITweet,
   UserPost,
 } from '@prisma/client';
+import type {
+  ExecutiveDashboardData,
+  CustomReportData,
+  PaginatedUsers,
+  DetailedUser,
+  UserSearchParams,
+  PredictionSearchParams,
+  FinancialSearchParams,
+  BadgeSearchParams,
+  QueryParams,
+} from '@ems/types';
 
-/** Simple key/value map for query filters from req.query */
-export type QueryParams = Record<string, any>;
+// TEMP: Re-export for backwards compatibility during migration
+export type {
+  ExecutiveDashboardData,
+  CustomReportData,
+  PaginatedUsers,
+  DetailedUser,
+  UserSearchParams,
+  PredictionSearchParams,
+  FinancialSearchParams,
+  BadgeSearchParams,
+  QueryParams,
+};
 
-/** Enhanced search and pagination parameters for user management */
-export interface UserSearchParams {
-  search?: string; // Search name/email with fuzzy matching
-  role?: Role[]; // Filter by multiple roles
-  active?: boolean; // Filter by active status
-  bannedOnly?: boolean; // Show only banned users
-  page: number; // Pagination support (0-based)
-  limit: number; // Results per page (max 100)
-  sortBy?: 'name' | 'email' | 'createdAt' | 'muskBucks' | 'role';
-  sortOrder?: 'asc' | 'desc';
-}
+// UserSearchParams moved to @ems/types - see import above
 
-/** Paginated user results with metadata */
-export interface PaginatedUsers {
-  users: DetailedUser[];
-  totalCount: number;
-  totalPages: number;
-  currentPage: number;
-  hasNextPage: boolean;
-  hasPreviousPage: boolean;
-}
-
-/** Enhanced user data with aggregated information */
-export interface DetailedUser extends User {
-  banStatus?: {
-    isBanned: boolean;
-    banType?: string;
-    reason?: string;
-    expiresAt?: Date;
-  };
-  stats?: {
-    totalBets: number;
-    totalWagered: number;
-    totalWon: number;
-    winRate: number;
-  };
-  recentActivity?: {
-    lastLogin?: Date;
-    lastBet?: Date;
-    totalLogins: number;
-  };
-  badges?: Badge[];
-}
+// PaginatedUsers moved to @ems/types - see import above
+// DetailedUser moved to @ems/types - see import above
 
 /** Bulk operation request */
 export interface BulkUserOperation {
@@ -87,25 +69,7 @@ export interface BulkOperationResult {
 
 // -- Enhanced Prediction Management Interfaces --
 
-/** Prediction search and filtering parameters */
-export interface PredictionSearchParams {
-  search?: string; // Search title and description
-  category?: string[]; // Filter by categories
-  status?: ('pending' | 'approved' | 'rejected' | 'resolved')[];
-  creatorId?: number; // Filter by specific creator
-  dateRange?: {
-    start?: Date;
-    end?: Date;
-  };
-  bettingVolume?: {
-    min?: number;
-    max?: number;
-  };
-  page: number;
-  limit: number;
-  sortBy?: 'createdAt' | 'title' | 'category' | 'expiresAt' | 'bettingVolume';
-  sortOrder?: 'asc' | 'desc';
-}
+// PredictionSearchParams moved to @ems/types - see import above
 
 /** Enhanced prediction with aggregated data */
 export interface DetailedPrediction extends Prediction {
@@ -173,24 +137,7 @@ export interface BulkPredictionResult {
 
 // -- Enhanced Financial Operations Dashboard Interfaces --
 
-/** Financial search and filtering parameters */
-export interface FinancialSearchParams {
-  search?: string; // Search user names, prediction titles
-  userId?: number;
-  predictionId?: number;
-  betType?: ('single' | 'parlay')[];
-  status?: ('pending' | 'won' | 'lost' | 'refunded')[];
-  transactionType?: ('DEBIT' | 'CREDIT')[];
-  minAmount?: number;
-  maxAmount?: number;
-  startDate?: string;
-  endDate?: string;
-  suspiciousOnly?: boolean;
-  page: number;
-  limit: number;
-  sortBy?: 'createdAt' | 'amount' | 'potentialPayout' | 'userName' | 'profit';
-  sortOrder?: 'asc' | 'desc';
-}
+// FinancialSearchParams moved to @ems/types - see import above
 
 /** Enhanced bet with user and prediction details */
 export interface DetailedBet extends Bet {
@@ -335,21 +282,8 @@ export interface BadgeCategory {
   createdAt: Date;
 }
 
-/** Badge search and filtering parameters */
-export interface BadgeSearchParams {
-  search?: string;
-  categoryId?: number;
-  isActive?: boolean;
-  rarity?: ('common' | 'rare' | 'epic' | 'legendary')[];
-  userCount?: {
-    min?: number;
-    max?: number;
-  };
-  page: number;
-  limit: number;
-  sortBy?: 'name' | 'createdAt' | 'userCount' | 'category';
-  sortOrder?: 'asc' | 'desc';
-}
+// BadgeSearchParams moved to @ems/types - see import above
+// QueryParams moved to @ems/types - see import above
 
 /** Enhanced badge with analytics and usage data */
 export interface DetailedBadge extends Badge {
@@ -491,30 +425,7 @@ export interface AnalyticsParams {
   granularity?: 'day' | 'week' | 'month';
 }
 
-export interface ExecutiveDashboardData {
-  overview: {
-    totalUsers: number;
-    activeUsers: number;
-    totalPredictions: number;
-    totalBets: number;
-    totalRevenue: number;
-    totalPayouts: number;
-    netProfit: number;
-    avgUserValue: number;
-  };
-  growthMetrics: {
-    userGrowthRate: number;
-    revenueGrowthRate: number;
-    engagementGrowthRate: number;
-    retentionRate: number;
-  };
-  currentPeriodComparison: {
-    newUsers: { current: number; previous: number; change: number };
-    revenue: { current: number; previous: number; change: number };
-    bets: { current: number; previous: number; change: number };
-    engagement: { current: number; previous: number; change: number };
-  };
-}
+// ExecutiveDashboardData moved to @ems/types - see import above
 
 export interface UserBehaviorAnalytics {
   demographics: {
@@ -557,16 +468,7 @@ export interface PredictiveAnalytics {
   };
 }
 
-export interface CustomReportData {
-  reportId: string;
-  title: string;
-  data: Array<Record<string, any>>;
-  metadata: {
-    totalRows: number;
-    generatedAt: string;
-    parameters: Record<string, any>;
-  };
-}
+// CustomReportData moved to @ems/types - see import above
 
 export interface RealtimeMetrics {
   activeUsers: number;

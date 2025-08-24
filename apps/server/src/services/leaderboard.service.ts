@@ -9,37 +9,21 @@ import type {
   UserRank,
   LeaderboardStats,
 } from '../repositories/ILeaderboardRepository';
+import type { LeaderboardTrigger, LeaderboardMetrics, ScheduleConfig } from '@ems/types';
+import { QUEUE_NAMES } from '@ems/types';
 import { LeaderboardRepository } from '../repositories/LeaderboardRepository';
 
-// New interfaces for enhanced functionality
-export interface LeaderboardTrigger {
-  event: 'bet:resolved' | 'prediction:completed' | 'user:milestone' | 'scheduled:refresh';
-  priority: 'immediate' | 'batched' | 'scheduled';
-  userId?: number;
-  affectedMetrics: ('profit' | 'winRate' | 'streak' | 'volume')[];
-  metadata?: Record<string, any>;
-}
+// TEMP: Re-export for backwards compatibility during migration
+export type { LeaderboardTrigger, LeaderboardMetrics, ScheduleConfig } from '@ems/types';
 
-export interface LeaderboardMetrics {
-  profit: number;
-  winRate: number;
-  streak: number;
-  volume: number;
-  roi: number;
-}
-
-export interface ScheduleConfig {
-  interval: string; // cron expression
-  timezone?: string;
-  enabled: boolean;
-}
+// LeaderboardTrigger, LeaderboardMetrics, ScheduleConfig moved to @ems/types - see import above
 
 /**
  * Enhanced leaderboard service with event-driven updates and intelligent scheduling
  */
 export class LeaderboardService {
-  private refreshQueue = new Queue('leaderboard-refresh', { connection: redisClient });
-  private eventQueue = new Queue('leaderboard-events', { connection: redisClient });
+  private refreshQueue = new Queue(QUEUE_NAMES.LEADERBOARD_REFRESH, { connection: redisClient });
+  private eventQueue = new Queue(QUEUE_NAMES.LEADERBOARD_EVENTS, { connection: redisClient });
   private repo: ILeaderboardRepository;
   private batchBuffer: Map<number, LeaderboardTrigger[]> = new Map();
   private batchTimeout: NodeJS.Timeout | null = null;

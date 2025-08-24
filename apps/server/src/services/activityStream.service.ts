@@ -1,59 +1,7 @@
 // import redisClient from '../lib/redis';
 import type { IActivityRepository } from '../repositories/IActivityRepository';
 import { ActivityRepository } from '../repositories/ActivityRepository';
-
-export interface ActivityEventData {
-  type: string;
-  title: string;
-  description?: string;
-  metadata?: Record<string, any>;
-  isPersonal?: boolean;
-  priority?: 'low' | 'medium' | 'high';
-  relatedUserId?: number;
-  predictionId?: number;
-  betId?: number;
-}
-
-export interface ActivityStreamQuery {
-  userId?: number;
-  includePersonal?: boolean;
-  includePublic?: boolean;
-  limit?: number;
-  offset?: number;
-  types?: string[];
-  priority?: 'low' | 'medium' | 'high';
-  since?: Date;
-}
-
-export interface ActivityStreamEntry {
-  id: number;
-  type: string;
-  title: string;
-  description?: string;
-  details?: any;
-  isPersonal: boolean;
-  priority: string;
-  createdAt: string;
-  user: {
-    id: number;
-    name: string;
-    avatarUrl?: string | null;
-  };
-  relatedUser?: {
-    id: number;
-    name: string;
-    avatarUrl?: string | null;
-  };
-  prediction?: {
-    id: number;
-    title: string;
-    category: string;
-  };
-  bet?: {
-    id: number;
-    amount: number;
-  };
-}
+import type { ActivityEventData, ActivityStreamQuery, ActivityStreamEntry } from '@ems/types';
 
 export class ActivityStreamService {
   private repo: IActivityRepository;

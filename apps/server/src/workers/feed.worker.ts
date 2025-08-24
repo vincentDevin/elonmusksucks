@@ -1,26 +1,16 @@
 // apps/server/src/workers/feed.worker.ts
 import 'dotenv/config';
 import { Worker } from 'bullmq';
+import { FeedFetchJobData, FeedHealthCheckData } from '@ems/types';
 import { PrismaClient } from '@prisma/client';
 import redisClient from '../lib/redis';
 import type { Job } from 'bullmq';
-import type { FeedFetchJob } from '@ems/types';
 import Parser from 'rss-parser';
 import { createHash } from 'crypto';
 
 const prisma = new PrismaClient();
 
-// Job data interfaces
-interface FeedFetchJobData extends FeedFetchJob {
-  feedId: number;
-  url: string;
-  forceRefresh?: boolean;
-}
-
-interface FeedHealthCheckData {
-  feedId: number;
-  checkConnectivity?: boolean;
-}
+// Note: Job data interfaces now imported from @ems/types
 
 /**
  * RSS/Atom Feed Worker

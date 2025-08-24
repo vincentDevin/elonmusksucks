@@ -1,14 +1,16 @@
 // apps/server/src/services/admin.service.ts
 import type { Role } from '@prisma/client';
+import type { IAdminRepository } from '../repositories/IAdminRepository';
 import type {
-  IAdminRepository,
   QueryParams,
   UserSearchParams,
   PaginatedUsers,
   DetailedUser,
+  PredictionSearchParams,
+} from '@ems/types';
+import type {
   BulkUserOperation,
   BulkOperationResult,
-  PredictionSearchParams,
   PaginatedPredictions,
   DetailedPrediction,
   BulkPredictionOperation,

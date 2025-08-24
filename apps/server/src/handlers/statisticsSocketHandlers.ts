@@ -1,51 +1,29 @@
 import { Socket, Server as IOServer } from 'socket.io';
+import {
+  StatsSocketEvents,
+  StatsUpdatePayload,
+  RankingChangePayload,
+  AchievementUnlockedPayload,
+} from '@ems/types';
+
+// TEMP: Re-export shared ACK types for backwards compatibility during migration
+export type { AckCallback, AckCallbackObj, AckResult, AckOk, AckErr } from '@ems/types';
 import { EnhancedUserStatsService } from '../services/enhancedUserStats.service';
+import { UserRepository } from '../repositories/UserRepository';
+import { BettingRepository } from '../repositories/BettingRepository';
+import { StatsRepository } from '../repositories/StatsRepository';
+import { PrismaClient } from '@prisma/client';
 import redisClient from '../lib/redis';
 
-const enhancedUserStatsService = new EnhancedUserStatsService();
-
-export interface StatsUpdatePayload {
-  userId: number;
-  changes: {
-    winRate?: number;
-    profit?: number;
-    rank?: number;
-    streak?: number;
-    totalBets?: number;
-  };
-  achievements?: Array<{
-    id: string;
-    title: string;
-    description: string;
-    isUnlocked: boolean;
-  }>;
-  timestamp: string;
-}
-
-export interface RankingChangePayload {
-  userId: number;
-  oldRank: number;
-  newRank: number;
-  change: number;
-  category: 'allTime' | 'daily';
-  percentile: number;
-}
-
-export interface AchievementUnlockedPayload {
-  userId: number;
-  achievement: {
-    id: string;
-    title: string;
-    description: string;
-    category: string;
-  };
-  progress: {
-    previous: number;
-    current: number;
-    target: number;
-  };
-  timestamp: string;
-}
+const userRepository = new UserRepository();
+const bettingRepository = new BettingRepository();
+const prisma = new PrismaClient();
+const statsRepository = new StatsRepository(prisma);
+const enhancedUserStatsService = new EnhancedUserStatsService(
+  userRepository,
+  bettingRepository,
+  statsRepository,
+);
 
 /**
  * Register real-time statistics handlers for individual socket connections
@@ -65,13 +43,13 @@ export function registerStatisticsHandlers(socket: Socket): void {
 
       // Send current stats immediately
       const currentStats = await enhancedUserStatsService.getEnhancedStats(user.id);
-      socket.emit('stats:current', {
+      socket.emit(StatsSocketEvents.CURRENT, {
         stats: currentStats,
         timestamp: new Date().toISOString(),
       });
     } catch (error) {
       console.error('[stats-socket] Error fetching current stats:', error);
-      socket.emit('stats:error', { message: 'Failed to fetch current statistics' });
+      socket.emit(StatsSocketEvents.ERROR, { message: 'Failed to fetch current statistics' });
     }
   });
 
@@ -139,7 +117,7 @@ function handleStatsUpdate(io: IOServer, payload: StatsUpdatePayload): void {
   const { userId, changes, achievements, timestamp } = payload;
 
   // Emit to user's personal stats room
-  io.to(`user:${userId}:stats`).emit('stats:updated', {
+  io.to(`user:${userId}:stats`).emit(StatsSocketEvents.UPDATED, {
     changes,
     achievements,
     timestamp,
@@ -155,7 +133,7 @@ function handleRankingChange(io: IOServer, payload: RankingChangePayload): void 
   const { userId, oldRank, newRank, change, category, percentile } = payload;
 
   // Emit to user's ranking room
-  io.to(`user:${userId}:ranking`).emit('ranking:changed', {
+  io.to(`user:${userId}:ranking`).emit(StatsSocketEvents.RANKING_CHANGED, {
     oldRank,
     newRank,
     change,
@@ -165,7 +143,7 @@ function handleRankingChange(io: IOServer, payload: RankingChangePayload): void 
   });
 
   // Also emit to stats room for general updates
-  io.to(`user:${userId}:stats`).emit('stats:ranking', {
+  io.to(`user:${userId}:stats`).emit(StatsSocketEvents.RANKING, {
     rank: newRank,
     change,
     category,
@@ -205,14 +183,14 @@ function handleAchievementUnlocked(io: IOServer, payload: any): void {
   const timestamp = payload.timestamp || new Date().toISOString();
 
   // Emit to user's achievement room
-  io.to(`user:${userId}:achievements`).emit('achievement:unlocked', {
+  io.to(`user:${userId}:achievements`).emit(StatsSocketEvents.ACHIEVEMENT_UNLOCKED, {
     achievement,
     progress,
     timestamp,
   });
 
   // Also emit to stats room for general updates
-  io.to(`user:${userId}:stats`).emit('stats:achievement', {
+  io.to(`user:${userId}:stats`).emit(StatsSocketEvents.ACHIEVEMENT, {
     achievement,
     progress,
   });
@@ -232,7 +210,7 @@ function handleStatsRefresh(io: IOServer, payload: { userId: number }): void {
   enhancedUserStatsService
     .getEnhancedStats(userId)
     .then((stats) => {
-      io.to(`user:${userId}:stats`).emit('stats:refreshed', {
+      io.to(`user:${userId}:stats`).emit(StatsSocketEvents.REFRESHED, {
         stats,
         timestamp: new Date().toISOString(),
       });

@@ -6,6 +6,7 @@
 
 import type { IPayoutRepository } from '../repositories/IPayoutRepository';
 import type { PublicPrediction } from '@ems/types';
+import { QUEUE_NAMES } from '@ems/types';
 import { PayoutRepository } from '../repositories/PayoutRepository';
 import { Queue } from 'bullmq';
 import redis from '../lib/redis';
@@ -33,7 +34,7 @@ subscriptionRedis.on('connect', () => {
 });
 
 export class PayoutService {
-  private payoutQueue = new Queue('payouts', { connection: redis });
+  private payoutQueue = new Queue(QUEUE_NAMES.PAYOUTS, { connection: redis });
 
   constructor(private repo: IPayoutRepository = new PayoutRepository()) {}
 

@@ -1,32 +1,16 @@
 // apps/server/src/workers/leaderboard.worker.ts
 import 'dotenv/config';
 import { Worker } from 'bullmq';
+import { RefreshJobData, IncrementalUpdateData, BatchUserUpdateData } from '@ems/types';
 import redisClient from '../lib/redis';
 import { LeaderboardRepository } from '../repositories/LeaderboardRepository';
 import type { Job } from 'bullmq';
-import type { LeaderboardTrigger, LeaderboardMetrics } from '../services/leaderboard.service';
+import type { LeaderboardMetrics } from '@ems/types';
 import { achievementService } from '../services/achievement.service';
 
 const repo = new LeaderboardRepository();
 
-// Job data interfaces
-interface RefreshJobData {
-  trigger?: LeaderboardTrigger;
-  batchData?: Record<string, LeaderboardTrigger[]>;
-  config?: any;
-}
-
-interface IncrementalUpdateData {
-  userId: number;
-  metrics: Partial<LeaderboardMetrics>;
-  timestamp: string;
-}
-
-interface BatchUserUpdateData {
-  userId: number;
-  triggers: LeaderboardTrigger[];
-  timestamp: string;
-}
+// Note: Job data interfaces now imported from @ems/types
 
 /**
  * Enhanced worker that handles different types of leaderboard updates

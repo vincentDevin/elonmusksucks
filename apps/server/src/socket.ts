@@ -8,6 +8,10 @@
 import { type Server as HTTPServer } from 'http';
 import { Server as IOServer } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
+
+// TEMP: Re-export shared room/channel types for backwards compatibility during migration
+export { SOCKET_ROOMS, REDIS_CHANNELS } from '@ems/types';
+export type { SocketRoom, RedisChannel } from '@ems/types';
 import redisClient from './lib/redis';
 import { socketAuthMiddleware } from './middleware/socketAuthMiddleware';
 import { registerChatHandlers } from './handlers/chatHandlers';
@@ -19,6 +23,7 @@ import { registerStatisticsRedisHandlers } from './handlers/statisticsSocketHand
 import { setupUnifiedActivityHandlers } from './handlers/unifiedActivityHandlers';
 import { registerTimelineHandlers } from './handlers/timelineHandlers';
 import { registerPongHandlers, registerPongRedisHandlers } from './handlers/pongSocketHandlers';
+import { socketCleanupManager } from './lib/SocketCleanupManager';
 // import { registerRoomHandlers } from './handlers/roomHandlers'; // future rooms
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -138,12 +143,29 @@ export async function initSocket(httpServer: HTTPServer) {
         console.log(`[socket] Admin user ${user.id} joined admin room`);
       }
 
+      // Register event handlers (tracked for cleanup)
       // registerRoomHandlers(io, socket); // Uncomment when multi‑room is live
       registerChatHandlers(socket);
       registerBetHandlers(socket);
       registerModerationHandlers(socket);
       registerPongHandlers(socket);
       setupUnifiedActivityHandlers(socket);
+
+      // Setup disconnect handler for cleanup
+      socket.on('disconnect', async (reason) => {
+        console.log(`[socket] client disconnected: ${socket.id}, reason: ${reason}`);
+        try {
+          await socketCleanupManager.cleanupSocket(socket.id);
+
+          // Log cleanup stats periodically
+          const stats = socketCleanupManager.getStats();
+          if (stats.socketsWithListeners % 100 === 0 || stats.socketsWithListeners === 0) {
+            console.log('[socket] Cleanup stats:', stats);
+          }
+        } catch (error) {
+          console.error(`[socket] Cleanup error for ${socket.id}:`, error);
+        }
+      });
     } catch (err) {
       console.error('[socket] handler error:', err);
     }
@@ -156,7 +178,15 @@ export async function initSocket(httpServer: HTTPServer) {
     console.log(`[socket] Received ${signal}, cleaning up Redis connections...`);
 
     try {
-      // Close Socket.IO server first
+      // Clean up socket listeners first
+      console.log('[socket] Cleaning up socket listeners...');
+      try {
+        await socketCleanupManager.cleanupAll();
+      } catch (error) {
+        console.error('[socket] Error during socket cleanup:', error);
+      }
+
+      // Close Socket.IO server
       io.close(() => {
         console.log('[socket] Socket.IO server closed');
       });

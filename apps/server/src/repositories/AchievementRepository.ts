@@ -24,6 +24,7 @@ export interface IAchievementRepository {
   ): Promise<any | null>;
   findAllAchievements(): Promise<any[]>;
   findAllUserAchievementsWithDetails(): Promise<any[]>;
+  findRecentUserAchievements(userId: number, limit: number): Promise<any[]>;
   // Idempotency methods
   recordEventIdempotency(
     idempotencyKey: string,
@@ -33,6 +34,15 @@ export interface IAchievementRepository {
   hasProcessedEvent(idempotencyKey: string): Promise<boolean>;
   findActiveRulesIndexedByEventKey(): Promise<Map<string, any[]>>;
   backfillAchievementRules(): Promise<number>;
+  getShameAchievements(userId: number): Promise<
+    Array<{
+      slug: string;
+      title: string;
+      description: string;
+      completedAt: Date;
+    }>
+  >;
+  findShameAchievementByName(name: string): Promise<any | null>;
 }
 
 export class AchievementRepository implements IAchievementRepository {
@@ -92,6 +102,7 @@ export class AchievementRepository implements IAchievementRepository {
       include: {
         achievement: true,
       },
+      orderBy: [{ achievement: { category: 'asc' } }, { achievement: { sortOrder: 'asc' } }],
     });
   }
 
@@ -342,6 +353,69 @@ export class AchievementRepository implements IAchievementRepository {
       include: {
         user: true,
         achievement: true,
+      },
+    });
+  }
+
+  async findRecentUserAchievements(userId: number, limit: number) {
+    return this.prisma.userAchievement.findMany({
+      where: {
+        userId,
+        completedAt: { not: null },
+      },
+      include: {
+        achievement: true,
+      },
+      orderBy: {
+        completedAt: 'desc',
+      },
+      take: limit,
+    });
+  }
+
+  async getShameAchievements(userId: number): Promise<
+    Array<{
+      slug: string;
+      title: string;
+      description: string;
+      completedAt: Date;
+    }>
+  > {
+    const userAchievements = await this.prisma.userAchievement.findMany({
+      where: {
+        userId,
+        completedAt: { not: null },
+        achievement: {
+          isShame: true,
+        },
+      },
+      include: {
+        achievement: {
+          select: {
+            slug: true,
+            title: true,
+            description: true,
+          },
+        },
+      },
+      orderBy: {
+        completedAt: 'desc',
+      },
+    });
+
+    return userAchievements.map((ua) => ({
+      slug: ua.achievement.slug || '',
+      title: ua.achievement.title,
+      description: ua.achievement.description,
+      completedAt: ua.completedAt!,
+    }));
+  }
+
+  async findShameAchievementByName(name: string): Promise<any | null> {
+    return this.prisma.achievement.findFirst({
+      where: {
+        name,
+        isShame: true,
       },
     });
   }

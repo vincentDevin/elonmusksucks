@@ -1,59 +1,23 @@
 import { PrismaClient } from '@prisma/client';
+import { AchievementTrigger, AchievementProgress, Achievement } from '@ems/types';
 import { StatisticsEventEmitter } from '../handlers/statisticsSocketHandlers';
 import { unifiedActivityService } from './unifiedActivity.service';
 import { bettingStatsService } from './bettingStats.service';
 import { socialStatsService } from './socialStats.service';
 import { AchievementRepository } from '../repositories/AchievementRepository';
+import { UserRepository } from '../repositories/UserRepository';
 
-export interface AchievementTrigger {
-  type:
-    | 'bet_placed'
-    | 'bet_won'
-    | 'bet_lost'
-    | 'parlay_completed'
-    | 'prediction_created'
-    | 'user_followed'
-    | 'streak_updated'
-    | 'accuracy_updated'
-    | 'volume_updated'
-    | 'profit_updated'
-    | 'ranking_updated';
-  userId: number;
-  data: Record<string, any>;
-}
-
-export interface AchievementProgress {
-  id: string; // Changed to string for frontend compatibility
-  achievementId: number;
-  name: string;
-  title: string;
-  description: string;
-  category: string;
-  progress: number;
-  targetValue: number;
-  isCompleted: boolean;
-  completedAt?: string;
-}
-
-export interface Achievement {
-  id: number;
-  name: string;
-  title: string;
-  description: string;
-  category: string;
-  targetValue: number;
-  iconUrl?: string;
-  isActive: boolean;
-  sortOrder: number;
-}
+// Note: Achievement service interfaces now imported from @ems/types
 
 export class AchievementService {
   private prisma: PrismaClient;
   private achievementRepository: AchievementRepository;
+  private userRepository: UserRepository;
 
   constructor() {
     this.prisma = new PrismaClient();
     this.achievementRepository = new AchievementRepository(this.prisma);
+    this.userRepository = new UserRepository();
   }
 
   /**
@@ -112,13 +76,7 @@ export class AchievementService {
    * Get user's achievement progress
    */
   async getUserAchievementProgress(userId: number): Promise<AchievementProgress[]> {
-    const userAchievements = await this.prisma.userAchievement.findMany({
-      where: { userId },
-      include: {
-        achievement: true,
-      },
-      orderBy: [{ achievement: { category: 'asc' } }, { achievement: { sortOrder: 'asc' } }],
-    });
+    const userAchievements = await this.achievementRepository.findUserAchievements(userId);
 
     return userAchievements.map((ua) => ({
       id: ua.achievement.name, // Use achievement name as string ID for frontend compatibility
@@ -138,7 +96,7 @@ export class AchievementService {
    * Get all available achievements
    */
   async getAllAchievements(): Promise<Achievement[]> {
-    const achievements = await this.prisma.achievement.findMany({
+    const achievements = await this.achievementRepository.findMany({
       where: { isActive: true },
       orderBy: [{ category: 'asc' }, { sortOrder: 'asc' }],
     });
@@ -168,10 +126,7 @@ export class AchievementService {
       progress: 0,
     }));
 
-    await this.prisma.userAchievement.createMany({
-      data: userAchievements,
-      skipDuplicates: true,
-    });
+    await this.achievementRepository.createManyUserAchievements(userAchievements);
 
     // Check for immediate achievements (like early_adopter)
     await this.checkAndUpdateAchievements({
@@ -189,9 +144,7 @@ export class AchievementService {
     achievementName: string,
     newProgress: number,
   ): Promise<Achievement | null> {
-    const achievement = await this.prisma.achievement.findUnique({
-      where: { name: achievementName },
-    });
+    const achievement = await this.achievementRepository.findByName(achievementName);
 
     if (!achievement) return null;
 
@@ -480,7 +433,7 @@ export class AchievementService {
       await unifiedActivityService.publishActivity({
         type: 'achievement_unlocked',
         userId,
-        userName: (await this.prisma.user.findUnique({ where: { id: userId } }))?.name || 'Someone',
+        userName: (await this.userRepository.findUserBasicById(userId))?.name || 'Someone',
         title: `Achievement unlocked: ${achievement.title}`,
         description: achievement.description,
         icon: '🏅',

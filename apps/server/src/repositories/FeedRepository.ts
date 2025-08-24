@@ -1,5 +1,8 @@
 import { PrismaClient, FeedStatus, ArticleStatus } from '@prisma/client';
 
+// TEMP: Re-export shared types for backwards compatibility during migration
+export type { PageQuery, CursorPage, SortOrder, DateRange } from '@ems/types';
+
 export class FeedRepository {
   constructor(private prisma: PrismaClient) {}
 

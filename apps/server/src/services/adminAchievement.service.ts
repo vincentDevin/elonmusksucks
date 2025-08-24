@@ -504,19 +504,10 @@ class AdminAchievementService {
       completedAt: string;
     }>
   > {
-    const recentAchievements = await prisma.userAchievement.findMany({
-      where: {
-        userId,
-        completedAt: { not: null },
-      },
-      include: {
-        achievement: true,
-      },
-      orderBy: {
-        completedAt: 'desc',
-      },
-      take: limit,
-    });
+    const recentAchievements = await achievementRepository.findRecentUserAchievements(
+      userId,
+      limit,
+    );
 
     return recentAchievements.map((ua) => ({
       id: ua.achievement.name, // Use name as ID for frontend compatibility

@@ -1,8 +1,6 @@
 import { Socket, Server as IOServer } from 'socket.io';
-import {
-  activityStreamService,
-  type ActivityStreamEntry,
-} from '../services/activityStream.service';
+import { activityStreamService } from '../services/activityStream.service';
+import type { ActivityStreamEntry } from '@ems/types';
 
 /**
  * Register activity stream handlers for individual socket connections

@@ -4,15 +4,18 @@
 import { PrismaClient, BanType } from '@prisma/client';
 import { achievementEvaluatorService } from './achievementEvaluator.service';
 import { adminAchievementService } from './adminAchievement.service';
+import { UserRepository } from '../repositories/UserRepository';
+import { ModerationRepository } from '../repositories/ModerationRepository';
+import { AchievementRepository } from '../repositories/AchievementRepository';
+import type { BanRequest } from '@ems/types';
 
 const prisma = new PrismaClient();
+const userRepository = new UserRepository();
+const moderationRepository = new ModerationRepository(prisma);
+const achievementRepository = new AchievementRepository(prisma);
 
-export interface BanRequest {
-  userId: number;
-  reason: string;
-  durationDays?: number; // undefined = permanent
-  moderatorId: number;
-}
+// TEMP: Re-export for backwards compatibility during migration
+export type { BanRequest } from '@ems/types';
 
 export interface ShameWallEntry {
   userId: number;
@@ -45,25 +48,21 @@ export interface BanHistory {
 }
 
 class ShameWallService {
+  private achievementRepository = new AchievementRepository(prisma);
+  private moderationRepository = new ModerationRepository(prisma);
   /**
    * Issue a ban and award appropriate shame achievements
    */
   async issueBan(request: BanRequest): Promise<BanHistory> {
     const { userId, reason, durationDays, moderatorId } = request;
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, name: true },
-    });
+    const user = await userRepository.findUserBasicById(userId);
 
     if (!user) {
       throw new Error('User not found');
     }
 
-    const moderator = await prisma.user.findUnique({
-      where: { id: moderatorId },
-      select: { name: true },
-    });
+    const moderator = await userRepository.findUserBasicById(moderatorId);
 
     if (!moderator) {
       throw new Error('Moderator not found');
@@ -76,35 +75,29 @@ class ShameWallService {
       : new Date(Date.now() + durationDays! * 24 * 60 * 60 * 1000);
 
     // Create the ban record
-    const ban = await prisma.userBan.create({
-      data: {
-        userId,
-        banType,
-        reason,
-        expiresAt,
-        isActive: true,
-      },
+    const ban = await moderationRepository.createBan({
+      userId,
+      banType,
+      reason,
+      expiresAt: expiresAt || undefined,
+      isActive: true,
     });
 
     // Create moderation log
-    await prisma.moderationLog.create({
-      data: {
-        moderatorId,
-        targetUserId: userId,
-        action: 'USER_BAN',
-        reason,
-        details: {
-          banType,
-          durationDays: durationDays || null,
-          banId: ban.id,
-        },
+    await moderationRepository.createModerationLog({
+      moderatorId,
+      targetUserId: userId,
+      action: 'USER_BAN',
+      reason,
+      details: {
+        banType,
+        durationDays: durationDays || null,
+        banId: ban.id,
       },
     });
 
     // Count total bans for this user
-    const banCount = await prisma.userBan.count({
-      where: { userId },
-    });
+    const banCount = await moderationRepository.countUserBans(userId);
 
     const shameAchievementsAwarded: string[] = [];
 
@@ -164,10 +157,7 @@ class ShameWallService {
    * Lift a ban (for temporary bans or pardons)
    */
   async liftBan(banId: number, moderatorId: number, reason?: string): Promise<void> {
-    const ban = await prisma.userBan.findUnique({
-      where: { id: banId },
-      include: { user: true },
-    });
+    const ban = await moderationRepository.getBanById(banId);
 
     if (!ban) {
       throw new Error('Ban not found');
@@ -178,25 +168,17 @@ class ShameWallService {
     }
 
     // Deactivate ban
-    await prisma.userBan.update({
-      where: { id: banId },
-      data: {
-        isActive: false,
-        updatedAt: new Date(),
-      },
-    });
+    await moderationRepository.updateBanStatus(banId, false);
 
     // Log the unban action
-    await prisma.moderationLog.create({
-      data: {
-        moderatorId,
-        targetUserId: ban.userId,
-        action: 'USER_UNBAN',
-        reason: reason || 'Ban lifted',
-        details: {
-          originalBanId: banId,
-          originalReason: ban.reason,
-        },
+    await moderationRepository.createModerationLog({
+      moderatorId,
+      targetUserId: ban.userId,
+      action: 'USER_UNBAN',
+      reason: reason || 'Ban lifted',
+      details: {
+        originalBanId: banId,
+        originalReason: ban.reason,
       },
     });
 
@@ -207,34 +189,14 @@ class ShameWallService {
    * Get current shame wall (active bans with shame achievements)
    */
   async getShameWall(): Promise<ShameWallEntry[]> {
-    const activeBans = await prisma.userBan.findMany({
-      where: {
-        isActive: true,
-        OR: [
-          { expiresAt: null }, // Permanent bans
-          { expiresAt: { gt: new Date() } }, // Non-expired temporary bans
-        ],
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            avatarUrl: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
+    const activeBans = await moderationRepository.getActiveBans();
 
     // Get ban counts for each user
     const userIds = activeBans.map((ban) => ban.userId);
     const banCounts = await Promise.all(
       userIds.map(async (userId) => ({
         userId,
-        count: await prisma.userBan.count({ where: { userId } }),
+        count: await moderationRepository.countUserBans(userId),
       })),
     );
     const banCountMap = Object.fromEntries(banCounts.map((bc) => [bc.userId, bc.count]));
@@ -243,24 +205,7 @@ class ShameWallService {
     const shameWallEntries = await Promise.all(
       activeBans.map(async (ban) => {
         // Get shame achievements for this user
-        const shameAchievements = await prisma.userAchievement.findMany({
-          where: {
-            userId: ban.userId,
-            completedAt: { not: null },
-            achievement: {
-              isShame: true,
-            },
-          },
-          include: {
-            achievement: {
-              select: {
-                slug: true,
-                title: true,
-                description: true,
-              },
-            },
-          },
-        });
+        const shameAchievements = await achievementRepository.getShameAchievements(ban.userId);
 
         return {
           userId: ban.user.id,
@@ -270,11 +215,11 @@ class ShameWallService {
           startDate: ban.createdAt.toISOString(),
           endDate: ban.expiresAt?.toISOString(),
           isActive: ban.isActive,
-          shameAchievements: shameAchievements.map((ua) => ({
-            slug: ua.achievement.slug!,
-            title: ua.achievement.title,
-            description: ua.achievement.description,
-            awardedAt: ua.completedAt!.toISOString(),
+          shameAchievements: shameAchievements.map((achievement) => ({
+            slug: achievement.slug,
+            title: achievement.title,
+            description: achievement.description,
+            awardedAt: achievement.completedAt.toISOString(),
           })),
           banCount: banCountMap[ban.userId] || 1,
         };
@@ -288,54 +233,10 @@ class ShameWallService {
    * Get ban history for admin
    */
   async getBanHistory(limit = 50): Promise<BanHistory[]> {
-    const bans = await prisma.userBan.findMany({
-      include: {
-        user: {
-          select: { name: true },
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-      take: limit,
-    });
-
-    // Get moderator info from moderation logs (simplified approach)
-    const moderatorMap: Record<number, string> = {};
-
-    for (const ban of bans) {
-      // Get the moderation log for this specific ban
-      const log = await prisma.moderationLog.findFirst({
-        where: {
-          action: 'USER_BAN',
-          targetUserId: ban.userId,
-          createdAt: {
-            gte: new Date(ban.createdAt.getTime() - 1000), // 1 second tolerance
-            lte: new Date(ban.createdAt.getTime() + 1000),
-          },
-        },
-        include: {
-          moderator: {
-            select: { name: true },
-          },
-        },
-      });
-
-      if (log) {
-        moderatorMap[ban.id] = log.moderator.name;
-      }
-    }
-
-    return bans.map((ban) => ({
-      id: ban.id,
-      userId: ban.userId,
-      userName: ban.user.name,
-      banType: ban.banType,
-      reason: ban.reason,
-      startDate: ban.createdAt.toISOString(),
-      endDate: ban.expiresAt?.toISOString(),
-      isActive: ban.isActive,
-      moderatorName: moderatorMap[ban.id] || 'System',
+    const history = await moderationRepository.getBanHistoryWithModerator(limit);
+    return history.map((ban) => ({
+      ...ban,
+      endDate: ban.endDate || undefined,
       shameAchievementsAwarded: [], // Would need to track this separately
     }));
   }
@@ -344,35 +245,20 @@ class ShameWallService {
    * Automatically lift expired bans (run via cron/worker)
    */
   async expireOldBans(): Promise<number> {
-    const expiredBans = await prisma.userBan.updateMany({
-      where: {
-        isActive: true,
-        banType: BanType.TEMPORARY,
-        expiresAt: {
-          lte: new Date(),
-        },
-      },
-      data: {
-        isActive: false,
-        updatedAt: new Date(),
-      },
-    });
+    const expiredCount = await moderationRepository.checkExpiredBans();
 
-    if (expiredBans.count > 0) {
-      console.log(`[shame-wall] Auto-expired ${expiredBans.count} temporary bans`);
+    if (expiredCount > 0) {
+      console.log(`[shame-wall] Auto-expired ${expiredCount} temporary bans`);
     }
 
-    return expiredBans.count;
+    return expiredCount;
   }
 
   /**
    * Helper: Get achievement ID by slug
    */
   private async getAchievementIdBySlug(slug: string): Promise<number> {
-    const achievement = await prisma.achievement.findFirst({
-      where: { name: slug }, // Use name field for now until slug is populated
-      select: { id: true },
-    });
+    const achievement = await this.achievementRepository.findByName(slug);
 
     if (!achievement) {
       throw new Error(`Achievement not found: ${slug}`);
@@ -390,12 +276,7 @@ class ShameWallService {
     moderatorId: number,
     reason?: string,
   ): Promise<void> {
-    const achievement = await prisma.achievement.findFirst({
-      where: {
-        name: slug, // Use name field for now until slug is populated
-        isShame: true,
-      },
-    });
+    const achievement = await this.achievementRepository.findShameAchievementByName(slug);
 
     if (!achievement) {
       throw new Error('Shame achievement not found');
@@ -404,17 +285,15 @@ class ShameWallService {
     await adminAchievementService.grantAchievement(achievement.id, userId);
 
     // Log the manual shame award
-    await prisma.moderationLog.create({
-      data: {
-        moderatorId,
-        targetUserId: userId,
-        action: 'USER_BAN', // Closest existing action
-        reason: reason || `Manual shame achievement: ${achievement.title}`,
-        details: {
-          achievementSlug: slug,
-          achievementTitle: achievement.title,
-          type: 'manual_shame_award',
-        },
+    await this.moderationRepository.createModerationLog({
+      moderatorId,
+      targetUserId: userId,
+      action: 'USER_BAN', // Closest existing action
+      reason: reason || `Manual shame achievement: ${achievement.title}`,
+      details: {
+        achievementSlug: slug,
+        achievementTitle: achievement.title,
+        type: 'manual_shame_award',
       },
     });
   }

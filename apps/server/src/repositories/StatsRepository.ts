@@ -119,6 +119,103 @@ export class StatsRepository implements IStatsRepository {
   }
 
   /**
+   * Get monthly profit/loss for a user
+   */
+  async getMonthlyProfitLoss(userId: number): Promise<
+    Array<{
+      date: string;
+      profit: bigint;
+    }>
+  > {
+    return await this.prisma.$queryRaw<
+      Array<{
+        date: string;
+        profit: bigint;
+      }>
+    >`
+      SELECT 
+        dates.date::text as date,
+        COALESCE(SUM(
+          CASE 
+            WHEN b.status = 'WON' THEN COALESCE(b.payout, 0) - b.amount
+            WHEN b.status = 'LOST' THEN -b.amount
+            ELSE 0
+          END
+        ), 0)::bigint as profit
+      FROM generate_series(
+        CURRENT_DATE - INTERVAL '29 days',
+        CURRENT_DATE,
+        INTERVAL '1 day'
+      ) as dates(date)
+      LEFT JOIN "Bet" b ON DATE(b."createdAt") = dates.date AND b."userId" = ${userId}
+      GROUP BY dates.date
+      ORDER BY dates.date
+    `;
+  }
+
+  /**
+   * Get weekly bet volume for a user
+   */
+  async getWeeklyVolume(userId: number): Promise<
+    Array<{
+      date: string;
+      volume: bigint;
+    }>
+  > {
+    return await this.prisma.$queryRaw<
+      Array<{
+        date: string;
+        volume: bigint;
+      }>
+    >`
+      SELECT 
+        dates.date::text as date,
+        COALESCE(SUM(b.amount), 0)::bigint as volume
+      FROM generate_series(
+        CURRENT_DATE - INTERVAL '6 days',
+        CURRENT_DATE,
+        INTERVAL '1 day'
+      ) as dates(date)
+      LEFT JOIN "Bet" b ON DATE(b."createdAt") = dates.date AND b."userId" = ${userId}
+      GROUP BY dates.date
+      ORDER BY dates.date
+    `;
+  }
+
+  /**
+   * Get category accuracy statistics for a user
+   */
+  async getCategoryAccuracy(userId: number): Promise<
+    Array<{
+      category: string;
+      totalBets: bigint;
+      wins: bigint;
+      accuracy: number;
+    }>
+  > {
+    return await this.prisma.$queryRaw<
+      Array<{
+        category: string;
+        totalBets: bigint;
+        wins: bigint;
+        accuracy: number;
+      }>
+    >`
+      SELECT 
+        p.category,
+        COUNT(*)::bigint as "totalBets",
+        SUM(CASE WHEN b.status = 'WON' THEN 1 ELSE 0 END)::bigint as wins,
+        AVG(CASE WHEN b.status = 'WON' THEN 1.0 ELSE 0.0 END) as accuracy
+      FROM "Bet" b 
+      JOIN "Prediction" p ON b."predictionId" = p.id 
+      WHERE b."userId" = ${userId} AND b.status IN ('WON', 'LOST')
+      GROUP BY p.category
+      HAVING COUNT(*) >= 3
+      ORDER BY accuracy DESC
+    `;
+  }
+
+  /**
    * Default counters for new users
    */
   private getDefaultCounters(): Record<string, number> {

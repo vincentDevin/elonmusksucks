@@ -7,6 +7,8 @@
 
 import 'dotenv/config';
 import { Worker, Job } from 'bullmq';
+import { PayoutJobData } from '@ems/types';
+// TODO: Use QUEUE_NAMES and QueueOptions from @ems/types once imports resolve
 import redisClient from '../lib/redis';
 import { PayoutRepository } from '../repositories/PayoutRepository';
 import type { PublicPrediction } from '@ems/types';
@@ -15,9 +17,9 @@ import type { LeaderboardTrigger } from '../services/leaderboard.service';
 
 const payoutRepo = new PayoutRepository();
 
-const payoutWorker = new Worker<{ predictionId: number; winningOptionId: number }>(
+const payoutWorker = new Worker<PayoutJobData>(
   'payouts',
-  async (job: Job<{ predictionId: number; winningOptionId: number }>) => {
+  async (job: Job<PayoutJobData>) => {
     const { predictionId, winningOptionId } = job.data;
     console.log(`[worker] Processing payout for prediction ${predictionId}`);
 

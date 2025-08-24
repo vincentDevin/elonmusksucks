@@ -4,49 +4,9 @@
 
 import redisClient from '../lib/redis';
 import { randomUUID } from 'crypto';
-import type { ActivityEventType } from '@ems/types';
+import type { UnifiedActivityEvent } from '@ems/types';
 import type { IActivityRepository } from '../repositories/IActivityRepository';
 import { ActivityRepository } from '../repositories/ActivityRepository';
-
-export interface UnifiedActivityEvent {
-  id: string;
-  type:
-    | ActivityEventType
-    | 'live_bet'
-    | 'live_parlay'
-    | 'market_movement'
-    | 'big_bet_alert'
-    | 'achievement_unlocked'
-    | 'user_followed';
-  timestamp: string;
-  priority: 'high' | 'medium' | 'low';
-
-  // User context
-  userId: number;
-  userName: string;
-  userAvatar?: string;
-
-  // Rich content
-  title: string;
-  description: string;
-  icon: string;
-  color?: string;
-
-  // Activity-specific data
-  amount?: number;
-  odds?: number;
-  predictionId?: number;
-  predictionTitle?: string;
-  category?: string;
-  optionLabel?: string;
-
-  // Metadata
-  isPersonal: boolean;
-  isHighValue: boolean;
-  isWin?: boolean;
-  streak?: number;
-  meta?: Record<string, any>;
-}
 
 export class UnifiedActivityService {
   private repo: IActivityRepository;

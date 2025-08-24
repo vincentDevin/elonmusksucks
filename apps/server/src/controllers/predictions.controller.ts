@@ -2,7 +2,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import { predictionService } from '../services/predictions.service';
 import { UserService } from '../services/user.service';
-import { PredictionType } from '@ems/types';
+import { PredictionType, CreatePredictionPayload } from '@ems/types';
 
 const userService = new UserService();
 
@@ -82,15 +82,8 @@ export const createPrediction = async (
   next: NextFunction,
 ): Promise<void> => {
   try {
-    const { title, description, category, expiresAt, options, type, threshold } = req.body as {
-      title: string;
-      description: string;
-      category: string;
-      expiresAt: string;
-      options?: Array<{ label: string }>;
-      type: PredictionType;
-      threshold?: number;
-    };
+    const { title, description, category, expiresAt, options, type, threshold } =
+      req.body as CreatePredictionPayload;
 
     const creatorId = (req as any).user?.id;
     if (!creatorId) {
