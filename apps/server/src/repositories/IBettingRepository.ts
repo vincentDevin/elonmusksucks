@@ -31,6 +31,7 @@ export interface IBettingRepository {
   /**
    * Persist a single bet and all related updates in one transaction.
    */
+  // Rollback: Remove idempotencyKey parameter
   placeBet(
     userId: number,
     predictionId: number,
@@ -38,6 +39,7 @@ export interface IBettingRepository {
     amount: number,
     oddsAtPlacement: number,
     potentialPayout: bigint,
+    idempotencyKey?: string,
   ): Promise<DbBet>;
 
   /**
@@ -48,6 +50,7 @@ export interface IBettingRepository {
     legs: Array<{ predictionId: number; optionId: number; oddsAtPlacement: number }>,
     amount: number,
     potentialPayout: bigint,
+    idempotencyKey?: string,
   ): Promise<DbParlay>;
 
   /**

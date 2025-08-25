@@ -1,5 +1,6 @@
 // apps/client/src/components/dashboard/ParlayPanel.tsx
-import { useState, useMemo, useEffect } from 'react';
+// Rollback: git checkout HEAD -- apps/client/src/components/dashboard/ParlayPanel.tsx
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useParlay } from '../../contexts/ParlayContext';
 import { usePredictionMarket } from '../../contexts/PredictionContext';
 import { useSocket } from '../../contexts/SocketContext';
@@ -110,20 +111,21 @@ export default function ParlayPanel() {
 
   const riskInfo = getRiskLevel();
 
+  /* ---------- Memoized socket handlers to prevent recreation ---------- */
+  const handleBetPlaced = useCallback(() => {
+    // When someone places a bet, odds may change - trigger recalculation animation
+    setIsCalculating(true);
+    setTimeout(() => setIsCalculating(false), 500);
+  }, []);
+
+  const handlePredictionUpdate = useCallback(() => {
+    setIsCalculating(true);
+    setTimeout(() => setIsCalculating(false), 500);
+  }, []);
+
   /* ---------- Real-time odds updates ---------- */
   useEffect(() => {
     if (!socket) return;
-
-    const handleBetPlaced = () => {
-      // When someone places a bet, odds may change - trigger recalculation animation
-      setIsCalculating(true);
-      setTimeout(() => setIsCalculating(false), 500);
-    };
-
-    const handlePredictionUpdate = () => {
-      setIsCalculating(true);
-      setTimeout(() => setIsCalculating(false), 500);
-    };
 
     socket.on('betPlaced', handleBetPlaced);
     socket.on('predictionCreated', handlePredictionUpdate);
@@ -134,7 +136,7 @@ export default function ParlayPanel() {
       socket.off('predictionCreated', handlePredictionUpdate);
       socket.off('predictionResolved', handlePredictionUpdate);
     };
-  }, [socket]);
+  }, [socket, handleBetPlaced, handlePredictionUpdate]);
 
   /* ---------- Parlay placement handler ---------- */
   const handlePlaceParlay = async () => {

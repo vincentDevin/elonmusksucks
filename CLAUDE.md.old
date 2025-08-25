@@ -1,0 +1,647 @@
+# CLAUDE.md — Repository Guide
+
+## Overview
+
+**Elon Musk Sucks** is a full-stack TypeScript prediction market platform with real-time features, social interactions, and Pong gaming. Built as a monorepo using Node.js 24+, React/Vite, Express.js, Prisma, PostgreSQL, Redis, Socket.IO, and BullMQ.
+
+Current sprint focus: Client UI & component quality (performance, a11y, consistency), with admin deletions gated behind a deep review.
+
+### Tech Stack
+
+| Component | Technology | Version | Purpose |
+|-----------|------------|---------|---------|
+| Runtime | Node.js | ≥24.0.0 | Server runtime |
+| Frontend | React + Vite | Latest | SPA with hot reload |
+| Backend | Express.js | Latest | REST API + Socket.IO server |
+| Database | PostgreSQL | Latest | Primary data store |
+| ORM | Prisma | 6.11.1+ | Type-safe database access |
+| Cache/Pub-Sub | Redis | Latest | Sessions, real-time events |
+| Queues | BullMQ | Latest | Background job processing |
+| Real-time | Socket.IO | Latest | Live updates, gaming |
+| Styling | Tailwind CSS | Latest | Utility-first CSS |
+| Testing | Jest | 29.7.0+ | Unit/integration tests |
+| Language | TypeScript | Latest | Type safety throughout |
+
+## Monorepo Layout
+
+```
+elonmusksucks/
+├── apps/
+│   ├── client/               # React SPA (Vite)
+│   ├── server/              # Express.js API server
+│   └── pong-server/         # Dedicated Pong game server
+├── packages/
+│   ├── types/              # Shared TypeScript types
+│   ├── config/            # Shared configuration
+│   └── shared/            # Shared utilities
+├── prisma/                # Database schema & migrations
+└── scripts/              # Deployment & maintenance scripts
+```
+
+**Purpose & Ownership:**
+- **apps/client**: Frontend SPA, handles UI/UX, real-time updates
+- **apps/server**: Main API server, business logic, Socket.IO hub
+- **apps/pong-server**: High-performance game server for Pong matches
+- **packages/types**: Shared type definitions across all apps
+- **prisma**: Database schema, migrations, seeding
+
+## Run, Build & Dev
+
+### Local Development
+
+| Command | Purpose | Ports |
+|---------|---------|-------|
+| `npm run dev` | Start all services | Client: 5173, Server: 3000, Pong: 3001 |
+| `npm run build` | Production build | Build all apps |
+| `npm run setup` | Initial setup | Install, migrate, seed |
+
+### Quality Gates (temporary)
+Green = **typecheck + lint** only.
+
+```bash
+npm -w apps/server run tsc -- --noEmit
+npm -w apps/client run tsc -- --noEmit
+npm run lint
+```
+
+## Configuration & Env
+
+### Required Environment Variables
+
+**Server (.env)**:
+```bash
+DATABASE_URL=postgresql://user:pass@localhost:5432/elonmusksucks
+REDIS_URL=redis://localhost:6379
+JWT_SECRET=your-jwt-secret
+CORS_ORIGIN=https://elonmusksucks.net
+BASE_URL_CLIENT=http://localhost:5173
+BASE_URL_SERVER=http://localhost:3000
+```
+
+### Service Ports
+- **Client**: 5173 (Vite dev server)
+- **Server**: 3000 (Express + Socket.IO)
+- **Pong Server**: 3001 (Game physics server)
+- **PostgreSQL**: 5432 (local development)
+- **Redis**: 6379 (local development)
+
+## Data & Persistence
+
+### Core Database Entities
+
+| Model | Purpose | Key Relations |
+|-------|---------|---------------|
+| User | Authentication, profiles, balances | → Bets, Predictions, Parlays |
+| Prediction | Market questions with options | → PredictionOptions, Bets |
+| Bet | Single prediction wagers | → User, PredictionOption |
+| Parlay | Multi-prediction combo bets | → ParlayLegs, User |
+| Transaction | Financial record keeping | → User, Bet, Parlay |
+| Message | Global chat system | → User |
+| Achievement | Gamification rewards | → UserAchievements |
+
+### Data Flow Patterns
+1. **Predictions**: Created by users → options auto-generated or custom → bets placed → resolution with payouts
+2. **Timeline**: Feeds fetched by workers → articles moderated → approved content shown
+3. **Parlays**: Multiple prediction legs → combined odds calculated → all-or-nothing resolution
+4. **Real-time**: Database changes → Redis pub/sub → Socket.IO broadcast → client updates
+
+## Real-time & Queues
+
+### Socket.IO Configuration
+- **Server**: Single Socket.IO instance attached to Express server on port 3000
+- **Pong Server**: Dedicated Socket.IO instance on port 3001 for game events
+- **Adapter**: Redis adapter for horizontal scaling
+- **Namespaces**: Default namespace with room-based targeting
+- **ACK**: Acknowledgments used for critical events (bets, predictions)
+
+### Redis Event Bus (DI, no direct client usage)
+
+Services must not call `redisClient.publish()` directly. Instead, depend on an injected interface:
+
+```ts
+// packages/types/index.ts
+interface IEventBus {
+  publish<T>(channel: string, payload: T): Promise<void>;
+  subscribe(channel: string, handler: (buf: Buffer) => void): Promise<void>; // server-internal only
+}
+```
+
+### BullMQ Queue System
+
+| Queue | Purpose | Worker | Jobs |
+|-------|---------|--------|------|
+| `payouts` | Bet resolution payouts | `payout.worker.ts` | Process winnings, update balances |
+| `leaderboard-refresh` | Periodic ranking updates | `leaderboard.worker.ts` | Recalculate user rankings |
+| `feed-fetch` | RSS/Atom content fetching | `feed.worker.ts` | Fetch articles from feeds |
+
+## Backend Layering & Validation
+
+### Architecture Pattern
+HTTP Request → Routes → Controllers → Services → Repositories → Prisma → PostgreSQL
+             ↓
+Socket Event → Handlers → Services → Repositories → Prisma → PostgreSQL
+
+### Layer Responsibilities
+
+| Layer | Purpose | Rules |
+|-------|---------|-------|
+| **Routes** | Express routing, basic validation | No business logic, no Prisma |
+| **Controllers** | Request/response handling, input validation | Lightweight guards, delegate to services |
+| **Services** | Business logic, orchestration | Core invariants, Socket.IO DI only |
+| **Repositories** | Data access, query optimization | Prisma operations only |
+
+### Shared Types Location
+
+All cross-boundary DTOs, socket payloads, queue job data live in **`packages/types/index.ts`** (single barrel export). Use `as const` objects + value-of union types for events/rooms/queues.
+
+**Event naming & versioning**
+- Define event maps using `as const` pattern in `@ems/types`.
+- Changes must be **additive**. Breaking changes create a new event name with new payload type.
+
+### Transactions & Idempotency
+- **Place Bet**: Wrap create bet + balance debit in a single Prisma transaction. Emit events after commit.
+- **Payouts**: Idempotent BullMQ jobs keyed by `<betId>|<resolutionId>`; no duplicate payouts.
+- **Queue Workers**: Use dedupe (jobId) and backoff; retries capped; poison-queue on final failure.
+
+## Security & Auth
+
+### Authentication Flow
+1. **Registration**: Email verification required
+2. **Login**: JWT tokens (access + refresh)
+3. **Session**: Redis-stored refresh tokens
+4. **Socket**: Token-based authentication via middleware
+
+### Authorization Layers
+- **Routes**: `requireAuth` middleware for protected endpoints
+- **Socket**: `socketAuthMiddleware` for real-time events
+- **Admin**: Role-based access control (`role: 'ADMIN'`)
+
+## Manual Guardrails (run before committing)
+
+```bash
+# 1) No enums in shared/public areas
+rg -n -P "export\\s+enum|const\\s+enum" packages/types apps/server/src/handlers apps/server/src/services && echo "❌ enums found in shared/public areas"
+
+# 2) No schema libraries anywhere
+rg -n -P "from\\s+['\"](zod|yup|valibot|ajv)['\"]" apps --hidden -g '!**/node_modules/**' && echo "❌ Found schema lib imports"
+
+# 3) No Prisma outside repositories
+rg -n "prisma\\." apps/server/src/{routes,controllers,services} --hidden -g '!**/node_modules/**' && echo "❌ Prisma leak"
+
+# 4) No direct sockets/redis in routes/controllers
+rg -n -P "(io\\.(emit|to)|socket\\.(emit|on)|publish\\()" apps/server/src/{routes,controllers} --hidden -g '!**/node_modules/**' && echo "❌ Direct socket/redis leak"
+
+# 5) Green gate
+npm -w apps/server run tsc -- --noEmit && npm -w apps/server run lint
+```
+
+### Deletion Guardrails
+
+- Admin component deletions are PROHIBITED until the 🔍 Admin Components Deep Review Gate marks a component as **DELETE** with evidence (0 refs, not lazy/dynamic, not registry, not flag/experiment, no parity gaps).
+
+## Observability
+
+### Logging Strategy
+- **Production**: Structured JSON logs
+- **Development**: Human-readable console output
+- **Error Tracking**: Console errors with stack traces
+
+### Monitoring Points
+- Socket.IO connection counts
+- Redis pub/sub message rates
+- BullMQ job processing times
+- Database connection pool usage
+
+## Testing Strategy (Doc Only)
+### Test Structure
+```
+tests/
+├── unit/           # Isolated component tests
+├── integration/    # API endpoint tests
+└── e2e/           # Full user flow tests (planned)
+```
+
+## CI/CD & Deployment
+
+### CI Pipeline (temporary)
+1. **Install**: `npm install` with workspace resolution
+2. **Generate**: Prisma client generation
+3. **Type Check**: TypeScript compilation validation
+4. **Lint**: ESLint with max 0 warnings
+5. **Build**: Production builds for client/server
+
+### Deployment Targets
+- **Frontend**: Static hosting (Vercel, Netlify)
+- **Backend**: Container deployment (Docker + Kubernetes)
+- **Database**: Managed PostgreSQL (AWS RDS, Digital Ocean)
+- **Redis**: Managed Redis (AWS ElastiCache, Digital Ocean)
+
+## Diagrams (Mermaid)
+
+### Infrastructure Architecture
+```mermaid
+graph TB
+    Client[React SPA<br/>Port 5173]
+    Server[Express API<br/>Port 3000]
+    PongServer[Pong Game Server<br/>Port 3001]
+    
+    DB[(PostgreSQL<br/>Port 5432)]
+    Redis[(Redis<br/>Port 6379)]
+    
+    Client <--> Server
+    Client <--> PongServer
+    Server --> DB
+    Server --> Redis
+    PongServer --> Redis
+```
+
+## 🎯 Client UI Focus Queue (Sprint)
+
+- [x] **Dashboard component naming normalization** — Remove confusing prefixes  
+  Consumers: apps/client/src/components/dashboard/**/{UnifiedDashboardSettings,QuickStatsGrid,PerformanceMetricsCard}.tsx  
+  Size: `S`  Risk: `Low`  Deps: `Delete unused DashboardSettings`  
+  Exit: neutral component names; imports updated in ≤3 files; no runtime changes
+
+- [x] **TODO cleanup** — Complete timeline and admin placeholders  
+  Consumers: components/timeline/Timeline.tsx:37,222,284, components/timeline/ArticleCard.tsx:35,69,193, components/admin/FeedManager.tsx:135,229, components/admin/OPMLManager.tsx:38,76  
+  Size: `M`  Risk: `Med`  Deps: `none`  
+  Exit: all TODO comments resolved or converted to tickets
+
+- [x] **Route-level code splitting** — reduce initial bundle size  
+  Consumers: routes/AppRoutes.tsx, pages/** (convert to lazy)  
+  Size: `S`  Risk: `Low`  Deps: `none`  
+  Notes: • React.lazy for all major routes + Suspense boundaries • **Exit:** main routes lazy-loaded, bundle analysis shows reduction
+
+- [x] **Heavy list virtualization** — optimize scrolling performance  
+  Consumers: components/timeline/Timeline.tsx, pages/EnhancedLeaderboard.tsx:476,711, components/UnifiedActivityFeed.tsx  
+  Size: `S`  Risk: `Low`  Deps: `Route-level code splitting`  
+  Notes: • react-window for >100 item lists • **Exit:** scroll jank eliminated in timeline/leaderboard
+
+- [x] **Image lazy loading** — defer off-screen images  
+  Consumers: components/timeline/ArticleCard.tsx, components/profile/ProfileHeader.tsx  
+  Size: `S`  Risk: `Low`  Deps: `none`  
+  Notes: • Intersection Observer + skeleton placeholders • **Exit:** images load only when scrolled into view
+
+- [ ] **Admin error handling** — standardized error displays  
+  Consumers: components/admin/** error states  
+  Size: `S`  Risk: `Low`  Deps: `none`  
+  Notes: • Consistent error toasts, retry mechanisms, permission denied states • **Exit:** error UX consistent across admin screens
+
+- [ ] **Admin data refresh** — real-time updates via sockets  
+  Consumers: components/admin/**, contexts/AdminContext.tsx  
+  Size: `S`  Risk: `Low`  Deps: `Socket payload typing + ACKs`  
+  Notes: • Auto-refresh admin data when server events occur • **Exit:** admin screens stay current without manual refresh
+
+- [ ] **Keyboard navigation audit** — tab order and focus management  
+  Consumers: components/dashboard/**, pages/**, components/admin/**  
+  Size: `S`  Risk: `Low`  Deps: `none`  
+  Notes: • Tab order, focus rings, skip links, ARIA roles • **Exit:** axe-core report clean for major violations
+
+- [ ] **Screen reader support** — ARIA labels and announcements  
+  Consumers: components/timeline/Timeline.tsx, components/BetModal.tsx, components/admin/**  
+  Size: `S`  Risk: `Low`  Deps: `Keyboard navigation audit`  
+  Notes: • ARIA labels, live regions for dynamic content • **Exit:** screen reader can navigate all primary flows
+
+- [ ] **Color contrast compliance** — ensure WCAG AA standards  
+  Consumers: theme/themes/**, components with custom colors  
+  Size: `S`  Risk: `Low`  Deps: `none`  
+  Notes: • Audit contrast ratios, improve text/background combinations • **Exit:** all text meets WCAG AA contrast requirements
+
+- [ ] **Dashboard grid spec** — Document modular layout architecture  
+  Consumers: docs/dashboard-grid-spec.md (new)  
+  Size: `S`  Risk: `Low`  Deps: `none`  
+  Exit: spec documented with API endpoints
+
+- [ ] **Dashboard module registry** — pluggable widget system  
+  Consumers: components/dashboard/desktop/DesktopDashboard.tsx:25-58, components/dashboard/registry/ (new)  
+  Size: `M`  Risk: `Med`  Deps: `Dashboard grid spec`  
+  Notes: • Widget registry + lazy loading + user preferences • **Exit:** widgets can be toggled on/off per user
+
+- [ ] **Grid drag-drop MVP** — basic rearrangement with localStorage  
+  Consumers: components/dashboard/desktop/DesktopDashboard.tsx, hooks/useDashboardCustomization.ts  
+  Size: `M`  Risk: `Med`  Deps: `Dashboard module registry`  
+  Notes: • CSS transforms + persistence, avoid react-grid-layout complexity • **Exit:** positions persist on reload
+
+## 🔍 Admin Components Deep Review Gate (NO-WRITE)
+
+Purpose: A read-only, evidence-backed audit of apps/client/src/components/admin/** and their consumers.
+Output: AdminComponentsDeepDive.md + in-place updates to CLAUDE.md tickets.
+
+Steps:
+- Inventory all admin components & exports (rg export scan).
+- Reference map (static refs, lazy/dynamic imports, registries, flags/cohorts).
+- Data sources per component (axios/fetch hooks, sockets, events).
+- Server parity checklist (RBAC middleware per endpoint/event).
+- React 19 hygiene & perf/a11y quick checks.
+- Decision per component: KEEP / CONSOLIDATE / DELETE with Confidence.
+
+Exit: "Admin deletions unblocked" only after decisions are attached to each candidate item with evidence links.
+
+## 🏁 Sprint Queue — Master Order of Work
+
+### Component Consolidation (P1/P2)
+
+Admin deletions are paused pending the 🔍 Admin Components Deep Review Gate.
+
+- [ ] **Re-evaluate legacy admin components (HOLD pending Deep Review)** — Remove superseded components  
+  Consumers: apps/client/src/components/admin/{UserStats,BadgesManager,BetsTransactions,UserManagement}.tsx  
+  Size: `S`  Risk: `Low`  Deps: `none`  
+  Exit: 4 files removed; UnifiedUserManagement provides all functionality; no references remain  
+  Note: This task will be split into specific KEEP/CONSOLIDATE/DELETE tickets by the 🔍 gate. Do NOT delete files yet.
+
+### Backlog (post-sprint if time allows)
+
+- [ ] **Fix missing @updatedAt** — User, PredictionOption, Bet, Transaction, Message models  
+  Consumers: prisma/schema.prisma:56,174,185,364,118  
+  Size: `S`  Risk: `Low`  Deps: `none`  
+  Notes: • Add @updatedAt to track row modification timestamps • **Exit:** all core models have updatedAt tracking
+
+- [ ] **Backfill NOT NULL defaults** — User.displayName, User.profileComplete validation  
+  Consumers: schema.prisma:59,64, UserRepository.ts  
+  Size: `S`  Risk: `Low`  Deps: `none`  
+  Notes: • Add defaults for required profile fields • **Exit:** no NULL display names, profile validation enforced
+
+- [ ] **Add email uniqueness constraint** — case-insensitive User.email  
+  Consumers: schema.prisma:58, AuthRepository.ts  
+  Size: `S`  Risk: `Low`  Deps: `none`  
+  Notes: • CREATE UNIQUE INDEX ON "User" (LOWER(email)) • **Exit:** duplicate email prevention works case-insensitively
+
+- [ ] **Transaction timeout configuration** — set statement_timeout in connection string  
+  Consumers: apps/server/src/lib/prisma.ts, .env DATABASE_URL  
+  Size: `S`  Risk: `Low`  Deps: `none`  
+  Notes: • Add ?options=-c%20statement_timeout=30s to prevent hanging • **Exit:** long transactions auto-kill after 30s
+
+### Polish & Documentation (P2)
+- [ ] **Admin parity audit** — Map UI coverage to server endpoints  
+  Consumers: pages/AdminDashboard.tsx:12-24, components/admin/** vs server routes/admin.routes.ts  
+  Size: `S`  Risk: `Low`  Deps: `none`  
+  Exit: coverage report + gap tickets created
+
+
+### 🗄️ Prisma & Database Review Queue
+_Backlog to be generated by the DB Discovery prompt; covers schema correctness, migrations hygiene, indexing, constraints, performance, retention._
+
+**Discovery Summary:** 17 schema/constraint issues, 4 migration hygiene concerns, 8 indexing gaps, 3 transaction optimizations, 2 retention candidates, 1 operational improvement found across 25+ models and 25 migration files.
+
+// Database items → 🏁 Sprint Queue: Harden money precision, FK constraint, ON DELETE behavior, composite indexes, idempotency keys, CHECK constraints
+// Remaining backlog items (not critical for sprint):
+
+- [ ] **Migration naming audit** — rename opaque timestamps to descriptive names  
+  Consumers: prisma/migrations/20250810_add_performance_indexes, others  
+  Size: `S`  Risk: `Low`  Deps: `none`  
+  Notes: • Document remaining timestamp-only migration names • **Exit:** migration purpose clear from filename/description
+
+- [ ] **Add rollback safety** — DROP operations need IF EXISTS guards  
+  Consumers: migration 20250705222703_updating_prediction_outcome/migration.sql:8,12  
+  Size: `S`  Risk: `Low`  Deps: `none`  
+  Notes: • Add IF EXISTS to DROP COLUMN/TYPE commands • **Exit:** rollback/replay safe migrations
+
+- [ ] **Partition candidate analysis** — Message table growth projection  
+  Consumers: MessageRepository.ts, schema.prisma:118  
+  Size: `S`  Risk: `Low`  Deps: `none`  
+  Notes: • Estimate monthly growth, plan time-based partitioning at 10M+ rows • **Exit:** partition strategy with cutover threshold documented
+
+- [ ] **Retention policy** — ArticleComment, UserActivity tables (90-day cleanup)  
+  Consumers: schema.prisma:585,398, cleanup job  
+  Size: `S`  Risk: `Low`  Deps: `none`  
+  Notes: • Archive/delete old comments and activity logs • **Exit:** automated retention job removes 90d+ old records
+
+- [ ] **Index utilization audit** — verify EXPLAIN ANALYZE on repository queries  
+  Consumers: all Repository.ts files, slow query log  
+  Size: `S`  Risk: `Low`  Deps: `Slow Query Sampling List`  
+  Notes: • Match slow queries to missing indexes • **Exit:** unused indexes dropped, missing indexes added per query patterns
+
+- [ ] **Add database constraints** — enum validation via CHECK constraints  
+  Consumers: schema.prisma role/status enums, migration  
+  Size: `S`  Risk: `Low`  Deps: `none`  
+  Notes: • Add CHECK constraints for enum values at DB level • **Exit:** invalid enum inserts blocked by PostgreSQL constraints
+
+### 🖥️ Client Review & Optimization Queue
+// Core items → 🏁 Sprint Queue: Non-null assertions, TODO cleanup, Dashboard grid spec, Admin parity audit
+
+- [ ] **Content formatting utilities** — standardize names/dates/numbers across components  
+  Consumers: utils/formatting.ts (extend), components/timeline/ArticleCard.tsx:69, components/leaderboard/LeaderboardEntry.tsx  
+  Size: `S`  Risk: `Low`  Deps: `TODO cleanup`  
+  Notes: • Add formatUser, formatDate, formatRelativeTime utilities • **Exit:** consistent formatting used in ≥5 components
+
+- [ ] **Profile image fallbacks** — handle missing avatars consistently  
+  Consumers: components/profile/ProfileHeader.tsx, components/leaderboard/LeaderboardEntry.tsx, components/ChatWidget.tsx  
+  Size: `S`  Risk: `Low`  Deps: `none`  
+  Notes: • Add default avatar component, consistent image error handling • **Exit:** no broken image placeholders visible
+
+- [ ] **Empty state components** — standardize across lists and feeds  
+  Consumers: components/timeline/Timeline.tsx, components/UnifiedActivityFeed.tsx, components/BetsList.tsx  
+  Size: `S`  Risk: `Low`  Deps: `none`  
+  Notes: • Create reusable EmptyState component with illustration • **Exit:** empty states used in ≥4 pages
+
+- [ ] **Bulk operations UI** — user management actions  
+  Consumers: components/admin/UnifiedUserManagement.tsx, components/admin/UserDataGrid.tsx  
+  Size: `S`  Risk: `Low`  Deps: `Admin parity audit`  
+  Notes: • Multi-select + bulk ban/unban/role actions • **Exit:** bulk operations match server capabilities
+
+**Performance & Bundling**
+
+- [ ] **SWR/query deduplication** — eliminate duplicate API calls  
+  Consumers: hooks/useEnhancedUserStats.ts, hooks/useEnhancedLeaderboard.ts, api/**.ts  
+  Size: `S`  Risk: `Low`  Deps: `none`  
+  Notes: • Request deduplication + stale-while-revalidate patterns • **Exit:** identical requests batched, cache hit rate >80%
+
+**Data Layer (optional but recommended if not adopting SWR yet)**
+- [ ] **Install & Bootstrap SWR/AXIOS (client)**
+  Consumers: apps/client/src/api/http.ts, apps/client/src/main.tsx (SWRConfig)  
+  Size: `S`  Risk: `Low`  Deps: `Add client TypeScript script (tsc)`  
+  Exit: Axios instance with timeout+auth is present; `<SWRConfig>` wraps `<App>`; dedupe/retry config present; no runtime behavior changes  
+  Notes: This is optional if you prefer a custom dedupe manager. If adopted, subsequent cache tickets should use SWR keys and `mutate()` on socket events.
+
+- [ ] **Memoization audit** — optimize re-renders  
+  Consumers: components/dashboard/desktop/DesktopDashboard.tsx:40-71, expensive computation components  
+  Size: `S`  Risk: `Low`  Deps: `SWR/query deduplication`  
+  Notes: • React.memo, useMemo, useCallback where beneficial • **Exit:** React DevTools Profiler shows reduced re-renders
+
+- [ ] **Bundle analysis + tree shaking** — eliminate unused code  
+  Consumers: vite.config.ts, package dependencies  
+  Size: `S`  Risk: `Low`  Deps: `Route-level code splitting`  
+  Notes: • webpack-bundle-analyzer equivalent for Vite • **Exit:** bundle size report + dead code elimination
+
+### 🧹 Client Component Consolidation & Cleanup Queue
+// Core items → 🏁 Sprint Queue: Delete legacy admin components
+
+- [ ] **Delete StatsGraph legacy component** — superseded by profile/graphs/* components  
+  Consumers: apps/client/src/components/profile/StatsGraph.tsx  
+  Size: `S`  Risk: `Low`  Deps: `none`  
+  Exit: file removed; profile charts (PerformanceBarChart, FinancialBarChart) provide equivalent functionality
+
+- [ ] **Delete ImageCropper unused component** — profile upload doesn't use cropping  
+  Consumers: apps/client/src/components/profile/ImageCropper.tsx  
+  Size: `S`  Risk: `Low`  Deps: `none`  
+  Exit: file removed; ProfileImageUpload works without cropping; no feature regression
+
+
+- [ ] **Consolidate FeedManager → FeedsManager** — merge duplicate RSS feed management  
+  Consumers: apps/client/src/components/admin/FeedManager.tsx, FeedsManager.tsx  
+  Size: `S`  Risk: `Low`  Deps: `Delete legacy admin components`  
+  Exit: single component handles both single/multi feed modes; AdminDashboard imports updated
+
+- [ ] **Unify leaderboard hooks** — merge useLeaderboard into useEnhancedLeaderboard with options  
+  Consumers: apps/client/src/hooks/useLeaderboard.ts, useEnhancedLeaderboard.ts  
+  Size: `M`  Risk: `Med`  Deps: `none`  
+  Exit: single hook with `simple: boolean` option; Leaderboard.tsx migrated; legacy hook deprecated
+
+- [ ] **Consolidate Leaderboard pages** — merge classic into enhanced with mode toggle  
+  Consumers: apps/client/src/pages/Leaderboard.tsx, EnhancedLeaderboard.tsx  
+  Size: `M`  Risk: `Med`  Deps: `Unify leaderboard hooks`  
+  Exit: single page with classic/enhanced modes; /leaderboard/classic route redirects to mode param
+
+- [ ] **Evaluate dashboard settings consolidation** — check if individual components still needed  
+  Consumers: apps/client/src/components/dashboard/customization/{DashboardSettings,LayoutSelector,ThemeSelector,NotificationSettings}.tsx  
+  Size: `S`  Risk: `Low`  Deps: `none`  
+  Exit: unused individual components removed; UnifiedDashboardSettings handles all preferences
+
+- [ ] **Remove unused profile components audit** — ProfileFollowers, CreatePostForm if no social features  
+  Consumers: apps/client/src/components/profile/{ProfileFollowers,CreatePostForm}.tsx  
+  Size: `S`  Risk: `Low`  Deps: `none`  
+  Exit: files removed if social features not implemented; Profile.tsx imports updated
+
+- [ ] **Consolidate prediction creation components** — CreatePredictionForm vs CreatePredictionModal  
+  Consumers: apps/client/src/components/CreatePredictionForm.tsx, dashboard/CreatePredictionModal.tsx  
+  Size: `S`  Risk: `Low`  Deps: `none`  
+  Exit: single component with modal/inline modes; duplicate form logic eliminated
+
+### 🧹 Dashboard & Admin Component Review Queue
+// Core items → 🏁 Sprint Queue: Delete legacy admin components, Virtualize admin tables
+
+- [ ] **P1 Admin error boundaries** — wrap admin sections with error boundaries  
+  Consumers: apps/client/src/components/admin/AdminErrorBoundary.tsx (new), pages/AdminDashboard.tsx  
+  Size: `S`  Risk: `Low`  Deps: `none`  
+  Exit: Admin errors show fallback UI instead of breaking entire dashboard
+
+- [ ] **P1 Admin AbortController** — cancel in-flight admin requests on navigation  
+  Consumers: apps/client/src/api/admin.ts, contexts/AdminContext.tsx  
+  Size: `S`  Risk: `Low`  Deps: `Implement AbortController for navigation`  
+  Exit: Admin API calls cancelled on navigation; no setState after unmount warnings
+
+- [ ] **P2 Admin component memoization** — React.memo for expensive admin components  
+  Consumers: apps/client/src/components/admin/{UnifiedUserManagement,UserDataGrid,AdvancedAnalyticsDashboard}.tsx  
+  Size: `S`  Risk: `Low`  Deps: `none`  
+  Exit: Admin re-renders reduced 50%; React DevTools shows stable component identity
+
+- [ ] **P2 Admin ARIA compliance** — roles, labels, keyboard navigation for admin tables/modals  
+  Consumers: apps/client/src/components/admin/**/*.tsx  
+  Size: `M`  Risk: `Low`  Deps: `none`  
+  Exit: axe-core shows 0 critical/serious violations on admin screens; keyboard nav functional
+
+- [ ] **P2 Bulk operation progress indicators** — loading states for admin bulk operations  
+  Consumers: apps/client/src/components/admin/UserDataGrid.tsx, api/admin.ts  
+  Size: `S`  Risk: `Low`  Deps: `none`  
+  Exit: Bulk operations show progress bars; user feedback for operations >2s
+
+- [ ] **P2 Admin data grid consolidation** — extract reusable DataGrid with admin/user scopes  
+  Consumers: apps/client/src/components/admin/UserDataGrid.tsx, components/dashboard/**/*Table*.tsx  
+  Size: `M`  Risk: `Med`  Deps: `Dashboard module registry`  
+  Exit: Single DataGrid component used in admin + dashboard; 70% code reduction in table components
+
+### 🧹 User Dashboard Component Review Queue
+// Core items → 🏁 Sprint Queue: Delete DashboardSettings, Stabilize socket handlers, Dashboard naming, Virtualize lists
+
+- [ ] **Complete dashboard settings consolidation** — inline individual settings components  
+  Consumers: apps/client/src/components/dashboard/customization/{ThemeSelector,LayoutSelector,NotificationSettings,PerformanceSettings,PrivacySettings}.tsx  
+  Size: `M`  Risk: `Med`  Deps: `Dashboard component naming normalization`  
+  Exit: Settings components consolidated into single DashboardSettings; 5→1 component reduction
+
+- [ ] **Add dashboard ARIA compliance** — proper roles, labels, keyboard navigation  
+  Consumers: apps/client/src/components/dashboard/**/*.tsx  
+  Size: `M`  Risk: `Low`  Deps: `none`  
+  Exit: axe-core shows 0 critical/serious violations on dashboard; keyboard navigation functional
+
+- [ ] **Dashboard image lazy loading** — defer below-fold avatars and graphics  
+  Consumers: apps/client/src/components/dashboard/**/*.tsx  
+  Size: `S`  Risk: `Low`  Deps: `none`  
+  Exit: Images load on viewport intersection; initial bundle reduced 15%
+
+### Client Network & Socket Audit (NO-WRITE)
+
+**Priorities (P0 → P2)**
+P0 — stop the storms / leaks (ship first)
+- Centralize user data fetching (UserDataProvider pattern)
+- Add socket cleanup for activity streams (ensure `off` on unmount)
+- Stabilize socket handlers with `useCallback`
+- Request deduplication manager (single-flight within 100–200ms)
+- Implement `AbortController` for navigation (cancel in-flight requests)
+
+P1 — UX + cache niceties
+- Add Suspense boundaries to routes (consistent loading UX)
+- Cache timeline data in `sessionStorage` (5 min TTL)
+- Debounce leaderboard socket updates (coalesce within 500ms)
+- Convert market overview to cached hook (replace raw fetch)
+- Add visibility-change guard (avoid focus re-fetch)
+
+P2 — bigger wins / optional
+- Implement optimistic UI updates for bets/parlays
+- Create socket event constants in `@ems/types`
+- Lazy load heavy components (keep main bundle < 200KB)
+- Add request timing metrics (dev-only)
+
+**Success Metrics**
+- Dashboard mount requests **< 5** (from 20+)
+- Navigation to any main route **< 3** network calls (steady state)
+- Socket cleanup coverage **100%** (from ~65%)
+- Stable handler count **0 recreations** across 3 navigations
+- No setState-after-unmount warnings during route changes
+
+// Core infra items → 🏁 Sprint Queue: TypeScript script, Lint gate
+
+**P0 implementation order (recommended)**
+1) Add socket cleanup for activity streams  
+2) Stabilize socket handlers with `useCallback`  
+3) Request deduplication manager (single-flight)  
+4) Implement `AbortController` for navigation  
+5) Centralize user data fetching (UserDataProvider)
+
+- [ ] **Batch user stats into single endpoint** — reduce server load  
+  Consumers: hooks/useEnhancedUserStats.ts, server API endpoint (new)  
+  Size: `S`  Risk: `Low`  Deps: `Centralize user data fetching`  
+  Exit: /api/users/{id}/dashboard returns all data in one call  
+  Notes: • Server-side change needed; currently 6 parallel calls
+
+- [ ] **Lazy load heavy components** — reduce initial bundle  
+  Consumers: components/dashboard/desktop/DesktopDashboard.tsx, routes/AppRoutes.tsx  
+  Size: `S`  Risk: `Low`  Deps: `Add Suspense boundaries to routes`  
+  Exit: Dashboard widgets load on-demand, main bundle < 200KB  
+  Notes: • React.lazy for non-critical dashboard modules
+
+## packages/types — Module Layout
+
+### Event Map Example
+```ts
+export const StatsSocketEvents = {
+  StatsUpdated: 'stats:updated',
+  RankingChanged: 'ranking:changed',
+  AchievementUnlocked: 'achievement:unlocked',
+} as const;
+export type StatsSocketEvent = typeof StatsSocketEvents[keyof typeof StatsSocketEvents];
+```
+
+## Implementation Notes — Shared Types
+
+**Guardrails for type centralization:**
+- Prefer `as const` objects + value-of UNION TYPES for events/rooms/queues; values MUST match current strings
+- Avoid `enum` / `const enum` in public/shared contracts
+- No public key renames (REST/socket)
+- Patches ≤4 files / ≤150 LOC; TEMP type-only re-exports allowed to avoid wide churn
+- Sockets/Redis via DI only (no direct `io.emit` / `redisClient.publish` in routes/controllers)
+- Cross-boundary only: Move types used by ≥2 services/boundaries; keep internal types local
+- Import discipline: Always import from `@ems/types` index; never import from sub-paths
+
+## Completed Queues & Archived Logs
+
+2025-08-25 — Heavy list virtualization — no files touched — exit met: Timeline uses infinite scroll, EnhancedLeaderboard has pagination (25/page), UnifiedActivityFeed limits to maxItems (50), all components already optimized against large list performance issues.
+
+2025-08-25 — Image lazy loading — touched: apps/client/src/components/timeline/ArticleCard.tsx, apps/client/src/components/profile/ProfileHeader.tsx — reverted: Images loaded quickly without lazy loading; implementation broke immediate loading, user requested complete revert to original direct loading.
+
+
+# important-instruction-reminders
+Deep Review.
+Do what has been asked; nothing more, nothing less.
+NEVER create files unless they're absolutely necessary for achieving your goal.
+ALWAYS prefer editing an existing file to creating a new one.
+NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.

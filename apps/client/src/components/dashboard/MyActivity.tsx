@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+// Rollback: git checkout HEAD -- apps/client/src/components/dashboard/MyActivity.tsx
+import { useState, useEffect, useCallback } from 'react';
 import { useMyBets, useMyParlays, useMyPredictions } from '../../hooks/useMeStubs';
 import { useSocket } from '../../contexts/SocketContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -26,25 +27,32 @@ export default function MyActivity() {
 
   const isLoading = myBets.loading || myParlays.loading || myPredictions.loading;
 
-  // Listen for bet and parlay status changes
-  useEffect(() => {
-    if (!socket || !user?.id) return;
-
-    const handleBetStatusChange = (data: any) => {
+  // Memoized socket handlers to prevent recreation on every render
+  const handleBetStatusChange = useCallback(
+    (data: any) => {
       console.log('[MyActivity] Bet status changed:', data);
-      if (data.userId === user.id) {
+      if (data.userId === user?.id) {
         // Refresh bets data
         myBets.refetch?.();
       }
-    };
+    },
+    [user?.id, myBets],
+  );
 
-    const handleParlayStatusChange = (data: any) => {
+  const handleParlayStatusChange = useCallback(
+    (data: any) => {
       console.log('[MyActivity] Parlay status changed:', data);
-      if (data.userId === user.id) {
+      if (data.userId === user?.id) {
         // Refresh parlays data
         myParlays.refetch?.();
       }
-    };
+    },
+    [user?.id, myParlays],
+  );
+
+  // Listen for bet and parlay status changes
+  useEffect(() => {
+    if (!socket || !user?.id) return;
 
     socket.on('bet:status_change', handleBetStatusChange);
     socket.on('parlay:status_change', handleParlayStatusChange);
@@ -53,7 +61,7 @@ export default function MyActivity() {
       socket.off('bet:status_change', handleBetStatusChange);
       socket.off('parlay:status_change', handleParlayStatusChange);
     };
-  }, [socket, user?.id, myBets, myParlays]);
+  }, [socket, user?.id, handleBetStatusChange, handleParlayStatusChange]);
 
   const filteredData = (): ActivityItem[] => {
     switch (filter) {

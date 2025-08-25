@@ -1,8 +1,10 @@
+// Rollback: Remove useCallback import and unwrap all socket handlers from useCallback
 // apps/client/src/components/admin/ModerationPanel.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSocket } from '../../contexts/SocketContext';
 import * as moderationApi from '../../api/moderation';
 import type { ModerationLogEntry } from '../../api/moderation';
+import { AdminSocketEvents } from '@ems/types';
 
 interface QuickActionForm {
   userId: number;
@@ -160,30 +162,31 @@ const ModerationPanel: React.FC = () => {
     return new Date(timestamp).toLocaleString();
   };
 
+  // Stable handler for socket events
+  const handleModerationAction = useCallback(() => {
+    loadRecentActions(); // Reload recent actions
+  }, []);
+
   // Listen for real-time updates
   useEffect(() => {
     if (socket) {
-      const handleModerationAction = () => {
-        loadRecentActions(); // Reload recent actions
-      };
-
-      socket.on('adminModerationUserBan', handleModerationAction);
-      socket.on('adminModerationUserUnban', handleModerationAction);
-      socket.on('adminModerationUserMute', handleModerationAction);
-      socket.on('adminModerationUserKick', handleModerationAction);
-      socket.on('adminModerationMessageDelete', handleModerationAction);
-      socket.on('adminModerationPostDelete', handleModerationAction);
+      socket.on(AdminSocketEvents.ModerationUserBan, handleModerationAction);
+      socket.on(AdminSocketEvents.ModerationUserUnban, handleModerationAction);
+      socket.on(AdminSocketEvents.ModerationUserMute, handleModerationAction);
+      socket.on(AdminSocketEvents.ModerationUserKick, handleModerationAction);
+      socket.on(AdminSocketEvents.ModerationMessageDelete, handleModerationAction);
+      socket.on(AdminSocketEvents.ModerationPostDelete, handleModerationAction);
 
       return () => {
-        socket.off('adminModerationUserBan', handleModerationAction);
-        socket.off('adminModerationUserUnban', handleModerationAction);
-        socket.off('adminModerationUserMute', handleModerationAction);
-        socket.off('adminModerationUserKick', handleModerationAction);
-        socket.off('adminModerationMessageDelete', handleModerationAction);
-        socket.off('adminModerationPostDelete', handleModerationAction);
+        socket.off(AdminSocketEvents.ModerationUserBan, handleModerationAction);
+        socket.off(AdminSocketEvents.ModerationUserUnban, handleModerationAction);
+        socket.off(AdminSocketEvents.ModerationUserMute, handleModerationAction);
+        socket.off(AdminSocketEvents.ModerationUserKick, handleModerationAction);
+        socket.off(AdminSocketEvents.ModerationMessageDelete, handleModerationAction);
+        socket.off(AdminSocketEvents.ModerationPostDelete, handleModerationAction);
       };
     }
-  }, [socket]);
+  }, [socket, handleModerationAction]);
 
   // Load on mount
   useEffect(() => {

@@ -1,7 +1,9 @@
+// Rollback: Remove useEffect import and role change monitoring
 // apps/client/src/contexts/AdminContext.tsx
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import * as adminApi from '../api/admin';
+import { useAuth } from './AuthContext';
 import type {
   PublicUser,
   PublicPrediction,
@@ -43,12 +45,30 @@ interface AdminContextType {
 const AdminContext = createContext<AdminContextType | undefined>(undefined);
 
 export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { user } = useAuth();
   const [users, setUsers] = useState<PublicUser[]>([]);
   const [pendingPredictions, setPendingPredictions] = useState<PublicPrediction[]>([]);
   const [bets, setBets] = useState<PublicBet[]>([]);
   const [transactions, setTransactions] = useState<PublicTransaction[]>([]);
   const [badges, setBadges] = useState<PublicBadge[]>([]);
   const [statsFor, setStatsFor] = useState<Record<number, UserStatsDTO | null>>({});
+
+  // Rollback: Remove clearAdminData function and useEffect for role monitoring
+  const clearAdminData = useCallback(() => {
+    setUsers([]);
+    setPendingPredictions([]);
+    setBets([]);
+    setTransactions([]);
+    setBadges([]);
+    setStatsFor({});
+  }, []);
+
+  // Monitor user role changes and clear admin data when role downgrades from ADMIN
+  useEffect(() => {
+    if (user && user.role !== 'ADMIN') {
+      clearAdminData();
+    }
+  }, [user?.role, clearAdminData]);
 
   const loadUsers = useCallback(async () => {
     const data = await adminApi.listUsers();

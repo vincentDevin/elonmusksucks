@@ -1,22 +1,24 @@
 // Rollback: Remove Suspense boundaries and restore direct route rendering
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { Suspense } from 'react';
+import { Suspense, lazy } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import Login from '../pages/Login';
 import Register from '../pages/Register';
 import ForgotPassword from '../pages/ForgotPassword';
 import ResetPassword from '../pages/ResetPassword';
-import Dashboard from '../pages/Dashboard';
-import Predictions from '../pages/Predictions';
 import Leaderboard from '../pages/Leaderboard';
-import EnhancedLeaderboard from '../pages/EnhancedLeaderboard';
 import PrivateRoute from '../components/PrivateRoute';
 import Home from '../pages/Home';
-import Profile from '../pages/Profile';
 import ProfileSetup from '../pages/ProfileSetup';
-import AdminDashboard from '../pages/AdminDashboard';
-import Pong from '../pages/Pong';
-import { AdminProvider } from '../contexts/AdminContext';
+import RequireAdmin from '../components/admin/RequireAdmin';
+
+// Lazy-loaded major routes for code splitting
+const Dashboard = lazy(() => import('../pages/Dashboard'));
+const Predictions = lazy(() => import('../pages/Predictions'));
+const EnhancedLeaderboard = lazy(() => import('../pages/EnhancedLeaderboard'));
+const Profile = lazy(() => import('../pages/Profile'));
+const AdminDashboard = lazy(() => import('../pages/AdminDashboard'));
+const Pong = lazy(() => import('../pages/Pong'));
 
 // Suspense fallback component
 const RouteFallback = () => (
@@ -26,7 +28,7 @@ const RouteFallback = () => (
 );
 
 export default function AppRoutes() {
-  const { accessToken, user } = useAuth();
+  const { accessToken } = useAuth();
 
   return (
     <Routes>
@@ -65,22 +67,34 @@ export default function AppRoutes() {
           }
         />
         <Route path="/leaderboard/classic" element={<Leaderboard />} />
-        <Route path="/profile/:userId" element={<Profile />} />
+        <Route
+          path="/profile/:userId"
+          element={
+            <Suspense fallback={<RouteFallback />}>
+              <Profile />
+            </Suspense>
+          }
+        />
 
         {/* Pong route - enabled by default */}
-        <Route path="/pong" element={<Pong />} />
+        <Route
+          path="/pong"
+          element={
+            <Suspense fallback={<RouteFallback />}>
+              <Pong />
+            </Suspense>
+          }
+        />
 
         {/* Admin-only route */}
         <Route
           path="/admin"
           element={
-            user?.role === 'ADMIN' ? (
-              <AdminProvider>
+            <RequireAdmin>
+              <Suspense fallback={<RouteFallback />}>
                 <AdminDashboard />
-              </AdminProvider>
-            ) : (
-              <Navigate to="/dashboard" replace />
-            )
+              </Suspense>
+            </RequireAdmin>
           }
         />
       </Route>

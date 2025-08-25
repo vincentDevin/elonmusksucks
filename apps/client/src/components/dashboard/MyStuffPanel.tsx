@@ -2,8 +2,8 @@
 import { useState, memo } from 'react';
 import { useEnhancedUserStats } from '../../hooks/useEnhancedUserStats';
 import { useEnhancedLeaderboard } from '../../hooks/useEnhancedLeaderboard';
-import PerformanceMetricsCard from './analytics/PerformanceMetricsCard';
-import QuickStatsGrid from './analytics/QuickStatsGrid';
+import MetricsCard from './analytics/PerformanceMetricsCard';
+import StatsGrid from './analytics/QuickStatsGrid';
 import SmartInsights from './analytics/SmartInsights';
 import AchievementProgress from './analytics/AchievementProgress';
 
@@ -81,10 +81,10 @@ const MyStuffPanel = memo(function MyStuffPanel() {
         /* Analytics View */
         <div className="space-y-6">
           {/* Performance Metrics - Full Width */}
-          <PerformanceMetricsCard stats={stats} />
+          <MetricsCard stats={stats} />
 
           {/* Quick Stats Grid - Full Width */}
-          <QuickStatsGrid stats={stats} userRank={userRank} />
+          <StatsGrid stats={stats} userRank={userRank} />
 
           {/* Smart Insights - Full Width */}
           <SmartInsights insights={smartInsights} />

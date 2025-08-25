@@ -24,6 +24,8 @@ export class BettingRepository implements IBettingRepository {
     });
   }
 
+  // Rollback: Remove idempotencyKey parameter and usage
+  // Rollback: Move stats upsert back into main transaction
   async placeBet(
     userId: number,
     predictionId: number,
@@ -31,8 +33,10 @@ export class BettingRepository implements IBettingRepository {
     amount: number,
     oddsAtPlacement: number,
     potentialPayout: bigint,
+    idempotencyKey?: string,
   ): Promise<DbBet> {
-    return await prisma.$transaction(async (tx) => {
+    // Critical transaction: only financial operations to reduce lock contention
+    const bet = await prisma.$transaction(async (tx) => {
       const user = await tx.user.update({
         where: { id: userId },
         data: { muskBucks: { decrement: amount } },
@@ -46,10 +50,11 @@ export class BettingRepository implements IBettingRepository {
           balanceAfter: user.muskBucks,
           relatedBetId: null,
           relatedParlayId: null,
+          idempotencyKey: idempotencyKey ? `${idempotencyKey}-debit` : undefined,
         },
       });
 
-      const bet = await tx.bet.create({
+      return await tx.bet.create({
         data: {
           userId,
           predictionId,
@@ -57,42 +62,43 @@ export class BettingRepository implements IBettingRepository {
           amount: BigInt(amount),
           oddsAtPlacement,
           potentialPayout,
+          idempotencyKey,
         },
       });
-
-      // upsert stats for single bet
-      await tx.userStats.upsert({
-        where: { userId },
-        create: {
-          userId,
-          totalBets: 1,
-          betsWon: 0,
-          betsLost: 0,
-          totalParlays: 0,
-          parlaysWon: 0,
-          parlaysLost: 0,
-          totalParlayLegs: 0,
-          parlayLegsWon: 0,
-          parlayLegsLost: 0,
-          totalWagered: BigInt(amount),
-          totalWon: BigInt(0),
-          profit: BigInt(-amount),
-          roi: 0,
-          currentStreak: 0,
-          longestStreak: 0,
-          mostCommonBet: null,
-          biggestWin: BigInt(0),
-          updatedAt: new Date(),
-        },
-        update: {
-          totalBets: { increment: 1 },
-          totalWagered: { increment: BigInt(amount) },
-          profit: { decrement: BigInt(amount) },
-        },
-      });
-
-      return bet;
     });
+
+    // Update stats outside transaction to reduce lock scope
+    await prisma.userStats.upsert({
+      where: { userId },
+      create: {
+        userId,
+        totalBets: 1,
+        betsWon: 0,
+        betsLost: 0,
+        totalParlays: 0,
+        parlaysWon: 0,
+        parlaysLost: 0,
+        totalParlayLegs: 0,
+        parlayLegsWon: 0,
+        parlayLegsLost: 0,
+        totalWagered: BigInt(amount),
+        totalWon: BigInt(0),
+        profit: BigInt(-amount),
+        roi: 0,
+        currentStreak: 0,
+        longestStreak: 0,
+        mostCommonBet: null,
+        biggestWin: BigInt(0),
+        updatedAt: new Date(),
+      },
+      update: {
+        totalBets: { increment: 1 },
+        totalWagered: { increment: BigInt(amount) },
+        profit: { decrement: BigInt(amount) },
+      },
+    });
+
+    return bet;
   }
 
   async placeParlay(
@@ -100,6 +106,7 @@ export class BettingRepository implements IBettingRepository {
     legs: Array<{ predictionId: number; optionId: number; oddsAtPlacement: number }>,
     amount: number,
     potentialPayout: bigint,
+    idempotencyKey?: string,
   ): Promise<DbParlay> {
     const legCount = legs.length;
 
@@ -117,6 +124,7 @@ export class BettingRepository implements IBettingRepository {
           balanceAfter: user.muskBucks,
           relatedBetId: null,
           relatedParlayId: null,
+          idempotencyKey: idempotencyKey ? `${idempotencyKey}-debit` : undefined,
         },
       });
 
@@ -126,6 +134,7 @@ export class BettingRepository implements IBettingRepository {
           amount: BigInt(amount),
           combinedOdds: legs.reduce((a, l) => a * l.oddsAtPlacement, 1),
           potentialPayout,
+          idempotencyKey,
           legs: {
             create: legs.map((l) => ({
               optionId: l.optionId,

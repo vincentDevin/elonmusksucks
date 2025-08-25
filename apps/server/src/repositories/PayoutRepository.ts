@@ -47,7 +47,8 @@ export class PayoutRepository implements IPayoutRepository {
         const bets = await tx.bet.findMany({ where: { predictionId } });
         for (const b of bets) {
           const isWinner = b.optionId === winningOptionId;
-          const payoutAmount = isWinner ? (b.potentialPayout ?? 0) : 0;
+          // Rollback: Change back to b.potentialPayout ?? 0
+          const payoutAmount = isWinner ? (b.potentialPayout ?? BigInt(0)) : BigInt(0);
 
           await tx.bet.update({
             where: { id: b.id },
@@ -79,13 +80,13 @@ export class PayoutRepository implements IPayoutRepository {
           if (isWinner) {
             const user = await tx.user.findUnique({ where: { id: b.userId } });
             if (user) {
-              const newBal = user.muskBucks + BigInt(payoutAmount);
+              const newBal = user.muskBucks + payoutAmount;
               await tx.user.update({ where: { id: user.id }, data: { muskBucks: newBal } });
               await tx.transaction.create({
                 data: {
                   userId: user.id,
                   type: 'CREDIT',
-                  amount: BigInt(payoutAmount),
+                  amount: payoutAmount,
                   balanceAfter: newBal,
                   relatedBetId: b.id,
                   relatedParlayId: null,

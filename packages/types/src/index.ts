@@ -56,6 +56,28 @@ export const TimelineSocketEvents = {
 
 export type TimelineSocketEvent = typeof TimelineSocketEvents[keyof typeof TimelineSocketEvents];
 
+// Rollback: Remove AdminSocketEvents constant and type export
+// Admin socket events with typed payloads
+export const AdminSocketEvents = {
+  // Moderation events
+  ModerationUserBan: 'adminModerationUserBan',
+  ModerationUserUnban: 'adminModerationUserUnban', 
+  ModerationUserMute: 'adminModerationUserMute',
+  ModerationUserKick: 'adminModerationUserKick',
+  ModerationMessageDelete: 'adminModerationMessageDelete',
+  ModerationPostDelete: 'adminModerationPostDelete',
+  ModerationBulk: 'admin:moderation:bulk',
+  RetaggingBulk: 'admin:retagging:bulk',
+  
+  // Feed management events
+  FeedRefresh: 'admin:feed:refresh',
+  
+  // Metrics events
+  MetricsUpdate: 'admin:metrics:update',
+} as const;
+
+export type AdminSocketEvent = typeof AdminSocketEvents[keyof typeof AdminSocketEvents];
+
 // Socket payload interfaces
 export interface StatsUpdatePayload {
   userId: number;

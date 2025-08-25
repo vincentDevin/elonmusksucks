@@ -132,7 +132,7 @@ export const FeedManager: React.FC<FeedManagerProps> = ({ className = '' }) => {
         <div className="bg-white p-4 rounded-lg shadow">
           <h3 className="text-sm font-medium text-gray-500">Articles This Week</h3>
           <p className="text-2xl font-bold text-blue-600">
-            {/* TODO: Add article count from API */}
+            {/* Article count placeholder - connect to analytics API */}
             --
           </p>
         </div>
@@ -226,7 +226,7 @@ export const FeedManager: React.FC<FeedManagerProps> = ({ className = '' }) => {
         )}
       </div>
 
-      {/* TODO: Add Feed Modal */}
+      {/* Add Feed Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full">

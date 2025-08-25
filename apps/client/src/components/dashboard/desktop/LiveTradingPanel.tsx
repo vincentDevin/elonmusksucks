@@ -1,5 +1,6 @@
 // apps/client/src/components/dashboard/desktop/LiveTradingPanel.tsx
-import { useState, useEffect } from 'react';
+// Rollback: git checkout HEAD -- apps/client/src/components/dashboard/desktop/LiveTradingPanel.tsx
+import { useState, useEffect, useCallback } from 'react';
 import { useSocket } from '../../../contexts/SocketContext';
 
 interface LiveOrder {
@@ -32,78 +33,88 @@ export default function LiveTradingPanel() {
   const [activeTab, setActiveTab] = useState<'orders' | 'movements'>('orders');
   const [isConnected, setIsConnected] = useState(false);
 
-  useEffect(() => {
-    if (!socket) return;
+  // Memoized socket handlers to prevent recreation on every render
+  const handleBetPlaced = useCallback((data: any) => {
+    const newOrder: LiveOrder = {
+      id: `bet_${data.betId || data.id || Date.now()}`,
+      type: 'bet',
+      prediction: data.predictionTitle || data.prediction?.title || 'Unknown Prediction',
+      amount: data.amount || 0,
+      odds: data.odds || data.oddsAtPlacement || 1.0,
+      timestamp: new Date().toISOString(),
+      status: 'confirmed',
+      user: data.userName || data.user?.name || 'Anonymous',
+      userId: data.userId || data.user?.id,
+      predictionId: data.predictionId,
+    };
 
-    // Listen for real bet placement events
-    const handleBetPlaced = (data: any) => {
+    setLiveOrders((prev) => [newOrder, ...prev.slice(0, 19)]);
+  }, []);
+
+  // Listen for real parlay placement events
+  const handleParlayPlaced = useCallback((data: any) => {
+    const newOrder: LiveOrder = {
+      id: `parlay_${data.parlayId || data.id || Date.now()}`,
+      type: 'parlay',
+      prediction: `${data.legCount || 0}-leg parlay`,
+      amount: data.amount || 0,
+      odds: data.combinedOdds || 1.0,
+      timestamp: new Date().toISOString(),
+      status: 'confirmed',
+      user: data.userName || data.user?.name || 'Anonymous',
+      userId: data.userId || data.user?.id,
+    };
+
+    setLiveOrders((prev) => [newOrder, ...prev.slice(0, 19)]);
+  }, []);
+
+  // Listen for market movements (odds changes)
+  const handleOddsChange = useCallback((data: any) => {
+    const movement: MarketMovement = {
+      predictionId: data.predictionId?.toString() || Date.now().toString(),
+      title: data.predictionTitle || data.title || 'Market Update',
+      oldOdds: data.oldOdds || 1.0,
+      newOdds: data.newOdds || 1.0,
+      change: data.change || 0,
+      volume: data.volume || data.totalVolume || 0,
+      timestamp: new Date().toISOString(),
+    };
+
+    setMarketMovements((prev) => [movement, ...prev.slice(0, 19)]);
+  }, []);
+
+  // Listen for big bet alerts (whale activity)
+  const handleBigBet = useCallback((data: any) => {
+    if (data.amount >= 1000) {
       const newOrder: LiveOrder = {
-        id: `bet_${data.betId || data.id || Date.now()}`,
-        type: 'bet',
-        prediction: data.predictionTitle || data.prediction?.title || 'Unknown Prediction',
-        amount: data.amount || 0,
-        odds: data.odds || data.oddsAtPlacement || 1.0,
+        id: `whale_${data.betId || Date.now()}`,
+        type: data.type === 'parlay' ? 'parlay' : 'bet',
+        prediction: data.predictionTitle || 'High-Value Bet',
+        amount: data.amount,
+        odds: data.odds || 1.0,
         timestamp: new Date().toISOString(),
         status: 'confirmed',
-        user: data.userName || data.user?.name || 'Anonymous',
-        userId: data.userId || data.user?.id,
+        user: data.userName || '🐋 Whale',
+        userId: data.userId,
         predictionId: data.predictionId,
       };
 
       setLiveOrders((prev) => [newOrder, ...prev.slice(0, 19)]);
-    };
+    }
+  }, []);
 
-    // Listen for real parlay placement events
-    const handleParlayPlaced = (data: any) => {
-      const newOrder: LiveOrder = {
-        id: `parlay_${data.parlayId || data.id || Date.now()}`,
-        type: 'parlay',
-        prediction: `${data.legCount || 0}-leg parlay`,
-        amount: data.amount || 0,
-        odds: data.combinedOdds || 1.0,
-        timestamp: new Date().toISOString(),
-        status: 'confirmed',
-        user: data.userName || data.user?.name || 'Anonymous',
-        userId: data.userId || data.user?.id,
-      };
+  // Handle connection status
+  const handleConnect = useCallback(() => {
+    setIsConnected(true);
+    // No need to subscribe - events are automatically broadcast
+  }, []);
 
-      setLiveOrders((prev) => [newOrder, ...prev.slice(0, 19)]);
-    };
+  const handleDisconnect = useCallback(() => {
+    setIsConnected(false);
+  }, []);
 
-    // Listen for market movements (odds changes)
-    const handleOddsChange = (data: any) => {
-      const movement: MarketMovement = {
-        predictionId: data.predictionId?.toString() || Date.now().toString(),
-        title: data.predictionTitle || data.title || 'Market Update',
-        oldOdds: data.oldOdds || 1.0,
-        newOdds: data.newOdds || 1.0,
-        change: data.change || 0,
-        volume: data.volume || data.totalVolume || 0,
-        timestamp: new Date().toISOString(),
-      };
-
-      setMarketMovements((prev) => [movement, ...prev.slice(0, 19)]);
-    };
-
-    // Listen for big bet alerts (whale activity)
-    const handleBigBet = (data: any) => {
-      if (data.amount >= 1000) {
-        const newOrder: LiveOrder = {
-          id: `whale_${data.betId || Date.now()}`,
-          type: data.type === 'parlay' ? 'parlay' : 'bet',
-          prediction: data.predictionTitle || 'High-Value Bet',
-          amount: data.amount,
-          odds: data.odds || 1.0,
-          timestamp: new Date().toISOString(),
-          status: 'confirmed',
-          user: data.userName || '🐋 Whale',
-          userId: data.userId,
-          predictionId: data.predictionId,
-        };
-
-        setLiveOrders((prev) => [newOrder, ...prev.slice(0, 19)]);
-      }
-    };
+  useEffect(() => {
+    if (!socket) return;
 
     // Register Socket.IO event listeners
     socket.on('bet:placed', handleBetPlaced);
@@ -111,16 +122,6 @@ export default function LiveTradingPanel() {
     socket.on('market:oddsChange', handleOddsChange);
     socket.on('bigBetAlert', handleBigBet);
     socket.on('prediction:trending', handleOddsChange); // Also show trending as market movement
-
-    // Handle connection status
-    const handleConnect = () => {
-      setIsConnected(true);
-      // No need to subscribe - events are automatically broadcast
-    };
-
-    const handleDisconnect = () => {
-      setIsConnected(false);
-    };
 
     // Set up connection listeners
     socket.on('connect', handleConnect);
@@ -140,7 +141,15 @@ export default function LiveTradingPanel() {
       socket.off('connect', handleConnect);
       socket.off('disconnect', handleDisconnect);
     };
-  }, [socket]);
+  }, [
+    socket,
+    handleBetPlaced,
+    handleParlayPlaced,
+    handleOddsChange,
+    handleBigBet,
+    handleConnect,
+    handleDisconnect,
+  ]);
 
   const getStatusColor = (status: LiveOrder['status']) => {
     switch (status) {

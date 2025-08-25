@@ -2,15 +2,12 @@
 import { useMemo, memo } from 'react';
 import type { EnhancedUserStats } from '../../../hooks/useEnhancedUserStats';
 
-interface PerformanceMetricsCardProps {
+interface MetricsCardProps {
   stats: EnhancedUserStats;
   className?: string;
 }
 
-const PerformanceMetricsCard = memo(function PerformanceMetricsCard({
-  stats,
-  className = '',
-}: PerformanceMetricsCardProps) {
+const MetricsCard = memo(function MetricsCard({ stats, className = '' }: MetricsCardProps) {
   const { performance } = stats;
 
   // Calculate trend indicators (placeholder for now)
@@ -129,4 +126,4 @@ const PerformanceMetricsCard = memo(function PerformanceMetricsCard({
   );
 });
 
-export default PerformanceMetricsCard;
+export default MetricsCard;

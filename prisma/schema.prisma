@@ -64,7 +64,7 @@ model User {
   profileComplete    Boolean             @default(false)
   role               Role                @default(USER)
   active             Boolean             @default(true)
-  muskBucks          BigInt              @default(1000)
+  muskBucks          BigInt              @default(1000) // Rollback: remove @@map constraint reference
   isSystemAccount    Boolean             @default(false)
   bets               Bet[]
   refreshTokens      RefreshToken[]
@@ -189,21 +189,26 @@ model Bet {
   prediction      Prediction        @relation(fields: [predictionId], references: [id])
   predictionId    Int
   amount          BigInt
-  oddsAtPlacement Float? // snapshot of odds when placing the bet
+  oddsAtPlacement Float? // snapshot of odds when placing the bet; Rollback: remove constraint reference
   potentialPayout BigInt? // computed at placement: amount * oddsAtPlacement
   status          BetStatus         @default(PENDING)
-  optionOption    PredictionOption? @relation("OptionToBet", fields: [optionId], references: [id])
+  // Rollback: Remove onDelete: SetNull from the relation
+  optionOption    PredictionOption? @relation("OptionToBet", fields: [optionId], references: [id], onDelete: SetNull)
   optionId        Int?
   won             Boolean? // null until resolved
   payout          BigInt? // null until resolved
   createdAt       DateTime          @default(now())
   activities      UserActivity[]
+  // Rollback: Remove idempotencyKey field and unique constraint
+  idempotencyKey  String?           @unique // Client-provided key to prevent duplicate bets
 
   @@index([userId, createdAt(sort: Desc)])
   @@index([predictionId, createdAt(sort: Desc)])
   @@index([status, createdAt(sort: Desc)])
   @@index([userId, status])
   @@index([userId, predictionId, createdAt(sort: Desc)])
+  // Rollback: Remove this index
+  @@index([userId, status, createdAt(sort: Desc)]) // Optimize user bet history queries with status filter
 }
 
 model AITweet {
@@ -346,6 +351,8 @@ model Parlay {
   status          BetStatus   @default(PENDING)
   legs            ParlayLeg[]
   createdAt       DateTime    @default(now())
+  // Rollback: Remove idempotencyKey field and unique constraint
+  idempotencyKey  String?     @unique // Client-provided key to prevent duplicate parlays
 
   @@index([userId, createdAt(sort: Desc)])
   @@index([status, createdAt(sort: Desc)])
@@ -374,6 +381,8 @@ model Transaction {
   // Pong relations
   pongEscrowMatches PongMatch[]    @relation("PongEscrowTransaction")
   pongPayoutMatches PongMatch[]    @relation("PongPayoutTransaction")
+  // Rollback: Remove idempotencyKey field and unique constraint
+  idempotencyKey  String?         @unique // Client-provided key to prevent duplicate transactions
 
   @@index([userId, createdAt(sort: Desc)])
   @@index([type, createdAt(sort: Desc)])
@@ -424,6 +433,8 @@ model UserActivity {
   @@index([relatedUserId, createdAt(sort: Desc)], name: "idx_user_activities_related_user")
   @@index([predictionId, createdAt(sort: Desc)], name: "idx_user_activities_prediction")
   @@index([betId, createdAt(sort: Desc)], name: "idx_user_activities_bet")
+  // Rollback: Remove this index
+  @@index([isPersonal, type, createdAt(sort: Desc)], name: "idx_user_activities_dashboard") // Optimize dashboard activity queries
 }
 
 model UserStats {
@@ -566,6 +577,8 @@ model Article {
   @@index([hash])
   @@index([feedId])
   @@index([createdAt(sort: Desc)])
+  // Rollback: Remove this covering index  
+  @@index([status, feedId, publishedAt(sort: Desc)], name: "idx_articles_timeline_covering") // Covering index for timeline loads
 }
 
 model ArticleReaction {
@@ -666,7 +679,7 @@ model PongMatch {
   aiDifficulty    PongDifficulty? // Set when playing against AI
   
   // Wager & Economy
-  wagerAmount     BigInt          @default(0) // 0 for practice matches
+  wagerAmount     BigInt          @default(0) // 0 for practice matches; Rollback: remove constraint reference
   escrowTxId      Int?            // Reference to escrow transaction
   escrowTx        Transaction?    @relation("PongEscrowTransaction", fields: [escrowTxId], references: [id])
   payoutTxId      Int?            // Reference to payout transaction
@@ -757,4 +770,7 @@ model PongStats {
   @@index([wins(sort: Desc)])
   @@index([winStreak(sort: Desc)])
   @@index([totalWon(sort: Desc)])
+  // Rollback: Remove these missing leaderboard indexes
+  @@index([totalWagered(sort: Desc)]) // Optimize wager leaderboard
+  @@index([perfectGames(sort: Desc)]) // Optimize perfect games leaderboard
 }

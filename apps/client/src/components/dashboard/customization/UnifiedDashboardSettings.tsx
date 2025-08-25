@@ -6,7 +6,7 @@ import NotificationSettings from './NotificationSettings';
 import PrivacySettings from './PrivacySettings';
 import PerformanceSettings from './PerformanceSettings';
 
-interface UnifiedDashboardSettingsProps {
+interface DashboardSettingsProps {
   isOpen: boolean;
   onClose: () => void;
   className?: string;
@@ -18,11 +18,11 @@ type SettingsTab = 'themes' | 'notifications' | 'privacy' | 'performance';
  * Unified dashboard settings that replaces the old DashboardSettings
  * Uses the new AdvancedThemeSelector instead of the conflicting ThemeSelector
  */
-export default function UnifiedDashboardSettings({
+export default function DashboardSettings({
   isOpen,
   onClose,
   className = '',
-}: UnifiedDashboardSettingsProps) {
+}: DashboardSettingsProps) {
   const [activeTab, setActiveTab] = useState<SettingsTab>('themes');
   const { updatePreferences, loading } = useAdvancedThemes();
 

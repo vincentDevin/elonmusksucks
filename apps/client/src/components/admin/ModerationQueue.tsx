@@ -1,6 +1,8 @@
+// Rollback: Remove useCallback wrapping from socket handlers and remove from import
 // apps/client/src/components/admin/ModerationQueue.tsx
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { ArticleModerationData } from '@ems/types';
+import { AdminSocketEvents } from '@ems/types';
 import { useSocket } from '../../contexts/SocketContext';
 import * as feedsAPI from '../../api/feeds';
 
@@ -64,49 +66,50 @@ export const ModerationQueue: React.FC<ModerationQueueProps> = ({ className = ''
     };
   }, [searchQuery]);
 
-  // Socket.IO integration for real-time admin updates
-  useEffect(() => {
-    if (!socket) return;
-
-    // Listen for new articles requiring moderation
-    const handleNewArticle = (data: any) => {
+  // Stable handlers for socket events
+  const handleNewArticle = useCallback(
+    (data: any) => {
       console.log('[ModerationQueue] New article for moderation:', data);
 
       // Only update if we're viewing pending articles
       if (filter === 'pending' || filter === 'all') {
         loadArticles();
       }
-    };
+    },
+    [filter],
+  );
 
-    // Listen for bulk moderation updates
-    const handleBulkModeration = (data: any) => {
-      console.log('[ModerationQueue] Bulk moderation completed:', data);
+  const handleSocketBulkModeration = useCallback((data: any) => {
+    console.log('[ModerationQueue] Bulk moderation completed:', data);
 
-      // Clear selected articles and reload
-      setSelectedArticles(new Set());
-      setBulkProcessing(false);
-      loadArticles();
-    };
+    // Clear selected articles and reload
+    setSelectedArticles(new Set());
+    setBulkProcessing(false);
+    loadArticles();
+  }, []);
 
-    // Listen for bulk retagging updates
-    const handleBulkRetagging = (data: any) => {
-      console.log('[ModerationQueue] Bulk retagging completed:', data);
+  const handleSocketBulkRetagging = useCallback((data: any) => {
+    console.log('[ModerationQueue] Bulk retagging completed:', data);
 
-      // Reload articles to show updated tags
-      loadArticles();
-    };
+    // Reload articles to show updated tags
+    loadArticles();
+  }, []);
+
+  // Socket.IO integration for real-time admin updates
+  useEffect(() => {
+    if (!socket) return;
 
     // Register event listeners
     socket.on('feed:article:new', handleNewArticle);
-    socket.on('admin:moderation:bulk', handleBulkModeration);
-    socket.on('admin:retagging:bulk', handleBulkRetagging);
+    socket.on(AdminSocketEvents.ModerationBulk, handleSocketBulkModeration);
+    socket.on(AdminSocketEvents.RetaggingBulk, handleSocketBulkRetagging);
 
     return () => {
       socket.off('feed:article:new', handleNewArticle);
-      socket.off('admin:moderation:bulk', handleBulkModeration);
-      socket.off('admin:retagging:bulk', handleBulkRetagging);
+      socket.off(AdminSocketEvents.ModerationBulk, handleSocketBulkModeration);
+      socket.off(AdminSocketEvents.RetaggingBulk, handleSocketBulkRetagging);
     };
-  }, [socket, filter]);
+  }, [socket, handleNewArticle, handleSocketBulkModeration, handleSocketBulkRetagging]);
 
   const loadArticles = async () => {
     try {

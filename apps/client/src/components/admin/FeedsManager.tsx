@@ -1,11 +1,13 @@
 // apps/client/src/components/admin/FeedsManager.tsx
-import React, { useState, useEffect } from 'react';
+// Rollback: Remove useCallback import and unwrap socket handlers from useCallback
+import React, { useState, useEffect, useCallback } from 'react';
 import type {
   PublicFeedSource,
   CreateFeedRequest,
   UpdateFeedRequest,
   FeedStatsResponse,
 } from '@ems/types';
+import { AdminSocketEvents } from '@ems/types';
 import { useSocket } from '../../contexts/SocketContext';
 import * as feedsAPI from '../../api/feeds';
 
@@ -38,41 +40,40 @@ export const FeedsManager: React.FC<FeedsManagerProps> = ({ className = '' }) =>
     loadStats();
   }, []);
 
+  // Stable handlers for socket events
+  const handleFeedRefresh = useCallback((data: any) => {
+    console.log('[FeedsManager] Feed refresh notification:', data);
+
+    // Remove from refreshing set and reload feeds
+    setRefreshingFeeds((prev) => {
+      const newSet = new Set(prev);
+      newSet.delete(data.feedId);
+      return newSet;
+    });
+
+    loadFeeds();
+    loadStats();
+  }, []);
+
+  const handleAdminFeedRefresh = useCallback((data: any) => {
+    console.log('[FeedsManager] Admin feed refresh:', data);
+    loadFeeds();
+    loadStats();
+  }, []);
+
   // Socket.IO integration for real-time feed updates
   useEffect(() => {
     if (!socket) return;
 
-    // Listen for feed refresh notifications
-    const handleFeedRefresh = (data: any) => {
-      console.log('[FeedsManager] Feed refresh notification:', data);
-
-      // Remove from refreshing set and reload feeds
-      setRefreshingFeeds((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(data.feedId);
-        return newSet;
-      });
-
-      loadFeeds();
-      loadStats();
-    };
-
-    // Listen for admin feed refresh events
-    const handleAdminFeedRefresh = (data: any) => {
-      console.log('[FeedsManager] Admin feed refresh:', data);
-      loadFeeds();
-      loadStats();
-    };
-
     // Register event listeners
-    socket.on('admin:feed:refresh', handleAdminFeedRefresh);
+    socket.on(AdminSocketEvents.FeedRefresh, handleAdminFeedRefresh);
     socket.on('timeline:feed:refresh', handleFeedRefresh);
 
     return () => {
-      socket.off('admin:feed:refresh', handleAdminFeedRefresh);
+      socket.off(AdminSocketEvents.FeedRefresh, handleAdminFeedRefresh);
       socket.off('timeline:feed:refresh', handleFeedRefresh);
     };
-  }, [socket]);
+  }, [socket, handleAdminFeedRefresh, handleFeedRefresh]);
 
   const loadFeeds = async () => {
     try {

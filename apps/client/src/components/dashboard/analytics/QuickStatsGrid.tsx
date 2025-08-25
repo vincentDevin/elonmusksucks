@@ -2,7 +2,7 @@
 import { useMemo, memo } from 'react';
 import type { EnhancedUserStats } from '../../../hooks/useEnhancedUserStats';
 
-interface QuickStatsGridProps {
+interface StatsGridProps {
   stats: EnhancedUserStats;
   userRank?: { allTimeRank: number | null; dailyRank: number | null } | null;
   className?: string;
@@ -17,11 +17,7 @@ interface StatItem {
   subtext?: string;
 }
 
-const QuickStatsGrid = memo(function QuickStatsGrid({
-  stats,
-  userRank,
-  className = '',
-}: QuickStatsGridProps) {
+const StatsGrid = memo(function StatsGrid({ stats, userRank, className = '' }: StatsGridProps) {
   const quickStats = useMemo((): StatItem[] => {
     if (!stats || !stats.portfolio || !stats.ranking || !stats.achievements || !stats.performance) {
       // Return empty stats if data is not available
@@ -160,4 +156,4 @@ const QuickStatsGrid = memo(function QuickStatsGrid({
   );
 });
 
-export default QuickStatsGrid;
+export default StatsGrid;

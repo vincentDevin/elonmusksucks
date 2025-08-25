@@ -53,19 +53,20 @@ const UnifiedUserManagement: React.FC<UnifiedUserManagementProps> = ({ className
     loadModerationActions();
   }, []);
 
+  // Stable handler for socket events
+  const handleModerationUpdate = useCallback(async () => {
+    try {
+      const actions = await moderationApi.getRecentModerationActions(10);
+      setRecentModerationActions(actions);
+      setRefreshTrigger((prev) => prev + 1);
+    } catch (error) {
+      console.error('Failed to reload moderation actions:', error);
+    }
+  }, []);
+
   // Listen for real-time moderation updates
   useEffect(() => {
     if (socket) {
-      const handleModerationUpdate = async () => {
-        try {
-          const actions = await moderationApi.getRecentModerationActions(10);
-          setRecentModerationActions(actions);
-          setRefreshTrigger((prev) => prev + 1);
-        } catch (error) {
-          console.error('Failed to reload moderation actions:', error);
-        }
-      };
-
       socket.on('adminModerationUserBan', handleModerationUpdate);
       socket.on('adminModerationUserUnban', handleModerationUpdate);
       socket.on('adminModerationUserMute', handleModerationUpdate);
@@ -78,7 +79,7 @@ const UnifiedUserManagement: React.FC<UnifiedUserManagementProps> = ({ className
         socket.off('adminModerationUserKick', handleModerationUpdate);
       };
     }
-  }, [socket]);
+  }, [socket, handleModerationUpdate]);
 
   const handleSearchResults = useCallback((results: PaginatedUsers) => {
     setUsers(results.users);
