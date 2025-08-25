@@ -18,7 +18,7 @@ import {
 import {
   getPredictions,
   createPrediction as createPredictionApi,
-  type PredictionFull,
+  type PredictionView,
   type CreatePredictionPayload,
 } from '../api/predictions';
 import type { BetWithUser, ParlayLegWithUser, PublicPredictionOption } from '@ems/types';
@@ -35,7 +35,7 @@ import { useAuth } from './AuthContext';
 
 // ---- Context shape ----
 interface Ctx {
-  predictions: PredictionFull[];
+  predictions: PredictionView[];
   loading: boolean;
   error: Error | null;
   refresh: () => Promise<void>;
@@ -54,7 +54,7 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
   const socket = useSocket();
   const { refreshUser } = useAuth();
   const optimisticBetsRef = useRef<Map<string, any>>(new Map());
-  const [predictions, setPredictions] = useState<PredictionFull[]>([]);
+  const [predictions, setPredictions] = useState<PredictionView[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
@@ -80,8 +80,8 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
 
   // ── Live socket updates ───────────────────────────────────────────────────
   useEffect(() => {
-    const onCreated = (p: PredictionFull) => setPredictions((prev) => [p, ...prev]);
-    const onResolved = (p: PredictionFull) =>
+    const onCreated = (p: PredictionView) => setPredictions((prev) => [p, ...prev]);
+    const onResolved = (p: PredictionView) =>
       setPredictions((prev) => prev.map((x) => (x.id === p.id ? p : x)));
 
     const onBet = (bet: BetWithUser) => {

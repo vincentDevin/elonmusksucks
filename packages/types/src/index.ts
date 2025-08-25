@@ -770,6 +770,111 @@ export type DbUserStats = {
 };
 
 // ——— User Profile & Stats DTOs ————————————————————————————————————
+
+// Standardized User Profile Response
+export interface UserProfileView {
+  id: number;
+  name: string;
+  role: string;
+  muskBucks: string;            // BigInt → string
+  profileComplete: boolean;
+  rank?: number;
+  bio?: string | null;
+  avatarUrl?: string | null;
+  location?: string | null;
+  timezone?: string | null;
+  notifyOnResolve: boolean;
+  theme: string;
+  twoFactorEnabled: boolean;
+  stats: {
+    successRate: number;
+    totalPredictions: number;
+    currentStreak: number;
+    longestStreak: number;
+  };
+  badges: PublicUserBadge[];
+  followersCount: number;
+  followingCount: number;
+  isFollowing: boolean;
+  createdAt: string;            // Date → ISO string
+  updatedAt: string;            // Date → ISO string
+}
+
+// Standardized User Stats Response  
+export interface UserStatsView {
+  totalBets: number;
+  betsWon: number;
+  betsLost: number;
+  totalParlays: number;
+  parlaysWon: number;
+  parlaysLost: number;
+  totalParlayLegs: number;
+  parlayLegsWon: number;
+  parlayLegsLost: number;
+  totalWagered: string;         // BigInt → string
+  totalWon: string;             // BigInt → string
+  profit: string;               // BigInt → string
+  roi: number;
+  currentStreak: number;
+  longestStreak: number;
+  mostCommonBet: string | null;
+  biggestWin: string;           // BigInt → string
+  updatedAt: string;            // Date → ISO string
+}
+
+// Standardized Prediction Response
+export interface PredictionView {
+  id: number;
+  title: string;
+  description: string;
+  category: string;
+  status: string;              // 'PENDING' | 'APPROVED' | 'RESOLVED'
+  type: string;
+  threshold?: number | null;
+  createdAt: string;            // Date → ISO string
+  expiresAt: string;            // Date → ISO string (kept as expiresAt for client compatibility)  
+  resolvedAt: string | null;    // Date → ISO string
+  creatorUserId: number;
+  winningOptionId: number | null;
+  options: Array<{
+    id: number;
+    label: string;
+    odds: number;
+    predictionId: number;
+  }>;
+  bets: Array<{
+    id: number;
+    userId: number;
+    userName: string;
+    amount: string;             // BigInt → string
+    potentialPayout: string | null;  // BigInt → string
+    payout: string | null;      // BigInt → string
+    status: string;
+    createdAt: string;          // Date → ISO string
+  }>;
+  sourceLinks?: Array<{
+    id: number;
+    url: string;
+    title: string;
+    description: string | null;
+  }>;
+}
+
+// Standardized Leaderboard Entry Response  
+export interface LeaderboardEntryView {
+  userId: number;
+  userName: string;
+  avatarUrl: string | null;
+  balance: string;              // BigInt → string
+  totalBets: number;
+  winRate: number;
+  profitAll: string;            // BigInt → string
+  profitPeriod: string;         // BigInt → string
+  roi: number;
+  longestStreak: number;
+  rank: number;
+}
+
 export interface PublicUserProfile {
   id:               number;
   name:             string;

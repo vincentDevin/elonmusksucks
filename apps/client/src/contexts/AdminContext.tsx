@@ -92,7 +92,7 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const loadPendingPredictions = useCallback(async () => {
     const all = await adminApi.listPredictions();
-    setPendingPredictions(all.filter((p) => !(p as any).approved));
+    setPendingPredictions(all.filter((p) => p.status === 'PENDING'));
   }, []);
 
   const approvePrediction = useCallback(async (id: number) => {

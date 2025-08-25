@@ -2,7 +2,13 @@
 import type { Request, Response, NextFunction } from 'express';
 import { predictionService } from '../services/predictions.service';
 import { UserService } from '../services/user.service';
-import { PredictionType, CreatePredictionPayload, InputSizeLimits } from '@ems/types';
+import {
+  PredictionType,
+  CreatePredictionPayload,
+  InputSizeLimits,
+  PredictionView,
+} from '@ems/types';
+import { toPredictionView } from '../view/prediction.view';
 
 const userService = new UserService();
 
@@ -21,18 +27,8 @@ export const getAllPredictions = async (
   try {
     const all = await predictionService.listAllPredictions();
 
-    // Convert BigInt fields to strings for JSON serialization
-    const serializedPredictions = all.map((prediction) => ({
-      ...prediction,
-      bets: prediction.bets.map((bet) => ({
-        ...bet,
-        amount: bet.amount.toString(),
-        potentialPayout: bet.potentialPayout?.toString() || null,
-        payout: bet.payout?.toString() || null,
-      })),
-    }));
-
-    res.json(serializedPredictions);
+    const payload = all.map(toPredictionView) satisfies PredictionView[];
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -55,18 +51,8 @@ export const getPredictionById = async (
       return;
     }
 
-    // Convert BigInt fields to strings for JSON serialization
-    const serializedPrediction = {
-      ...prediction,
-      bets: prediction.bets.map((bet) => ({
-        ...bet,
-        amount: bet.amount.toString(),
-        potentialPayout: bet.potentialPayout?.toString() || null,
-        payout: bet.payout?.toString() || null,
-      })),
-    };
-
-    res.json(serializedPrediction);
+    const payload = toPredictionView(prediction) satisfies PredictionView;
+    res.json(payload);
   } catch (err) {
     next(err);
   }

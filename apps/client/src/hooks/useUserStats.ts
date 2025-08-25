@@ -210,7 +210,8 @@ export function useUserStats() {
         const potentialWinnings =
           myParlays.data?.reduce((sum, parlay) => sum + Number(parlay.potentialPayout || 0), 0) ||
           0;
-        const pendingPredictions = myPredictions.data?.filter((p) => !p.approved).length || 0;
+        const pendingPredictions =
+          myPredictions.data?.filter((p) => p.status === 'PENDING').length || 0;
         const approvalRate = calculateApprovalRate(myPredictions.data || []);
 
         // Extract performance data from enhanced stats or calculate from current data
@@ -361,7 +362,8 @@ export function useUserStats() {
       myBets.data?.reduce((sum, bet) => sum + Number(bet.amount || 0), 0) || 0;
     const activeParlaysValue =
       myParlays.data?.reduce((sum, parlay) => sum + Number(parlay.amount || 0), 0) || 0;
-    const pendingPredictions = myPredictions.data?.filter((p) => !p.approved).length || 0;
+    const pendingPredictions =
+      myPredictions.data?.filter((p) => p.status === 'PENDING').length || 0;
 
     return {
       performance: {
@@ -629,9 +631,11 @@ export function useUserStats() {
 }
 
 // Helper functions
-function calculateApprovalRate(predictions: { approved?: boolean }[]): number {
+function calculateApprovalRate(predictions: { status: string }[]): number {
   if (predictions.length === 0) return 0;
-  const approved = predictions.filter((p) => p.approved).length;
+  const approved = predictions.filter(
+    (p) => p.status === 'APPROVED' || p.status === 'RESOLVED',
+  ).length;
   return approved / predictions.length;
 }
 

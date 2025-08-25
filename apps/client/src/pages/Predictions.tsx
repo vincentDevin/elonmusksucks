@@ -28,14 +28,14 @@ export default function Predictions() {
 
       switch (tab) {
         case 'PENDING':
-          return !p.approved;
+          return p.status === 'PENDING';
         case 'RESOLVED':
-          return p.approved && p.resolved;
+          return p.status === 'RESOLVED';
         case 'EXPIRED':
-          return p.approved && !p.resolved && now > expires;
+          return p.status === 'APPROVED' && now > expires;
         case 'OPEN':
         default:
-          return p.approved && !p.resolved && now <= expires;
+          return p.status === 'APPROVED' && now <= expires;
       }
     });
   }, [raw, tab]);
@@ -117,12 +117,12 @@ export default function Predictions() {
         <ul className="space-y-6">
           {filtered.map((pred) => {
             // Only show approved predictions or user's own predictions
-            if (!pred.approved && pred.creatorId !== user?.id) {
+            if (pred.status !== 'APPROVED' && pred.creatorUserId !== user?.id) {
               return null;
             }
 
             // For non-approved predictions, show status message
-            if (!pred.approved) {
+            if (pred.status === 'PENDING') {
               return (
                 <li
                   key={pred.id}

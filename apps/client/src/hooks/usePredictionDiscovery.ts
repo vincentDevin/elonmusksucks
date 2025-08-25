@@ -234,7 +234,7 @@ export function usePredictionDiscovery() {
       // Basic filters (approved, not resolved, not expired)
       const now = Date.now();
       const expires = new Date(prediction.expiresAt).getTime();
-      if (!prediction.approved || prediction.resolved || now > expires) {
+      if (prediction.status !== 'APPROVED' || now > expires) {
         return false;
       }
 

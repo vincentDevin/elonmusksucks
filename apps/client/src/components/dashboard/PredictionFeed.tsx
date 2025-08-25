@@ -13,7 +13,7 @@ export default function PredictionFeed() {
     let filtered = predictions.filter((p) => {
       const now = Date.now();
       const expires = new Date(p.expiresAt).getTime();
-      return p.approved && !p.resolved && now <= expires;
+      return p.status === 'APPROVED' && now <= expires;
     });
 
     if (filterByCategory !== 'all') {

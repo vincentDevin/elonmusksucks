@@ -13,9 +13,12 @@ import type {
   UserFeedPost,
   UserActivity,
   UserStatsDTO,
+  UserStatsView,
+  UserProfileView,
   UpdateProfilePayload,
   CreateUserPostPayload,
 } from '@ems/types';
+import { toUserStatsView, toUserProfileView } from '../view/user.view';
 
 // Define MulterFile type explicitly to avoid mismatched declarations
 export type MulterFile = {
@@ -46,7 +49,7 @@ const enhancedUserStatsService = new EnhancedUserStatsService(
 );
 
 /**
- * GET /api/users/:userId
+ * GET /api/users/profile/:userId
  * Fetch a user's profile
  */
 export async function getProfile(
@@ -63,8 +66,11 @@ export async function getProfile(
     }
 
     const viewerId = req.user?.id;
-    const profileDTO: PublicUserProfile = await userService.getUserProfile(targetUserId, viewerId);
-    res.json(profileDTO);
+    const profileData: PublicUserProfile = await userService.getUserProfile(targetUserId, viewerId);
+
+    // Map to standardized DTO with BigInt → string conversion
+    const payload = toUserProfileView(profileData) satisfies UserProfileView;
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -211,7 +217,9 @@ export async function updateProfileHandler(
       targetUserId,
       updateData,
     );
-    res.json(updated);
+
+    const payload = toUserProfileView(updated) satisfies UserProfileView;
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -316,7 +324,9 @@ export async function getUserStatsHandler(
       res.status(404).json({ error: 'Stats not found' });
       return;
     }
-    res.json(stats);
+
+    const payload = toUserStatsView(stats) satisfies UserStatsView;
+    res.json(payload);
   } catch (err) {
     next(err);
   }
