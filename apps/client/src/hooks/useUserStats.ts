@@ -7,8 +7,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useVisibilityGuard } from '../lib/visibilityGuard';
 import { useSocket } from '../contexts/SocketContext';
 import { useMyBets, useMyParlays, useMyPredictions } from './useMeStubs';
-import { useEnhancedLeaderboard } from './useEnhancedLeaderboard';
-import api, { createAbortableRequest } from '../api/axios';
+import { useLeaderboard } from './useLeaderboard';
+import { createAbortableRequest } from '../api/axios';
 import { cache, CACHE_KEYS, CACHE_TTL } from '../utils/cache';
 
 export interface CategoryAccuracy {
@@ -60,7 +60,7 @@ export interface TrendData {
   value: number;
 }
 
-export interface EnhancedUserStats {
+export interface UserStats {
   performance: {
     totalBets: number;
     winRate: number;
@@ -124,13 +124,13 @@ export interface QuickAction {
   disabled?: boolean;
 }
 
-export function useEnhancedUserStats() {
+export function useUserStats() {
   const { user } = useAuth();
   const socket = useSocket();
   const myBets = useMyBets();
   const myParlays = useMyParlays();
   const myPredictions = useMyPredictions();
-  const leaderboard = useEnhancedLeaderboard('all-time', { enableAchievements: true });
+  const leaderboard = useLeaderboard('all-time', { enableAchievements: true });
 
   const { shouldRefresh, updateLastFetch } = useVisibilityGuard(5 * 60 * 1000); // 5 minutes
 
@@ -140,7 +140,7 @@ export function useEnhancedUserStats() {
     return { ...userData, enhancedStats: userData.stats };
   }
 
-  const [stats, setStats] = useState<EnhancedUserStats | null>(null);
+  const [stats, setStats] = useState<UserStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
@@ -166,7 +166,7 @@ export function useEnhancedUserStats() {
       // Check cache first unless forcing refresh
       const cacheKey = CACHE_KEYS.USER_STATS(user.id);
       if (!force) {
-        const cachedStats = cache.get<EnhancedUserStats>(cacheKey);
+        const cachedStats = cache.get<UserStats>(cacheKey);
         if (cachedStats) {
           setStats(cachedStats);
           setLoading(false);
@@ -242,7 +242,7 @@ export function useEnhancedUserStats() {
           return []; // Return empty array instead of mock data
         };
 
-        const enhancedStats: EnhancedUserStats = {
+        const enhancedStats: UserStats = {
           performance: {
             totalBets,
             winRate,
@@ -355,7 +355,7 @@ export function useEnhancedUserStats() {
   );
 
   // Create fallback stats from existing data
-  const createFallbackStats = useCallback((): EnhancedUserStats => {
+  const createFallbackStats = useCallback((): UserStats => {
     const totalBets = myBets.data?.length || 0;
     const activeBetsValue =
       myBets.data?.reduce((sum, bet) => sum + Number(bet.amount || 0), 0) || 0;
@@ -536,12 +536,12 @@ export function useEnhancedUserStats() {
       console.log('[useEnhancedUserStats] Received achievement:unlocked', data);
       if (data.userId === user?.id) {
         // Add to recent activity
-        const achievement = data.achievement || data;
+        const achievement: any = data.achievements || data;
         const newActivity: ActivityItem = {
           id: `achievement_${Date.now()}`,
           type: 'achievement_earned',
           title: 'Achievement Unlocked!',
-          description: achievement.title || achievement.name || 'New achievement',
+          description: achievement?.title || achievement?.name || 'New achievement',
           timestamp: data.timestamp || new Date().toISOString(),
           metadata: { achievement },
         };
@@ -598,7 +598,7 @@ export function useEnhancedUserStats() {
     if (!user?.id) return;
 
     // Check if we already have cached data
-    const cachedStats = cache.get<EnhancedUserStats>(CACHE_KEYS.USER_STATS(user.id));
+    const cachedStats = cache.get<UserStats>(CACHE_KEYS.USER_STATS(user.id));
     if (!cachedStats) {
       fetchEnhancedStats();
     } else {

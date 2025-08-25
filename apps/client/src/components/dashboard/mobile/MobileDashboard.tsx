@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useMobileOptimization } from '../../../hooks/useMobileOptimization';
 import MyStuffPanel from '../MyStuffPanel';
 import PredictionPanel from '../PredictionPanel';
-import UnifiedActivityFeed from '../../UnifiedActivityFeed';
+import ActivityFeed from '../../ActivityFeed';
 import ParlayPanel from '../ParlayPanel';
 
 type MobileTab = 'analytics' | 'predictions' | 'activity' | 'parlay';
@@ -49,7 +49,7 @@ export default function MobileDashboard({ className = '' }: MobileDashboardProps
   const tabs = [
     { id: 'analytics', label: 'Analytics', icon: '📊', component: MyStuffPanel },
     { id: 'predictions', label: 'Markets', icon: '🎯', component: PredictionPanel },
-    { id: 'activity', label: 'Activity', icon: '📡', component: UnifiedActivityFeed },
+    { id: 'activity', label: 'Activity', icon: '📡', component: ActivityFeed },
     { id: 'parlay', label: 'Parlay', icon: '🎰', component: ParlayPanel },
   ] as const;
 

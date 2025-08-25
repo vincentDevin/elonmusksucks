@@ -414,16 +414,22 @@ export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
       // Convert the approved article to TimelineItem format
       const timelineItem: TimelineItem = {
-        id: data.id.toString(),
+        id: `article-${data.id}`,
         type: 'article',
-        title: data.title,
-        excerpt: data.excerpt,
-        url: data.url,
-        publishedAt: data.publishedAt,
-        leadImageUrl: data.leadImageUrl,
+        timestamp: data.publishedAt,
+        content: {
+          title: data.title,
+          excerpt: data.excerpt,
+          url: data.url,
+          imageUrl: data.leadImageUrl,
+          author: data.feed?.name || 'Unknown',
+          source: data.feed?.siteUrl,
+        },
+        engagement: {
+          reactions: 0,
+          comments: 0,
+        },
         tags: data.tags || [],
-        publisher: data.feed?.name || 'Unknown',
-        publisherIconUrl: data.feed?.siteUrl ? `${data.feed.siteUrl}/favicon.ico` : undefined,
       };
 
       // Add to timeline if user is viewing articles
@@ -437,18 +443,20 @@ export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       console.log('[Timeline] New tweet:', data);
 
       const timelineItem: TimelineItem = {
-        id: data.id,
+        id: `tweet-${data.id}`,
         type: 'tweet',
-        title: data.text,
-        url: data.permalink,
-        publishedAt: data.postedAt,
-        authorHandle: data.authorHandle,
-        engagement: {
-          likes: data.counts?.likes || 0,
-          replies: data.counts?.replies || 0,
-          reposts: data.counts?.reposts || 0,
-          quotes: data.counts?.quotes || 0,
+        timestamp: data.postedAt,
+        content: {
+          title: data.text,
+          url: data.permalink,
+          author: data.authorHandle,
+          source: 'Twitter',
         },
+        engagement: {
+          reactions: data.counts?.likes || 0,
+          comments: data.counts?.replies || 0,
+        },
+        tags: [],
       };
 
       // Add to timeline if user is viewing tweets

@@ -1,4 +1,4 @@
-// apps/client/src/components/UnifiedOddsBar.tsx
+// apps/client/src/components/OddsBar.tsx
 // Unified odds bar component merging regular and compact variants
 import { useState, useEffect } from 'react';
 import type { PublicPredictionOption, PublicBet } from '@ems/types';
@@ -13,7 +13,7 @@ interface FlattenedParlayLeg {
   createdAt: string;
 }
 
-interface UnifiedOddsBarProps {
+interface OddsBarProps {
   variant?: 'full' | 'compact' | 'mini';
   type: PredictionType;
   options: PublicPredictionOption[];
@@ -24,7 +24,7 @@ interface UnifiedOddsBarProps {
   className?: string;
 }
 
-export default function UnifiedOddsBar({
+export default function OddsBar({
   variant = 'full',
   type,
   options,
@@ -33,7 +33,7 @@ export default function UnifiedOddsBar({
   predictionId,
   expiresAt,
   className = '',
-}: UnifiedOddsBarProps) {
+}: OddsBarProps) {
   const socket = useSocket();
   const [currentOptions, setCurrentOptions] = useState(options);
   const [oddsAnimations, setOddsAnimations] = useState<Record<number, 'up' | 'down' | null>>({});
@@ -92,9 +92,10 @@ export default function UnifiedOddsBar({
 
   // Calculate excitement level
   const getExcitementLevel = () => {
+    const asNum = (v: string | number | bigint | undefined | null) => Number(v ?? 0);
     const totalPool =
-      bets.reduce((sum, bet) => sum + bet.amount, 0) +
-      parlayLegs.reduce((sum, leg) => sum + leg.stake, 0);
+      bets.reduce<number>((sum, bet) => sum + asNum(bet.amount), 0) +
+      parlayLegs.reduce<number>((sum, leg) => sum + asNum(leg.stake), 0);
     const timeLeft = expiresAt
       ? (new Date(expiresAt).getTime() - Date.now()) / (1000 * 60 * 60)
       : 24;
@@ -126,8 +127,10 @@ export default function UnifiedOddsBar({
   const palette = palettes[type] ?? palettes[PredictionType.MULTIPLE];
 
   // Calculate total staked
+  const asNum = (v: string | number | bigint | undefined | null) => Number(v ?? 0);
   const totalStaked =
-    bets.reduce((sum, b) => sum + b.amount, 0) + parlayLegs.reduce((sum, l) => sum + l.stake, 0);
+    bets.reduce<number>((sum, b) => sum + asNum(b.amount), 0) +
+    parlayLegs.reduce<number>((sum, l) => sum + asNum(l.stake), 0);
 
   // No bets yet state
   if (totalStaked === 0 || currentOptions.length === 0) {
@@ -184,10 +187,12 @@ export default function UnifiedOddsBar({
   // Build pool data for visualization
   let cumPct = 0;
   const pools = currentOptions.slice(0, palette.length).map((opt, i) => {
-    const singles = bets.filter((b) => b.optionId === opt.id).reduce((s, b) => s + b.amount, 0);
+    const singles = bets
+      .filter((b) => b.optionId === opt.id)
+      .reduce<number>((s, b) => s + asNum(b.amount), 0);
     const parlays = parlayLegs
       .filter((l) => l.optionId === opt.id)
-      .reduce((s, l) => s + l.stake, 0);
+      .reduce<number>((s, l) => s + asNum(l.stake), 0);
     const stake = singles + parlays;
     const pct = stake / totalStaked;
     const left = cumPct;
@@ -269,8 +274,12 @@ export default function UnifiedOddsBar({
         {currentOptions.map((option) => {
           const animation = oddsAnimations[option.id];
           const optionStake =
-            bets.filter((b) => b.optionId === option.id).reduce((s, b) => s + b.amount, 0) +
-            parlayLegs.filter((l) => l.optionId === option.id).reduce((s, l) => s + l.stake, 0);
+            bets
+              .filter((b) => b.optionId === option.id)
+              .reduce<number>((s, b) => s + asNum(b.amount), 0) +
+            parlayLegs
+              .filter((l) => l.optionId === option.id)
+              .reduce<number>((s, l) => s + asNum(l.stake), 0);
           const marketShare = optionStake / totalStaked;
 
           return (

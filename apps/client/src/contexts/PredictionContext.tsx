@@ -21,8 +21,15 @@ import {
   type PredictionFull,
   type CreatePredictionPayload,
 } from '../api/predictions';
-import type { BetWithUser, ParlayLegWithUser } from '@ems/types';
+import type { BetWithUser, ParlayLegWithUser, PublicPredictionOption } from '@ems/types';
 import { socketRequest } from '../lib/socketRequest';
+import { SocketEvents } from '@ems/types';
+
+// Extended option type with client-side properties
+type ExtendedOption = PublicPredictionOption & {
+  userBet?: any;
+  totalBets?: number;
+};
 import { useSocket } from './SocketContext';
 import { useAuth } from './AuthContext';
 
@@ -181,14 +188,18 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
           options:
             pred.options?.map((opt) =>
               opt.id === payload.optionId
-                ? { ...opt, userBet: optimisticBet, totalBets: (opt.totalBets || 0) + 1 }
+                ? {
+                    ...opt,
+                    userBet: optimisticBet,
+                    totalBets: ((opt as ExtendedOption).totalBets || 0) + 1,
+                  }
                 : opt,
             ) || [],
         })),
       );
 
       try {
-        const result = await socketRequest('bet:place', payload);
+        const result = await socketRequest(SocketEvents.BetPlace as any, payload);
         console.log('PredictionContext placeBet success', result);
 
         // Clean up optimistic bet and replace with real data
@@ -220,8 +231,12 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
             ...pred,
             options:
               pred.options?.map((opt) =>
-                opt.id === payload.optionId && opt.userBet?.isOptimistic
-                  ? { ...opt, userBet: undefined, totalBets: Math.max(0, (opt.totalBets || 0) - 1) }
+                opt.id === payload.optionId && (opt as ExtendedOption).userBet?.isOptimistic
+                  ? {
+                      ...opt,
+                      userBet: undefined,
+                      totalBets: Math.max(0, ((opt as ExtendedOption).totalBets || 0) - 1),
+                    }
                   : opt,
               ) || [],
           })),
@@ -253,14 +268,14 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
       setLatestParlay(optimisticParlay as any);
 
       try {
-        const result = await socketRequest('parlay:place', payload);
+        const result = await socketRequest(SocketEvents.ParlayPlace as any, payload);
 
         // Clean up optimistic parlay
         optimisticBetsRef.current.delete(optimisticParlayId);
 
         // Replace with real parlay data if available
         if (result && typeof result === 'object' && 'parlay' in result) {
-          setLatestParlay(result.parlay);
+          setLatestParlay((result as any).parlay);
         }
 
         // Trigger user refresh to update balance and stats

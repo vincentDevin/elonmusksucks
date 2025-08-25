@@ -29,7 +29,7 @@ const initialFilters: FilterState = {
   sortOrder: 'desc',
 };
 
-export default function AdvancedAchievementManager() {
+export default function AchievementManager() {
   const [activeTab, setActiveTab] = useState<
     'overview' | 'achievements' | 'analytics' | 'categories'
   >('overview');

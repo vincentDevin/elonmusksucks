@@ -1,5 +1,4 @@
 // apps/client/src/pages/ThemeTest.tsx
-import React from 'react';
 import { ThemeDemo } from '../theme';
 
 /**

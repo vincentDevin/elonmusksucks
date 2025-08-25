@@ -2,7 +2,7 @@
 // Rollback: Remove UserDataProvider wrapper and restore direct hook usage
 // Rollback: Remove Suspense usage - handled at route level
 import { useState } from 'react';
-import UnifiedDashboardSettings from '../components/dashboard/customization/UnifiedDashboardSettings';
+import DashboardSettings from '../components/dashboard/customization/DashboardSettings';
 import MobileDashboard from '../components/dashboard/mobile/MobileDashboard';
 import DesktopDashboard from '../components/dashboard/desktop/DesktopDashboard';
 import { useMobileOptimization } from '../hooks/useMobileOptimization';
@@ -25,7 +25,7 @@ export default function Dashboard() {
     return (
       <UserDataProvider>
         <MobileDashboard />
-        <UnifiedDashboardSettings isOpen={showSettings} onClose={() => setShowSettings(false)} />
+        <DashboardSettings isOpen={showSettings} onClose={() => setShowSettings(false)} />
       </UserDataProvider>
     );
   }

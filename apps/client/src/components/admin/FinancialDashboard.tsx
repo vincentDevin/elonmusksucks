@@ -37,7 +37,7 @@ const initialFilters: FilterState = {
   sortOrder: 'desc',
 };
 
-export default function UnifiedFinancialDashboard() {
+export default function FinancialDashboard() {
   const [activeTab, setActiveTab] = useState<'overview' | 'bets' | 'transactions' | 'analytics'>(
     'overview',
   );

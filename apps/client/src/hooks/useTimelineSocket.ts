@@ -27,7 +27,8 @@ export const useTimelineSocket = ({
   onArticleUpdate,
   onModerationUpdate,
 }: UseTimelineSocketProps) => {
-  const { socket, isConnected } = useSocket();
+  const socket = useSocket();
+  const isConnected = socket?.connected || false;
 
   // Handle new approved articles
   const handleNewArticles = useCallback(

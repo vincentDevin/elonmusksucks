@@ -1,5 +1,8 @@
 // apps/client/src/components/leaderboard/LeaderboardEntry.tsx
 import { useState, useEffect } from 'react';
+
+// Helper to convert string/number to number
+const asNum = (v: string | number | bigint | undefined | null) => Number(v ?? 0);
 import { Link } from 'react-router-dom';
 import { UserCircleIcon, TrophyIcon, FireIcon } from '@heroicons/react/24/outline';
 import type { PublicLeaderboardEntry } from '@ems/types';
@@ -182,7 +185,11 @@ export default function LeaderboardEntry({
 
         {/* Stats Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 flex-1">
-          <Stat label="Balance" value={`${entry.balance} 🪙`} highlight={entry.balance > 10000} />
+          <Stat
+            label="Balance"
+            value={`${entry.balance} 🪙`}
+            highlight={asNum(entry.balance) > 10000}
+          />
           <Stat label="Bets" value={`${entry.totalBets}`} highlight={entry.totalBets > 100} />
           <Stat
             label="Win Rate"
@@ -195,9 +202,13 @@ export default function LeaderboardEntry({
           <Stat
             label={period === 'all-time' ? 'Total Profit' : 'Daily Profit'}
             value={`${period === 'all-time' ? entry.profitAll : entry.profitPeriod} 🏦`}
-            highlight={period === 'all-time' ? entry.profitAll > 1000 : entry.profitPeriod > 100}
+            highlight={
+              period === 'all-time'
+                ? asNum(entry.profitAll) > 1000
+                : asNum(entry.profitPeriod) > 100
+            }
             color={
-              (period === 'all-time' ? entry.profitAll : entry.profitPeriod) > 0
+              asNum(period === 'all-time' ? entry.profitAll : entry.profitPeriod) > 0
                 ? 'text-green-400'
                 : 'text-red-400'
             }

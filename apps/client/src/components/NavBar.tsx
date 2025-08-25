@@ -1,16 +1,19 @@
 // apps/client/src/components/NavBar.tsx
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { FaSun, FaMoon, FaBars, FaTimes } from 'react-icons/fa';
+import { FaBars, FaTimes } from 'react-icons/fa';
 import { useAuth } from '../hooks/useAuth';
-import { useThemeContext } from '../contexts/ThemeContext';
+import { LightDarkToggle } from '../theme';
 import { formatMuskBucks, getMuskBucksColorClasses } from '../utils/formatting';
 
+/**
+ * Updated NavBar component using the unified theme system
+ * Replaces the old NavBar with conflicting theme toggle
+ */
 export default function NavBar() {
   const { accessToken, logout, user } = useAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { theme, toggleTheme } = useThemeContext();
   const navigate = useNavigate();
   const loc = useLocation();
 
@@ -21,12 +24,12 @@ export default function NavBar() {
 
   const linkClasses = (path: string) =>
     `px-3 py-2 rounded ${
-      loc.pathname === path ? 'bg-primary text-surface' : 'hover:bg-muted transition-colors'
+      loc.pathname === path ? 'bg-primary text-white' : 'hover:bg-muted transition-colors'
     }`;
 
   const mobileLinkClasses = (path: string) =>
     `block px-4 py-3 rounded-lg ${
-      loc.pathname === path ? 'bg-primary text-surface' : 'hover:bg-muted transition-colors'
+      loc.pathname === path ? 'bg-primary text-white' : 'hover:bg-muted transition-colors'
     }`;
 
   return (
@@ -50,6 +53,9 @@ export default function NavBar() {
                 <Link to="/leaderboard" className={linkClasses('/leaderboard')}>
                   Leaderboard
                 </Link>
+                <Link to="/pong" className={linkClasses('/pong')}>
+                  🏓 Pong
+                </Link>
                 <div className="relative">
                   <button
                     onClick={() => setDropdownOpen(!dropdownOpen)}
@@ -66,11 +72,11 @@ export default function NavBar() {
                   {dropdownOpen && (
                     <ul
                       className="
-                        absolute z-60 right-0 mt-2
+                        absolute right-0 mt-2 z-[100]
                         bg-surface text-content
-                        border border-muted rounded shadow
+                        border border-muted rounded shadow-xl
                         space-y-1 p-2 w-40
-                        transition-colors 
+                        transition-colors
                       "
                     >
                       {user.role === 'ADMIN' && (
@@ -98,7 +104,7 @@ export default function NavBar() {
                           onClick={handleLogout}
                           className="
                             w-full text-left px-3 py-2 rounded
-                            hover:bg-error hover:text-surface
+                            hover:bg-error hover:text-white
                             transition-colors
                           "
                         >
@@ -123,27 +129,14 @@ export default function NavBar() {
             </>
           )}
 
-          <button
-            onClick={toggleTheme}
-            aria-label={theme === 'light' ? 'Activate dark mode' : 'Activate light mode'}
-            aria-pressed={theme === 'dark'}
-            title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
-            className="ml-4 flex items-center space-x-1 p-2 rounded hover:bg-muted transition-colors"
-          >
-            <span className="text-lg">{theme === 'light' ? <FaMoon /> : <FaSun />}</span>
-            <span className="sr-only">{theme === 'light' ? 'Dark mode' : 'Light mode'}</span>
-          </button>
+          {/* Unified Theme Toggle - Simple light/dark mode */}
+          <LightDarkToggle variant="icon" size="md" className="ml-4" />
         </nav>
 
         {/* Mobile Controls */}
         <div className="md:hidden flex items-center space-x-2">
-          <button
-            onClick={toggleTheme}
-            aria-label={theme === 'light' ? 'Activate dark mode' : 'Activate light mode'}
-            className="p-2 rounded hover:bg-muted transition-colors"
-          >
-            <span className="text-lg">{theme === 'light' ? <FaMoon /> : <FaSun />}</span>
-          </button>
+          {/* Mobile Theme Toggle */}
+          <LightDarkToggle variant="icon" size="sm" />
 
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -183,6 +176,13 @@ export default function NavBar() {
                   >
                     Leaderboard
                   </Link>
+                  <Link
+                    to="/pong"
+                    className={mobileLinkClasses('/pong')}
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    🏓 Pong
+                  </Link>
 
                   <div className="border-t border-muted pt-2 mt-2">
                     <div className="flex items-center space-x-3 px-4 py-3">
@@ -218,7 +218,7 @@ export default function NavBar() {
                         handleLogout();
                         setMobileMenuOpen(false);
                       }}
-                      className="w-full text-left px-4 py-3 rounded-lg hover:bg-error hover:text-surface transition-colors"
+                      className="w-full text-left px-4 py-3 rounded-lg hover:bg-error hover:text-white transition-colors"
                     >
                       Logout
                     </button>

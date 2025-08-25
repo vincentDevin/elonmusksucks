@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { usePredictionMarket } from '../../contexts/PredictionContext';
-import UnifiedPredictionCard from '../UnifiedPredictionCard';
+import PredictionCard from '../PredictionCard';
 import { useInfiniteScroll } from '../../hooks/useInfiniteScroll';
 
 export default function PredictionFeed() {
@@ -94,7 +94,7 @@ export default function PredictionFeed() {
       ) : (
         <div className="space-y-4 pr-2">
           {items.map((p) => (
-            <UnifiedPredictionCard
+            <PredictionCard
               key={p.id}
               prediction={p}
               variant="compact"

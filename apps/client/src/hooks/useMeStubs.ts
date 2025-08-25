@@ -90,7 +90,7 @@ export function useMyBets() {
     };
   }, [user?.id, socket, fetchBets]);
 
-  return { data, loading, error };
+  return { data, loading, error, refetch: fetchBets };
 }
 
 export function useMyParlays() {
@@ -142,7 +142,7 @@ export function useMyParlays() {
     };
   }, [user?.id, socket, fetchParlays]);
 
-  return { data, loading, error };
+  return { data, loading, error, refetch: fetchParlays };
 }
 
 export function useMyPredictions() {
@@ -194,5 +194,5 @@ export function useMyPredictions() {
     };
   }, [user?.id, socket, fetchPredictions]);
 
-  return { data, loading, error };
+  return { data, loading, error, refetch: fetchPredictions };
 }

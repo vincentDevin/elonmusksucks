@@ -1,4 +1,3 @@
-// Rollback: Restore any type for form submission error handling
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
@@ -77,6 +76,7 @@ export default function ProfileSetup() {
     e.preventDefault();
     setError(null);
     try {
+      if (!currentUser?.id) throw new Error('User not authenticated');
       await updateUserProfile(currentUser.id, { ...formData, profileComplete: true });
       await refreshUser();
       navigate('/');

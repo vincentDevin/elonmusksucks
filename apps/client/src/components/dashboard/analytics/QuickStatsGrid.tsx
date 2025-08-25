@@ -1,9 +1,9 @@
 // apps/client/src/components/dashboard/analytics/QuickStatsGrid.tsx
 import { useMemo, memo } from 'react';
-import type { EnhancedUserStats } from '../../../hooks/useEnhancedUserStats';
+import type { UserStats } from '../../../hooks/useUserStats';
 
 interface StatsGridProps {
-  stats: EnhancedUserStats;
+  stats: UserStats;
   userRank?: { allTimeRank: number | null; dailyRank: number | null } | null;
   className?: string;
 }

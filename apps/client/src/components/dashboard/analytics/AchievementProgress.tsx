@@ -1,9 +1,9 @@
 // apps/client/src/components/dashboard/analytics/AchievementProgress.tsx
 import { useState, memo, useMemo } from 'react';
-import type { EnhancedUserStats } from '../../../hooks/useEnhancedUserStats';
+import type { UserStats } from '../../../hooks/useUserStats';
 
 interface AchievementProgressProps {
-  stats: EnhancedUserStats;
+  stats: UserStats;
   className?: string;
 }
 
@@ -131,7 +131,7 @@ const AchievementProgress = memo(function AchievementProgress({
             return (
               <div
                 key={progress.id}
-                className={`p-3 rounded-lg border-l-4 ${getRarityColor(progress.achievement?.rarity || 'common')} hover:shadow-sm transition-shadow`}
+                className={`p-3 rounded-lg border-l-4 ${getRarityColor('common')} hover:shadow-sm transition-shadow`}
               >
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex items-center space-x-3">
@@ -143,7 +143,7 @@ const AchievementProgress = memo(function AchievementProgress({
                       <div className="text-xs text-tertiary mt-1">{progress.description}</div>
                       <div className="flex items-center gap-2 mt-2">
                         <span className="text-xs px-2 py-1 bg-surface rounded-full border text-tertiary capitalize">
-                          {progress.achievement?.rarity || 'common'}
+                          common
                         </span>
                         <span className="text-xs px-2 py-1 bg-surface rounded-full border text-tertiary capitalize">
                           {progress.category}

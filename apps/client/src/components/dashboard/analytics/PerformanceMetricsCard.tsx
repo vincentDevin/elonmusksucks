@@ -1,9 +1,9 @@
 // apps/client/src/components/dashboard/analytics/PerformanceMetricsCard.tsx
 import { useMemo, memo } from 'react';
-import type { EnhancedUserStats } from '../../../hooks/useEnhancedUserStats';
+import type { UserStats } from '../../../hooks/useUserStats';
 
 interface MetricsCardProps {
-  stats: EnhancedUserStats;
+  stats: UserStats;
   className?: string;
 }
 
@@ -17,11 +17,18 @@ const MetricsCard = memo(function MetricsCard({ stats, className = '' }: Metrics
   }, [performance.winRate]);
 
   const profitTrend = useMemo(() => {
-    return performance.profitLoss > 0 ? 'up' : performance.profitLoss === 0 ? 'neutral' : 'down';
+    const profit =
+      typeof performance.profitLoss === 'string'
+        ? Number(performance.profitLoss)
+        : performance.profitLoss;
+    return profit > 0 ? 'up' : profit === 0 ? 'neutral' : 'down';
   }, [performance.profitLoss]);
 
   const formatPercent = (value: number) => `${(value * 100).toFixed(1)}%`;
-  const formatCurrency = (value: number) => `${value >= 0 ? '+' : ''}${value.toFixed(0)}🪙`;
+  const formatCurrency = (value: string | number) => {
+    const num = typeof value === 'string' ? Number(value) : value;
+    return `${num >= 0 ? '+' : ''}${num.toFixed(0)}🪙`;
+  };
 
   const TrendIcon = ({ trend }: { trend: 'up' | 'down' | 'neutral' }) => {
     if (trend === 'up') return <span className="text-green-500">↗</span>;

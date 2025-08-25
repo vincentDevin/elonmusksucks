@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useAdmin } from '../contexts/AdminContext';
-import UnifiedUserManagement from '../components/admin/UnifiedUserManagement';
-import ModernPredictionQueue from '../components/admin/ModernPredictionQueue';
-import UnifiedFinancialDashboard from '../components/admin/UnifiedFinancialDashboard';
-import AdvancedBadgeManager from '../components/admin/AdvancedBadgeManager';
+import UserManagement from '../components/admin/UserManagement';
+import PredictionQueue from '../components/admin/PredictionQueue';
+import FinancialDashboard from '../components/admin/FinancialDashboard';
+import AchievementManager from '../components/admin/AchievementManager';
 import AdvancedAnalyticsDashboard from '../components/admin/AdvancedAnalyticsDashboard';
 import FeedsManager from '../components/admin/FeedsManager';
 import ModerationQueue from '../components/admin/ModerationQueue';
@@ -14,10 +14,10 @@ const AdminDashboard: React.FC = () => {
   const { loadUsers, loadPendingPredictions, loadBadges } = useAdmin();
 
   const tabs = [
-    { key: 'users', label: 'User Management & Moderation', component: <UnifiedUserManagement /> },
-    { key: 'predictions', label: 'Prediction Management', component: <ModernPredictionQueue /> },
-    { key: 'bets', label: 'Financial Operations', component: <UnifiedFinancialDashboard /> },
-    { key: 'badges', label: 'Badge Management', component: <AdvancedBadgeManager /> },
+    { key: 'users', label: 'User Management & Moderation', component: <UserManagement /> },
+    { key: 'predictions', label: 'Prediction Management', component: <PredictionQueue /> },
+    { key: 'bets', label: 'Financial Operations', component: <FinancialDashboard /> },
+    { key: 'badges', label: 'Achievement Management', component: <AchievementManager /> },
     { key: 'feeds', label: 'RSS Feeds Management', component: <FeedsManager /> },
     { key: 'moderation', label: 'Content Moderation', component: <ModerationQueue /> },
     { key: 'analytics', label: 'Advanced Analytics', component: <AdvancedAnalyticsDashboard /> },

@@ -1,4 +1,7 @@
 import { useState } from 'react';
+
+// Helper to convert string/number to number
+const asNum = (v: string | number | bigint | undefined | null) => Number(v ?? 0);
 import type { UserStatsDTO } from '@ems/types';
 import { WinLossPieChart } from './graphs/WinLossPieChart';
 import { FinancialBarChart } from './graphs/FinancialBarChart';
@@ -67,9 +70,9 @@ export function ProfileStats({
         </div>
         <div className="text-center">
           <div
-            className={`text-lg font-bold ${stats.profit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
+            className={`text-lg font-bold ${asNum(stats.profit) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
           >
-            {stats.profit >= 0 ? '+' : ''}${stats.profit.toLocaleString()}
+            {asNum(stats.profit) >= 0 ? '+' : ''}${asNum(stats.profit).toLocaleString()}
           </div>
           <div className="text-xs text-tertiary">Profit</div>
         </div>
@@ -90,9 +93,9 @@ export function ProfileStats({
 
             <div className="bg-background/50 border border-muted rounded-xl p-4 hover:bg-background/70 transition-colors duration-200">
               <FinancialBarChart
-                wagered={stats.totalWagered}
-                won={stats.totalWon}
-                profit={stats.profit}
+                wagered={asNum(stats.totalWagered)}
+                won={asNum(stats.totalWon)}
+                profit={asNum(stats.profit)}
               />
             </div>
 

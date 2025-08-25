@@ -91,7 +91,8 @@ export default function BetModal({
     }
 
     // Market impact calculation
-    const totalBets = prediction.bets.reduce((sum, bet) => sum + bet.amount, 0);
+    const asNum = (v: string | number | bigint | undefined | null) => Number(v ?? 0);
+    const totalBets = prediction.bets.reduce<number>((sum, bet) => sum + asNum(bet.amount), 0);
     const marketImpact = amount > Math.max(100, totalBets * 0.1);
 
     // 🚀 ALL-IN bonus detection
@@ -142,13 +143,13 @@ export default function BetModal({
           id: Date.now(),
           userId: user.id,
           predictionId: prediction.id,
-          amount,
+          amount: amount.toString(),
           oddsAtPlacement: 0,
-          potentialPayout: 0,
+          potentialPayout: '0',
           status: 'PENDING' as any,
           optionId,
           won: null as any,
-          payout: 0,
+          payout: '0',
           createdAt: new Date(),
           user: {
             id: user.id,

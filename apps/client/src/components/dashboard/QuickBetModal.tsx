@@ -1,5 +1,8 @@
 // apps/client/src/components/dashboard/QuickBetModal.tsx
 import { useState, useEffect } from 'react';
+
+// Helper to convert string/number to number
+const asNum = (v: string | number | bigint | undefined | null) => Number(v ?? 0);
 import { usePredictionMarket } from '../../contexts/PredictionContext';
 import BetModal from '../BetModal';
 import type { PredictionFull } from '../../api/predictions';
@@ -130,7 +133,7 @@ export default function QuickBetModal({ isOpen, onClose }: QuickBetModalProps) {
                 {topPredictions.map((prediction) => {
                   const totalBets = prediction.bets?.length || 0;
                   const totalVolume =
-                    prediction.bets?.reduce((sum, bet) => sum + bet.amount, 0) || 0;
+                    prediction.bets?.reduce<number>((sum, bet) => sum + asNum(bet.amount), 0) || 0;
                   const timeLeft = new Date(prediction.expiresAt).getTime() - Date.now();
                   const hoursLeft = Math.ceil(timeLeft / (1000 * 60 * 60));
 

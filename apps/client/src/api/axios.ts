@@ -56,7 +56,7 @@ api.interceptors.request.use((config) => {
 
   // Start timing for dev metrics
   const requestId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  config.metadata = { ...config.metadata, requestId, startTime: Date.now() };
+  (config as any).metadata = { ...(config as any).metadata, requestId, startTime: Date.now() };
 
   devMetrics.startRequest(requestId, config.method?.toUpperCase() || 'GET', config.url || '');
 
@@ -74,7 +74,7 @@ api.interceptors.request.use(
     }
 
     // Mark this request for potential deduplication
-    config.metadata = { ...config.metadata, shouldDedupe: true };
+    (config as any).metadata = { ...(config as any).metadata, shouldDedupe: true };
     return config;
   },
   (error) => Promise.reject(error),
@@ -109,8 +109,8 @@ export const createAbortableRequest = () => {
 api.interceptors.response.use(
   (response) => {
     // End timing for dev metrics
-    if (response.config.metadata) {
-      const { requestId } = response.config.metadata;
+    if ((response.config as any).metadata) {
+      const { requestId } = (response.config as any).metadata;
       devMetrics.endRequest(
         requestId,
         response.config.method?.toUpperCase() || 'GET',

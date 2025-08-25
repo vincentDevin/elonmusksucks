@@ -9,7 +9,7 @@
 import { useState, useMemo } from 'react';
 
 import CreatePredictionForm from '../components/CreatePredictionForm';
-import UnifiedPredictionCard from '../components/UnifiedPredictionCard';
+import PredictionCard from '../components/PredictionCard';
 
 import { usePredictionMarket } from '../contexts/PredictionContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -142,7 +142,7 @@ export default function Predictions() {
 
             // For approved predictions, use the unified PredictionCard
             return (
-              <UnifiedPredictionCard
+              <PredictionCard
                 key={pred.id}
                 prediction={pred}
                 variant="full"

@@ -1,7 +1,7 @@
-// apps/client/src/components/UnifiedActivityFeed.tsx
+// apps/client/src/components/ActivityFeed.tsx
 import { useMemo, useState, useRef, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { useUnifiedActivity, type UnifiedActivity } from '../contexts/UnifiedActivityContext';
+import { useActivity, type Activity } from '../contexts/ActivityContext';
 import type { ActivityEventType } from '@ems/types';
 
 // CSS for hiding scrollbar across all browsers
@@ -31,7 +31,7 @@ interface Props {
 }
 
 // Rich formatting with complete context
-function formatRichActivity(activity: UnifiedActivity): {
+function formatRichActivity(activity: Activity): {
   text: string;
   shortText: string;
   className: string;
@@ -168,12 +168,12 @@ function formatRichActivity(activity: UnifiedActivity): {
   return { text, shortText, className, icon };
 }
 
-export default function UnifiedActivityFeed({ maxItems = 50, className = '' }: Props) {
+export default function ActivityFeed({ maxItems = 50, className = '' }: Props) {
   const location = useLocation();
   const isDashboard = location.pathname === '/dashboard';
 
   // Use global unified activity context
-  const { activities: allActivities, loading, error, isConnected, refresh } = useUnifiedActivity();
+  const { activities: allActivities, loading, error, isConnected, refresh } = useActivity();
 
   // UI state for dashboard layout
   const [isExpanded, setIsExpanded] = useState(false);

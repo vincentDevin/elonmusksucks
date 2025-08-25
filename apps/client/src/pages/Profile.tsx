@@ -1,5 +1,8 @@
 // apps/client/src/pages/Profile.tsx
 import { useState, useEffect, useCallback } from 'react';
+
+// Helper to convert string/number to number
+const asNum = (v: string | number | bigint | undefined | null) => Number(v ?? 0);
 import { useParams } from 'react-router-dom';
 import { followUser, unfollowUser } from '../api/users';
 import { useAuth } from '../contexts/AuthContext';
@@ -166,11 +169,11 @@ export default function Profile() {
         />
       ) : (
         <>
-          <ProfileBadges badges={profile.badges} />
+          <ProfileBadges badges={profile.badges as any} />
 
           <ProfileStats
-            profile={{ muskBucks: profile.muskBucks, rank: profile.rank }}
-            stats={statsData}
+            profile={{ muskBucks: asNum(profile.muskBucks), rank: profile.rank }}
+            stats={statsData as any}
             isOwn={isOwn}
           />
 

@@ -6,7 +6,7 @@
 // using the live `parlayPlaced` broadcast.
 // -----------------------------------------------------------------------------
 
-import { createContext, useContext, useReducer, useEffect, useCallback, useRef } from 'react';
+import { createContext, useContext, useReducer, useEffect, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import { useSocket } from './SocketContext';
 import { useAuth } from './AuthContext';
@@ -83,7 +83,6 @@ const ParlayCtx = createContext<Ctx>({
 
 /* ---------- Provider ---------- */
 export function ParlayProvider({ children }: { children: ReactNode }) {
-  const optimisticParlaysRef = useRef<Map<string, any>>(new Map());
   const [state, dispatch] = useReducer(reducer, initial, () => {
     const raw = localStorage.getItem('parlay-builder');
     return raw ? (JSON.parse(raw) as State) : initial;

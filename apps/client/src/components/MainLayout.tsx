@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
-import UnifiedNavBar from './UnifiedNavBar';
+import NavBar from './NavBar';
 import ChatBar from './ChatBar';
-import UnifiedActivityFeed from './UnifiedActivityFeed';
+import ActivityFeed from './ActivityFeed';
 import { QuickThemeSwitcher } from '../theme';
 
 interface MainLayoutProps {
@@ -15,8 +15,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
   return (
     <div className="flex flex-col min-h-screen bg-background text-content transition-colors duration-300">
-      <UnifiedNavBar />
-      {!inDashboard && <UnifiedActivityFeed />}
+      <NavBar />
+      {!inDashboard && <ActivityFeed />}
 
       {/* Main content is below NavBar, but above fixed ChatBar */}
       <div className="relative flex-1">

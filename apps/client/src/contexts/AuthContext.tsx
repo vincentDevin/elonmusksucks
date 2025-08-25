@@ -32,7 +32,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [accessToken, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [onUserDataRefresh, setOnUserDataRefresh] = useState<(() => Promise<void>) | undefined>();
+  const [onUserDataRefresh] = useState<(() => Promise<void>) | undefined>();
 
   // Refresh token and load current user on mount
   useEffect(() => {

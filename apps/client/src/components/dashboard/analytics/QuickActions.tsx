@@ -1,5 +1,5 @@
 // apps/client/src/components/dashboard/analytics/QuickActions.tsx
-import type { QuickAction } from '../../../hooks/useEnhancedUserStats';
+import type { QuickAction } from '../../../hooks/useUserStats';
 
 interface QuickActionsProps {
   actions: QuickAction[];

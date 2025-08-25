@@ -2,7 +2,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
 import api from '../api/axios';
-import type { User } from '@ems/types';
 
 interface UserDataState {
   stats: any | null;
@@ -20,7 +19,8 @@ interface UserDataContextType extends UserDataState {
 const UserDataContext = createContext<UserDataContextType | undefined>(undefined);
 
 export const UserDataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUser, isAuthenticated } = useAuth();
+  const { user } = useAuth();
+  const isAuthenticated = !!user;
   const [state, setState] = useState<UserDataState>({
     stats: null,
     achievements: null,
@@ -31,7 +31,7 @@ export const UserDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   });
 
   const refreshUserData = useCallback(async () => {
-    if (!currentUser?.id || !isAuthenticated) {
+    if (!user?.id || !isAuthenticated) {
       setState((prev) => ({
         ...prev,
         stats: null,
@@ -46,9 +46,9 @@ export const UserDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     try {
       const [statsRes, achievementsRes, activitiesRes] = await Promise.all([
-        api.get(`/api/users/${currentUser.id}/stats`),
-        api.get(`/api/users/${currentUser.id}/achievements`),
-        api.get(`/api/users/${currentUser.id}/activities?limit=20`),
+        api.get(`/api/users/${user.id}/stats`),
+        api.get(`/api/users/${user.id}/achievements`),
+        api.get(`/api/users/${user.id}/activities?limit=20`),
       ]);
 
       setState((prev) => ({
@@ -66,7 +66,7 @@ export const UserDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         error: error instanceof Error ? error.message : 'Failed to load user data',
       }));
     }
-  }, [currentUser?.id, isAuthenticated]);
+  }, [user?.id, isAuthenticated]);
 
   useEffect(() => {
     refreshUserData();

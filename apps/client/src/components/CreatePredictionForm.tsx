@@ -38,7 +38,6 @@ export default function CreatePredictionForm({
   onCreated,
   onCancel,
   sourceData: propSourceData,
-  disabled,
 }: CreatePredictionFormProps) {
   const location = useLocation();
   const [title, setTitle] = useState('');

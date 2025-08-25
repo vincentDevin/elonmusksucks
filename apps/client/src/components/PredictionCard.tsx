@@ -1,6 +1,9 @@
 // apps/client/src/components/UnifiedPredictionCard.tsx
 // Unified prediction card component merging full and compact variants
 import { useState } from 'react';
+
+// Helper to convert string/number to number
+const asNum = (v: string | number | bigint | undefined | null) => Number(v ?? 0);
 import type {
   PublicPredictionOption,
   BetWithUser,
@@ -8,7 +11,7 @@ import type {
   PredictionType,
 } from '@ems/types';
 import type { PredictionFull } from '../api/predictions';
-import UnifiedOddsBar from './UnifiedOddsBar';
+import OddsBar from './OddsBar';
 import BetsList from './BetsList';
 import BetModal from './BetModal';
 import { useParlay } from '../contexts/ParlayContext';
@@ -73,8 +76,8 @@ export default function UnifiedPredictionCard({
   // Engagement metrics
   const totalBets = prediction.bets.length + flatParlays.length;
   const totalVolume =
-    prediction.bets.reduce((sum: number, bet: BetWithUser) => sum + bet.amount, 0) +
-    flatParlays.reduce((sum: number, leg: ParlayLegWithUser) => sum + leg.stake, 0);
+    prediction.bets.reduce<number>((sum, bet) => sum + asNum(bet.amount), 0) +
+    flatParlays.reduce<number>((sum, leg) => sum + asNum(leg.stake), 0);
   const recentActivity = prediction.bets.filter(
     (bet: BetWithUser) => new Date(bet.createdAt).getTime() > Date.now() - 30 * 60 * 1000,
   ).length;
@@ -210,13 +213,14 @@ export default function UnifiedPredictionCard({
           )}
 
           {/* Odds visual */}
-          <UnifiedOddsBar
+          <OddsBar
             variant="full"
             type={prediction.type as PredictionType}
             options={prediction.options as PublicPredictionOption[]}
             bets={prediction.bets}
             parlayLegs={flatParlays.map((leg) => ({
               ...leg,
+              stake: asNum(leg.stake),
               createdAt:
                 leg.createdAt instanceof Date ? leg.createdAt.toISOString() : leg.createdAt,
             }))}
@@ -303,13 +307,14 @@ export default function UnifiedPredictionCard({
           )}
 
           {/* Compact Odds */}
-          <UnifiedOddsBar
+          <OddsBar
             variant={isCompact ? 'compact' : 'mini'}
             type={prediction.type as PredictionType}
             options={prediction.options as PublicPredictionOption[]}
             bets={prediction.bets}
             parlayLegs={flatParlays.map((leg) => ({
               ...leg,
+              stake: asNum(leg.stake),
               createdAt:
                 leg.createdAt instanceof Date ? leg.createdAt.toISOString() : leg.createdAt,
             }))}
@@ -425,7 +430,7 @@ export default function UnifiedPredictionCard({
               <span className="flex items-center gap-1">
                 {prediction.options.find((opt: any) =>
                   prediction.bets.some(
-                    (bet: BetWithUser) => bet.optionId === opt.id && bet.amount > 500,
+                    (bet: BetWithUser) => bet.optionId === opt.id && asNum(bet.amount) > 500,
                   ),
                 ) && <span title="High-stakes activity">🔥</span>}
                 {flatParlays.length > 0 && <span title="Parlay activity">📈</span>}

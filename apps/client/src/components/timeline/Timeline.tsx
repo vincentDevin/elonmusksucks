@@ -127,12 +127,20 @@ export const Timeline: React.FC<TimelineProps> = ({ className = '', initialTab =
   }, []);
 
   // Handle real-time updates via Socket.IO
-  const handleNewArticles = useCallback((newArticles: TimelineItem[]) => {
-    setArticles((prev) => [...newArticles, ...prev]);
+  const handleNewArticles = useCallback((payload: any) => {
+    // Extract items from payload - adapt based on actual payload structure
+    const newArticles = payload.items || payload.articles || payload.data || [];
+    if (Array.isArray(newArticles)) {
+      setArticles((prev) => [...newArticles, ...prev]);
+    }
   }, []);
 
-  const handleNewTweets = useCallback((newTweets: TimelineItem[]) => {
-    setTweets((prev) => [...newTweets, ...prev]);
+  const handleNewTweets = useCallback((payload: any) => {
+    // Extract items from payload - adapt based on actual payload structure
+    const newTweets = payload.items || payload.tweets || payload.data || [];
+    if (Array.isArray(newTweets)) {
+      setTweets((prev) => [...newTweets, ...prev]);
+    }
   }, []);
 
   const { isConnected } = useTimelineSocket({

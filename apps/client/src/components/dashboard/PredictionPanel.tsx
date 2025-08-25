@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { usePredictionDiscovery } from '../../hooks/usePredictionDiscovery';
 import PredictionFilters from './discovery/PredictionFilters';
 import PredictionSectionCard from './discovery/PredictionSectionCard';
-import UnifiedPredictionCard from '../UnifiedPredictionCard';
+import PredictionCard from '../PredictionCard';
 
 type ViewMode = 'sections' | 'all';
 
@@ -145,7 +145,7 @@ export default function PredictionPanel() {
                   className="bg-background/50 rounded-xl border border-muted overflow-hidden"
                 >
                   <div className="p-4">
-                    <UnifiedPredictionCard
+                    <PredictionCard
                       prediction={prediction}
                       variant="compact"
                       showParlayActions={true}

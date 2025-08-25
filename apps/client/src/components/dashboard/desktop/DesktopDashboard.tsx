@@ -3,13 +3,13 @@ import { Suspense, lazy, useState, memo, useMemo, useEffect } from 'react';
 import { useAdvancedThemes } from '../../../theme/hooks/useUnifiedTheme';
 import { useMobileOptimization } from '../../../hooks/useMobileOptimization';
 import { useAuth } from '../../../contexts/AuthContext';
-import { useEnhancedUserStats } from '../../../hooks/useEnhancedUserStats';
-import { useEnhancedLeaderboard } from '../../../hooks/useEnhancedLeaderboard';
+import { useUserStats } from '../../../hooks/useUserStats';
+import { useLeaderboard } from '../../../hooks/useLeaderboard';
 import MyStuffPanel from '../MyStuffPanel';
 import PredictionPanel from '../PredictionPanel';
-import UnifiedActivityFeed from '../../UnifiedActivityFeed';
+import ActivityFeed from '../../ActivityFeed';
 import ParlayPanel from '../ParlayPanel';
-import UnifiedDashboardSettings from '../customization/UnifiedDashboardSettings';
+import DashboardSettings from '../customization/DashboardSettings';
 import DesktopWidgets from './DesktopWidgets';
 import MarketOverview from './MarketOverview';
 import QuickBetModal from '../QuickBetModal';
@@ -30,8 +30,8 @@ const DesktopDashboard = memo(function DesktopDashboard({ className = '' }: Desk
   const { preferences } = useAdvancedThemes();
   const { screenWidth } = useMobileOptimization();
   const { user } = useAuth();
-  const { stats, loading: statsLoading } = useEnhancedUserStats();
-  const { userRank } = useEnhancedLeaderboard('all-time');
+  const { stats, loading: statsLoading } = useUserStats();
+  const { userRank } = useLeaderboard('all-time');
 
   // Performance preferences
   const { reducedAnimations, reducedData } = preferences.performance;
@@ -272,7 +272,7 @@ const DesktopDashboard = memo(function DesktopDashboard({ className = '' }: Desk
 
             {/* Unified Activity Feed - Adaptive height */}
             <div className="flex flex-col min-h-0">
-              <UnifiedActivityFeed />
+              <ActivityFeed />
             </div>
           </aside>
         )}
@@ -333,7 +333,7 @@ const DesktopDashboard = memo(function DesktopDashboard({ className = '' }: Desk
 
             {/* Unified Activity Feed - Compact for smaller screens */}
             <div className="flex flex-col min-h-0">
-              <UnifiedActivityFeed />
+              <ActivityFeed />
             </div>
 
             {/* Chat Panel */}
@@ -386,7 +386,7 @@ const DesktopDashboard = memo(function DesktopDashboard({ className = '' }: Desk
       </div>
 
       {/* Modals */}
-      <UnifiedDashboardSettings isOpen={showSettings} onClose={() => setShowSettings(false)} />
+      <DashboardSettings isOpen={showSettings} onClose={() => setShowSettings(false)} />
       <QuickBetModal isOpen={showQuickBetModal} onClose={() => setShowQuickBetModal(false)} />
       <CreatePredictionModal
         isOpen={showCreatePredictionModal}

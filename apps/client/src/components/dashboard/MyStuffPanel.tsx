@@ -1,7 +1,7 @@
 // apps/client/src/components/dashboard/MyStuffPanel.tsx
 import { useState, memo } from 'react';
-import { useEnhancedUserStats } from '../../hooks/useEnhancedUserStats';
-import { useEnhancedLeaderboard } from '../../hooks/useEnhancedLeaderboard';
+import { useUserStats } from '../../hooks/useUserStats';
+import { useLeaderboard } from '../../hooks/useLeaderboard';
 import MetricsCard from './analytics/PerformanceMetricsCard';
 import StatsGrid from './analytics/QuickStatsGrid';
 import SmartInsights from './analytics/SmartInsights';
@@ -11,8 +11,8 @@ type ViewMode = 'analytics' | 'activity';
 
 const MyStuffPanel = memo(function MyStuffPanel() {
   const [viewMode, setViewMode] = useState<ViewMode>('analytics');
-  const { stats, loading, error, smartInsights } = useEnhancedUserStats();
-  const { userRank } = useEnhancedLeaderboard('all-time');
+  const { stats, loading, error, smartInsights } = useUserStats();
+  const { userRank } = useLeaderboard('all-time');
 
   if (loading) {
     return (
@@ -87,7 +87,7 @@ const MyStuffPanel = memo(function MyStuffPanel() {
           <StatsGrid stats={stats} userRank={userRank} />
 
           {/* Smart Insights - Full Width */}
-          <SmartInsights insights={smartInsights} />
+          <SmartInsights insights={smartInsights || []} />
 
           {/* Achievement Progress - Full Width */}
           <AchievementProgress stats={stats} />

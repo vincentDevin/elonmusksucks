@@ -3,9 +3,8 @@
 // Feature Flag Context - Client-side Feature Control
 // -----------------------------------------------------------------------------
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import type { FeatureFlagConfig } from '@ems/types';
-import api from '../api/axios';
 
 interface FlagsContextType {
   flags: FeatureFlagConfig;

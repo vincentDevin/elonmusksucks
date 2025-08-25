@@ -24,7 +24,8 @@ export default function DashboardSettings({
   className = '',
 }: DashboardSettingsProps) {
   const [activeTab, setActiveTab] = useState<SettingsTab>('themes');
-  const { updatePreferences, loading } = useAdvancedThemes();
+  const [loading, setLoading] = useState(false);
+  const { updatePreferences } = useAdvancedThemes();
 
   if (!isOpen) return null;
 
@@ -35,9 +36,16 @@ export default function DashboardSettings({
     { id: 'performance', label: 'Performance', icon: '⚡' },
   ] as const;
 
-  const handleReset = () => {
+  const handleReset = async () => {
     if (confirm('Are you sure you want to reset all dashboard settings to defaults?')) {
-      // This will be handled by the individual components
+      setLoading(true);
+      try {
+        // Reset to default preferences
+        updatePreferences({});
+        console.log('Dashboard settings reset to defaults');
+      } finally {
+        setLoading(false);
+      }
     }
   };
 

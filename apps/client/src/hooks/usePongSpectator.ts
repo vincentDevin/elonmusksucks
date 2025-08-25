@@ -54,10 +54,10 @@ export function usePongSpectator(): SpectatorHook {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [gameState, setGameState] = useState<SpectatorGameState | null>(null);
   const [connectionError, setConnectionError] = useState<string | null>(null);
-  const [spectatorCount, setSpectatorCount] = useState(0);
+  const [spectatorCount] = useState(0);
   const [shouldReturnToLobby, setShouldReturnToLobby] = useState(false);
 
-  const cleanupRef = useRef<() => void>();
+  const cleanupRef = useRef<(() => void) | undefined>(undefined);
   const currentGameIdRef = useRef<string | null>(null);
 
   const connect = useCallback(() => {

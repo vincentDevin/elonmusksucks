@@ -6,7 +6,7 @@ import { UnifiedThemeProvider } from './theme';
 import { PredictionProvider } from './contexts/PredictionContext';
 import { ParlayProvider } from './contexts/ParlayContext';
 import { ChatProvider } from './contexts/ChatContext';
-import { UnifiedActivityProvider } from './contexts/UnifiedActivityContext';
+import { ActivityProvider } from './contexts/ActivityContext';
 import MainLayout from './components/MainLayout';
 import AppRoutes from './routes/AppRoutes';
 import { useAuth } from './contexts/AuthContext';
@@ -20,7 +20,7 @@ function AppContent() {
     <SocketProvider>
       <UnifiedThemeProvider userId={user?.id}>
         {/* domain state that depends on socket/auth */}
-        <UnifiedActivityProvider>
+        <ActivityProvider>
           <PredictionProvider>
             <ParlayProvider>
               <ChatProvider>
@@ -32,7 +32,7 @@ function AppContent() {
               </ChatProvider>
             </ParlayProvider>
           </PredictionProvider>
-        </UnifiedActivityProvider>
+        </ActivityProvider>
       </UnifiedThemeProvider>
     </SocketProvider>
   );

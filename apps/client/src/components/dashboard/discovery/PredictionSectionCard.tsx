@@ -1,7 +1,7 @@
 // apps/client/src/components/dashboard/discovery/PredictionSectionCard.tsx
 import { useState } from 'react';
 import type { PredictionSection, EnhancedPrediction } from '../../../hooks/usePredictionDiscovery';
-import UnifiedPredictionCard from '../../UnifiedPredictionCard';
+import PredictionCard from '../../PredictionCard';
 
 interface PredictionSectionCardProps {
   section: PredictionSection;
@@ -167,7 +167,7 @@ export default function PredictionSectionCard({
 
                 {/* Prediction Card */}
                 <div className="transform transition-all duration-200 hover:scale-[1.02]">
-                  <UnifiedPredictionCard
+                  <PredictionCard
                     prediction={prediction}
                     variant="compact"
                     showParlayActions={true}

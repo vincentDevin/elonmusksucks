@@ -1,6 +1,6 @@
-// apps/client/src/contexts/UnifiedActivityContext.tsx
+// apps/client/src/contexts/ActivityContext.tsx
 // Rollback: Remove socket event constants import and restore string literals
-import React, { createContext, useContext, useState, useRef, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useSocket } from './SocketContext';
 import { SocketEvents } from '@ems/types';
 import { useVisibilityGuard } from '../lib/visibilityGuard';
@@ -8,7 +8,7 @@ import { getRecentActivities } from '../api/activity';
 import type { ActivityEventType } from '@ems/types';
 
 // Enhanced activity interface that combines all data sources
-export interface UnifiedActivity {
+export interface Activity {
   id: string;
   type:
     | ActivityEventType
@@ -52,8 +52,8 @@ export interface UnifiedActivity {
   streak?: number;
 }
 
-interface UnifiedActivityContextType {
-  activities: UnifiedActivity[];
+interface ActivityContextType {
+  activities: Activity[];
   loading: boolean;
   error: string | null;
   isConnected: boolean;
@@ -61,11 +61,11 @@ interface UnifiedActivityContextType {
   refresh: () => void;
 }
 
-const UnifiedActivityContext = createContext<UnifiedActivityContextType | undefined>(undefined);
+const ActivityContext = createContext<ActivityContextType | undefined>(undefined);
 
 // Storage keys
 const STORAGE_KEYS = {
-  ACTIVITIES: 'ems_unified_activities',
+  ACTIVITIES: 'ems_activities',
   HAS_INITIALIZED: 'ems_activity_initialized',
   TIMESTAMP: 'ems_activity_timestamp',
 } as const;
@@ -74,7 +74,7 @@ const STORAGE_KEYS = {
 const CACHE_EXPIRY_MS = 5 * 60 * 1000;
 
 // Helper functions for browser storage
-const getStoredActivities = (): UnifiedActivity[] => {
+const getStoredActivities = (): Activity[] => {
   try {
     const stored = sessionStorage.getItem(STORAGE_KEYS.ACTIVITIES);
     const timestamp = sessionStorage.getItem(STORAGE_KEYS.TIMESTAMP);
@@ -113,7 +113,7 @@ const getStoredHasInitialized = (): boolean => {
   }
 };
 
-const storeActivities = (activities: UnifiedActivity[]) => {
+const storeActivities = (activities: Activity[]) => {
   try {
     sessionStorage.setItem(STORAGE_KEYS.ACTIVITIES, JSON.stringify(activities));
     sessionStorage.setItem(STORAGE_KEYS.HAS_INITIALIZED, 'true');
@@ -135,13 +135,13 @@ const clearStoredActivities = () => {
 
 // Global state to persist across component unmounts/remounts
 let globalHasRequestedInitialData = false;
-let globalActivities: UnifiedActivity[] = getStoredActivities();
+let globalActivities: Activity[] = getStoredActivities();
 let globalHasInitialized = getStoredHasInitialized();
 
-export function UnifiedActivityProvider({ children }: { children: React.ReactNode }) {
+export function ActivityProvider({ children }: { children: React.ReactNode }) {
   const socket = useSocket();
   const { shouldRefresh, updateLastFetch } = useVisibilityGuard(5 * 60 * 1000); // 5 minutes
-  const [activities, setActivities] = useState<UnifiedActivity[]>(globalActivities);
+  const [activities, setActivities] = useState<Activity[]>(globalActivities);
   const [loading, setLoading] = useState(!globalHasInitialized);
   const [error, setError] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -152,7 +152,7 @@ export function UnifiedActivityProvider({ children }: { children: React.ReactNod
     setLoading(false);
     setError(null);
 
-    const unifiedActivities: UnifiedActivity[] = data.map((activity) => ({
+    const unifiedActivities: Activity[] = data.map((activity) => ({
       id: activity.id,
       type: activity.type,
       timestamp: activity.timestamp,
@@ -206,12 +206,12 @@ export function UnifiedActivityProvider({ children }: { children: React.ReactNod
   // Handle real-time activity updates
   const handleActivityUpdate = useCallback((activity: any) => {
     console.log(
-      '[UnifiedActivityContext] Received activity update:',
+      '[ActivityContext] Received activity update:',
       activity.id,
       activity.type,
       activity.title,
     );
-    const unifiedActivity: UnifiedActivity = {
+    const unifiedActivity: Activity = {
       id: activity.id,
       type: activity.type,
       timestamp: activity.timestamp,
@@ -265,12 +265,12 @@ export function UnifiedActivityProvider({ children }: { children: React.ReactNod
     setError(null);
 
     try {
-      console.log('[UnifiedActivityContext] Loading initial activities from Redis cache...');
+      console.log('[ActivityContext] Loading initial activities from Redis cache...');
       const response = await getRecentActivities(100);
 
       if (response.success && response.activities.length > 0) {
         console.log(
-          `[UnifiedActivityContext] Loaded ${response.activities.length} activities from ${response.cached ? 'Redis cache' : 'database'}`,
+          `[ActivityContext] Loaded ${response.activities.length} activities from ${response.cached ? 'Redis cache' : 'database'}`,
         );
 
         // Transform to unified format - handle both Redis and database formats
@@ -356,21 +356,19 @@ export function UnifiedActivityProvider({ children }: { children: React.ReactNod
         setHasInitialized(true);
         updateLastFetch();
       } else {
-        console.log(
-          '[UnifiedActivityContext] No initial activities found, waiting for real-time events',
-        );
+        console.log('[ctivityContext] No initial activities found, waiting for real-time events');
         globalHasInitialized = true;
         setHasInitialized(true);
         updateLastFetch();
       }
     } catch (error) {
-      console.error('[UnifiedActivityContext] Error loading initial activities:', error);
+      console.error('[ActivityContext] Error loading initial activities:', error);
       setError('Failed to load initial activities');
 
       // Fall back to cached data if available
       const cached = getStoredActivities();
       if (cached.length > 0) {
-        console.log('[UnifiedActivityContext] Falling back to browser cache');
+        console.log('[ActivityContext] Falling back to browser cache');
         setActivities(cached);
         globalActivities = cached;
         globalHasInitialized = true;
@@ -458,18 +456,18 @@ export function UnifiedActivityProvider({ children }: { children: React.ReactNod
   }, [socket]);
 
   return (
-    <UnifiedActivityContext.Provider
+    <ActivityContext.Provider
       value={{ activities, loading, error, isConnected, hasInitialized, refresh }}
     >
       {children}
-    </UnifiedActivityContext.Provider>
+    </ActivityContext.Provider>
   );
 }
 
-export function useUnifiedActivity() {
-  const context = useContext(UnifiedActivityContext);
+export function useActivity() {
+  const context = useContext(ActivityContext);
   if (!context) {
-    throw new Error('useUnifiedActivity must be used within UnifiedActivityProvider');
+    throw new Error('useActivity must be used within ActivityProvider');
   }
   return context;
 }
