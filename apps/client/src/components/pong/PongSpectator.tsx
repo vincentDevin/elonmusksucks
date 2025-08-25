@@ -1,6 +1,6 @@
 import React from 'react';
 import { usePongSpectator } from '../../hooks/usePongSpectator';
-import { PongCanvasEnhanced } from './PongCanvasEnhanced';
+import { PongCanvas } from './PongCanvas';
 
 // Convert spectator state to the format expected by PongCanvasEnhanced
 interface SpectatorCanvasProps {
@@ -203,7 +203,7 @@ export function PongSpectator({ gameId, onBackToLobby }: SpectatorCanvasProps) {
 
         {/* Game Canvas */}
         <div className="flex justify-center mb-6">
-          <PongCanvasEnhanced
+          <PongCanvas
             gameState={canvasGameState}
             ping={0}
             onSetReady={undefined} // No ready button for spectators

@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { PongGameOptimized } from '../components/pong/PongGameOptimized';
+import { PongGame } from '../components/pong/PongGame';
 import { useAuth } from '../hooks/useAuth';
 
 export default function Pong() {
@@ -24,5 +24,5 @@ export default function Pong() {
     );
   }
 
-  return <PongGameOptimized />;
+  return <PongGame />;
 }

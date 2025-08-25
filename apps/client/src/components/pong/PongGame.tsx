@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
-import { usePongSocketOptimized } from '../../hooks/usePongSocketOptimized';
-import { usePongInputOptimized } from '../../hooks/usePongInputOptimized';
-import { PongCanvasEnhanced } from './PongCanvasEnhanced';
-import { PongLobbyOptimized } from './PongLobbyOptimized';
+import { usePongSocket } from '../../hooks/usePongSocket';
+import { usePongInput } from '../../hooks/usePongInput';
+import { PongCanvas } from './PongCanvas';
+import { PongLobby } from './PongLobby';
 import { PongSpectator } from './PongSpectator';
 import { PONG_PHYSICS } from '@ems/types';
 
-export function PongGameOptimized() {
+export function PongGame() {
   const {
     socket,
     isConnected,
@@ -25,12 +25,12 @@ export function PongGameOptimized() {
     sendInput,
     setReady,
     leaveMatch,
-  } = usePongSocketOptimized();
+  } = usePongSocket();
 
   // Local state for spectator mode
   const [spectatingGameId, setSpectatingGameId] = useState<string | null>(null);
 
-  const { inputState, setSendInput, isInputActive } = usePongInputOptimized();
+  const { inputState, setSendInput, isInputActive } = usePongInput();
 
   // Connect input system to socket
   useEffect(() => {
@@ -174,7 +174,7 @@ export function PongGameOptimized() {
 
             {/* Game Canvas */}
             <div className="flex justify-center">
-              <PongCanvasEnhanced
+              <PongCanvas
                 gameState={currentGame}
                 ping={lastPing}
                 onSetReady={setReady}
@@ -224,7 +224,7 @@ export function PongGameOptimized() {
           /* Lobby */
           <>
             {console.log('🏓 Rendering PongLobby')}
-            <PongLobbyOptimized
+            <PongLobby
               lobbies={lobbies}
               activeGames={activeGames}
               isConnected={isConnected}

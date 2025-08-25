@@ -2,7 +2,7 @@ import { useRef, useEffect, useCallback, useState } from 'react';
 import { PONG_PHYSICS } from '@ems/types';
 
 // Match the same interface from usePongSocketOptimized
-interface OptimizedGameState {
+interface GameState {
   gameId: string;
   playerSlot: 0 | 1;
   players: [any, any];
@@ -24,8 +24,8 @@ interface OptimizedGameState {
   readyStates?: [boolean, boolean];
 }
 
-interface PongCanvasEnhancedProps {
-  gameState?: OptimizedGameState;
+interface PongCanvasProps {
+  gameState?: GameState;
   className?: string;
   ping?: number;
   onSetReady?: (ready: boolean) => void;
@@ -74,12 +74,12 @@ const VISUAL_CONFIG = {
   ANIMATION_SPEED: 0.0078, // 128fps (1/128)
 };
 
-export function PongCanvasEnhanced({
+export function PongCanvas({
   gameState,
   className = '',
   onSetReady,
   isSpectating = false,
-}: PongCanvasEnhancedProps) {
+}: PongCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>(0);
   const [particles, setParticles] = useState<Particle[]>([]);

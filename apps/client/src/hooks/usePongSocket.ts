@@ -16,7 +16,7 @@ const userSockets = new Map<number, Socket>(); // userId -> Socket
 const userConnecting = new Set<number>(); // Set of userIds currently connecting
 
 // Client-side game state (different from server GameState)
-interface OptimizedGameState {
+interface GameState {
   gameId: string;
   playerSlot: 0 | 1; // Which paddle the user controls
   players: [Player, Player | null];
@@ -45,7 +45,7 @@ interface PongSocketState {
   socket: Socket | null;
   isConnected: boolean;
   isAuthenticated: boolean;
-  currentGame: OptimizedGameState | null;
+  currentGame: GameState | null;
   lobbies: LobbyEntry[];
   activeGames: ActiveGameEntry[];
   connectionError: string | null;
@@ -70,14 +70,14 @@ interface PongSocketActions {
 
 interface PongSocketHook extends PongSocketState, PongSocketActions {}
 
-export function usePongSocketOptimized(): PongSocketHook {
+export function usePongSocket(): PongSocketHook {
   const { user, accessToken } = useAuth();
 
   // State
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [currentGame, setCurrentGame] = useState<OptimizedGameState | null>(null);
+  const [currentGame, setCurrentGame] = useState<GameState | null>(null);
   const [lobbies, setLobbies] = useState<LobbyEntry[]>([]);
   const [activeGames, setActiveGames] = useState<ActiveGameEntry[]>([]);
   const [connectionError, setConnectionError] = useState<string | null>(null);

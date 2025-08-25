@@ -19,7 +19,7 @@ interface PongInputHook {
   isInputActive: boolean;
 }
 
-export function usePongInputOptimized(): PongInputHook {
+export function usePongInput(): PongInputHook {
   const [inputState, setInputState] = useState<InputState>({ up: false, down: false });
   const [isInputActive, setIsInputActive] = useState(false);
 

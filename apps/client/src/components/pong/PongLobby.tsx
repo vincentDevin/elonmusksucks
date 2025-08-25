@@ -4,7 +4,7 @@ import { PongLobbyHeader } from './PongLobbyHeader';
 import { PongMatchCreator } from './PongMatchCreator';
 import { PongGamesList } from './PongGamesList';
 
-interface PongLobbyOptimizedProps {
+interface PongLobbyProps {
   lobbies: LobbyEntry[];
   activeGames: ActiveGameEntry[];
   isConnected: boolean;
@@ -22,7 +22,7 @@ interface PongLobbyOptimizedProps {
   onSpectateGame: (gameId: string) => void;
 }
 
-export function PongLobbyOptimized({
+export function PongLobby({
   lobbies,
   activeGames,
   isConnected,
@@ -34,7 +34,7 @@ export function PongLobbyOptimized({
   onCreateMatch,
   onJoinMatch,
   onSpectateGame,
-}: PongLobbyOptimizedProps) {
+}: PongLobbyProps) {
   // Auto-refresh lobby every 15 seconds when connected and authenticated
   useEffect(() => {
     if (!isConnected || !isAuthenticated) return;
