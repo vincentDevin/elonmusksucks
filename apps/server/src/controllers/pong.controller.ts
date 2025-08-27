@@ -5,6 +5,12 @@ import { PongEloService } from '../services/pongElo.service';
 import { PongRepository } from '../repositories/PongRepository';
 import { PongSocketEmitter } from '../handlers/pongSocketHandlers';
 import { serializeBigInt } from '../utils/bigintSerializer';
+import {
+  toUserPongStatsView,
+  toPongMatchHistoryView,
+  toPongLeaderboardView,
+} from '../view/pong.view';
+import type { UserPongStatsView, PongMatchHistoryView, PongLeaderboardView } from '@ems/types';
 
 const pongRepository = new PongRepository();
 const pongStatsService = new PongStatsService(pongRepository);
@@ -120,7 +126,10 @@ export const getEloLeaderboard = async (
       offset,
     );
 
-    res.json(serializeBigInt(leaderboard));
+    const payload = leaderboard.map((entry, index) =>
+      toPongLeaderboardView(entry, offset + index + 1),
+    ) satisfies PongLeaderboardView[];
+    res.json(payload);
   } catch (error) {
     console.error('Get Elo leaderboard error:', error);
     next(error);
@@ -197,7 +206,8 @@ export const getUserPongStats = async (
 
     // Use service to get stats with defaults (follows proper pattern)
     const enrichedStats = await PongStatsService.getUserStatsWithDefaults(userId, pongRepository);
-    res.json(serializeBigInt(enrichedStats));
+    const payload = toUserPongStatsView(enrichedStats) satisfies UserPongStatsView;
+    res.json(payload);
   } catch (error) {
     console.error('Get user Pong stats error:', error);
     next(error);
@@ -298,7 +308,8 @@ export const getUserPongHistory = async (
 
     const matches = await pongRepository.getPlayerMatchHistory(userId, limit);
     const enrichedHistory = PongStatsService.calculateMatchHistoryMetrics(matches, userId);
-    res.json(serializeBigInt(enrichedHistory));
+    const payload = enrichedHistory.map(toPongMatchHistoryView) satisfies PongMatchHistoryView[];
+    res.json(payload);
   } catch (error) {
     console.error('Get user Pong history error:', error);
     next(error);

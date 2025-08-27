@@ -7,7 +7,10 @@ import type {
   LoginPayload,
   PasswordResetRequestPayload,
   PasswordResetPayload,
+  AuthUserView,
+  UserBalanceView,
 } from '@ems/types';
+import { toAuthUserView, toUserBalanceView } from '../view/auth.view';
 import {
   createUser,
   validateUser,
@@ -121,16 +124,8 @@ export const me: RequestHandler = async (req, res, next) => {
       return sendError(res, 404, 'User not found');
     }
 
-    return res.json({
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      muskBucks: user.muskBucks.toString(),
-      profileComplete: user.profileComplete,
-      avatarUrl: user.avatarUrl,
-      theme: user.theme,
-    });
+    const payload = toAuthUserView(user) satisfies AuthUserView;
+    return res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -152,9 +147,8 @@ export const getBalance: RequestHandler = async (req, res, next) => {
       return sendError(res, 404, 'User not found');
     }
 
-    return res.json({
-      muskBucks: user.muskBucks.toString(),
-    });
+    const payload = toUserBalanceView(user) satisfies UserBalanceView;
+    return res.json(payload);
   } catch (err) {
     next(err);
   }

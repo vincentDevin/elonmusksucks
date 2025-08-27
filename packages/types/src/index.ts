@@ -216,6 +216,24 @@ export interface PasswordResetPayload {
   newPassword?: string;
 }
 
+// ——— Auth Response DTOs ————————————————————————————————————————————————————
+export interface AuthUserView {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+  muskBucks: string;              // BigInt → string
+  profileComplete: boolean;
+  avatarUrl: string | null;
+  theme: string;
+  createdAt: string;              // Date → ISO string
+  updatedAt: string;              // Date → ISO string
+}
+
+export interface UserBalanceView {
+  muskBucks: string;              // BigInt → string
+}
+
 // ——— Predictions REST Payloads ————————————————————————————————————————————
 export interface CreatePredictionPayload {
   title: string;
@@ -622,6 +640,39 @@ export interface BetWithUser extends PublicBet {
   /** optional contextual info */
   optionLabel?: string;
   predictionTitle?: string;
+}
+
+// ——— User Betting Response DTOs ————————————————————————————————————————————
+export interface UserBetView {
+  id: number;
+  predictionId: number;
+  predictionTitle: string;
+  optionId: number | null;
+  optionLabel: string | null;
+  amount: string;              // BigInt → string
+  potentialPayout: string | null;
+  payout: string | null;
+  status: BetStatus;
+  won: boolean | null;
+  oddsAtPlacement: number;
+  createdAt: string;           // Date → ISO
+}
+
+export interface UserParlayView {
+  id: number;
+  amount: string;              // BigInt → string
+  combinedOdds: number;
+  potentialPayout: string;     // BigInt → string
+  status: BetStatus;
+  createdAt: string;           // Date → ISO
+  legs: Array<{
+    id: number;
+    predictionId: number;
+    predictionTitle: string;
+    optionId: number;
+    optionLabel: string;
+    oddsAtPlacement: number;
+  }>;
 }
 
 // ——— Parlay & ParlayLeg ——————————————————————————————————————
@@ -1955,6 +2006,58 @@ export const AI_DIFFICULTIES = {
 } as const;
 
 export type AIDifficulty = keyof typeof AI_DIFFICULTIES;
+
+// ——— Pong Response DTOs ————————————————————————————————————————————
+export interface UserPongStatsView {
+  userId: number;
+  userName: string;
+  eloRating: number;
+  tier: string;
+  gamesPlayed: number;
+  wins: number;
+  losses: number;
+  winRate: number;
+  winStreak: number;
+  bestStreak: number;
+  perfectGames: number;
+  comebacks: number;
+  totalWagered: string;        // BigInt → string
+  totalWon: string;            // BigInt → string
+  profit: string;              // BigInt → string
+  biggestWin: string;          // BigInt → string
+  averagePing: number;
+  createdAt: string;           // Date → ISO
+  updatedAt: string;           // Date → ISO
+}
+
+export interface PongMatchHistoryView {
+  id: number;
+  playerOneId: number;
+  playerTwoId: number | null;
+  playerOneScore: number;
+  playerTwoScore: number;
+  playerWon: boolean;
+  wagerAmount: string;         // BigInt → string
+  payoutAmount: string;        // BigInt → string
+  eloChange: number;
+  duration: number;
+  aiDifficulty?: string;
+  opponentName: string | null;
+  opponentElo: number | null;
+  playedAt: string;            // Date → ISO
+}
+
+export interface PongLeaderboardView {
+  userId: number;
+  userName: string;
+  eloRating: number;
+  tier: string;
+  gamesPlayed: number;
+  wins: number;
+  winRate: number;
+  totalWon: string;            // BigInt → string
+  rank: number;
+}
 
 // ——— Achievement Events ————————————————————————————————————
 export type AchievementEventKey =

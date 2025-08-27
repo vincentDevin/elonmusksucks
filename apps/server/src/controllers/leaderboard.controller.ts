@@ -1,7 +1,7 @@
 // apps/server/src/controllers/leaderboard.controller.ts
 import type { Request, Response, NextFunction } from 'express';
 import { leaderboardService } from '../services/leaderboard.service';
-import type { PublicLeaderboardEntry, LeaderboardEntryView } from '@ems/types';
+import type { LeaderboardEntryView } from '@ems/types';
 import type {
   PaginatedLeaderboard,
   UserRank,
@@ -36,13 +36,17 @@ export const getTopAllTime = async (
  */
 export const getTopDaily = async (
   req: Request,
-  res: Response<PublicLeaderboardEntry[]>,
+  res: Response,
   next: NextFunction,
 ): Promise<void> => {
   try {
     const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 25;
     const entries = await leaderboardService.getTopDaily(limit);
-    res.json(entries);
+
+    const payload = entries.map((entry, index) =>
+      toLeaderboardEntryView(entry, index + 1),
+    ) satisfies LeaderboardEntryView[];
+    res.json(payload);
   } catch (err) {
     next(err);
   }

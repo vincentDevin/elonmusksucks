@@ -17,8 +17,11 @@ import type {
   UserProfileView,
   UpdateProfilePayload,
   CreateUserPostPayload,
+  UserBetView,
+  UserParlayView,
 } from '@ems/types';
 import { toUserStatsView, toUserProfileView } from '../view/user.view';
+import { toUserBetView, toUserParlayView } from '../view/betting.view';
 
 // Define MulterFile type explicitly to avoid mismatched declarations
 export type MulterFile = {
@@ -352,7 +355,8 @@ export async function getUserBetsHandler(
     }
 
     const bets = await userService.getUserActiveBets(targetUserId);
-    res.json(bets);
+    const payload = bets.map(toUserBetView) satisfies UserBetView[];
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -378,7 +382,8 @@ export async function getUserParlaysHandler(
     }
 
     const parlays = await userService.getUserActiveParlays(targetUserId);
-    res.json(parlays);
+    const payload = parlays.map(toUserParlayView) satisfies UserParlayView[];
+    res.json(payload);
   } catch (err) {
     next(err);
   }
