@@ -16,6 +16,37 @@ const PALETTES: Record<PredictionType, string[]> = {
   [PredictionType.MULTIPLE]: ['bg-blue-500', 'bg-green-500', 'bg-yellow-500', 'bg-red-500'],
 };
 
+const initials = (name?: string | null) =>
+  (name ?? 'User')
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((s) => s[0]?.toUpperCase() ?? '')
+    .join('') || 'U';
+
+const SafeAvatar = ({ name, avatarUrl }: { name?: string | null; avatarUrl?: string | null }) => {
+  const src = avatarUrl && avatarUrl.length > 0 ? avatarUrl : undefined;
+  if (src) {
+    return (
+      <img
+        src={src}
+        alt={name ?? 'User'}
+        className="inline-block w-7 h-7 rounded-full border border-gray-300"
+      />
+    );
+  }
+  // fallback: initials circle
+  return (
+    <span
+      aria-hidden
+      className="inline-flex w-7 h-7 items-center justify-center rounded-full bg-gray-200 text-gray-700 text-[10px] font-semibold border border-gray-300"
+      title={name ?? 'User'}
+    >
+      {initials(name)}
+    </span>
+  );
+};
+
 export default function BetsList({ type, bets, parlayLegs = [], options }: BetsListProps) {
   const [expanded, setExpanded] = useState(false);
 
@@ -26,15 +57,8 @@ export default function BetsList({ type, bets, parlayLegs = [], options }: BetsL
     ...bets.map((b) => ({ kind: 'bet' as const, data: b })),
     ...parlayLegs.map((l) => ({ kind: 'parlay' as const, data: l })),
   ].sort((a, b) => {
-    // sort newest first
-    const aDate =
-      a.kind === 'bet'
-        ? new Date(a.data.createdAt).getTime()
-        : new Date(a.data.createdAt).getTime();
-    const bDate =
-      b.kind === 'bet'
-        ? new Date(b.data.createdAt).getTime()
-        : new Date(b.data.createdAt).getTime();
+    const aDate = new Date(a.data.createdAt).getTime();
+    const bDate = new Date(b.data.createdAt).getTime();
     return bDate - aDate;
   });
 
@@ -51,10 +75,11 @@ export default function BetsList({ type, bets, parlayLegs = [], options }: BetsL
         {shown.map((item) => {
           const optId = item.data.optionId;
           const optIndex = options.findIndex((o) => o.id === optId);
-          const colorClass = textPalette[optIndex] ?? textPalette[0];
+          const colorClass = textPalette[Math.max(0, optIndex)] ?? textPalette[0];
 
           if (item.kind === 'bet') {
             const b = item.data;
+            const u = b.user ?? null;
             const label = options.find((o) => o.id === b.optionId)?.label ?? 'Unknown';
             return (
               <li
@@ -62,14 +87,8 @@ export default function BetsList({ type, bets, parlayLegs = [], options }: BetsL
                 className="flex justify-between bg-[var(--color-surface)] border border-[var(--color-muted)] rounded-lg px-3 py-2 shadow-sm"
               >
                 <span className="flex items-center gap-2">
-                  {b.user.avatarUrl && (
-                    <img
-                      src={b.user.avatarUrl}
-                      alt={b.user.name}
-                      className="inline-block w-7 h-7 rounded-full border border-gray-300"
-                    />
-                  )}
-                  <strong>{b.user.name}</strong> bet <em>{b.amount}</em> on{' '}
+                  <SafeAvatar name={u?.name} avatarUrl={u?.avatarUrl as string | null} />
+                  <strong>{u?.name ?? 'Anonymous'}</strong> bet <em>{b.amount}</em> on{' '}
                   <strong className={colorClass}>{label}</strong>
                 </span>
                 <span className="text-xs text-[var(--color-tertiary)]">
@@ -79,6 +98,7 @@ export default function BetsList({ type, bets, parlayLegs = [], options }: BetsL
             );
           } else {
             const l = item.data;
+            const u = l.user ?? null;
             const label = options.find((o) => o.id === l.optionId)?.label ?? 'Unknown';
             return (
               <li
@@ -86,14 +106,8 @@ export default function BetsList({ type, bets, parlayLegs = [], options }: BetsL
                 className="flex justify-between bg-[var(--color-surface)] border border-[var(--color-muted)] rounded-lg px-3 py-2 shadow-sm italic"
               >
                 <span className="flex items-center gap-2">
-                  {l.user.avatarUrl && (
-                    <img
-                      src={l.user.avatarUrl}
-                      alt={l.user.name}
-                      className="inline-block w-7 h-7 rounded-full border border-gray-300"
-                    />
-                  )}
-                  <strong>{l.user.name}</strong> parlayed <em>{l.stake}</em> on{' '}
+                  <SafeAvatar name={u?.name} avatarUrl={u?.avatarUrl as string | null} />
+                  <strong>{u?.name ?? 'Anonymous'}</strong> parlayed <em>{l.stake}</em> on{' '}
                   <strong className={colorClass}>{label}</strong>
                 </span>
                 <span className="text-xs text-[var(--color-tertiary)]">
