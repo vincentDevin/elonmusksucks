@@ -4,6 +4,8 @@ import {
   getMarketOverviewStats,
   getTrendingPredictions as getTrendingPredictionsService,
 } from '../services/market.service';
+import { toMarketOverviewView } from '../view/market.view';
+import type { MarketOverviewView } from '@ems/types';
 
 export const getMarketOverview: RequestHandler = async (_req, res, _next) => {
   try {
@@ -11,7 +13,9 @@ export const getMarketOverview: RequestHandler = async (_req, res, _next) => {
     const cached = await redisClient.get(cacheKey);
 
     if (cached) {
-      res.json({ cached: true, ...JSON.parse(cached) });
+      const cachedStats = JSON.parse(cached);
+      const payload = toMarketOverviewView(cachedStats, true) satisfies MarketOverviewView;
+      res.json(payload);
       return;
     }
 
@@ -20,7 +24,8 @@ export const getMarketOverview: RequestHandler = async (_req, res, _next) => {
     // Cache for 30 seconds
     await redisClient.setex(cacheKey, 30, JSON.stringify(stats));
 
-    res.json({ cached: false, ...stats });
+    const payload = toMarketOverviewView(stats, false) satisfies MarketOverviewView;
+    res.json(payload);
   } catch (error) {
     console.error('Error fetching market overview:', error);
     res.status(500).json({

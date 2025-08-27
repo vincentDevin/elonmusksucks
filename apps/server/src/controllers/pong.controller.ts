@@ -4,7 +4,6 @@ import { PongStatsService } from '../services/pongStats.service';
 import { PongEloService } from '../services/pongElo.service';
 import { PongRepository } from '../repositories/PongRepository';
 import { PongSocketEmitter } from '../handlers/pongSocketHandlers';
-import { serializeBigInt } from '../utils/bigintSerializer';
 import {
   toUserPongStatsView,
   toPongMatchHistoryView,
@@ -172,7 +171,10 @@ export const getLeaderboardByMetric = async (
     }
 
     const leaderboard = PongStatsService.calculateLeaderboardMetrics(stats, offset);
-    res.json(serializeBigInt(leaderboard));
+    const payload = leaderboard.map((entry, index) =>
+      toPongLeaderboardView(entry, offset + index + 1),
+    ) satisfies PongLeaderboardView[];
+    res.json(payload);
   } catch (error) {
     console.error('Get leaderboard by metric error:', error);
     next(error);

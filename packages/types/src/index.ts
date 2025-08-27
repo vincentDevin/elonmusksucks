@@ -2059,6 +2059,52 @@ export interface PongLeaderboardView {
   rank: number;
 }
 
+// ——— Shame Wall Response DTOs —————————————————————————————————————————————
+export interface ShameWallEntryView {
+  id: number;
+  userId: number;
+  userName: string;
+  reason: string;
+  startDate: string;           // Date → ISO
+  endDate: string | null;      // Date → ISO (null for permanent)
+  moderatorId: number;
+  moderatorName: string;
+  shameAchievements: Array<{
+    title: string;
+    description: string;
+    icon: string;
+  }>;
+}
+
+export interface ShameWallStatsView {
+  totalBanned: number;
+  permanentBans: number;
+  temporaryBans: number;
+  mostCommonReasons: Array<{
+    reason: string;
+    count: number;
+  }>;
+  shameAchievementCounts: Array<{
+    slug: string;
+    title: string;
+    count: number;
+  }>;
+}
+
+// ——— Market Response DTOs ——————————————————————————————————————————————————
+export interface MarketOverviewView {
+  cached: boolean;
+  totalVolume: number;
+  activeMarkets: number;
+  totalUsers: number;
+  volumeChange: number;
+  trending: Array<{
+    category: string;
+    icon: string;
+    growth: number;
+  }>;
+}
+
 // ——— Achievement Events ————————————————————————————————————
 export type AchievementEventKey =
   | 'bet:placed'

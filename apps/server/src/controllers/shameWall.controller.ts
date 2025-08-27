@@ -3,7 +3,8 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { shameWallService } from '../services/shameWall.service';
-import { serializeBigInt } from '../utils/bigintSerializer';
+import { toShameWallEntryView, toShameWallStatsView } from '../view/shameWall.view';
+import type { ShameWallEntryView, ShameWallStatsView } from '@ems/types';
 
 /**
  * Get current shame wall (public endpoint)
@@ -16,7 +17,8 @@ export async function getShameWall(
 ): Promise<void> {
   try {
     const shameWall = await shameWallService.getShameWall();
-    res.json(serializeBigInt(shameWall));
+    const payload = shameWall.map(toShameWallEntryView) satisfies ShameWallEntryView[];
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -41,7 +43,8 @@ export async function getShameWallStats(
       shameAchievementCounts: calculateShameAchievementStats(shameWall),
     };
 
-    res.json(stats);
+    const payload = toShameWallStatsView(stats) satisfies ShameWallStatsView;
+    res.json(payload);
   } catch (err) {
     next(err);
   }
