@@ -2382,3 +2382,42 @@ export interface UnifiedActivityEvent {
   streak?: number;
   meta?: Record<string, any>;
 }
+
+// Admin View DTOs
+export type AdminUserView = {
+  id: number;
+  name: string;
+  email: string;
+  muskBucks: string;
+  role: string;
+  isEmailVerified: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AdminBetView = {
+  id: number;
+  userId: number;
+  userName: string;
+  predictionId: number;
+  predictionTitle: string;
+  optionId: number | null;
+  optionLabel: string | null;
+  amount: string;
+  potentialPayout: string | null;
+  payout: string | null;
+  status: string;
+  createdAt: string;
+};
+
+export type AdminTransactionView = {
+  id: number;
+  userId: number;
+  userName: string;
+  type: string;
+  amount: string;
+  balanceAfter: string;
+  relatedBetId: number | null;
+  relatedParlayId: number | null;
+  createdAt: string;
+};

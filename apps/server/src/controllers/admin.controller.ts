@@ -4,6 +4,7 @@ import * as adminService from '../services/admin.service';
 import { payoutService } from '../services/payout.service';
 import { adminAchievementService } from '../services/adminAchievement.service';
 import { shameWallService } from '../services/shameWall.service';
+import { toAdminUserView, toAdminBetView, toAdminTransactionView } from '../view/admin.view';
 import { serializeBigInt } from '../utils/bigintSerializer';
 import { AdminActions } from '@ems/types';
 import type {
@@ -15,6 +16,9 @@ import type {
   PublicUserBadge,
   PublicAITweet,
   AdminTransaction,
+  AdminUserView,
+  AdminBetView,
+  AdminTransactionView,
   ResolvePredictionPayload,
 } from '@ems/types';
 import type { Role } from '@prisma/client';
@@ -38,7 +42,8 @@ export async function getUsers(req: Request, res: Response, next: NextFunction):
     // RBAC: Only ADMIN role can manage users
     // This is enforced by requireAdmin middleware, but logged here for audit
     const users: PublicUser[] = await adminService.listUsers();
-    res.json(serializeBigInt(users));
+    const payload = users.map(toAdminUserView) satisfies AdminUserView[];
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -320,7 +325,8 @@ export async function getBets(req: Request, res: Response, next: NextFunction): 
 
     const filters = req.query as unknown as QueryParams;
     const bets = await adminService.listBets(filters);
-    res.json(serializeBigInt(bets));
+    const payload = bets.map(toAdminBetView) satisfies AdminBetView[];
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -351,7 +357,8 @@ export async function getTransactions(
       userName: users.find((u) => u.id === t.userId)?.name ?? 'Unknown',
     }));
 
-    res.json(serializeBigInt(detailedTxns));
+    const payload = detailedTxns.map(toAdminTransactionView) satisfies AdminTransactionView[];
+    res.json(payload);
   } catch (err) {
     next(err);
   }
