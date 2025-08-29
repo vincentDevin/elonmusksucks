@@ -2,6 +2,8 @@ import type { Request, Response } from 'express';
 import { FeedService } from '../services/feed.service';
 import redisClient from '../lib/redis';
 import { Queue } from 'bullmq';
+import { toFeedView, toFeedsListResponse } from '../view/feed.view';
+import type { FeedView, FeedsListResponse, CreateFeedRequest, UpdateFeedRequest } from '@ems/types';
 
 const feedService = new FeedService();
 const feedQueue = new Queue('feed', { connection: redisClient });
@@ -9,25 +11,8 @@ const feedQueue = new Queue('feed', { connection: redisClient });
 export async function listFeeds(_req: Request, res: Response) {
   try {
     const feeds = await feedService.listFeeds();
-
-    const publicFeeds = feeds.map((feed) => ({
-      id: feed.id,
-      name: feed.name,
-      url: feed.url,
-      siteUrl: feed.siteUrl,
-      status: feed.status,
-      allowImages: feed.allowImages,
-      lastFetchedAt: feed.lastFetchedAt?.toISOString() || null,
-      lastSuccessAt: feed.lastSuccessAt?.toISOString() || null,
-      lastErrorAt: feed.lastErrorAt?.toISOString() || null,
-      lastErrorMsg: feed.lastErrorMsg,
-      fetchCount: feed.fetchCount,
-      errorCount: feed.errorCount,
-      createdAt: feed.createdAt.toISOString(),
-      updatedAt: feed.updatedAt.toISOString(),
-    }));
-
-    res.json(publicFeeds);
+    const payload = toFeedsListResponse(feeds) satisfies FeedsListResponse;
+    res.json(payload.feeds);
   } catch (error) {
     console.error('[feeds] Error listing feeds:', error);
     res.status(500).json({ error: 'Failed to list feeds' });
@@ -46,7 +31,7 @@ export async function getFeedStats(_req: Request, res: Response) {
 
 export async function createFeed(req: Request, res: Response) {
   try {
-    const { name, url, siteUrl, allowImages = true } = req.body;
+    const { name, url, siteUrl, allowImages = true } = req.body as CreateFeedRequest;
 
     if (!name || !url) {
       res.status(400).json({ error: 'Name and URL are required' });
@@ -54,23 +39,8 @@ export async function createFeed(req: Request, res: Response) {
     }
 
     const feed = await feedService.createFeed({ name, url, siteUrl, allowImages });
-
-    res.status(201).json({
-      id: feed.id,
-      name: feed.name,
-      url: feed.url,
-      siteUrl: feed.siteUrl,
-      status: feed.status,
-      allowImages: feed.allowImages,
-      lastFetchedAt: null,
-      lastSuccessAt: null,
-      lastErrorAt: null,
-      lastErrorMsg: null,
-      fetchCount: 0,
-      errorCount: 0,
-      createdAt: feed.createdAt.toISOString(),
-      updatedAt: feed.updatedAt.toISOString(),
-    });
+    const payload = toFeedView(feed) satisfies FeedView;
+    res.status(201).json(payload);
   } catch (error) {
     console.error('Error creating feed:', error);
     res.status(500).json({ error: 'Failed to create feed' });
@@ -97,7 +67,7 @@ export async function deleteFeed(req: Request, res: Response) {
 export const updateFeed = async (req: Request, res: Response) => {
   try {
     const feedId = parseInt(req.params.id);
-    const { name, url, siteUrl, status, allowImages } = req.body;
+    const { name, url, siteUrl, status, allowImages } = req.body as UpdateFeedRequest;
 
     if (isNaN(feedId)) {
       res.status(400).json({ error: 'Invalid feed ID' });
@@ -112,23 +82,8 @@ export const updateFeed = async (req: Request, res: Response) => {
     if (allowImages !== undefined) updates.allowImages = allowImages;
 
     const updatedFeed = await feedService.updateFeed(feedId, updates);
-
-    res.json({
-      id: updatedFeed.id,
-      name: updatedFeed.name,
-      url: updatedFeed.url,
-      siteUrl: updatedFeed.siteUrl,
-      status: updatedFeed.status,
-      allowImages: updatedFeed.allowImages,
-      lastFetchedAt: updatedFeed.lastFetchedAt?.toISOString() || null,
-      lastSuccessAt: updatedFeed.lastSuccessAt?.toISOString() || null,
-      lastErrorAt: updatedFeed.lastErrorAt?.toISOString() || null,
-      lastErrorMsg: updatedFeed.lastErrorMsg,
-      fetchCount: updatedFeed.fetchCount,
-      errorCount: updatedFeed.errorCount,
-      createdAt: updatedFeed.createdAt.toISOString(),
-      updatedAt: updatedFeed.updatedAt.toISOString(),
-    });
+    const payload = toFeedView(updatedFeed) satisfies FeedView;
+    res.json(payload);
   } catch (error) {
     console.error('Error updating feed:', error);
     res.status(500).json({ error: 'Failed to update feed' });

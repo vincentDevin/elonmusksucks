@@ -1,8 +1,19 @@
 import type { Request, Response } from 'express';
 import { TimelineService } from '../services/timeline.service';
-import type { TimelineItem, TimelineResponse } from '@ems/types';
+import type {
+  TimelineItem,
+  TimelineResponse,
+  TimelineArticlesResponse,
+  ArticleReactionResponse,
+  ArticleCommentResponse,
+} from '@ems/types';
 import { validateArticleId } from '../utils/timeline';
 import type { AuthRequest } from '../middleware/auth.middleware';
+import {
+  toTimelineArticlesResponse,
+  toArticleReactionResponse,
+  toArticleCommentResponse,
+} from '../view/timeline.view';
 
 const timelineService = new TimelineService();
 
@@ -25,40 +36,18 @@ export async function getArticles(req: Request, res: Response) {
     const hasMore = articles.length > pageLimit;
     const items = articles.slice(0, pageLimit);
 
-    const timelineItems = items.map((article) => ({
-      id: `article-${article.id}`,
-      type: 'article' as const,
-      timestamp: article.publishedAt?.toISOString() || article.createdAt.toISOString(),
-      content: {
-        title: article.title,
-        excerpt: article.excerpt || undefined,
-        url: article.url,
-        imageUrl: article.leadImageUrl,
-        author: article.feed?.name || 'Unknown',
-        source: article.feed?.siteUrl ? new URL(article.feed.siteUrl).hostname : 'Unknown',
-      },
-      engagement: {
-        reactions: article.reactions,
-        comments: article.comments,
-      },
-      tags: article.tags,
-      sourceLinks: [],
-    }));
-
     const nextCursor =
       hasMore && items.length > 0
         ? items[items.length - 1].publishedAt?.toISOString() ||
           items[items.length - 1].createdAt.toISOString()
         : undefined;
 
-    res.json({
-      items: timelineItems,
-      pagination: {
-        cursor: nextCursor,
-        hasMore,
-        total: undefined,
-      },
-    });
+    const payload = toTimelineArticlesResponse(
+      items,
+      hasMore,
+      nextCursor,
+    ) satisfies TimelineArticlesResponse;
+    res.json(payload);
   } catch (error) {
     console.error('[timeline] Error fetching articles:', error);
     res.status(500).json({ error: 'Failed to fetch articles' });
@@ -200,19 +189,20 @@ export const toggleArticleReaction = async (req: AuthRequest, res: Response) => 
     }
 
     // Validate reaction type
-    const validTypes = ['like', 'dislike', 'love', 'laugh', 'angry'];
-    if (!validTypes.includes(type)) {
+    const validTypes = ['like', 'dislike', 'love', 'laugh', 'angry'] as const;
+    if (!validTypes.includes(type as (typeof validTypes)[number])) {
       res.status(400).json({ error: 'Invalid reaction type' });
       return;
     }
 
     const result = await timelineService.toggleArticleReaction(articleId, userId, type);
 
-    res.json({
+    const payload = toArticleReactionResponse({
       action: result.action,
-      type,
-      counts: result.counts,
-    });
+      type: type as string,
+      totalReactions: (result.counts as any)?.[type] || 0,
+    }) satisfies ArticleReactionResponse;
+    res.json(payload);
   } catch (error: any) {
     console.error('[timeline] Error toggling article reaction:', error);
 
@@ -290,13 +280,15 @@ export const createArticleComment = async (req: AuthRequest, res: Response) => {
 
     const newComment = await timelineService.createArticleComment(articleId, userId, content);
 
-    res.status(201).json({
+    const payload = toArticleCommentResponse({
       id: newComment.id,
       content: newComment.content,
-      user: newComment.user,
-      createdAt: newComment.createdAt.toISOString(),
-      updatedAt: newComment.updatedAt.toISOString(),
-    });
+      authorId: newComment.user.id,
+      authorName: newComment.user.name,
+      articleId,
+      createdAt: newComment.createdAt,
+    }) satisfies ArticleCommentResponse;
+    res.status(201).json(payload);
   } catch (error: any) {
     console.error('[timeline] Error creating article comment:', error);
 

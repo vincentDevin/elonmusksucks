@@ -4,8 +4,21 @@ import * as adminService from '../services/admin.service';
 import { payoutService } from '../services/payout.service';
 import { adminAchievementService } from '../services/adminAchievement.service';
 import { shameWallService } from '../services/shameWall.service';
-import { toAdminUserView, toAdminBetView, toAdminTransactionView } from '../view/admin.view';
-import { serializeBigInt } from '../utils/bigintSerializer';
+import {
+  toAdminUserView,
+  toAdminBetView,
+  toAdminTransactionView,
+  toAdminUserSearchResponse,
+  toAdminFinancialDataResponse,
+  toAdminFinancialAnalyticsResponse,
+  toAdminPredictionSearchResponse,
+  toAdminBulkPredictionsResponse,
+  toAdminAchievementView,
+  toAdminBulkOperationResponse,
+  toAdminUserAchievementView,
+  toAdminAchievementAnalyticsResponse,
+  toAdminBanHistoryView,
+} from '../view/admin.view';
 import { AdminActions } from '@ems/types';
 import type {
   PublicUser,
@@ -19,6 +32,16 @@ import type {
   AdminUserView,
   AdminBetView,
   AdminTransactionView,
+  AdminUserSearchResponse,
+  AdminFinancialDataResponse,
+  AdminFinancialAnalyticsResponse,
+  AdminPredictionSearchResponse,
+  AdminBulkPredictionsResponse,
+  AdminAchievementView,
+  AdminBulkOperationResponse,
+  AdminUserAchievementView,
+  AdminAchievementAnalyticsResponse,
+  AdminBanHistoryView,
   ResolvePredictionPayload,
 } from '@ems/types';
 import type { Role } from '@prisma/client';
@@ -65,7 +88,8 @@ export async function searchUsers(req: Request, res: Response, next: NextFunctio
     };
 
     const result = await adminService.searchUsers(params);
-    res.json(serializeBigInt(result));
+    const payload = toAdminUserSearchResponse(result) satisfies AdminUserSearchResponse;
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -111,7 +135,8 @@ export async function bulkUpdateUsers(
     }
 
     const result = await adminService.bulkUpdateUsers(operation);
-    res.json(serializeBigInt(result));
+    const payload = toAdminBulkOperationResponse(result) satisfies AdminBulkOperationResponse;
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -211,7 +236,8 @@ export async function searchPredictions(
     };
 
     const result = await adminService.searchPredictions(params);
-    res.json(serializeBigInt(result));
+    const payload = toAdminPredictionSearchResponse(result) satisfies AdminPredictionSearchResponse;
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -261,7 +287,8 @@ export async function bulkUpdatePredictions(
     }
 
     const result = await adminService.bulkUpdatePredictions(operation);
-    res.json(serializeBigInt(result));
+    const payload = toAdminBulkPredictionsResponse(result) satisfies AdminBulkPredictionsResponse;
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -373,7 +400,8 @@ export async function searchFinancialData(
   try {
     const params = req.query as unknown as any; // Will be typed properly in service
     const data = await adminService.searchFinancialData(params);
-    res.json(serializeBigInt(data));
+    const payload = toAdminFinancialDataResponse(data) satisfies AdminFinancialDataResponse;
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -387,7 +415,10 @@ export async function getFinancialAnalytics(
   try {
     const params = req.query as unknown as any;
     const analytics = await adminService.getFinancialAnalytics(params);
-    res.json(serializeBigInt(analytics));
+    const payload = toAdminFinancialAnalyticsResponse(
+      analytics,
+    ) satisfies AdminFinancialAnalyticsResponse;
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -813,7 +844,8 @@ export async function getAllAchievements(
 ): Promise<void> {
   try {
     const achievements = await adminAchievementService.getAllAchievements();
-    res.json(serializeBigInt(achievements));
+    const payload = achievements.map(toAdminAchievementView) satisfies AdminAchievementView[];
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -833,7 +865,8 @@ export async function getAchievementById(
       return;
     }
 
-    res.json(serializeBigInt(achievement));
+    const payload = toAdminAchievementView(achievement) satisfies AdminAchievementView;
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -847,7 +880,8 @@ export async function createAchievement(
   try {
     const data = req.body;
     const achievement = await adminAchievementService.createAchievement(data);
-    res.status(201).json(serializeBigInt(achievement));
+    const payload = toAdminAchievementView(achievement) satisfies AdminAchievementView;
+    res.status(201).json(payload);
   } catch (err) {
     next(err);
   }
@@ -862,7 +896,8 @@ export async function updateAchievement(
     const achievementId = parseInt(req.params.id);
     const data = req.body;
     const achievement = await adminAchievementService.updateAchievement(achievementId, data);
-    res.json(serializeBigInt(achievement));
+    const payload = toAdminAchievementView(achievement) satisfies AdminAchievementView;
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -941,7 +976,8 @@ export async function getUsersWithAchievement(
   try {
     const achievementId = parseInt(req.params.id);
     const users = await adminAchievementService.getUsersWithAchievement(achievementId);
-    res.json(serializeBigInt(users));
+    const payload = users.map(toAdminUserAchievementView) satisfies AdminUserAchievementView[];
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -954,7 +990,10 @@ export async function getAchievementAnalytics(
 ): Promise<void> {
   try {
     const analytics = await adminAchievementService.getAchievementAnalytics();
-    res.json(serializeBigInt(analytics));
+    const payload = toAdminAchievementAnalyticsResponse(
+      analytics,
+    ) satisfies AdminAchievementAnalyticsResponse;
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -984,7 +1023,8 @@ export async function issueBan(req: Request, res: Response, next: NextFunction):
       moderatorId,
     });
 
-    res.status(201).json(serializeBigInt(banHistory));
+    const payload = toAdminBanHistoryView(banHistory) satisfies AdminBanHistoryView;
+    res.status(201).json(payload);
   } catch (err) {
     next(err);
   }
@@ -1015,7 +1055,8 @@ export async function getBanHistory(
 ): Promise<void> {
   try {
     const history = await shameWallService.getBanHistory();
-    res.json(serializeBigInt(history));
+    const payload = history.map(toAdminBanHistoryView) satisfies AdminBanHistoryView[];
+    res.json(payload);
   } catch (err) {
     next(err);
   }

@@ -553,7 +553,7 @@ export type Role            = PrismaRole;
 export type BetOption       = PrismaBetOption;
 export type BetStatus       = PrismaBetStatus;
 export type TransactionType = PrismaTransactionType;
-export type FeedStatus      = PrismaFeedStatus;
+// FeedStatus moved to standardized section
 export type ArticleStatus   = PrismaArticleStatus;
 export type ModerationAction = PrismaModerationAction;
 
@@ -1217,17 +1217,7 @@ export type ArticleModerationData = {
   leadImageUrl: string | null;
 };
 
-// API Request/Response Types
-export type CreateFeedRequest = {
-  name: string;
-  url: string;
-  siteUrl?: string;
-  allowImages?: boolean;
-};
-
-export type UpdateFeedRequest = Partial<CreateFeedRequest> & {
-  status?: FeedStatus;
-};
+// API Request/Response Types moved to standardized section
 
 export type UpdateArticleRequest = {
   status: ArticleStatus;
@@ -2252,6 +2242,347 @@ export interface ApiError {
   code?: string;
   details?: Record<string, unknown>;
 }
+
+// ——— Timeline Response DTOs ————————————————————————————————————————————
+export interface TimelineArticlesResponse {
+  items: TimelineItem[];
+  pagination: {
+    cursor?: string;
+    hasMore: boolean;
+    total?: number;
+  };
+}
+
+export interface ArticleReactionResponse {
+  action: 'added' | 'removed';
+  type: string;
+  totalReactions: number;
+}
+
+export interface ArticleCommentResponse {
+  id: number;
+  content: string;
+  authorId: number;
+  authorName: string;
+  articleId: number;
+  createdAt: string; // Date → ISO string
+}
+
+// ——— Admin Response DTOs ————————————————————————————————————————————
+export interface AdminUserSearchResponse {
+  users: AdminUserView[];
+  totalCount: number;
+  totalPages: number;
+  currentPage: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+}
+
+export interface AdminFinancialDataResponse {
+  transactions: AdminTransactionView[];
+  bets: AdminBetView[];
+  summary: {
+    totalTransactions: number;
+    totalBets: number;
+    totalVolume: string;        // BigInt → string
+    totalPayouts: string;       // BigInt → string
+    netRevenue: string;         // BigInt → string
+  };
+  pagination: {
+    page: number;
+    limit: number;
+    totalPages: number;
+    hasMore: boolean;
+  };
+}
+
+// ——— Feed Response DTOs —————————————————————————————————————————————
+export const FeedStatuses = { ACTIVE: 'ACTIVE', INACTIVE: 'INACTIVE', ERROR: 'ERROR' } as const;
+export type FeedStatus = typeof FeedStatuses[keyof typeof FeedStatuses];
+
+export interface FeedView {
+  id: number;
+  name: string;
+  url: string;
+  siteUrl: string | null;
+  status: FeedStatus;
+  allowImages: boolean;
+  lastFetchedAt: string | null;   // Date → ISO string
+  lastSuccessAt: string | null;   // Date → ISO string  
+  lastErrorAt: string | null;     // Date → ISO string
+  lastErrorMsg: string | null;
+  fetchCount: number;
+  errorCount: number;
+  createdAt: string;              // Date → ISO string
+  updatedAt: string;              // Date → ISO string
+}
+
+export interface FeedsListResponse {
+  feeds: FeedView[];
+}
+
+export interface CreateFeedRequest {
+  name: string;
+  url: string;
+  siteUrl?: string;
+  allowImages?: boolean;
+}
+
+export interface UpdateFeedRequest {
+  name?: string;
+  url?: string;
+  siteUrl?: string;
+  status?: FeedStatus;
+  allowImages?: boolean;
+}
+
+// ——— Monitoring Response DTOs ———————————————————————————————————————————
+export interface DatabaseStatus {
+  connected: boolean;
+  timestamp: string;              // Date → ISO string
+}
+
+export interface RedisStatus {
+  connected: boolean;
+  memory?: string;
+  error?: string;
+}
+
+export interface QueryMetrics {
+  totalQueries: number;
+  averageExecutionTime: number;
+  slowQueries: Array<{
+    query: string;
+    duration: number;
+    timestamp: string;
+  }>;
+}
+
+export interface DatabaseMetricsResponse {
+  database: {
+    totalQueries: number;
+    averageExecutionTime: number;
+    slowQueries: Array<{
+      query: string;
+      duration: number;
+      timestamp: string;
+    }>;
+    status: DatabaseStatus;
+  };
+  redis: RedisStatus;
+  timestamp: string;              // Date → ISO string
+}
+
+export interface ClearMetricsResponse {
+  success: boolean;
+  message: string;
+  timestamp: string;              // Date → ISO string
+}
+
+export interface HealthCheckResponse {
+  status: 'healthy' | 'unhealthy';
+  checks: {
+    database: boolean;
+    redis: boolean;
+  };
+  timestamp: string;              // Date → ISO string
+}
+
+// ——— Admin Analytics Response DTOs ———————————————————————————————————————
+export interface AdminFinancialAnalyticsResponse {
+  totalRevenue: string;           // BigInt → string
+  totalVolume: string;            // BigInt → string
+  totalPayouts: string;           // BigInt → string
+  netRevenue: string;             // BigInt → string
+  totalTransactions: number;
+  totalBets: number;
+  avgBetAmount: string;           // BigInt → string
+  profitMargin: number;
+  revenueByDay: Array<{
+    date: string;                 // Date → ISO string
+    revenue: string;              // BigInt → string
+    volume: string;               // BigInt → string
+    bets: number;
+  }>;
+  topUsers: Array<{
+    userId: number;
+    userName: string;
+    totalWagered: string;         // BigInt → string
+    totalWon: string;             // BigInt → string
+    netLoss: string;              // BigInt → string
+  }>;
+  generatedAt: string;            // Date → ISO string
+}
+
+export interface AdminPredictionSearchResponse {
+  predictions: Array<{
+    id: number;
+    title: string;
+    status: string;
+    totalBets: number;
+    totalVolume: string;          // BigInt → string
+    expectedPayout: string;       // BigInt → string
+    createdAt: string;            // Date → ISO string
+    closesAt: string | null;      // Date → ISO string
+    resolvedAt: string | null;    // Date → ISO string
+  }>;
+  totalCount: number;
+  totalPages: number;
+  currentPage: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+}
+
+export interface AdminBulkPredictionsResponse {
+  updated: number;
+  failed: number;
+  errors: Array<{
+    id: number;
+    error: string;
+  }>;
+  summary: {
+    totalProcessed: number;
+    successRate: number;
+  };
+  processedAt: string;            // Date → ISO string
+}
+
+export interface AdminAchievementView {
+  id: number;
+  name: string;
+  title: string;
+  description: string;
+  category: string;
+  targetValue: number;
+  iconUrl: string | null;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;             // Date → ISO string
+  updatedAt: string;             // Date → ISO string
+  totalUsers?: number;           // Optional stats fields
+  completedUsers?: number;
+  completionRate?: number;
+  recentUnlocks?: Array<{
+    userId: number;
+    userName: string;
+    completedAt: string;         // Date → ISO string
+  }>;
+}
+
+export interface AdminBulkOperationResponse {
+  successCount: number;
+  failureCount: number;
+  errors: Array<{
+    userId: number;
+    error: string;
+  }>;
+  updatedUsers: AdminUserView[];
+}
+
+export interface AdminUserAchievementView {
+  userId: number;
+  userName: string;
+  progress: number;
+  completedAt: string | null;    // Date → ISO string
+}
+
+export interface AdminAchievementAnalyticsResponse {
+  overview: {
+    totalAchievements: number;
+    totalCategories: number;
+    totalUnlocks: number;
+    activeUsers: number;
+    averageCompletion: number;
+  };
+  categoryBreakdown: Array<{
+    category: string;
+    achievementCount: number;
+    totalUnlocks: number;
+    averageCompletion: number;
+  }>;
+  topAchievements: Array<{
+    id: number;
+    name: string;
+    title: string;
+    completedUsers: number;
+    completionRate: number;
+  }>;
+  recentActivity: Array<{
+    achievementId: number;
+    achievementTitle: string;
+    userId: number;
+    userName: string;
+    completedAt: string;         // Date → ISO string
+  }>;
+}
+
+export interface AdminBanHistoryView {
+  id: number;
+  userId: number;
+  userName: string;
+  banType: BanType;
+  reason: string;
+  startDate: string;             // Date → ISO string
+  endDate?: string;              // Date → ISO string
+  isActive: boolean;
+  moderatorName: string;
+  shameAchievementsAwarded: string[];
+}
+
+export interface UserEnhancedStatsView {
+  totalBets: number;
+  totalWon: number;
+  totalAmount: string;           // BigInt → string
+  totalPayout: string;           // BigInt → string
+  winRate: number;
+  accuracy: {
+    overall: number;
+    categories: Record<string, number>;
+  };
+  streak: {
+    current: number;
+    type: 'win' | 'loss';
+    best: number;
+  };
+  trends: {
+    winRate: {
+      current: number;
+      change: number;
+      period: string;
+    };
+    volume: {
+      current: number;
+      change: number;
+      period: string;
+    };
+  };
+  ranking: {
+    overall: number;
+    percentile: number;
+    tier: string;
+  };
+}
+
+export interface UserAchievementProgressView {
+  id: number;
+  name: string;
+  title: string;
+  description: string;
+  category: string;
+  targetValue: number;
+  currentValue: number;
+  progress: number;
+  isCompleted: boolean;
+  completedAt: string | null;     // Date → ISO string
+  iconUrl?: string | null;
+  rarity: string;
+}
+
+export interface PongTierDistributionView {
+  tiers: Record<string, number>;
+  totalPlayers: number;
+}
+
 
 // Activity Stream Service Types
 export interface ActivityEventData {

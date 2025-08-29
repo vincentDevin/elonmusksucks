@@ -8,8 +8,14 @@ import {
   toUserPongStatsView,
   toPongMatchHistoryView,
   toPongLeaderboardView,
+  toPongTierDistributionView,
 } from '../view/pong.view';
-import type { UserPongStatsView, PongMatchHistoryView, PongLeaderboardView } from '@ems/types';
+import type {
+  UserPongStatsView,
+  PongMatchHistoryView,
+  PongLeaderboardView,
+  PongTierDistributionView,
+} from '@ems/types';
 
 const pongRepository = new PongRepository();
 const pongStatsService = new PongStatsService(pongRepository);
@@ -226,7 +232,8 @@ export const getEloDistribution = async (
 ): Promise<void> => {
   try {
     const distribution = await pongRepository.getTierDistribution();
-    res.json(distribution);
+    const payload = toPongTierDistributionView(distribution) satisfies PongTierDistributionView;
+    res.json(payload);
   } catch (error) {
     console.error('Get Elo distribution error:', error);
     next(error);

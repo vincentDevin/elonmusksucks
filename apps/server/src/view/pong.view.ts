@@ -1,4 +1,9 @@
-import type { UserPongStatsView, PongMatchHistoryView, PongLeaderboardView } from '@ems/types';
+import type {
+  UserPongStatsView,
+  PongMatchHistoryView,
+  PongLeaderboardView,
+  PongTierDistributionView,
+} from '@ems/types';
 
 /**
  * Maps pong stats data to standardized UserPongStatsView DTO
@@ -110,3 +115,17 @@ export const toPongLeaderboardView = (
   totalWon: entry.totalWon ? entry.totalWon.toString() : '0',
   rank: rank,
 });
+
+/**
+ * Maps tier distribution data to standardized PongTierDistributionView DTO
+ * Calculates total players from tier counts
+ */
+export const toPongTierDistributionView = (
+  tiers: Record<string, number>,
+): PongTierDistributionView => {
+  const totalPlayers = Object.values(tiers).reduce((sum, count) => sum + count, 0);
+  return {
+    tiers,
+    totalPlayers,
+  };
+};

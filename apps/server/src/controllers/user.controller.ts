@@ -19,8 +19,15 @@ import type {
   CreateUserPostPayload,
   UserBetView,
   UserParlayView,
+  UserEnhancedStatsView,
+  UserAchievementProgressView,
 } from '@ems/types';
-import { toUserStatsView, toUserProfileView } from '../view/user.view';
+import {
+  toUserStatsView,
+  toUserProfileView,
+  toUserEnhancedStatsView,
+  toUserAchievementProgressView,
+} from '../view/user.view';
 import { toUserBetView, toUserParlayView } from '../view/betting.view';
 
 // Define MulterFile type explicitly to avoid mismatched declarations
@@ -437,7 +444,8 @@ export async function getEnhancedUserStatsHandler(
     // Get enhanced stats using the new service with real data calculations
     const enhancedStats = await enhancedUserStatsService.getEnhancedStats(targetUserId);
 
-    res.json(enhancedStats);
+    const payload = toUserEnhancedStatsView(enhancedStats) satisfies UserEnhancedStatsView;
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -465,7 +473,10 @@ export async function getUserAchievementsHandler(
     // Get user achievement progress
     const achievements = await achievementService.getUserAchievementProgress(targetUserId);
 
-    res.json(achievements);
+    const payload = achievements.map(
+      toUserAchievementProgressView,
+    ) satisfies UserAchievementProgressView[];
+    res.json(payload);
   } catch (err) {
     next(err);
   }
