@@ -1,3 +1,6 @@
+// System constants
+export const SYSTEM_AI_USER_ID = -1; // Canonical AI user ID for Pong matches
+
 // Rollback: Remove StatsSocketEvents, TimelineSocketEvents, and payload types
 // Socket Event Constants - centralized type-safe event names
 export const SocketEvents = {

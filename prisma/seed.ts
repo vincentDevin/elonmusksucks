@@ -4,6 +4,7 @@ dotenv.config();
 
 import { PrismaClient, TransactionType, BetStatus } from '@prisma/client';
 import { SEED_ACHIEVEMENTS } from './achievement-catalog.ts';
+import { SYSTEM_AI_USER_ID } from '../packages/types/src/index.js';
 
 const prisma = new PrismaClient();
 
@@ -36,7 +37,7 @@ async function main() {
   await clear('ModerationLog',    () => prisma.moderationLog.deleteMany());
   await clear('UserBan',          () => prisma.userBan.deleteMany());
 
-  console.log('👥 Creating users Alice, Bob, Carol, and Admin…');
+  console.log('👥 Creating users Alice, Bob, Carol, Admin, and AI system user…');
   const [alice, bob, carol, admin] = await Promise.all([
     prisma.user.upsert({ where: { email: 'alice@example.com' }, update: {}, create: {
       email: 'alice@example.com', name: 'Alice', passwordHash: 'hash', emailVerified: true,
@@ -59,6 +60,29 @@ async function main() {
       location: 'Server Room', timezone: 'UTC', muskBucks: 100000,
     }}),
   ]);
+  
+  // Create AI system user with special ID (using raw SQL for specific ID)
+  console.log('🤖 Creating AI system user for Pong matches...');
+  await prisma.$executeRaw`
+    INSERT INTO "User" (id, email, name, "passwordHash", "emailVerified", "isSystemAccount", "muskBucks", role, active, bio)
+    VALUES (${SYSTEM_AI_USER_ID}, 'ai@system.internal', 'Elon AI', 'system-account-no-login', true, true, 0, 'USER', true, 'AI opponent for Pong matches')
+    ON CONFLICT (id) DO UPDATE SET 
+      name = EXCLUDED.name,
+      "isSystemAccount" = EXCLUDED."isSystemAccount",
+      bio = EXCLUDED.bio
+  `;
+  
+  // Initialize PongStats for AI user with starting Elo
+  await prisma.pongStats.upsert({
+    where: { userId: SYSTEM_AI_USER_ID },
+    update: {},
+    create: {
+      userId: SYSTEM_AI_USER_ID,
+      eloRating: 1500, // Starting Elo for AI
+      peakElo: 1500,
+      tier: 'GOLD',
+    }
+  });
 
   console.log('🏆 Seeding comprehensive achievement catalog...');
   console.log(`Upserting ${SEED_ACHIEVEMENTS.length} achievements by slug...`);

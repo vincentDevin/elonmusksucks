@@ -114,21 +114,25 @@ export const toUserEnhancedStatsView = (stats: {
   }>;
   currentStreak: {
     count: number;
-    type: 'win' | 'loss';
+    type: 'win' | 'lose';
   };
   bestCategory: string;
   totalWagered: number;
   avgBetSize: number;
   ranking: {
     allTime: {
-      rank: number;
+      rank: number | null;
       percentile: number;
-      tier: string;
+      rankChange: number | null;
+      totalUsers: number;
+      category: 'allTime' | 'daily';
     };
     daily: {
-      rank: number;
+      rank: number | null;
       percentile: number;
-      tier: string;
+      rankChange: number | null;
+      totalUsers: number;
+      category: 'allTime' | 'daily';
     };
   };
 }): UserEnhancedStatsView => ({
@@ -149,7 +153,7 @@ export const toUserEnhancedStatsView = (stats: {
   },
   streak: {
     current: stats.currentStreak.count,
-    type: stats.currentStreak.type,
+    type: stats.currentStreak.type === 'lose' ? 'loss' : stats.currentStreak.type,
     best: stats.currentStreak.count, // Use current as best for now
   },
   trends: {
@@ -165,9 +169,9 @@ export const toUserEnhancedStatsView = (stats: {
     },
   },
   ranking: {
-    overall: stats.ranking.allTime.rank,
+    overall: stats.ranking.allTime.rank || 0,
     percentile: stats.ranking.allTime.percentile,
-    tier: stats.ranking.allTime.tier,
+    tier: 'bronze', // Default tier since UserRanking doesn't have tier
   },
 });
 

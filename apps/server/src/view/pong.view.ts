@@ -55,36 +55,23 @@ export const toUserPongStatsView = (stats: {
  * Maps pong match history data to standardized PongMatchHistoryView DTO
  * Handles BigInt → string conversion for amounts and Date → ISO string
  */
-export const toPongMatchHistoryView = (match: {
-  id: number;
-  playerOneId: number;
-  playerTwoId: number | null;
-  playerOneScore: number;
-  playerTwoScore: number;
-  playerWon: boolean;
-  wagerAmount: bigint;
-  payoutAmount: bigint;
-  eloChange: number;
-  duration: number;
-  aiDifficulty?: string;
-  opponentName: string | null;
-  opponentElo: number | null;
-  playedAt: Date;
-}): PongMatchHistoryView => ({
+export const toPongMatchHistoryView = (match: any): PongMatchHistoryView => ({
   id: match.id,
   playerOneId: match.playerOneId,
   playerTwoId: match.playerTwoId,
   playerOneScore: match.playerOneScore,
   playerTwoScore: match.playerTwoScore,
   playerWon: match.playerWon,
-  wagerAmount: match.wagerAmount.toString(),
-  payoutAmount: match.payoutAmount.toString(),
-  eloChange: match.eloChange,
-  duration: match.duration,
-  aiDifficulty: match.aiDifficulty,
-  opponentName: match.opponentName,
-  opponentElo: match.opponentElo,
-  playedAt: match.playedAt.toISOString(),
+  wagerAmount: (match.wagerAmount ?? 0n).toString(),
+  payoutAmount: (match.payoutAmount ?? 0n).toString(),
+  eloChange: match.eloChange || 0,
+  duration: match.duration || 0,
+  aiDifficulty: match.aiDifficulty || null,
+  opponentName:
+    match.opponent?.name ||
+    (match.isAiMatch ? `AI (${match.aiDifficulty || 'medium'})` : 'Unknown'),
+  opponentElo: match.opponent?.eloRating || null,
+  playedAt: (match.completedAt || match.createdAt || new Date()).toISOString(),
 });
 
 /**

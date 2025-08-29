@@ -28,6 +28,8 @@ export function processPongStats(matchId: string, userId: number, _stats: any): 
 // PongDifficulty now handled via 'any' type in shared interfaces
 import { PongMatchResult, PongStatsUpdate, EloChangeComponents } from '@ems/types';
 import { PongEloService } from './pongElo.service';
+import { PureEloService } from './pureElo.service';
+import { SYSTEM_AI_USER_ID } from '@ems/types';
 import type { PongStatsData } from '../repositories/IPongRepository';
 
 // Note: Pong service interfaces now imported from @ems/types
@@ -349,36 +351,71 @@ export class PongStatsService {
     const isPerfectGame = loserScore === 0;
     const isComeback = winnerScore === 11 && loserScore >= 5;
 
+    // Determine match mode
+    const mode = aiDifficulty || loserId === SYSTEM_AI_USER_ID ? 'PVE_AI' : 'PVP';
+    const isRated = PureEloService.isRatedMatch(wagerAmount);
+
     // Get current Elo ratings
-    const winnerElo = winnerStats?.eloRating || PongEloService.getDefaultElo();
+    const winnerElo = winnerStats?.eloRating || 1200; // Default starting Elo
     const loserElo =
       loserStats?.eloRating ||
-      (aiDifficulty ? PongEloService.getAiElo(aiDifficulty) : PongEloService.getDefaultElo());
+      (aiDifficulty ? PureEloService.getAIEloByDifficulty(aiDifficulty) : 1200);
 
-    // Calculate Elo changes for winner
-    const winnerEloChange = PongEloService.calculateEloChange({
-      playerElo: winnerElo,
-      opponentElo: loserElo,
-      playerWon: true,
-      wagerAmount,
-      amountWon: payoutAmount,
-      isAiOpponent: !!aiDifficulty,
-      isPerfectGame,
-    });
-
-    // Calculate Elo changes for loser (if human loser exists)
+    // Calculate Elo changes using pure Elo service if match is rated
+    let winnerEloChange: EloChangeComponents;
     let loserEloChange: EloChangeComponents | undefined;
-    if (loserId && loserId > 0) {
-      // Human loser (positive ID)
-      loserEloChange = PongEloService.calculateEloChange({
-        playerElo: loserElo,
-        opponentElo: winnerElo,
-        playerWon: false,
-        wagerAmount,
-        amountWon: 0n,
-        isAiOpponent: !!aiDifficulty,
-        isPerfectGame: false,
+
+    if (isRated) {
+      // Use pure Elo calculation for rated matches
+      const pureEloResult = PureEloService.calculateEloChange({
+        playerElo: winnerElo,
+        opponentElo: loserElo,
+        won: true,
+        mode: mode as 'PVP' | 'PVE_AI',
       });
+
+      // Convert to legacy format for compatibility
+      winnerEloChange = {
+        skillChange: pureEloResult.delta,
+        economyChange: 0, // Pure Elo doesn't have economy component
+        economyComponent: 0,
+        totalChange: pureEloResult.delta,
+        newRating: pureEloResult.newRating,
+        newTier: PureEloService.getTier(pureEloResult.newRating),
+      };
+
+      // Calculate loser changes if human loser
+      if (loserId && loserId > 0) {
+        loserEloChange = {
+          skillChange: pureEloResult.opponentDelta,
+          economyChange: 0,
+          economyComponent: 0,
+          totalChange: pureEloResult.opponentDelta,
+          newRating: pureEloResult.opponentNewRating,
+          newTier: PureEloService.getTier(pureEloResult.opponentNewRating),
+        };
+      }
+    } else {
+      // Unrated matches - no Elo change
+      winnerEloChange = {
+        skillChange: 0,
+        economyChange: 0,
+        economyComponent: 0,
+        totalChange: 0,
+        newRating: winnerElo,
+        newTier: PureEloService.getTier(winnerElo),
+      };
+
+      if (loserId && loserId > 0) {
+        loserEloChange = {
+          skillChange: 0,
+          economyChange: 0,
+          economyComponent: 0,
+          totalChange: 0,
+          newRating: loserElo,
+          newTier: PureEloService.getTier(loserElo),
+        };
+      }
     }
 
     // Calculate stats updates

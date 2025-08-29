@@ -225,8 +225,10 @@ export default function PongStatsCard({
             </div>
             <div className="flex justify-between">
               <span className="text-tertiary">ROI</span>
-              <span className={`font-medium ${stats.roi >= 0 ? 'text-success' : 'text-error'}`}>
-                {stats.roi.toFixed(1)}%
+              <span
+                className={`font-medium ${(stats.roi ?? 0) >= 0 ? 'text-success' : 'text-error'}`}
+              >
+                {(stats.roi ?? 0).toFixed(1)}%
               </span>
             </div>
             <div className="flex justify-between">
@@ -265,7 +267,7 @@ export default function PongStatsCard({
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div className="flex justify-between">
               <span className="text-tertiary">Avg Ping</span>
-              <span className="font-medium text-content">{stats.avgPing.toFixed(0)}ms</span>
+              <span className="font-medium text-content">{(stats.avgPing ?? 0).toFixed(0)}ms</span>
             </div>
             <div className="flex justify-between">
               <span className="text-tertiary">Avg Game Time</span>

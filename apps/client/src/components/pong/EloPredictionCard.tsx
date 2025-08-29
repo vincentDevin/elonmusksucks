@@ -104,12 +104,12 @@ export default function EloPredictionCard({
 
   if (wagerAmount === 0) {
     return (
-      <div className={`bg-blue-50 border border-blue-200 rounded-lg p-4 ${className}`}>
+      <div className={`bg-surface border border-accent/20 rounded-lg p-4 ${className}`}>
         <div className="flex items-center space-x-2 text-info">
           <InformationCircleIcon className="w-5 h-5" />
           <span className="text-sm font-medium">Free Practice Mode</span>
         </div>
-        <p className="text-xs text-info mt-1">
+        <p className="text-xs text-tertiary mt-1">
           This is a free match - no Elo changes or MuskBucks at stake. Perfect for practice!
         </p>
       </div>
@@ -129,12 +129,12 @@ export default function EloPredictionCard({
 
   if (error || !prediction) {
     return (
-      <div className={`bg-red-50 border border-red-200 rounded-lg p-4 ${className}`}>
+      <div className={`bg-surface border border-error/20 rounded-lg p-4 ${className}`}>
         <div className="flex items-center space-x-2 text-error">
           <InformationCircleIcon className="w-5 h-5" />
           <span className="text-sm font-medium">Prediction Unavailable</span>
         </div>
-        <p className="text-xs text-error mt-1">{error || 'Unable to calculate Elo changes'}</p>
+        <p className="text-xs text-tertiary mt-1">{error || 'Unable to calculate Elo changes'}</p>
       </div>
     );
   }
@@ -199,7 +199,7 @@ export default function EloPredictionCard({
       {/* Prediction Results */}
       <div className="grid grid-cols-2 gap-3">
         {/* Win Scenario */}
-        <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+        <div className="bg-success/10 border border-success/20 rounded-lg p-3">
           <div className="flex items-center space-x-2 mb-2">
             <ArrowTrendingUpIcon className="w-4 h-4 text-success" />
             <span className="text-sm font-medium text-success">If You Win</span>
@@ -212,7 +212,7 @@ export default function EloPredictionCard({
         </div>
 
         {/* Loss Scenario */}
-        <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+        <div className="bg-error/10 border border-error/20 rounded-lg p-3">
           <div className="flex items-center space-x-2 mb-2">
             <ArrowTrendingDownIcon className="w-4 h-4 text-error" />
             <span className="text-sm font-medium text-error">If You Lose</span>

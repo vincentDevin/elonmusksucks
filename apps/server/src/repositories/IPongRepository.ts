@@ -58,6 +58,15 @@ export interface PongMatchData {
   eloChange?: number;
   skillComponent?: number;
   economyComponent?: number;
+  // Canonical fields
+  mode?: string;
+  rated?: boolean;
+  hostUserId?: number;
+  joinerUserId?: number;
+  aiUserId?: number;
+  hostDisplayName?: string;
+  joinerDisplayName?: string;
+  aiDisplayName?: string;
 }
 
 export interface PongStatsWithUser extends PongStatsData {
