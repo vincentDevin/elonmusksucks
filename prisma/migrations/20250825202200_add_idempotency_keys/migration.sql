@@ -7,16 +7,16 @@
 ALTER TABLE "Bet" ADD COLUMN "idempotencyKey" TEXT;
 
 -- Add unique constraint on Bet.idempotencyKey (only when not null)
-CREATE UNIQUE INDEX CONCURRENTLY "Bet_idempotencyKey_key" ON "Bet"("idempotencyKey") WHERE "idempotencyKey" IS NOT NULL;
+CREATE UNIQUE INDEX "Bet_idempotencyKey_key" ON "Bet"("idempotencyKey") WHERE "idempotencyKey" IS NOT NULL;
 
 -- Add idempotencyKey column to Parlay table  
 ALTER TABLE "Parlay" ADD COLUMN "idempotencyKey" TEXT;
 
 -- Add unique constraint on Parlay.idempotencyKey (only when not null)
-CREATE UNIQUE INDEX CONCURRENTLY "Parlay_idempotencyKey_key" ON "Parlay"("idempotencyKey") WHERE "idempotencyKey" IS NOT NULL;
+CREATE UNIQUE INDEX "Parlay_idempotencyKey_key" ON "Parlay"("idempotencyKey") WHERE "idempotencyKey" IS NOT NULL;
 
 -- Add idempotencyKey column to Transaction table
 ALTER TABLE "Transaction" ADD COLUMN "idempotencyKey" TEXT;
 
 -- Add unique constraint on Transaction.idempotencyKey (only when not null) 
-CREATE UNIQUE INDEX CONCURRENTLY "Transaction_idempotencyKey_key" ON "Transaction"("idempotencyKey") WHERE "idempotencyKey" IS NOT NULL;
+CREATE UNIQUE INDEX "Transaction_idempotencyKey_key" ON "Transaction"("idempotencyKey") WHERE "idempotencyKey" IS NOT NULL;

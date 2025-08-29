@@ -4,7 +4,12 @@ dotenv.config();
 
 import { PrismaClient, TransactionType, BetStatus } from '@prisma/client';
 import { SEED_ACHIEVEMENTS } from './achievement-catalog.ts';
-import { SYSTEM_AI_USER_ID } from '../packages/types/src/index.js';
+const AI_USERS = [
+  { id: -1, name: "Grimes' Laptop", difficulty: 'EASY' },
+  { id: -2, name: "Zuck's Metaverse", difficulty: 'MEDIUM' },
+  { id: -3, name: "Bezos' Rocket", difficulty: 'HARD' },
+  { id: -4, name: "X Æ A-XII", difficulty: 'IMPOSSIBLE' },
+];
 
 const prisma = new PrismaClient();
 
@@ -61,28 +66,36 @@ async function main() {
     }}),
   ]);
   
-  // Create AI system user with special ID (using raw SQL for specific ID)
-  console.log('🤖 Creating AI system user for Pong matches...');
-  await prisma.$executeRaw`
-    INSERT INTO "User" (id, email, name, "passwordHash", "emailVerified", "isSystemAccount", "muskBucks", role, active, bio)
-    VALUES (${SYSTEM_AI_USER_ID}, 'ai@system.internal', 'Elon AI', 'system-account-no-login', true, true, 0, 'USER', true, 'AI opponent for Pong matches')
-    ON CONFLICT (id) DO UPDATE SET 
-      name = EXCLUDED.name,
-      "isSystemAccount" = EXCLUDED."isSystemAccount",
-      bio = EXCLUDED.bio
-  `;
-  
-  // Initialize PongStats for AI user with starting Elo
-  await prisma.pongStats.upsert({
-    where: { userId: SYSTEM_AI_USER_ID },
-    update: {},
-    create: {
-      userId: SYSTEM_AI_USER_ID,
-      eloRating: 1500, // Starting Elo for AI
-      peakElo: 1500,
-      tier: 'GOLD',
-    }
-  });
+  // Create AI system users with special IDs (using raw SQL for specific IDs)
+  console.log('🤖 Creating AI system users for Pong matches...');
+  for (const aiUser of AI_USERS) {
+    await prisma.$executeRaw`
+      INSERT INTO "User" (id, email, name, "passwordHash", "emailVerified", "isSystemAccount", "muskBucks", role, active, bio)
+      VALUES (${aiUser.id}, ${`ai${aiUser.id}@system.internal`}, ${aiUser.name}, 'system-account-no-login', true, true, 0, 'USER', true, ${`AI opponent (${aiUser.difficulty}) for Pong matches`})
+      ON CONFLICT (id) DO UPDATE SET 
+        name = EXCLUDED.name,
+        "isSystemAccount" = EXCLUDED."isSystemAccount",
+        bio = EXCLUDED.bio
+    `;
+    
+    // Initialize PongStats for each AI user with appropriate Elo
+    const baseElo = aiUser.difficulty === 'EASY' ? 1200 : 
+                   aiUser.difficulty === 'MEDIUM' ? 1400 :
+                   aiUser.difficulty === 'HARD' ? 1600 : 1800; // IMPOSSIBLE
+    
+    await prisma.pongStats.upsert({
+      where: { userId: aiUser.id },
+      update: {},
+      create: {
+        userId: aiUser.id,
+        eloRating: baseElo,
+        peakElo: baseElo,
+        tier: aiUser.difficulty === 'EASY' ? 'SILVER' :
+              aiUser.difficulty === 'MEDIUM' ? 'GOLD' :
+              aiUser.difficulty === 'HARD' ? 'PLATINUM' : 'DIAMOND',
+      }
+    });
+  }
 
   console.log('🏆 Seeding comprehensive achievement catalog...');
   console.log(`Upserting ${SEED_ACHIEVEMENTS.length} achievements by slug...`);
