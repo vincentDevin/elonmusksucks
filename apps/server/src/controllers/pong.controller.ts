@@ -4,6 +4,7 @@ import { PongStatsService } from '../services/pongStats.service';
 import { PongEloService } from '../services/pongElo.service';
 import { PongRepository } from '../repositories/PongRepository';
 import { PongSocketEmitter } from '../handlers/pongSocketHandlers';
+import { eventBus } from '../services/eventBus.service';
 import {
   toUserPongStatsView,
   toPongMatchHistoryView,
@@ -31,7 +32,34 @@ export const recordMatch = async (
   next: NextFunction,
 ): Promise<void> => {
   try {
-    const { matchId, winnerId, loserId, wagerAmount, payoutAmount, duration, isAI } = req.body;
+    const {
+      matchId,
+      winnerId,
+      winnerName,
+      winnerScore,
+      loserId,
+      loserName,
+      loserScore,
+      wagerAmount,
+      payoutAmount,
+      duration,
+      isAI,
+    } = req.body;
+
+    // Debug logging to see what we're receiving
+    console.log(`[DEBUG] Record match request:`, {
+      matchId,
+      winnerId,
+      winnerName,
+      winnerScore,
+      loserId,
+      loserName,
+      loserScore,
+      wagerAmount,
+      payoutAmount,
+      duration,
+      isAI,
+    });
 
     // Validation
     if (typeof matchId !== 'string') {
@@ -42,8 +70,24 @@ export const recordMatch = async (
       res.status(400).json({ error: 'winnerId must be a number or null' });
       return;
     }
+    if (typeof winnerName !== 'string') {
+      res.status(400).json({ error: 'winnerName must be a string' });
+      return;
+    }
+    if (typeof winnerScore !== 'number') {
+      res.status(400).json({ error: 'winnerScore must be a number' });
+      return;
+    }
     if (loserId !== null && typeof loserId !== 'number') {
       res.status(400).json({ error: 'loserId must be a number or null' });
+      return;
+    }
+    if (loserName !== null && typeof loserName !== 'string') {
+      res.status(400).json({ error: 'loserName must be a string or null' });
+      return;
+    }
+    if (typeof loserScore !== 'number') {
+      res.status(400).json({ error: 'loserScore must be a number' });
       return;
     }
     if (typeof wagerAmount !== 'number' || wagerAmount < 0) {
@@ -64,15 +108,22 @@ export const recordMatch = async (
     }
 
     // Create service with injected socket emitter
-    const pongStatsService = new PongStatsService(pongRepository, PongSocketEmitter);
+    const socketEmitter = new PongSocketEmitter(eventBus);
 
-    const result = await pongStatsService.processMatchRecording(
+    const result = await PongStatsService.processMatchRecording(
       matchId,
       winnerId,
       loserId,
       wagerAmount,
       payoutAmount,
       duration,
+      winnerName,
+      loserName,
+      pongRepository,
+      socketEmitter,
+      isAI,
+      winnerScore,
+      loserScore,
     );
 
     // Get final balances for response using repository

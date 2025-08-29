@@ -91,20 +91,18 @@ export class PongApiClient {
 
   async recordMatchResult(result: MatchResult): Promise<void> {
     try {
-      const loserId =
-        result.playerOneId === result.winnerId ? result.playerTwoId : result.playerOneId;
-      // Check if either player is AI (negative ID)
-      const isAI =
-        (result.winnerId !== null && result.winnerId < 0) || (loserId !== null && loserId < 0);
-
       await this.request('/record-match', 'POST', {
         matchId: result.matchId,
         winnerId: result.winnerId,
-        loserId: loserId,
+        winnerName: result.winnerName,
+        winnerScore: result.winnerScore,
+        loserId: result.loserId,
+        loserName: result.loserName,
+        loserScore: result.loserScore,
         wagerAmount: result.wagerAmount,
         payoutAmount: result.payoutAmount,
         duration: result.duration,
-        isAI: isAI,
+        isAI: result.isAI,
       });
     } catch (error) {
       console.error('Failed to record match result:', error);

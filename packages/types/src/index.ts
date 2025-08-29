@@ -271,6 +271,7 @@ export const QUEUE_NAMES = {
   LEADERBOARD_REFRESH: 'leaderboard-refresh',
   LEADERBOARD_EVENTS: 'leaderboard-events',
   PAYOUTS: 'payouts',
+  PONG_PAYOUTS: 'pong-payouts',
   FEED: 'feed',
 } as const;
 export type QueueName = typeof QUEUE_NAMES[keyof typeof QUEUE_NAMES];
@@ -1965,13 +1966,15 @@ export interface ServerEvents {
 export interface MatchResult {
   matchId: string;
   winnerId: number | null;
-  winnerSlot: 0 | 1 | null;
-  playerOneId: number;
-  playerTwoId: number | null;
-  finalScores: [number, number];
+  winnerName: string;
+  winnerScore: number;
+  loserId: number | null;
+  loserName: string | null;
+  loserScore: number;
   duration: number;
   wagerAmount: number;
   payoutAmount: number;
+  isAI: boolean;
   reason: 'completed' | 'forfeit' | 'disconnect' | 'error';
 }
 
@@ -2024,20 +2027,30 @@ export interface UserPongStatsView {
 }
 
 export interface PongMatchHistoryView {
-  id: number;
+  id: string;
   playerOneId: number;
   playerTwoId: number | null;
   playerOneScore: number;
   playerTwoScore: number;
+  currentUserScore: number;    // Current user's score in context
+  opponentScore: number;       // Opponent's score in context
+  currentUserName: string;     // Current user's name
+  opponentName: string;        // Opponent's name
   playerWon: boolean;
   wagerAmount: string;         // BigInt → string
-  payoutAmount: string;        // BigInt → string
+  payoutAmount: string;        // BigInt → string  
   eloChange: number;
   duration: number;
   aiDifficulty?: string;
-  opponentName: string | null;
-  opponentElo: number | null;
-  playedAt: string;            // Date → ISO
+  opponent?: {
+    id: number;
+    name: string;
+    avatarUrl?: string | null;
+  } | null;
+  isAiMatch: boolean;
+  completedAt: string;
+  skillComponent?: number;
+  economyComponent?: number;
 }
 
 export interface PongLeaderboardView {
@@ -2755,3 +2768,18 @@ export type AdminTransactionView = {
   relatedParlayId: number | null;
   createdAt: string;
 };
+
+// ——— Pong Payout Worker Types ——————————————————————————————————————————
+export interface PongPayoutData {
+  matchId: string;
+  winnerId: number;
+  mode: 'PVP' | 'PVE_AI';
+  stakeAmount: number;
+}
+
+export interface PongPayoutResult {
+  success: boolean;
+  payoutAmount?: bigint;
+  transactionId?: number;
+  error?: string;
+}

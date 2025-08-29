@@ -105,4 +105,54 @@ export class PureEloService {
 
     return difficultyMap[difficulty] || 1200;
   }
+
+  /**
+   * Verify Elo calculation matches spec
+   * For equal Elo (1500 vs 1500):
+   * - PVP win: +16, loss: -16
+   * - PVE_AI win: +12, loss: -12
+   */
+  static verifyCalculation(): boolean {
+    // Test PVP equal Elo
+    const pvpWin = this.calculateEloChange({
+      playerElo: 1500,
+      opponentElo: 1500,
+      won: true,
+      mode: 'PVP',
+    });
+    const pvpLoss = this.calculateEloChange({
+      playerElo: 1500,
+      opponentElo: 1500,
+      won: false,
+      mode: 'PVP',
+    });
+
+    // Test PVE_AI equal Elo
+    const pveWin = this.calculateEloChange({
+      playerElo: 1500,
+      opponentElo: 1500,
+      won: true,
+      mode: 'PVE_AI',
+    });
+    const pveLoss = this.calculateEloChange({
+      playerElo: 1500,
+      opponentElo: 1500,
+      won: false,
+      mode: 'PVE_AI',
+    });
+
+    const isValid =
+      pvpWin.delta === 16 && pvpLoss.delta === -16 && pveWin.delta === 12 && pveLoss.delta === -12;
+
+    if (!isValid) {
+      console.error('Pure Elo calculation verification failed:', {
+        pvpWin: pvpWin.delta,
+        pvpLoss: pvpLoss.delta,
+        pveWin: pveWin.delta,
+        pveLoss: pveLoss.delta,
+      });
+    }
+
+    return isValid;
+  }
 }

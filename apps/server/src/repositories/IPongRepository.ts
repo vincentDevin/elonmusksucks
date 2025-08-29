@@ -105,6 +105,12 @@ export interface IPongRepository {
   findMatchById(matchId: string): Promise<PongMatchData | null>;
   createMatch(data: PongMatchData): Promise<PongMatchData>;
   updateMatch(matchId: string, data: Partial<PongMatchData>): Promise<void>;
+  setMatchActive(
+    matchId: string,
+    hostUserId: number,
+    joinerUserId?: number,
+    aiUserId?: number,
+  ): Promise<void>;
 
   // Leaderboard operations
   getEloLeaderboard(limit: number, offset: number): Promise<PongStatsWithUser[]>;
@@ -134,7 +140,6 @@ export interface IPongRepository {
     matchData: PongMatchData,
     winnerStatsData?: Partial<PongStatsData>,
     loserStatsData?: Partial<PongStatsData>,
-    payoutAmount?: bigint,
   ): Promise<{ isLossOnly: boolean; winnerId?: number; loserId?: number }>;
 
   // Utility operations

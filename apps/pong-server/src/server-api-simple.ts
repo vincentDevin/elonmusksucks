@@ -98,7 +98,8 @@ class DatabaseManager {
       console.log(`📊 Recording match result via API:`, {
         matchId: result.matchId,
         winner: result.winnerId,
-        scores: result.finalScores,
+        winnerScore: result.winnerScore,
+        loserScore: result.loserScore,
         wager: result.wagerAmount,
         payout: result.payoutAmount,
       });
@@ -761,17 +762,55 @@ class GameManager {
     const winnerPlayer = winnerSlot !== undefined ? game.players[winnerSlot] : null;
     const winnerId = winnerPlayer?.id || null; // Keep the actual ID (including negative AI IDs)
 
-    // Record result in database
+    // Calculate correct payout amount based on match type
+    let payoutAmount = 0;
+    if (winnerId) {
+      if (game.isAI) {
+        // AI match: house pays 2x stake if human wins, no payout if AI wins
+        payoutAmount = winnerId > 0 ? game.wager * 2 : 0;
+      } else {
+        // PVP match: winner gets the full pot (2x stake total)
+        payoutAmount = game.wager * 2;
+      }
+    }
+
+    // Determine winner and loser based on actual winner ID
+    const player1 = game.players[0];
+    const player2 = game.players[1];
+    const isPlayer1Winner = winnerId === player1.id;
+    const isPlayer2Winner = winnerId === player2?.id;
+
+    let winnerUserId = winnerId;
+    let winnerName = isPlayer1Winner ? player1.name : isPlayer2Winner ? player2?.name : null;
+    let winnerScore = isPlayer1Winner ? player1.score : isPlayer2Winner ? player2?.score : 0;
+
+    let loserUserId: number | null = null;
+    let loserName: string | null = null;
+    let loserScore = 0;
+
+    if (isPlayer1Winner && player2) {
+      loserUserId = player2.id;
+      loserName = player2.name;
+      loserScore = player2.score;
+    } else if (isPlayer2Winner) {
+      loserUserId = player1.id;
+      loserName = player1.name;
+      loserScore = player1.score;
+    }
+
+    // Record result in database - simplified data structure
     const result: MatchResult = {
       matchId: game.id,
-      winnerId,
-      winnerSlot: winnerSlot ?? null,
-      playerOneId: game.players[0].id,
-      playerTwoId: game.players[1]?.id || null, // Keep the actual ID (including negative AI IDs)
-      finalScores: [game.players[0].score, game.players[1]?.score || 0],
+      winnerId: winnerUserId,
+      winnerName: winnerName || 'Unknown',
+      winnerScore,
+      loserId: loserUserId,
+      loserName: loserName || null,
+      loserScore,
       duration,
       wagerAmount: game.wager,
-      payoutAmount: winnerId ? game.wager * 2 : 0,
+      payoutAmount,
+      isAI: game.isAI,
       reason: reason as any,
     };
 
@@ -785,7 +824,7 @@ class GameManager {
           winnerSlot === 0 ? result.payoutAmount : game.wager > 0 ? -game.wager : 0;
         this.io.to(player1SocketId).emit('match_end', {
           winner: winnerSlot !== undefined ? winnerSlot : null,
-          scores: result.finalScores,
+          scores: [result.winnerScore, result.loserScore],
           reason,
           duration,
           payout: player1Payout,
@@ -800,7 +839,7 @@ class GameManager {
           winnerSlot === 1 ? result.payoutAmount : game.wager > 0 ? -game.wager : 0;
         this.io.to(player2SocketId).emit('match_end', {
           winner: winnerSlot !== undefined ? winnerSlot : null,
-          scores: result.finalScores,
+          scores: [result.winnerScore, result.loserScore],
           reason,
           duration,
           payout: player2Payout,
@@ -815,7 +854,7 @@ class GameManager {
       spectatorSocketIds.forEach((socketId) => {
         this.io.to(socketId).emit('match_end', {
           winner: winnerSlot !== undefined ? winnerSlot : null,
-          scores: result.finalScores,
+          scores: [result.winnerScore, result.loserScore],
           reason,
           duration,
           payout: 0, // Spectators don't get payout info

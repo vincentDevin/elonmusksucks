@@ -31,6 +31,10 @@ interface MatchHistoryEntry {
   completedAt: string;
   playerOneScore: number;
   playerTwoScore: number;
+  currentUserScore: number;
+  opponentScore: number;
+  currentUserName: string;
+  opponentName: string;
   skillComponent?: number;
   economyComponent?: number;
 }
@@ -136,38 +140,19 @@ export default function PongMatchHistory({
                     />
                   </div>
 
-                  {/* Opponent Info */}
+                  {/* Match Info */}
                   <div>
                     <div className="flex items-center space-x-2">
-                      {match.opponent ? (
-                        <>
-                          {match.opponent.avatarUrl ? (
-                            // Check if avatar is an emoji (single character or short string)
-                            match.opponent.avatarUrl.length <= 2 ? (
-                              <div className="w-6 h-6 flex items-center justify-center text-lg">
-                                {match.opponent.avatarUrl}
-                              </div>
-                            ) : (
-                              <img
-                                src={match.opponent.avatarUrl}
-                                alt={match.opponent.name}
-                                className="w-6 h-6 rounded-full"
-                              />
-                            )
-                          ) : (
-                            <div className="w-6 h-6 bg-muted rounded-full flex items-center justify-center">
-                              <UserIcon className="w-3 h-3 text-tertiary" />
-                            </div>
-                          )}
-                          <span className="font-medium text-content">{match.opponent.name}</span>
-                        </>
-                      ) : (
-                        <span className="font-medium text-content">Unknown Opponent</span>
-                      )}
+                      <div className="w-6 h-6 bg-muted rounded-full flex items-center justify-center">
+                        <UserIcon className="w-3 h-3 text-tertiary" />
+                      </div>
+                      <span className="font-medium text-content">
+                        {match.currentUserName} vs {match.opponentName}
+                      </span>
                     </div>
                     <div className="text-sm text-tertiary">
-                      {match.playerOneScore}-{match.playerTwoScore} •{' '}
-                      {formatTimeAgo(match.completedAt)}
+                      {match.playerWon ? 'Won' : 'Lost'} {match.currentUserScore}-
+                      {match.opponentScore} • {formatTimeAgo(match.completedAt)}
                       {Number(match.wagerAmount) > 0 && (
                         <span> • {formatCurrency(match.wagerAmount)} wagered</span>
                       )}

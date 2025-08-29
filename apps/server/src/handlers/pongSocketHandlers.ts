@@ -1,5 +1,5 @@
 import { type Server as IOServer, type Socket } from 'socket.io';
-import redisClient from '../lib/redis';
+import { IEventBus } from '@ems/types';
 
 /**
  * Register Pong-specific Socket.IO event handlers
@@ -177,13 +177,15 @@ function handleLeaderboardUpdate(io: IOServer, data: any) {
 }
 
 /**
- * Utility functions for emitting Pong events from services
+ * Utility class for emitting Pong events from services using dependency injection
  */
 export class PongSocketEmitter {
+  constructor(private eventBus: IEventBus) {}
+
   /**
    * Emit Elo rating change event
    */
-  static async emitEloUpdate(
+  async emitEloUpdate(
     userId: number,
     oldRating: number,
     newRating: number,
@@ -200,13 +202,13 @@ export class PongSocketEmitter {
       matchId,
     };
 
-    await redisClient.publish('pong:elo:update', JSON.stringify(data));
+    await this.eventBus.publish('pong:elo:update', data);
   }
 
   /**
    * Emit tier change event
    */
-  static async emitTierChange(userId: number, oldTier: string, newTier: string, eloRating: number) {
+  async emitTierChange(userId: number, oldTier: string, newTier: string, eloRating: number) {
     const data = {
       userId,
       oldTier,
@@ -215,39 +217,39 @@ export class PongSocketEmitter {
       isPromotion: this.getTierRank(newTier) > this.getTierRank(oldTier),
     };
 
-    await redisClient.publish('pong:tier:change', JSON.stringify(data));
+    await this.eventBus.publish('pong:tier:change', data);
   }
 
   /**
    * Emit stats update event
    */
-  static async emitStatsUpdate(userId: number, stats: any, matchResult?: any) {
+  async emitStatsUpdate(userId: number, stats: any, matchResult?: any) {
     const data = {
       userId,
       stats,
       matchResult,
     };
 
-    await redisClient.publish('pong:stats:update', JSON.stringify(data));
+    await this.eventBus.publish('pong:stats:update', data);
   }
 
   /**
    * Emit leaderboard update event
    */
-  static async emitLeaderboardUpdate(metric: string, rankings: any[], totalPlayers: number) {
+  async emitLeaderboardUpdate(metric: string, rankings: any[], totalPlayers: number) {
     const data = {
       metric,
       rankings: rankings.slice(0, 50), // Top 50 for real-time updates
       totalPlayers,
     };
 
-    await redisClient.publish('pong:leaderboard:update', JSON.stringify(data));
+    await this.eventBus.publish('pong:leaderboard:update', data);
   }
 
   /**
    * Get numeric rank for tier comparison
    */
-  private static getTierRank(tier: string): number {
+  private getTierRank(tier: string): number {
     const ranks = {
       BRONZE: 1,
       SILVER: 2,

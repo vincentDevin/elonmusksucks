@@ -99,6 +99,36 @@ export class PongRepository implements IPongRepository {
     });
   }
 
+  // Method to set match as ACTIVE with opponent name snapshotting
+  async setMatchActive(
+    matchId: string,
+    hostUserId: number,
+    joinerUserId?: number,
+    aiUserId?: number,
+  ): Promise<void> {
+    // Fetch user names for snapshotting
+    const [hostUser, joinerUser, aiUser] = await Promise.all([
+      hostUserId
+        ? prisma.user.findUnique({ where: { id: hostUserId }, select: { name: true } })
+        : null,
+      joinerUserId
+        ? prisma.user.findUnique({ where: { id: joinerUserId }, select: { name: true } })
+        : null,
+      aiUserId ? prisma.user.findUnique({ where: { id: aiUserId }, select: { name: true } }) : null,
+    ]);
+
+    await prisma.pongMatch.update({
+      where: { id: matchId },
+      data: {
+        status: 'ACTIVE',
+        startedAt: new Date(),
+        hostDisplayName: hostUser?.name || null,
+        joinerDisplayName: joinerUser?.name || null,
+        aiDisplayName: aiUser?.name || 'Elon AI',
+      },
+    });
+  }
+
   // Leaderboard operations
   async getEloLeaderboard(limit: number, offset: number): Promise<PongStatsWithUser[]> {
     const stats = await prisma.pongStats.findMany({
@@ -246,30 +276,69 @@ export class PongRepository implements IPongRepository {
   async getPlayerMatchHistory(userId: number, limit: number): Promise<PongMatchWithPlayers[]> {
     const matches = await prisma.pongMatch.findMany({
       where: {
-        OR: [{ playerOneId: userId }, { playerTwoId: userId }],
+        OR: [
+          { hostUserId: userId },
+          { joinerUserId: userId },
+          // Fallback to legacy fields for old matches
+          { playerOneId: userId },
+          { playerTwoId: userId },
+        ],
         status: 'COMPLETED',
       },
       orderBy: { completedAt: 'desc' },
       take: limit,
       include: {
-        playerOne: {
-          select: { id: true, name: true, avatarUrl: true },
-        },
-        playerTwo: {
-          select: { id: true, name: true, avatarUrl: true },
-        },
-        winner: {
-          select: { id: true, name: true },
-        },
+        // Minimal includes - only what's needed for opponent name resolution
+        playerOne: { select: { id: true, name: true, avatarUrl: true } },
+        playerTwo: { select: { id: true, name: true, avatarUrl: true } },
+        hostUser: { select: { id: true, name: true } },
+        joinerUser: { select: { id: true, name: true } },
+        aiUser: { select: { id: true, name: true } },
+        winner: { select: { id: true, name: true } },
       },
     });
 
-    return matches.map((match) => ({
-      ...this.mapPongMatch(match),
-      playerOne: match.playerOne,
-      playerTwo: match.playerTwo || undefined,
-      winner: match.winner || undefined,
-    }));
+    return matches.map((match) => {
+      const mappedMatch = this.mapPongMatch(match);
+
+      // Ultra-simplified opponent resolution using userId < 0 for AI detection
+      let opponentName: string;
+      let opponentId: number;
+
+      if (match.winnerId === userId) {
+        // Current user won, opponent is the loser
+        opponentId = match.playerTwoId || 0; // playerTwoId is the loser
+        opponentName =
+          opponentId < 0
+            ? match.aiDisplayName || match.joinerDisplayName || 'Elon AI'
+            : match.joinerDisplayName || match.playerTwo?.name || 'Unknown Player';
+      } else {
+        // Current user lost, opponent is the winner
+        opponentId = match.winnerId || match.playerOneId || 0; // winnerId is opponent
+        opponentName =
+          opponentId < 0
+            ? match.aiDisplayName || match.hostDisplayName || 'Elon AI'
+            : match.hostDisplayName || match.playerOne?.name || 'Unknown Player';
+      }
+
+      // Create opponent object matching expected interface
+      const opponent = {
+        id: opponentId,
+        name: opponentName,
+        avatarUrl: null, // Not needed for Pong stats
+      };
+
+      return {
+        ...mappedMatch,
+        playerOne: match.playerOne,
+        playerTwo: opponent,
+        // Preserve original player names for stats service
+        originalPlayerOneName: match.playerOne?.name || match.hostDisplayName,
+        originalPlayerTwoName:
+          match.playerTwo?.name || match.joinerDisplayName || match.aiDisplayName,
+        winner: match.winner || undefined,
+      };
+    });
   }
 
   async getRecentMatches(userId: number, limit: number): Promise<PongMatchData[]> {
@@ -324,7 +393,6 @@ export class PongRepository implements IPongRepository {
     matchData: PongMatchData,
     winnerStatsData?: Partial<PongStatsData>,
     loserStatsData?: Partial<PongStatsData>,
-    payoutAmount?: bigint,
   ): Promise<{ isLossOnly: boolean; winnerId?: number; loserId?: number }> {
     return await this.executeInTransaction(async (tx) => {
       // 1. Create the match record
@@ -333,7 +401,7 @@ export class PongRepository implements IPongRepository {
       // 2. Determine winner and loser using canonical fields
       const isAIMatch = matchData.mode === 'PVE_AI' || matchData.aiUserId !== undefined;
 
-      // For proper winner/loser determination
+      // Use the winnerId passed from the game server - it already knows the correct winner
       let actualWinnerId = matchData.winnerId;
       let actualLoserId: number | undefined;
 
@@ -342,13 +410,10 @@ export class PongRepository implements IPongRepository {
         const humanId = matchData.hostUserId || matchData.playerOneId;
         const aiId = matchData.aiUserId || -1;
 
-        if (matchData.playerOneScore > matchData.playerTwoScore) {
-          // Human (host) won
-          actualWinnerId = humanId;
+        // Winner is already determined by game server
+        if (actualWinnerId === humanId) {
           actualLoserId = aiId;
-        } else {
-          // AI won
-          actualWinnerId = aiId;
+        } else if (actualWinnerId === aiId) {
           actualLoserId = humanId;
         }
       } else {
@@ -356,13 +421,10 @@ export class PongRepository implements IPongRepository {
         const hostId = matchData.hostUserId || matchData.playerOneId;
         const joinerId = matchData.joinerUserId || matchData.playerTwoId;
 
-        if (matchData.playerOneScore > matchData.playerTwoScore) {
-          // Host won
-          actualWinnerId = hostId;
+        // Winner is already determined by game server
+        if (actualWinnerId === hostId) {
           actualLoserId = joinerId;
-        } else {
-          // Joiner won
-          actualWinnerId = joinerId;
+        } else if (actualWinnerId === joinerId) {
           actualLoserId = hostId;
         }
       }
@@ -456,24 +518,8 @@ export class PongRepository implements IPongRepository {
         }
       }
 
-      // Process payout if there's a winner and payout amount (only for human winners)
-      if (payoutAmount && payoutAmount > 0n && actualWinnerId && actualWinnerId > 0) {
-        const winnerUpdate = await tx.user.update({
-          where: { id: actualWinnerId },
-          data: { muskBucks: { increment: payoutAmount } },
-          select: { muskBucks: true },
-        });
-
-        // Create payout transaction
-        await tx.transaction.create({
-          data: {
-            userId: actualWinnerId,
-            type: 'CREDIT',
-            amount: payoutAmount,
-            balanceAfter: winnerUpdate.muskBucks,
-          },
-        });
-      }
+      // Payout processing is now handled by the dedicated payout worker
+      // The caller should enqueue a payout job after this method completes successfully
 
       return {
         isLossOnly: false,

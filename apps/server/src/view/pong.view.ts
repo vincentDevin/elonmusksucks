@@ -55,24 +55,48 @@ export const toUserPongStatsView = (stats: {
  * Maps pong match history data to standardized PongMatchHistoryView DTO
  * Handles BigInt → string conversion for amounts and Date → ISO string
  */
-export const toPongMatchHistoryView = (match: any): PongMatchHistoryView => ({
-  id: match.id,
-  playerOneId: match.playerOneId,
-  playerTwoId: match.playerTwoId,
-  playerOneScore: match.playerOneScore,
-  playerTwoScore: match.playerTwoScore,
-  playerWon: match.playerWon,
-  wagerAmount: (match.wagerAmount ?? 0n).toString(),
-  payoutAmount: (match.payoutAmount ?? 0n).toString(),
-  eloChange: match.eloChange || 0,
-  duration: match.duration || 0,
-  aiDifficulty: match.aiDifficulty || null,
-  opponentName:
-    match.opponent?.name ||
-    (match.isAiMatch ? `AI (${match.aiDifficulty || 'medium'})` : 'Unknown'),
-  opponentElo: match.opponent?.eloRating || null,
-  playedAt: (match.completedAt || match.createdAt || new Date()).toISOString(),
-});
+export const toPongMatchHistoryView = (match: any): PongMatchHistoryView => {
+  // Build opponent object based on available data
+  let opponent = null;
+
+  if (match.opponent) {
+    opponent = {
+      id: match.opponent.id,
+      name: match.opponent.name,
+      avatarUrl: match.opponent.avatarUrl || null,
+    };
+  } else if (match.isAiMatch) {
+    // For AI matches, create a synthetic opponent object
+    opponent = {
+      id: match.playerTwoId || -1, // Use the AI ID
+      name: match.aiDifficulty ? `AI (${match.aiDifficulty})` : 'Elon AI',
+      avatarUrl: null,
+    };
+  }
+
+  return {
+    id: match.id,
+    playerOneId: match.playerOneId,
+    playerTwoId: match.playerTwoId,
+    playerOneScore: match.playerOneScore,
+    playerTwoScore: match.playerTwoScore,
+    currentUserScore: match.currentUserScore || match.playerOneScore,
+    opponentScore: match.opponentScore || match.playerTwoScore,
+    currentUserName: match.currentUserName || 'Unknown Player',
+    opponentName: match.opponentName || opponent?.name || 'Unknown Player',
+    playerWon: match.playerWon,
+    wagerAmount: (match.wagerAmount ?? 0n).toString(),
+    payoutAmount: (match.payoutAmount ?? 0n).toString(),
+    eloChange: match.eloChange || 0,
+    duration: match.duration || 0,
+    aiDifficulty: match.aiDifficulty || undefined,
+    opponent,
+    isAiMatch: match.isAiMatch || false,
+    completedAt: (match.completedAt || match.createdAt || new Date()).toISOString(),
+    skillComponent: match.skillComponent,
+    economyComponent: match.economyComponent,
+  };
+};
 
 /**
  * Maps pong leaderboard data to standardized PongLeaderboardView DTO
