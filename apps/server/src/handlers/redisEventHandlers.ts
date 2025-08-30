@@ -180,18 +180,12 @@ export function registerRedisEventHandlers(io: Server, eventSub: any) {
 
       // Pong events
       case 'pong:elo:update':
-        const pongEloPayload = payload as any;
-        if (pongEloPayload.userId) {
-          io.to(`user:${pongEloPayload.userId}`).emit('pong:elo:update', payload);
-        }
-        io.emit('pong:elo:update', payload); // Also broadcast globally for leaderboard
+        // Emit to everyone (for leaderboards/spectators)
+        io.emit('pong:elo:update', payload);
         break;
       case 'pong:tier:change':
-        const pongTierPayload = payload as any;
-        if (pongTierPayload.userId) {
-          io.to(`user:${pongTierPayload.userId}`).emit('pong:tier:change', payload);
-        }
-        io.emit('pong:tier:change', payload); // Also broadcast globally
+        // Emit to everyone (for leaderboards/spectators)
+        io.emit('pong:tier:change', payload);
         break;
       case 'pong:stats:update':
         const pongStatsPayload = payload as any;

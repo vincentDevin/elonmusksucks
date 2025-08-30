@@ -100,14 +100,30 @@ export default function PongEloNotification() {
       // Only show notifications for the current user
       if (data.userId !== user.id) return;
 
+      const timestamp = Date.now();
       const notification: NotificationData = {
         ...data,
         type: 'elo-update',
-        timestamp: Date.now(),
-        id: `elo-${data.matchId}-${Date.now()}`,
+        timestamp,
+        id: `elo-${data.matchId}-${timestamp}-${Math.random().toString(36).substr(2, 9)}`,
       };
 
-      setNotifications((prev) => [notification, ...prev.slice(0, 4)]); // Keep only 5 notifications
+      setNotifications((prev) => {
+        // Check if we already have a notification for this match (deduplication)
+        const existingIndex = prev.findIndex(
+          (n) => n.type === 'elo-update' && n.matchId === data.matchId && n.userId === data.userId,
+        );
+
+        if (existingIndex !== -1) {
+          // Replace the existing notification with the new one
+          const updated = [...prev];
+          updated[existingIndex] = notification;
+          return updated;
+        }
+
+        // Add new notification
+        return [notification, ...prev.slice(0, 4)]; // Keep only 5 notifications
+      });
     };
 
     // Listen for tier changes

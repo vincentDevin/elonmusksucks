@@ -9,6 +9,7 @@ import { Worker, Job } from 'bullmq';
 import { PongPayoutData, PongPayoutResult, QUEUE_NAMES } from '@ems/types';
 import redisClient from '../lib/redis';
 import { PrismaClient } from '@prisma/client';
+import { serializeBigInt } from '../utils/bigintSerializer';
 
 const prisma = new PrismaClient();
 
@@ -30,7 +31,7 @@ const pongPayoutWorker = new Worker<PongPayoutData>(
       const existingPayout = await checkExistingPayout(idempotencyKey);
       if (existingPayout) {
         console.log(`[pong-payout-worker] Payout already processed for match ${matchId}`);
-        return existingPayout;
+        return serializeBigInt(existingPayout);
       }
 
       // 2. Process payout based on mode
@@ -38,9 +39,9 @@ const pongPayoutWorker = new Worker<PongPayoutData>(
       const stakeAmountBigInt = BigInt(stakeAmount); // Convert number to bigint
 
       if (mode === 'PVP') {
-        result = await processPVPPayout(matchId, winnerId, stakeAmountBigInt, idempotencyKey);
+        result = await processPVPPayout(winnerId, stakeAmountBigInt, idempotencyKey);
       } else if (mode === 'PVE_AI') {
-        result = await processPVEPayout(matchId, winnerId, stakeAmountBigInt, idempotencyKey);
+        result = await processPVEPayout(winnerId, stakeAmountBigInt, idempotencyKey);
       } else {
         throw new Error(`Invalid match mode: ${mode}`);
       }
@@ -51,7 +52,7 @@ const pongPayoutWorker = new Worker<PongPayoutData>(
         `[pong-payout-worker] Successfully processed payout for match ${matchId}: ${result.payoutAmount} to user ${winnerId}`,
       );
 
-      return result;
+      return serializeBigInt(result);
     } catch (error) {
       console.error(`[pong-payout-worker] Failed to process payout for match ${matchId}:`, error);
       throw error; // Re-throw to mark job as failed
@@ -87,7 +88,6 @@ async function checkExistingPayout(idempotencyKey: string): Promise<PongPayoutRe
  * Note: Winner already paid their stake, so they get back their stake + opponent's stake
  */
 async function processPVPPayout(
-  matchId: string,
   winnerId: number,
   stakeAmount: bigint,
   idempotencyKey: string,
@@ -127,7 +127,6 @@ async function processPVPPayout(
  * Process PVE_AI payout (house pays 2x player stake)
  */
 async function processPVEPayout(
-  matchId: string,
   winnerId: number,
   stakeAmount: bigint,
   idempotencyKey: string,
