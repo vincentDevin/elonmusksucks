@@ -10,6 +10,7 @@ import type {
 } from '@ems/types';
 import { PONG_PHYSICS } from '@ems/types';
 import { useAuth } from './useAuth';
+import { GameStateBuffer, type GameStateSnapshot } from '../types/pongInterpolation';
 
 // Per-user socket management to prevent duplicate connections within same user session
 const userSockets = new Map<number, Socket>(); // userId -> Socket
@@ -55,6 +56,7 @@ interface PongSocketState {
     activeGames: number;
     availableMatches: number;
   };
+  gameStateBuffer: GameStateBuffer;
 }
 
 interface PongSocketActions {
@@ -87,6 +89,9 @@ export function usePongSocket(): PongSocketHook {
     activeGames: 0,
     availableMatches: 0,
   });
+
+  // Game state buffer for interpolation
+  const [gameStateBuffer] = useState(() => new GameStateBuffer(10));
 
   // Refs for stable references
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
@@ -321,9 +326,49 @@ export function usePongSocket(): PongSocketHook {
         };
       });
 
-      // Update ping
+      // Update ping and network health
       const ping = Date.now() - data.timestamp;
       setLastPing(ping);
+
+      // Store game state in buffer for interpolation
+      setCurrentGame((currentGameState) => {
+        if (currentGameState && currentGameState.status === 'active') {
+          // Create updated player data with server paddle positions
+          const updatedPlayers: [any, any] = [
+            currentGameState.players[0]
+              ? {
+                  ...currentGameState.players[0],
+                  paddleY:
+                    currentGameState.playerSlot === 0
+                      ? currentGameState.players[0].paddleY // Keep our own paddle unchanged
+                      : (data.opponentPaddleY ?? currentGameState.players[0].paddleY), // Use server data for opponent
+                }
+              : null,
+            currentGameState.players[1]
+              ? {
+                  ...currentGameState.players[1],
+                  paddleY:
+                    currentGameState.playerSlot === 1
+                      ? currentGameState.players[1].paddleY // Keep our own paddle unchanged
+                      : (data.opponentPaddleY ?? currentGameState.players[1].paddleY), // Use server data for opponent
+                }
+              : null,
+          ];
+
+          const bufferSnapshot: GameStateSnapshot = {
+            ball: data.ball,
+            players: updatedPlayers,
+            scores: data.scores,
+            tick: data.tick,
+            timestamp: data.timestamp,
+            serverTime: data.timestamp,
+            status: 'active',
+          };
+
+          gameStateBuffer.addState(bufferSnapshot);
+        }
+        return currentGameState; // Don't modify the current game state
+      });
     });
 
     newSocket.on('score_update', (data: ServerEvents['score_update']) => {
@@ -523,7 +568,8 @@ export function usePongSocket(): PongSocketHook {
     console.log('🏓 Leaving match...');
     socket.emit('leave_match', {} as ClientEvents['leave_match']);
     setCurrentGame(null);
-  }, [socket, isAuthenticated]);
+    gameStateBuffer.clear();
+  }, [socket, isAuthenticated, gameStateBuffer]);
 
   // Auto-connect when user and token are available
   useEffect(() => {
@@ -562,6 +608,7 @@ export function usePongSocket(): PongSocketHook {
     connectionError,
     lastPing,
     stats,
+    gameStateBuffer,
     connect,
     disconnect,
     joinLobby,

@@ -407,42 +407,35 @@ export class PongStatsService {
     // Get current Elo ratings
     const winnerElo = winnerStats?.eloRating || 1200; // Default starting Elo
     const loserElo =
-      loserStats?.eloRating ||
-      (aiDifficulty ? PureEloService.getAIEloByDifficulty(aiDifficulty) : 1200);
+      loserStats?.eloRating || (aiDifficulty ? PongEloService.getAiElo(aiDifficulty as any) : 1200);
 
     // Calculate Elo changes using pure Elo service if match is rated
     let winnerEloChange: EloChangeComponents;
     let loserEloChange: EloChangeComponents | undefined;
 
     if (isRated) {
-      // Use pure Elo calculation for rated matches
-      const pureEloResult = PureEloService.calculateEloChange({
+      // Use complex hybrid Elo calculation for rated matches
+      winnerEloChange = PongEloService.calculateEloChange({
         playerElo: winnerElo,
         opponentElo: loserElo,
-        won: true,
-        mode: mode as 'PVP' | 'PVE_AI',
+        playerWon: true,
+        wagerAmount,
+        amountWon: payoutAmount,
+        isAiOpponent: mode === 'PVE_AI',
+        isPerfectGame,
       });
-
-      // Convert to legacy format for compatibility
-      winnerEloChange = {
-        skillChange: pureEloResult.delta,
-        economyChange: 0, // Pure Elo doesn't have economy component
-        economyComponent: 0,
-        totalChange: pureEloResult.delta,
-        newRating: pureEloResult.newRating,
-        newTier: PureEloService.getTier(pureEloResult.newRating),
-      };
 
       // Calculate loser changes if human loser
       if (loserId && loserId > 0) {
-        loserEloChange = {
-          skillChange: pureEloResult.opponentDelta,
-          economyChange: 0,
-          economyComponent: 0,
-          totalChange: pureEloResult.opponentDelta,
-          newRating: pureEloResult.opponentNewRating,
-          newTier: PureEloService.getTier(pureEloResult.opponentNewRating),
-        };
+        loserEloChange = PongEloService.calculateEloChange({
+          playerElo: loserElo,
+          opponentElo: winnerElo,
+          playerWon: false,
+          wagerAmount,
+          amountWon: 0n,
+          isAiOpponent: mode === 'PVE_AI',
+          isPerfectGame: false,
+        });
       }
     } else {
       // Unrated matches - no Elo change
@@ -452,7 +445,7 @@ export class PongStatsService {
         economyComponent: 0,
         totalChange: 0,
         newRating: winnerElo,
-        newTier: PureEloService.getTier(winnerElo),
+        newTier: PongEloService.getTierFromElo(winnerElo),
       };
 
       if (loserId && loserId > 0) {
@@ -462,7 +455,7 @@ export class PongStatsService {
           economyComponent: 0,
           totalChange: 0,
           newRating: loserElo,
-          newTier: PureEloService.getTier(loserElo),
+          newTier: PongEloService.getTierFromElo(loserElo),
         };
       }
     }

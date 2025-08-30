@@ -18,6 +18,7 @@ import {
   type LeaderboardPeriod,
   type LeaderboardMetric,
 } from '../hooks/useLeaderboard';
+import type { PongLeaderboardView } from '@ems/types';
 import LeaderboardEntry from '../components/leaderboard/LeaderboardEntry';
 import AchievementNotification from '../components/leaderboard/AchievementNotification';
 import { getShameWall, getShameWallStats } from '../api/shameWall';
@@ -39,7 +40,7 @@ export default function EnhancedLeaderboard() {
   const [shameWallError, setShameWallError] = useState<string | null>(null);
 
   // Pong state
-  const [pongLeaderboard, setPongLeaderboard] = useState<any[]>([]);
+  const [pongLeaderboard, setPongLeaderboard] = useState<PongLeaderboardView[]>([]);
   const [pongMetric, setPongMetric] = useState<string>('elo');
   const [pongLoading, setPongLoading] = useState(false);
   const [pongError, setPongError] = useState<string | null>(null);
@@ -636,102 +637,97 @@ export default function EnhancedLeaderboard() {
       {/* Pong Leaderboard Entries */}
       {activeTab === 'pong' && pongLeaderboard.length > 0 && (
         <ul className="space-y-4">
-          {pongLeaderboard.map((entry, idx) => (
-            <li
-              key={entry.user.id}
-              className={`bg-surface rounded-xl shadow-sm hover:shadow-md transition border-l-4 border-primary ${
-                user?.id === entry.user.id ? 'ring-2 ring-primary/50' : ''
-              }`}
-            >
-              <div className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <div className="text-2xl font-bold text-primary">#{idx + 1}</div>
-                    {entry.user.avatarUrl ? (
-                      <img
-                        src={entry.user.avatarUrl}
-                        alt={`${entry.user.name}'s avatar`}
-                        className="w-12 h-12 rounded-full object-cover"
-                      />
-                    ) : (
+          {pongLeaderboard
+            .filter((entry) => entry && entry.userId && entry.userName) // Filter out invalid entries
+            .map((entry, idx) => (
+              <li
+                key={entry.userId}
+                className={`bg-surface rounded-xl shadow-sm hover:shadow-md transition border-l-4 border-primary ${
+                  user?.id === entry.userId ? 'ring-2 ring-primary/50' : ''
+                }`}
+              >
+                <div className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <div className="text-2xl font-bold text-primary">#{idx + 1}</div>
+                      {/* Note: PongLeaderboardView doesn't include avatarUrl, so we'll always show the initials */}
                       <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
                         <span className="text-primary font-bold">
-                          {entry.user.name.charAt(0).toUpperCase()}
+                          {entry.userName.charAt(0).toUpperCase()}
                         </span>
                       </div>
-                    )}
-                    <div>
-                      <h3 className="text-lg font-bold text-content">{entry.user.name}</h3>
-                      <div className="flex items-center space-x-2">
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs font-bold ${
-                            entry.tier === 'GRANDMASTER'
-                              ? 'bg-purple-100 text-purple-800'
-                              : entry.tier === 'MASTER'
-                                ? 'bg-red-100 text-red-800'
-                                : entry.tier === 'DIAMOND'
-                                  ? 'bg-primary/10 text-primary'
-                                  : entry.tier === 'PLATINUM'
-                                    ? 'bg-green-100 text-green-800'
-                                    : entry.tier === 'GOLD'
-                                      ? 'bg-yellow-100 text-yellow-800'
-                                      : entry.tier === 'SILVER'
-                                        ? 'bg-gray-100 text-gray-800'
-                                        : 'bg-orange-100 text-orange-800'
-                          }`}
-                        >
-                          {entry.tier}
-                        </span>
-                        {entry.riskTaker && (
-                          <span className="px-2 py-1 bg-red-100 text-red-600 rounded-full text-xs font-medium">
-                            🎲 High Roller
+                      <div>
+                        <h3 className="text-lg font-bold text-content">{entry.userName}</h3>
+                        <div className="flex items-center space-x-2">
+                          <span
+                            className={`px-2 py-1 rounded-full text-xs font-bold ${
+                              entry.tier === 'GRANDMASTER'
+                                ? 'bg-purple-100 text-purple-800'
+                                : entry.tier === 'MASTER'
+                                  ? 'bg-red-100 text-red-800'
+                                  : entry.tier === 'DIAMOND'
+                                    ? 'bg-primary/10 text-primary'
+                                    : entry.tier === 'PLATINUM'
+                                      ? 'bg-green-100 text-green-800'
+                                      : entry.tier === 'GOLD'
+                                        ? 'bg-yellow-100 text-yellow-800'
+                                        : entry.tier === 'SILVER'
+                                          ? 'bg-gray-100 text-gray-800'
+                                          : 'bg-orange-100 text-orange-800'
+                            }`}
+                          >
+                            {entry.tier}
                           </span>
-                        )}
+                          {entry.riskTaker && (
+                            <span className="px-2 py-1 bg-red-100 text-red-600 rounded-full text-xs font-medium">
+                              🎲 High Roller
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-2xl font-bold text-primary">
+                        {pongMetric === 'elo'
+                          ? entry.eloRating
+                          : pongMetric === 'wins'
+                            ? entry.wins
+                            : pongMetric === 'winStreak'
+                              ? entry.winStreak
+                              : pongMetric === 'totalWon'
+                                ? `${(Number(entry.totalWon) / 1000).toFixed(1)}k`
+                                : pongMetric === 'totalWagered'
+                                  ? `${(Number(entry.totalWagered) / 1000).toFixed(1)}k`
+                                  : entry.perfectGames}
+                      </div>
+                      <div className="text-sm text-tertiary">
+                        {pongMetrics.find((m) => m.key === pongMetric)?.label}
                       </div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-2xl font-bold text-primary">
-                      {pongMetric === 'elo'
-                        ? entry.eloRating
-                        : pongMetric === 'wins'
-                          ? entry.wins
-                          : pongMetric === 'winStreak'
-                            ? entry.winStreak
-                            : pongMetric === 'totalWon'
-                              ? `${(Number(entry.totalWon) / 1000).toFixed(1)}k`
-                              : pongMetric === 'totalWagered'
-                                ? `${(Number(entry.totalWagered) / 1000).toFixed(1)}k`
-                                : entry.perfectGames}
+                  <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div className="text-center">
+                      <div className="font-bold text-primary">{entry.eloRating}</div>
+                      <div className="text-tertiary">Elo Rating</div>
                     </div>
-                    <div className="text-sm text-tertiary">
-                      {pongMetrics.find((m) => m.key === pongMetric)?.label}
+                    <div className="text-center">
+                      <div className="font-bold text-success">{entry.wins}</div>
+                      <div className="text-tertiary">Wins</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="font-bold text-warning">{entry.winRate?.toFixed(1)}%</div>
+                      <div className="text-tertiary">Win Rate</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="font-bold text-accent">
+                        {(Number(entry.totalWon) / 1000).toFixed(1)}k
+                      </div>
+                      <div className="text-tertiary">Earnings</div>
                     </div>
                   </div>
                 </div>
-                <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                  <div className="text-center">
-                    <div className="font-bold text-primary">{entry.eloRating}</div>
-                    <div className="text-tertiary">Elo Rating</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="font-bold text-success">{entry.wins}</div>
-                    <div className="text-tertiary">Wins</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="font-bold text-warning">{entry.winRate?.toFixed(1)}%</div>
-                    <div className="text-tertiary">Win Rate</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="font-bold text-accent">
-                      {(Number(entry.totalWon) / 1000).toFixed(1)}k
-                    </div>
-                    <div className="text-tertiary">Earnings</div>
-                  </div>
-                </div>
-              </div>
-            </li>
-          ))}
+              </li>
+            ))}
         </ul>
       )}
 

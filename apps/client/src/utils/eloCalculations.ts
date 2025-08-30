@@ -1,9 +1,7 @@
-import type { PongDifficulty } from '@prisma/client';
-
 export interface EloChangeComponents {
   skillChange: number;
   economyChange: number;
-  economyComponent: number; // Added missing property
+  economyComponent: number;
   totalChange: number;
   newRating: number;
   newTier: string;
@@ -13,13 +11,13 @@ export interface EloCalculationInput {
   playerElo: number;
   opponentElo: number;
   playerWon: boolean;
-  wagerAmount: bigint;
-  amountWon: bigint;
+  wagerAmount: number; // Use number on client (convert to bigint for calculation)
+  amountWon: number;
   isAiOpponent?: boolean;
-  isPerfectGame?: boolean; // 11-0 victory
+  isPerfectGame?: boolean;
 }
 
-export class PongEloService {
+export class ClientEloCalculator {
   private static readonly K_FACTOR = 32;
   private static readonly MIN_ELO = 400;
   private static readonly MAX_ELO = 3000;
@@ -35,9 +33,18 @@ export class PongEloService {
     GRANDMASTER: { min: 3000, max: 10000 },
   };
 
-  /**
-   * Calculate hybrid Elo change based on skill and economy components
-   */
+  // AI Elo mappings (standardized)
+  private static readonly AI_ELO_MAP: Record<string, number> = {
+    easy: 800,
+    medium: 1200,
+    hard: 1600,
+    impossible: 2400,
+    EASY: 800,
+    MEDIUM: 1200,
+    HARD: 1600,
+    IMPOSSIBLE: 2400,
+  };
+
   static calculateEloChange(input: EloCalculationInput): EloChangeComponents {
     const {
       playerElo,
@@ -49,6 +56,10 @@ export class PongEloService {
       isPerfectGame = false,
     } = input;
 
+    // Convert to bigint for calculations to match server logic
+    const wagerAmountBigInt = BigInt(Math.floor(wagerAmount));
+    const amountWonBigInt = BigInt(Math.floor(amountWon));
+
     // SKILL COMPONENT (50% weight)
     const expectedWin = 1 / (1 + Math.pow(10, (opponentElo - playerElo) / 400));
     const actualResult = playerWon ? 1 : 0;
@@ -56,9 +67,9 @@ export class PongEloService {
 
     // ECONOMY COMPONENT (50% weight)
     let economyChange = 0;
-    if (wagerAmount > 0n) {
-      const wagerNumber = Number(wagerAmount);
-      const amountWonNumber = Number(amountWon);
+    if (wagerAmountBigInt > 0n) {
+      const wagerNumber = Number(wagerAmountBigInt);
+      const amountWonNumber = Number(amountWonBigInt);
 
       // Wager multiplier - higher wagers = higher stakes
       const wagerMultiplier = Math.log10(Math.max(wagerNumber / 100, 1));
@@ -70,12 +81,10 @@ export class PongEloService {
 
       // Note: AI opponents give full economy rewards now to match user expectations
       // Previously reduced by 50% but this led to confusion when predictions didn't match results
-      // isAiOpponent parameter is available for future differentiation if needed
-      void isAiOpponent; // Acknowledge parameter to avoid unused variable warning
     }
 
     // Free games only apply skill component at 50% rate
-    if (wagerAmount === 0n) {
+    if (wagerAmountBigInt === 0n) {
       skillChange *= 0.5;
       economyChange = 0;
     }
@@ -84,7 +93,7 @@ export class PongEloService {
     let bonusMultiplier = 1;
 
     // Underdog bonus: Extra points for beating higher-rated opponent with big wager
-    if (playerWon && opponentElo > playerElo && wagerAmount >= 1000n) {
+    if (playerWon && opponentElo > playerElo && wagerAmountBigInt >= 1000n) {
       const eloGap = opponentElo - playerElo;
       bonusMultiplier += Math.min(eloGap / 1000, 0.5); // Up to 50% bonus
     }
@@ -95,7 +104,7 @@ export class PongEloService {
     }
 
     // High roller bonus: Slight boost for wagers >10k
-    if (wagerAmount >= 10000n) {
+    if (wagerAmountBigInt >= 10000n) {
       bonusMultiplier += 0.05;
     }
 
@@ -121,93 +130,23 @@ export class PongEloService {
     };
   }
 
-  /**
-   * Get tier name from Elo rating
-   */
   static getTierFromElo(elo: number): string {
     for (const [tier, bounds] of Object.entries(this.TIERS)) {
       if (elo >= bounds.min && elo <= bounds.max) {
         return tier;
       }
     }
-    return 'BRONZE'; // Fallback
+    return 'BRONZE';
   }
 
-  /**
-   * Get AI opponent Elo based on difficulty
-   */
-  static getAiElo(difficulty: PongDifficulty): number {
-    switch (difficulty) {
-      case 'EASY':
-        return 800;
-      case 'MEDIUM':
-        return 1200;
-      case 'HARD':
-        return 1600;
-      case 'IMPOSSIBLE':
-        return 2400;
-      default:
-        return 1200;
-    }
+  static getAiElo(difficulty: string): number {
+    return this.AI_ELO_MAP[difficulty] || 1200;
   }
 
-  /**
-   * Generate Elo history entry for a match
-   */
-  static generateEloHistoryEntry(eloChange: EloChangeComponents, matchId: string): any {
-    return {
-      date: new Date().toISOString(),
-      rating: eloChange.newRating,
-      matchId,
-      change: eloChange.totalChange,
-      skillComponent: eloChange.skillChange,
-      economyComponent: eloChange.economyComponent,
-    };
-  }
-
-  /**
-   * Update Elo history with new entry, maintaining max size
-   */
-  static updateEloHistory(currentHistory: any[], newEntry: any, maxEntries: number = 100): any[] {
-    const history = [...(currentHistory || []), newEntry];
-
-    // Keep only last N entries to prevent JSON bloat
-    if (history.length > maxEntries) {
-      history.splice(0, history.length - maxEntries);
-    }
-
-    return history;
-  }
-
-  /**
-   * Calculate new peak Elo
-   */
-  static calculatePeakElo(currentPeak: number, newRating: number): number {
-    return Math.max(currentPeak, newRating);
-  }
-
-  /**
-   * Calculate Elo gain/loss tracking
-   */
-  static calculateEloTracking(
-    currentGained: number,
-    currentLost: number,
-    eloChange: number,
-  ): { totalEloGained: number; totalEloLost: number } {
-    const isGain = eloChange > 0;
-    return {
-      totalEloGained: isGain ? currentGained + eloChange : currentGained,
-      totalEloLost: !isGain ? currentLost + Math.abs(eloChange) : currentLost,
-    };
-  }
-
-  /**
-   * Predict Elo change for a potential wager
-   */
   static predictEloChange(
     playerElo: number,
     opponentElo: number,
-    wagerAmount: bigint,
+    wagerAmount: number,
   ): {
     winChange: number;
     lossChange: number;
@@ -220,7 +159,7 @@ export class PongEloService {
       opponentElo,
       playerWon: true,
       wagerAmount,
-      amountWon: wagerAmount * 2n, // Assume 2x payout
+      amountWon: wagerAmount * 2, // Assume 2x payout
     });
 
     const lossScenario = this.calculateEloChange({
@@ -228,7 +167,7 @@ export class PongEloService {
       opponentElo,
       playerWon: false,
       wagerAmount,
-      amountWon: 0n,
+      amountWon: 0,
     });
 
     // Determine confidence level based on Elo difference
@@ -252,26 +191,10 @@ export class PongEloService {
     };
   }
 
-  /**
-   * Check if player should be flagged as risk taker
-   */
-  static shouldFlagAsRiskTaker(recentWagers: bigint[]): boolean {
-    if (recentWagers.length < 5) return false;
-
-    const highWagerCount = recentWagers.filter((w) => w >= 1000n).length;
-    return highWagerCount >= 3; // 3+ high wagers in recent history
-  }
-
-  /**
-   * Get default Elo rating for new players
-   */
   static getDefaultElo(): number {
     return 1200;
   }
 
-  /**
-   * Get default tier for new players
-   */
   static getDefaultTier(): string {
     return 'SILVER';
   }

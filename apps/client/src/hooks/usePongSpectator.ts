@@ -132,7 +132,7 @@ export function usePongSpectator(): SpectatorHook {
           ...prev,
           ball: data.ball,
           scores: data.scores,
-          status: 'active',
+          status: 'active' as const,
           tick: data.tick,
           timestamp: data.timestamp,
           wager: data.wager,

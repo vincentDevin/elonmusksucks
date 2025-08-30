@@ -12,15 +12,27 @@ export function PongMatchCreator({ onCreateMatch }: PongMatchCreatorProps) {
   const [aiWager, setAiWager] = useState(0);
   const [aiDifficulty, setAiDifficulty] = useState('medium');
   const [pvpWager, setPvpWager] = useState(100);
+  const [isAiWagerLocked, setIsAiWagerLocked] = useState(false);
+  const [isPvpWagerLocked, setIsPvpWagerLocked] = useState(false);
 
   const handleCreateAI = () => {
+    if (aiWager > 0 && !isAiWagerLocked) {
+      // Don't allow creation if wager isn't locked
+      return;
+    }
     onCreateMatch(aiWager, 'ai', aiDifficulty);
     setSelectedMode(null); // Collapse after creation
+    setIsAiWagerLocked(false); // Reset lock state
   };
 
   const handleCreatePVP = () => {
+    if (pvpWager > 0 && !isPvpWagerLocked) {
+      // Don't allow creation if wager isn't locked
+      return;
+    }
     onCreateMatch(pvpWager, 'pvp');
     setSelectedMode(null); // Collapse after creation
+    setIsPvpWagerLocked(false); // Reset lock state
   };
 
   const aiDifficultyInfo = {
@@ -171,19 +183,31 @@ export function PongMatchCreator({ onCreateMatch }: PongMatchCreatorProps) {
               <input
                 type="number"
                 value={aiWager}
-                onChange={(e) => setAiWager(Math.max(0, parseInt(e.target.value) || 0))}
+                onChange={(e) => {
+                  setAiWager(Math.max(0, parseInt(e.target.value) || 0));
+                  setIsAiWagerLocked(false); // Unlock when wager changes
+                }}
                 min="0"
                 max="1000"
                 step="10"
                 placeholder="0"
-                className="flex-1 px-4 py-3 bg-background border border-muted rounded-lg focus:ring-2 focus:ring-accent focus:border-accent"
+                disabled={isAiWagerLocked}
+                className={`flex-1 px-4 py-3 bg-background border border-muted rounded-lg focus:ring-2 focus:ring-accent focus:border-accent ${
+                  isAiWagerLocked ? 'opacity-60 cursor-not-allowed' : ''
+                }`}
               />
               <div className="flex space-x-2">
                 {[0, 50, 100, 250].map((amount) => (
                   <button
                     key={amount}
-                    onClick={() => setAiWager(amount)}
-                    className="px-3 py-3 text-sm bg-muted/20 text-content rounded-lg hover:bg-muted/40 transition-colors cursor-pointer"
+                    onClick={() => {
+                      setAiWager(amount);
+                      setIsAiWagerLocked(false); // Unlock when preset is selected
+                    }}
+                    disabled={isAiWagerLocked}
+                    className={`px-3 py-3 text-sm bg-muted/20 text-content rounded-lg hover:bg-muted/40 transition-colors cursor-pointer ${
+                      isAiWagerLocked ? 'opacity-60 cursor-not-allowed' : ''
+                    }`}
                   >
                     {amount === 0 ? 'Free' : `${amount}`}
                   </button>
@@ -193,15 +217,26 @@ export function PongMatchCreator({ onCreateMatch }: PongMatchCreatorProps) {
           </div>
 
           {/* Elo Prediction */}
-          <EloPredictionCard wagerAmount={aiWager} opponentType="ai" aiDifficulty={aiDifficulty} />
+          <EloPredictionCard
+            wagerAmount={aiWager}
+            opponentType="ai"
+            aiDifficulty={aiDifficulty}
+            onWagerLocked={(locked) => setIsAiWagerLocked(locked)}
+          />
 
           {/* Action Buttons */}
           <div className="flex space-x-3">
             <button
               onClick={handleCreateAI}
-              className="flex-1 px-6 py-3 bg-accent text-accent-foreground rounded-lg hover:bg-accent/90 transition-colors font-semibold cursor-pointer"
+              disabled={aiWager > 0 && !isAiWagerLocked}
+              className={`flex-1 px-6 py-3 rounded-lg transition-colors font-semibold cursor-pointer ${
+                aiWager > 0 && !isAiWagerLocked
+                  ? 'bg-muted/40 text-tertiary cursor-not-allowed'
+                  : 'bg-accent text-accent-foreground hover:bg-accent/90'
+              }`}
+              title={aiWager > 0 && !isAiWagerLocked ? 'Please lock your wager first' : ''}
             >
-              🚀 Start AI Match
+              {aiWager > 0 && !isAiWagerLocked ? '🔓 Lock Wager First' : '🚀 Start AI Match'}
             </button>
             <button
               onClick={() => setSelectedMode(null)}
@@ -235,19 +270,31 @@ export function PongMatchCreator({ onCreateMatch }: PongMatchCreatorProps) {
               <input
                 type="number"
                 value={pvpWager}
-                onChange={(e) => setPvpWager(Math.max(0, parseInt(e.target.value) || 0))}
+                onChange={(e) => {
+                  setPvpWager(Math.max(0, parseInt(e.target.value) || 0));
+                  setIsPvpWagerLocked(false); // Unlock when wager changes
+                }}
                 min="0"
                 max="10000"
                 step="50"
                 placeholder="100"
-                className="flex-1 px-4 py-3 bg-background border border-muted rounded-lg focus:ring-2 focus:ring-accent focus:border-accent"
+                disabled={isPvpWagerLocked}
+                className={`flex-1 px-4 py-3 bg-background border border-muted rounded-lg focus:ring-2 focus:ring-accent focus:border-accent ${
+                  isPvpWagerLocked ? 'opacity-60 cursor-not-allowed' : ''
+                }`}
               />
               <div className="flex space-x-2">
                 {[0, 100, 500, 1000, 2500].map((amount) => (
                   <button
                     key={amount}
-                    onClick={() => setPvpWager(amount)}
-                    className="px-3 py-3 text-sm bg-muted/20 text-content rounded-lg hover:bg-muted/40 transition-colors cursor-pointer"
+                    onClick={() => {
+                      setPvpWager(amount);
+                      setIsPvpWagerLocked(false); // Unlock when preset is selected
+                    }}
+                    disabled={isPvpWagerLocked}
+                    className={`px-3 py-3 text-sm bg-muted/20 text-content rounded-lg hover:bg-muted/40 transition-colors cursor-pointer ${
+                      isPvpWagerLocked ? 'opacity-60 cursor-not-allowed' : ''
+                    }`}
                   >
                     {amount === 0 ? 'Free' : `${amount}`}
                   </button>
@@ -273,15 +320,25 @@ export function PongMatchCreator({ onCreateMatch }: PongMatchCreatorProps) {
           </div>
 
           {/* Elo Prediction */}
-          <EloPredictionCard wagerAmount={pvpWager} opponentType="pvp" />
+          <EloPredictionCard
+            wagerAmount={pvpWager}
+            opponentType="pvp"
+            onWagerLocked={(locked) => setIsPvpWagerLocked(locked)}
+          />
 
           {/* Action Buttons */}
           <div className="flex space-x-3">
             <button
               onClick={handleCreatePVP}
-              className="flex-1 px-6 py-3 bg-accent text-accent-foreground rounded-lg hover:bg-accent/90 transition-colors font-semibold cursor-pointer"
+              disabled={pvpWager > 0 && !isPvpWagerLocked}
+              className={`flex-1 px-6 py-3 rounded-lg transition-colors font-semibold cursor-pointer ${
+                pvpWager > 0 && !isPvpWagerLocked
+                  ? 'bg-muted/40 text-tertiary cursor-not-allowed'
+                  : 'bg-accent text-accent-foreground hover:bg-accent/90'
+              }`}
+              title={pvpWager > 0 && !isPvpWagerLocked ? 'Please lock your wager first' : ''}
             >
-              🎯 Create PVP Lobby
+              {pvpWager > 0 && !isPvpWagerLocked ? '🔓 Lock Wager First' : '🎯 Create PVP Lobby'}
             </button>
             <button
               onClick={() => setSelectedMode(null)}

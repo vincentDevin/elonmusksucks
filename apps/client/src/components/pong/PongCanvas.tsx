@@ -1,5 +1,10 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
 import { PONG_PHYSICS } from '@ems/types';
+import {
+  GameStateBuffer,
+  LinearInterpolation,
+  type GameStateSnapshot,
+} from '../../types/pongInterpolation';
 
 // Match the same interface from usePongSocketOptimized
 interface GameState {
@@ -30,6 +35,18 @@ interface PongCanvasProps {
   ping?: number;
   onSetReady?: (ready: boolean) => void;
   isSpectating?: boolean;
+  gameStateBuffer?: GameStateBuffer;
+  // Interpolation function props (optional for backward compatibility)
+  getInterpolatedGameState?: (currentTime?: number) => {
+    ball: { x: number; y: number; vx: number; vy: number };
+    opponentPaddleY?: number;
+    player1PaddleY?: number;
+    player2PaddleY?: number;
+    confidence: { ball: number; opponent?: number; player1?: number; player2?: number };
+  } | null;
+  enableAdvancedRenderer?: boolean;
+  targetFPS?: number;
+  showDebugInfo?: boolean;
 }
 
 interface Particle {
@@ -79,11 +96,105 @@ export function PongCanvas({
   className = '',
   onSetReady,
   isSpectating = false,
+  gameStateBuffer,
+  getInterpolatedGameState,
+  enableAdvancedRenderer = false,
+  targetFPS = 120,
+  showDebugInfo = false,
 }: PongCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>(0);
   const [particles, setParticles] = useState<Particle[]>([]);
   const lastBallPos = useRef({ x: 0, y: 0 });
+
+  // Simple ball interpolation using gameStateBuffer
+  const getInterpolatedBallPosition = useCallback(
+    (currentTime: number = Date.now()) => {
+      if (!gameStateBuffer || !gameState || gameState.status !== 'active') {
+        return null;
+      }
+
+      const states = gameStateBuffer.getStates();
+      if (states.length < 2) {
+        return null; // Need at least 2 states to interpolate
+      }
+
+      // Find the two states to interpolate between
+      let beforeState: GameStateSnapshot | null = null;
+      let afterState: GameStateSnapshot | null = null;
+
+      for (let i = 0; i < states.length - 1; i++) {
+        if (states[i].timestamp <= currentTime && states[i + 1].timestamp >= currentTime) {
+          beforeState = states[i];
+          afterState = states[i + 1];
+          break;
+        }
+      }
+
+      // If we couldn't find a good interval, use the latest state
+      if (!beforeState || !afterState) {
+        const latestState = gameStateBuffer.getLatestState();
+        return latestState ? latestState.ball : null;
+      }
+
+      // Interpolate between the two states
+      const t = LinearInterpolation.getInterpolationFactor(
+        currentTime,
+        beforeState.timestamp,
+        afterState.timestamp,
+      );
+
+      return LinearInterpolation.lerpPoint(beforeState.ball, afterState.ball, t);
+    },
+    [gameStateBuffer, gameState],
+  );
+
+  // Simple paddle interpolation using gameStateBuffer
+  const getInterpolatedPaddlePosition = useCallback(
+    (playerIndex: 0 | 1, currentTime: number = Date.now()) => {
+      if (!gameStateBuffer || !gameState || gameState.status !== 'active') {
+        return null;
+      }
+
+      const states = gameStateBuffer.getStates();
+      if (states.length < 2) {
+        return null;
+      }
+
+      // Find the two states to interpolate between
+      let beforeState: GameStateSnapshot | null = null;
+      let afterState: GameStateSnapshot | null = null;
+
+      for (let i = 0; i < states.length - 1; i++) {
+        if (states[i].timestamp <= currentTime && states[i + 1].timestamp >= currentTime) {
+          beforeState = states[i];
+          afterState = states[i + 1];
+          break;
+        }
+      }
+
+      if (!beforeState || !afterState) {
+        const latestState = gameStateBuffer.getLatestState();
+        return latestState?.players[playerIndex]?.paddleY || null;
+      }
+
+      const beforePaddle = beforeState.players[playerIndex];
+      const afterPaddle = afterState.players[playerIndex];
+
+      if (!beforePaddle || !afterPaddle) {
+        return null;
+      }
+
+      const t = LinearInterpolation.getInterpolationFactor(
+        currentTime,
+        beforeState.timestamp,
+        afterState.timestamp,
+      );
+
+      return LinearInterpolation.lerp(beforePaddle.paddleY, afterPaddle.paddleY, t);
+    },
+    [gameStateBuffer, gameState],
+  );
   const lastScores = useRef<[number, number]>([0, 0]);
   const lastGameBallPos = useRef({ x: 0, y: 0 }); // Track ball position in game coordinates
   const paintedLines = useRef<
@@ -486,7 +597,7 @@ export function PongCanvas({
     const scaleX = (width - 40) / PONG_PHYSICS.FIELD_WIDTH;
     const scaleY = (height - 40) / PONG_PHYSICS.FIELD_HEIGHT;
 
-    // Draw paddles with enhanced graphics
+    // Draw paddles with enhanced graphics (with interpolation)
     if (gameState.players) {
       gameState.players.forEach((player, index) => {
         if (player) {
@@ -495,7 +606,39 @@ export function PongCanvas({
             index === 0
               ? 20 // Left paddle starts at field edge (20px offset for canvas border)
               : width - 20 - paddleWidth; // Right paddle ends at field edge
-          const y = 20 + player.paddleY * scaleY; // paddleY is the TOP of the paddle (server treats it this way)
+
+          // Use interpolated paddle position when available, fall back to direct server data
+          let paddleY = player.paddleY;
+
+          // Try our simple paddle interpolation first
+          const interpolatedPaddleY = getInterpolatedPaddlePosition(index as 0 | 1);
+          if (interpolatedPaddleY !== null) {
+            // For players, only interpolate opponent paddle to avoid conflicting with local input
+            if (isSpectating || index !== gameState.playerSlot) {
+              paddleY = interpolatedPaddleY;
+            }
+          } else if (getInterpolatedGameState && gameState.status === 'active') {
+            // Fallback to advanced interpolation
+            const interpolated = getInterpolatedGameState();
+            if (interpolated) {
+              if (isSpectating) {
+                // For spectators, use interpolated positions for both players
+                if (index === 0 && interpolated.player1PaddleY !== undefined) {
+                  paddleY = interpolated.player1PaddleY;
+                } else if (index === 1 && interpolated.player2PaddleY !== undefined) {
+                  paddleY = interpolated.player2PaddleY;
+                }
+              } else {
+                // For players, only interpolate opponent paddle
+                const isOpponent = index !== gameState.playerSlot;
+                if (isOpponent && interpolated.opponentPaddleY !== undefined) {
+                  paddleY = interpolated.opponentPaddleY;
+                }
+              }
+            }
+          }
+
+          const y = 20 + paddleY * scaleY; // paddleY is the TOP of the paddle (server treats it this way)
 
           // For spectators, use different colors for each player
           // For players, use player/opponent colors based on their slot
@@ -522,11 +665,24 @@ export function PongCanvas({
       });
     }
 
-    // Draw ball with enhanced graphics
+    // Draw ball with enhanced graphics (with interpolation)
     if (gameState.ball && gameState.status === 'active') {
-      // Use direct server position (no interpolation)
-      const ballX = 20 + gameState.ball.x * scaleX;
-      const ballY = 20 + gameState.ball.y * scaleY;
+      let ballPosition = gameState.ball;
+
+      // Use our simple interpolation first
+      const interpolatedBall = getInterpolatedBallPosition();
+      if (interpolatedBall) {
+        ballPosition = interpolatedBall;
+      } else if (getInterpolatedGameState) {
+        // Fallback to the advanced interpolation if available
+        const interpolated = getInterpolatedGameState();
+        if (interpolated && interpolated.confidence.ball > 0.1) {
+          ballPosition = interpolated.ball;
+        }
+      }
+
+      const ballX = 20 + ballPosition.x * scaleX;
+      const ballY = 20 + ballPosition.y * scaleY;
 
       drawEnhancedBall(ctx, ballX, ballY, 8);
     }
@@ -535,6 +691,10 @@ export function PongCanvas({
     drawParticles(ctx);
   }, [
     gameState,
+    isSpectating,
+    getInterpolatedGameState,
+    getInterpolatedBallPosition,
+    getInterpolatedPaddlePosition,
     drawEnhancedBackground,
     drawGameField,
     drawEnhancedPaddle,

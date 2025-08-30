@@ -97,10 +97,10 @@ export class PureEloService {
   static getAIEloByDifficulty(difficulty: string): number {
     const difficultyMap: Record<string, number> = {
       BABY: 800,
-      EASY: 1000,
-      MEDIUM: 1200,
-      HARD: 1500,
-      IMPOSSIBLE: 1800,
+      EASY: 800, // Changed from 1000 to match PongEloService
+      MEDIUM: 1200, // Same
+      HARD: 1600, // Changed from 1500 to match PongEloService
+      IMPOSSIBLE: 2400, // Changed from 1800 to match PongEloService
     };
 
     return difficultyMap[difficulty] || 1200;

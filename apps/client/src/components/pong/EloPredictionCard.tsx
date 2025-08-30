@@ -1,11 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   TrophyIcon,
   ArrowTrendingUpIcon,
   ArrowTrendingDownIcon,
   InformationCircleIcon,
+  LockClosedIcon,
+  LockOpenIcon,
 } from '@heroicons/react/24/outline';
 import api from '../../api/axios';
+import { ClientEloCalculator } from '../../utils/eloCalculations';
 
 interface EloPredictionCardProps {
   wagerAmount: number;
@@ -14,6 +17,8 @@ interface EloPredictionCardProps {
   opponentElo?: number;
   playerElo?: number; // Allow passing player Elo directly
   className?: string;
+  onWagerLocked?: (isLocked: boolean, wager: number) => void;
+  autoLock?: boolean; // Auto-lock when wager is set
 }
 
 interface EloPredictionResult {
@@ -37,9 +42,13 @@ export default function EloPredictionCard({
   opponentElo,
   playerElo: propPlayerElo,
   className = '',
+  onWagerLocked,
+  autoLock = false,
 }: EloPredictionCardProps) {
-  const [prediction, setPrediction] = useState<EloPredictionResult | null>(null);
   const [playerElo, setPlayerElo] = useState<number>(propPlayerElo || 1200);
+  const [isWagerLocked, setIsWagerLocked] = useState(false);
+  const [lockedWager, setLockedWager] = useState(0);
+  const [serverPrediction, setServerPrediction] = useState<EloPredictionResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -63,44 +72,69 @@ export default function EloPredictionCard({
     fetchPlayerElo();
   }, [propPlayerElo]);
 
-  // Fetch Elo prediction when parameters change
-  useEffect(() => {
-    if (wagerAmount < 0) return;
+  // Use client-side calculation for immediate feedback
+  const clientPrediction = useMemo(() => {
+    if (wagerAmount <= 0) return null;
 
-    const fetchPrediction = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        // Determine opponent Elo based on type
-        let effectiveOpponentElo = opponentElo;
-        if (opponentType === 'ai') {
-          const aiEloMap = {
-            easy: 800,
-            medium: 1200,
-            hard: 1600,
-            impossible: 2200,
-          };
-          effectiveOpponentElo = aiEloMap[aiDifficulty as keyof typeof aiEloMap] || 1200;
-        } else if (!effectiveOpponentElo) {
-          // For PVP without known opponent, use average Elo
-          effectiveOpponentElo = 1400;
+    let effectiveOpponentElo = opponentElo;
+    if (opponentType === 'ai') {
+      effectiveOpponentElo = ClientEloCalculator.getAiElo(aiDifficulty);
+    } else if (!effectiveOpponentElo) {
+      effectiveOpponentElo = 1400; // Default PVP opponent Elo
+    }
+
+    return ClientEloCalculator.predictEloChange(playerElo, effectiveOpponentElo, wagerAmount);
+  }, [playerElo, opponentElo, opponentType, aiDifficulty, wagerAmount]);
+
+  // Handle wager locking
+  const handleLockWager = async () => {
+    if (isWagerLocked) {
+      // Unlock
+      setIsWagerLocked(false);
+      setLockedWager(0);
+      setServerPrediction(null);
+      onWagerLocked?.(false, 0);
+    } else {
+      // Lock and optionally fetch server prediction for validation
+      setIsWagerLocked(true);
+      setLockedWager(wagerAmount);
+      onWagerLocked?.(true, wagerAmount);
+
+      // Optional: Fetch server prediction for comparison/validation
+      if (wagerAmount > 0) {
+        setLoading(true);
+        setError(null);
+        try {
+          let effectiveOpponentElo = opponentElo;
+          if (opponentType === 'ai') {
+            effectiveOpponentElo = ClientEloCalculator.getAiElo(aiDifficulty);
+          } else if (!effectiveOpponentElo) {
+            effectiveOpponentElo = 1400;
+          }
+
+          const response = await api.get(
+            `/api/pong/predict-elo?playerElo=${playerElo}&opponentElo=${effectiveOpponentElo}&wagerAmount=${wagerAmount}`,
+          );
+          setServerPrediction(response.data);
+        } catch (err) {
+          // Use client prediction as fallback
+          console.error('Failed to fetch server prediction:', err);
+        } finally {
+          setLoading(false);
         }
-
-        const response = await api.get(
-          `/api/pong/predict-elo?playerElo=${playerElo}&opponentElo=${effectiveOpponentElo}&wagerAmount=${wagerAmount}`,
-        );
-
-        const data = response.data;
-        setPrediction(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to predict Elo changes');
-      } finally {
-        setLoading(false);
       }
-    };
+    }
+  };
 
-    fetchPrediction();
-  }, [wagerAmount, opponentType, aiDifficulty, opponentElo, playerElo]);
+  // Auto-lock if enabled
+  useEffect(() => {
+    if (autoLock && wagerAmount > 0 && !isWagerLocked) {
+      handleLockWager();
+    }
+  }, [autoLock, wagerAmount]);
+
+  // Use server prediction if available, otherwise use client prediction
+  const prediction = serverPrediction || clientPrediction;
 
   if (wagerAmount === 0) {
     return (
@@ -116,7 +150,10 @@ export default function EloPredictionCard({
     );
   }
 
-  if (loading) {
+  // Show lock button for wagers
+  const showLockButton = wagerAmount > 0 && !autoLock;
+
+  if (loading && !clientPrediction) {
     return (
       <div className={`bg-surface border border-accent/20 rounded-lg p-4 ${className}`}>
         <div className="flex items-center space-x-3">
@@ -171,10 +208,37 @@ export default function EloPredictionCard({
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center space-x-2">
           <TrophyIcon className="w-5 h-5 text-primary" />
-          <span className="font-medium text-content text-sm">Elo Impact Preview</span>
+          <span className="font-medium text-content text-sm">
+            Elo Impact Preview{' '}
+            {isWagerLocked && <span className="text-xs text-success">(Locked)</span>}
+          </span>
         </div>
-        <div className={`text-xs font-medium ${getConfidenceColor(prediction.confidenceLevel)}`}>
-          {getConfidenceText(prediction.confidenceLevel)}
+        <div className="flex items-center space-x-2">
+          {showLockButton && (
+            <button
+              onClick={handleLockWager}
+              className={`flex items-center space-x-1 px-2 py-1 rounded text-xs font-medium transition-colors ${
+                isWagerLocked
+                  ? 'bg-success/20 text-success hover:bg-success/30'
+                  : 'bg-accent/20 text-accent hover:bg-accent/30'
+              }`}
+            >
+              {isWagerLocked ? (
+                <>
+                  <LockClosedIcon className="w-3 h-3" />
+                  <span>Unlock</span>
+                </>
+              ) : (
+                <>
+                  <LockOpenIcon className="w-3 h-3" />
+                  <span>Lock Wager</span>
+                </>
+              )}
+            </button>
+          )}
+          <div className={`text-xs font-medium ${getConfidenceColor(prediction.confidenceLevel)}`}>
+            {getConfidenceText(prediction.confidenceLevel)}
+          </div>
         </div>
       </div>
 
@@ -192,7 +256,10 @@ export default function EloPredictionCard({
         </div>
         <div>
           <div className="text-tertiary">Wager</div>
-          <div className="font-bold text-accent">{wagerAmount}</div>
+          <div className="font-bold text-accent">
+            {isWagerLocked ? lockedWager : wagerAmount}
+            {isWagerLocked && ' 🔒'}
+          </div>
         </div>
       </div>
 
@@ -230,9 +297,19 @@ export default function EloPredictionCard({
         <div className="text-xs text-tertiary text-center">
           💡 Elo changes are based on skill difference and wager size
         </div>
+        {!isWagerLocked && showLockButton && (
+          <div className="text-xs text-info text-center mt-1">
+            🔐 Lock your wager to confirm the match stakes
+          </div>
+        )}
         {opponentType === 'pvp' && !opponentElo && (
           <div className="text-xs text-warning text-center mt-1">
             ⚠️ Opponent Elo unknown - using estimated values
+          </div>
+        )}
+        {!serverPrediction && clientPrediction && (
+          <div className="text-xs text-tertiary text-center mt-1">
+            📊 Using client-side prediction
           </div>
         )}
       </div>

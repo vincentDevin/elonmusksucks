@@ -16,6 +16,129 @@ const prisma = new PrismaClient();
 // Note: Job data interfaces now imported from @ems/types
 
 /**
+ * Fetch with retry logic to handle redirect and network issues
+ */
+async function fetchWithRetry(
+  url: string,
+  forceRefresh: boolean,
+  maxRetries = 3,
+): Promise<Response> {
+  let lastError: Error = new Error('Unknown fetch error');
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': `elonmusksucks.net/1.0 RSS Reader (+https://elonmusksucks.net) - Attempt ${attempt}`,
+          Accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml, */*',
+          'Cache-Control': forceRefresh ? 'no-cache' : 'max-age=300',
+          // Add additional headers that might help with some sites
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Accept-Encoding': 'gzip, deflate, br',
+        },
+        signal: controller.signal,
+        redirect: 'follow',
+      });
+
+      clearTimeout(timeoutId);
+      return response;
+    } catch (error) {
+      lastError = error as Error;
+      console.warn(
+        `[feed-worker] Fetch attempt ${attempt}/${maxRetries} failed:`,
+        error instanceof Error ? error.message : error,
+      );
+
+      // Check if it's a redirect error
+      if (error instanceof Error && error.message.includes('redirect')) {
+        // If it's a redirect issue, try with different approaches
+        if (attempt === 2) {
+          // Second attempt: try to manually handle some redirects
+          try {
+            const redirectResponse = await handleRedirectManually(url);
+            if (redirectResponse) return redirectResponse;
+          } catch (redirectError) {
+            console.warn(`[feed-worker] Manual redirect handling failed:`, redirectError);
+          }
+        }
+      }
+
+      // Wait before retry (exponential backoff)
+      if (attempt < maxRetries) {
+        const delay = Math.pow(2, attempt - 1) * 1000; // 1s, 2s, 4s
+        console.log(`[feed-worker] Retrying in ${delay}ms...`);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+  }
+
+  throw lastError;
+}
+
+/**
+ * Attempt to handle redirects manually for problematic URLs
+ */
+async function handleRedirectManually(originalUrl: string): Promise<Response | null> {
+  // Common redirect patterns for RSS feeds
+  const commonRedirects = [
+    // Try with trailing slash (very common fix)
+    originalUrl.endsWith('/') ? originalUrl.slice(0, -1) : originalUrl + '/',
+    // Try removing www.
+    originalUrl.replace('www.', ''),
+    // Try HTTPS if HTTP
+    originalUrl.replace('http://', 'https://'),
+    // Try adding /rss if not present
+    originalUrl.endsWith('/') ? originalUrl + 'rss' : originalUrl + '/rss',
+    // Try /feed
+    originalUrl.endsWith('/') ? originalUrl + 'feed' : originalUrl + '/feed',
+  ];
+
+  for (const redirectUrl of commonRedirects) {
+    if (redirectUrl === originalUrl) continue;
+
+    try {
+      console.log(`[feed-worker] Trying redirect URL: ${redirectUrl}`);
+      const response = await fetch(redirectUrl, {
+        headers: {
+          'User-Agent': 'elonmusksucks.net/1.0 RSS Reader (+https://elonmusksucks.net)',
+          Accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml',
+        },
+        redirect: 'manual', // Don't follow redirects automatically
+      });
+
+      if (response.ok) {
+        return response;
+      }
+
+      // Check for redirect status codes and follow them manually
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get('location');
+        if (location) {
+          console.log(`[feed-worker] Following manual redirect to: ${location}`);
+          const redirectedResponse = await fetch(location, {
+            headers: {
+              'User-Agent': 'elonmusksucks.net/1.0 RSS Reader (+https://elonmusksucks.net)',
+              Accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml',
+            },
+          });
+          if (redirectedResponse.ok) {
+            return redirectedResponse;
+          }
+        }
+      }
+    } catch (error) {
+      // Continue to next redirect attempt
+      continue;
+    }
+  }
+
+  return null;
+}
+
+/**
  * RSS/Atom Feed Worker
  * Handles feed fetching, parsing, and article creation with deduplication
  */
@@ -75,20 +198,8 @@ async function processFeedFetch(job: Job<FeedFetchJobData>): Promise<{
 
     await job.updateProgress(10);
 
-    // Fetch feed XML with proper headers
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
-
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'elonmusksucks.net/1.0 RSS Reader (+https://elonmusksucks.net)',
-        Accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml',
-        'Cache-Control': forceRefresh ? 'no-cache' : 'max-age=300',
-      },
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeoutId);
+    // Fetch feed XML with retry logic for redirect issues
+    const response = await fetchWithRetry(url, forceRefresh || false);
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -191,6 +302,13 @@ async function processFeedFetch(job: Job<FeedFetchJobData>): Promise<{
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     errors.push(errorMessage);
 
+    // Determine if this is a permanent or temporary error
+    const isPermanentError =
+      errorMessage.includes('redirect count exceeded') ||
+      errorMessage.includes('HTTP 404') ||
+      errorMessage.includes('HTTP 403') ||
+      errorMessage.includes('not found');
+
     // Update feed error metrics
     await prisma.feedSource.update({
       where: { id: feedId },
@@ -198,8 +316,17 @@ async function processFeedFetch(job: Job<FeedFetchJobData>): Promise<{
         lastErrorAt: new Date(),
         lastErrorMsg: errorMessage,
         errorCount: { increment: 1 },
+        // Update status based on error type - block for permanent errors
+        status: isPermanentError ? 'BLOCKED' : undefined, // Keep current status for temporary errors
       },
     });
+
+    // Log different severity levels
+    if (isPermanentError) {
+      console.warn(
+        `[feed-worker] Feed ${feedId} may need manual review - permanent error detected`,
+      );
+    }
   }
 
   return {

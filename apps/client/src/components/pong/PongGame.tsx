@@ -17,6 +17,7 @@ export function PongGame() {
     connectionError,
     lastPing,
     stats,
+    gameStateBuffer,
     connect,
     disconnect,
     joinLobby,
@@ -179,6 +180,7 @@ export function PongGame() {
                 ping={lastPing}
                 onSetReady={setReady}
                 isSpectating={false}
+                gameStateBuffer={gameStateBuffer}
                 className="max-w-4xl w-full"
               />
             </div>
