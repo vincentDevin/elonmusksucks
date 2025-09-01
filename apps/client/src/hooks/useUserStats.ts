@@ -107,7 +107,7 @@ export interface ActivityItem {
     | 'bet_won'
     | 'bet_lost'
     | 'prediction_created'
-    | 'achievement_earned'
+    | 'achievement_unlocked'
     | 'rank_changed';
   title: string;
   description: string;
@@ -541,7 +541,7 @@ export function useUserStats() {
         const achievement: any = data.achievements || data;
         const newActivity: ActivityItem = {
           id: `achievement_${Date.now()}`,
-          type: 'achievement_earned',
+          type: 'achievement_unlocked',
           title: 'Achievement Unlocked!',
           description: achievement?.title || achievement?.name || 'New achievement',
           timestamp: data.timestamp || new Date().toISOString(),

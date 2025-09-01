@@ -24,6 +24,7 @@ import { setupUnifiedActivityHandlers } from './handlers/unifiedActivityHandlers
 import { registerTimelineHandlers } from './handlers/timelineHandlers';
 import { registerPongHandlers, registerPongRedisHandlers } from './handlers/pongSocketHandlers';
 import { socketCleanupManager } from './lib/SocketCleanupManager';
+import { setupAchievementRedisHandlers } from './workers/achievementEventHandler';
 // import { registerRoomHandlers } from './handlers/roomHandlers'; // future rooms
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -108,6 +109,10 @@ export async function initSocket(httpServer: HTTPServer) {
     'pong:tier:change',
     'pong:stats:update',
     'pong:leaderboard:update',
+    // Pong achievement events
+    'pong:match:completed',
+    'pong:match:lost',
+    'pong:elo:milestone',
   );
   registerRedisEventHandlers(io, eventSub);
   registerPongRedisHandlers(io, eventSub);
@@ -127,6 +132,10 @@ export async function initSocket(httpServer: HTTPServer) {
   // Give the unified activity service access to Socket.IO for immediate broadcasts
   const { unifiedActivityService } = await import('./services/unifiedActivity.service');
   unifiedActivityService.setSocketIO(io);
+
+  // ── Achievement Redis subscriber ──────────────────────────────────────────
+  const achievementSub = setupAchievementRedisHandlers(io);
+  redisClients.push(achievementSub);
 
   // ── Timeline event handlers ───────────────────────────────────────────────
   registerTimelineHandlers(io);

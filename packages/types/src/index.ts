@@ -1608,6 +1608,21 @@ export interface AchievementUnlockedPayload {
   timestamp: string;
 }
 
+export interface PongAchievementContext {
+  matchId: string;
+  winnerId: number;
+  loserId?: number;
+  vsAI: boolean;
+  aiDifficulty?: 'EASY' | 'MEDIUM' | 'HARD' | 'IMPOSSIBLE';
+  wager: number;
+  winnerScore: number;
+  loserScore: number;
+  duration: number;
+  eloChange?: number;
+  newElo?: number;
+  streak?: number;
+}
+
 // ——— BullMQ Job Data Types —————————————————————————————————————
 
 export interface RefreshJobData {
@@ -2119,10 +2134,19 @@ export type AchievementEventKey =
   | 'payout:completed'
   | 'parlay:won'
   | 'pong:match:recorded'
+  | 'pong:match:completed'
+  | 'pong:match:lost'
   | 'pong:elo:update'
+  | 'pong:elo:milestone'
+  | 'pong:win:pvp'
+  | 'pong:win:ai'
   | 'user:login'
   | 'user:follow'
-  | 'prediction:created';
+  | 'prediction:created'
+  | 'prediction:bet:placed'
+  | 'prediction:bet:settled'
+  | 'prediction:market:created'
+  | 'prediction:market:settled';
 
 export interface AchievementEvent {
   key: AchievementEventKey;

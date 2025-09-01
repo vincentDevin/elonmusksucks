@@ -1,0 +1,3665 @@
+{
+  "generatedAt": "2025-09-01T00:24:10.510Z",
+  "total": 141,
+  "categories": [
+    "betting",
+    "chat",
+    "event",
+    "leaderboard",
+    "participation",
+    "pong",
+    "prediction",
+    "secret",
+    "shame"
+  ],
+  "allowedEventKeys": [
+    "pong:match:completed",
+    "pong:match:lost",
+    "pong:elo:milestone",
+    "prediction:bet:settled",
+    "prediction:market:settled",
+    "bet:placed"
+  ],
+  "eventKeyUsage": [
+    [
+      "pong:elo:milestone",
+      5
+    ],
+    [
+      "pong:match:completed",
+      24
+    ],
+    [
+      "pong:match:lost",
+      9
+    ]
+  ],
+  "achievements": [
+    {
+      "id": 1,
+      "slug": "muskbucks-millionaire",
+      "key": "muskbucks-millionaire",
+      "name": "MuskBucks Millionaire",
+      "description": "Earn ≥1,000,000 MuskBucks net profit from betting",
+      "category": "betting",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 2,
+      "slug": "big-spender",
+      "key": "big-spender",
+      "name": "Big Spender",
+      "description": "Place a single bet with stake ≥100,000 MuskBucks",
+      "category": "betting",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 3,
+      "slug": "yolo-all-in",
+      "key": "yolo-all-in",
+      "name": "YOLO All-In",
+      "description": "Go all-in with your entire balance and win",
+      "category": "betting",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 4,
+      "slug": "paper-hands",
+      "key": "paper-hands",
+      "name": "Paper Hands",
+      "description": "Lose 5 bets in a row",
+      "category": "betting",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 5,
+      "slug": "diamond-hands",
+      "key": "diamond-hands",
+      "name": "Diamond Hands",
+      "description": "Win 10 bets in a row",
+      "category": "betting",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 6,
+      "slug": "parlay-prodigy",
+      "key": "parlay-prodigy",
+      "name": "Parlay Prodigy",
+      "description": "Win a parlay with 3 or more legs",
+      "category": "betting",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 7,
+      "slug": "the-long-shot",
+      "key": "the-long-shot",
+      "name": "The Long Shot",
+      "description": "Win a bet with implied odds less than 10%",
+      "category": "betting",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 8,
+      "slug": "bankrupt-billionaire",
+      "key": "bankrupt-billionaire",
+      "name": "Bankrupt Billionaire",
+      "description": "Your MuskBucks balance hits zero",
+      "category": "betting",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 48,
+      "slug": "defies-probability",
+      "key": "defies-probability",
+      "name": "Defies Probability",
+      "description": "Win a bet placed at implied odds <5%",
+      "category": "betting",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 9,
+      "slug": "rags-to-riches",
+      "key": "rags-to-riches",
+      "name": "Rags to Riches",
+      "description": "Go from <100 to ≥50,000 MuskBucks in the same day",
+      "category": "betting",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 49,
+      "slug": "statistical-anomaly",
+      "key": "statistical-anomaly",
+      "name": "Statistical Anomaly",
+      "description": "Win a bet placed at implied odds <1%",
+      "category": "betting",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 154,
+      "slug": "first-timer",
+      "key": "first-timer",
+      "name": "First Timer",
+      "description": "Place your very first bet",
+      "category": "betting",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 155,
+      "slug": "betting-machine",
+      "key": "betting-machine",
+      "name": "Betting Machine",
+      "description": "Place 100 total bets",
+      "category": "betting",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 52,
+      "slug": "first-bet",
+      "key": "first-bet",
+      "name": "First Bet",
+      "description": "Place your first bet",
+      "category": "betting",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 156,
+      "slug": "whale-bettor",
+      "key": "whale-bettor",
+      "name": "Whale Bettor",
+      "description": "Place a bet worth 500,000+ MuskBucks",
+      "category": "betting",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 53,
+      "slug": "action-junkie",
+      "key": "action-junkie",
+      "name": "Action Junkie",
+      "description": "Place 100 bets",
+      "category": "betting",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 157,
+      "slug": "comeback-king",
+      "key": "comeback-king",
+      "name": "Comeback King",
+      "description": "Win after being down 90% of your bankroll",
+      "category": "betting",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 158,
+      "slug": "diversified-gambler",
+      "key": "diversified-gambler",
+      "name": "Diversified Gambler",
+      "description": "Place bets in 10 different prediction categories",
+      "category": "betting",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 54,
+      "slug": "losing-spiral",
+      "key": "losing-spiral",
+      "name": "Losing Spiral",
+      "description": "Lose 10 bets in a row",
+      "category": "betting",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 55,
+      "slug": "billionaire-on-paper",
+      "key": "billionaire-on-paper",
+      "name": "Billionaire on Paper",
+      "description": "Reach ≥1,000,000,000 MuskBucks lifetime net profit",
+      "category": "betting",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 159,
+      "slug": "speed-demon",
+      "key": "speed-demon",
+      "name": "Speed Demon",
+      "description": "Place 10 bets in under 5 minutes",
+      "category": "betting",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 56,
+      "slug": "burnt-a-billion",
+      "key": "burnt-a-billion",
+      "name": "Burnt a Billion",
+      "description": "Accumulate ≥1,000,000,000 MuskBucks in total losses",
+      "category": "betting",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 160,
+      "slug": "parlay-master",
+      "key": "parlay-master",
+      "name": "Parlay Master",
+      "description": "Win a 5+ leg parlay",
+      "category": "betting",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 161,
+      "slug": "lucky-seven",
+      "key": "lucky-seven",
+      "name": "Lucky Seven",
+      "description": "Win 7 bets in a row",
+      "category": "betting",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 57,
+      "slug": "parlay-architect",
+      "key": "parlay-architect",
+      "name": "Parlay Architect",
+      "description": "Win a parlay with 5 or more legs",
+      "category": "betting",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 58,
+      "slug": "galaxy-brain-parlay",
+      "key": "galaxy-brain-parlay",
+      "name": "Galaxy Brain Parlay",
+      "description": "Win a parlay with 7 or more legs",
+      "category": "betting",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 59,
+      "slug": "grinder-500",
+      "key": "grinder-500",
+      "name": "Grinder 500",
+      "description": "Place 500 bets",
+      "category": "betting",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 60,
+      "slug": "hot-hand",
+      "key": "hot-hand",
+      "name": "Hot Hand",
+      "description": "Win 5 bets in a row",
+      "category": "betting",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 20,
+      "slug": "keyboard-warrior",
+      "key": "keyboard-warrior",
+      "name": "Keyboard Warrior",
+      "description": "Send 1,000 messages in global chat",
+      "category": "chat",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 21,
+      "slug": "chief-shitposter",
+      "key": "chief-shitposter",
+      "name": "Chief Shitposter",
+      "description": "Get 50+ upvotes on a single profile post",
+      "category": "chat",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 79,
+      "slug": "typing-titan",
+      "key": "typing-titan",
+      "name": "Typing Titan",
+      "description": "Send 5,000 messages in global chat",
+      "category": "chat",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 80,
+      "slug": "chat-fiend",
+      "key": "chat-fiend",
+      "name": "Chat Fiend",
+      "description": "Send 10,000 messages in global chat",
+      "category": "chat",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 22,
+      "slug": "reply-guy",
+      "key": "reply-guy",
+      "name": "Reply Guy",
+      "description": "Comment on 50 different user profile posts",
+      "category": "chat",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 23,
+      "slug": "community-meme-lord",
+      "key": "community-meme-lord",
+      "name": "Community Meme Lord",
+      "description": "Post a meme that gets 100+ upvotes",
+      "category": "chat",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 24,
+      "slug": "elon-reply-intern",
+      "key": "elon-reply-intern",
+      "name": "Elon Reply Intern",
+      "description": "Be the first to reply to an AI Elon tweet",
+      "category": "chat",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 25,
+      "slug": "free-speech-absolutist",
+      "key": "free-speech-absolutist",
+      "name": "Free Speech Absolutist",
+      "description": "Participate in a chat thread with 100+ messages",
+      "category": "chat",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 170,
+      "slug": "first-words",
+      "key": "first-words",
+      "name": "First Words",
+      "description": "Send your first chat message",
+      "category": "chat",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 171,
+      "slug": "chatterbox",
+      "key": "chatterbox",
+      "name": "Chatterbox",
+      "description": "Send 100 messages in a single day",
+      "category": "chat",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 172,
+      "slug": "ghost-of-chat",
+      "key": "ghost-of-chat",
+      "name": "Ghost of Chat",
+      "description": "Go 30 days without sending a message",
+      "category": "chat",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 173,
+      "slug": "debate-champion",
+      "key": "debate-champion",
+      "name": "Debate Champion",
+      "description": "Participate in a heated discussion with 20+ back-and-forth messages",
+      "category": "chat",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 174,
+      "slug": "emoji-master",
+      "key": "emoji-master",
+      "name": "Emoji Master",
+      "description": "Use 50+ different emojis in your messages",
+      "category": "chat",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 86,
+      "slug": "upvote-magnet",
+      "key": "upvote-magnet",
+      "name": "Upvote Magnet",
+      "description": "Get 100+ upvotes on any single post",
+      "category": "chat",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 87,
+      "slug": "viral-sensation",
+      "key": "viral-sensation",
+      "name": "Viral Sensation",
+      "description": "Get 250+ upvotes on any single post",
+      "category": "chat",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 88,
+      "slug": "commentator",
+      "key": "commentator",
+      "name": "Commentator",
+      "description": "Write 250 comments across profile posts",
+      "category": "chat",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 89,
+      "slug": "thread-starter",
+      "key": "thread-starter",
+      "name": "Thread Starter",
+      "description": "Create 50 profile posts",
+      "category": "chat",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 94,
+      "slug": "precrime-parlay",
+      "key": "precrime-parlay",
+      "name": "Precrime Parlay",
+      "description": "Win a parlay that correctly predicts AI Elon will tweet about a topic before real Elon",
+      "category": "event",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 95,
+      "slug": "turing-test-rookie",
+      "key": "turing-test-rookie",
+      "name": "Turing Test Rookie",
+      "description": "Score 10 correct in the Tweet-or-Yeet Turing Test",
+      "category": "event",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 96,
+      "slug": "turing-test-savant",
+      "key": "turing-test-savant",
+      "name": "Turing Test Savant",
+      "description": "Score 50 correct in the Tweet-or-Yeet Turing Test",
+      "category": "event",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 32,
+      "slug": "dogefather-believer",
+      "key": "dogefather-believer",
+      "name": "Dogefather Believer",
+      "description": "Correctly predict when Elon tweets about Dogecoin",
+      "category": "event",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 33,
+      "slug": "mars-colony-ceo",
+      "key": "mars-colony-ceo",
+      "name": "Mars Colony CEO",
+      "description": "Correctly predict a SpaceX Mars mission announcement",
+      "category": "event",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 34,
+      "slug": "tesla-stonk-hodler",
+      "key": "tesla-stonk-hodler",
+      "name": "Tesla Stonk Hodler",
+      "description": "Correctly predict a major TSLA stock price movement",
+      "category": "event",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 35,
+      "slug": "xtreme-x-user",
+      "key": "xtreme-x-user",
+      "name": "Xtreme X User",
+      "description": "Win 10 predictions in a row about Twitter/X changes",
+      "category": "event",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 180,
+      "slug": "spacex-oracle",
+      "key": "spacex-oracle",
+      "name": "SpaceX Oracle",
+      "description": "Correctly predict 5 SpaceX launch outcomes",
+      "category": "event",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 181,
+      "slug": "crypto-prophet",
+      "key": "crypto-prophet",
+      "name": "Crypto Prophet",
+      "description": "Correctly predict a major crypto price movement",
+      "category": "event",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 182,
+      "slug": "twitter-sage",
+      "key": "twitter-sage",
+      "name": "Twitter Sage",
+      "description": "Predict 3 Twitter/X policy changes correctly",
+      "category": "event",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 183,
+      "slug": "neuralink-visionary",
+      "key": "neuralink-visionary",
+      "name": "Neuralink Visionary",
+      "description": "Correctly predict a Neuralink milestone",
+      "category": "event",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 10,
+      "slug": "high-roller",
+      "key": "high-roller",
+      "name": "High Roller",
+      "description": "Hold #1 position on leaderboard for 7 consecutive days",
+      "category": "leaderboard",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 11,
+      "slug": "chief-musk-whisperer",
+      "key": "chief-musk-whisperer",
+      "name": "Chief Musk Whisperer",
+      "description": "Finish #1 on the weekly leaderboard",
+      "category": "leaderboard",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 12,
+      "slug": "rocket-fumbler",
+      "key": "rocket-fumbler",
+      "name": "Rocket Fumbler",
+      "description": "Finish last place on weekly leaderboard (among active bettors)",
+      "category": "leaderboard",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 62,
+      "slug": "podium-finisher",
+      "key": "podium-finisher",
+      "name": "Podium Finisher",
+      "description": "Finish in the weekly top 3",
+      "category": "leaderboard",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 13,
+      "slug": "whale-of-wall-street",
+      "key": "whale-of-wall-street",
+      "name": "Whale of Wall Street",
+      "description": "Have the largest single-day profit site-wide",
+      "category": "leaderboard",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 14,
+      "slug": "clown-of-the-week",
+      "key": "clown-of-the-week",
+      "name": "Clown of the Week",
+      "description": "Place the single biggest losing bet of the week",
+      "category": "leaderboard",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 63,
+      "slug": "on-the-board",
+      "key": "on-the-board",
+      "name": "On the Board",
+      "description": "Finish in the weekly top 10",
+      "category": "leaderboard",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 162,
+      "slug": "weekend-warrior",
+      "key": "weekend-warrior",
+      "name": "Weekend Warrior",
+      "description": "Finish in top 3 on weekend leaderboard",
+      "category": "leaderboard",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 163,
+      "slug": "monthly-champion",
+      "key": "monthly-champion",
+      "name": "Monthly Champion",
+      "description": "Finish #1 on monthly leaderboard",
+      "category": "leaderboard",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 164,
+      "slug": "comeback-artist",
+      "key": "comeback-artist",
+      "name": "Comeback Artist",
+      "description": "Rise from bottom 10% to top 10% in a week",
+      "category": "leaderboard",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 66,
+      "slug": "comeback-kid",
+      "key": "comeback-kid",
+      "name": "Comeback Kid",
+      "description": "Climb from bottom half midweek to a top-3 weekly finish",
+      "category": "leaderboard",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 165,
+      "slug": "consistency-king",
+      "key": "consistency-king",
+      "name": "Consistency King",
+      "description": "Stay in top 10 for 30 consecutive days",
+      "category": "leaderboard",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 69,
+      "slug": "volume-leader",
+      "key": "volume-leader",
+      "name": "Volume Leader",
+      "description": "Place the most bets this week",
+      "category": "leaderboard",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 70,
+      "slug": "parlay-king",
+      "key": "parlay-king",
+      "name": "Parlay King",
+      "description": "Record the highest parlay payout of the week",
+      "category": "leaderboard",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 26,
+      "slug": "consistent-gambler",
+      "key": "consistent-gambler",
+      "name": "Consistent Gambler",
+      "description": "Place at least one bet every day for 30 days straight",
+      "category": "participation",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 27,
+      "slug": "late-stage-capitalist",
+      "key": "late-stage-capitalist",
+      "name": "Late Stage Capitalist",
+      "description": "Earn 5,000,000 lifetime MuskBucks through betting",
+      "category": "participation",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 28,
+      "slug": "early-adopter",
+      "key": "early-adopter",
+      "name": "Early Adopter",
+      "description": "Joined within the first 30 days of launch",
+      "category": "participation",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 29,
+      "slug": "conspiracy-theorist",
+      "key": "conspiracy-theorist",
+      "name": "Conspiracy Theorist",
+      "description": "Participate in 50+ different predictions",
+      "category": "participation",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 30,
+      "slug": "ultimate-degenerate",
+      "key": "ultimate-degenerate",
+      "name": "Ultimate Degenerate",
+      "description": "Place 500+ bets in your lifetime",
+      "category": "participation",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 31,
+      "slug": "bug-hunter",
+      "key": "bug-hunter",
+      "name": "Bug Hunter",
+      "description": "Report a bug that gets fixed by the development team",
+      "category": "participation",
+      "isActive": true,
+      "autoAward": false,
+      "manualOnly": true,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 175,
+      "slug": "daily-visitor",
+      "key": "daily-visitor",
+      "name": "Daily Visitor",
+      "description": "Log in every day for 7 consecutive days",
+      "category": "participation",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 176,
+      "slug": "weekly-regular",
+      "key": "weekly-regular",
+      "name": "Weekly Regular",
+      "description": "Log in every day for 30 consecutive days",
+      "category": "participation",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 177,
+      "slug": "profile-perfectionist",
+      "key": "profile-perfectionist",
+      "name": "Profile Perfectionist",
+      "description": "Complete your profile with bio, location, and avatar",
+      "category": "participation",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 178,
+      "slug": "social-butterfly",
+      "key": "social-butterfly",
+      "name": "Social Butterfly",
+      "description": "Follow 25 other users",
+      "category": "participation",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 179,
+      "slug": "influence-peddler",
+      "key": "influence-peddler",
+      "name": "Influence Peddler",
+      "description": "Have 100+ users follow you",
+      "category": "participation",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 97,
+      "slug": "welcome-wagon",
+      "key": "welcome-wagon",
+      "name": "Welcome Wagon",
+      "description": "Send your first message in global chat",
+      "category": "participation",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 98,
+      "slug": "profile-complete",
+      "key": "profile-complete",
+      "name": "Profile Complete",
+      "description": "Set an avatar and display name",
+      "category": "participation",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 102,
+      "slug": "daily-visit-streak",
+      "key": "daily-visit-streak",
+      "name": "Daily Visit Streak",
+      "description": "Log in 7 days in a row",
+      "category": "participation",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 103,
+      "slug": "chaos-newsletter",
+      "key": "chaos-newsletter",
+      "name": "Chaos Newsletter",
+      "description": "Subscribe to the site's newsletter",
+      "category": "participation",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 187,
+      "slug": "pong-first-blood",
+      "key": "pong-first-blood",
+      "name": "First Blood",
+      "description": "Win your first Pong match.",
+      "category": "pong",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": {
+        "progress": {
+          "kind": "count",
+          "incrementIf": {
+            "payload.vsAI": "any",
+            "payload.winnerId": "{{ userId }}"
+          }
+        },
+        "eventKeys": [
+          "pong:match:completed"
+        ],
+        "unlockWhen": {
+          "progress >=": 1
+        }
+      },
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "progress.when missing",
+          "unlock must be { gte: { path: \"progress\", value: number } }"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 188,
+      "slug": "pong-10-wins",
+      "key": "pong-10-wins",
+      "name": "Table Regular",
+      "description": "Win 10 Pong matches.",
+      "category": "pong",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": {
+        "progress": {
+          "kind": "count",
+          "incrementIf": {
+            "payload.vsAI": "any",
+            "payload.winnerId": "{{ userId }}"
+          }
+        },
+        "eventKeys": [
+          "pong:match:completed"
+        ],
+        "unlockWhen": {
+          "progress >=": 10
+        }
+      },
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "progress.when missing",
+          "unlock must be { gte: { path: \"progress\", value: number } }"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 189,
+      "slug": "pong-50-wins",
+      "key": "pong-50-wins",
+      "name": "Spin Doctor",
+      "description": "Win 50 Pong matches.",
+      "category": "pong",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": {
+        "progress": {
+          "kind": "count",
+          "incrementIf": {
+            "payload.vsAI": "any",
+            "payload.winnerId": "{{ userId }}"
+          }
+        },
+        "eventKeys": [
+          "pong:match:completed"
+        ],
+        "unlockWhen": {
+          "progress >=": 50
+        }
+      },
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "progress.when missing",
+          "unlock must be { gte: { path: \"progress\", value: number } }"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 190,
+      "slug": "pong-100-wins",
+      "key": "pong-100-wins",
+      "name": "Arcade Royalty",
+      "description": "Win 100 Pong matches.",
+      "category": "pong",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": {
+        "progress": {
+          "kind": "count",
+          "incrementIf": {
+            "payload.vsAI": "any",
+            "payload.winnerId": "{{ userId }}"
+          }
+        },
+        "eventKeys": [
+          "pong:match:completed"
+        ],
+        "unlockWhen": {
+          "progress >=": 100
+        }
+      },
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "progress.when missing",
+          "unlock must be { gte: { path: \"progress\", value: number } }"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 191,
+      "slug": "pong-100-matches",
+      "key": "pong-100-matches",
+      "name": "Grinder",
+      "description": "Play 100 Pong matches.",
+      "category": "pong",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": {
+        "progress": {
+          "kind": "count",
+          "incrementIf": {
+            "payload.vsAI": "any"
+          }
+        },
+        "eventKeys": [
+          "pong:match:completed",
+          "pong:match:lost"
+        ],
+        "unlockWhen": {
+          "progress >=": 100
+        }
+      },
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "progress.when missing",
+          "unlock must be { gte: { path: \"progress\", value: number } }"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 192,
+      "slug": "pong-500-matches",
+      "key": "pong-500-matches",
+      "name": "Marathoner",
+      "description": "Play 500 Pong matches.",
+      "category": "pong",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": {
+        "progress": {
+          "kind": "count",
+          "incrementIf": {
+            "payload.vsAI": "any"
+          }
+        },
+        "eventKeys": [
+          "pong:match:completed",
+          "pong:match:lost"
+        ],
+        "unlockWhen": {
+          "progress >=": 500
+        }
+      },
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "progress.when missing",
+          "unlock must be { gte: { path: \"progress\", value: number } }"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 193,
+      "slug": "pong-1000-matches",
+      "key": "pong-1000-matches",
+      "name": "Endless Rally",
+      "description": "Play 1000 Pong matches.",
+      "category": "pong",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": {
+        "progress": {
+          "kind": "count",
+          "incrementIf": {
+            "payload.vsAI": "any"
+          }
+        },
+        "eventKeys": [
+          "pong:match:completed",
+          "pong:match:lost"
+        ],
+        "unlockWhen": {
+          "progress >=": 1000
+        }
+      },
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "progress.when missing",
+          "unlock must be { gte: { path: \"progress\", value: number } }"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 194,
+      "slug": "pong-streak-3",
+      "key": "pong-streak-3",
+      "name": "Hot Hands I",
+      "description": "Win 3 matches in a row.",
+      "category": "pong",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": {
+        "progress": {
+          "kind": "streak",
+          "resetIf": {
+            "payload.winnerId": {
+              "!==": "{{ userId }}"
+            }
+          },
+          "incrementIf": {
+            "payload.vsAI": "any",
+            "payload.winnerId": "{{ userId }}"
+          }
+        },
+        "eventKeys": [
+          "pong:match:completed",
+          "pong:match:lost"
+        ],
+        "unlockWhen": {
+          "progress >=": 3
+        }
+      },
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "progress.when missing",
+          "progress.resetWhen required for streak",
+          "unlock must be { gte: { path: \"progress\", value: number } }"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 195,
+      "slug": "pong-streak-5",
+      "key": "pong-streak-5",
+      "name": "Hot Hands II",
+      "description": "Win 5 matches in a row.",
+      "category": "pong",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": {
+        "progress": {
+          "kind": "streak",
+          "resetIf": {
+            "payload.winnerId": {
+              "!==": "{{ userId }}"
+            }
+          },
+          "incrementIf": {
+            "payload.vsAI": "any",
+            "payload.winnerId": "{{ userId }}"
+          }
+        },
+        "eventKeys": [
+          "pong:match:completed",
+          "pong:match:lost"
+        ],
+        "unlockWhen": {
+          "progress >=": 5
+        }
+      },
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "progress.when missing",
+          "progress.resetWhen required for streak",
+          "unlock must be { gte: { path: \"progress\", value: number } }"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 196,
+      "slug": "pong-streak-10",
+      "key": "pong-streak-10",
+      "name": "Inferno",
+      "description": "Win 10 matches in a row.",
+      "category": "pong",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": {
+        "progress": {
+          "kind": "streak",
+          "resetIf": {
+            "payload.winnerId": {
+              "!==": "{{ userId }}"
+            }
+          },
+          "incrementIf": {
+            "payload.vsAI": "any",
+            "payload.winnerId": "{{ userId }}"
+          }
+        },
+        "eventKeys": [
+          "pong:match:completed",
+          "pong:match:lost"
+        ],
+        "unlockWhen": {
+          "progress >=": 10
+        }
+      },
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "progress.when missing",
+          "progress.resetWhen required for streak",
+          "unlock must be { gte: { path: \"progress\", value: number } }"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 197,
+      "slug": "pong-streak-20",
+      "key": "pong-streak-20",
+      "name": "Unstoppable",
+      "description": "Win 20 matches in a row.",
+      "category": "pong",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": {
+        "progress": {
+          "kind": "streak",
+          "resetIf": {
+            "payload.winnerId": {
+              "!==": "{{ userId }}"
+            }
+          },
+          "incrementIf": {
+            "payload.vsAI": "any",
+            "payload.winnerId": "{{ userId }}"
+          }
+        },
+        "eventKeys": [
+          "pong:match:completed",
+          "pong:match:lost"
+        ],
+        "unlockWhen": {
+          "progress >=": 20
+        }
+      },
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "progress.when missing",
+          "progress.resetWhen required for streak",
+          "unlock must be { gte: { path: \"progress\", value: number } }"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 198,
+      "slug": "pong-perfect-11-0",
+      "key": "pong-perfect-11-0",
+      "name": "Perfect Game",
+      "description": "Win 11–0.",
+      "category": "pong",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": {
+        "progress": {
+          "kind": "binary",
+          "incrementIf": {
+            "payload.winnerId": "{{ userId }}",
+            "payload.loserScore": 0,
+            "payload.winnerScore": 11
+          }
+        },
+        "eventKeys": [
+          "pong:match:completed"
+        ],
+        "unlockWhen": {
+          "progress >=": 1
+        }
+      },
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "progress.when missing",
+          "unlock must be { gte: { path: \"progress\", value: number } }"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 289,
+      "slug": "pong-comeback-king",
+      "key": "pong-comeback-king",
+      "name": "Pong Comeback King",
+      "description": "Win after trailing by 5+ points.",
+      "category": "pong",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": {
+        "progress": {
+          "kind": "binary",
+          "incrementIf": {
+            "payload.winnerId": "{{ userId }}",
+            "payload.loserScore": {
+              ">=": 6
+            },
+            "payload.winnerScore": 11
+          }
+        },
+        "eventKeys": [
+          "pong:match:completed"
+        ],
+        "unlockWhen": {
+          "progress >=": 1
+        }
+      },
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "progress.when missing",
+          "unlock must be { gte: { path: \"progress\", value: number } }"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 290,
+      "slug": "pong-wall-builder",
+      "key": "pong-wall-builder",
+      "name": "Wall Builder",
+      "description": "Hold opponent to ≤2 points.",
+      "category": "pong",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": {
+        "progress": {
+          "kind": "binary",
+          "incrementIf": {
+            "payload.winnerId": "{{ userId }}",
+            "payload.loserScore": {
+              "<=": 2
+            }
+          }
+        },
+        "eventKeys": [
+          "pong:match:completed"
+        ],
+        "unlockWhen": {
+          "progress >=": 1
+        }
+      },
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "progress.when missing",
+          "unlock must be { gte: { path: \"progress\", value: number } }"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 291,
+      "slug": "pong-speedrunner",
+      "key": "pong-speedrunner",
+      "name": "Speedrunner",
+      "description": "Win a match in under 60 seconds.",
+      "category": "pong",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": {
+        "progress": {
+          "kind": "binary",
+          "incrementIf": {
+            "payload.duration": {
+              "<": 60
+            },
+            "payload.winnerId": "{{ userId }}"
+          }
+        },
+        "eventKeys": [
+          "pong:match:completed"
+        ],
+        "unlockWhen": {
+          "progress >=": 1
+        }
+      },
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "progress.when missing",
+          "unlock must be { gte: { path: \"progress\", value: number } }"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 292,
+      "slug": "pong-ai-easy",
+      "key": "pong-ai-easy",
+      "name": "Bot Breaker: Easy",
+      "description": "Beat Easy AI.",
+      "category": "pong",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": {
+        "progress": {
+          "kind": "binary",
+          "incrementIf": {
+            "payload.vsAI": true,
+            "payload.winnerId": "{{ userId }}",
+            "payload.aiDifficulty": "EASY"
+          }
+        },
+        "eventKeys": [
+          "pong:match:completed"
+        ],
+        "unlockWhen": {
+          "progress >=": 1
+        }
+      },
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "progress.when missing",
+          "unlock must be { gte: { path: \"progress\", value: number } }"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 293,
+      "slug": "pong-ai-medium",
+      "key": "pong-ai-medium",
+      "name": "Bot Breaker: Medium",
+      "description": "Beat Medium AI.",
+      "category": "pong",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": {
+        "progress": {
+          "kind": "binary",
+          "incrementIf": {
+            "payload.vsAI": true,
+            "payload.winnerId": "{{ userId }}",
+            "payload.aiDifficulty": "MEDIUM"
+          }
+        },
+        "eventKeys": [
+          "pong:match:completed"
+        ],
+        "unlockWhen": {
+          "progress >=": 1
+        }
+      },
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "progress.when missing",
+          "unlock must be { gte: { path: \"progress\", value: number } }"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 294,
+      "slug": "pong-ai-hard",
+      "key": "pong-ai-hard",
+      "name": "Bot Breaker: Hard",
+      "description": "Beat Hard AI.",
+      "category": "pong",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": {
+        "progress": {
+          "kind": "binary",
+          "incrementIf": {
+            "payload.vsAI": true,
+            "payload.winnerId": "{{ userId }}",
+            "payload.aiDifficulty": "HARD"
+          }
+        },
+        "eventKeys": [
+          "pong:match:completed"
+        ],
+        "unlockWhen": {
+          "progress >=": 1
+        }
+      },
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "progress.when missing",
+          "unlock must be { gte: { path: \"progress\", value: number } }"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 295,
+      "slug": "pong-ai-impossible",
+      "key": "pong-ai-impossible",
+      "name": "Bot Breaker: Impossible",
+      "description": "Beat Impossible AI.",
+      "category": "pong",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": {
+        "progress": {
+          "kind": "binary",
+          "incrementIf": {
+            "payload.vsAI": true,
+            "payload.winnerId": "{{ userId }}",
+            "payload.aiDifficulty": "IMPOSSIBLE"
+          }
+        },
+        "eventKeys": [
+          "pong:match:completed"
+        ],
+        "unlockWhen": {
+          "progress >=": 1
+        }
+      },
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "progress.when missing",
+          "unlock must be { gte: { path: \"progress\", value: number } }"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 296,
+      "slug": "pong-highroller-1k",
+      "key": "pong-highroller-1k",
+      "name": "Pong High Stakes I",
+      "description": "Win with a wager ≥ 1,000.",
+      "category": "pong",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": {
+        "progress": {
+          "kind": "binary",
+          "incrementIf": {
+            "payload.wager": {
+              ">=": 1000
+            },
+            "payload.winnerId": "{{ userId }}"
+          }
+        },
+        "eventKeys": [
+          "pong:match:completed"
+        ],
+        "unlockWhen": {
+          "progress >=": 1
+        }
+      },
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "progress.when missing",
+          "unlock must be { gte: { path: \"progress\", value: number } }"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 297,
+      "slug": "pong-highroller-10k",
+      "key": "pong-highroller-10k",
+      "name": "Pong High Stakes II",
+      "description": "Win with a wager ≥ 10,000.",
+      "category": "pong",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": {
+        "progress": {
+          "kind": "binary",
+          "incrementIf": {
+            "payload.wager": {
+              ">=": 10000
+            },
+            "payload.winnerId": "{{ userId }}"
+          }
+        },
+        "eventKeys": [
+          "pong:match:completed"
+        ],
+        "unlockWhen": {
+          "progress >=": 1
+        }
+      },
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "progress.when missing",
+          "unlock must be { gte: { path: \"progress\", value: number } }"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 298,
+      "slug": "pong-highroller-50k",
+      "key": "pong-highroller-50k",
+      "name": "Pong High Stakes III",
+      "description": "Win with a wager ≥ 50,000.",
+      "category": "pong",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": {
+        "progress": {
+          "kind": "binary",
+          "incrementIf": {
+            "payload.wager": {
+              ">=": 50000
+            },
+            "payload.winnerId": "{{ userId }}"
+          }
+        },
+        "eventKeys": [
+          "pong:match:completed"
+        ],
+        "unlockWhen": {
+          "progress >=": 1
+        }
+      },
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "progress.when missing",
+          "unlock must be { gte: { path: \"progress\", value: number } }"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 299,
+      "slug": "pong-highroller-100k",
+      "key": "pong-highroller-100k",
+      "name": "Pong High Stakes IV",
+      "description": "Win with a wager ≥ 100,000.",
+      "category": "pong",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": {
+        "progress": {
+          "kind": "binary",
+          "incrementIf": {
+            "payload.wager": {
+              ">=": 100000
+            },
+            "payload.winnerId": "{{ userId }}"
+          }
+        },
+        "eventKeys": [
+          "pong:match:completed"
+        ],
+        "unlockWhen": {
+          "progress >=": 1
+        }
+      },
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "progress.when missing",
+          "unlock must be { gte: { path: \"progress\", value: number } }"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 300,
+      "slug": "pong-elo-1400",
+      "key": "pong-elo-1400",
+      "name": "Gold Threshold",
+      "description": "Reach Elo 1400.",
+      "category": "pong",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": {
+        "progress": {
+          "kind": "binary",
+          "incrementIf": {
+            "payload.newElo": {
+              ">=": 1400
+            }
+          }
+        },
+        "eventKeys": [
+          "pong:elo:milestone"
+        ],
+        "unlockWhen": {
+          "progress >=": 1
+        }
+      },
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "progress.when missing",
+          "unlock must be { gte: { path: \"progress\", value: number } }"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 301,
+      "slug": "pong-elo-1800",
+      "key": "pong-elo-1800",
+      "name": "Platinum Threshold",
+      "description": "Reach Elo 1800.",
+      "category": "pong",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": {
+        "progress": {
+          "kind": "binary",
+          "incrementIf": {
+            "payload.newElo": {
+              ">=": 1800
+            }
+          }
+        },
+        "eventKeys": [
+          "pong:elo:milestone"
+        ],
+        "unlockWhen": {
+          "progress >=": 1
+        }
+      },
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "progress.when missing",
+          "unlock must be { gte: { path: \"progress\", value: number } }"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 302,
+      "slug": "pong-elo-2200",
+      "key": "pong-elo-2200",
+      "name": "Diamond Threshold",
+      "description": "Reach Elo 2200.",
+      "category": "pong",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": {
+        "progress": {
+          "kind": "binary",
+          "incrementIf": {
+            "payload.newElo": {
+              ">=": 2200
+            }
+          }
+        },
+        "eventKeys": [
+          "pong:elo:milestone"
+        ],
+        "unlockWhen": {
+          "progress >=": 1
+        }
+      },
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "progress.when missing",
+          "unlock must be { gte: { path: \"progress\", value: number } }"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 303,
+      "slug": "pong-elo-2600",
+      "key": "pong-elo-2600",
+      "name": "Master Threshold",
+      "description": "Reach Elo 2600.",
+      "category": "pong",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": {
+        "progress": {
+          "kind": "binary",
+          "incrementIf": {
+            "payload.newElo": {
+              ">=": 2600
+            }
+          }
+        },
+        "eventKeys": [
+          "pong:elo:milestone"
+        ],
+        "unlockWhen": {
+          "progress >=": 1
+        }
+      },
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "progress.when missing",
+          "unlock must be { gte: { path: \"progress\", value: number } }"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 304,
+      "slug": "pong-elo-3000",
+      "key": "pong-elo-3000",
+      "name": "Grandmaster",
+      "description": "Reach Elo 3000.",
+      "category": "pong",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": {
+        "progress": {
+          "kind": "binary",
+          "incrementIf": {
+            "payload.newElo": {
+              ">=": 3000
+            }
+          }
+        },
+        "eventKeys": [
+          "pong:elo:milestone"
+        ],
+        "unlockWhen": {
+          "progress >=": 1
+        }
+      },
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "progress.when missing",
+          "unlock must be { gte: { path: \"progress\", value: number } }"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 305,
+      "slug": "pong-freeplay-enthusiast",
+      "key": "pong-freeplay-enthusiast",
+      "name": "Freeplay Enthusiast",
+      "description": "Win 10 freeplay matches.",
+      "category": "pong",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": {
+        "progress": {
+          "kind": "count",
+          "incrementIf": {
+            "payload.wager": 0,
+            "payload.winnerId": "{{ userId }}"
+          }
+        },
+        "eventKeys": [
+          "pong:match:completed"
+        ],
+        "unlockWhen": {
+          "progress >=": 10
+        }
+      },
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "progress.when missing",
+          "unlock must be { gte: { path: \"progress\", value: number } }"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 306,
+      "slug": "pong-ragequit-shame",
+      "key": "pong-ragequit-shame",
+      "name": "Cable Pulled",
+      "description": "Forfeit 3 matches by disconnect.",
+      "category": "pong",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": {
+        "progress": {
+          "kind": "count",
+          "incrementIf": {
+            "payload.reason": "disconnect"
+          }
+        },
+        "eventKeys": [
+          "pong:match:lost"
+        ],
+        "unlockWhen": {
+          "progress >=": 3
+        }
+      },
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "progress.when missing",
+          "unlock must be { gte: { path: \"progress\", value: number } }"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 307,
+      "slug": "pong-bot-loss-shame",
+      "key": "pong-bot-loss-shame",
+      "name": "Whiff Wizard",
+      "description": "Lose to Easy AI twice in a row.",
+      "category": "pong",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": {
+        "progress": {
+          "kind": "streak",
+          "resetIf": {
+            "payload.winnerId": "{{ userId }}"
+          },
+          "incrementIf": {
+            "payload.vsAI": true,
+            "payload.winnerId": {
+              "!==": "{{ userId }}"
+            },
+            "payload.aiDifficulty": "EASY"
+          }
+        },
+        "eventKeys": [
+          "pong:match:lost"
+        ],
+        "unlockWhen": {
+          "progress >=": 2
+        }
+      },
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "progress.when missing",
+          "progress.resetWhen required for streak",
+          "unlock must be { gte: { path: \"progress\", value: number } }"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 15,
+      "slug": "prophet-of-mars",
+      "key": "prophet-of-mars",
+      "name": "Prophet of Mars",
+      "description": "Create a prediction that receives over 100 bets",
+      "category": "prediction",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 16,
+      "slug": "chaos-agent",
+      "key": "chaos-agent",
+      "name": "Chaos Agent",
+      "description": "Have 10 predictions approved by admins",
+      "category": "prediction",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 17,
+      "slug": "trendsetter",
+      "key": "trendsetter",
+      "name": "Trendsetter",
+      "description": "First to create prediction about an event that actually happens",
+      "category": "prediction",
+      "isActive": true,
+      "autoAward": false,
+      "manualOnly": true,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 18,
+      "slug": "cursed-predictor",
+      "key": "cursed-predictor",
+      "name": "Cursed Predictor",
+      "description": "Five of your created predictions resolve in unexpected ways",
+      "category": "prediction",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 19,
+      "slug": "musk-whisperer",
+      "key": "musk-whisperer",
+      "name": "Musk Whisperer",
+      "description": "Create prediction about Elon that resolves correctly within 24h",
+      "category": "prediction",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 76,
+      "slug": "crowd-favorite",
+      "key": "crowd-favorite",
+      "name": "Crowd Favorite",
+      "description": "Your prediction receives ≥20 bets",
+      "category": "prediction",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 166,
+      "slug": "prediction-pioneer",
+      "key": "prediction-pioneer",
+      "name": "Prediction Pioneer",
+      "description": "Create your first prediction",
+      "category": "prediction",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 77,
+      "slug": "media-magnet",
+      "key": "media-magnet",
+      "name": "Media Magnet",
+      "description": "Your prediction receives ≥500 bets",
+      "category": "prediction",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 167,
+      "slug": "prediction-factory",
+      "key": "prediction-factory",
+      "name": "Prediction Factory",
+      "description": "Create 50 predictions",
+      "category": "prediction",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 78,
+      "slug": "fast-and-right",
+      "key": "fast-and-right",
+      "name": "Fast and Right",
+      "description": "Your prediction resolves correctly within 2 hours of approval",
+      "category": "prediction",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 168,
+      "slug": "viral-predictor",
+      "key": "viral-predictor",
+      "name": "Viral Predictor",
+      "description": "Create a prediction with 500+ bets",
+      "category": "prediction",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 169,
+      "slug": "crystal-ball",
+      "key": "crystal-ball",
+      "name": "Crystal Ball",
+      "description": "Have 80%+ accuracy on your created predictions",
+      "category": "prediction",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 36,
+      "slug": "cult-leader",
+      "key": "cult-leader",
+      "name": "Cult Leader",
+      "description": "Build an impressive following through charismatic predictions",
+      "category": "secret",
+      "isActive": true,
+      "autoAward": false,
+      "manualOnly": true,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 37,
+      "slug": "banhammer-survivor",
+      "key": "banhammer-survivor",
+      "name": "Banhammer Survivor",
+      "description": "Return from a temporary ban stronger than ever",
+      "category": "secret",
+      "isActive": true,
+      "autoAward": false,
+      "manualOnly": true,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 38,
+      "slug": "true-visionary",
+      "key": "true-visionary",
+      "name": "True Visionary",
+      "description": "Demonstrate exceptional foresight in multiple predictions",
+      "category": "secret",
+      "isActive": true,
+      "autoAward": false,
+      "manualOnly": true,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 39,
+      "slug": "rocket-man",
+      "key": "rocket-man",
+      "name": "Rocket Man",
+      "description": "Show deep understanding of SpaceX and space technology",
+      "category": "secret",
+      "isActive": true,
+      "autoAward": false,
+      "manualOnly": true,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 40,
+      "slug": "dumpster-fire-aficionado",
+      "key": "dumpster-fire-aficionado",
+      "name": "Dumpster Fire Aficionado",
+      "description": "Master of predicting spectacular corporate failures",
+      "category": "secret",
+      "isActive": true,
+      "autoAward": false,
+      "manualOnly": true,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 184,
+      "slug": "meme-legend",
+      "key": "meme-legend",
+      "name": "Meme Legend",
+      "description": "Create content that becomes a community inside joke",
+      "category": "secret",
+      "isActive": true,
+      "autoAward": false,
+      "manualOnly": true,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 108,
+      "slug": "site-legend",
+      "key": "site-legend",
+      "name": "Site Legend",
+      "description": "Manual award for legendary contributions to the community",
+      "category": "secret",
+      "isActive": true,
+      "autoAward": false,
+      "manualOnly": true,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 185,
+      "slug": "easter-egg-hunter",
+      "key": "easter-egg-hunter",
+      "name": "Easter Egg Hunter",
+      "description": "Discover a hidden feature in the platform",
+      "category": "secret",
+      "isActive": true,
+      "autoAward": false,
+      "manualOnly": true,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 186,
+      "slug": "dev-whisperer",
+      "key": "dev-whisperer",
+      "name": "Dev Whisperer",
+      "description": "Successfully suggest a feature that gets implemented",
+      "category": "secret",
+      "isActive": true,
+      "autoAward": false,
+      "manualOnly": true,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 41,
+      "slug": "perma-banned-legend",
+      "key": "perma-banned-legend",
+      "name": "Perma-banned Legend",
+      "description": "Received a permanent ban from the platform",
+      "category": "shame",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 42,
+      "slug": "one-week-timeout",
+      "key": "one-week-timeout",
+      "name": "One Week Timeout",
+      "description": "Served a 7-day temporary ban",
+      "category": "shame",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 43,
+      "slug": "community-menace",
+      "key": "community-menace",
+      "name": "Community Menace",
+      "description": "Banned 3 or more times for disruptive behavior",
+      "category": "shame",
+      "isActive": true,
+      "autoAward": true,
+      "manualOnly": false,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    },
+    {
+      "id": 44,
+      "slug": "scammer-of-muskbucks",
+      "key": "scammer-of-muskbucks",
+      "name": "Scammer of MuskBucks",
+      "description": "Attempted to exploit the MuskBucks system",
+      "category": "shame",
+      "isActive": true,
+      "autoAward": false,
+      "manualOnly": true,
+      "points": 0,
+      "muskBucksReward": 0,
+      "ruleData": null,
+      "ruleParseError": null,
+      "ruleValidation": {
+        "ok": false,
+        "errors": [
+          "ruleData missing/null for auto award"
+        ]
+      },
+      "canUnlock": false
+    }
+  ]
+}

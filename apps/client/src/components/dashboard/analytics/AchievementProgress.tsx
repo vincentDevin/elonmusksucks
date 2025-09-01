@@ -80,7 +80,7 @@ const AchievementProgress = memo(function AchievementProgress({
     <div className={`bg-background/50 rounded-xl p-4 border border-muted ${className}`}>
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-semibold text-content flex items-center">🏅 Achievement Progress</h3>
-        <div className="text-sm text-tertiary">{achievements.totalBadges} earned</div>
+        <div className="text-sm text-tertiary">{achievements.totalBadges} unlocked</div>
       </div>
 
       {/* Recent Achievements */}

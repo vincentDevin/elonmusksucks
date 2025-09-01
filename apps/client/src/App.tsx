@@ -11,6 +11,7 @@ import MainLayout from './components/MainLayout';
 import AppRoutes from './routes/AppRoutes';
 import { useAuth } from './contexts/AuthContext';
 import PongEloNotification from './components/pong/PongEloNotification';
+import { AchievementCelebrationContainer } from './components/achievements/AchievementCelebrationContainer';
 
 // Inner component that has access to auth context
 function AppContent() {
@@ -28,6 +29,8 @@ function AppContent() {
                   <AppRoutes />
                   {/* Global Pong Elo notifications */}
                   <PongEloNotification />
+                  {/* Global Achievement celebrations */}
+                  <AchievementCelebrationContainer />
                 </MainLayout>
               </ChatProvider>
             </ParlayProvider>

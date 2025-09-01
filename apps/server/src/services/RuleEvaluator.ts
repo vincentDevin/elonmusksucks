@@ -187,6 +187,11 @@ export class RuleEvaluator {
     event: AchievementEvent,
     userCounters: Record<string, number>,
   ): any {
+    // Handle placeholders
+    if (path === '$.userId') {
+      return event.userId;
+    }
+
     // Handle counter references
     if (path.startsWith('counter.')) {
       const counterName = path.substring(8);
@@ -197,6 +202,12 @@ export class RuleEvaluator {
     if (path.startsWith('payload.')) {
       const payloadPath = path.substring(8);
       return this.getNestedValue(event.payload, payloadPath);
+    }
+
+    // Handle data references (common in achievement rules)
+    if (path.startsWith('data.')) {
+      const dataPath = path.substring(5);
+      return this.getNestedValue(event.payload, dataPath);
     }
 
     // Handle event properties
@@ -219,18 +230,52 @@ export class RuleEvaluator {
   }
 
   /**
-   * Validate that a rule has the correct structure
+   * Validate that a rule has the correct structure with detailed error messages
+   */
+  validateRuleWithErrors(rule: any): { ok: boolean; errors: string[] } {
+    const errors: string[] = [];
+
+    if (!rule) {
+      errors.push('ruleData missing/null for auto award');
+      return { ok: false, errors };
+    }
+
+    if (!Array.isArray(rule.eventKeys) || rule.eventKeys.length === 0) {
+      errors.push('eventKeys must be non-empty array');
+    }
+
+    if (!rule.progress) {
+      errors.push('progress missing');
+    } else {
+      if (!rule.progress.kind || !['count', 'streak', 'binary'].includes(rule.progress.kind)) {
+        errors.push('progress.kind must be count, streak, or binary');
+      }
+
+      // Streak rules require resetIf
+      if (rule.progress.kind === 'streak' && !rule.progress.resetIf) {
+        errors.push('streak rules require progress.resetIf');
+      }
+    }
+
+    if (!rule.unlockWhen) {
+      errors.push('progress.when missing');
+    } else {
+      const hasValidCondition = Object.keys(rule.unlockWhen).some(
+        (key) => key.includes('>=') || key.includes('<=') || key.includes('=='),
+      );
+      if (!hasValidCondition) {
+        errors.push('unlockWhen must have valid condition (>=, <=, ==)');
+      }
+    }
+
+    return { ok: errors.length === 0, errors };
+  }
+
+  /**
+   * Validate that a rule has the correct structure (backward compatibility)
    */
   validateRule(rule: any): rule is CompiledRule {
-    return (
-      rule &&
-      Array.isArray(rule.eventKeys) &&
-      rule.progress &&
-      typeof rule.progress.kind === 'string' &&
-      ['count', 'streak', 'binary'].includes(rule.progress.kind) &&
-      rule.unlockWhen &&
-      typeof rule.unlockWhen === 'object'
-    );
+    return this.validateRuleWithErrors(rule).ok;
   }
 
   /**

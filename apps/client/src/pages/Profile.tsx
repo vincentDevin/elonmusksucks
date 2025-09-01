@@ -13,7 +13,7 @@ import type { UpdateProfilePayload } from '../api/users';
 import { ProfileHeader } from '../components/profile/ProfileHeader';
 import { ProfileEditForm } from '../components/profile/ProfileEditForm';
 import { ProfileStats } from '../components/profile/ProfileStats';
-import { ProfileBadges } from '../components/profile/ProfileBadges';
+import { ProfileAchievements } from '../components/profile/ProfileAchievements';
 import { CreatePostForm } from '../components/profile/CreatePostForm';
 import { ProfileFeed } from '../components/profile/ProfileFeed';
 import { ProfileActivity } from '../components/profile/ProfileActivity';
@@ -169,7 +169,7 @@ export default function Profile() {
         />
       ) : (
         <>
-          <ProfileBadges badges={profile.badges as any} />
+          <ProfileAchievements achievements={profile.achievements || (profile.badges as any)} />
 
           <ProfileStats
             profile={{ muskBucks: asNum(profile.muskBucks), rank: profile.rank }}

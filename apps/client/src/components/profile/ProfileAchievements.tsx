@@ -12,30 +12,37 @@ interface Achievement {
   awardedAt?: string;
 }
 
-interface ProfileBadgesProps {
-  badges: Achievement[];
+interface ProfileAchievementsProps {
+  achievements: Achievement[];
 }
 
-export function ProfileBadges({ badges }: ProfileBadgesProps) {
+export function ProfileAchievements({ achievements }: ProfileAchievementsProps) {
   const [expanded, setExpanded] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedRarity, setSelectedRarity] = useState<string>('all');
 
   // Get unique categories and rarities
-  const categories = ['all', ...Array.from(new Set(badges.map((b) => b.category).filter(Boolean)))];
-  const rarities = ['all', ...Array.from(new Set(badges.map((b) => b.rarity).filter(Boolean)))];
+  const categories = [
+    'all',
+    ...Array.from(new Set(achievements.map((a) => a.category).filter(Boolean))),
+  ];
+  const rarities = [
+    'all',
+    ...Array.from(new Set(achievements.map((a) => a.rarity).filter(Boolean))),
+  ];
 
-  // Filter badges
-  const filteredBadges = badges.filter((badge) => {
+  // Filter achievements
+  const filteredAchievements = achievements.filter((achievement) => {
     const categoryMatch =
-      selectedCategory === 'all' || (badge.category && badge.category === selectedCategory);
+      selectedCategory === 'all' ||
+      (achievement.category && achievement.category === selectedCategory);
     const rarityMatch =
-      selectedRarity === 'all' || (badge.rarity && badge.rarity === selectedRarity);
+      selectedRarity === 'all' || (achievement.rarity && achievement.rarity === selectedRarity);
     return categoryMatch && rarityMatch;
   });
 
   // Sort by rarity and date
-  const sortedBadges = filteredBadges.sort((a, b) => {
+  const sortedAchievements = filteredAchievements.sort((a, b) => {
     const rarityOrder = { legendary: 0, rare: 1, uncommon: 2, secret: 3, common: 4, shame: 5 };
     const aRarity = rarityOrder[a.rarity as keyof typeof rarityOrder] ?? 6;
     const bRarity = rarityOrder[b.rarity as keyof typeof rarityOrder] ?? 6;
@@ -55,10 +62,14 @@ export function ProfileBadges({ badges }: ProfileBadgesProps) {
         return '💰';
       case 'leaderboard':
         return '🏆';
+      case 'pong':
+        return '🏓';
       case 'chat':
         return '💬';
       case 'participation':
         return '🎯';
+      case 'event':
+        return '🎪';
       case 'secret':
         return '🔮';
       case 'shame':
@@ -103,9 +114,9 @@ export function ProfileBadges({ badges }: ProfileBadgesProps) {
   };
 
   const getStats = () => {
-    const stats = badges.reduce(
-      (acc, badge) => {
-        acc[badge.rarity] = (acc[badge.rarity] || 0) + 1;
+    const stats = achievements.reduce(
+      (acc, achievement) => {
+        acc[achievement.rarity] = (acc[achievement.rarity] || 0) + 1;
         return acc;
       },
       {} as Record<string, number>,
@@ -118,8 +129,8 @@ export function ProfileBadges({ badges }: ProfileBadgesProps) {
 
   // Get newest achievement
   const newestAchievement =
-    badges.length > 0
-      ? sortedBadges.reduce((newest, current) => {
+    achievements.length > 0
+      ? sortedAchievements.reduce((newest, current) => {
           const newestDate = new Date(newest.completedAt || newest.awardedAt || 0).getTime();
           const currentDate = new Date(current.completedAt || current.awardedAt || 0).getTime();
           return currentDate > newestDate ? current : newest;
@@ -154,7 +165,7 @@ export function ProfileBadges({ badges }: ProfileBadgesProps) {
       {/* Achievement Summary - always visible */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 bg-muted/10 rounded-xl">
         <div className="text-center">
-          <div className="text-lg font-bold text-primary">{badges.length}</div>
+          <div className="text-lg font-bold text-primary">{achievements.length}</div>
           <div className="text-xs text-tertiary">Total</div>
         </div>
         <div className="text-center">
@@ -213,7 +224,7 @@ export function ProfileBadges({ badges }: ProfileBadgesProps) {
       )}
 
       {/* Expandable Achievement Collection */}
-      {expanded && badges.length > 0 && (
+      {expanded && achievements.length > 0 && (
         <div className="mt-6 space-y-6">
           {/* Filters */}
           <div className="flex gap-4 flex-wrap">
@@ -253,46 +264,54 @@ export function ProfileBadges({ badges }: ProfileBadgesProps) {
 
           {/* Achievement Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {sortedBadges.map((badge) => (
+            {sortedAchievements.map((achievement) => (
               <div
-                key={badge.id}
-                className={`relative p-4 rounded-xl border-2 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] ${getRarityStyles(badge.rarity)}`}
+                key={achievement.id}
+                className={`relative p-4 rounded-xl border-2 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] ${getRarityStyles(achievement.rarity)}`}
               >
                 {/* Rarity Badge */}
                 <div
-                  className={`absolute top-2 right-2 px-2 py-1 rounded-full text-xs font-bold ${getRarityBadgeColor(badge.rarity)}`}
+                  className={`absolute top-2 right-2 px-2 py-1 rounded-full text-xs font-bold ${getRarityBadgeColor(achievement.rarity)}`}
                 >
-                  {badge.rarity}
+                  {achievement.rarity}
                 </div>
 
                 <div className="space-y-3">
                   {/* Icon and Category */}
                   <div className="flex items-center justify-between">
                     <div className="text-3xl">
-                      {badge.iconUrl ? (
-                        <img src={badge.iconUrl} alt={badge.name} className="w-8 h-8 rounded-lg" />
+                      {achievement.iconUrl ? (
+                        <img
+                          src={achievement.iconUrl}
+                          alt={achievement.name}
+                          className="w-8 h-8 rounded-lg"
+                        />
                       ) : (
-                        getCategoryIcon(badge.category)
+                        getCategoryIcon(achievement.category)
                       )}
                     </div>
                     <span className="text-xs px-2 py-1 bg-muted/20 rounded-full text-tertiary font-medium capitalize">
-                      {badge.category || 'general'}
+                      {achievement.category || 'general'}
                     </span>
                   </div>
 
                   {/* Achievement Info */}
                   <div className="space-y-2">
                     <h3 className="font-bold text-content leading-tight">
-                      {badge.title || badge.name}
+                      {achievement.title || achievement.name}
                     </h3>
-                    <p className="text-xs text-tertiary leading-relaxed">{badge.description}</p>
+                    <p className="text-xs text-tertiary leading-relaxed">
+                      {achievement.description}
+                    </p>
                   </div>
 
                   {/* Date */}
                   <div className="flex items-center justify-between text-xs text-tertiary">
                     <span className="flex items-center gap-1">📅 Unlocked</span>
                     <span className="font-medium">
-                      {new Date(badge.completedAt || badge.awardedAt || '').toLocaleDateString()}
+                      {new Date(
+                        achievement.completedAt || achievement.awardedAt || '',
+                      ).toLocaleDateString()}
                     </span>
                   </div>
                 </div>
@@ -300,7 +319,7 @@ export function ProfileBadges({ badges }: ProfileBadgesProps) {
             ))}
           </div>
 
-          {filteredBadges.length === 0 && (
+          {filteredAchievements.length === 0 && (
             <div className="text-center py-8 text-tertiary">
               <div className="text-4xl mb-3">🔍</div>
               <p className="text-sm font-medium">No achievements match your filters</p>
@@ -311,13 +330,13 @@ export function ProfileBadges({ badges }: ProfileBadgesProps) {
       )}
 
       {/* Empty State */}
-      {badges.length === 0 && expanded && (
+      {achievements.length === 0 && expanded && (
         <div className="text-center py-8 text-tertiary">
           <div className="text-4xl mb-3">🎯</div>
           <h3 className="text-base font-semibold text-content mb-2">No achievements yet</h3>
           <p className="text-sm text-tertiary max-w-md mx-auto">
-            Start placing bets, engaging with the community, and climbing the leaderboard to unlock
-            your first achievements!
+            Start placing bets, engaging with the community, playing Pong, and climbing the
+            leaderboard to unlock your first achievements!
           </p>
         </div>
       )}

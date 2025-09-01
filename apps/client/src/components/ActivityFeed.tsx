@@ -135,9 +135,8 @@ function formatRichActivity(activity: Activity): {
       break;
 
     case 'achievement_unlocked':
-    case 'badge_earned':
-      text = `${userName} earned "${title}"`;
-      shortText = `${userName} earned badge`;
+      text = `${userName} unlocked "${title}"`;
+      shortText = `${userName} unlocked achievement`;
       break;
 
     case 'user_followed':

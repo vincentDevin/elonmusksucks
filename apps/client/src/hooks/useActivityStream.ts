@@ -14,7 +14,7 @@ export interface ActivityItem {
     | 'parlay_lost'
     | 'prediction_created'
     | 'prediction_resolved'
-    | 'achievement_earned'
+    | 'achievement_unlocked'
     | 'rank_changed'
     | 'big_bet'
     | 'big_win'
@@ -46,12 +46,43 @@ export interface ActivityFilter {
   showPlatform: boolean;
 }
 
+// Achievement progress tracking interfaces
+export interface AchievementProgress {
+  achievementId: number;
+  achievementName: string;
+  achievementSlug: string;
+  progress: number;
+  targetValue: number;
+  percentage: number;
+  category: string;
+  rarity: string;
+  lastUpdated: string;
+}
+
+export interface AchievementCelebration {
+  achievement: {
+    id: number;
+    name: string;
+    title: string;
+    description: string;
+    category: string;
+    rarity: string;
+    iconUrl?: string;
+  };
+  progress: number;
+  progressMax: number;
+  unlockedAt: string;
+  isVisible: boolean;
+}
+
 export interface ActivityStreamState {
   activities: ActivityItem[];
   loading: boolean;
   error: string | null;
   hasMore: boolean;
   filters: ActivityFilter;
+  achievementProgress: Map<number, AchievementProgress>;
+  activeCelebrations: AchievementCelebration[];
 }
 
 const ACTIVITY_ICONS: Record<ActivityItem['type'], string> = {
@@ -63,7 +94,7 @@ const ACTIVITY_ICONS: Record<ActivityItem['type'], string> = {
   parlay_lost: '💸',
   prediction_created: '📊',
   prediction_resolved: '✅',
-  achievement_earned: '🏅',
+  achievement_unlocked: '🏅',
   rank_changed: '📈',
   big_bet: '🐋',
   big_win: '💎',
@@ -81,7 +112,7 @@ const ACTIVITY_COLORS: Record<ActivityItem['type'], string> = {
   parlay_lost: 'text-red-600',
   prediction_created: 'text-indigo-500',
   prediction_resolved: 'text-teal-500',
-  achievement_earned: 'text-yellow-500',
+  achievement_unlocked: 'text-yellow-500',
   rank_changed: 'text-orange-500',
   big_bet: 'text-blue-600',
   big_win: 'text-emerald-500',
@@ -106,6 +137,8 @@ export function useActivityStream() {
       showSocial: true,
       showPlatform: true,
     },
+    achievementProgress: new Map<number, AchievementProgress>(),
+    activeCelebrations: [],
   });
 
   // Initialize activity stream from Socket.IO only
@@ -243,10 +276,10 @@ export function useActivityStream() {
         case 'achievementUnlocked':
           return {
             id: `achievement_${data.id}_${Date.now()}`,
-            type: 'achievement_earned',
+            type: 'achievement_unlocked',
             title: isPersonal
               ? 'Achievement unlocked!'
-              : `${data.user?.username || 'Someone'} earned an achievement`,
+              : `${data.user?.username || 'Someone'} unlocked an achievement`,
             description: `${data.title}: ${data.description}`,
             timestamp: now,
             userId: data.userId || data.user?.id,
@@ -255,8 +288,8 @@ export function useActivityStream() {
             metadata: { achievementId: data.id, category: data.category },
             isPersonal,
             priority: 'high',
-            icon: ACTIVITY_ICONS.achievement_earned,
-            color: ACTIVITY_COLORS.achievement_earned,
+            icon: ACTIVITY_ICONS.achievement_unlocked,
+            color: ACTIVITY_COLORS.achievement_unlocked,
           };
 
         case 'leaderboard:rankChange':
@@ -347,6 +380,88 @@ export function useActivityStream() {
       }));
     };
 
+    // Achievement progress and celebration handlers
+    const achievementProgressHandler = (data: any) => {
+      console.log('[achievement-progress] Progress update:', data);
+
+      if (!data.achievementId || data.userId !== user?.id) return;
+
+      const progressUpdate: AchievementProgress = {
+        achievementId: data.achievementId,
+        achievementName: data.achievementName || data.achievement?.name || 'Unknown Achievement',
+        achievementSlug: data.achievementSlug || data.achievement?.slug || 'unknown',
+        progress: data.progress || 0,
+        targetValue: data.targetValue || data.achievement?.targetValue || 1,
+        percentage: data.percentage || (data.progress / (data.targetValue || 1)) * 100,
+        category: data.category || data.achievement?.category || 'general',
+        rarity: data.rarity || data.achievement?.rarity || 'common',
+        lastUpdated: new Date().toISOString(),
+      };
+
+      setState((prev) => ({
+        ...prev,
+        achievementProgress: new Map(prev.achievementProgress).set(
+          data.achievementId,
+          progressUpdate,
+        ),
+      }));
+    };
+
+    const achievementCelebrationHandler = (data: any) => {
+      console.log('[achievement-celebration] Celebration triggered:', data);
+
+      if (!data.achievement || data.userId !== user?.id) return;
+
+      const celebration: AchievementCelebration = {
+        achievement: {
+          id: data.achievement.id,
+          name: data.achievement.name,
+          title: data.achievement.title || data.achievement.name,
+          description: data.achievement.description || '',
+          category: data.achievement.category || 'general',
+          rarity: data.achievement.rarity || 'common',
+          iconUrl: data.achievement.iconUrl,
+        },
+        progress: data.progress || data.achievement.targetValue || 1,
+        progressMax: data.progressMax || data.achievement.targetValue || 1,
+        unlockedAt: data.unlockedAt || new Date().toISOString(),
+        isVisible: true,
+      };
+
+      setState((prev) => ({
+        ...prev,
+        activeCelebrations: [celebration, ...prev.activeCelebrations.slice(0, 4)], // Keep max 5 celebrations
+      }));
+
+      // Auto-hide celebration after 8 seconds
+      setTimeout(() => {
+        setState((prev) => ({
+          ...prev,
+          activeCelebrations: prev.activeCelebrations.filter((c) => c !== celebration),
+        }));
+      }, 8000);
+    };
+
+    const achievementBatchUnlockedHandler = (data: any) => {
+      console.log('[achievement-batch] Batch unlock:', data);
+
+      if (!data.achievements || !Array.isArray(data.achievements) || data.userId !== user?.id)
+        return;
+
+      // Handle multiple achievements unlocked at once
+      data.achievements.forEach((achievement: any, index: number) => {
+        setTimeout(() => {
+          achievementCelebrationHandler({
+            achievement,
+            userId: data.userId,
+            progress: achievement.targetValue || 1,
+            progressMax: achievement.targetValue || 1,
+            unlockedAt: new Date().toISOString(),
+          });
+        }, index * 2000); // Stagger celebrations by 2 seconds
+      });
+    };
+
     // Store handlers for cleanup
     const betPlacedHandler = handleActivity('betPlaced');
     const betResolvedHandler = handleActivity('betResolved');
@@ -373,6 +488,9 @@ export function useActivityStream() {
     socket.on('prediction:created', predictionCreatedHandler);
     socket.on('prediction:resolved', predictionResolvedHandler);
     socket.on('achievement:unlocked', achievementUnlockedHandler);
+    socket.on('achievement:progress', achievementProgressHandler);
+    socket.on('achievement:celebration', achievementCelebrationHandler);
+    socket.on('achievement:batch_unlocked', achievementBatchUnlockedHandler);
     socket.on('leaderboard:rankChange', leaderboardRankChangeHandler);
     socket.on('activity:update', activityUpdateHandler);
 
@@ -400,6 +518,9 @@ export function useActivityStream() {
       socket.off('prediction:created', predictionCreatedHandler);
       socket.off('prediction:resolved', predictionResolvedHandler);
       socket.off('achievement:unlocked', achievementUnlockedHandler);
+      socket.off('achievement:progress', achievementProgressHandler);
+      socket.off('achievement:celebration', achievementCelebrationHandler);
+      socket.off('achievement:batch_unlocked', achievementBatchUnlockedHandler);
       socket.off('leaderboard:rankChange', leaderboardRankChangeHandler);
       socket.off('activity:update', activityUpdateHandler);
       socket.off('bigBetAlert', handleBigBetAlert);
@@ -481,6 +602,23 @@ export function useActivityStream() {
     }
   }, [socket, initializeActivityStream]);
 
+  // Helper functions for achievement management
+  const dismissCelebration = useCallback((celebrationId: string) => {
+    setState((prev) => ({
+      ...prev,
+      activeCelebrations: prev.activeCelebrations.filter(
+        (c) => `${c.achievement.id}-${c.unlockedAt}` !== celebrationId,
+      ),
+    }));
+  }, []);
+
+  const getAchievementProgress = useCallback(
+    (achievementId: number): AchievementProgress | null => {
+      return state.achievementProgress.get(achievementId) || null;
+    },
+    [state.achievementProgress],
+  );
+
   return {
     activities: filteredActivities,
     loading: state.loading,
@@ -490,5 +628,10 @@ export function useActivityStream() {
     updateFilters,
     loadMore,
     refresh,
+    // Achievement progress and celebration features
+    achievementProgress: Array.from(state.achievementProgress.values()),
+    activeCelebrations: state.activeCelebrations,
+    dismissCelebration,
+    getAchievementProgress,
   };
 }

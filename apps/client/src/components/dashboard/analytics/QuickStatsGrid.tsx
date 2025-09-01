@@ -71,7 +71,7 @@ const StatsGrid = memo(function StatsGrid({ stats, userRank, className = '' }: S
         subtext: `${safeActiveBetsValue.toFixed(0)}🪙 total`,
       },
       {
-        label: 'Badges Earned',
+        label: 'Achievements Unlocked',
         value: achievements.totalBadges.toString(),
         icon: '🏅',
         color: 'text-purple-500',

@@ -32,6 +32,7 @@ import { PureEloService } from './pureElo.service';
 import { SYSTEM_AI_USER_ID } from '@ems/types';
 import type { PongStatsData } from '../repositories/IPongRepository';
 import { pongPayoutQueueService } from './pongPayoutQueue.service';
+import { eventBus } from './eventBus.service';
 
 // Note: Pong service interfaces now imported from @ems/types
 // MatchResult -> PongMatchResult, other interfaces imported directly
@@ -370,6 +371,88 @@ export class PongStatsService {
           calculations.socketEvents.loserTierChange.newTier,
           calculations.socketEvents.loserTierChange.newElo,
         );
+      }
+    }
+
+    // 13. Emit achievement events for winner
+    if (winnerId && winnerId > 0) {
+      try {
+        const achievementPayload = {
+          key: 'pong:match:completed',
+          userId: winnerId,
+          winnerId,
+          loserId,
+          matchId,
+          vsAI: isAIMatch,
+          aiDifficulty: isAIMatch ? PongStatsService.getAIDifficultyFromId(loserId) : undefined,
+          wager: wagerAmount,
+          winnerScore: winnerScore || 11,
+          loserScore: loserScore || 0,
+          duration,
+          eloChange: calculations?.winnerEloChange?.totalChange,
+          newElo: calculations?.winnerEloChange?.newRating,
+          occurredAt: new Date().toISOString(),
+        };
+
+        await eventBus.publish('pong:match:completed', achievementPayload);
+        console.log(`[PongStats] Achievement event emitted for winner ${winnerId}`);
+      } catch (error) {
+        console.error(`[PongStats] Failed to emit achievement event for winner:`, error);
+      }
+    }
+
+    // 14. Emit achievement events for loser (for loss tracking/shame achievements)
+    if (loserId && loserId > 0) {
+      try {
+        const loserPayload = {
+          key: 'pong:match:lost',
+          userId: loserId,
+          winnerId,
+          loserId,
+          matchId,
+          vsAI: isAIMatch,
+          aiDifficulty: isAIMatch ? PongStatsService.getAIDifficultyFromId(winnerId) : undefined,
+          wager: wagerAmount,
+          winnerScore: winnerScore || 11,
+          loserScore: loserScore || 0,
+          duration,
+          eloChange: calculations?.loserEloChange?.totalChange,
+          newElo: calculations?.loserEloChange?.newRating,
+          occurredAt: new Date().toISOString(),
+        };
+
+        await eventBus.publish('pong:match:lost', loserPayload);
+        console.log(`[PongStats] Achievement event emitted for loser ${loserId}`);
+      } catch (error) {
+        console.error(`[PongStats] Failed to emit achievement event for loser:`, error);
+      }
+    }
+
+    // 15. Emit ELO milestone events for winner
+    if (winnerId && winnerId > 0 && calculations?.winnerEloChange?.newRating) {
+      try {
+        const newElo = calculations.winnerEloChange.newRating;
+        const oldElo = winnerStats?.eloRating || PongEloService.getDefaultElo();
+        const milestones = [1400, 1800, 2200, 2600, 3000];
+
+        for (const milestone of milestones) {
+          if (oldElo < milestone && newElo >= milestone) {
+            const milestonePayload = {
+              key: 'pong:elo:milestone',
+              userId: winnerId,
+              milestone,
+              newElo,
+              oldElo,
+              matchId,
+              occurredAt: new Date().toISOString(),
+            };
+
+            await eventBus.publish('pong:elo:milestone', milestonePayload);
+            console.log(`[PongStats] ELO milestone ${milestone} achieved by user ${winnerId}`);
+          }
+        }
+      } catch (error) {
+        console.error(`[PongStats] Failed to emit ELO milestone events:`, error);
       }
     }
 
