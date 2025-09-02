@@ -5,10 +5,14 @@ import { useMobileOptimization } from '../../../hooks/useMobileOptimization';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useUserStats } from '../../../hooks/useUserStats';
 import { useLeaderboard } from '../../../hooks/useLeaderboard';
-import MyStuffPanel from '../MyStuffPanel';
 import PredictionPanel from '../PredictionPanel';
 import ActivityFeed from '../../ActivityFeed';
 import ParlayPanel from '../ParlayPanel';
+import PerformanceMetricsPanel from '../PerformanceMetricsPanel';
+import QuickStatsPanel from '../QuickStatsPanel';
+import SmartInsightsPanel from '../SmartInsightsPanel';
+import PersonalStatsPanel from '../PersonalStatsPanel';
+import AchievementProgressPanel from '../AchievementProgressPanel';
 import DashboardSettings from '../customization/DashboardSettings';
 import DesktopWidgets from './DesktopWidgets';
 import MarketOverview from './MarketOverview';
@@ -27,6 +31,9 @@ const DesktopDashboard = memo(function DesktopDashboard({ className = '' }: Desk
   const [showQuickBetModal, setShowQuickBetModal] = useState(false);
   const [showCreatePredictionModal, setShowCreatePredictionModal] = useState(false);
   const [pendingSourceData, setPendingSourceData] = useState<any>(null);
+  const [activeMainTab, setActiveMainTab] = useState<
+    'predictions' | 'achievements' | 'market' | 'stats'
+  >('predictions');
   const { preferences } = useAdvancedThemes();
   const { screenWidth } = useMobileOptimization();
   const { user } = useAuth();
@@ -206,18 +213,11 @@ const DesktopDashboard = memo(function DesktopDashboard({ className = '' }: Desk
 
       {/* Main Dashboard Grid - Modular Layout System */}
       <main className={`grid gap-6 p-6 ${gridLayout}`}>
-        {/* Column 1: Analytics Hub - Personal Command Center + Market Overview */}
+        {/* Column 1: Analytics Hub - Combined Personal Stats */}
         {isWide && (
-          <aside className="space-y-6 overflow-y-auto scrollbar-thin scrollbar-track-secondary/20 scrollbar-thumb-primary/40">
-            {/* Personal Command Center - Now gets full width (600px @ 1440p) */}
-            <div className="bg-surface border border-muted rounded-2xl">
-              <MyStuffPanel />
-            </div>
-
-            {/* Market Overview - Dedicated space below Personal Command Center */}
-            <div className="bg-surface border border-muted rounded-2xl">
-              <MarketOverview />
-            </div>
+          <aside className="space-y-4 overflow-y-auto scrollbar-thin scrollbar-track-secondary/20 scrollbar-thumb-primary/40">
+            {/* Combined Personal Stats Panel */}
+            <PersonalStatsPanel />
 
             {/* Desktop Widgets - Compact bottom section */}
             {(is1440p || is5K) && !reducedData && (
@@ -228,22 +228,67 @@ const DesktopDashboard = memo(function DesktopDashboard({ className = '' }: Desk
           </aside>
         )}
 
-        {/* Column 2: Content Discovery - Predictions + Live Trading */}
+        {/* Column 2: Main Content Area with Tabs */}
         <div className="space-y-6 overflow-y-auto scrollbar-thin scrollbar-track-secondary/20 scrollbar-thumb-primary/40">
-          {/* For smaller screens, show Market Overview here if not in sidebar */}
-          {!isWide && (
-            <div className="bg-surface border border-muted rounded-2xl">
-              <MarketOverview />
+          {/* Tab Navigation */}
+          <div className="bg-surface border border-muted rounded-2xl p-4">
+            <div className="flex space-x-2 flex-wrap">
+              <button
+                onClick={() => setActiveMainTab('predictions')}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  activeMainTab === 'predictions'
+                    ? 'bg-primary text-white'
+                    : 'bg-background text-tertiary hover:text-content'
+                }`}
+              >
+                🎯 Smart Predictions
+              </button>
+              <button
+                onClick={() => setActiveMainTab('market')}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  activeMainTab === 'market'
+                    ? 'bg-primary text-white'
+                    : 'bg-background text-tertiary hover:text-content'
+                }`}
+              >
+                📊 Market Overview
+              </button>
+              <button
+                onClick={() => setActiveMainTab('achievements')}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  activeMainTab === 'achievements'
+                    ? 'bg-primary text-white'
+                    : 'bg-background text-tertiary hover:text-content'
+                }`}
+              >
+                🏆 Achievements
+              </button>
+              {/* Personal Stats tab - only on compact screens */}
+              {!isWide && (
+                <button
+                  onClick={() => setActiveMainTab('stats')}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    activeMainTab === 'stats'
+                      ? 'bg-primary text-white'
+                      : 'bg-background text-tertiary hover:text-content'
+                  }`}
+                >
+                  📈 Personal Stats
+                </button>
+              )}
             </div>
-          )}
+          </div>
 
-          {/* Predictions Panel - Primary content, gets full remaining width */}
+          {/* Tab Content */}
           <div className="bg-surface border border-muted rounded-2xl">
-            <PredictionPanel />
+            {activeMainTab === 'predictions' && <PredictionPanel />}
+            {activeMainTab === 'market' && <MarketOverview />}
+            {activeMainTab === 'achievements' && <AchievementProgressPanel />}
+            {activeMainTab === 'stats' && !isWide && <PersonalStatsPanel />}
           </div>
         </div>
 
-        {/* Column 3: Social Interaction - Chat + Activity + Trading + Parlay */}
+        {/* Column 3: Social Interaction - Chat + Parlay + Activity */}
         {isWide && (
           <aside className="space-y-4 overflow-y-auto scrollbar-thin scrollbar-track-secondary/20 scrollbar-thumb-primary/40">
             {/* Chat Panel - Primary social feature at top */}
@@ -265,12 +310,12 @@ const DesktopDashboard = memo(function DesktopDashboard({ className = '' }: Desk
               </Suspense>
             </div>
 
-            {/* Parlay Panel - Tool section */}
+            {/* Parlay Panel - Under chat on wide screens */}
             <div className="bg-surface border border-muted rounded-2xl">
               <ParlayPanel />
             </div>
 
-            {/* Unified Activity Feed - Adaptive height */}
+            {/* Unified Activity Feed */}
             <div className="flex flex-col min-h-0">
               <ActivityFeed />
             </div>
@@ -325,18 +370,8 @@ const DesktopDashboard = memo(function DesktopDashboard({ className = '' }: Desk
 
         {/* Fallback for compact desktop - Show essential components only */}
         {!isWide && !is5K && (
-          <aside className="space-y-6 overflow-y-auto scrollbar-thin scrollbar-track-secondary/20 scrollbar-thumb-primary/40">
-            {/* Personal Command Center for smaller screens */}
-            <div className="bg-surface border border-muted rounded-2xl">
-              <MyStuffPanel />
-            </div>
-
-            {/* Unified Activity Feed - Compact for smaller screens */}
-            <div className="flex flex-col min-h-0">
-              <ActivityFeed />
-            </div>
-
-            {/* Chat Panel */}
+          <aside className="space-y-4 overflow-y-auto scrollbar-thin scrollbar-track-secondary/20 scrollbar-thumb-primary/40">
+            {/* Chat Panel - Top priority on compact */}
             <div className="bg-surface border border-muted rounded-2xl">
               <Suspense
                 fallback={
@@ -347,6 +382,16 @@ const DesktopDashboard = memo(function DesktopDashboard({ className = '' }: Desk
               >
                 <ChatPanel />
               </Suspense>
+            </div>
+
+            {/* Parlay Panel - Always visible under chat */}
+            <div className="bg-surface border border-muted rounded-2xl">
+              <ParlayPanel />
+            </div>
+
+            {/* Activity Feed - At bottom */}
+            <div className="flex flex-col min-h-0">
+              <ActivityFeed />
             </div>
           </aside>
         )}
