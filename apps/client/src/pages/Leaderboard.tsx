@@ -22,8 +22,8 @@ import { getShameWall, getShameWallStats } from '../api/shameWall';
 import type { ShameWallEntry, ShameWallStats } from '../api/shameWall';
 
 // New unified components
-import { UnifiedLeaderboardHeader } from '../components/leaderboard/UnifiedLeaderboardHeader';
-import { UnifiedLeaderboardEntry } from '../components/leaderboard/UnifiedLeaderboardEntry';
+import { LeaderboardHeader } from '../components/leaderboard/LeaderboardHeader';
+import { LeaderboardEntry } from '../components/leaderboard/LeaderboardEntry';
 import { CompactControlBar } from '../components/leaderboard/CompactControlBar';
 import AchievementNotification from '../components/leaderboard/AchievementNotification';
 import {
@@ -315,7 +315,7 @@ export default function Leaderboard() {
 
       {/* Unified Header with Tab Navigation */}
       <div className="space-y-4">
-        <UnifiedLeaderboardHeader
+        <LeaderboardHeader
           variant={activeTab as LeaderboardVariant}
           title={
             activeTab === 'betting'
@@ -392,7 +392,7 @@ export default function Leaderboard() {
             const isCurrentUser = user?.id === entry.id;
 
             return (
-              <UnifiedLeaderboardEntry
+              <LeaderboardEntry
                 key={`${activeTab}-${entry.id}`}
                 entry={entry}
                 rank={rank}

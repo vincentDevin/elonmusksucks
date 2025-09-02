@@ -6,10 +6,10 @@ import {
   exportFinancialData,
   type FinancialSearchParams,
   type PaginatedFinancialData,
-  type FinancialAnalytics,
   type DetailedBet,
   type DetailedTransaction,
 } from '../../api/admin';
+import type { AdminFinancialAnalyticsResponse } from '@ems/types';
 
 interface FilterState {
   search: string;
@@ -38,16 +38,14 @@ const initialFilters: FilterState = {
 };
 
 export default function FinancialDashboard() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'bets' | 'transactions' | 'analytics'>(
-    'overview',
-  );
+  const [activeTab, setActiveTab] = useState<'overview' | 'bets' | 'transactions'>('overview');
   const [filters, setFilters] = useState<FilterState>(initialFilters);
   const [currentPage, setCurrentPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
 
   // Data states
   const [financialData, setFinancialData] = useState<PaginatedFinancialData | null>(null);
-  const [analytics, setAnalytics] = useState<FinancialAnalytics | null>(null);
+  const [analytics, setAnalytics] = useState<AdminFinancialAnalyticsResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -115,7 +113,7 @@ export default function FinancialDashboard() {
 
   // Load analytics on tab change or date filter changes
   useEffect(() => {
-    if (activeTab === 'analytics' || activeTab === 'overview') {
+    if (activeTab === 'overview') {
       loadAnalytics();
     }
   }, [activeTab, filters.startDate, filters.endDate]);
@@ -250,7 +248,6 @@ export default function FinancialDashboard() {
           { key: 'overview', label: 'Overview' },
           { key: 'bets', label: 'Bets' },
           { key: 'transactions', label: 'Transactions' },
-          { key: 'analytics', label: 'Analytics' },
         ].map((tab) => (
           <button
             key={tab.key}
@@ -437,29 +434,52 @@ export default function FinancialDashboard() {
               <h3 className="text-lg font-semibold text-content mb-4">Analytics Summary</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
-                  <div className="text-xl font-bold text-primary">
-                    ${analytics.overview.totalBettingVolume}
-                  </div>
+                  <div className="text-xl font-bold text-primary">${analytics.totalVolume}</div>
                   <div className="text-sm text-tertiary">Total Volume</div>
                 </div>
                 <div>
-                  <div className="text-xl font-bold text-primary">
-                    {analytics.overview.activeBettors}
-                  </div>
-                  <div className="text-sm text-tertiary">Active Bettors</div>
+                  <div className="text-xl font-bold text-primary">{analytics.totalBets}</div>
+                  <div className="text-sm text-tertiary">Total Bets</div>
                 </div>
                 <div>
-                  <div className="text-xl font-bold text-primary">
-                    ${analytics.overview.avgBetSize.toFixed(2)}
-                  </div>
+                  <div className="text-xl font-bold text-primary">${analytics.avgBetAmount}</div>
                   <div className="text-sm text-tertiary">Avg Bet Size</div>
                 </div>
                 <div>
-                  <div className="text-xl font-bold text-primary">
-                    ${analytics.overview.netRevenue}
-                  </div>
+                  <div className="text-xl font-bold text-primary">${analytics.netRevenue}</div>
                   <div className="text-sm text-tertiary">Net Revenue</div>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Top Users */}
+          {analytics && analytics.topUsers.length > 0 && (
+            <div className="bg-surface p-6 rounded-lg border border-muted">
+              <h3 className="text-lg font-semibold text-content mb-4">Top Users</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-muted">
+                      <th className="text-left py-2 text-sm font-medium text-content">User</th>
+                      <th className="text-left py-2 text-sm font-medium text-content">
+                        Total Wagered
+                      </th>
+                      <th className="text-left py-2 text-sm font-medium text-content">Total Won</th>
+                      <th className="text-left py-2 text-sm font-medium text-content">Net Loss</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {analytics.topUsers.map((user, index) => (
+                      <tr key={index} className="border-b border-muted">
+                        <td className="py-2 text-sm text-content">{user.userName}</td>
+                        <td className="py-2 text-sm text-content">${user.totalWagered}</td>
+                        <td className="py-2 text-sm text-content">${user.totalWon}</td>
+                        <td className="py-2 text-sm text-content">${user.netLoss}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
@@ -741,112 +761,6 @@ export default function FinancialDashboard() {
               >
                 Next
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Analytics Tab */}
-      {activeTab === 'analytics' && analytics && (
-        <div className="space-y-6">
-          {/* Overview Analytics */}
-          <div className="bg-surface p-6 rounded-lg border border-muted">
-            <h3 className="text-lg font-semibold text-content mb-4">Financial Overview</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <div>
-                <div className="text-2xl font-bold text-primary">
-                  ${analytics.overview.totalBettingVolume}
-                </div>
-                <div className="text-sm text-tertiary">Total Betting Volume</div>
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-primary">
-                  ${analytics.overview.totalPayouts}
-                </div>
-                <div className="text-sm text-tertiary">Total Payouts</div>
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-primary">
-                  ${analytics.overview.totalRefunds}
-                </div>
-                <div className="text-sm text-tertiary">Total Refunds</div>
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-primary">
-                  ${analytics.overview.netRevenue}
-                </div>
-                <div className="text-sm text-tertiary">Net Revenue</div>
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-primary">
-                  {analytics.overview.activeBettors}
-                </div>
-                <div className="text-sm text-tertiary">Active Bettors</div>
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-primary">
-                  ${analytics.overview.avgBetSize.toFixed(2)}
-                </div>
-                <div className="text-sm text-tertiary">Average Bet Size</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Category Breakdown */}
-          {analytics.categoryBreakdown.length > 0 && (
-            <div className="bg-surface p-6 rounded-lg border border-muted">
-              <h3 className="text-lg font-semibold text-content mb-4">Category Breakdown</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-muted">
-                      <th className="text-left py-2 text-sm font-medium text-content">Category</th>
-                      <th className="text-left py-2 text-sm font-medium text-content">Volume</th>
-                      <th className="text-left py-2 text-sm font-medium text-content">Bet Count</th>
-                      <th className="text-left py-2 text-sm font-medium text-content">
-                        Profit Margin
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {analytics.categoryBreakdown.map((category, index) => (
-                      <tr key={index} className="border-b border-muted">
-                        <td className="py-2 text-sm text-content">{category.category}</td>
-                        <td className="py-2 text-sm text-content">${category.volume}</td>
-                        <td className="py-2 text-sm text-content">{category.betCount}</td>
-                        <td className="py-2 text-sm text-content">
-                          {(category.profitMargin * 100).toFixed(1)}%
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* Fraud Detection */}
-          <div className="bg-surface p-6 rounded-lg border border-muted">
-            <h3 className="text-lg font-semibold text-content mb-4">Fraud Detection</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <div className="text-xl font-bold text-yellow-600">
-                  {analytics.fraudDetection.suspiciousBets}
-                </div>
-                <div className="text-sm text-tertiary">Suspicious Bets</div>
-              </div>
-              <div>
-                <div className="text-xl font-bold text-red-600">
-                  {analytics.fraudDetection.flaggedUsers}
-                </div>
-                <div className="text-sm text-tertiary">Flagged Users</div>
-              </div>
-              <div>
-                <div className="text-xl font-bold text-orange-600">
-                  {analytics.fraudDetection.riskPatterns.length}
-                </div>
-                <div className="text-sm text-tertiary">Risk Patterns</div>
-              </div>
             </div>
           </div>
         </div>

@@ -1,7 +1,7 @@
 import React from 'react';
 import type { LeaderboardVariant, LeaderboardHeaderStats } from './types';
 
-interface UnifiedLeaderboardHeaderProps {
+interface LeaderboardHeaderProps {
   variant: LeaderboardVariant;
   title: string;
   subtitle: string;
@@ -31,14 +31,14 @@ const variantStyles = {
   },
 };
 
-export function UnifiedLeaderboardHeader({
+export function LeaderboardHeader({
   variant,
   title,
   subtitle,
   icon: Icon,
   stats,
   isLoading = false,
-}: UnifiedLeaderboardHeaderProps) {
+}: LeaderboardHeaderProps) {
   const styles = variantStyles[variant];
 
   return (

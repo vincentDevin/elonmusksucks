@@ -10,6 +10,7 @@ import type {
   UserStatsDTO,
   PublicAITweet,
   Role,
+  AdminFinancialAnalyticsResponse,
 } from '@ems/types';
 
 /** — Enhanced User Management — **/
@@ -348,45 +349,6 @@ export interface PaginatedFinancialData {
   hasPreviousPage: boolean;
 }
 
-export interface FinancialAnalytics {
-  overview: {
-    totalBettingVolume: number;
-    totalPayouts: number;
-    totalRefunds: number;
-    netRevenue: number;
-    activeBettors: number;
-    avgBetSize: number;
-  };
-  timeSeriesData: Array<{
-    date: string;
-    volume: number;
-    payouts: number;
-    profit: number;
-    betCount: number;
-  }>;
-  categoryBreakdown: Array<{
-    category: string;
-    volume: number;
-    betCount: number;
-    profitMargin: number;
-  }>;
-  userSegments: Array<{
-    segment: string;
-    userCount: number;
-    avgLifetimeValue: number;
-    churnRate: number;
-  }>;
-  fraudDetection: {
-    suspiciousBets: number;
-    flaggedUsers: number;
-    riskPatterns: Array<{
-      pattern: string;
-      count: number;
-      severity: 'low' | 'medium' | 'high';
-    }>;
-  };
-}
-
 export interface BulkFinancialOperation {
   betIds?: number[];
   userIds?: number[];
@@ -437,13 +399,15 @@ export async function getFinancialAnalytics(params?: {
   startDate?: string;
   endDate?: string;
   category?: string;
-}): Promise<FinancialAnalytics> {
+}): Promise<AdminFinancialAnalyticsResponse> {
   const queryParams = new URLSearchParams();
   if (params?.startDate) queryParams.append('startDate', params.startDate);
   if (params?.endDate) queryParams.append('endDate', params.endDate);
   if (params?.category) queryParams.append('category', params.category);
 
-  const res = await api.get<FinancialAnalytics>(`/api/admin/financial/analytics?${queryParams}`);
+  const res = await api.get<AdminFinancialAnalyticsResponse>(
+    `/api/admin/financial/analytics?${queryParams}`,
+  );
   return res.data;
 }
 
