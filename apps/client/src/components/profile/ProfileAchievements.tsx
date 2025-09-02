@@ -17,11 +17,15 @@ interface Achievement {
 
 interface ProfileAchievementsProps {
   achievements?: Achievement[]; // Now optional, will fall back to context
+  embedded?: boolean; // When true, removes container hover effects for embedded usage
 }
 
-export function ProfileAchievements({ achievements: propAchievements }: ProfileAchievementsProps) {
+export function ProfileAchievements({
+  achievements: propAchievements,
+  embedded = false,
+}: ProfileAchievementsProps) {
   const { recentAchievements, loading } = useAchievements();
-  const { getRarityClasses, getCategoryIcon, utils } = useAchievementTheme();
+  const { getRarityClasses, getCategoryIcon, getCardClasses, utils } = useAchievementTheme();
 
   // Use context achievements if no props provided, or filter context for completed ones
   const achievements = propAchievements || recentAchievements || [];
@@ -62,56 +66,13 @@ export function ProfileAchievements({ achievements: propAchievements }: ProfileA
     return bDate - aDate;
   });
 
-  // Theme-aware styling functions with enhanced visual flair
-  const getRarityStyles = (rarity: string) => {
-    if (!utils.isValidRarity(rarity)) {
-      return getRarityClasses('common').card;
-    }
-    const classes = getRarityClasses(rarity as AchievementRarity);
-    const rarityEffects = {
-      common: '',
-      uncommon: 'hover:shadow-green-200/20',
-      rare: 'hover:shadow-blue-300/30 hover:ring-1 hover:ring-blue-200/30',
-      legendary: 'hover:shadow-yellow-400/40 hover:ring-2 hover:ring-yellow-200/40 animate-pulse',
-      epic: 'hover:shadow-purple-400/50 hover:ring-2 hover:ring-purple-200/50',
-      secret: 'hover:shadow-pink-400/40 hover:ring-2 hover:ring-pink-200/40',
-      shame: 'hover:shadow-red-300/30',
+  // Helper to get themed styling for achievements
+  const getAchievementThemeClasses = (rarity: string, category: string) => {
+    const validRarity = utils.isValidRarity(rarity) ? (rarity as AchievementRarity) : 'common';
+    return {
+      rarityClasses: getRarityClasses(validRarity),
+      cardClasses: getCardClasses(validRarity, category),
     };
-    return `${classes.card} ${rarityEffects[rarity as AchievementRarity] || ''}`;
-  };
-
-  const getRarityBadgeColor = (rarity: string) => {
-    if (!utils.isValidRarity(rarity)) {
-      return getRarityClasses('common').badge;
-    }
-    return getRarityClasses(rarity as AchievementRarity).badge;
-  };
-
-  const getCategoryBadgeStyle = (category: string, rarity: string) => {
-    const categoryColors = {
-      betting: 'bg-emerald-100/80 text-emerald-700 border-emerald-200',
-      pong: 'bg-orange-100/80 text-orange-700 border-orange-200',
-      leaderboard: 'bg-yellow-100/80 text-yellow-700 border-yellow-200',
-      chat: 'bg-blue-100/80 text-blue-700 border-blue-200',
-      prediction: 'bg-purple-100/80 text-purple-700 border-purple-200',
-      participation: 'bg-green-100/80 text-green-700 border-green-200',
-      event: 'bg-pink-100/80 text-pink-700 border-pink-200',
-      secret: 'bg-gray-100/80 text-gray-700 border-gray-200',
-      shame: 'bg-red-100/80 text-red-700 border-red-200',
-    };
-    return (
-      categoryColors[category as keyof typeof categoryColors] ||
-      'bg-gray-100/80 text-gray-700 border-gray-200'
-    );
-  };
-
-  const getRarityGlow = (rarity: string) => {
-    const glowEffects = {
-      legendary: 'drop-shadow-[0_0_8px_rgba(251,191,36,0.3)]',
-      epic: 'drop-shadow-[0_0_6px_rgba(147,51,234,0.3)]',
-      secret: 'drop-shadow-[0_0_6px_rgba(236,72,153,0.3)]',
-    };
-    return glowEffects[rarity as keyof typeof glowEffects] || '';
   };
 
   const getStats = () => {
@@ -156,7 +117,13 @@ export function ProfileAchievements({ achievements: propAchievements }: ProfileA
       : null;
 
   return (
-    <div className="bg-surface border border-muted rounded-2xl p-4 sm:p-6 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.01]">
+    <div
+      className={`${
+        embedded
+          ? ''
+          : 'bg-surface border border-muted rounded-2xl p-4 sm:p-6 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.01]'
+      }`}
+    >
       {/* Header with expand/collapse button */}
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-semibold text-content flex items-center gap-2">
@@ -203,41 +170,65 @@ export function ProfileAchievements({ achievements: propAchievements }: ProfileA
       {/* Newest Achievement - only visible when collapsed */}
       {!expanded && newestAchievement && (
         <div className="mt-4">
-          <h4 className="text-sm font-medium text-tertiary mb-2">Latest Achievement</h4>
-          <div className={`p-4 rounded-xl border-2 ${getRarityStyles(newestAchievement.rarity)}`}>
-            <div className="flex items-center gap-3">
-              <div className={`text-3xl ${getRarityGlow(newestAchievement.rarity)} animate-bounce`}>
-                {newestAchievement.iconUrl ? (
-                  <img
-                    src={newestAchievement.iconUrl}
-                    alt={newestAchievement.name}
-                    className="w-10 h-10 rounded-lg"
-                  />
-                ) : (
-                  getCategoryIcon(newestAchievement.category)
-                )}
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <h5 className="font-bold text-content">
-                    {newestAchievement.title || newestAchievement.name}
-                  </h5>
-                  <span
-                    className={`px-2 py-1 rounded-full text-xs font-bold ${getRarityBadgeColor(newestAchievement.rarity)}`}
-                  >
-                    {newestAchievement.rarity}
-                  </span>
+          <h4 className="text-sm font-medium text-tertiary mb-2 flex items-center gap-1">
+            <span>✨</span>
+            Latest Achievement
+          </h4>
+          {(() => {
+            const { rarityClasses, cardClasses } = getAchievementThemeClasses(
+              newestAchievement.rarity,
+              newestAchievement.category,
+            );
+
+            return (
+              <div
+                className={`relative overflow-hidden transition-all duration-300 ${cardClasses.container} ${rarityClasses.celebration} shadow-lg hover:shadow-xl`}
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-success/5 to-transparent animate-pulse" />
+                <div className="relative p-4">
+                  <div className="flex items-center gap-4">
+                    <div
+                      className={`relative w-12 h-12 rounded-full flex items-center justify-center text-2xl ${rarityClasses.card} shadow-lg ring-2 ${rarityClasses.leftBorder} transform rotate-3`}
+                    >
+                      {newestAchievement.iconUrl ? (
+                        <img
+                          src={newestAchievement.iconUrl}
+                          alt={newestAchievement.name}
+                          className="w-8 h-8 rounded-lg"
+                        />
+                      ) : (
+                        cardClasses.categoryIcon
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h5 className="font-bold text-content">
+                          {newestAchievement.title || newestAchievement.name}
+                        </h5>
+                        <span className={`${cardClasses.badge} uppercase tracking-wide shadow-sm`}>
+                          {newestAchievement.rarity}
+                        </span>
+                      </div>
+                      <p className="text-sm text-content/80 mb-2">
+                        {newestAchievement.description}
+                      </p>
+                      <div className="flex items-center gap-3 text-xs">
+                        <span className="text-tertiary capitalize">
+                          {newestAchievement.category}
+                        </span>
+                        <span className="text-success font-medium">
+                          🏆 Unlocked{' '}
+                          {new Date(
+                            newestAchievement.completedAt || newestAchievement.awardedAt || '',
+                          ).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <p className="text-xs text-tertiary">{newestAchievement.description}</p>
-                <div className="text-xs text-tertiary mt-1">
-                  🗓️ Unlocked{' '}
-                  {new Date(
-                    newestAchievement.completedAt || newestAchievement.awardedAt || '',
-                  ).toLocaleDateString()}
-                </div>
               </div>
-            </div>
-          </div>
+            );
+          })()}
         </div>
       )}
 
@@ -282,65 +273,79 @@ export function ProfileAchievements({ achievements: propAchievements }: ProfileA
 
           {/* Achievement Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {sortedAchievements.map((achievement) => (
-              <div
-                key={achievement.id}
-                className={`relative p-4 rounded-xl border-2 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] ${getRarityStyles(achievement.rarity)}`}
-              >
-                <div className="space-y-3">
-                  {/* Icon and Category */}
-                  <div className="flex items-center justify-between">
-                    <div
-                      className={`text-4xl ${getRarityGlow(achievement.rarity)} transition-all duration-300`}
-                    >
-                      {achievement.iconUrl ? (
-                        <img
-                          src={achievement.iconUrl}
-                          alt={achievement.name}
-                          className="w-10 h-10 rounded-lg"
-                        />
-                      ) : (
-                        <div className="transform hover:scale-110 transition-transform duration-200">
-                          {getCategoryIcon(achievement.category)}
-                        </div>
-                      )}
-                    </div>
-                    <span
-                      className={`text-xs px-3 py-1 rounded-full font-bold capitalize border ${getCategoryBadgeStyle(achievement.category, achievement.rarity)} shadow-sm`}
-                    >
-                      {achievement.category || 'general'}
-                    </span>
-                  </div>
+            {sortedAchievements.map((achievement) => {
+              const { rarityClasses, cardClasses } = getAchievementThemeClasses(
+                achievement.rarity,
+                achievement.category,
+              );
 
-                  {/* Achievement Info */}
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-bold text-content leading-tight">
-                        {achievement.title || achievement.name}
-                      </h3>
-                      <span
-                        className={`px-2 py-1 rounded-full text-xs font-bold ${getRarityBadgeColor(achievement.rarity)}`}
+              return (
+                <div
+                  key={achievement.id}
+                  className={`group relative overflow-hidden transition-all duration-300 ${cardClasses.container} ${rarityClasses.celebration} hover:shadow-xl hover:scale-[1.02]`}
+                >
+                  <div className="absolute inset-0 opacity-5 bg-gradient-to-br from-transparent via-white/10 to-transparent" />
+
+                  <div className="relative p-4 space-y-3">
+                    {/* Icon and Category */}
+                    <div className="flex items-center justify-between">
+                      <div
+                        className={`relative w-12 h-12 rounded-full flex items-center justify-center text-2xl ${rarityClasses.card} shadow-lg ring-2 ${rarityClasses.leftBorder} transform rotate-3`}
                       >
-                        {achievement.rarity}
+                        {achievement.iconUrl ? (
+                          <img
+                            src={achievement.iconUrl}
+                            alt={achievement.name}
+                            className="w-8 h-8 rounded-lg"
+                          />
+                        ) : (
+                          cardClasses.categoryIcon
+                        )}
+                        {/* Completion Checkmark */}
+                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-success rounded-full flex items-center justify-center text-white text-xs font-bold shadow-md">
+                          ✓
+                        </div>
+                      </div>
+                      <span
+                        className={`text-xs px-2 py-1 rounded-md font-medium capitalize border bg-muted/50 text-content/70`}
+                      >
+                        {achievement.category || 'general'}
                       </span>
                     </div>
-                    <p className="text-xs text-tertiary leading-relaxed">
-                      {achievement.description}
-                    </p>
-                  </div>
 
-                  {/* Date */}
-                  <div className="flex items-center justify-between text-xs text-tertiary">
-                    <span className="flex items-center gap-1">📅 Unlocked</span>
-                    <span className="font-medium">
-                      {new Date(
-                        achievement.completedAt || achievement.awardedAt || '',
-                      ).toLocaleDateString()}
-                    </span>
+                    {/* Achievement Info */}
+                    <div className="space-y-2">
+                      <div className="flex items-start gap-2">
+                        <h3 className="font-bold text-content leading-tight flex-1">
+                          {achievement.title || achievement.name}
+                        </h3>
+                        <span
+                          className={`${cardClasses.badge} text-xs uppercase tracking-wide shadow-sm`}
+                        >
+                          {achievement.rarity}
+                        </span>
+                      </div>
+                      <p className="text-sm text-content/80 leading-relaxed">
+                        {achievement.description}
+                      </p>
+                    </div>
+
+                    {/* Completion Info */}
+                    <div className="flex items-center justify-center py-2 border-t border-muted/30">
+                      <div className="flex items-center gap-2 text-success font-medium text-sm">
+                        <span>🏆</span>
+                        <span>
+                          Unlocked{' '}
+                          {new Date(
+                            achievement.completedAt || achievement.awardedAt || '',
+                          ).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {filteredAchievements.length === 0 && (

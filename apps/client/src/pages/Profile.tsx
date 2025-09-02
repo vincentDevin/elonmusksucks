@@ -2,7 +2,6 @@
 import { useState, useEffect, useCallback } from 'react';
 
 // Helper to convert string/number to number
-const asNum = (v: string | number | bigint | undefined | null) => Number(v ?? 0);
 import { useParams } from 'react-router-dom';
 import { followUser, unfollowUser } from '../api/users';
 import { useAuth } from '../contexts/AuthContext';
@@ -12,12 +11,9 @@ import type { UpdateProfilePayload } from '../api/users';
 // Profile sections
 import { ProfileHeader } from '../components/profile/ProfileHeader';
 import { ProfileEditForm } from '../components/profile/ProfileEditForm';
-import { ProfileStats } from '../components/profile/ProfileStats';
-import { ProfileAchievements } from '../components/profile/ProfileAchievements';
+import { ProfileStatsPanel } from '../components/profile/ProfileStatsPanel';
 import { CreatePostForm } from '../components/profile/CreatePostForm';
 import { ProfileFeed } from '../components/profile/ProfileFeed';
-import { ProfileActivity } from '../components/profile/ProfileActivity';
-import ProfilePongStats from '../components/profile/ProfilePongStats';
 
 export default function Profile() {
   const { user: currentUser } = useAuth();
@@ -32,7 +28,6 @@ export default function Profile() {
     setFormData,
     refresh: reloadProfile,
     feed,
-    activity,
     stats,
     saveProfile, // from hook
     postToFeed,
@@ -169,18 +164,18 @@ export default function Profile() {
         />
       ) : (
         <>
-          <ProfileAchievements achievements={profile.achievements || (profile.badges as any)} />
-
-          <ProfileStats
-            profile={{ muskBucks: asNum(profile.muskBucks), rank: profile.rank }}
-            stats={statsData as any}
+          <ProfileStatsPanel
+            profile={{
+              id: profile.id,
+              name: profile.name,
+              muskBucks: profile.muskBucks,
+              rank: profile.rank,
+              achievements: profile.achievements,
+              badges: profile.badges,
+            }}
+            stats={statsData}
             isOwn={isOwn}
           />
-
-          <ProfileActivity activity={activity ?? []} />
-
-          {/* Pong Statistics Section */}
-          <ProfilePongStats userId={profile.id} isOwn={isOwn} userName={profile.name} />
 
           {isOwn ? (
             <CreatePostForm onSubmit={handlePost} disabled={loading} />
