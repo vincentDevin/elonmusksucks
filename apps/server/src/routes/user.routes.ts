@@ -17,6 +17,7 @@ import {
   getUserAchievementsHandler,
   getRecentAchievementsHandler,
   getAllAchievementsHandler,
+  searchUsersHandler,
 } from '../controllers/user.controller';
 import { getUserPosts as getUserPostsHandler } from '../controllers/post.controller';
 import { requireAuth } from '../middleware/auth.middleware';
@@ -27,6 +28,9 @@ const router = Router();
 
 // IMPORTANT: All /me routes MUST come first before any /:userId routes
 router.get('/me/pong-stats', requireAuth, getUserPongStats);
+
+// User search for mentions - MUST come before /:userId routes
+router.get('/search', searchUsersHandler);
 
 // Fetch a user's public profile
 router.get('/profile/:userId', requireAuth, getProfile);

@@ -116,3 +116,15 @@ export async function createComment(postId: number, content: string): Promise<Us
   const response = await api.post<UserFeedPost>(`/api/posts/${postId}/comments`, { content });
   return response.data;
 }
+
+/**
+ * Share a post
+ */
+export async function sharePost(
+  postId: number,
+): Promise<{ success: boolean; sharesCount: number }> {
+  const response = await api.post<{ success: boolean; sharesCount: number }>(
+    `/api/posts/${postId}/share`,
+  );
+  return response.data;
+}

@@ -385,6 +385,34 @@ export class UserRepository implements IUserRepository {
       where: { userId, status: 'WON' },
     });
   }
+
+  async searchUsersByName(
+    query: string,
+  ): Promise<{ id: number; name: string; avatarUrl?: string }[]> {
+    const users = await prisma.user.findMany({
+      where: {
+        name: {
+          contains: query,
+          mode: 'insensitive',
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        avatarUrl: true,
+      },
+      take: 10, // Limit results for performance
+      orderBy: {
+        name: 'asc',
+      },
+    });
+
+    return users.map((user) => ({
+      id: user.id,
+      name: user.name,
+      avatarUrl: user.avatarUrl || undefined,
+    }));
+  }
 }
 
 function mapUserPost(post: any): DbUserPost {

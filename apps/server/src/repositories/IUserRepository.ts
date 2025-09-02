@@ -111,4 +111,7 @@ export interface IUserRepository {
   getUserTotalBetsCount(userId: number): Promise<number>;
   getUserCategoryWinsCount(userId: number, category: string): Promise<number>;
   getUserParlayWinsCount(userId: number): Promise<number>;
+
+  // User search for mentions
+  searchUsersByName(query: string): Promise<{ id: number; name: string; avatarUrl?: string }[]>;
 }

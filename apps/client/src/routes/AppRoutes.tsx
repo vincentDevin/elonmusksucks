@@ -18,6 +18,7 @@ const Leaderboard = lazy(() => import('../pages/Leaderboard'));
 const Profile = lazy(() => import('../pages/Profile'));
 const AdminDashboard = lazy(() => import('../pages/AdminDashboard'));
 const Pong = lazy(() => import('../pages/Pong'));
+import HashtagFeed from '../components/posts/HashtagFeed';
 
 // Suspense fallback component
 const RouteFallback = () => (
@@ -73,6 +74,9 @@ export default function AppRoutes() {
             </Suspense>
           }
         />
+
+        {/* Hashtag feed route */}
+        <Route path="/hashtag/:tag" element={<HashtagFeed />} />
 
         {/* Pong route - enabled by default */}
         <Route

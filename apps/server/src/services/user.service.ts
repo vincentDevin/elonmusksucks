@@ -515,6 +515,17 @@ export class UserService {
   async getUserPredictions(userId: number) {
     return this.repo.getUserPredictions(userId);
   }
+
+  /**
+   * Search users by name for mentions
+   */
+  async searchUsers(query: string): Promise<{ id: number; name: string; avatarUrl?: string }[]> {
+    if (!query || query.trim().length < 2) {
+      return [];
+    }
+
+    return this.repo.searchUsersByName(query.trim());
+  }
 }
 
 // --- Helpers: always map DB types to DTOs used on frontend ---

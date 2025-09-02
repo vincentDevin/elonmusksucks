@@ -521,3 +521,32 @@ export async function getAllAchievementsHandler(
     next(err);
   }
 }
+
+/**
+ * Search users by name/username
+ * GET /api/users/search?q=searchterm
+ */
+export async function searchUsersHandler(
+  req: ReqWithUser,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const query = req.query.q as string;
+
+    if (!query || query.trim().length === 0) {
+      res.json([]);
+      return;
+    }
+
+    if (query.length < 2) {
+      res.status(400).json({ error: 'Search query must be at least 2 characters' });
+      return;
+    }
+
+    const users = await userService.searchUsers(query.trim());
+    res.json(users);
+  } catch (err) {
+    next(err);
+  }
+}

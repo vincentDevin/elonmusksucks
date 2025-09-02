@@ -1,5 +1,7 @@
 import React, { useState, useRef } from 'react';
 import type { PostVisibility, PostContentType } from '@ems/types';
+import { PrivacySelector, VisibilityIndicator } from '../posts/PrivacySelector';
+import { MentionAutocomplete } from '../posts/MentionAutocomplete';
 
 type CreatePostFormProps = {
   onSubmit: (
@@ -28,7 +30,6 @@ export function CreatePostForm({
   const [error, setError] = useState<string | null>(null);
   const [visibility, setVisibility] = useState<PostVisibility>('PUBLIC');
   const [showOptions, setShowOptions] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,8 +44,6 @@ export function CreatePostForm({
       setContent('');
       setVisibility('PUBLIC');
       setShowOptions(false);
-      // Optionally focus after posting (for replies)
-      if (textareaRef.current) textareaRef.current.focus();
     } catch (err: any) {
       setError(err?.message || 'Failed to post');
     } finally {
@@ -63,18 +62,17 @@ export function CreatePostForm({
       <form onSubmit={handleSubmit} className="space-y-3">
         {/* Main content area */}
         <div className="relative">
-          <textarea
-            ref={textareaRef}
-            className="w-full border border-muted rounded-lg p-3 resize-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all bg-surface text-content"
-            rows={isComment ? 2 : 4}
+          <MentionAutocomplete
+            value={content}
+            onChange={setContent}
             placeholder={
               placeholder ||
               (isComment ? 'Write a comment…' : 'Share your thoughts about Elon Musk...')
             }
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
             disabled={saving || disabled}
             maxLength={characterLimit}
+            rows={isComment ? 2 : 4}
+            className=""
           />
 
           {/* Character counter */}
@@ -111,12 +109,7 @@ export function CreatePostForm({
             )}
 
             {/* Visibility indicator */}
-            {!isComment && (
-              <div className="flex items-center gap-1 text-sm text-tertiary">
-                <span>{visibility === 'PUBLIC' ? '🌐' : '🔒'}</span>
-                <span className="capitalize">{visibility.toLowerCase()}</span>
-              </div>
-            )}
+            {!isComment && <VisibilityIndicator visibility={visibility} showLabel={true} />}
           </div>
 
           {/* Submit button */}
@@ -164,40 +157,14 @@ export function CreatePostForm({
 
         {/* Expanded options */}
         {showOptions && !isComment && showVisibilityOptions && (
-          <div className="border-t border-muted pt-3 space-y-3">
-            <div>
-              <label className="block text-sm font-medium text-content mb-2">
-                Who can see this post?
-              </label>
-              <div className="space-y-2">
-                <label className="flex items-center">
-                  <input
-                    type="radio"
-                    name="visibility"
-                    value="PUBLIC"
-                    checked={visibility === 'PUBLIC'}
-                    onChange={(e) => setVisibility(e.target.value as PostVisibility)}
-                    className="mr-2"
-                  />
-                  <span className="flex items-center gap-2">
-                    🌐 <span>Public - Anyone can see this post</span>
-                  </span>
-                </label>
-                <label className="flex items-center">
-                  <input
-                    type="radio"
-                    name="visibility"
-                    value="PRIVATE"
-                    checked={visibility === 'PRIVATE'}
-                    onChange={(e) => setVisibility(e.target.value as PostVisibility)}
-                    className="mr-2"
-                  />
-                  <span className="flex items-center gap-2">
-                    🔒 <span>Private - Only you can see this post</span>
-                  </span>
-                </label>
-              </div>
-            </div>
+          <div className="border-t border-muted pt-3">
+            <PrivacySelector
+              value={visibility}
+              onChange={setVisibility}
+              disabled={saving}
+              showLabels={true}
+              compact={false}
+            />
           </div>
         )}
       </form>

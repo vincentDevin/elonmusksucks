@@ -1183,6 +1183,7 @@ export const ActivityEventType = {
   BADGE_EARNED: 'badge_earned',
   BIG_WIN: 'big_win',
   LEADERBOARD_UPDATE: 'leaderboard_update',
+  USER_MENTIONED: 'user_mentioned',
 } as const;
 export type ActivityEventType = (typeof ActivityEventType)[keyof typeof ActivityEventType];
 
@@ -2887,7 +2888,8 @@ export interface UnifiedActivityEvent {
     | 'market_movement'
     | 'big_bet_alert'
     | 'achievement_unlocked'
-    | 'user_followed';
+    | 'user_followed'
+    | 'user_mentioned';
   timestamp: string;
   priority: 'high' | 'medium' | 'low';
   userId: number;

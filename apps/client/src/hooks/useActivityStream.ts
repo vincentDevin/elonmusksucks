@@ -462,6 +462,39 @@ export function useActivityStream() {
       });
     };
 
+    // Mention notification handler
+    const mentionReceivedHandler = (data: any) => {
+      console.log('[mention-received] Mention notification:', data);
+
+      // Only show for current user
+      if (!user?.id || data.mentionedUserId !== user.id) return;
+
+      const activity: ActivityItem = {
+        id: `mention_${data.mentionId}_${Date.now()}`,
+        type: 'friend_activity', // Using existing type for mention notifications
+        title: `@${data.authorName} mentioned you`,
+        description: data.content,
+        timestamp: data.createdAt,
+        userId: data.authorId,
+        userName: data.authorName,
+        userAvatar: data.authorAvatar,
+        metadata: {
+          postId: data.postId,
+          mentionId: data.mentionId,
+          type: 'mention',
+        },
+        isPersonal: true,
+        priority: 'medium',
+        icon: '@',
+        color: 'text-blue-400',
+      };
+
+      setState((prev) => ({
+        ...prev,
+        activities: [activity, ...prev.activities].slice(0, 100),
+      }));
+    };
+
     // Store handlers for cleanup
     const betPlacedHandler = handleActivity('betPlaced');
     const betResolvedHandler = handleActivity('betResolved');
@@ -491,6 +524,7 @@ export function useActivityStream() {
     socket.on('achievement:progress', achievementProgressHandler);
     socket.on('achievement:celebration', achievementCelebrationHandler);
     socket.on('achievement:batch_unlocked', achievementBatchUnlockedHandler);
+    socket.on('mention:received', mentionReceivedHandler);
     socket.on('leaderboard:rankChange', leaderboardRankChangeHandler);
     socket.on('activity:update', activityUpdateHandler);
 
@@ -521,6 +555,7 @@ export function useActivityStream() {
       socket.off('achievement:progress', achievementProgressHandler);
       socket.off('achievement:celebration', achievementCelebrationHandler);
       socket.off('achievement:batch_unlocked', achievementBatchUnlockedHandler);
+      socket.off('mention:received', mentionReceivedHandler);
       socket.off('leaderboard:rankChange', leaderboardRankChangeHandler);
       socket.off('activity:update', activityUpdateHandler);
       socket.off('bigBetAlert', handleBigBetAlert);

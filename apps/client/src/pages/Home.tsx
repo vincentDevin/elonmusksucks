@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { TimelineProvider } from '../contexts/TimelineContext';
 import Timeline from '../components/timeline/Timeline';
 import { TimelineWithPosts } from '../components/timeline/TimelineWithPosts';
+import { TrendingHashtags } from '../components/posts/TrendingHashtags';
 import { useAuth } from '../hooks/useAuth';
 import { useMarketOverview } from '../hooks/useMarketOverview';
 
@@ -79,7 +80,7 @@ export default function Home() {
                 </p>
               </div>
               <div className="p-6">
-                <TimelineWithPosts initialTab="articles" />
+                <TimelineWithPosts initialTab="posts" />
               </div>
             </div>
           </div>

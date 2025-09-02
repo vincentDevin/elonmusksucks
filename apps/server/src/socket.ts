@@ -23,6 +23,8 @@ import { registerStatisticsRedisHandlers } from './handlers/statisticsSocketHand
 import { setupUnifiedActivityHandlers } from './handlers/unifiedActivityHandlers';
 import { registerTimelineHandlers } from './handlers/timelineHandlers';
 import { registerPongHandlers, registerPongRedisHandlers } from './handlers/pongSocketHandlers';
+import { registerPostHandlers } from './handlers/postHandlers';
+import { registerPostRedisHandlers } from './handlers/postRedisEventHandlers';
 import { socketCleanupManager } from './lib/SocketCleanupManager';
 import { setupAchievementRedisHandlers } from './workers/achievementEventHandler';
 // import { registerRoomHandlers } from './handlers/roomHandlers'; // future rooms
@@ -140,6 +142,10 @@ export async function initSocket(httpServer: HTTPServer) {
   // ── Timeline event handlers ───────────────────────────────────────────────
   registerTimelineHandlers(io);
 
+  // ── Post Redis handlers ───────────────────────────────────────────────────
+  const postSub = registerPostRedisHandlers(io);
+  redisClients.push(postSub);
+
   // ── Chat event subscriptions ──────────────────────────────────────────────
   const chatSub = redisClient.duplicate();
   redisClients.push(chatSub);
@@ -172,6 +178,7 @@ export async function initSocket(httpServer: HTTPServer) {
       registerBetHandlers(socket);
       registerModerationHandlers(socket);
       registerPongHandlers(socket);
+      registerPostHandlers(socket);
       setupUnifiedActivityHandlers(socket);
 
       // Setup disconnect handler for cleanup

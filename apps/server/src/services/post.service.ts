@@ -3,10 +3,12 @@ import { PostRepository } from '../repositories/PostRepository';
 import prisma from '../db';
 import type { UserFeedPost, PostContentType, PostVisibility, ReactionType } from '@ems/types';
 import { NotFoundError, ForbiddenError, ValidationError } from '../errors';
+import { unifiedActivityService } from './unifiedActivity.service';
 
 export class PostService {
   private postRepository: PostRepository;
   private io?: SocketIOServer;
+  private unifiedActivityService = unifiedActivityService;
 
   constructor(io?: SocketIOServer) {
     this.postRepository = new PostRepository(prisma);
@@ -225,6 +227,126 @@ export class PostService {
   }
 
   /**
+   * Share a post (increment share count)
+   */
+  async sharePost(
+    postId: number,
+    userId: number,
+  ): Promise<{ success: boolean; sharesCount: number }> {
+    // Check if post exists and is not deleted
+    const post = await this.postRepository.getPost(postId);
+    if (!post) {
+      throw new NotFoundError('Post not found');
+    }
+
+    if (post.isDeleted) {
+      throw new ForbiddenError('Cannot share a deleted post');
+    }
+
+    // Check if post is private and user has access
+    if (post.visibility === 'PRIVATE' && post.authorId !== userId) {
+      throw new ForbiddenError('Cannot share a private post');
+    }
+
+    // Increment shares count
+    const updatedPost = await prisma.userPost.update({
+      where: { id: postId },
+      data: {
+        sharesCount: { increment: 1 },
+      },
+      select: { sharesCount: true },
+    });
+
+    // TODO: Create share activity record
+    // TODO: Send notification to post author
+    // TODO: Add to user's activity log
+
+    // Emit real-time update
+    if (this.io) {
+      this.io.emit('post:shared', {
+        postId,
+        sharesCount: updatedPost.sharesCount,
+        sharedBy: userId,
+      });
+    }
+
+    return {
+      success: true,
+      sharesCount: updatedPost.sharesCount,
+    };
+  }
+
+  /**
+   * Report a post for moderation
+   */
+  async reportPost(
+    postId: number,
+    reporterId: number,
+    reason: string,
+    details?: string,
+  ): Promise<{ success: boolean; reportId: number }> {
+    // Check if post exists and is not deleted
+    const post = await this.postRepository.getPost(postId);
+    if (!post) {
+      throw new NotFoundError('Post not found');
+    }
+
+    if (post.isDeleted) {
+      throw new ForbiddenError('Cannot report a deleted post');
+    }
+
+    // Check if user already reported this post
+    const existingReport = await prisma.postReport.findFirst({
+      where: {
+        postId,
+        reporterId,
+      },
+    });
+
+    if (existingReport) {
+      throw new ValidationError('You have already reported this post');
+    }
+
+    // Create the report
+    const report = await prisma.postReport.create({
+      data: {
+        postId,
+        reporterId,
+        reason: reason as any, // Cast to ReportReason enum
+        details: details?.trim() || null,
+        status: 'PENDING',
+      },
+    });
+
+    // Increment report count on the post
+    await prisma.userPost.update({
+      where: { id: postId },
+      data: {
+        reportCount: { increment: 1 },
+      },
+    });
+
+    // TODO: Check if post should be auto-flagged based on report count
+    // TODO: Send notification to moderators
+    // TODO: Add to moderation queue
+
+    // Emit real-time update for admins
+    if (this.io) {
+      this.io.to('admin').emit('post:reported', {
+        postId,
+        reportId: report.id,
+        reason,
+        reportCount: post.reportCount + 1,
+      });
+    }
+
+    return {
+      success: true,
+      reportId: report.id,
+    };
+  }
+
+  /**
    * Convert database post to API format
    */
   private toFeedPost(post: any, viewerId?: number): UserFeedPost {
@@ -338,13 +460,75 @@ export class PostService {
                 },
               });
 
-              // TODO: Send notification to mentioned user
+              // Create mention activity and notification
+              await this.createMentionNotification(postId, user.id, username);
             }
           }
         }
       } catch (error) {
         console.error(`Failed to process mention @${username}:`, error);
       }
+    }
+  }
+
+  /**
+   * Create mention notification and activity
+   */
+  private async createMentionNotification(
+    postId: number,
+    mentionedUserId: number,
+    username: string,
+  ): Promise<void> {
+    try {
+      // Get post and author details
+      const post = await prisma.userPost.findUnique({
+        where: { id: postId },
+        include: {
+          author: {
+            select: { id: true, name: true, avatarUrl: true },
+          },
+        },
+      });
+
+      if (!post || !post.author) return;
+
+      // Create unified activity for the mention
+      const contentPreview =
+        post.content.length > 50 ? post.content.substring(0, 47) + '...' : post.content;
+
+      await this.unifiedActivityService.publishActivity({
+        type: 'user_mentioned',
+        userId: post.author.id,
+        userName: post.author.name,
+        userAvatar: post.author.avatarUrl || undefined,
+        title: `${post.author.name} mentioned @${username}`,
+        description: `"${contentPreview}"`,
+        icon: '@',
+        color: 'text-blue-400',
+        priority: 'medium',
+        isPersonal: false,
+        isHighValue: false,
+        meta: {
+          postId,
+          mentionedUserId,
+          mentionedUsername: username,
+        },
+      });
+
+      // Emit real-time notification to mentioned user
+      if (this.io) {
+        this.io.to(`user:${mentionedUserId}`).emit('mention:received', {
+          postId,
+          mentionId: `${postId}-${mentionedUserId}`,
+          authorId: post.author.id,
+          authorName: post.author.name,
+          authorAvatar: post.author.avatarUrl,
+          content: contentPreview,
+          createdAt: post.createdAt.toISOString(),
+        });
+      }
+    } catch (error) {
+      console.error(`Failed to create mention notification:`, error);
     }
   }
 
@@ -372,5 +556,140 @@ export class PostService {
         console.error(`Failed to process hashtag #${tag}:`, error);
       }
     }
+  }
+
+  /**
+   * Get trending hashtags
+   */
+  async getTrendingHashtags(limit: number = 10): Promise<
+    Array<{
+      id: number;
+      tag: string;
+      usageCount: number;
+      trendingScore?: number;
+    }>
+  > {
+    // Get hashtags with most usage in the last 7 days
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+    const trending = await prisma.hashtag.findMany({
+      where: {
+        posts: {
+          some: {
+            post: {
+              createdAt: { gte: sevenDaysAgo },
+              isDeleted: false,
+            },
+          },
+        },
+      },
+      select: {
+        id: true,
+        tag: true,
+        usageCount: true,
+        _count: {
+          select: {
+            posts: {
+              where: {
+                post: {
+                  createdAt: { gte: sevenDaysAgo },
+                  isDeleted: false,
+                },
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        usageCount: 'desc',
+      },
+      take: limit,
+    });
+
+    return trending.map((hashtag) => ({
+      id: hashtag.id,
+      tag: hashtag.tag,
+      usageCount: hashtag.usageCount,
+      trendingScore: hashtag._count.posts, // Recent usage count
+    }));
+  }
+
+  /**
+   * Get posts by hashtag
+   */
+  async getPostsByHashtag(
+    tag: string,
+    options: {
+      cursor?: number;
+      limit?: number;
+      viewerId?: number;
+    } = {},
+  ): Promise<{ posts: UserFeedPost[]; nextCursor?: number }> {
+    const limit = options.limit ?? 20;
+
+    // First find the hashtag
+    const hashtag = await prisma.hashtag.findUnique({
+      where: { tag },
+    });
+
+    if (!hashtag) {
+      return { posts: [] };
+    }
+
+    // Get posts with this hashtag
+    const postHashtags = await prisma.postHashtag.findMany({
+      where: {
+        hashtagId: hashtag.id,
+        post: {
+          isDeleted: false,
+          visibility: 'PUBLIC', // Only show public posts in hashtag feeds
+        },
+      },
+      include: {
+        post: {
+          include: {
+            author: {
+              select: {
+                id: true,
+                name: true,
+                avatarUrl: true,
+              },
+            },
+            reactions: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+            _count: {
+              select: {
+                children: true,
+                reactions: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        post: {
+          createdAt: 'desc',
+        },
+      },
+      take: limit + 1,
+      cursor: options.cursor ? { id: options.cursor } : undefined,
+      skip: options.cursor ? 1 : 0,
+    });
+
+    const hasMore = postHashtags.length > limit;
+    const resultPosts = hasMore ? postHashtags.slice(0, -1) : postHashtags;
+    const nextCursor = hasMore ? resultPosts[resultPosts.length - 1]?.id : undefined;
+
+    const posts = resultPosts.map((ph) => this.toFeedPost(ph.post, options.viewerId));
+
+    return { posts, nextCursor };
   }
 }

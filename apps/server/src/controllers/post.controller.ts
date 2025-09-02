@@ -356,3 +356,105 @@ export async function getReactionCounts(
     next(error);
   }
 }
+
+/**
+ * Share a post
+ * POST /api/posts/:id/share
+ */
+export async function sharePost(
+  req: ReqWithUser,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const postId = Number(req.params.id);
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({ error: 'Not authenticated' });
+      return;
+    }
+
+    const result = await postService.sharePost(postId, userId);
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Report a post
+ * POST /api/posts/:id/report
+ */
+export async function reportPost(
+  req: ReqWithUser,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const postId = Number(req.params.id);
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({ error: 'Not authenticated' });
+      return;
+    }
+
+    const { reason, details } = req.body;
+
+    if (!reason) {
+      res.status(400).json({ error: 'Report reason is required' });
+      return;
+    }
+
+    const result = await postService.reportPost(postId, userId, reason, details);
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Get trending hashtags
+ * GET /api/posts/hashtags/trending
+ */
+export async function getTrendingHashtags(
+  req: ReqWithUser,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const limit = parseInt(req.query.limit as string) || 10;
+    const hashtags = await postService.getTrendingHashtags(limit);
+    res.json(hashtags);
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Get posts by hashtag
+ * GET /api/posts/hashtags/:tag
+ */
+export async function getPostsByHashtag(
+  req: ReqWithUser,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const tag = req.params.tag.toLowerCase();
+    const cursor = req.query.cursor ? Number(req.query.cursor) : undefined;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const viewerId = req.user?.id;
+
+    const result = await postService.getPostsByHashtag(tag, {
+      cursor,
+      limit,
+      viewerId,
+    });
+
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+}

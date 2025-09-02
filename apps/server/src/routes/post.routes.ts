@@ -8,6 +8,10 @@ const router = Router();
 router.get('/', postController.getTimeline);
 router.get('/trending', postController.getTrendingPosts);
 
+// Hashtag endpoints
+router.get('/hashtags/trending', postController.getTrendingHashtags);
+router.get('/hashtags/:tag', postController.getPostsByHashtag);
+
 // Single post operations
 router.get('/:id', postController.getPost);
 router.get('/:id/comments', postController.getPostComments);
@@ -32,5 +36,11 @@ router.post('/:id/comments', postController.createComment);
 // Reactions (require authentication)
 router.post('/:id/reactions', postController.toggleReaction);
 router.delete('/:id/reactions/:type', postController.removeReaction);
+
+// Share post
+router.post('/:id/share', postController.sharePost);
+
+// Report post
+router.post('/:id/report', postController.reportPost);
 
 export default router;
