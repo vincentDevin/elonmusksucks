@@ -46,6 +46,16 @@ export class UserRepository implements IUserRepository {
     }) as Promise<Array<DbUserBadge & { badge: DbBadge }>>;
   }
 
+  async findUserAchievements(userId: number): Promise<any[]> {
+    return prisma.userAchievement.findMany({
+      where: { userId, completedAt: { not: null } },
+      include: {
+        achievement: true,
+      },
+      orderBy: [{ achievement: { category: 'asc' } }, { achievement: { sortOrder: 'asc' } }],
+    });
+  }
+
   async existsFollow(followerId: number, followingId: number): Promise<boolean> {
     const follow = await prisma.follow.findUnique({
       where: { followerId_followingId: { followerId, followingId } },

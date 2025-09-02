@@ -1,18 +1,31 @@
 // apps/client/src/components/dashboard/analytics/AchievementProgress.tsx
 import { useState, memo, useMemo } from 'react';
-import type { UserStats } from '../../../hooks/useUserStats';
+import { useAchievements } from '../../../contexts/AchievementContext';
 
 interface AchievementProgressProps {
-  stats: UserStats;
   className?: string;
 }
 
 const AchievementProgress = memo(function AchievementProgress({
-  stats,
   className = '',
 }: AchievementProgressProps) {
   const [showAll, setShowAll] = useState(false);
-  const { achievements } = stats;
+  const {
+    achievements: progressToNext,
+    recentAchievements: recentBadges,
+    totalBadges,
+    totalAvailable,
+    completionRate,
+    loading,
+  } = useAchievements();
+
+  const achievements = {
+    recentBadges,
+    progressToNext,
+    totalBadges,
+    totalAvailable,
+    completionRate,
+  };
 
   // Memoize achievement categorization to avoid recalculation
   const achievementCategories = useMemo(() => {
@@ -34,9 +47,9 @@ const AchievementProgress = memo(function AchievementProgress({
     : achievementCategories.upcoming.slice(0, 3);
 
   const getProgressColor = (progress: number) => {
-    if (progress >= 90) return 'bg-green-500';
-    if (progress >= 70) return 'bg-yellow-500';
-    if (progress >= 50) return 'bg-orange-500';
+    if (progress >= 90) return 'bg-success';
+    if (progress >= 70) return 'bg-warning';
+    if (progress >= 50) return 'bg-error';
     return 'bg-primary';
   };
 
@@ -62,24 +75,43 @@ const AchievementProgress = memo(function AchievementProgress({
   const getRarityColor = (rarity: string) => {
     switch (rarity) {
       case 'legendary':
-        return 'border-l-purple-500 bg-purple-50/50';
+        return 'border-l-accent bg-surface border border-muted';
       case 'rare':
-        return 'border-l-blue-500 bg-blue-50/50';
+        return 'border-l-primary bg-surface border border-muted';
       case 'uncommon':
-        return 'border-l-green-500 bg-green-50/50';
+        return 'border-l-success bg-surface border border-muted';
       case 'secret':
-        return 'border-l-indigo-500 bg-indigo-50/50';
+        return 'border-l-info bg-surface border border-muted';
       case 'shame':
-        return 'border-l-red-500 bg-red-50/50';
+        return 'border-l-error bg-surface border border-muted';
       default:
-        return 'border-l-gray-500 bg-gray-50/50';
+        return 'border-l-muted bg-surface border border-muted';
     }
   };
 
+  // Show loading state if we're fetching data independently
+  if (loading) {
+    return (
+      <div className={`bg-background/50 rounded-xl p-4 border border-muted ${className}`}>
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-semibold text-content flex items-center gap-2">
+            🏆 Achievements
+          </h3>
+        </div>
+        <div className="flex items-center justify-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <span className="ml-3 text-tertiary">Loading achievements...</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`bg-background/50 rounded-xl p-4 border border-muted ${className}`}>
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="font-semibold text-content flex items-center">🏅 Achievement Progress</h3>
+      <div className="flex items-center justify-between">
+        <h3 className="font-semibold text-content mb-3 flex items-center">
+          🏅 Achievement Progress
+        </h3>
         <div className="text-sm text-tertiary">{achievements.totalBadges} unlocked</div>
       </div>
 
@@ -167,7 +199,7 @@ const AchievementProgress = memo(function AchievementProgress({
                 </div>
 
                 {progressPercent >= 90 && !progress.isCompleted && (
-                  <div className="text-xs text-green-600 font-medium mt-2 flex items-center gap-1">
+                  <div className="text-xs text-success font-medium mt-2 flex items-center gap-1">
                     ⚡ Almost unlocked!{' '}
                     {(progress.targetValue - progress.progress).toLocaleString()} more to go!
                   </div>
@@ -225,7 +257,7 @@ const AchievementProgress = memo(function AchievementProgress({
           />
         </div>
         {achievementCategories.completed.length > 0 && (
-          <div className="text-xs text-green-600 font-medium mt-2 text-center">
+          <div className="text-xs text-success font-medium mt-2 text-center">
             🎉 Keep it up! You're doing great!
           </div>
         )}

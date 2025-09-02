@@ -18,6 +18,7 @@ export interface IUserRepository {
   getFollowersCount(userId: number): Promise<number>;
   getFollowingCount(userId: number): Promise<number>;
   findUserBadges(userId: number): Promise<Array<DbUserBadge & { badge: DbBadge }>>;
+  findUserAchievements(userId: number): Promise<any[]>;
   existsFollow(followerId: number, followingId: number): Promise<boolean>;
   createFollow(followerId: number, followingId: number): Promise<void>;
   deleteFollow(followerId: number, followingId: number): Promise<void>;

@@ -76,20 +76,33 @@ export class AchievementService {
    * Get user's achievement progress
    */
   async getUserAchievementProgress(userId: number): Promise<AchievementProgress[]> {
-    const userAchievements = await this.achievementRepository.findUserAchievements(userId);
+    // Get all achievements and user's progress
+    const [allAchievements, userAchievements] = await Promise.all([
+      this.achievementRepository.findAllAchievements(),
+      this.achievementRepository.findUserAchievements(userId),
+    ]);
 
-    return userAchievements.map((ua) => ({
-      id: ua.achievement.name, // Use achievement name as string ID for frontend compatibility
-      achievementId: ua.achievementId,
-      name: ua.achievement.name,
-      title: ua.achievement.title,
-      description: ua.achievement.description,
-      category: ua.achievement.category,
-      progress: ua.progress,
-      targetValue: ua.achievement.targetValue,
-      isCompleted: !!ua.completedAt,
-      completedAt: ua.completedAt?.toISOString(),
-    }));
+    // Create a map of user achievements for quick lookup
+    const userAchievementMap = new Map(userAchievements.map((ua) => [ua.achievementId, ua]));
+
+    // Return all achievements with user progress (0 if not started)
+    return allAchievements.map((achievement) => {
+      const userAchievement = userAchievementMap.get(achievement.id);
+
+      return {
+        id: achievement.name, // Use achievement name as string ID for frontend compatibility
+        achievementId: achievement.id,
+        name: achievement.name,
+        title: achievement.title,
+        description: achievement.description,
+        category: achievement.category,
+        rarity: achievement.rarity || 'common',
+        progress: userAchievement?.progress || 0,
+        targetValue: achievement.targetValue,
+        isCompleted: !!userAchievement?.completedAt,
+        completedAt: userAchievement?.completedAt?.toISOString(),
+      };
+    });
   }
 
   /**

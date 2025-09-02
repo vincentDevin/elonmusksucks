@@ -848,6 +848,7 @@ export interface UserProfileView {
     longestStreak: number;
   };
   badges: PublicUserBadge[];
+  achievements?: PublicUserAchievement[];
   followersCount: number;
   followingCount: number;
   isFollowing: boolean;
@@ -930,6 +931,18 @@ export interface LeaderboardEntryView {
   rank: number;
 }
 
+export interface PublicUserAchievement {
+  id:           number;
+  name:         string;
+  title:        string;
+  description:  string;
+  category:     string;
+  rarity:       string;
+  iconUrl?:     string | null;
+  completedAt?: string | null;
+  awardedAt?:   string | null;
+}
+
 export interface PublicUserProfile {
   id:               number;
   name:             string;
@@ -951,6 +964,7 @@ export interface PublicUserProfile {
     longestStreak:   number;
   };
   badges:           PublicUserBadge[];
+  achievements?:    PublicUserAchievement[];
   followersCount:   number;
   followingCount:   number;
   isFollowing:      boolean;
@@ -1685,6 +1699,7 @@ export interface AchievementProgress {
   title: string;
   description: string;
   category: string;
+  rarity?: string;
   progress: number;
   targetValue: number;
   isCompleted: boolean;

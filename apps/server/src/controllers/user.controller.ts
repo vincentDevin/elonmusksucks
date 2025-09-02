@@ -507,3 +507,17 @@ export async function getRecentAchievementsHandler(
     next(err);
   }
 }
+
+export async function getAllAchievementsHandler(
+  _req: ReqWithUser,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    // Get all available achievements (public endpoint)
+    const achievements = await achievementService.getAllAchievements();
+    res.json(achievements);
+  } catch (err) {
+    next(err);
+  }
+}

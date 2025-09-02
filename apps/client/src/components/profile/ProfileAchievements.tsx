@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useAchievements } from '../../contexts/AchievementContext';
 
 interface Achievement {
   id: number;
@@ -13,10 +14,14 @@ interface Achievement {
 }
 
 interface ProfileAchievementsProps {
-  achievements: Achievement[];
+  achievements?: Achievement[]; // Now optional, will fall back to context
 }
 
-export function ProfileAchievements({ achievements }: ProfileAchievementsProps) {
+export function ProfileAchievements({ achievements: propAchievements }: ProfileAchievementsProps) {
+  const { recentAchievements, loading } = useAchievements();
+
+  // Use context achievements if no props provided, or filter context for completed ones
+  const achievements = propAchievements || recentAchievements || [];
   const [expanded, setExpanded] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedRarity, setSelectedRarity] = useState<string>('all');
@@ -90,7 +95,7 @@ export function ProfileAchievements({ achievements }: ProfileAchievementsProps) 
       case 'secret':
         return 'bg-gradient-to-br from-accent/10 to-accent/20 border-accent/30 shadow-sm';
       case 'shame':
-        return 'bg-gradient-to-br from-danger/10 to-danger/20 border-danger/30 shadow-sm';
+        return 'bg-gradient-to-br from-error/10 to-error/20 border-error/30 shadow-sm';
       default:
         return 'bg-gradient-to-br from-muted/10 to-muted/20 border-muted/30 shadow-sm';
     }
@@ -99,17 +104,17 @@ export function ProfileAchievements({ achievements }: ProfileAchievementsProps) 
   const getRarityBadgeColor = (rarity: string) => {
     switch (rarity) {
       case 'legendary':
-        return 'bg-primary text-primary-foreground';
+        return 'bg-primary text-surface';
       case 'rare':
-        return 'bg-secondary text-secondary-foreground';
+        return 'bg-secondary text-surface';
       case 'uncommon':
-        return 'bg-success text-success-foreground';
+        return 'bg-success text-surface';
       case 'secret':
-        return 'bg-accent text-accent-foreground';
+        return 'bg-accent text-surface';
       case 'shame':
-        return 'bg-danger text-danger-foreground';
+        return 'bg-error text-surface';
       default:
-        return 'bg-muted text-muted-foreground';
+        return 'bg-muted text-content';
     }
   };
 
@@ -126,6 +131,23 @@ export function ProfileAchievements({ achievements }: ProfileAchievementsProps) 
   };
 
   const stats = getStats();
+
+  // Show loading state if using context and still loading
+  if (!propAchievements && loading) {
+    return (
+      <div className="bg-surface border border-muted rounded-2xl p-4 sm:p-6 shadow-lg">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-semibold text-content flex items-center gap-2">
+            🏆 Achievements
+          </h3>
+        </div>
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <span className="ml-3 text-tertiary">Loading achievements...</span>
+        </div>
+      </div>
+    );
+  }
 
   // Get newest achievement
   const newestAchievement =

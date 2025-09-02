@@ -233,10 +233,11 @@ export class UserService {
     const user = await this.repo.findById(userId);
     if (!user) throw new Error('User not found');
 
-    const [followersCount, followingCount, userBadges] = await Promise.all([
+    const [followersCount, followingCount, userBadges, userAchievements] = await Promise.all([
       this.repo.getFollowersCount(userId),
       this.repo.getFollowingCount(userId),
       this.repo.findUserBadges(userId),
+      this.repo.findUserAchievements(userId),
     ]);
 
     const rank = await this.repo.getUserRank(userId);
@@ -281,6 +282,25 @@ export class UserService {
             ? ub.badge.createdAt
             : ub.badge.createdAt.toISOString(),
         awardedAt: typeof ub.awardedAt === 'string' ? ub.awardedAt : ub.awardedAt.toISOString(),
+      })),
+      achievements: userAchievements.map((ua: any) => ({
+        id: ua.achievement.id,
+        name: ua.achievement.name,
+        title: ua.achievement.title || ua.achievement.name,
+        description: ua.achievement.description,
+        category: ua.achievement.category || 'general',
+        rarity: ua.achievement.rarity || 'common',
+        iconUrl: ua.achievement.iconUrl || null,
+        completedAt: ua.completedAt
+          ? typeof ua.completedAt === 'string'
+            ? ua.completedAt
+            : ua.completedAt.toISOString()
+          : null,
+        awardedAt: ua.completedAt
+          ? typeof ua.completedAt === 'string'
+            ? ua.completedAt
+            : ua.completedAt.toISOString()
+          : null,
       })),
       followersCount,
       followingCount,

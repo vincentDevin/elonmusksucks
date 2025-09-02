@@ -90,7 +90,7 @@ const MyStuffPanel = memo(function MyStuffPanel() {
           <SmartInsights insights={smartInsights || []} />
 
           {/* Achievement Progress - Full Width */}
-          <AchievementProgress stats={stats} />
+          <AchievementProgress />
         </div>
       ) : (
         /* Legacy Activity View */

@@ -7,6 +7,7 @@ import { PredictionProvider } from './contexts/PredictionContext';
 import { ParlayProvider } from './contexts/ParlayContext';
 import { ChatProvider } from './contexts/ChatContext';
 import { ActivityProvider } from './contexts/ActivityContext';
+import { AchievementProvider } from './contexts/AchievementContext';
 import MainLayout from './components/MainLayout';
 import AppRoutes from './routes/AppRoutes';
 import { useAuth } from './contexts/AuthContext';
@@ -22,19 +23,21 @@ function AppContent() {
       <UnifiedThemeProvider userId={user?.id}>
         {/* domain state that depends on socket/auth */}
         <ActivityProvider>
-          <PredictionProvider>
-            <ParlayProvider>
-              <ChatProvider>
-                <MainLayout>
-                  <AppRoutes />
-                  {/* Global Pong Elo notifications */}
-                  <PongEloNotification />
-                  {/* Global Achievement celebrations */}
-                  <AchievementCelebrationContainer />
-                </MainLayout>
-              </ChatProvider>
-            </ParlayProvider>
-          </PredictionProvider>
+          <AchievementProvider>
+            <PredictionProvider>
+              <ParlayProvider>
+                <ChatProvider>
+                  <MainLayout>
+                    <AppRoutes />
+                    {/* Global Pong Elo notifications */}
+                    <PongEloNotification />
+                    {/* Global Achievement celebrations */}
+                    <AchievementCelebrationContainer />
+                  </MainLayout>
+                </ChatProvider>
+              </ParlayProvider>
+            </PredictionProvider>
+          </AchievementProvider>
         </ActivityProvider>
       </UnifiedThemeProvider>
     </SocketProvider>

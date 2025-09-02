@@ -15,17 +15,17 @@ export function AchievementCelebrationComponent({
   const getRarityStyles = (rarity: string) => {
     switch (rarity) {
       case 'legendary':
-        return 'bg-gradient-to-br from-yellow-400/20 to-orange-500/20 border-yellow-400 shadow-yellow-400/20';
+        return 'bg-gradient-to-br from-primary/20 to-primary/30 border-primary shadow-lg';
       case 'rare':
-        return 'bg-gradient-to-br from-purple-400/20 to-pink-500/20 border-purple-400 shadow-purple-400/20';
+        return 'bg-gradient-to-br from-secondary/20 to-secondary/30 border-secondary shadow-lg';
       case 'uncommon':
-        return 'bg-gradient-to-br from-blue-400/20 to-cyan-500/20 border-blue-400 shadow-blue-400/20';
+        return 'bg-gradient-to-br from-success/20 to-success/30 border-success shadow-lg';
       case 'secret':
-        return 'bg-gradient-to-br from-gray-600/20 to-black/20 border-gray-400 shadow-gray-400/20';
+        return 'bg-gradient-to-br from-accent/20 to-accent/30 border-accent shadow-lg';
       case 'shame':
-        return 'bg-gradient-to-br from-red-400/20 to-red-600/20 border-red-400 shadow-red-400/20';
+        return 'bg-gradient-to-br from-error/20 to-error/30 border-error shadow-lg';
       default:
-        return 'bg-gradient-to-br from-green-400/20 to-emerald-500/20 border-green-400 shadow-green-400/20';
+        return 'bg-gradient-to-br from-info/20 to-info/30 border-info shadow-lg';
     }
   };
 
@@ -61,10 +61,10 @@ export function AchievementCelebrationComponent({
       {/* Close button */}
       <button
         onClick={() => onDismiss(celebrationId)}
-        className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center rounded-full bg-black/20 hover:bg-black/40 transition-colors"
+        className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center rounded-full bg-muted/60 hover:bg-muted/80 transition-colors"
         aria-label="Dismiss celebration"
       >
-        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className="w-4 h-4 text-content" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -77,7 +77,7 @@ export function AchievementCelebrationComponent({
       {/* Achievement unlocked header */}
       <div className="flex items-center gap-2 mb-3">
         <div className="text-2xl animate-bounce">🎉</div>
-        <div className="text-sm font-bold text-white tracking-wide uppercase">
+        <div className="text-sm font-bold text-content tracking-wide uppercase">
           Achievement Unlocked!
         </div>
       </div>
@@ -93,7 +93,7 @@ export function AchievementCelebrationComponent({
               className="w-12 h-12 rounded-lg"
             />
           ) : (
-            <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center text-2xl">
+            <div className="w-12 h-12 bg-surface rounded-lg flex items-center justify-center text-2xl border border-muted">
               {getCategoryIcon(achievement.category)}
             </div>
           )}
@@ -102,25 +102,25 @@ export function AchievementCelebrationComponent({
         {/* Content */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <h3 className="font-bold text-white text-base leading-tight">{achievement.title}</h3>
-            <span className="px-2 py-1 bg-white/20 rounded-full text-xs font-bold text-white capitalize">
+            <h3 className="font-bold text-content text-base leading-tight">{achievement.title}</h3>
+            <span className="px-2 py-1 bg-surface/60 rounded-full text-xs font-bold text-content capitalize border border-muted">
               {achievement.rarity}
             </span>
           </div>
 
-          <p className="text-white/80 text-sm leading-relaxed mb-2">{achievement.description}</p>
+          <p className="text-content/80 text-sm leading-relaxed mb-2">{achievement.description}</p>
 
           <div className="flex items-center justify-between text-xs">
-            <span className="text-white/60 capitalize">{achievement.category}</span>
-            <span className="text-white/60">Just now</span>
+            <span className="text-tertiary capitalize">{achievement.category}</span>
+            <span className="text-tertiary">Just now</span>
           </div>
         </div>
       </div>
 
       {/* Animated progress bar (for visual flair) */}
-      <div className="mt-3 h-1 bg-white/20 rounded-full overflow-hidden">
+      <div className="mt-3 h-1 bg-muted/30 rounded-full overflow-hidden">
         <div
-          className="h-full bg-gradient-to-r from-white/60 to-white/80 rounded-full transition-all duration-1000 ease-out"
+          className="h-full bg-gradient-to-r from-primary/60 to-primary/80 rounded-full transition-all duration-1000 ease-out"
           style={{ width: '100%' }}
         />
       </div>

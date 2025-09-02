@@ -515,6 +515,7 @@ class AdminAchievementService {
       title: ua.achievement.title,
       description: ua.achievement.description,
       category: ua.achievement.category,
+      rarity: ua.achievement.rarity || 'common',
       iconUrl: ua.achievement.iconUrl,
       completedAt: ua.completedAt!.toISOString(),
     }));

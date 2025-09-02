@@ -195,11 +195,27 @@ export function useUserStats() {
             .get(`/api/users/${user.id}/enhanced-stats`)
             .catch(() => request.get(`/api/users/${user.id}/stats`).catch(() => ({ data: null }))),
           request.get(`/api/users/${user.id}/activity`).catch(() => ({ data: [] })),
-          request.get(`/api/users/${user.id}/achievements`).catch(() => ({ data: [] })),
-          request
-            .get(`/api/users/${user.id}/achievements/recent?limit=5`)
-            .catch(() => ({ data: [] })),
-          request.get('/api/admin/achievements').catch(() => ({ data: [] })), // Get all available achievements
+          request.get(`/api/users/${user.id}/achievements`).catch((err) => {
+            // Only log non-cancellation errors
+            if (err.name !== 'CanceledError') {
+              console.error('Failed to fetch user achievements:', err);
+            }
+            return { data: [] };
+          }),
+          request.get(`/api/users/${user.id}/achievements/recent?limit=5`).catch((err) => {
+            // Only log non-cancellation errors
+            if (err.name !== 'CanceledError') {
+              console.error('Failed to fetch recent achievements:', err);
+            }
+            return { data: [] };
+          }),
+          request.get('/api/users/achievements/all').catch((err) => {
+            // Only log non-cancellation errors
+            if (err.name !== 'CanceledError') {
+              console.error('Failed to fetch all achievements:', err);
+            }
+            return { data: [] };
+          }),
         ]);
 
         // Calculate enhanced stats from available data

@@ -16,6 +16,7 @@ import {
   getEnhancedUserStatsHandler,
   getUserAchievementsHandler,
   getRecentAchievementsHandler,
+  getAllAchievementsHandler,
 } from '../controllers/user.controller';
 import { requireAuth } from '../middleware/auth.middleware';
 import { uploadConfig, validateFileContent } from '../middleware/fileValidation.middleware';
@@ -57,6 +58,7 @@ router.get('/:userId/stats', requireAuth, getUserStatsHandler);
 router.get('/:userId/enhanced-stats', requireAuth, getEnhancedUserStatsHandler);
 router.get('/:userId/achievements', requireAuth, getUserAchievementsHandler);
 router.get('/:userId/achievements/recent', requireAuth, getRecentAchievementsHandler);
+router.get('/achievements/all', requireAuth, getAllAchievementsHandler);
 
 // User activity data for dashboard
 router.get('/:userId/bets', requireAuth, getUserBetsHandler);

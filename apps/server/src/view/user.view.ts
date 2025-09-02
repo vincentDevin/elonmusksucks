@@ -30,6 +30,7 @@ export const toUserProfileView = (user: {
     longestStreak: number;
   };
   badges: any[];
+  achievements?: any[];
   followersCount: number;
   followingCount: number;
   isFollowing: boolean;
@@ -49,6 +50,7 @@ export const toUserProfileView = (user: {
   twoFactorEnabled: user.twoFactorEnabled,
   stats: user.stats,
   badges: user.badges,
+  achievements: user.achievements,
   followersCount: user.followersCount,
   followingCount: user.followingCount,
   isFollowing: user.isFollowing,
