@@ -23,6 +23,7 @@ import shameWallRoutes from './routes/shameWall.routes';
 import monitoringRoutes from './routes/monitoring.routes';
 import timelineRoutes from './routes/timeline.routes';
 import pongRoutes from './routes/pong.routes';
+import postRoutes from './routes/post.routes';
 
 const app = express();
 
@@ -67,6 +68,7 @@ app.use('/api/shame-wall', shameWallRoutes);
 app.use('/api/monitoring', monitoringRoutes);
 app.use('/api/timeline', timelineRoutes);
 app.use('/api/pong', pongRoutes);
+app.use('/api/posts', postRoutes);
 
 // Note: feedsRoutes are mounted under /api/admin/feeds and already include requireAdmin middleware
 

@@ -31,6 +31,23 @@ export const SocketEvents = {
   LeaderboardAllTime: 'leaderboardAllTime',
   LeaderboardDaily: 'leaderboardDaily',
   LeaderboardRankChange: 'leaderboard:rankChange',
+  
+  // Post events
+  PostCreate: 'post:create',
+  PostCreated: 'post:created',
+  PostUpdate: 'post:update',
+  PostUpdated: 'post:updated',
+  PostDelete: 'post:delete',
+  PostDeleted: 'post:deleted',
+  PostReact: 'post:react',
+  PostReaction: 'post:reaction',
+  PostReport: 'post:report',
+  PostReported: 'post:reported',
+  CommentCreate: 'comment:create',
+  CommentCreated: 'comment:created',
+  CommentDelete: 'comment:delete',
+  CommentDeleted: 'comment:deleted',
+  TimelineUpdate: 'timeline:update',
 } as const;
 
 // Stats socket events with typed payloads
@@ -264,6 +281,105 @@ export interface UpdateProfilePayload {
 export interface CreateUserPostPayload {
   content: string;
   parentId?: number;
+  contentType?: PostContentType;
+  visibility?: PostVisibility;
+  mediaUrls?: string[];
+  linkPreview?: LinkPreview;
+}
+
+// Post-related enums
+export const PostContentTypes = {
+  TEXT: 'TEXT',
+  IMAGE: 'IMAGE',
+  LINK: 'LINK',
+  PREDICTION_SHARE: 'PREDICTION_SHARE',
+  POLL: 'POLL'
+} as const;
+export type PostContentType = typeof PostContentTypes[keyof typeof PostContentTypes];
+
+export const PostVisibilities = {
+  PUBLIC: 'PUBLIC',
+  PRIVATE: 'PRIVATE',
+  FOLLOWERS: 'FOLLOWERS',
+  MENTIONED_ONLY: 'MENTIONED_ONLY'
+} as const;
+export type PostVisibility = typeof PostVisibilities[keyof typeof PostVisibilities];
+
+export const ReactionTypes = {
+  LIKE: 'LIKE',
+  LOVE: 'LOVE',
+  LAUGH: 'LAUGH',
+  WOW: 'WOW',
+  SAD: 'SAD',
+  ANGRY: 'ANGRY'
+} as const;
+export type ReactionType = typeof ReactionTypes[keyof typeof ReactionTypes];
+
+export const ReportReasons = {
+  SPAM: 'SPAM',
+  HARASSMENT: 'HARASSMENT',
+  HATE_SPEECH: 'HATE_SPEECH',
+  MISINFORMATION: 'MISINFORMATION',
+  INAPPROPRIATE_CONTENT: 'INAPPROPRIATE_CONTENT',
+  COPYRIGHT: 'COPYRIGHT',
+  OTHER: 'OTHER'
+} as const;
+export type ReportReason = typeof ReportReasons[keyof typeof ReportReasons];
+
+export const ReportStatuses = {
+  PENDING: 'PENDING',
+  REVIEWED: 'REVIEWED',
+  ACTIONED: 'ACTIONED',
+  DISMISSED: 'DISMISSED'
+} as const;
+export type ReportStatus = typeof ReportStatuses[keyof typeof ReportStatuses];
+
+// Post-related interfaces
+export interface LinkPreview {
+  url: string;
+  title?: string;
+  description?: string;
+  image?: string;
+  siteName?: string;
+}
+
+export interface PostReaction {
+  id: number;
+  postId: number;
+  userId: number;
+  type: ReactionType;
+  createdAt: string;
+  userName?: string;
+  userAvatar?: string;
+}
+
+export interface PostReport {
+  id: number;
+  postId: number;
+  reporterId: number;
+  reason: ReportReason;
+  details?: string;
+  status: ReportStatus;
+  reviewedBy?: number;
+  reviewNote?: string;
+  createdAt: string;
+  reviewedAt?: string;
+}
+
+export interface PostMention {
+  id: number;
+  postId: number;
+  userId: number;
+  startIndex: number;
+  endIndex: number;
+  userName?: string;
+}
+
+export interface Hashtag {
+  id: number;
+  tag: string;
+  usageCount: number;
+  createdAt: string;
 }
 
 // ——— Queue Options & Names ————————————————————————————————————————————————————
@@ -995,24 +1111,49 @@ export type UserStatsDTO = {
 export type DbUserPost = {
   id:         number;
   authorId:   number;
-  ownerId:    number;
   content:    string;
+  contentType: PostContentType;
+  visibility: PostVisibility;
   parentId:   number | null;
+  threadDepth: number;
+  likesCount: number;
+  commentsCount: number;
+  sharesCount: number;
+  viewsCount: bigint;
+  isDeleted: boolean;
+  isFlagged: boolean;
   createdAt:  Date;
   updatedAt:  Date;
+  editedAt?: Date | null;
   children?:  DbUserPost[];
   authorName?:string;
 };
 export type UserFeedPost = {
   id:         number;
   authorId:   number;
-  ownerId:    number;
   content:    string;
+  contentType: PostContentType;
+  visibility: PostVisibility;
+  mediaUrls?: string[];
+  linkPreview?: LinkPreview;
   parentId:   number | null;
+  threadDepth: number;
+  likesCount: number;
+  commentsCount: number;
+  sharesCount: number;
+  viewsCount: string; // BigInt as string
+  reactionCounts?: Record<ReactionType, number>;
+  userReaction?: ReactionType;
+  isDeleted: boolean;
+  isFlagged: boolean;
   createdAt:  string;
   updatedAt:  string;
+  editedAt?:  string;
   children?:  UserFeedPost[];
   authorName?:string;
+  authorAvatar?: string;
+  canEdit?: boolean;
+  canDelete?: boolean;
 };
 
 // ——— Legacy Activity (for backwards compatibility) ————————————————————

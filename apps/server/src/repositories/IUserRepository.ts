@@ -46,7 +46,6 @@ export interface IUserRepository {
 
   createUserPost(data: {
     authorId: number;
-    ownerId: number;
     content: string;
     parentId: number | null;
   }): Promise<DbUserPost>;

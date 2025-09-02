@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { TimelineProvider } from '../contexts/TimelineContext';
 import Timeline from '../components/timeline/Timeline';
+import { TimelineWithPosts } from '../components/timeline/TimelineWithPosts';
 import { useAuth } from '../hooks/useAuth';
 import { useMarketOverview } from '../hooks/useMarketOverview';
 
@@ -69,16 +70,16 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Timeline Section */}
+            {/* Community Feed Section */}
             <div className="bg-surface shadow rounded-lg transition-colors duration-300">
               <div className="p-6 border-b border-border">
-                <h2 className="text-2xl font-bold mb-2">Latest Musk Timeline</h2>
+                <h2 className="text-2xl font-bold mb-2">Community Feed</h2>
                 <p className="text-content/70">
-                  Stay updated with the latest chaos from the Musk-verse
+                  Connect with the community, share your thoughts, and track Musk news
                 </p>
               </div>
               <div className="p-6">
-                <Timeline />
+                <TimelineWithPosts initialTab="articles" />
               </div>
             </div>
           </div>
@@ -165,7 +166,7 @@ export default function Home() {
                   to="/register"
                   className="px-4 py-2 bg-primary text-white rounded hover:bg-primary-hover font-medium text-sm"
                 >
-                  Sign up to predict
+                  Join the community
                 </Link>
               </div>
             </div>
@@ -182,9 +183,9 @@ export default function Home() {
                 <div className="w-12 h-12 bg-primary text-white rounded-full flex items-center justify-center mx-auto mb-4 text-xl font-bold">
                   1
                 </div>
-                <h3 className="font-semibold mb-2">Track the Timeline</h3>
+                <h3 className="font-semibold mb-2">Join the Community</h3>
                 <p className="text-content/70 text-sm">
-                  Follow real-time articles and tweets about Elon Musk's ventures
+                  Connect with fellow Musk watchers, share insights, and react to community posts
                 </p>
               </div>
               <div className="text-center">
@@ -193,8 +194,8 @@ export default function Home() {
                 </div>
                 <h3 className="font-semibold mb-2">Make Predictions</h3>
                 <p className="text-content/70 text-sm">
-                  Use timeline events to predict Tesla stock moves, SpaceX launches, and Twitter
-                  chaos
+                  Use timeline events and community insights to predict Tesla stock moves, SpaceX
+                  launches, and Twitter chaos
                 </p>
               </div>
               <div className="text-center">

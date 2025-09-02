@@ -94,7 +94,7 @@ export class UserRepository implements IUserRepository {
   }
 
   async getUserFeed(userId: number, options?: { parentId: number | null }): Promise<DbUserPost[]> {
-    const where: any = { ownerId: userId };
+    const where: any = { authorId: userId };
     if (options && 'parentId' in options) {
       where.parentId = options.parentId;
     }
@@ -102,7 +102,20 @@ export class UserRepository implements IUserRepository {
     const posts = await prisma.userPost.findMany({
       where,
       orderBy: { createdAt: 'desc' },
-      include: { author: true },
+      include: {
+        author: true,
+        reactions: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                avatarUrl: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     // Nest into a tree
@@ -122,11 +135,26 @@ export class UserRepository implements IUserRepository {
 
   async createUserPost(data: {
     authorId: number;
-    ownerId: number;
     content: string;
     parentId: number | null;
   }): Promise<DbUserPost> {
-    return prisma.userPost.create({ data }) as Promise<DbUserPost>;
+    // Legacy method - now redirects to new PostRepository for consistency
+    return prisma.userPost.create({
+      data: {
+        authorId: data.authorId,
+        content: data.content,
+        parentId: data.parentId,
+        contentType: 'TEXT',
+        visibility: 'PUBLIC',
+        threadDepth: 0, // Will be calculated properly in new PostRepository
+        likesCount: 0,
+        commentsCount: 0,
+        sharesCount: 0,
+        viewsCount: 0,
+        isDeleted: false,
+        isFlagged: false,
+      },
+    }) as Promise<DbUserPost>;
   }
 
   async getUserPostThread(

@@ -18,6 +18,7 @@ import {
   getRecentAchievementsHandler,
   getAllAchievementsHandler,
 } from '../controllers/user.controller';
+import { getUserPosts as getUserPostsHandler } from '../controllers/post.controller';
 import { requireAuth } from '../middleware/auth.middleware';
 import { uploadConfig, validateFileContent } from '../middleware/fileValidation.middleware';
 import { getUserPongStats, getUserPongHistory } from '../controllers/pong.controller';
@@ -42,9 +43,12 @@ router.post(
   uploadProfileImageHandler,
 );
 
-// User feed endpoints
+// User feed endpoints (legacy - will be deprecated)
 router.get('/:userId/feed', requireAuth, getUserFeedHandler);
 router.post('/:userId/feed', requireAuth, createUserPostHandler);
+
+// User posts endpoints (new)
+router.get('/:userId/posts', getUserPostsHandler);
 
 // User activity log
 router.get('/:userId/activity', requireAuth, getUserActivityHandler);

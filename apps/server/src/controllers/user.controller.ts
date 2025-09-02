@@ -42,7 +42,7 @@ export type MulterFile = {
 
 // Extend Request to include authenticated user and optionally an uploaded file
 export type ReqWithUser = Request & {
-  user?: { id: number };
+  user?: { id: number; role?: string };
   file?: MulterFile;
 };
 
@@ -280,7 +280,7 @@ export async function createUserPostHandler(
       res.status(403).json({ error: 'Forbidden' });
       return;
     }
-    // Create post/comment (pass ownerId=profileUserId, authorId=authUserId)
+    // Create post/comment
     const post: UserFeedPost = await userService.createUserPost(
       authUserId,
       content,

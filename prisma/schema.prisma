@@ -53,6 +53,47 @@ enum ModerationAction {
   USER_KICK
 }
 
+enum PostContentType {
+  TEXT
+  IMAGE
+  LINK
+  PREDICTION_SHARE
+  POLL
+}
+
+enum PostVisibility {
+  PUBLIC
+  PRIVATE
+  FOLLOWERS
+  MENTIONED_ONLY
+}
+
+enum ReactionType {
+  LIKE
+  LOVE
+  LAUGH
+  WOW
+  SAD
+  ANGRY
+}
+
+enum ReportReason {
+  SPAM
+  HARASSMENT
+  HATE_SPEECH
+  MISINFORMATION
+  INAPPROPRIATE_CONTENT
+  COPYRIGHT
+  OTHER
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWED
+  ACTIONED
+  DISMISSED
+}
+
 model User {
   id                 Int                 @id @default(autoincrement())
   email              String              @unique
@@ -89,8 +130,10 @@ model User {
   parlayes           Parlay[]
   transactions       Transaction[]
   feedPrivate        Boolean             @default(false)
-  posts              UserPost[]          @relation("OwnerToPost")
-  comments           UserPost[]          @relation("AuthorToPost")
+  posts              UserPost[]          @relation("AuthorToPost")
+  postReactions      PostReaction[]
+  postReports        PostReport[]
+  postMentions       PostMention[]
   activities         UserActivity[]
   relatedActivities  UserActivity[] @relation("RelatedUserActivity")
   achievements       UserAchievement[]
@@ -394,17 +437,53 @@ model Transaction {
 }
 
 model UserPost {
-  id        Int        @id @default(autoincrement())
-  author    User       @relation("AuthorToPost", fields: [authorId], references: [id])
-  authorId  Int
-  owner     User       @relation("OwnerToPost", fields: [ownerId], references: [id])
-  ownerId   Int
-  content   String
-  parent    UserPost?  @relation("PostParent", fields: [parentId], references: [id])
-  parentId  Int?
-  children  UserPost[] @relation("PostParent")
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @default(now()) @updatedAt
+  id            Int                @id @default(autoincrement())
+  author        User               @relation("AuthorToPost", fields: [authorId], references: [id])
+  authorId      Int
+  
+  // Content
+  content       String             @db.Text
+  contentType   PostContentType    @default(TEXT)
+  mediaUrls     Json?              // Array of media URLs
+  linkPreview   Json?              // OG tags for link previews
+  
+  // Privacy & Visibility
+  visibility    PostVisibility     @default(PUBLIC)
+  isDeleted     Boolean            @default(false)
+  deletedAt     DateTime?
+  deletedBy     Int?               // User ID who deleted (author or admin)
+  
+  // Engagement Metrics
+  likesCount    Int                @default(0)
+  commentsCount Int                @default(0)
+  sharesCount   Int                @default(0)
+  viewsCount    BigInt             @default(0)
+  
+  // Threading
+  parent        UserPost?          @relation("PostParent", fields: [parentId], references: [id])
+  parentId      Int?
+  children      UserPost[]         @relation("PostParent")
+  threadDepth   Int                @default(0)
+  
+  // Moderation
+  reportCount   Int                @default(0)
+  isFlagged     Boolean            @default(false)
+  moderationNote String?
+  
+  // Timestamps
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  editedAt      DateTime?
+  
+  // Relations
+  reactions     PostReaction[]
+  reports       PostReport[]
+  mentions      PostMention[]
+  hashtags      PostHashtag[]
+  
+  @@index([authorId, visibility, createdAt])
+  @@index([visibility, createdAt])
+  @@index([parentId])
 }
 
 model UserActivity {
@@ -794,4 +873,70 @@ model PongStats {
   // Rollback: Remove these missing leaderboard indexes
   @@index([totalWagered(sort: Desc)]) // Optimize wager leaderboard
   @@index([perfectGames(sort: Desc)]) // Optimize perfect games leaderboard
+}
+
+model PostReaction {
+  id         Int       @id @default(autoincrement())
+  post       UserPost  @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId     Int
+  user       User      @relation(fields: [userId], references: [id])
+  userId     Int
+  type       ReactionType
+  createdAt  DateTime  @default(now())
+  
+  @@unique([postId, userId, type])
+  @@index([postId])
+  @@index([userId])
+}
+
+model PostReport {
+  id         Int       @id @default(autoincrement())
+  post       UserPost  @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId     Int
+  reporter   User      @relation(fields: [reporterId], references: [id])
+  reporterId Int
+  reason     ReportReason
+  details    String?
+  status     ReportStatus @default(PENDING)
+  reviewedBy Int?
+  reviewNote String?
+  createdAt  DateTime  @default(now())
+  reviewedAt DateTime?
+  
+  @@index([postId, status])
+  @@index([reporterId])
+}
+
+model PostMention {
+  id           Int      @id @default(autoincrement())
+  post         UserPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId       Int
+  mentionedUser User    @relation(fields: [userId], references: [id])
+  userId       Int
+  startIndex   Int      // Position in content where mention starts
+  endIndex     Int      // Position where mention ends
+  
+  @@index([postId])
+  @@index([userId])
+}
+
+model PostHashtag {
+  id       Int      @id @default(autoincrement())
+  post     UserPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId   Int
+  hashtag  Hashtag  @relation(fields: [hashtagId], references: [id])
+  hashtagId Int
+  
+  @@unique([postId, hashtagId])
+  @@index([hashtagId])
+}
+
+model Hashtag {
+  id        Int           @id @default(autoincrement())
+  tag       String        @unique
+  usageCount Int          @default(0)
+  posts     PostHashtag[]
+  createdAt DateTime      @default(now())
+  
+  @@index([usageCount])
 }

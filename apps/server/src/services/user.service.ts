@@ -13,6 +13,7 @@ import type {
 } from '@ems/types';
 // TODO: Branded types available: UserId, PredictionId, ISODateString, TimestampMs
 import type { PublicUserProfile, UserFeedPost, UserActivity, UserStatsDTO } from '@ems/types';
+import { PostService } from './post.service';
 import { unifiedActivityService } from './unifiedActivity.service';
 import { ImageProcessingService, ProcessedImageSizes } from './imageProcessing.service';
 import { DeleteObjectCommand } from '@aws-sdk/client-s3';
@@ -26,11 +27,13 @@ export type UploadedFile = {
 
 export class UserService {
   private repo: IUserRepository;
+  private postService: PostService;
   private s3: S3Client;
   private bucket: string;
 
   constructor(repo: IUserRepository = new UserRepository()) {
     this.repo = repo;
+    this.postService = new PostService();
     this.s3 = new S3Client({
       region: 'auto',
       endpoint: process.env.TIGRIS_S3_ENDPOINT,
@@ -349,19 +352,19 @@ export class UserService {
     authorId: number,
     content: string,
     parentId?: number | null,
-    ownerId?: number,
+    _profileOwnerId?: number, // Legacy parameter for backward compatibility
   ): Promise<UserFeedPost> {
-    const feedOwnerId = ownerId ?? authorId;
-    const post: DbUserPost = await this.repo.createUserPost({
-      authorId,
-      ownerId: feedOwnerId,
+    // Always use the new PostService for consistency
+    const post = await this.postService.createPost(authorId, {
       content,
-      parentId: typeof parentId === 'undefined' ? null : parentId,
+      visibility: 'PUBLIC', // Default to public for user feed posts
+      parentId: parentId || null,
     });
+
     // Create legacy activity record (still needed for getUserActivity endpoint)
     await this.repo.createUserActivity({
       userId: authorId,
-      type: parentId ? 'COMMENT_CREATED' : 'POST_CREATED',
+      type: 'COMMENT_CREATED',
       details: { postId: post.id },
     });
 
@@ -371,18 +374,18 @@ export class UserService {
       await unifiedActivityService.createPostActivity(
         {
           id: author.id,
-          name: author.name,
-          avatarUrl: author.avatarUrl,
+          name: author.name || 'Unknown User',
+          avatarUrl: author.avatarUrl || null,
         },
         {
           id: post.id,
           content,
-          isComment: Boolean(parentId),
+          isComment: !!parentId,
         },
       );
     }
 
-    return toFeedPostDTO(post);
+    return post;
   }
 
   async getUserPostThread(
@@ -516,17 +519,51 @@ export class UserService {
 
 // --- Helpers: always map DB types to DTOs used on frontend ---
 
+function calculateReactionCounts(reactions: any[]): Record<any, number> {
+  const counts: Record<any, number> = {
+    LIKE: 0,
+    LOVE: 0,
+    LAUGH: 0,
+    WOW: 0,
+    SAD: 0,
+    ANGRY: 0,
+  };
+
+  reactions.forEach((reaction: any) => {
+    if (reaction.type && reaction.type in counts) {
+      counts[reaction.type]++;
+    }
+  });
+
+  return counts;
+}
+
 function toFeedPostDTO(
-  post: DbUserPost & { children?: DbUserPost[]; authorName?: string },
+  post: DbUserPost & { children?: DbUserPost[]; authorName?: string; reactions?: any[] },
 ): UserFeedPost {
   return {
     id: post.id,
     authorId: post.authorId,
-    ownerId: post.ownerId,
     content: post.content,
+    contentType: post.contentType,
+    visibility: post.visibility,
     parentId: post.parentId,
+    threadDepth: post.threadDepth,
+    likesCount: post.likesCount,
+    commentsCount: post.commentsCount,
+    sharesCount: post.sharesCount,
+    viewsCount: post.viewsCount.toString(),
+    reactionCounts: calculateReactionCounts(post.reactions || []),
+    userReaction: undefined, // TODO: Pass viewerId to calculate user reaction
+    isDeleted: post.isDeleted,
+    isFlagged: post.isFlagged,
     createdAt: post.createdAt instanceof Date ? post.createdAt.toISOString() : post.createdAt,
     updatedAt: post.updatedAt instanceof Date ? post.updatedAt.toISOString() : post.updatedAt,
+    editedAt: post.editedAt
+      ? post.editedAt instanceof Date
+        ? post.editedAt.toISOString()
+        : post.editedAt
+      : undefined,
     children: post.children ? post.children.map(toFeedPostDTO) : undefined,
     authorName: post.authorName,
   };
