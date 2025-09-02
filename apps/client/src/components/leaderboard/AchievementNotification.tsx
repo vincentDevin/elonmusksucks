@@ -3,6 +3,8 @@ import { useState, useEffect } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { TrophyIcon, FireIcon, ChartBarIcon, CurrencyDollarIcon } from '@heroicons/react/24/solid';
 import type { Achievement } from '../../hooks/useEnhancedLeaderboard';
+import { useAchievementTheme } from '../../theme/hooks/useAchievementTheme';
+import type { AchievementRarity } from '../../theme/utils/achievement-colors';
 
 interface AchievementNotificationProps {
   achievements: Achievement[];
@@ -15,6 +17,7 @@ export default function AchievementNotification({
 }: AchievementNotificationProps) {
   const [visibleAchievements, setVisibleAchievements] = useState<Achievement[]>([]);
   const [animatingOut, setAnimatingOut] = useState<Set<string>>(new Set());
+  const { getRarityClasses, utils } = useAchievementTheme();
 
   useEffect(() => {
     // Show new achievements
@@ -25,6 +28,7 @@ export default function AchievementNotification({
   }, [achievements]);
 
   const getAchievementIcon = (type: Achievement['type']) => {
+    // Uses theme semantic colors that automatically adapt to current theme
     switch (type) {
       case 'rank_milestone':
         return <TrophyIcon className="w-6 h-6 text-accent" />;
@@ -40,6 +44,7 @@ export default function AchievementNotification({
   };
 
   const getAchievementColor = (type: Achievement['type']) => {
+    // Map achievement types to theme semantic colors
     switch (type) {
       case 'rank_milestone':
         return 'from-accent/20 to-accent/30 border-accent/50';

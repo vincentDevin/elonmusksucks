@@ -1,4 +1,6 @@
 import type { AchievementCelebration } from '../../hooks/useActivityStream';
+import { useAchievementTheme } from '../../theme/hooks/useAchievementTheme';
+import type { AchievementRarity } from '../../theme/utils/achievement-colors';
 
 interface AchievementCelebrationProps {
   celebration: AchievementCelebration;
@@ -11,48 +13,17 @@ export function AchievementCelebrationComponent({
 }: AchievementCelebrationProps) {
   const { achievement, unlockedAt } = celebration;
   const celebrationId = `${achievement.id}-${unlockedAt}`;
+  const { getRarityClasses, getCategoryIcon, utils } = useAchievementTheme();
 
+  // Theme-aware rarity styling function
   const getRarityStyles = (rarity: string) => {
-    switch (rarity) {
-      case 'legendary':
-        return 'bg-gradient-to-br from-primary/20 to-primary/30 border-primary shadow-lg';
-      case 'rare':
-        return 'bg-gradient-to-br from-secondary/20 to-secondary/30 border-secondary shadow-lg';
-      case 'uncommon':
-        return 'bg-gradient-to-br from-success/20 to-success/30 border-success shadow-lg';
-      case 'secret':
-        return 'bg-gradient-to-br from-accent/20 to-accent/30 border-accent shadow-lg';
-      case 'shame':
-        return 'bg-gradient-to-br from-error/20 to-error/30 border-error shadow-lg';
-      default:
-        return 'bg-gradient-to-br from-info/20 to-info/30 border-info shadow-lg';
+    if (!utils.isValidRarity(rarity)) {
+      return getRarityClasses('common').celebration;
     }
+    return getRarityClasses(rarity as AchievementRarity).celebration;
   };
 
-  const getCategoryIcon = (category: string) => {
-    switch (category.toLowerCase()) {
-      case 'betting':
-        return '💰';
-      case 'leaderboard':
-        return '🏆';
-      case 'pong':
-        return '🏓';
-      case 'prediction':
-        return '📊';
-      case 'chat':
-        return '💬';
-      case 'participation':
-        return '🎯';
-      case 'event':
-        return '🎪';
-      case 'secret':
-        return '🔮';
-      case 'shame':
-        return '😱';
-      default:
-        return '🏅';
-    }
-  };
+  // Using theme-aware getCategoryIcon from hook
 
   return (
     <div

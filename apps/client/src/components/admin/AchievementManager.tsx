@@ -1,3 +1,6 @@
+// TODO: This admin component could be updated to use the achievement theme system
+// from /theme/hooks/useAchievementTheme for consistency, but it uses hardcoded
+// colors that are acceptable for admin interfaces.
 import { useState, useEffect, useMemo } from 'react';
 import {
   getAllAchievements,
