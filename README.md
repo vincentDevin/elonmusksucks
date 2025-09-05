@@ -9,6 +9,8 @@ A satirical prediction market platform parodying Elon Musk's ventures with dual-
 - **Public Site** (Port 5173): Server-side rendered marketing site for SEO
 - **Single API Backend**: Serves both applications with shared authentication
 
+> 📊 **[View Complete System Architecture](./docs/SYSTEM_ARCHITECTURE.md)** - Visual diagrams of all systems and data flows
+
 **Frontend:**
 - **Vite 6** + **React 19** + **TypeScript 5.8** + **TailwindCSS 4**
 - **Server-Side Rendering** with Vite SSR for public marketing site
@@ -497,6 +499,7 @@ git commit -m "feat: add your feature description"
 ## 📚 Documentation & Resources
 
 - **[CLAUDE.md](./CLAUDE.md)** - Comprehensive engineering guide and architecture documentation
+- **[System Architecture](./docs/SYSTEM_ARCHITECTURE.md)** - Visual system diagrams with 15+ Mermaid flowcharts
 - **[Database Schema](./prisma/schema.prisma)** - Complete data model definitions with 44 indexes
 - **[Theme System Guide](./CLAUDE.md#unified-theme-system)** - Component development with dual-app theming
 - **[SSR Architecture](./CLAUDE.md#dual-application-architecture)** - Server-side rendering implementation
