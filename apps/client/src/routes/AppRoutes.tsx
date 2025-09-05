@@ -8,11 +8,13 @@ import ForgotPassword from '../pages/ForgotPassword';
 import ResetPassword from '../pages/ResetPassword';
 import PrivateRoute from '../components/PrivateRoute';
 import Home from '../pages/Home';
+import HomeRedirect from '../components/HomeRedirect';
 import ProfileSetup from '../pages/ProfileSetup';
 import RequireAdmin from '../components/admin/RequireAdmin';
 
 // Lazy-loaded major routes for code splitting
 const Dashboard = lazy(() => import('../pages/Dashboard'));
+const Timeline = lazy(() => import('../pages/Timeline'));
 const Predictions = lazy(() => import('../pages/Predictions'));
 const Leaderboard = lazy(() => import('../pages/Leaderboard'));
 const Profile = lazy(() => import('../pages/Profile'));
@@ -33,7 +35,7 @@ export default function AppRoutes() {
   return (
     <Routes>
       {/* Public */}
-      <Route path="/" element={<Home />} />
+      <Route path="/" element={<HomeRedirect />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -47,6 +49,14 @@ export default function AppRoutes() {
           element={
             <Suspense fallback={<RouteFallback />}>
               <Dashboard />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/timeline"
+          element={
+            <Suspense fallback={<RouteFallback />}>
+              <Timeline />
             </Suspense>
           }
         />
@@ -101,8 +111,8 @@ export default function AppRoutes() {
         />
       </Route>
 
-      {/* Fallback */}
-      <Route path="*" element={<Navigate to={accessToken ? '/dashboard' : '/login'} replace />} />
+      {/* Fallback - redirect unknown routes */}
+      <Route path="*" element={<Navigate to={accessToken ? '/timeline' : '/'} replace />} />
     </Routes>
   );
 }

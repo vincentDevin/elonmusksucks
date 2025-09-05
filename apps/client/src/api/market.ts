@@ -54,7 +54,7 @@ export const getMarketOverview = async (): Promise<MarketStats> => {
  * Get trending predictions by volume
  */
 export const getTrendingPredictions = async (limit = 10): Promise<TrendingPrediction[]> => {
-  const response = await api.get<TrendingPrediction[]>('/market/trending', {
+  const response = await api.get<TrendingPrediction[]>('/api/market/trending', {
     params: { limit },
   });
   return response.data;
@@ -64,7 +64,7 @@ export const getTrendingPredictions = async (limit = 10): Promise<TrendingPredic
  * Get market health indicators
  */
 export const getMarketHealth = async (): Promise<MarketHealth> => {
-  const response = await api.get<MarketHealth>('/market/health');
+  const response = await api.get<MarketHealth>('/api/market/health');
   return response.data;
 };
 

@@ -45,34 +45,41 @@ export const PostCard: React.FC<PostCardProps> = ({
       <div className="bg-surface rounded-lg p-4 hover:bg-surface/80 transition-colors">
         {/* Author Header */}
         <div className="flex items-start justify-between mb-3">
-          <div className="flex items-center space-x-3">
-            <Link to={`/profile/${post.authorId}`}>
+          <div className="flex items-start space-x-3">
+            <Link to={`/profile/${post.authorId}`} className="flex-shrink-0">
               {post.authorAvatar ? (
                 <img
                   src={post.authorAvatar}
                   alt={post.authorName || 'User'}
-                  className="w-10 h-10 rounded-full"
+                  className="w-12 h-12 rounded-full object-cover ring-2 ring-primary/20 hover:ring-primary/40 transition-all"
                 />
               ) : (
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white font-semibold">
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white font-semibold text-lg ring-2 ring-primary/20 hover:ring-primary/40 transition-all">
                   {post.authorName?.[0]?.toUpperCase() || '?'}
                 </div>
               )}
             </Link>
-            <div>
-              <Link
-                to={`/profile/${post.authorId}`}
-                className="font-semibold text-content hover:text-primary transition-colors"
-              >
-                {post.authorName || 'Unknown User'}
-              </Link>
-              <div className="flex items-center space-x-2 text-xs text-tertiary">
-                <span>{formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}</span>
-                {post.editedAt && <span className="italic">(edited)</span>}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center space-x-2 mb-1">
+                <Link
+                  to={`/profile/${post.authorId}`}
+                  className="font-semibold text-content hover:text-primary transition-colors text-base"
+                >
+                  {post.authorName || 'Unknown User'}
+                </Link>
                 {post.visibility !== 'PUBLIC' && (
-                  <span className="px-2 py-0.5 bg-muted/50 rounded-full text-xs">
+                  <span className="px-2 py-0.5 bg-muted/50 rounded-full text-xs font-medium">
                     {post.visibility.toLowerCase()}
                   </span>
+                )}
+              </div>
+              <div className="flex items-center space-x-2 text-sm text-tertiary">
+                <span>{formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}</span>
+                {post.editedAt && (
+                  <>
+                    <span>•</span>
+                    <span className="italic">edited</span>
+                  </>
                 )}
               </div>
             </div>

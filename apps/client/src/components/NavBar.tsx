@@ -47,6 +47,9 @@ export default function NavBar() {
                 <Link to="/dashboard" className={linkClasses('/dashboard')}>
                   Dashboard
                 </Link>
+                <Link to="/timeline" className={linkClasses('/timeline')}>
+                  Timeline
+                </Link>
                 <Link to="/predictions" className={linkClasses('/predictions')}>
                   Predictions
                 </Link>
@@ -161,6 +164,13 @@ export default function NavBar() {
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     Dashboard
+                  </Link>
+                  <Link
+                    to="/timeline"
+                    className={mobileLinkClasses('/timeline')}
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Timeline
                   </Link>
                   <Link
                     to="/predictions"
