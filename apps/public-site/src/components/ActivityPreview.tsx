@@ -80,7 +80,7 @@ export default function ActivityPreview({
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-2xl font-bold text-content">⚡ Live Activity</h2>
         <div className="flex items-center space-x-2">
-          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+          <div className="w-2 h-2 bg-success rounded-full animate-pulse"></div>
           <span className="text-xs text-tertiary">Live</span>
         </div>
       </div>

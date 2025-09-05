@@ -1,4 +1,5 @@
 import React from 'react';
+import ThemeToggle from './ThemeToggle';
 
 interface NavigationProps {
   currentPath: string;
@@ -58,8 +59,9 @@ export default function Navigation({ currentPath, clientAppUrl }: NavigationProp
             </div>
           </div>
 
-          {/* Auth Links */}
+          {/* Theme Toggle and Auth Links */}
           <div className="flex items-center space-x-4">
+            <ThemeToggle />
             <a
               href={`${clientAppUrl}/login`}
               className="font-medium text-content hover:text-primary transition-colors"

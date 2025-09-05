@@ -52,11 +52,11 @@ export default function LeaderboardPage({
   const getRankStyle = (rank: number) => {
     switch (rank) {
       case 1:
-        return 'bg-gradient-to-r from-yellow-100 to-yellow-50 border-yellow-300';
+        return 'bg-gradient-to-r from-warning/20 to-warning/10 border-warning/30';
       case 2:
-        return 'bg-gradient-to-r from-gray-100 to-gray-50 border-gray-300';
+        return 'bg-gradient-to-r from-muted/20 to-muted/10 border-muted/30';
       case 3:
-        return 'bg-gradient-to-r from-amber-100 to-amber-50 border-amber-300';
+        return 'bg-gradient-to-r from-warning/15 to-warning/5 border-warning/25';
       default:
         return 'bg-surface';
     }
@@ -112,17 +112,15 @@ export default function LeaderboardPage({
               <div className="text-sm text-tertiary">Active Players</div>
             </div>
             <div className="bg-surface rounded-lg p-4 shadow">
-              <div className="text-3xl font-bold text-green-600">
-                {formatMuskBucks(totalVolume)}
-              </div>
+              <div className="text-3xl font-bold text-success">{formatMuskBucks(totalVolume)}</div>
               <div className="text-sm text-tertiary">Total Volume</div>
             </div>
             <div className="bg-surface rounded-lg p-4 shadow">
-              <div className="text-3xl font-bold text-blue-600">{totalBets}</div>
+              <div className="text-3xl font-bold text-info">{totalBets}</div>
               <div className="text-sm text-tertiary">Total Bets</div>
             </div>
             <div className="bg-surface rounded-lg p-4 shadow">
-              <div className="text-3xl font-bold text-purple-600">{avgWinRate}%</div>
+              <div className="text-3xl font-bold text-secondary">{avgWinRate}%</div>
               <div className="text-sm text-tertiary">Avg Win Rate</div>
             </div>
           </div>
@@ -135,7 +133,7 @@ export default function LeaderboardPage({
                 {/* Second Place */}
                 <div className="md:pt-8">
                   {leaderboard[1] && (
-                    <div className="bg-gradient-to-b from-gray-100 to-gray-50 rounded-lg p-6 shadow-lg border-2 border-gray-300">
+                    <div className="bg-gradient-to-b from-muted/20 to-muted/10 rounded-lg p-6 shadow-lg border-2 border-muted/30">
                       <div className="text-center mb-4">
                         <div className="text-4xl mb-2">🥈</div>
                         <div className="text-3xl font-bold">2nd</div>
@@ -150,7 +148,7 @@ export default function LeaderboardPage({
                             {Math.round(leaderboard[1].winRate * 100)}% win rate
                           </div>
                           <div className="text-tertiary">{leaderboard[1].totalBets} bets</div>
-                          <div className="font-medium text-green-600">
+                          <div className="font-medium text-success">
                             {Math.round((leaderboard[1].roi || 0) * 100)}% ROI
                           </div>
                         </div>
@@ -162,10 +160,10 @@ export default function LeaderboardPage({
                 {/* First Place */}
                 <div>
                   {leaderboard[0] && (
-                    <div className="bg-gradient-to-b from-yellow-100 to-yellow-50 rounded-lg p-6 shadow-xl border-2 border-yellow-400 transform scale-105">
+                    <div className="bg-gradient-to-b from-warning/20 to-warning/10 rounded-lg p-6 shadow-xl border-2 border-warning/40 transform scale-105">
                       <div className="text-center mb-4">
                         <div className="text-5xl mb-2">🏆</div>
-                        <div className="text-4xl font-bold text-yellow-600">1st</div>
+                        <div className="text-4xl font-bold text-warning">1st</div>
                       </div>
                       <div className="text-center">
                         <div className="font-bold text-xl mb-2">{leaderboard[0].userName}</div>
@@ -177,11 +175,11 @@ export default function LeaderboardPage({
                             {Math.round(leaderboard[0].winRate * 100)}% win rate
                           </div>
                           <div className="text-tertiary">{leaderboard[0].totalBets} bets</div>
-                          <div className="font-bold text-green-600">
+                          <div className="font-bold text-success">
                             {Math.round((leaderboard[0].roi || 0) * 100)}% ROI
                           </div>
                           {leaderboard[0].longestStreak > 0 && (
-                            <div className="text-orange-600 font-medium">
+                            <div className="text-warning font-medium">
                               🔥 {leaderboard[0].longestStreak} streak
                             </div>
                           )}
@@ -194,7 +192,7 @@ export default function LeaderboardPage({
                 {/* Third Place */}
                 <div className="md:pt-8">
                   {leaderboard[2] && (
-                    <div className="bg-gradient-to-b from-amber-100 to-amber-50 rounded-lg p-6 shadow-lg border-2 border-amber-300">
+                    <div className="bg-gradient-to-b from-warning/15 to-warning/5 rounded-lg p-6 shadow-lg border-2 border-warning/25">
                       <div className="text-center mb-4">
                         <div className="text-4xl mb-2">🥉</div>
                         <div className="text-3xl font-bold">3rd</div>
@@ -209,7 +207,7 @@ export default function LeaderboardPage({
                             {Math.round(leaderboard[2].winRate * 100)}% win rate
                           </div>
                           <div className="text-tertiary">{leaderboard[2].totalBets} bets</div>
-                          <div className="font-medium text-green-600">
+                          <div className="font-medium text-success">
                             {Math.round((leaderboard[2].roi || 0) * 100)}% ROI
                           </div>
                         </div>
@@ -283,14 +281,14 @@ export default function LeaderboardPage({
                               <div>{entry.totalBets}</div>
                             </td>
                             <td className="px-4 py-3 text-right">
-                              <div className="font-medium text-green-600">
+                              <div className="font-medium text-success">
                                 {Math.round((entry.roi || 0) * 100)}%
                               </div>
                             </td>
                             <td className="px-4 py-3 text-right hidden lg:table-cell">
                               {entry.longestStreak > 0 && (
                                 <div className="inline-flex items-center space-x-1">
-                                  <span className="text-orange-500">🔥</span>
+                                  <span className="text-warning">🔥</span>
                                   <span>{entry.longestStreak}</span>
                                 </div>
                               )}

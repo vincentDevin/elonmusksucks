@@ -63,7 +63,7 @@ export default function TimelinePage({
         <div className="flex-1 min-w-0">
           <div className="flex items-center space-x-2 mb-2">
             <span className="text-2xl">📰</span>
-            <span className="text-xs font-medium text-white bg-blue-600 px-2 py-1 rounded">
+            <span className="text-xs font-medium text-info bg-info/10 border border-info/20 px-2 py-1 rounded">
               Article
             </span>
             <span className="text-xs text-tertiary">
@@ -129,7 +129,7 @@ export default function TimelinePage({
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center space-x-2 mb-2">
-            <span className="text-xs font-medium text-white bg-green-600 px-2 py-1 rounded">
+            <span className="text-xs font-medium text-success bg-success/10 border border-success/20 px-2 py-1 rounded">
               Community Post
             </span>
             <span className="font-medium text-content">{post.authorName}</span>
@@ -205,15 +205,15 @@ export default function TimelinePage({
           {/* Stats Bar */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
             <div className="bg-surface rounded-lg p-4 shadow">
-              <div className="text-3xl font-bold text-blue-600">{articles.length}</div>
+              <div className="text-3xl font-bold text-info">{articles.length}</div>
               <div className="text-sm text-tertiary">Latest Articles</div>
             </div>
             <div className="bg-surface rounded-lg p-4 shadow">
-              <div className="text-3xl font-bold text-green-600">{posts.length}</div>
+              <div className="text-3xl font-bold text-success">{posts.length}</div>
               <div className="text-sm text-tertiary">Community Posts</div>
             </div>
             <div className="bg-surface rounded-lg p-4 shadow">
-              <div className="text-3xl font-bold text-purple-600">{timelineItems.length}</div>
+              <div className="text-3xl font-bold text-secondary">{timelineItems.length}</div>
               <div className="text-sm text-tertiary">Total Updates</div>
             </div>
           </div>
@@ -223,7 +223,7 @@ export default function TimelinePage({
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold">Recent Updates</h2>
               <div className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <div className="w-2 h-2 bg-success rounded-full animate-pulse"></div>
                 <span className="text-sm text-tertiary">Live Feed</span>
               </div>
             </div>

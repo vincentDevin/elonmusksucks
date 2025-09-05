@@ -195,8 +195,21 @@ async function createServer(): Promise<CreateServerResult> {
 
       const finalHtml = template.replace('<!--app-html-->', html).replace(
         '<script type="module" src="/src/entry-client.tsx"></script>',
-        `<script>window.__SERVER_DATA__ = ${JSON.stringify(serverData, null, 2)}</script>
-           <script type="module" src="/src/entry-client.tsx"></script>`,
+        `<script>
+          // Initialize theme before any rendering to prevent flash
+          (function() {
+            const stored = localStorage.getItem('theme');
+            const theme = stored || 'dark';
+            if (theme === 'dark') {
+              document.documentElement.classList.add('dark');
+            }
+            if (!stored) {
+              localStorage.setItem('theme', 'dark');
+            }
+          })();
+          window.__SERVER_DATA__ = ${JSON.stringify(serverData, null, 2)};
+        </script>
+        <script type="module" src="/src/entry-client.tsx"></script>`,
       );
 
       res.status(200).set({ 'Content-Type': 'text/html' }).send(finalHtml);

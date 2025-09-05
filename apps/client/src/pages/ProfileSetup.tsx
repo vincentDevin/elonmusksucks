@@ -79,7 +79,7 @@ export default function ProfileSetup() {
       if (!currentUser?.id) throw new Error('User not authenticated');
       await updateUserProfile(currentUser.id, { ...formData, profileComplete: true });
       await refreshUser();
-      navigate('/');
+      window.location.href = '/dashboard';
     } catch (e: unknown) {
       const errorMessage = e instanceof Error ? e.message : 'Failed to update profile';
       setError(errorMessage);

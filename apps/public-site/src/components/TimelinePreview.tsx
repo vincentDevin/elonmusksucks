@@ -66,7 +66,7 @@ export default function TimelinePreview({
       <div className="text-2xl">📰</div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center space-x-2 mb-1">
-          <span className="text-xs font-medium text-primary bg-blue-100 px-2 py-1 rounded">
+          <span className="text-xs font-medium text-info bg-info/10 border border-info/20 px-2 py-1 rounded">
             Article
           </span>
           <span className="text-xs text-tertiary">by {article.content.author}</span>
@@ -100,7 +100,7 @@ export default function TimelinePreview({
       />
       <div className="flex-1 min-w-0">
         <div className="flex items-center space-x-2 mb-1">
-          <span className="text-xs font-medium text-primary bg-green-100 px-2 py-1 rounded">
+          <span className="text-xs font-medium text-success bg-success/10 border border-success/20 px-2 py-1 rounded">
             Post
           </span>
           <span className="font-medium text-sm text-content">{post.authorName}</span>

@@ -1,17 +1,24 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  darkMode: 'class',
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
       colors: {
-        primary: 'rgb(59 130 246)', // blue-500
-        'primary-hover': 'rgb(37 99 235)', // blue-600
-        background: 'rgb(255 255 255)', // white
-        surface: 'rgb(249 250 251)', // gray-50
-        content: 'rgb(17 24 39)', // gray-900
-        muted: 'rgb(209 213 219)', // gray-300
-        border: 'rgb(229 231 235)', // gray-200
-        tertiary: 'rgb(107 114 128)', // gray-500
+        primary: 'var(--color-primary)',
+        'primary-hover': 'var(--color-primary-hover)',
+        secondary: 'var(--color-secondary)',
+        accent: 'var(--color-accent)',
+        background: 'var(--color-background)',
+        surface: 'var(--color-surface)',
+        content: 'var(--color-content)',
+        muted: 'var(--color-muted)',
+        border: 'var(--color-border)',
+        tertiary: 'var(--color-tertiary)',
+        success: 'var(--color-success)',
+        warning: 'var(--color-warning)',
+        error: 'var(--color-error)',
+        info: 'var(--color-info)',
       },
     },
   },

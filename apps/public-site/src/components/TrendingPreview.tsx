@@ -46,11 +46,11 @@ export default function TrendingPreview({
 
   const getCategoryColor = (category: string) => {
     const colors = {
-      Tesla: 'bg-red-100 text-red-800',
-      Twitter: 'bg-blue-100 text-blue-800',
-      SpaceX: 'bg-purple-100 text-purple-800',
-      Neuralink: 'bg-green-100 text-green-800',
-      default: 'bg-gray-100 text-gray-800',
+      Tesla: 'bg-error/10 text-error border-error/20',
+      Twitter: 'bg-info/10 text-info border-info/20',
+      SpaceX: 'bg-secondary/10 text-secondary border-secondary/20',
+      Neuralink: 'bg-success/10 text-success border-success/20',
+      default: 'bg-muted/20 text-content border-border',
     };
     return colors[category as keyof typeof colors] || colors.default;
   };
@@ -75,7 +75,7 @@ export default function TrendingPreview({
                 <div className="flex items-center space-x-2 mb-2">
                   <span className="text-tertiary text-sm">#{index + 1}</span>
                   <span
-                    className={`text-xs px-2 py-1 rounded-full ${getCategoryColor(prediction.category)}`}
+                    className={`text-xs px-2 py-1 rounded-full border ${getCategoryColor(prediction.category)}`}
                   >
                     {prediction.category}
                   </span>

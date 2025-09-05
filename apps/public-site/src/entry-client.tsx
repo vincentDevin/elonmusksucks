@@ -3,24 +3,27 @@ import { hydrateRoot } from 'react-dom/client';
 import App from './App';
 import './index.css';
 
+// Initialize theme before React hydration to prevent flash
+const initializeTheme = () => {
+  const stored = localStorage.getItem('theme');
+  const theme = stored || 'dark'; // Default to dark theme
+
+  if (theme === 'dark') {
+    document.documentElement.classList.add('dark');
+  } else {
+    document.documentElement.classList.remove('dark');
+  }
+
+  if (!stored) {
+    localStorage.setItem('theme', 'dark');
+  }
+};
+
+// Initialize theme immediately
+initializeTheme();
+
 // Get server-side data from window
 const serverData = (window as any).__SERVER_DATA__ || {};
 
-// Hydrate the root, but don't interfere with navigation
-// This SSR site uses server-side navigation, not client-side routing
+// Hydrate the root
 hydrateRoot(document.getElementById('root')!, <App {...serverData} />);
-
-// Ensure all links work as normal browser navigation
-// Remove any React event handlers that might interfere
-document.addEventListener('DOMContentLoaded', () => {
-  // Force all internal links to use full page navigation
-  const links = document.querySelectorAll('a[href^="/"]');
-  links.forEach((link) => {
-    link.addEventListener('click', (e) => {
-      const href = (e.currentTarget as HTMLAnchorElement).href;
-      if (href !== window.location.href) {
-        window.location.href = href;
-      }
-    });
-  });
-});

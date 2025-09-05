@@ -58,13 +58,14 @@ export default function Register() {
           <p>
             Please check <strong>{email}</strong> for a verification link.
           </p>
-          <p>
-            Once verified, you can{' '}
-            <Link to="/login" className="text-blue-600 hover:underline">
-              log in here
-            </Link>
-            .
-          </p>
+          <div className="mt-4">
+            <a
+              href="/login"
+              className="inline-block w-full text-center px-4 py-2 bg-primary text-white rounded hover:bg-primary-hover transition-colors font-medium"
+            >
+              Go to Login Page
+            </a>
+          </div>
         </div>
       </div>
     );

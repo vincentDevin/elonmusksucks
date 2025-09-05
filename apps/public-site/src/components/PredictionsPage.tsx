@@ -39,14 +39,14 @@ export default function PredictionsPage({
 
   const getCategoryColor = (category: string) => {
     const colors: Record<string, string> = {
-      Tesla: 'bg-red-100 text-red-800',
-      Twitter: 'bg-blue-100 text-blue-800',
-      SpaceX: 'bg-purple-100 text-purple-800',
-      Stocks: 'bg-green-100 text-green-800',
-      Space: 'bg-indigo-100 text-indigo-800',
-      TEST: 'bg-gray-100 text-gray-800',
+      Tesla: 'bg-error/10 text-error border-error/20',
+      Twitter: 'bg-info/10 text-info border-info/20',
+      SpaceX: 'bg-secondary/10 text-secondary border-secondary/20',
+      Stocks: 'bg-success/10 text-success border-success/20',
+      Space: 'bg-info/10 text-info border-info/20',
+      TEST: 'bg-muted/20 text-content border-border',
     };
-    return colors[category] || 'bg-gray-100 text-gray-800';
+    return colors[category] || 'bg-muted/20 text-content border-border';
   };
 
   return (
@@ -88,11 +88,11 @@ export default function PredictionsPage({
               <div className="text-sm text-tertiary">Open Predictions</div>
             </div>
             <div className="bg-surface rounded-lg p-4 shadow">
-              <div className="text-3xl font-bold text-green-600">{resolvedPredictions.length}</div>
+              <div className="text-3xl font-bold text-success">{resolvedPredictions.length}</div>
               <div className="text-sm text-tertiary">Resolved</div>
             </div>
             <div className="bg-surface rounded-lg p-4 shadow">
-              <div className="text-3xl font-bold text-orange-600">
+              <div className="text-3xl font-bold text-warning">
                 {predictions.reduce((sum, p) => sum + p.bets.length, 0)}
               </div>
               <div className="text-sm text-tertiary">Total Bets</div>
@@ -102,7 +102,7 @@ export default function PredictionsPage({
           {/* Open Predictions */}
           <div className="mb-12">
             <h2 className="text-2xl font-bold mb-6 flex items-center">
-              <span className="text-green-500 mr-2">●</span> Open Predictions
+              <span className="text-success mr-2">●</span> Open Predictions
             </h2>
 
             {openPredictions.length === 0 ? (
@@ -124,7 +124,7 @@ export default function PredictionsPage({
                         )}
                         <div className="flex items-center space-x-3">
                           <span
-                            className={`text-xs px-2 py-1 rounded-full ${getCategoryColor(prediction.category)}`}
+                            className={`text-xs px-2 py-1 rounded-full border ${getCategoryColor(prediction.category)}`}
                           >
                             {prediction.category}
                           </span>
@@ -192,7 +192,7 @@ export default function PredictionsPage({
           {resolvedPredictions.length > 0 && (
             <div className="mb-12">
               <h2 className="text-2xl font-bold mb-6 flex items-center">
-                <span className="text-gray-500 mr-2">✓</span> Recently Resolved
+                <span className="text-tertiary mr-2">✓</span> Recently Resolved
               </h2>
 
               <div className="grid gap-4">
@@ -213,7 +213,7 @@ export default function PredictionsPage({
                               Resolved: {new Date(prediction.resolvedAt!).toLocaleDateString()}
                             </span>
                             {winningOption && (
-                              <span className="text-green-600 font-medium">
+                              <span className="text-success font-medium">
                                 Winner: {winningOption.label}
                               </span>
                             )}
