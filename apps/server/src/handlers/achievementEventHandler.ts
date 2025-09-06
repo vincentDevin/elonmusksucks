@@ -49,6 +49,54 @@ const ACHIEVEMENT_CHANNELS = [
   'leaderboard:rank:update',
   'leaderboard:daily:close',
   'leaderboard:weekly:close',
+  'leaderboard:position:reached',
+  'leaderboard:comeback:major',
+  'leaderboard:comeback:moderate',
+
+  // Streak events (from StreakManager)
+  'streak:updated',
+  'streak:broken',
+  'streak:milestone:reached',
+  'streak:reset',
+
+  // Financial events (from FinancialTracker)
+  'balance:milestone:reached',
+  'bankruptcy:detected',
+  'rags:to:riches',
+  'massive:loss:detected',
+  'massive:gain:detected',
+  'comeback:detected',
+  'profit:snapshot:daily',
+
+  // Complex event correlation (from EventCorrelator)
+  'event:sequence:completed',
+  'pattern:matched',
+  'achievement:statistical:anomaly',
+  'achievement:probability:defier',
+  'achievement:yolo:all:in',
+  'achievement:galaxy:brain:parlay',
+  'achievement:pong:comeback',
+
+  // Daily activity events
+  'user:daily:login',
+  'user:daily:summary',
+
+  // Social events
+  'emoji:used',
+  'thread:participation',
+  'post:upvoted',
+  'post:reaction:added',
+  'user:followed',
+
+  // Prediction tracking events
+  'prediction:viewed',
+  'prediction:first:correct:bet',
+  'prediction:resolved:fast',
+  'prediction:viral',
+
+  // Time-based activity events
+  'activity:time:pattern',
+  'activity:speed:burst',
 ] as const;
 
 export function setupAchievementRedisHandlers(io: SocketServer) {

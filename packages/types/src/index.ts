@@ -2978,3 +2978,92 @@ export interface PongPayoutResult {
   transactionId?: number;
   error?: string;
 }
+
+// ——— JSON Rule Achievement System Types ————————————————————————————————
+
+export interface JsonRuleAchievementData {
+  eventKeys: string[];
+  progress: {
+    kind: 'count' | 'streak' | 'threshold' | 'binary';
+    incrementIf?: Record<string, unknown>;
+    setIf?: Record<string, unknown>;
+    resetIf?: Record<string, unknown>;
+  };
+  unlockWhen: Record<string, unknown>;
+  counters?: string[];
+}
+
+export interface AchievementTemplate {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  rarity: 'common' | 'uncommon' | 'rare' | 'legendary' | 'secret' | 'shame';
+  ruleTemplate: JsonRuleAchievementData;
+  variables: Record<string, string>; // Template variables like {{streakLength}}
+  usage: number; // How many times this template has been used
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RuleValidationResult {
+  isValid: boolean;
+  errors: string[];
+  warnings: string[];
+  estimatedComplexity: 'low' | 'medium' | 'high';
+  complexityScore: number;
+  optimizationSuggestions: string[];
+  estimatedPerformanceImpact: 'minimal' | 'moderate' | 'high';
+}
+
+export interface EventKeyOption {
+  key: string;
+  description: string;
+  category: 'betting' | 'chat' | 'prediction' | 'leaderboard' | 'pong' | 'user' | 'admin';
+  payloadSchema: Record<string, string>; // field name -> type
+  volume: 'low' | 'medium' | 'high' | 'critical';
+  examples: Record<string, unknown>[]; // Sample payloads
+}
+
+export interface RuleSimulationResult {
+  userId?: number;
+  userName?: string;
+  simulatedEvents: Array<{
+    eventKey: string;
+    payload: Record<string, unknown>;
+    timestamp: string;
+  }>;
+  progressHistory: Array<{
+    step: number;
+    progress: number;
+    unlocked: boolean;
+    timestamp: string;
+    triggerEvent?: string;
+  }>;
+  finalProgress: number;
+  unlocked: boolean;
+  unlockTimestamp?: string;
+  estimatedUnlockRate: number; // Percentage of users expected to unlock
+}
+
+export interface RulePerformanceMetrics {
+  achievementId: number;
+  achievementTitle: string;
+  totalUsers: number;
+  completedUsers: number;
+  completionRate: number;
+  averageTimeToComplete: number; // in hours
+  processingLatency: {
+    p50: number;
+    p95: number;
+    p99: number;
+  };
+  eventVolume: {
+    daily: number;
+    weekly: number;
+    monthly: number;
+  };
+  complexityScore: number;
+  performanceScore: number; // 0-100, higher is better
+  lastAnalyzed: string;
+}

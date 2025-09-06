@@ -1,4 +1,6 @@
 import { PrismaClient, Prisma } from '@prisma/client';
+import type { JsonRuleAchievementData } from '@ems/types';
+import { RuleComplexityTracker } from '../services/RuleComplexityTracker';
 
 export interface IAchievementRepository {
   findMany(params?: any): Promise<any[]>;
@@ -43,9 +45,21 @@ export interface IAchievementRepository {
     }>
   >;
   findShameAchievementByName(name: string): Promise<any | null>;
+  // Rule complexity tracking methods
+  updateRuleComplexityMetrics(
+    achievementId: number,
+    complexityScore: number,
+    performanceScore: number,
+  ): Promise<void>;
+  findAchievementsNeedingValidation(): Promise<any[]>;
+  validateAndUpdateRuleMetrics(
+    achievementId: number,
+  ): Promise<{ complexityScore: number; performanceScore: number }>;
 }
 
 export class AchievementRepository implements IAchievementRepository {
+  private complexityTracker = new RuleComplexityTracker();
+
   constructor(private prisma: PrismaClient) {}
 
   async findMany(params?: any) {
@@ -53,6 +67,10 @@ export class AchievementRepository implements IAchievementRepository {
   }
 
   async findById(id: number) {
+    if (typeof id !== 'number' || isNaN(id)) {
+      throw new Error(`Invalid achievement ID: ${id} (type: ${typeof id})`);
+    }
+
     return this.prisma.achievement.findUnique({
       where: { id },
     });
@@ -427,5 +445,88 @@ export class AchievementRepository implements IAchievementRepository {
         isShame: true,
       },
     });
+  }
+
+  /**
+   * Update rule complexity and performance metrics for an achievement
+   */
+  async updateRuleComplexityMetrics(
+    achievementId: number,
+    complexityScore: number,
+    performanceScore: number,
+  ): Promise<void> {
+    await this.prisma.achievement.update({
+      where: { id: achievementId },
+      data: {
+        ruleComplexity: Math.min(100, Math.max(0, complexityScore)),
+        rulePerformanceScore: Math.min(100, Math.max(0, performanceScore)),
+        lastRuleValidation: new Date(),
+        updatedAt: new Date(),
+      },
+    });
+  }
+
+  /**
+   * Find achievements that need rule validation (never validated or validation is stale)
+   */
+  async findAchievementsNeedingValidation(): Promise<any[]> {
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    return this.prisma.achievement.findMany({
+      where: {
+        isActive: true,
+        ruleData: { not: Prisma.JsonNull },
+        OR: [{ lastRuleValidation: null }, { lastRuleValidation: { lt: sevenDaysAgo } }],
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        ruleData: true,
+        ruleComplexity: true,
+        rulePerformanceScore: true,
+        lastRuleValidation: true,
+      },
+    });
+  }
+
+  /**
+   * Validate and update rule metrics for a specific achievement
+   */
+  async validateAndUpdateRuleMetrics(
+    achievementId: number,
+  ): Promise<{ complexityScore: number; performanceScore: number }> {
+    const achievement = await this.prisma.achievement.findUnique({
+      where: { id: achievementId },
+      select: { ruleData: true },
+    });
+
+    if (!achievement?.ruleData) {
+      throw new Error(`Achievement ${achievementId} has no rule data`);
+    }
+
+    // Validate that the JSON actually matches our expected structure
+    const ruleData = achievement.ruleData;
+    if (!ruleData || typeof ruleData !== 'object' || Array.isArray(ruleData)) {
+      throw new Error(`Invalid rule data structure for achievement ${achievementId}`);
+    }
+
+    // Additional validation for required fields
+    const data = ruleData as Record<string, unknown>;
+    if (!data.eventKeys || !data.progress || !data.unlockWhen) {
+      throw new Error(`Rule data missing required fields for achievement ${achievementId}`);
+    }
+
+    const typedRuleData = data as unknown as JsonRuleAchievementData;
+
+    // Calculate complexity and performance scores
+    const complexityScore = this.complexityTracker.calculateComplexityScore(typedRuleData);
+    const performanceScore = this.complexityTracker.estimatePerformanceImpact(typedRuleData);
+
+    // Update in database
+    await this.updateRuleComplexityMetrics(achievementId, complexityScore, performanceScore);
+
+    return { complexityScore, performanceScore };
   }
 }

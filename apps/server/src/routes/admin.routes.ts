@@ -76,6 +76,11 @@ router.delete('/achievements/:id/revoke/:userId', adminController.revokeAchievem
 router.post('/achievements/:id/bulk-grant', adminController.bulkGrantAchievement);
 router.get('/achievements/:id/users', adminController.getUsersWithAchievement);
 
+// Rule simulation endpoints
+router.post('/achievements/rules/simulate', adminController.simulateRule);
+router.post('/achievements/rules/generate-test-events', adminController.generateTestEvents);
+router.post('/achievements/rules/quick-simulate', adminController.quickSimulate);
+
 // — Shame Wall Management System —
 router.post('/bans', adminController.issueBan);
 router.delete('/bans/:banId', adminController.liftBan);

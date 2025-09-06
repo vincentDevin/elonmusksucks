@@ -17,6 +17,7 @@ import { PostService } from './post.service';
 import { unifiedActivityService } from './unifiedActivity.service';
 import { ImageProcessingService, ProcessedImageSizes } from './imageProcessing.service';
 import { DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { eventBus } from './eventBus.service';
 
 // Define a minimal file interface matching Multer's in-memory buffer
 export type UploadedFile = {
@@ -525,6 +526,167 @@ export class UserService {
     }
 
     return this.repo.searchUsersByName(query.trim());
+  }
+
+  /**
+   * Track daily login for achievements and streak management
+   * This should be called whenever a user authenticates or accesses the system
+   */
+  async trackDailyLogin(userId: number): Promise<void> {
+    try {
+      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+      const loginKey = `daily_login:${userId}:${today}`;
+
+      // Check if user already logged in today using Redis for fast lookups
+      const alreadyLoggedToday = await redisClient.get(loginKey);
+
+      if (!alreadyLoggedToday) {
+        // Mark as logged in today (expires at end of day)
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(0, 0, 0, 0);
+        const secondsUntilMidnight = Math.floor((tomorrow.getTime() - Date.now()) / 1000);
+
+        await redisClient.setex(loginKey, secondsUntilMidnight, '1');
+
+        // Log activity for time-based tracking
+        await eventBus.publish('user:activity:log', {
+          userId,
+          activityType: 'daily_login',
+          metadata: {
+            loginDate: today,
+            timestamp: new Date().toISOString(),
+            isFirstLoginOfDay: true,
+          },
+          occurredAt: new Date().toISOString(),
+          dateKey: today,
+          idempotencyKey: `activity:login:${userId}:${today}`,
+        });
+
+        // Publish daily login event for achievement system
+        await eventBus.publish('user:daily:login', {
+          key: 'user:daily:login',
+          userId,
+          occurredAt: new Date().toISOString(),
+          idempotencyKey: `daily:login:${userId}:${today}`,
+          payload: {
+            loginDate: today,
+            consecutiveDays: await this.calculateConsecutiveLoginDays(userId),
+            timestamp: new Date().toISOString(),
+          },
+        });
+
+        // Check for weekend warrior achievement (login on Saturday/Sunday)
+        const dayOfWeek = new Date().getDay();
+        if (dayOfWeek === 0 || dayOfWeek === 6) {
+          // Sunday = 0, Saturday = 6
+          await eventBus.publish('user:weekend:login', {
+            key: 'user:weekend:login',
+            userId,
+            occurredAt: new Date().toISOString(),
+            idempotencyKey: `weekend:login:${userId}:${today}`,
+            payload: {
+              loginDate: today,
+              dayOfWeek: dayOfWeek === 0 ? 'sunday' : 'saturday',
+              timestamp: new Date().toISOString(),
+            },
+          });
+        }
+
+        console.log(`[user] Daily login tracked for user ${userId} on ${today}`);
+      }
+    } catch (error) {
+      console.error(`[user] Error tracking daily login for user ${userId}:`, error);
+      // Don't throw - login tracking failure shouldn't block authentication
+    }
+  }
+
+  /**
+   * Calculate consecutive login days for streak achievements
+   * This looks back through recent days to count the current streak
+   */
+  private async calculateConsecutiveLoginDays(userId: number): Promise<number> {
+    try {
+      let consecutiveDays = 0;
+      const today = new Date();
+
+      // Check last 30 days for consecutive logins
+      for (let i = 0; i < 30; i++) {
+        const checkDate = new Date(today);
+        checkDate.setDate(today.getDate() - i);
+        const dateKey = checkDate.toISOString().split('T')[0];
+
+        const loginKey = `daily_login:${userId}:${dateKey}`;
+        const loggedIn = await redisClient.get(loginKey);
+
+        if (loggedIn) {
+          consecutiveDays++;
+        } else {
+          // Break on first day without login (except today, which we just set)
+          if (i > 0) break;
+        }
+      }
+
+      return consecutiveDays;
+    } catch (error) {
+      console.error(`[user] Error calculating consecutive login days for user ${userId}:`, error);
+      return 1; // Default to 1 if calculation fails
+    }
+  }
+
+  /**
+   * Get login streak information for a user
+   * This can be used for dashboard displays or achievement checking
+   */
+  async getLoginStreakInfo(userId: number): Promise<{
+    currentStreak: number;
+    longestStreak: number;
+    lastLoginDate: string | null;
+    todaysLogin: boolean;
+  }> {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const loginKey = `daily_login:${userId}:${today}`;
+
+      const todaysLogin = !!(await redisClient.get(loginKey));
+      const currentStreak = await this.calculateConsecutiveLoginDays(userId);
+
+      // For longest streak, we'd need to implement a more sophisticated tracking system
+      // For now, return current streak as longest (placeholder)
+      const longestStreak = currentStreak; // TODO: Implement proper longest streak tracking
+
+      // Find last login date
+      let lastLoginDate: string | null = null;
+      const checkDate = new Date();
+      for (let i = 0; i < 7; i++) {
+        // Check last 7 days
+        const dateKey = checkDate.toISOString().split('T')[0];
+        const loginKey = `daily_login:${userId}:${dateKey}`;
+        const loggedIn = await redisClient.get(loginKey);
+
+        if (loggedIn) {
+          lastLoginDate = dateKey;
+          break;
+        }
+
+        checkDate.setDate(checkDate.getDate() - 1);
+      }
+
+      return {
+        currentStreak,
+        longestStreak,
+        lastLoginDate,
+        todaysLogin,
+      };
+    } catch (error) {
+      console.error(`[user] Error getting login streak info for user ${userId}:`, error);
+      return {
+        currentStreak: 0,
+        longestStreak: 0,
+        lastLoginDate: null,
+        todaysLogin: false,
+      };
+    }
   }
 }
 

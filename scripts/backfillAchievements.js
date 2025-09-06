@@ -30,6 +30,11 @@ async function backfillUserAchievements(userId) {
     const user = await prisma.user.findUnique({
       where: { id: parseInt(userId) }
     });
+    
+    // Get chat message count
+    const chatMessageCount = await prisma.message.count({
+      where: { userId: parseInt(userId) }
+    });
 
     if (!user) {
       console.log(`❌ User ${userId} not found`);
@@ -74,7 +79,7 @@ async function backfillUserAchievements(userId) {
     let updated = 0;
 
     for (const achievement of achievements) {
-      const progress = calculateProgress(achievement, userStats, pongStats, user);
+      const progress = calculateProgress(achievement, userStats, pongStats, user, chatMessageCount);
       const shouldBeUnlocked = progress >= achievement.targetValue;
       
       // Get current user achievement record
@@ -133,7 +138,7 @@ async function backfillUserAchievements(userId) {
 /**
  * Calculate achievement progress based on actual stats
  */
-function calculateProgress(achievement, userStats, pongStats, user) {
+function calculateProgress(achievement, userStats, pongStats, user, chatMessageCount) {
   const category = achievement.category.toLowerCase();
   const name = achievement.name.toLowerCase();
   
@@ -166,6 +171,16 @@ function calculateProgress(achievement, userStats, pongStats, user) {
     if (name.includes('diamond hands')) return userStats.longestStreak >= 10 ? userStats.longestStreak : 0;
     if (name.includes('parlay prodigy')) return userStats.parlaysWon >= 1 ? userStats.parlaysWon : 0;
     if (name.includes('grinder 500')) return userStats.totalBets;
+  }
+  
+  // Chat achievements
+  if ((category === 'chat' || category === 'participation') && chatMessageCount !== undefined) {
+    if (name.includes('first words') || name.includes('welcome wagon')) return chatMessageCount >= 1 ? chatMessageCount : 0;
+    if (name.includes('keyboard warrior')) return chatMessageCount;
+    if (name.includes('typing titan')) return chatMessageCount;
+    if (name.includes('chat fiend')) return chatMessageCount;
+    // For other chat achievements, use message count as progress
+    if (category === 'chat') return chatMessageCount;
   }
   
   // For achievements we can't map, keep existing progress

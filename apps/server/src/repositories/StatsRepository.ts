@@ -14,16 +14,39 @@ export class StatsRepository implements IStatsRepository {
    */
   async getUserCounters(userId: number): Promise<Record<string, number>> {
     try {
-      // Get all user stats in parallel
-      const [userStats, pongStats, user, predictionsCount, followersCount, followingCount] =
-        await Promise.all([
-          this.prisma.userStats.findUnique({ where: { userId } }),
-          this.prisma.pongStats.findUnique({ where: { userId } }),
-          this.prisma.user.findUnique({ where: { id: userId } }),
-          this.prisma.prediction.count({ where: { creatorId: userId } }),
-          this.prisma.follow.count({ where: { followingId: userId } }),
-          this.prisma.follow.count({ where: { followerId: userId } }),
-        ]);
+      // Get all user stats in parallel, including new tracking data sources
+      const [
+        userStats,
+        pongStats,
+        user,
+        predictionsCount,
+        followersCount,
+        followingCount,
+        messageCount,
+        // New tracking data sources
+        streakCounts,
+        activityCounts,
+        emojiUsageCount,
+        leaderboardHistory,
+        predictionViews,
+        firstCorrectBets,
+      ] = await Promise.all([
+        this.prisma.userStats.findUnique({ where: { userId } }),
+        this.prisma.pongStats.findUnique({ where: { userId } }),
+        this.prisma.user.findUnique({ where: { id: userId } }),
+        this.prisma.prediction.count({ where: { creatorId: userId } }),
+        this.prisma.follow.count({ where: { followingId: userId } }),
+        this.prisma.follow.count({ where: { followerId: userId } }),
+        this.prisma.message.count({ where: { userId } }),
+
+        // New tracking queries
+        this.getStreakCounts(userId),
+        this.getActivityCounts(userId),
+        this.prisma.userEmojiUsage.count({ where: { userId } }),
+        this.getLeaderboardStats(userId),
+        this.getPredictionViewStats(userId),
+        this.getFirstCorrectBetCount(userId),
+      ]);
 
       // Serialize bigint fields to numbers
       const serializedUserStats = userStats ? serializeBigInt(userStats) : null;
@@ -61,11 +84,56 @@ export class StatsRepository implements IStatsRepository {
         followersCount: followersCount || 0,
         followingCount: followingCount || 0,
 
+        // Chat counters - NOW USING REAL DATA
+        chatMessages: messageCount || 0,
+        chatFirstMessage: messageCount > 0 ? 1 : 0,
+
         // User profile completion counters
         profileComplete: user?.profileComplete ? 1 : 0,
         hasAvatar: user?.avatarUrl ? 1 : 0,
         hasBio: user?.bio ? 1 : 0,
         hasLocation: user?.location ? 1 : 0,
+
+        // New tracking counters - Streak Management
+        dailyLoginStreak: streakCounts.dailyLoginStreak || 0,
+        bettingWinStreak: streakCounts.bettingWinStreak || 0,
+        pongWinStreak: streakCounts.pongWinStreak || 0,
+        longestLoginStreak: streakCounts.longestLoginStreak || 0,
+        currentActiveStreaks: streakCounts.activeStreaks || 0,
+
+        // New tracking counters - Time-based Activity
+        activeDays: activityCounts.uniqueDays || 0,
+        weekendLogins: activityCounts.weekendLogins || 0,
+        chatMessagesToday: activityCounts.chatMessagesToday || 0,
+        betsThisWeek: activityCounts.betsThisWeek || 0,
+        dailyActivityPoints: activityCounts.dailyPoints || 0,
+
+        // New tracking counters - Emoji Usage
+        uniqueEmojisUsed: emojiUsageCount || 0,
+        emojiMaster: emojiUsageCount >= 50 ? 1 : 0,
+
+        // New tracking counters - Leaderboard History
+        bestLeaderboardRank: leaderboardHistory.bestRank || 999999,
+        leaderboardAppearances: leaderboardHistory.appearances || 0,
+        top10Finishes: leaderboardHistory.top10Finishes || 0,
+        leaderboardWins: leaderboardHistory.wins || 0,
+
+        // New tracking counters - Prediction Accuracy
+        predictionsViewed: predictionViews.totalViews || 0,
+        popularPredictions: predictionViews.popularPredictions || 0,
+        viralPredictions: predictionViews.viralPredictions || 0,
+        firstCorrectBets: firstCorrectBets || 0,
+
+        // Derived counters for complex achievements
+        socialButterfly: followersCount >= 10 && followingCount >= 10 ? 1 : 0,
+        conversationalist: messageCount >= 100 ? 1 : 0,
+        predictionGuru: firstCorrectBets >= 5 && predictionsCount >= 3 ? 1 : 0,
+        allRounder:
+          (userStats?.totalBets || 0) >= 10 &&
+          (pongStats?.totalMatches || 0) >= 10 &&
+          messageCount >= 20
+            ? 1
+            : 0,
       };
     } catch (error) {
       console.error('Failed to get user counters:', error);
@@ -265,6 +333,201 @@ export class StatsRepository implements IStatsRepository {
   }
 
   /**
+   * Get streak-related statistics for a user
+   */
+  private async getStreakCounts(userId: number): Promise<{
+    dailyLoginStreak: number;
+    bettingWinStreak: number;
+    pongWinStreak: number;
+    longestLoginStreak: number;
+    activeStreaks: number;
+  }> {
+    try {
+      const streaks = await this.prisma.userStreak.findMany({
+        where: { userId },
+      });
+
+      const streakMap = streaks.reduce(
+        (acc, streak) => {
+          acc[streak.streakType] = streak;
+          return acc;
+        },
+        {} as Record<string, any>,
+      );
+
+      return {
+        dailyLoginStreak: streakMap.daily_login?.currentStreak || 0,
+        bettingWinStreak: streakMap.betting_win?.currentStreak || 0,
+        pongWinStreak: streakMap.pong_win?.currentStreak || 0,
+        longestLoginStreak: streakMap.daily_login?.bestStreak || 0,
+        activeStreaks: streaks.filter((s) => s.currentStreak > 0).length,
+      };
+    } catch (error) {
+      console.error('Error getting streak counts:', error);
+      return {
+        dailyLoginStreak: 0,
+        bettingWinStreak: 0,
+        pongWinStreak: 0,
+        longestLoginStreak: 0,
+        activeStreaks: 0,
+      };
+    }
+  }
+
+  /**
+   * Get activity-based statistics for a user
+   */
+  private async getActivityCounts(userId: number): Promise<{
+    uniqueDays: number;
+    weekendLogins: number;
+    chatMessagesToday: number;
+    betsThisWeek: number;
+    dailyPoints: number;
+  }> {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+
+      const [uniqueDays, todayActivity, weeklyBets] = await Promise.all([
+        // Count unique days with any activity
+        this.prisma.userActivityLog.groupBy({
+          by: ['dateKey'],
+          where: { userId },
+          _count: { dateKey: true },
+        }),
+
+        // Today's activity
+        this.prisma.userActivityLog.findMany({
+          where: {
+            userId,
+            dateKey: today,
+          },
+        }),
+
+        // This week's bets
+        this.prisma.bet.count({
+          where: {
+            userId,
+            createdAt: {
+              gte: weekAgo,
+            },
+          },
+        }),
+      ]);
+
+      const chatMessagesToday = todayActivity.filter(
+        (a) => a.activityType === 'chat_message_sent',
+      ).length;
+      const weekendLogins = todayActivity.filter(
+        (a) =>
+          a.activityType === 'daily_login' &&
+          (new Date().getDay() === 0 || new Date().getDay() === 6),
+      ).length;
+
+      return {
+        uniqueDays: uniqueDays.length,
+        weekendLogins,
+        chatMessagesToday,
+        betsThisWeek: weeklyBets,
+        dailyPoints: todayActivity.length * 10, // 10 points per activity
+      };
+    } catch (error) {
+      console.error('Error getting activity counts:', error);
+      return {
+        uniqueDays: 0,
+        weekendLogins: 0,
+        chatMessagesToday: 0,
+        betsThisWeek: 0,
+        dailyPoints: 0,
+      };
+    }
+  }
+
+  /**
+   * Get leaderboard-related statistics for a user
+   */
+  private async getLeaderboardStats(userId: number): Promise<{
+    bestRank: number;
+    appearances: number;
+    top10Finishes: number;
+    wins: number;
+  }> {
+    try {
+      const history = await this.prisma.leaderboardHistory.findMany({
+        where: { userId },
+        select: {
+          position: true,
+        },
+      });
+
+      if (history.length === 0) {
+        return { bestRank: 999999, appearances: 0, top10Finishes: 0, wins: 0 };
+      }
+
+      const ranks = history.map((h) => h.position);
+      const bestRank = Math.min(...ranks);
+      const top10Finishes = ranks.filter((r) => r <= 10).length;
+      const wins = ranks.filter((r) => r === 1).length;
+
+      return {
+        bestRank,
+        appearances: history.length,
+        top10Finishes,
+        wins,
+      };
+    } catch (error) {
+      console.error('Error getting leaderboard stats:', error);
+      return { bestRank: 999999, appearances: 0, top10Finishes: 0, wins: 0 };
+    }
+  }
+
+  /**
+   * Get prediction view statistics for a user
+   */
+  private async getPredictionViewStats(userId: number): Promise<{
+    totalViews: number;
+    popularPredictions: number;
+    viralPredictions: number;
+  }> {
+    try {
+      const predictions = await this.prisma.prediction.findMany({
+        where: { creatorId: userId },
+        select: {
+          viewCount: true,
+        },
+      });
+
+      const totalViews = predictions.reduce((sum, p) => sum + (p.viewCount || 0), 0);
+      const popularPredictions = predictions.filter((p) => (p.viewCount || 0) >= 100).length;
+      const viralPredictions = predictions.filter((p) => (p.viewCount || 0) >= 1000).length;
+
+      return {
+        totalViews,
+        popularPredictions,
+        viralPredictions,
+      };
+    } catch (error) {
+      console.error('Error getting prediction view stats:', error);
+      return { totalViews: 0, popularPredictions: 0, viralPredictions: 0 };
+    }
+  }
+
+  /**
+   * Get count of predictions where user made the first correct bet
+   */
+  private async getFirstCorrectBetCount(userId: number): Promise<number> {
+    try {
+      return await this.prisma.prediction.count({
+        where: { firstCorrectBetUserId: userId },
+      });
+    } catch (error) {
+      console.error('Error getting first correct bet count:', error);
+      return 0;
+    }
+  }
+
+  /**
    * Default counters for new users
    */
   private getDefaultCounters(): Record<string, number> {
@@ -300,11 +563,51 @@ export class StatsRepository implements IStatsRepository {
       followersCount: 0,
       followingCount: 0,
 
+      // Chat counters
+      chatMessages: 0,
+      chatFirstMessage: 0,
+
       // User profile completion counters
       profileComplete: 0,
       hasAvatar: 0,
       hasBio: 0,
       hasLocation: 0,
+
+      // New tracking counters - Streak Management
+      dailyLoginStreak: 0,
+      bettingWinStreak: 0,
+      pongWinStreak: 0,
+      longestLoginStreak: 0,
+      currentActiveStreaks: 0,
+
+      // New tracking counters - Time-based Activity
+      activeDays: 0,
+      weekendLogins: 0,
+      chatMessagesToday: 0,
+      betsThisWeek: 0,
+      dailyActivityPoints: 0,
+
+      // New tracking counters - Emoji Usage
+      uniqueEmojisUsed: 0,
+      emojiMaster: 0,
+
+      // New tracking counters - Leaderboard History
+      bestLeaderboardRank: 999999,
+      leaderboardAppearances: 0,
+      top10Finishes: 0,
+      leaderboardWins: 0,
+
+      // New tracking counters - Prediction Accuracy
+      predictionsViewed: 0,
+      popularPredictions: 0,
+      viralPredictions: 0,
+      firstCorrectBets: 0,
+
+      // Derived counters for complex achievements
+      socialButterfly: 0,
+      conversationalist: 0,
+      predictionGuru: 0,
+      allRounder: 0,
     };
   }
 }

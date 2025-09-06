@@ -21,6 +21,8 @@ import { unifiedActivityService } from './unifiedActivity.service';
 import { UserService } from './user.service';
 import { broadcastRealtimeMetrics } from './admin.service';
 import { tracingCollector } from '../lib/tracing';
+import { streakManager } from './StreakManager.service';
+import { financialTracker } from './FinancialTracker.service';
 
 export class BettingService {
   private userService = new UserService();
@@ -171,6 +173,34 @@ export class BettingService {
                 odds: finalOdds,
                 optionLabel: opt.label,
               },
+            }),
+
+            // Add activity log entry for time-based tracking
+            this.eventBus.publish('user:activity:log', {
+              userId,
+              activityType: 'bet_placed',
+              metadata: {
+                betId: bet.id,
+                predictionId: opt.prediction.id,
+                amount,
+                odds: finalOdds,
+                category: opt.prediction.category,
+                timestamp: new Date().toISOString(),
+              },
+              occurredAt: new Date().toISOString(),
+              dateKey: new Date().toISOString().split('T')[0], // YYYY-MM-DD
+              idempotencyKey: `activity:bet:${bet.id}`,
+            }),
+
+            // Check for speed betting patterns (multiple bets in short time)
+            this.checkSpeedBettingPattern(userId),
+
+            // Process transaction for financial tracking
+            financialTracker.processTransaction(userId, {
+              type: 'DEBIT',
+              amount: BigInt(amount),
+              balanceAfter: BigInt(Number(user.muskBucks) - amount),
+              relatedBetId: bet.id,
             }),
 
             // Trigger stats update (coalesced)
@@ -382,6 +412,117 @@ export class BettingService {
         };
       }),
     });
+  }
+
+  /**
+   * Check for speed betting patterns (e.g., "10 bets in 60 seconds")
+   * @param userId - User ID to check
+   */
+  private async checkSpeedBettingPattern(userId: number): Promise<void> {
+    try {
+      const oneMinuteAgo = new Date(Date.now() - 60 * 1000);
+      const recentBets = await this.repo.findUserBets(userId, {
+        limit: 20,
+        createdAfter: oneMinuteAgo,
+      });
+
+      // Check for "Speed Demon" achievement (10 bets in 60 seconds)
+      if (recentBets.length >= 10) {
+        await this.eventBus.publish('activity:speed:burst', {
+          key: 'activity:speed:burst',
+          userId,
+          occurredAt: new Date().toISOString(),
+          idempotencyKey: `speed:burst:${userId}:${Date.now()}`,
+          payload: {
+            activityType: 'betting',
+            count: recentBets.length,
+            timeWindow: 60,
+            milestone: 'speed_demon',
+            firstBetAt: recentBets[recentBets.length - 1]?.createdAt.toISOString(),
+            lastBetAt: recentBets[0]?.createdAt.toISOString(),
+          },
+        });
+
+        console.log(
+          `[betting] User ${userId} achieved speed betting: ${recentBets.length} bets in 60 seconds`,
+        );
+      }
+
+      // Check for other time patterns
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+      const recentBetsFiveMin = await this.repo.findUserBets(userId, {
+        limit: 50,
+        createdAfter: fiveMinutesAgo,
+      });
+
+      if (recentBetsFiveMin.length >= 25) {
+        await this.eventBus.publish('activity:time:pattern', {
+          key: 'activity:time:pattern',
+          userId,
+          occurredAt: new Date().toISOString(),
+          idempotencyKey: `time:pattern:${userId}:${Date.now()}`,
+          payload: {
+            patternType: 'betting_frenzy',
+            count: recentBetsFiveMin.length,
+            timeWindow: 300, // 5 minutes
+            activityType: 'betting',
+          },
+        });
+      }
+    } catch (error) {
+      console.error('[betting] Error checking speed pattern:', error);
+      // Don't throw - this is optional tracking
+    }
+  }
+
+  /**
+   * Handle bet resolution events and update streaks
+   * Called by payout worker when bets are resolved
+   */
+  async handleBetResolution(
+    userId: number,
+    betId: number,
+    won: boolean,
+    amount: bigint,
+    payout?: bigint,
+  ): Promise<void> {
+    try {
+      // Update betting streak
+      await streakManager.updateStreak(userId, 'bet_win', won, {
+        betId,
+        amount: amount.toString(),
+        payout: payout?.toString(),
+      });
+
+      // Add activity log for resolution
+      await this.eventBus.publish('user:activity:log', {
+        userId,
+        activityType: won ? 'bet_won' : 'bet_lost',
+        metadata: {
+          betId,
+          amount: amount.toString(),
+          payout: payout?.toString(),
+          timestamp: new Date().toISOString(),
+        },
+        occurredAt: new Date().toISOString(),
+        dateKey: new Date().toISOString().split('T')[0],
+        idempotencyKey: `activity:bet:resolved:${betId}`,
+      });
+
+      // Process winning transaction for financial tracking
+      if (won && payout) {
+        await financialTracker.processTransaction(userId, {
+          type: 'CREDIT',
+          amount: payout,
+          balanceAfter: BigInt(0), // This would be populated from the actual transaction
+          relatedBetId: betId,
+        });
+      }
+
+      console.log(`[betting] Processed bet resolution: User ${userId}, Bet ${betId}, Won: ${won}`);
+    } catch (error) {
+      console.error('[betting] Error handling bet resolution:', error);
+    }
   }
 }
 

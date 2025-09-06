@@ -135,10 +135,15 @@ model User {
   postReports        PostReport[]
   postMentions       PostMention[]
   activities         UserActivity[]
+  activityLogs       UserActivityLog[]
+  streaks            UserStreak[]
+  emojiUsage         UserEmojiUsage[]
+  leaderboardHistory LeaderboardHistory[]
   relatedActivities  UserActivity[] @relation("RelatedUserActivity")
   achievements       UserAchievement[]
   stats              UserStats?
   Prediction         Prediction[]
+  firstCorrectBets   Prediction[] @relation("FirstCorrectBet")
   messages           Message[]
   bans               UserBan[]
   moderationActions  ModerationLog[] @relation("ModeratorActions")
@@ -200,9 +205,13 @@ model Prediction {
   expiresAt       DateTime
   resolved        Boolean            @default(false)
   approved        Boolean            @default(false)
-  resolvedAt      DateTime?
-  winningOptionId Int?
-  bets            Bet[]
+  resolvedAt          DateTime?
+  winningOptionId     Int?
+  viewCount           Int       @default(0)
+  firstCorrectBetUserId Int?
+  firstCorrectBetUser User?     @relation("FirstCorrectBet", fields: [firstCorrectBetUserId], references: [id])
+  resolvedWithinHour  Boolean   @default(false)
+  bets                Bet[]
   options         PredictionOption[]
   createdAt       DateTime           @default(now())
   creatorId       Int
@@ -214,6 +223,9 @@ model Prediction {
   @@index([creatorId, createdAt(sort: Desc)])
   @@index([category, createdAt(sort: Desc)])
   @@index([approved, resolved, createdAt(sort: Desc)])
+  @@index([viewCount(sort: Desc)], name: "idx_prediction_popularity")
+  @@index([firstCorrectBetUserId], name: "idx_prediction_first_correct")
+  @@index([resolvedWithinHour, resolvedAt], name: "idx_prediction_speed")
   @@index([category, approved])
 }
 
@@ -309,23 +321,26 @@ model Badge {
 }
 
 model Achievement {
-  id            Int                 @id @default(autoincrement())
-  name          String              @unique
-  slug          String?             @unique // Kebab-case unique identifier for seeds/lookups
-  title         String              // Display title
-  description   String              // Achievement description
-  category      String              // Category: betting, prediction, chat, leaderboard, event, secret, participation, shame
-  rarity        String              @default("common") // common, uncommon, rare, legendary, secret, shame
-  targetValue   Int                 // Target value to achieve (e.g., 10 for "Win 10 bets")
-  iconUrl       String?             // Icon URL for display
-  isActive      Boolean             @default(true) // Whether this achievement is currently active
-  autoAward     Boolean             @default(true) // Whether this achievement is auto-awarded via triggers
-  manualOnly    Boolean             @default(false) // Whether this achievement can only be manually granted
-  isShame       Boolean             @default(false) // Whether this is a shame achievement for banned users
-  sortOrder     Int                 @default(0) // Display order
-  ruleData      Json?               // JSON rules for event-driven achievement evaluation
-  createdAt     DateTime            @default(now())
-  updatedAt     DateTime            @default(now()) @updatedAt
+  id                    Int                 @id @default(autoincrement())
+  name                  String              @unique
+  slug                  String?             @unique // Kebab-case unique identifier for seeds/lookups
+  title                 String              // Display title
+  description           String              // Achievement description
+  category              String              // Category: betting, prediction, chat, leaderboard, event, secret, participation, shame
+  rarity                String              @default("common") // common, uncommon, rare, legendary, secret, shame
+  targetValue           Int                 // Target value to achieve (e.g., 10 for "Win 10 bets")
+  iconUrl               String?             // Icon URL for display
+  isActive              Boolean             @default(true) // Whether this achievement is currently active
+  autoAward             Boolean             @default(true) // Whether this achievement is auto-awarded via triggers
+  manualOnly            Boolean             @default(false) // Whether this achievement can only be manually granted
+  isShame               Boolean             @default(false) // Whether this is a shame achievement for banned users
+  sortOrder             Int                 @default(0) // Display order
+  ruleData              Json?               // JSON rules for event-driven achievement evaluation
+  ruleComplexity        Int                 @default(0) // Rule complexity score (0-100)
+  rulePerformanceScore  Int                 @default(0) // Rule performance score (0-100)
+  lastRuleValidation    DateTime?           // Last time rule was validated
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @default(now()) @updatedAt
   
   // Relations
   userProgress  UserAchievement[]
@@ -336,6 +351,10 @@ model Achievement {
   @@index([autoAward])
   @@index([isShame])
   @@index([category, rarity])
+  @@index([ruleComplexity])
+  @@index([rulePerformanceScore])
+  @@index([lastRuleValidation])
+  @@index([ruleComplexity, rulePerformanceScore])
 }
 
 model UserAchievement {
@@ -517,6 +536,72 @@ model UserActivity {
   @@index([betId, createdAt(sort: Desc)], name: "idx_user_activities_bet")
   // Rollback: Remove this index
   @@index([isPersonal, type, createdAt(sort: Desc)], name: "idx_user_activities_dashboard") // Optimize dashboard activity queries
+}
+
+model UserActivityLog {
+  id           Int      @id @default(autoincrement())
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       Int
+  activityType String   @db.VarChar(50) // 'chat_message', 'bet_placed', 'login', 'pong_match', etc.
+  metadata     Json?    // Additional context data for the activity
+  occurredAt   DateTime @default(now())
+  dateKey      String   @db.VarChar(10) // '2024-01-15' format for efficient daily aggregation
+
+  // Optimized indexes for time-based achievement queries
+  @@index([userId, dateKey, activityType], name: "idx_activity_user_date_type")
+  @@index([activityType, occurredAt(sort: Desc)], name: "idx_activity_type_time")
+  @@index([dateKey, activityType], name: "idx_activity_date_type")
+  @@index([userId, occurredAt(sort: Desc)], name: "idx_activity_user_time")
+}
+
+model UserStreak {
+  id            Int      @id @default(autoincrement())
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId        Int
+  streakType    String   @db.VarChar(50) // 'bet_win', 'pong_win', 'daily_login', 'parlay_win', etc.
+  currentStreak Int      @default(0)
+  bestStreak    Int      @default(0)
+  lastActionAt  DateTime?
+  startedAt     DateTime?
+  updatedAt     DateTime @default(now()) @updatedAt
+
+  // Ensure one streak record per user per streak type
+  @@unique([userId, streakType], name: "unique_user_streak_type")
+  @@index([streakType, bestStreak(sort: Desc)], name: "idx_streak_type_best")
+  @@index([userId, lastActionAt(sort: Desc)], name: "idx_streak_user_recent")
+}
+
+model UserEmojiUsage {
+  userId     Int      
+  emoji      String   @db.VarChar(10)
+  useCount   Int      @default(1)
+  lastUsedAt DateTime @default(now()) @updatedAt
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Composite primary key for user-emoji pair
+  @@id([userId, emoji], name: "user_emoji_pk")
+  @@index([emoji, useCount(sort: Desc)], name: "idx_emoji_popular")
+  @@index([userId, lastUsedAt(sort: Desc)], name: "idx_user_emoji_recent")
+  @@index([userId, useCount(sort: Desc)], name: "idx_user_emoji_frequency")
+}
+
+model LeaderboardHistory {
+  id              Int      @id @default(autoincrement())
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId          Int
+  leaderboardType String   @db.VarChar(20) // 'daily', 'weekly', 'monthly', 'allTime'
+  position        Int
+  score           BigInt   // User's score at snapshot time
+  snapshotDate    DateTime @db.Date // Date of the snapshot
+  metadata        Json?    // Additional context (category, etc.)
+  createdAt       DateTime @default(now())
+
+  // Unique constraint: one record per user per leaderboard type per date
+  @@unique([userId, leaderboardType, snapshotDate], name: "unique_user_leaderboard_snapshot")
+  @@index([leaderboardType, snapshotDate, position], name: "idx_leaderboard_ranking")
+  @@index([userId, leaderboardType, snapshotDate(sort: Desc)], name: "idx_user_leaderboard_history")
+  @@index([snapshotDate, leaderboardType], name: "idx_snapshot_date_type")
+  @@index([position, leaderboardType], name: "idx_position_leaderboard")
 }
 
 model UserStats {

@@ -13,6 +13,8 @@ import {
   type AchievementAnalytics,
   type CreateAchievementData,
 } from '../../api/admin';
+import { RuleBuilder } from './achievements/AchievementRuleBuilder/RuleBuilder';
+import type { JsonRuleAchievementData, RuleValidationResult } from '@ems/types';
 
 interface FilterState {
   search: string;
@@ -34,7 +36,7 @@ const initialFilters: FilterState = {
 
 export default function AchievementManager() {
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'achievements' | 'analytics' | 'categories'
+    'overview' | 'achievements' | 'rule-builder' | 'analytics' | 'categories'
   >('overview');
   const [filters, setFilters] = useState<FilterState>(initialFilters);
   const [currentPage, setCurrentPage] = useState(0);
@@ -55,6 +57,20 @@ export default function AchievementManager() {
   const [editingAchievement, setEditingAchievement] = useState<AchievementWithStats | null>(null);
   const [selectedAchievementDetails, setSelectedAchievementDetails] =
     useState<AchievementWithStats | null>(null);
+
+  // Rule Builder state
+  const [currentRule, setCurrentRule] = useState<Partial<JsonRuleAchievementData>>({
+    eventKeys: [],
+    progress: { kind: 'count' },
+    unlockWhen: {},
+    counters: [],
+  });
+  const [ruleValidation, setRuleValidation] = useState<RuleValidationResult>({
+    isValid: false,
+    errors: ['Rule is incomplete'],
+    warnings: [],
+    estimatedComplexity: 'low',
+  });
 
   // Load achievement data
   const loadAchievementData = async () => {
@@ -323,6 +339,7 @@ export default function AchievementManager() {
         {[
           { key: 'overview', label: 'Overview' },
           { key: 'achievements', label: 'Achievement Management' },
+          { key: 'rule-builder', label: 'Rule Builder' },
           { key: 'analytics', label: 'Analytics' },
           { key: 'categories', label: 'Categories' },
         ].map((tab) => (
@@ -663,6 +680,132 @@ export default function AchievementManager() {
                 Showing {achievementData.length} achievements
               </span>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rule Builder Tab */}
+      {activeTab === 'rule-builder' && (
+        <div className="space-y-6">
+          <div className="bg-surface p-6 rounded-lg border border-muted">
+            <h3 className="text-lg font-semibold text-content mb-4">Achievement Rule Builder</h3>
+            <p className="text-tertiary mb-6">
+              Create sophisticated achievement rules using the visual rule builder. Build complex
+              conditions, track progress, and test your rules with the integrated simulation engine.
+            </p>
+
+            <RuleBuilder
+              initialRule={currentRule}
+              onChange={(rule: JsonRuleAchievementData, validation: RuleValidationResult) => {
+                setCurrentRule(rule);
+                setRuleValidation(validation);
+              }}
+            />
+          </div>
+
+          {/* Rule Status Panel */}
+          <div className="bg-surface p-4 rounded-lg border border-muted">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="font-medium text-content">Current Rule Status</h4>
+              <div className="flex items-center space-x-2">
+                <div
+                  className={`h-2 w-2 rounded-full ${ruleValidation.isValid ? 'bg-success' : 'bg-error'}`}
+                ></div>
+                <span
+                  className={`text-sm font-medium ${ruleValidation.isValid ? 'text-success' : 'text-error'}`}
+                >
+                  {ruleValidation.isValid ? 'Valid' : 'Invalid'}
+                </span>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <div>
+                <span className="text-tertiary">Event Keys:</span>
+                <span className="ml-2 font-mono text-primary">
+                  {currentRule.eventKeys?.length || 0}
+                </span>
+              </div>
+              <div>
+                <span className="text-tertiary">Progress Type:</span>
+                <span className="ml-2 font-mono text-primary">
+                  {currentRule.progress?.kind || 'none'}
+                </span>
+              </div>
+              <div>
+                <span className="text-tertiary">Complexity:</span>
+                <span
+                  className={`ml-2 font-mono ${
+                    ruleValidation.estimatedComplexity === 'low'
+                      ? 'text-success'
+                      : ruleValidation.estimatedComplexity === 'medium'
+                        ? 'text-warning'
+                        : 'text-error'
+                  }`}
+                >
+                  {ruleValidation.estimatedComplexity}
+                </span>
+              </div>
+            </div>
+
+            {ruleValidation.errors.length > 0 && (
+              <div className="mt-3 p-3 bg-error/10 border border-error/20 rounded-lg">
+                <h5 className="text-sm font-medium text-error mb-2">Validation Errors:</h5>
+                <ul className="text-xs text-error space-y-1">
+                  {ruleValidation.errors.map((error, index) => (
+                    <li key={index}>• {error}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {ruleValidation.warnings.length > 0 && (
+              <div className="mt-3 p-3 bg-warning/10 border border-warning/20 rounded-lg">
+                <h5 className="text-sm font-medium text-warning mb-2">Warnings:</h5>
+                <ul className="text-xs text-warning space-y-1">
+                  {ruleValidation.warnings.map((warning, index) => (
+                    <li key={index}>• {warning}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+
+          {/* Quick Actions */}
+          <div className="flex flex-wrap gap-3">
+            <button
+              onClick={() => {
+                setCurrentRule({
+                  eventKeys: [],
+                  progress: { kind: 'count' },
+                  unlockWhen: {},
+                  counters: [],
+                });
+              }}
+              className="px-4 py-2 bg-secondary text-white rounded-lg hover:bg-secondary/80 transition-colors"
+            >
+              🔄 Reset Rule
+            </button>
+
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(JSON.stringify(currentRule, null, 2));
+              }}
+              disabled={!ruleValidation.isValid}
+              className="px-4 py-2 bg-info text-white rounded-lg hover:bg-info/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              📋 Copy JSON
+            </button>
+
+            <button
+              onClick={() => {
+                // TODO: Implement save functionality
+                alert('Save functionality will be implemented in the next phase');
+              }}
+              disabled={!ruleValidation.isValid}
+              className="px-4 py-2 bg-success text-white rounded-lg hover:bg-success/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              💾 Save Achievement
+            </button>
           </div>
         </div>
       )}

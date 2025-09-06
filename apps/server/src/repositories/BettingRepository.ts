@@ -396,4 +396,97 @@ export class BettingRepository implements IBettingRepository {
       },
     });
   }
+
+  async findUserBets(
+    userId: number,
+    options?: {
+      limit?: number;
+      createdAfter?: Date;
+      createdBefore?: Date;
+      status?: string;
+      predictionId?: number;
+    },
+  ): Promise<
+    Array<
+      DbBet & {
+        prediction: {
+          id: number;
+          title: string;
+          category: string;
+          resolved: boolean;
+        };
+        option: {
+          id: number;
+          label: string;
+        };
+      }
+    >
+  > {
+    const where: any = { userId };
+
+    // Apply optional filters
+    if (options?.createdAfter || options?.createdBefore) {
+      where.createdAt = {};
+      if (options.createdAfter) {
+        where.createdAt.gte = options.createdAfter;
+      }
+      if (options.createdBefore) {
+        where.createdAt.lte = options.createdBefore;
+      }
+    }
+
+    if (options?.status) {
+      where.status = options.status;
+    }
+
+    if (options?.predictionId) {
+      where.predictionId = options.predictionId;
+    }
+
+    const bets = await prisma.bet.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: options?.limit || 100,
+      include: {
+        prediction: {
+          select: {
+            id: true,
+            title: true,
+            category: true,
+            resolved: true,
+          },
+        },
+        optionOption: {
+          select: {
+            id: true,
+            label: true,
+          },
+        },
+      },
+    });
+
+    // Map the results to match the expected interface
+    return bets.map((bet) => ({
+      ...bet,
+      option: bet.optionOption
+        ? {
+            id: bet.optionOption.id,
+            label: bet.optionOption.label,
+          }
+        : null,
+    })) as Array<
+      DbBet & {
+        prediction: {
+          id: number;
+          title: string;
+          category: string;
+          resolved: boolean;
+        };
+        option: {
+          id: number;
+          label: string;
+        };
+      }
+    >;
+  }
 }

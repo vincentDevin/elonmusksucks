@@ -4,6 +4,9 @@ import * as adminService from '../services/admin.service';
 import { payoutService } from '../services/payout.service';
 import { adminAchievementService } from '../services/adminAchievement.service';
 import { shameWallService } from '../services/shameWall.service';
+import { RuleSimulationService } from '../services/RuleSimulationService';
+
+const ruleSimulationService = new RuleSimulationService();
 import { serializeBigInt } from '../utils/bigintSerializer';
 import {
   toAdminUserView,
@@ -20,6 +23,7 @@ import {
   toAdminBanHistoryView,
 } from '../view/admin.view';
 import { AdminActions } from '@ems/types';
+import type { JsonRuleAchievementData } from '@ems/types';
 import type {
   PublicUser,
   PublicPrediction,
@@ -859,6 +863,12 @@ export async function getAchievementById(
 ): Promise<void> {
   try {
     const achievementId = parseInt(req.params.id);
+
+    if (isNaN(achievementId)) {
+      res.status(400).json({ error: 'Invalid achievement ID' });
+      return;
+    }
+
     const achievement = await adminAchievementService.getAchievementById(achievementId);
 
     if (!achievement) {
@@ -1084,3 +1094,121 @@ export async function awardShameAchievement(
     next(err);
   }
 }
+
+export const simulateRule = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const { rule, events, scenario, eventCount } = req.body;
+
+    if (!rule) {
+      res.status(400).json({ error: 'Rule is required' });
+      return;
+    }
+
+    let simulationEvents = events;
+
+    if (!simulationEvents) {
+      simulationEvents = await ruleSimulationService.generateTestEvents(
+        rule as JsonRuleAchievementData,
+        scenario || 'mixed',
+        eventCount || 50,
+      );
+    }
+
+    const result = await ruleSimulationService.simulateRule(
+      rule as JsonRuleAchievementData,
+      simulationEvents,
+    );
+
+    res.json({
+      success: true,
+      simulation: result,
+      generatedEvents: !events,
+    });
+  } catch (err) {
+    console.error('Rule simulation failed:', err);
+    next(err);
+  }
+};
+
+export const generateTestEvents = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const { rule, scenario, eventCount } = req.body;
+
+    if (!rule) {
+      res.status(400).json({ error: 'Rule is required' });
+      return;
+    }
+
+    const events = await ruleSimulationService.generateTestEvents(
+      rule as JsonRuleAchievementData,
+      scenario || 'mixed',
+      eventCount || 50,
+    );
+
+    res.json({
+      success: true,
+      events,
+      scenario: scenario || 'mixed',
+      count: events.length,
+    });
+  } catch (err) {
+    console.error('Test event generation failed:', err);
+    next(err);
+  }
+};
+
+export const quickSimulate = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const { rule } = req.body;
+
+    if (!rule) {
+      res.status(400).json({ error: 'Rule is required' });
+      return;
+    }
+
+    const scenarios = ['success', 'failure', 'mixed'] as const;
+    const results: Record<string, any> = {};
+
+    for (const scenario of scenarios) {
+      const events = await ruleSimulationService.generateTestEvents(
+        rule as JsonRuleAchievementData,
+        scenario,
+        30,
+      );
+      const result = await ruleSimulationService.simulateRule(
+        rule as JsonRuleAchievementData,
+        events,
+      );
+
+      results[scenario] = {
+        ...result,
+        eventCount: events.length,
+      };
+    }
+
+    res.json({
+      success: true,
+      scenarios: results,
+      rule: {
+        eventKeys: rule.eventKeys,
+        progressType: rule.progress.kind,
+        complexity: results.mixed.complexity,
+      },
+    });
+  } catch (err) {
+    console.error('Quick simulation failed:', err);
+    next(err);
+  }
+};

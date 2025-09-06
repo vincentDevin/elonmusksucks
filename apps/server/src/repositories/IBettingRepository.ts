@@ -72,4 +72,33 @@ export interface IBettingRepository {
     userId: number,
     limit: number,
   ): Promise<Array<{ status: string; createdAt: Date }>>;
+
+  /**
+   * Find user bets with flexible filtering options.
+   */
+  findUserBets(
+    userId: number,
+    options?: {
+      limit?: number;
+      createdAfter?: Date;
+      createdBefore?: Date;
+      status?: string;
+      predictionId?: number;
+    },
+  ): Promise<
+    Array<
+      DbBet & {
+        prediction: {
+          id: number;
+          title: string;
+          category: string;
+          resolved: boolean;
+        };
+        option: {
+          id: number;
+          label: string;
+        };
+      }
+    >
+  >;
 }

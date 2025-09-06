@@ -21,6 +21,7 @@ import redisClient from '../lib/redis';
 import { UserService } from '../services/user.service';
 import { unifiedActivityService } from './unifiedActivity.service';
 import { EventBus } from '../lib/EventBus';
+import { eventBus } from './eventBus.service';
 
 // Using the global ParlayLegWithUser type from @ems/types
 
@@ -174,10 +175,240 @@ export class PredictionService {
   }
 
   /* ────────────────────────────────────────────────────────────────────────── */
-  /** Fetch ONE prediction (public safe shape) */
-  async getPrediction(id: number) {
+  /** Fetch ONE prediction (public safe shape) with view tracking */
+  async getPrediction(id: number, userId?: number) {
     const pred = await this.repo.findPredictionById(id);
-    return pred ? this.enrichAvatars(pred) : null;
+    if (!pred) return null;
+
+    // Track prediction view in background (don't block response)
+    if (userId) {
+      setImmediate(async () => {
+        try {
+          await this.trackPredictionView(id, userId);
+        } catch (viewError) {
+          console.error(
+            `[prediction] Error tracking view for prediction ${id} by user ${userId}:`,
+            viewError,
+          );
+        }
+      });
+    }
+
+    return this.enrichAvatars(pred);
+  }
+
+  /**
+   * Track prediction view and publish events for achievements
+   */
+  async trackPredictionView(predictionId: number, userId: number): Promise<void> {
+    try {
+      // Increment view count in database using repository method if available
+      try {
+        if (typeof (this.repo as any).incrementViewCount === 'function') {
+          await (this.repo as any).incrementViewCount(predictionId);
+        }
+      } catch (repoError) {
+        console.warn(
+          `[prediction] Could not increment view count for prediction ${predictionId}:`,
+          repoError,
+        );
+      }
+
+      // Get prediction details for event payload
+      const prediction = await this.repo.findPredictionById(predictionId);
+      if (!prediction) return;
+
+      // Check if user has bets on this prediction
+      const userHasBet = prediction.bets?.some((bet) => bet.user.id === userId) || false;
+
+      // Publish prediction view event
+      await eventBus.publish('prediction:viewed', {
+        key: 'prediction:viewed',
+        userId,
+        occurredAt: new Date().toISOString(),
+        idempotencyKey: `prediction:view:${predictionId}:${userId}:${Date.now()}`,
+        payload: {
+          predictionId,
+          title: prediction.title,
+          category: prediction.category,
+          isResolved: prediction.resolved,
+          userHasBet,
+          viewedAt: new Date().toISOString(),
+        },
+      });
+
+      // Add activity log for time-based tracking
+      await eventBus.publish('user:activity:log', {
+        userId,
+        activityType: 'prediction_viewed',
+        metadata: {
+          predictionId,
+          title: prediction.title?.substring(0, 100),
+          category: prediction.category,
+          isResolved: prediction.resolved,
+          userHasBet,
+          timestamp: new Date().toISOString(),
+        },
+        occurredAt: new Date().toISOString(),
+        dateKey: new Date().toISOString().split('T')[0],
+        idempotencyKey: `activity:prediction:view:${predictionId}:${userId}:${Date.now()}`,
+      });
+
+      console.log(`[prediction] User ${userId} viewed prediction ${predictionId}`);
+    } catch (error) {
+      console.error(`[prediction] Error tracking prediction view:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Track first correct bet achievement when user makes their first winning bet
+   * This will be called from betting service when a bet is resolved as winning
+   */
+  async trackFirstCorrectBet(userId: number, predictionId: number, betId: number): Promise<void> {
+    try {
+      // Get prediction details
+      const prediction = await this.repo.findPredictionById(predictionId);
+      if (!prediction) return;
+
+      // Update the prediction record with first correct bet user if available
+      try {
+        if (typeof (this.repo as any).updateFirstCorrectBetUser === 'function') {
+          await (this.repo as any).updateFirstCorrectBetUser(predictionId, userId);
+        }
+      } catch (repoError) {
+        console.warn(
+          `[prediction] Could not update first correct bet user for prediction ${predictionId}:`,
+          repoError,
+        );
+      }
+
+      // Publish first correct bet event (achievement engine will determine if it's truly the first)
+      await eventBus.publish('prediction:first:correct:bet', {
+        key: 'prediction:first:correct:bet',
+        userId,
+        occurredAt: new Date().toISOString(),
+        idempotencyKey: `prediction:first:correct:${userId}:${betId}`,
+        payload: {
+          predictionId,
+          betId,
+          title: prediction.title,
+          category: prediction.category,
+          achievedAt: new Date().toISOString(),
+        },
+      });
+
+      console.log(`[prediction] User ${userId} recorded correct bet on prediction ${predictionId}`);
+    } catch (error) {
+      console.error(`[prediction] Error tracking first correct bet:`, error);
+      // Don't throw - this shouldn't break bet processing
+    }
+  }
+
+  /**
+   * Track fast resolution achievements when predictions are resolved quickly
+   * This should be called from the payout service when resolving predictions
+   */
+  async trackFastResolution(
+    predictionId: number,
+    resolvedWithinHour: boolean = false,
+  ): Promise<void> {
+    try {
+      if (resolvedWithinHour) {
+        // Update database flag if available
+        try {
+          if (typeof (this.repo as any).markResolvedWithinHour === 'function') {
+            await (this.repo as any).markResolvedWithinHour(predictionId);
+          }
+        } catch (repoError) {
+          console.warn(
+            `[prediction] Could not mark resolved within hour for prediction ${predictionId}:`,
+            repoError,
+          );
+        }
+
+        // Get prediction details
+        const prediction = await this.repo.findPredictionById(predictionId);
+        if (!prediction) return;
+
+        // Calculate time difference if createdAt is available
+        let timeDifference = 'unknown';
+        if (prediction.createdAt) {
+          const diffMs = Date.now() - new Date(prediction.createdAt).getTime();
+          const diffMinutes = Math.floor(diffMs / (1000 * 60));
+          timeDifference = diffMinutes.toString();
+        }
+
+        // Publish fast resolution event
+        await eventBus.publish('prediction:resolved:fast', {
+          key: 'prediction:resolved:fast',
+          userId: prediction.creatorId,
+          occurredAt: new Date().toISOString(),
+          idempotencyKey: `prediction:fast:resolution:${predictionId}`,
+          payload: {
+            predictionId,
+            title: prediction.title,
+            category: prediction.category,
+            createdAt: prediction.createdAt?.toISOString(),
+            resolvedAt: new Date().toISOString(),
+            timeDifferenceMinutes: timeDifference,
+          },
+        });
+
+        console.log(
+          `[prediction] Prediction ${predictionId} resolved within an hour (${timeDifference} minutes)`,
+        );
+      }
+    } catch (error) {
+      console.error(`[prediction] Error tracking fast resolution:`, error);
+    }
+  }
+
+  /**
+   * Track viral predictions based on view counts and engagement
+   * This can be called periodically or when significant view/bet thresholds are reached
+   */
+  async trackViralPrediction(predictionId: number): Promise<void> {
+    try {
+      const prediction = await this.repo.findPredictionById(predictionId);
+      if (!prediction) return;
+
+      // Define viral threshold (could be made configurable)
+      const VIRAL_VIEW_THRESHOLD = 1000;
+      const VIRAL_BET_THRESHOLD = 100;
+
+      // Check if prediction has view count data (from updated schema)
+      const viewCount = (prediction as any).viewCount || 0;
+      const betCount = prediction.bets?.length || 0;
+
+      if (viewCount >= VIRAL_VIEW_THRESHOLD && betCount >= VIRAL_BET_THRESHOLD) {
+        // Publish viral prediction event
+        await eventBus.publish('prediction:viral', {
+          key: 'prediction:viral',
+          userId: prediction.creatorId,
+          occurredAt: new Date().toISOString(),
+          idempotencyKey: `prediction:viral:${predictionId}`,
+          payload: {
+            predictionId,
+            title: prediction.title,
+            category: prediction.category,
+            viewCount,
+            betCount,
+            viralMetrics: {
+              views: viewCount,
+              bets: betCount,
+              ratio: betCount / Math.max(viewCount, 1),
+            },
+          },
+        });
+
+        console.log(
+          `[prediction] Prediction ${predictionId} went viral: ${viewCount} views, ${betCount} bets`,
+        );
+      }
+    } catch (error) {
+      console.error(`[prediction] Error tracking viral prediction:`, error);
+    }
   }
 
   /* ────────────────────────────────────────────────────────────────────────── */

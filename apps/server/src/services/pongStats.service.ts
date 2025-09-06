@@ -33,6 +33,8 @@ import { SYSTEM_AI_USER_ID } from '@ems/types';
 import type { PongStatsData } from '../repositories/IPongRepository';
 import { pongPayoutQueueService } from './pongPayoutQueue.service';
 import { eventBus } from './eventBus.service';
+import { streakManager } from './StreakManager.service';
+import { eventCorrelator } from './EventCorrelator.service';
 
 // Note: Pong service interfaces now imported from @ems/types
 // MatchResult -> PongMatchResult, other interfaces imported directly
@@ -309,6 +311,75 @@ export class PongStatsService {
       winnerStatsData,
       loserStatsData,
     );
+
+    // 9.1. Process streak tracking and special achievements for human players
+    try {
+      if (winnerId && winnerId > 0) {
+        // Update pong win streak
+        await streakManager.updateStreak(winnerId, 'pong_win', true, {
+          matchId,
+          opponent: loserName || 'AI',
+          isAI: isAIMatch,
+          score: `${winnerScore}-${loserScore}`,
+          wager: wagerAmount,
+        });
+
+        // Check for comeback achievement (win from 0-9 deficit)
+        if (loserScore && winnerScore && loserScore >= 9 && winnerScore === 11) {
+          await eventCorrelator.detectComplexScenario(winnerId, 'pong_comeback');
+        }
+
+        // Add activity log for time-based tracking
+        await eventBus.publish('user:activity:log', {
+          userId: winnerId,
+          activityType: 'pong_match_won',
+          metadata: {
+            matchId,
+            opponent: loserName || 'AI',
+            isAI: isAIMatch,
+            score: `${winnerScore}-${loserScore}`,
+            duration,
+            wager: wagerAmount,
+            timestamp: new Date().toISOString(),
+          },
+          occurredAt: new Date().toISOString(),
+          dateKey: new Date().toISOString().split('T')[0],
+          idempotencyKey: `activity:pong:won:${matchId}:${winnerId}`,
+        });
+      }
+
+      if (loserId && loserId > 0) {
+        // Update pong loss streak (break win streak)
+        await streakManager.updateStreak(loserId, 'pong_win', false, {
+          matchId,
+          opponent: winnerName,
+          isAI: isAIMatch,
+          score: `${loserScore}-${winnerScore}`,
+          wager: wagerAmount,
+        });
+
+        // Add activity log for loser
+        await eventBus.publish('user:activity:log', {
+          userId: loserId,
+          activityType: 'pong_match_lost',
+          metadata: {
+            matchId,
+            opponent: winnerName,
+            isAI: isAIMatch,
+            score: `${loserScore}-${winnerScore}`,
+            duration,
+            wager: wagerAmount,
+            timestamp: new Date().toISOString(),
+          },
+          occurredAt: new Date().toISOString(),
+          dateKey: new Date().toISOString().split('T')[0],
+          idempotencyKey: `activity:pong:lost:${matchId}:${loserId}`,
+        });
+      }
+    } catch (streakError) {
+      console.error(`[PongStats] Error processing streaks for match ${matchId}:`, streakError);
+      // Don't fail the match processing if streak tracking fails
+    }
 
     // 10. Enqueue payout if there's a human winner and wager amount > 0
     if (winnerId && winnerId > 0 && wagerAmount > 0) {
