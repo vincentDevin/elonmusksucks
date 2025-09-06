@@ -26,7 +26,7 @@ import { registerPongHandlers, registerPongRedisHandlers } from './handlers/pong
 import { registerPostHandlers } from './handlers/postHandlers';
 import { registerPostRedisHandlers } from './handlers/postRedisEventHandlers';
 import { socketCleanupManager } from './lib/SocketCleanupManager';
-import { setupAchievementRedisHandlers } from './workers/achievementEventHandler';
+import { setupAchievementRedisHandlers } from './handlers/achievementEventHandler';
 // import { registerRoomHandlers } from './handlers/roomHandlers'; // future rooms
 
 // ──────────────────────────────────────────────────────────────────────────────

@@ -14,41 +14,58 @@ export class StatsRepository implements IStatsRepository {
    */
   async getUserCounters(userId: number): Promise<Record<string, number>> {
     try {
-      // Get user stats from the database
-      const userStats = await this.prisma.userStats.findUnique({
-        where: { userId },
-      });
+      // Get all user stats in parallel
+      const [userStats, pongStats, user, predictionsCount, followersCount, followingCount] =
+        await Promise.all([
+          this.prisma.userStats.findUnique({ where: { userId } }),
+          this.prisma.pongStats.findUnique({ where: { userId } }),
+          this.prisma.user.findUnique({ where: { id: userId } }),
+          this.prisma.prediction.count({ where: { creatorId: userId } }),
+          this.prisma.follow.count({ where: { followingId: userId } }),
+          this.prisma.follow.count({ where: { followerId: userId } }),
+        ]);
 
-      if (!userStats) {
-        // Return default counters for new users
-        return this.getDefaultCounters();
-      }
+      // Serialize bigint fields to numbers
+      const serializedUserStats = userStats ? serializeBigInt(userStats) : null;
+      const serializedPongStats = pongStats ? serializeBigInt(pongStats) : null;
 
-      // Serialize bigint fields to numbers and map database fields to counter names
-      const serialized = serializeBigInt(userStats);
       return {
         // Betting counters
-        betsPlaced: userStats.totalBets || 0,
-        betsWon: userStats.betsWon || 0,
-        totalStaked: Number(serialized.totalWagered || 0),
-        totalProfit: Number(serialized.totalWon || 0),
-        parlayWins: userStats.parlaysWon || 0,
-        biggestWin: Number(serialized.biggestWin || 0),
-        winStreak: userStats.currentStreak || 0,
-        bestWinStreak: userStats.longestStreak || 0,
+        betsPlaced: userStats?.totalBets || 0,
+        betsWon: userStats?.betsWon || 0,
+        betsLost: userStats?.betsLost || 0,
+        totalStaked: Number(serializedUserStats?.totalWagered || 0),
+        totalProfit: Number(serializedUserStats?.profit || 0), // Use actual profit, not totalWon
+        totalWon: Number(serializedUserStats?.totalWon || 0),
+        parlayWins: userStats?.parlaysWon || 0,
+        parlayTotal: userStats?.totalParlays || 0,
+        biggestWin: Number(serializedUserStats?.biggestWin || 0),
+        winStreak: userStats?.currentStreak || 0,
+        bestWinStreak: userStats?.longestStreak || 0,
+        winRate: userStats?.winRate || 0,
 
-        // Pong counters (placeholder - will be added to schema later)
-        pongMatches: 0,
-        pongWins: 0,
-        pongLosses: 0,
-        pongElo: 1200,
-        pongStreakWin: 0,
-        pongBestStreakWin: 0,
+        // Pong counters - NOW USING REAL DATA
+        pongMatches: pongStats?.totalMatches || 0,
+        pongWins: pongStats?.wins || 0,
+        pongLosses: pongStats?.losses || 0,
+        pongElo: pongStats?.eloRating || 1200,
+        pongStreakWin: pongStats?.winStreak || 0,
+        pongBestStreakWin: pongStats?.bestWinStreak || 0,
+        pongPerfectGames: pongStats?.perfectGames || 0,
+        pongComebacks: pongStats?.comebacks || 0,
+        pongTotalWagered: Number(serializedPongStats?.totalWagered || 0),
+        pongTotalWon: Number(serializedPongStats?.totalWon || 0),
 
-        // Social counters (placeholder)
-        predictionsCreated: 0,
-        followersCount: 0,
-        followingCount: 0,
+        // Social counters - NOW USING REAL DATA
+        predictionsCreated: predictionsCount || 0,
+        followersCount: followersCount || 0,
+        followingCount: followingCount || 0,
+
+        // User profile completion counters
+        profileComplete: user?.profileComplete ? 1 : 0,
+        hasAvatar: user?.avatarUrl ? 1 : 0,
+        hasBio: user?.bio ? 1 : 0,
+        hasLocation: user?.location ? 1 : 0,
       };
     } catch (error) {
       console.error('Failed to get user counters:', error);
@@ -58,42 +75,74 @@ export class StatsRepository implements IStatsRepository {
 
   /**
    * Update user counters (for stats synchronization)
+   * NOTE: This method is mainly for testing. In production, stats are updated
+   * directly by the respective services (betting, pong, etc.)
    */
   async updateUserCounters(userId: number, updates: Record<string, number>): Promise<void> {
     try {
-      // Map counter updates back to database fields
-      const dbUpdates: any = {};
+      // Map counter updates back to database fields for UserStats
+      const userStatsUpdates: any = {};
 
-      if (updates.betsPlaced !== undefined) dbUpdates.totalBets = updates.betsPlaced;
-      if (updates.betsWon !== undefined) dbUpdates.totalWins = updates.betsWon;
-      if (updates.totalStaked !== undefined) dbUpdates.totalStaked = updates.totalStaked.toString();
-      if (updates.totalProfit !== undefined) dbUpdates.totalProfit = updates.totalProfit.toString();
-      if (updates.parlayWins !== undefined) dbUpdates.parlayWins = updates.parlayWins;
-      if (updates.biggestWin !== undefined) dbUpdates.biggestWin = updates.biggestWin.toString();
-      if (updates.winStreak !== undefined) dbUpdates.currentWinStreak = updates.winStreak;
-      if (updates.bestWinStreak !== undefined) dbUpdates.bestWinStreak = updates.bestWinStreak;
+      if (updates.betsPlaced !== undefined) userStatsUpdates.totalBets = updates.betsPlaced;
+      if (updates.betsWon !== undefined) userStatsUpdates.betsWon = updates.betsWon;
+      if (updates.betsLost !== undefined) userStatsUpdates.betsLost = updates.betsLost;
+      if (updates.totalStaked !== undefined)
+        userStatsUpdates.totalWagered = BigInt(updates.totalStaked);
+      if (updates.totalProfit !== undefined) userStatsUpdates.profit = BigInt(updates.totalProfit);
+      if (updates.totalWon !== undefined) userStatsUpdates.totalWon = BigInt(updates.totalWon);
+      if (updates.parlayWins !== undefined) userStatsUpdates.parlaysWon = updates.parlayWins;
+      if (updates.parlayTotal !== undefined) userStatsUpdates.totalParlays = updates.parlayTotal;
+      if (updates.biggestWin !== undefined)
+        userStatsUpdates.biggestWin = BigInt(updates.biggestWin);
+      if (updates.winStreak !== undefined) userStatsUpdates.currentStreak = updates.winStreak;
+      if (updates.bestWinStreak !== undefined)
+        userStatsUpdates.longestStreak = updates.bestWinStreak;
+      if (updates.winRate !== undefined) userStatsUpdates.winRate = updates.winRate;
 
-      if (updates.pongMatches !== undefined) dbUpdates.pongMatches = updates.pongMatches;
-      if (updates.pongWins !== undefined) dbUpdates.pongWins = updates.pongWins;
-      if (updates.pongLosses !== undefined) dbUpdates.pongLosses = updates.pongLosses;
-      if (updates.pongElo !== undefined) dbUpdates.pongElo = updates.pongElo;
-      if (updates.pongStreakWin !== undefined) dbUpdates.pongWinStreak = updates.pongStreakWin;
-      if (updates.pongBestStreakWin !== undefined)
-        dbUpdates.pongBestWinStreak = updates.pongBestStreakWin;
-
-      if (updates.predictionsCreated !== undefined)
-        dbUpdates.predictionsCreated = updates.predictionsCreated;
-
-      if (Object.keys(dbUpdates).length > 0) {
+      // Update UserStats if there are changes
+      if (Object.keys(userStatsUpdates).length > 0) {
         await this.prisma.userStats.upsert({
           where: { userId },
           create: {
             userId,
-            ...dbUpdates,
+            ...userStatsUpdates,
           },
-          update: dbUpdates,
+          update: userStatsUpdates,
         });
       }
+
+      // Map counter updates back to database fields for PongStats
+      const pongStatsUpdates: any = {};
+
+      if (updates.pongMatches !== undefined) pongStatsUpdates.totalMatches = updates.pongMatches;
+      if (updates.pongWins !== undefined) pongStatsUpdates.wins = updates.pongWins;
+      if (updates.pongLosses !== undefined) pongStatsUpdates.losses = updates.pongLosses;
+      if (updates.pongElo !== undefined) pongStatsUpdates.eloRating = updates.pongElo;
+      if (updates.pongStreakWin !== undefined) pongStatsUpdates.winStreak = updates.pongStreakWin;
+      if (updates.pongBestStreakWin !== undefined)
+        pongStatsUpdates.bestWinStreak = updates.pongBestStreakWin;
+      if (updates.pongPerfectGames !== undefined)
+        pongStatsUpdates.perfectGames = updates.pongPerfectGames;
+      if (updates.pongComebacks !== undefined) pongStatsUpdates.comebacks = updates.pongComebacks;
+      if (updates.pongTotalWagered !== undefined)
+        pongStatsUpdates.totalWagered = BigInt(updates.pongTotalWagered);
+      if (updates.pongTotalWon !== undefined)
+        pongStatsUpdates.totalWon = BigInt(updates.pongTotalWon);
+
+      // Update PongStats if there are changes
+      if (Object.keys(pongStatsUpdates).length > 0) {
+        await this.prisma.pongStats.upsert({
+          where: { userId },
+          create: {
+            userId,
+            ...pongStatsUpdates,
+          },
+          update: pongStatsUpdates,
+        });
+      }
+
+      // Note: Social counters (predictionsCreated, followersCount, etc.) are derived
+      // from actual database relationships and should not be manually updated
     } catch (error) {
       console.error('Failed to update user counters:', error);
       throw error;
@@ -220,28 +269,42 @@ export class StatsRepository implements IStatsRepository {
    */
   private getDefaultCounters(): Record<string, number> {
     return {
-      // Betting
+      // Betting counters
       betsPlaced: 0,
       betsWon: 0,
+      betsLost: 0,
       totalStaked: 0,
       totalProfit: 0,
+      totalWon: 0,
       parlayWins: 0,
+      parlayTotal: 0,
       biggestWin: 0,
       winStreak: 0,
       bestWinStreak: 0,
+      winRate: 0,
 
-      // Pong
+      // Pong counters
       pongMatches: 0,
       pongWins: 0,
       pongLosses: 0,
       pongElo: 1200,
       pongStreakWin: 0,
       pongBestStreakWin: 0,
+      pongPerfectGames: 0,
+      pongComebacks: 0,
+      pongTotalWagered: 0,
+      pongTotalWon: 0,
 
-      // Social
+      // Social counters
       predictionsCreated: 0,
       followersCount: 0,
       followingCount: 0,
+
+      // User profile completion counters
+      profileComplete: 0,
+      hasAvatar: 0,
+      hasBio: 0,
+      hasLocation: 0,
     };
   }
 }
