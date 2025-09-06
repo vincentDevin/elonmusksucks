@@ -20,13 +20,13 @@ import { PredictionType } from '@prisma/client';
 import redisClient from '../lib/redis';
 import { UserService } from '../services/user.service';
 import { unifiedActivityService } from './unifiedActivity.service';
-import { achievementService } from './achievement.service';
-import { achievementEvaluatorService } from './achievementEvaluator.service';
+import { EventBus } from '../lib/EventBus';
 
 // Using the global ParlayLegWithUser type from @ems/types
 
 export class PredictionService {
   private userService = new UserService();
+  private eventBus = new EventBus();
 
   constructor(private repo: IPredictionRepository = new PredictionRepository()) {}
 
@@ -146,28 +146,28 @@ export class PredictionService {
       // Activity already published by unifiedActivityService above
       // No need for duplicate ActivityRecorder call
 
-      // Check for achievement unlocks (legacy system)
-      await achievementService.checkAndUpdateAchievements({
-        type: 'prediction_created',
-        userId: params.creatorId,
-        data: {
-          predictionId: pred.id,
-          title: pred.title,
-          category: pred.category,
-        },
-      });
-
-      // Check for achievement unlocks (advanced evaluator)
-      await achievementEvaluatorService.processAchievementEvent({
-        type: 'prediction_created',
-        userId: params.creatorId,
-        timestamp: new Date().toISOString(),
-        data: {
-          predictionId: pred.id,
-          title: pred.title,
-          category: pred.category,
-        },
-      });
+      // Publish JSON rule achievement event for prediction creation
+      try {
+        await this.eventBus.publish('prediction:created', {
+          key: 'prediction:created',
+          userId: params.creatorId,
+          occurredAt: pred.createdAt.toISOString(),
+          idempotencyKey: `prediction:${pred.id}:created`,
+          payload: {
+            predictionId: pred.id,
+            title: pred.title,
+            category: pred.category,
+            description: pred.description,
+            type: pred.type,
+            threshold: pred.threshold,
+            expiresAt: pred.expiresAt.toISOString(),
+            optionCount: pred.options?.length || 0,
+          },
+        });
+      } catch (achievementError) {
+        console.error('[prediction] Error publishing achievement event:', achievementError);
+        // Don't fail the prediction creation if achievement event fails
+      }
     }
 
     return dto;

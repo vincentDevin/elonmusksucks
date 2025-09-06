@@ -111,10 +111,8 @@ export async function initSocket(httpServer: HTTPServer) {
     'pong:tier:change',
     'pong:stats:update',
     'pong:leaderboard:update',
-    // Pong achievement events
-    'pong:match:completed',
-    'pong:match:lost',
-    'pong:elo:milestone',
+    // NOTE: Pong achievement events (pong:match:completed, pong:match:lost, pong:elo:milestone)
+    // are handled exclusively by achievementEventHandler.ts to avoid duplicate subscriptions
   );
   registerRedisEventHandlers(io, eventSub);
   registerPongRedisHandlers(io, eventSub);

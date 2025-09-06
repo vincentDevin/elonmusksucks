@@ -1,103 +1,123 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useAchievements } from '../../contexts/AchievementContext';
 import { useAchievementTheme } from '../../theme/hooks/useAchievementTheme';
 import type { AchievementRarity } from '../../theme/utils/achievement-colors';
-
-interface Achievement {
-  id: number;
-  name: string;
-  title: string;
-  description: string;
-  category: string;
-  rarity: string;
-  iconUrl?: string;
-  completedAt?: string;
-  awardedAt?: string;
-}
+import type { ComponentAchievement } from '../../utils/achievementDataTransform';
+import AchievementCard from '../dashboard/AchievementManager/AchievementCard';
 
 interface ProfileAchievementsProps {
-  achievements?: Achievement[]; // Now optional, will fall back to context
-  embedded?: boolean; // When true, removes container hover effects for embedded usage
+  achievements?: ComponentAchievement[];
+  embedded?: boolean;
 }
 
 export function ProfileAchievements({
   achievements: propAchievements,
   embedded = false,
 }: ProfileAchievementsProps) {
-  const { recentAchievements, loading } = useAchievements();
+  const { achievements, recentAchievements, totalBadges, totalAvailable, completionRate, loading } =
+    useAchievements();
+
   const { getRarityClasses, getCategoryIcon, getCardClasses, utils } = useAchievementTheme();
 
-  // Use context achievements if no props provided, or filter context for completed ones
-  const achievements = propAchievements || recentAchievements || [];
   const [expanded, setExpanded] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [selectedRarity, setSelectedRarity] = useState<string>('all');
+  const [pinnedAchievementId, setPinnedAchievementId] = useState<string | null>(null);
 
-  // Get unique categories and rarities
-  const categories = [
-    'all',
-    ...Array.from(new Set(achievements.map((a) => a.category).filter(Boolean))),
-  ];
-  const rarities = [
-    'all',
-    ...Array.from(new Set(achievements.map((a) => a.rarity).filter(Boolean))),
-  ];
+  // Create merged achievement data (like AchievementManager does)
+  const mergedAchievements = useMemo(() => {
+    const contextAchievements = achievements || [];
 
-  // Filter achievements
-  const filteredAchievements = achievements.filter((achievement) => {
-    const categoryMatch =
-      selectedCategory === 'all' ||
-      (achievement.category && achievement.category === selectedCategory);
-    const rarityMatch =
-      selectedRarity === 'all' || (achievement.rarity && achievement.rarity === selectedRarity);
-    return categoryMatch && rarityMatch;
-  });
+    // ALWAYS use context achievements if they're available and complete
+    // The context has the full data with user progress (130 items vs 22 props)
+    if (contextAchievements.length > (propAchievements?.length || 0)) {
+      // Context has more complete data, use it
+      return contextAchievements;
+    }
 
-  // Sort by rarity and date
-  const sortedAchievements = filteredAchievements.sort((a, b) => {
-    const rarityOrder = { legendary: 0, rare: 1, uncommon: 2, secret: 3, common: 4, shame: 5 };
-    const aRarity = rarityOrder[a.rarity as keyof typeof rarityOrder] ?? 6;
-    const bRarity = rarityOrder[b.rarity as keyof typeof rarityOrder] ?? 6;
+    if (!propAchievements) {
+      // No props, use context
+      return contextAchievements;
+    }
 
-    if (aRarity !== bRarity) return aRarity - bRarity;
+    // Other user profile - merge context achievements with their progress from props
+    return contextAchievements.map((contextAch) => {
+      const userProgress = propAchievements.find(
+        (p) => (p.achievementId || p.id) === (contextAch.achievementId || contextAch.id),
+      );
 
-    const aDate = new Date(a.completedAt || a.awardedAt || 0).getTime();
-    const bDate = new Date(b.completedAt || b.awardedAt || 0).getTime();
-    return bDate - aDate;
-  });
+      if (userProgress) {
+        // User has this achievement with their progress
+        return userProgress;
+      } else {
+        // User doesn't have progress on this achievement - show as locked
+        return {
+          ...contextAch,
+          isCompleted: false,
+          progress: 0,
+          completedAt: undefined,
+        };
+      }
+    });
+  }, [achievements, propAchievements]);
 
-  // Helper to get themed styling for achievements
-  const getAchievementThemeClasses = (rarity: string, category: string) => {
-    const validRarity = utils.isValidRarity(rarity) ? (rarity as AchievementRarity) : 'common';
-    return {
-      rarityClasses: getRarityClasses(validRarity),
-      cardClasses: getCardClasses(validRarity, category),
-    };
-  };
+  // Use merged data for both display and stats
+  const displayAchievements = mergedAchievements;
 
-  const getStats = () => {
-    const stats = achievements.reduce(
-      (acc, achievement) => {
-        acc[achievement.rarity] = (acc[achievement.rarity] || 0) + 1;
-        return acc;
-      },
-      {} as Record<string, number>,
-    );
+  // Calculate stats using the merged achievement data
+  const stats = useMemo(() => {
+    const categoryStats: Record<string, { total: number; completed: number }> = {};
+    const rarityStats: Record<string, { total: number; completed: number }> = {};
 
-    return stats;
-  };
+    mergedAchievements.forEach((achievement) => {
+      const category = achievement.category || 'general';
+      const rarity = achievement.rarity;
 
-  const stats = getStats();
+      // Category stats
+      if (!categoryStats[category]) {
+        categoryStats[category] = { total: 0, completed: 0 };
+      }
+      categoryStats[category].total++;
+      if (achievement.isCompleted) {
+        categoryStats[category].completed++;
+      }
 
-  // Show loading state if using context and still loading
-  if (!propAchievements && loading) {
+      // Rarity stats
+      if (!rarityStats[rarity]) {
+        rarityStats[rarity] = { total: 0, completed: 0 };
+      }
+      rarityStats[rarity].total++;
+      if (achievement.isCompleted) {
+        rarityStats[rarity].completed++;
+      }
+    });
+
+    // Find rarest completed achievement
+    const completedAchievements = mergedAchievements.filter((a) => a.isCompleted);
+    const rarityOrder = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'secret', 'shame'];
+    const rarestAchievement = completedAchievements.sort((a, b) => {
+      const aRarityIndex = rarityOrder.indexOf(a.rarity);
+      const bRarityIndex = rarityOrder.indexOf(b.rarity);
+      return bRarityIndex - aRarityIndex;
+    })[0];
+
+    return { categoryStats, rarityStats, rarestAchievement };
+  }, [mergedAchievements]);
+
+  const displayAchievement = useMemo(() => {
+    const completedAchievements = displayAchievements.filter((a) => a.isCompleted);
+
+    if (pinnedAchievementId) {
+      const pinned = completedAchievements.find((a) => a.id === pinnedAchievementId);
+      if (pinned) return pinned;
+    }
+
+    return stats.rarestAchievement || completedAchievements[0] || null;
+  }, [displayAchievements, pinnedAchievementId, stats.rarestAchievement]);
+
+  if (loading && !propAchievements) {
     return (
-      <div className="bg-surface border border-muted rounded-2xl p-4 sm:p-6 shadow-lg">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-content flex items-center gap-2">
-            🏆 Achievements
-          </h3>
-        </div>
+      <div
+        className={`${embedded ? '' : 'bg-surface border border-muted rounded-2xl p-4 sm:p-6 shadow-lg'}`}
+      >
         <div className="flex items-center justify-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           <span className="ml-3 text-tertiary">Loading achievements...</span>
@@ -106,25 +126,11 @@ export function ProfileAchievements({
     );
   }
 
-  // Get newest achievement
-  const newestAchievement =
-    achievements.length > 0
-      ? sortedAchievements.reduce((newest, current) => {
-          const newestDate = new Date(newest.completedAt || newest.awardedAt || 0).getTime();
-          const currentDate = new Date(current.completedAt || current.awardedAt || 0).getTime();
-          return currentDate > newestDate ? current : newest;
-        })
-      : null;
-
   return (
     <div
-      className={`${
-        embedded
-          ? ''
-          : 'bg-surface border border-muted rounded-2xl p-4 sm:p-6 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.01]'
-      }`}
+      className={`${embedded ? '' : 'bg-surface border border-muted rounded-2xl p-4 sm:p-6 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.01]'}`}
     >
-      {/* Header with expand/collapse button */}
+      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-semibold text-content flex items-center gap-2">
           🏆 Achievements
@@ -147,226 +153,142 @@ export function ProfileAchievements({
         </button>
       </div>
 
-      {/* Achievement Summary - always visible */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 bg-muted/10 rounded-xl">
-        <div className="text-center">
-          <div className="text-lg font-bold text-primary">{achievements.length}</div>
-          <div className="text-xs text-tertiary">Total</div>
+      {/* Overall Progress (like AchievementManager) */}
+      <div className="bg-background/50 rounded-lg p-4 border border-muted mb-4">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-sm font-medium text-content">Overall Progress</span>
+          <span className="text-lg font-bold text-primary">
+            {Math.round(
+              (displayAchievements.filter((a) => a.isCompleted).length /
+                Math.max(displayAchievements.length, 1)) *
+                100,
+            )}
+            %
+          </span>
         </div>
-        <div className="text-center">
-          <div className="text-lg font-bold text-content">{Object.keys(stats).length}</div>
-          <div className="text-xs text-tertiary">Rarities</div>
+        <div className="w-full bg-muted rounded-full h-2 overflow-hidden mb-2">
+          <div
+            className="bg-gradient-to-r from-primary to-primary/80 rounded-full h-2 transition-all duration-700"
+            style={{
+              width: `${(displayAchievements.filter((a) => a.isCompleted).length / Math.max(displayAchievements.length, 1)) * 100}%`,
+            }}
+          />
         </div>
-        <div className="text-center">
-          <div className="text-lg font-bold text-content">{categories.length - 1}</div>
-          <div className="text-xs text-tertiary">Categories</div>
-        </div>
-        <div className="text-center">
-          <div className="text-lg font-bold text-content">{stats.legendary || 0}</div>
-          <div className="text-xs text-tertiary">Legendary</div>
+        <div className="text-xs text-tertiary text-center">
+          {displayAchievements.filter((a) => a.isCompleted).length} of {displayAchievements.length}{' '}
+          achievements unlocked
         </div>
       </div>
 
-      {/* Newest Achievement - only visible when collapsed */}
-      {!expanded && newestAchievement && (
-        <div className="mt-4">
-          <h4 className="text-sm font-medium text-tertiary mb-2 flex items-center gap-1">
-            <span>✨</span>
-            Latest Achievement
-          </h4>
-          {(() => {
-            const { rarityClasses, cardClasses } = getAchievementThemeClasses(
-              newestAchievement.rarity,
-              newestAchievement.category,
-            );
+      {/* Rarity Stats Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+        {['legendary', 'rare', 'uncommon', 'common'].map((rarity) => {
+          const rarityData = stats.rarityStats[rarity] || { total: 0, completed: 0 };
+          const colors = {
+            legendary: 'text-amber-500',
+            rare: 'text-purple-500',
+            uncommon: 'text-blue-500',
+            common: 'text-gray-500',
+          };
+          const icons = {
+            legendary: '🏆',
+            rare: '💎',
+            uncommon: '⭐',
+            common: '📖',
+          };
 
-            return (
-              <div
-                className={`relative overflow-hidden transition-all duration-300 ${cardClasses.container} ${rarityClasses.celebration} shadow-lg hover:shadow-xl`}
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-success/5 to-transparent animate-pulse" />
-                <div className="relative p-4">
-                  <div className="flex items-center gap-4">
-                    <div
-                      className={`relative w-12 h-12 rounded-full flex items-center justify-center text-2xl ${rarityClasses.card} shadow-lg ring-2 ${rarityClasses.leftBorder} transform rotate-3`}
-                    >
-                      {newestAchievement.iconUrl ? (
-                        <img
-                          src={newestAchievement.iconUrl}
-                          alt={newestAchievement.name}
-                          className="w-8 h-8 rounded-lg"
-                        />
-                      ) : (
-                        cardClasses.categoryIcon
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h5 className="font-bold text-content">
-                          {newestAchievement.title || newestAchievement.name}
-                        </h5>
-                        <span className={`${cardClasses.badge} uppercase tracking-wide shadow-sm`}>
-                          {newestAchievement.rarity}
-                        </span>
-                      </div>
-                      <p className="text-sm text-content/80 mb-2">
-                        {newestAchievement.description}
-                      </p>
-                      <div className="flex items-center gap-3 text-xs">
-                        <span className="text-tertiary capitalize">
-                          {newestAchievement.category}
-                        </span>
-                        <span className="text-success font-medium">
-                          🏆 Unlocked{' '}
-                          {new Date(
-                            newestAchievement.completedAt || newestAchievement.awardedAt || '',
-                          ).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+          return (
+            <div
+              key={rarity}
+              className="text-center bg-background/50 rounded-lg p-3 border border-muted"
+            >
+              <div className={`text-lg font-bold ${colors[rarity as keyof typeof colors]}`}>
+                {rarityData.completed}/{rarityData.total}
               </div>
-            );
-          })()}
+              <div className="text-xs text-tertiary">
+                {icons[rarity as keyof typeof icons]}{' '}
+                {rarity.charAt(0).toUpperCase() + rarity.slice(1)}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Featured Achievement - collapsed view */}
+      {!expanded && displayAchievement && (
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="text-sm font-medium text-tertiary flex items-center gap-1">
+              <span>{pinnedAchievementId ? '📌' : '✨'}</span>
+              {pinnedAchievementId ? 'Pinned Achievement' : 'Featured Achievement'}
+            </h4>
+            {pinnedAchievementId && (
+              <button
+                onClick={() => setPinnedAchievementId(null)}
+                className="text-xs text-tertiary hover:text-content transition-colors"
+              >
+                Unpin
+              </button>
+            )}
+          </div>
+          <AchievementCard
+            achievement={displayAchievement}
+            viewMode="list"
+            isRecent={!pinnedAchievementId}
+            showProgress={false}
+            onTogglePin={(achievementId) => {
+              setPinnedAchievementId(pinnedAchievementId === achievementId ? null : achievementId);
+            }}
+            isPinned={pinnedAchievementId === displayAchievement.id}
+          />
         </div>
       )}
 
-      {/* Expandable Achievement Collection */}
-      {expanded && achievements.length > 0 && (
-        <div className="mt-6 space-y-6">
-          {/* Filters */}
-          <div className="flex gap-4 flex-wrap">
-            <div>
-              <label className="block text-xs font-medium text-tertiary mb-1">Category</label>
-              <select
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="text-sm px-3 py-1 border border-muted rounded-lg bg-background text-content focus:outline-none focus:ring-2 focus:ring-primary"
-              >
-                {categories.map((category) => (
-                  <option key={category} value={category}>
-                    {category === 'all'
-                      ? 'All Categories'
-                      : category.charAt(0).toUpperCase() + category.slice(1)}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-tertiary mb-1">Rarity</label>
-              <select
-                value={selectedRarity}
-                onChange={(e) => setSelectedRarity(e.target.value)}
-                className="text-sm px-3 py-1 border border-muted rounded-lg bg-background text-content focus:outline-none focus:ring-2 focus:ring-primary"
-              >
-                {rarities.map((rarity) => (
-                  <option key={rarity} value={rarity}>
-                    {rarity === 'all'
-                      ? 'All Rarities'
-                      : rarity.charAt(0).toUpperCase() + rarity.slice(1)}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Achievement Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {sortedAchievements.map((achievement) => {
-              const { rarityClasses, cardClasses } = getAchievementThemeClasses(
-                achievement.rarity,
-                achievement.category,
-              );
-
+      {/* Expanded view - unlocked achievements only */}
+      {expanded && (
+        <div className="space-y-3">
+          {displayAchievements
+            .filter((a) => a.isCompleted) // Only show completed/unlocked achievements
+            .sort((a, b) => {
+              const rarityOrder = { legendary: 0, rare: 1, uncommon: 2, common: 3, shame: 4 };
+              const aRarity = rarityOrder[a.rarity as keyof typeof rarityOrder] ?? 5;
+              const bRarity = rarityOrder[b.rarity as keyof typeof rarityOrder] ?? 5;
+              if (aRarity !== bRarity) return aRarity - bRarity;
               return (
-                <div
-                  key={achievement.id}
-                  className={`group relative overflow-hidden transition-all duration-300 ${cardClasses.container} ${rarityClasses.celebration} hover:shadow-xl hover:scale-[1.02]`}
-                >
-                  <div className="absolute inset-0 opacity-5 bg-gradient-to-br from-transparent via-white/10 to-transparent" />
-
-                  <div className="relative p-4 space-y-3">
-                    {/* Icon and Category */}
-                    <div className="flex items-center justify-between">
-                      <div
-                        className={`relative w-12 h-12 rounded-full flex items-center justify-center text-2xl ${rarityClasses.card} shadow-lg ring-2 ${rarityClasses.leftBorder} transform rotate-3`}
-                      >
-                        {achievement.iconUrl ? (
-                          <img
-                            src={achievement.iconUrl}
-                            alt={achievement.name}
-                            className="w-8 h-8 rounded-lg"
-                          />
-                        ) : (
-                          cardClasses.categoryIcon
-                        )}
-                        {/* Completion Checkmark */}
-                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-success rounded-full flex items-center justify-center text-white text-xs font-bold shadow-md">
-                          ✓
-                        </div>
-                      </div>
-                      <span
-                        className={`text-xs px-2 py-1 rounded-md font-medium capitalize border bg-muted/50 text-content/70`}
-                      >
-                        {achievement.category || 'general'}
-                      </span>
-                    </div>
-
-                    {/* Achievement Info */}
-                    <div className="space-y-2">
-                      <div className="flex items-start gap-2">
-                        <h3 className="font-bold text-content leading-tight flex-1">
-                          {achievement.title || achievement.name}
-                        </h3>
-                        <span
-                          className={`${cardClasses.badge} text-xs uppercase tracking-wide shadow-sm`}
-                        >
-                          {achievement.rarity}
-                        </span>
-                      </div>
-                      <p className="text-sm text-content/80 leading-relaxed">
-                        {achievement.description}
-                      </p>
-                    </div>
-
-                    {/* Completion Info */}
-                    <div className="flex items-center justify-center py-2 border-t border-muted/30">
-                      <div className="flex items-center gap-2 text-success font-medium text-sm">
-                        <span>🏆</span>
-                        <span>
-                          Unlocked{' '}
-                          {new Date(
-                            achievement.completedAt || achievement.awardedAt || '',
-                          ).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                new Date(b.completedAt || '').getTime() - new Date(a.completedAt || '').getTime()
               );
-            })}
-          </div>
+            })
+            .map((achievement) => (
+              <AchievementCard
+                key={achievement.id}
+                achievement={achievement}
+                viewMode="list"
+                showProgress={false}
+                onTogglePin={(achievementId) => {
+                  setPinnedAchievementId(
+                    pinnedAchievementId === achievementId ? null : achievementId,
+                  );
+                }}
+                isPinned={pinnedAchievementId === achievement.id}
+              />
+            ))}
 
-          {filteredAchievements.length === 0 && (
+          {displayAchievements.filter((a) => a.isCompleted).length === 0 && (
             <div className="text-center py-8 text-tertiary">
-              <div className="text-4xl mb-3">🔍</div>
-              <p className="text-sm font-medium">No achievements match your filters</p>
-              <p className="text-xs mt-1">Try adjusting your category or rarity selection</p>
+              <div className="text-4xl mb-3">🎯</div>
+              <p className="text-sm font-medium">No achievements unlocked yet</p>
+              <p className="text-xs mt-1">Start engaging to unlock your first achievements!</p>
             </div>
           )}
         </div>
       )}
 
-      {/* Empty State */}
-      {achievements.length === 0 && expanded && (
-        <div className="text-center py-8 text-tertiary">
-          <div className="text-4xl mb-3">🎯</div>
-          <h3 className="text-base font-semibold text-content mb-2">No achievements yet</h3>
-          <p className="text-sm text-tertiary max-w-md mx-auto">
-            Start placing bets, engaging with the community, playing Pong, and climbing the
-            leaderboard to unlock your first achievements!
-          </p>
+      {/* Empty state for collapsed view */}
+      {!expanded && !displayAchievement && displayAchievements.length === 0 && (
+        <div className="text-center py-6 text-tertiary">
+          <div className="text-3xl mb-2">🎯</div>
+          <p className="text-sm font-medium">No achievements unlocked yet</p>
+          <p className="text-xs mt-1">Start betting and engaging to earn achievements!</p>
         </div>
       )}
     </div>

@@ -16,6 +16,7 @@ import redisClient from '../lib/redis';
 import { socketCleanupManager } from '../lib/SocketCleanupManager';
 import { chatRateLimiter, createRateLimitMiddleware } from '../middleware/rateLimitMiddleware';
 import { InputSizeLimits } from '@ems/types';
+import { EventBus } from '../lib/EventBus';
 
 const GLOBAL_CHAT_ROOM = 'global';
 const GLOBAL_ROOM_ID = 1;
@@ -42,6 +43,7 @@ export type ChatMessageDTO = {
 };
 
 const userService = new UserService();
+const eventBus = new EventBus();
 
 export async function registerChatHandlers(socket: Socket) {
   const authSock = socket as AuthenticatedSocket;
@@ -180,6 +182,26 @@ export async function registerChatHandlers(socket: Socket) {
           saved.timestamp instanceof Date ? saved.timestamp.toISOString() : `${saved.timestamp}`,
       };
 
+      // Publish JSON rule achievement event for chat message
+      try {
+        await eventBus.publish('chat:message:sent', {
+          key: 'chat:message:sent',
+          userId: authSock.user.id,
+          occurredAt:
+            saved.timestamp instanceof Date ? saved.timestamp.toISOString() : `${saved.timestamp}`,
+          idempotencyKey: `chat:message:${saved.id}:sent`,
+          payload: {
+            messageId: saved.id,
+            messageLength: saved.content.length,
+            roomId: GLOBAL_ROOM_ID,
+            content: saved.content, // For future content analysis achievements
+          },
+        });
+      } catch (achievementError) {
+        console.error('[chat] Error publishing achievement event:', achievementError);
+        // Don't fail the message send if achievement event fails
+      }
+
       await redisClient.publish('chat:message', JSON.stringify(chatMsg));
 
       // clear typing state
@@ -197,21 +219,51 @@ export async function registerChatHandlers(socket: Socket) {
   // ────────────────────────────────────────────────────────────────────────────
   // 4. Typing indicators
   // ────────────────────────────────────────────────────────────────────────────
-  const typingHandler = () => {
+  const typingHandler = async () => {
     if (!authSock.user) return;
     const uid = authSock.user.id;
 
     if (!typingUsers.has(uid)) {
       typingUsers.add(uid);
       redisClient.publish('chat:typing', JSON.stringify({ id: uid, name: authSock.user.name }));
+
+      // Publish JSON rule achievement event for typing start
+      try {
+        await eventBus.publish('chat:typing:start', {
+          key: 'chat:typing:start',
+          userId: uid,
+          occurredAt: new Date().toISOString(),
+          idempotencyKey: `chat:typing:${uid}:${Date.now()}`,
+          payload: {
+            roomId: GLOBAL_ROOM_ID,
+          },
+        });
+      } catch (achievementError) {
+        console.error('[chat] Error publishing typing achievement event:', achievementError);
+      }
     }
 
     if (typingTimeout.has(uid)) clearTimeout(typingTimeout.get(uid));
 
-    const t = setTimeout(() => {
+    const t = setTimeout(async () => {
       typingUsers.delete(uid);
       redisClient.publish('chat:stopTyping', JSON.stringify({ id: uid }));
       typingTimeout.delete(uid);
+
+      // Publish JSON rule achievement event for typing stop
+      try {
+        await eventBus.publish('chat:typing:stop', {
+          key: 'chat:typing:stop',
+          userId: uid,
+          occurredAt: new Date().toISOString(),
+          idempotencyKey: `chat:typing:stop:${uid}:${Date.now()}`,
+          payload: {
+            roomId: GLOBAL_ROOM_ID,
+          },
+        });
+      } catch (achievementError) {
+        console.error('[chat] Error publishing typing stop achievement event:', achievementError);
+      }
     }, 4000);
 
     typingTimeout.set(uid, t);
@@ -220,7 +272,7 @@ export async function registerChatHandlers(socket: Socket) {
   socketCleanupManager.registerHandler(socket.id, 'chat:typing', typingHandler);
   listenerCount++;
 
-  const stopTypingHandler = () => {
+  const stopTypingHandler = async () => {
     if (!authSock.user) return;
     const uid = authSock.user.id;
     if (typingUsers.has(uid)) {
@@ -229,6 +281,25 @@ export async function registerChatHandlers(socket: Socket) {
       if (typingTimeout.has(uid)) {
         clearTimeout(typingTimeout.get(uid));
         typingTimeout.delete(uid);
+      }
+
+      // Publish JSON rule achievement event for explicit typing stop
+      try {
+        await eventBus.publish('chat:typing:stop', {
+          key: 'chat:typing:stop',
+          userId: uid,
+          occurredAt: new Date().toISOString(),
+          idempotencyKey: `chat:typing:stop:${uid}:${Date.now()}`,
+          payload: {
+            roomId: GLOBAL_ROOM_ID,
+            explicit: true, // User explicitly stopped typing vs timeout
+          },
+        });
+      } catch (achievementError) {
+        console.error(
+          '[chat] Error publishing explicit typing stop achievement event:',
+          achievementError,
+        );
       }
     }
   };

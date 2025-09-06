@@ -54,6 +54,7 @@ export class RuleEvaluator {
 
     // Check if this rule applies to this event
     if (!rule.eventKeys.includes(event.key)) {
+      console.log(`[RuleEvaluator] Event ${event.key} not in rule eventKeys:`, rule.eventKeys);
       return result;
     }
 
@@ -126,14 +127,99 @@ export class RuleEvaluator {
     if (!condition) return true; // No condition means always true
 
     for (const [key, expectedValue] of Object.entries(condition)) {
-      const actualValue = this.getValue(key, event, userCounters);
+      // Check if the key contains an operator (e.g., "data.wager >=")
+      const operatorMatch = key.match(/^(.+)\s+(>=|<=|==|!=|>|<)$/);
 
-      if (actualValue !== expectedValue) {
-        return false;
+      if (operatorMatch) {
+        // Handle comparison operators
+        const [, fieldPath, operator] = operatorMatch;
+        const actualValue = this.getValue(fieldPath, event, userCounters);
+        // Resolve expectedValue if it's a placeholder
+        const resolvedExpectedValue =
+          typeof expectedValue === 'string' && expectedValue.startsWith('$.')
+            ? this.getValue(expectedValue, event, userCounters)
+            : expectedValue;
+
+        const result = this.compareValues(actualValue, operator, resolvedExpectedValue);
+
+        if (!result) {
+          return false;
+        }
+      } else {
+        // Handle exact equality (original behavior)
+        const actualValue = this.getValue(key, event, userCounters);
+        // Resolve expectedValue if it's a placeholder
+        const resolvedExpectedValue =
+          typeof expectedValue === 'string' && expectedValue.startsWith('$.')
+            ? this.getValue(expectedValue, event, userCounters)
+            : expectedValue;
+
+        const result = actualValue === resolvedExpectedValue;
+
+        if (!result) {
+          return false;
+        }
       }
     }
 
     return true;
+  }
+
+  /**
+   * Compare two values using the specified operator
+   */
+  private compareValues(actual: any, operator: string, expected: any): boolean {
+    // Handle BigInt comparisons safely
+    if (typeof actual === 'bigint' || typeof expected === 'bigint') {
+      const actualBig = typeof actual === 'bigint' ? actual : BigInt(actual);
+      const expectedBig = typeof expected === 'bigint' ? expected : BigInt(expected);
+
+      switch (operator) {
+        case '>=':
+          return actualBig >= expectedBig;
+        case '<=':
+          return actualBig <= expectedBig;
+        case '>':
+          return actualBig > expectedBig;
+        case '<':
+          return actualBig < expectedBig;
+        case '==':
+          return actualBig === expectedBig;
+        case '!=':
+          return actualBig !== expectedBig;
+        default:
+          return false;
+      }
+    }
+
+    if (typeof actual === 'number' && typeof expected === 'number') {
+      switch (operator) {
+        case '>=':
+          return actual >= expected;
+        case '<=':
+          return actual <= expected;
+        case '>':
+          return actual > expected;
+        case '<':
+          return actual < expected;
+        case '==':
+          return actual === expected;
+        case '!=':
+          return actual !== expected;
+        default:
+          return false;
+      }
+    }
+
+    // For non-numeric values, only == and != make sense
+    switch (operator) {
+      case '==':
+        return actual === expected;
+      case '!=':
+        return actual !== expected;
+      default:
+        return false;
+    }
   }
 
   /**
@@ -282,7 +368,13 @@ export class RuleEvaluator {
    * Compile a raw rule object into a validated CompiledRule
    */
   compileRule(rawRule: any): CompiledRule | null {
-    if (!this.validateRule(rawRule)) {
+    console.log(`[RuleEvaluator] Compiling rule:`, JSON.stringify(rawRule, null, 2));
+
+    const validation = this.validateRuleWithErrors(rawRule);
+    console.log(`[RuleEvaluator] Validation result:`, validation);
+
+    if (!validation.ok) {
+      console.warn(`[RuleEvaluator] Rule validation failed:`, validation.errors);
       return null;
     }
 

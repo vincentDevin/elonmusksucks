@@ -23,18 +23,13 @@ export function setupAchievementRedisHandlers(io: SocketServer) {
 
   sub.on('message', async (channel, message) => {
     try {
-      const data = JSON.parse(message);
-      const userId = data.userId ?? data.winnerId ?? data.playerId;
-      const occurredAt = data.occurredAt ?? new Date().toISOString();
-      const idempotencyKey = `${channel}-${data.matchId ?? data.betId ?? data.marketId ?? occurredAt}-${userId}`;
+      const achievementEvent = JSON.parse(message);
+      console.log(
+        `[AchievementEventHandler] Processing ${achievementEvent.key} for user ${achievementEvent.userId}`,
+      );
+
       const engine = getAchievementEngine(io);
-      await engine.handle({
-        key: channel as any,
-        userId,
-        occurredAt,
-        idempotencyKey,
-        payload: data,
-      });
+      await engine.handle(achievementEvent);
     } catch (err) {
       console.error(`[AchievementSub] Error handling ${channel}:`, err);
     }

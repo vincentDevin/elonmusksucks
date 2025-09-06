@@ -5,8 +5,7 @@
 
 import { Server } from 'socket.io';
 import { SOCKET_ROOMS, REDIS_CHANNELS } from '@ems/types';
-import type { RedisChannel, AchievementEvent } from '@ems/types';
-import { getAchievementEngine } from '../services/AchievementEngineFactory';
+import type { RedisChannel } from '@ems/types';
 
 // TEMP: Additional channels not yet moved to shared types
 type ExtendedRedisChannel =
@@ -198,34 +197,8 @@ export function registerRedisEventHandlers(io: Server, eventSub: any) {
         }
         break;
 
-      // Pong achievement events - process through AchievementEngine
-      case 'pong:match:completed':
-      case 'pong:match:lost':
-      case 'pong:elo:milestone':
-        try {
-          const achievementPayload = payload as any;
-          if (achievementPayload.userId && achievementPayload.key) {
-            // Convert Redis payload to AchievementEvent format
-            const achievementEvent: AchievementEvent = {
-              key: achievementPayload.key,
-              userId: achievementPayload.userId,
-              idempotencyKey:
-                achievementPayload.idempotencyKey ||
-                `${achievementPayload.key}:${achievementPayload.userId}:${achievementPayload.matchId || Date.now()}`,
-              occurredAt: achievementPayload.occurredAt || new Date().toISOString(),
-              payload: achievementPayload,
-            };
-
-            // Process through achievement engine
-            const engine = getAchievementEngine(io);
-            await engine.handle(achievementEvent);
-
-            console.log(`[achievement] Processed ${channel} for user ${achievementPayload.userId}`);
-          }
-        } catch (error) {
-          console.error(`[achievement] Failed to process ${channel}:`, error);
-        }
-        break;
+      // NOTE: Pong achievement events (pong:match:completed, pong:match:lost, pong:elo:milestone)
+      // are handled exclusively by achievementEventHandler.ts and are not subscribed to by this handler
 
       default:
         console.warn('[socket] Unhandled Redis channel', channel);

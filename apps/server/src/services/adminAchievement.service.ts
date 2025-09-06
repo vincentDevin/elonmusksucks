@@ -520,6 +520,54 @@ class AdminAchievementService {
       completedAt: ua.completedAt!.toISOString(),
     }));
   }
+
+  /**
+   * Get user's achievement progress
+   * Returns all achievements with user's current progress
+   */
+  async getUserAchievementProgress(userId: number): Promise<
+    {
+      id: string;
+      achievementId: number;
+      name: string;
+      title: string;
+      description: string;
+      category: string;
+      rarity: string;
+      progress: number;
+      targetValue: number;
+      isCompleted: boolean;
+      completedAt?: string;
+    }[]
+  > {
+    // Get all achievements and user's progress
+    const [allAchievements, userAchievements] = await Promise.all([
+      achievementRepository.findAllAchievements(),
+      achievementRepository.findUserAchievements(userId),
+    ]);
+
+    // Create a map of user achievements for quick lookup
+    const userAchievementMap = new Map(userAchievements.map((ua) => [ua.achievementId, ua]));
+
+    // Return all achievements with user progress (0 if not started)
+    return allAchievements.map((achievement) => {
+      const userAchievement = userAchievementMap.get(achievement.id);
+
+      return {
+        id: achievement.name, // Use achievement name as string ID for frontend compatibility
+        achievementId: achievement.id,
+        name: achievement.name,
+        title: achievement.title,
+        description: achievement.description,
+        category: achievement.category,
+        rarity: achievement.rarity,
+        progress: userAchievement?.progress || 0,
+        targetValue: achievement.targetValue,
+        isCompleted: !!userAchievement?.completedAt,
+        completedAt: userAchievement?.completedAt?.toISOString(),
+      };
+    });
+  }
 }
 
 export const adminAchievementService = new AdminAchievementService();

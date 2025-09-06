@@ -6,7 +6,6 @@ import { BettingRepository } from '../repositories/BettingRepository';
 import { StatsRepository } from '../repositories/StatsRepository';
 import { PrismaClient } from '@prisma/client';
 import { unifiedActivityService } from '../services/unifiedActivity.service';
-import { achievementService } from '../services/achievement.service';
 import { adminAchievementService } from '../services/adminAchievement.service';
 import type {
   PublicUserProfile,
@@ -160,16 +159,6 @@ export async function followUserHandler(
         },
       });
     }
-
-    // Check for achievement unlocks
-    await achievementService.checkAndUpdateAchievements({
-      type: 'user_followed',
-      userId: followerId,
-      data: {
-        followedUserId: followingId,
-        followedUserName: followedUser?.name || 'Unknown',
-      },
-    });
 
     res.sendStatus(204);
   } catch (err) {
@@ -470,8 +459,8 @@ export async function getUserAchievementsHandler(
       return;
     }
 
-    // Get user achievement progress
-    const achievements = await achievementService.getUserAchievementProgress(targetUserId);
+    // Get user achievement progress using the modern system
+    const achievements = await adminAchievementService.getUserAchievementProgress(targetUserId);
 
     const payload = achievements.map(
       toUserAchievementProgressView,
@@ -515,7 +504,7 @@ export async function getAllAchievementsHandler(
 ): Promise<void> {
   try {
     // Get all available achievements (public endpoint)
-    const achievements = await achievementService.getAllAchievements();
+    const achievements = await adminAchievementService.getAllAchievements();
     res.json(achievements);
   } catch (err) {
     next(err);

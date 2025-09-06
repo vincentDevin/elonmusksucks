@@ -2,8 +2,10 @@
 import { PrismaClient } from '@prisma/client';
 import type { IBettingRepository, OptionWithPrediction } from './IBettingRepository';
 import type { DbBet, DbParlay } from '@ems/types';
+import { EventBus } from '../lib/EventBus';
 
 const prisma = new PrismaClient();
+const eventBus = new EventBus();
 
 export class BettingRepository implements IBettingRepository {
   async findOptionWithPrediction(optionId: number): Promise<OptionWithPrediction | null> {
@@ -97,6 +99,48 @@ export class BettingRepository implements IBettingRepository {
         profit: { decrement: BigInt(amount) },
       },
     });
+
+    // Publish user balance snapshot event for balance-based achievements
+    try {
+      // Get updated user data with stats
+      const userWithStats = await prisma.user.findUnique({
+        where: { id: userId },
+        include: {
+          stats: true,
+        },
+      });
+
+      if (userWithStats) {
+        await eventBus.publish('user:balance:snapshot', {
+          key: 'user:balance:snapshot',
+          userId,
+          occurredAt: new Date().toISOString(),
+          idempotencyKey: `balance:snapshot:${userId}:bet:${bet.id}`,
+          payload: {
+            balance: Number(userWithStats.muskBucks),
+            previousBalance: Number(userWithStats.muskBucks) + amount, // Balance before bet
+            changeAmount: -amount,
+            changeReason: 'bet_placed',
+            betId: bet.id,
+            // Include stats for achievements that check net profit, total lost, etc.
+            totalWagered: userWithStats.stats ? Number(userWithStats.stats.totalWagered) : amount,
+            totalWon: userWithStats.stats ? Number(userWithStats.stats.totalWon) : 0,
+            totalLost: userWithStats.stats
+              ? Number(userWithStats.stats.totalWagered) - Number(userWithStats.stats.totalWon)
+              : amount,
+            netProfit: userWithStats.stats ? Number(userWithStats.stats.profit) : -amount,
+            totalBets: userWithStats.stats ? userWithStats.stats.totalBets : 1,
+            winRate:
+              userWithStats.stats && userWithStats.stats.totalBets > 0
+                ? userWithStats.stats.betsWon / userWithStats.stats.totalBets
+                : 0,
+          },
+        });
+      }
+    } catch (achievementError) {
+      console.error('[betting] Error publishing balance snapshot event:', achievementError);
+      // Don't fail the bet placement if achievement event fails
+    }
 
     return bet;
   }

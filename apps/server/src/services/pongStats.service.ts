@@ -377,21 +377,33 @@ export class PongStatsService {
     // 13. Emit achievement events for winner
     if (winnerId && winnerId > 0) {
       try {
+        // Determine comeback and defensive win flags
+        const comeback = loserScore && winnerScore && loserScore >= 8 && winnerScore === 11;
+        const defensiveWin = duration && duration > 300000; // 5+ minute games are defensive
+        const ragequit = false; // Would need to track disconnections
+
         const achievementPayload = {
           key: 'pong:match:completed',
           userId: winnerId,
-          winnerId,
-          loserId,
-          matchId,
-          vsAI: isAIMatch,
-          aiDifficulty: isAIMatch ? PongStatsService.getAIDifficultyFromId(loserId) : undefined,
-          wager: wagerAmount,
-          winnerScore: winnerScore || 11,
-          loserScore: loserScore || 0,
-          duration,
-          eloChange: calculations?.winnerEloChange?.totalChange,
-          newElo: calculations?.winnerEloChange?.newRating,
           occurredAt: new Date().toISOString(),
+          idempotencyKey: `pong:match:completed:${winnerId}:${matchId}`,
+          payload: {
+            // Direct properties in payload, not wrapped in 'data'
+            winnerId,
+            loserId,
+            matchId,
+            vsAI: isAIMatch,
+            aiDifficulty: isAIMatch ? PongStatsService.getAIDifficultyFromId(loserId) : undefined,
+            wager: wagerAmount, // Keep as BigInt - let rule evaluation handle conversion
+            winnerScore: winnerScore || 5, // Pong games go to 5, not 11
+            loserScore: loserScore || 0,
+            duration: duration || 0,
+            comeback: comeback || false,
+            defensiveWin: defensiveWin || false,
+            ragequit: ragequit || false,
+            eloChange: calculations?.winnerEloChange?.totalChange,
+            newElo: calculations?.winnerEloChange?.newRating,
+          },
         };
 
         await eventBus.publish('pong:match:completed', achievementPayload);
@@ -404,21 +416,28 @@ export class PongStatsService {
     // 14. Emit achievement events for loser (for loss tracking/shame achievements)
     if (loserId && loserId > 0) {
       try {
+        const ragequit = false; // Would need to track disconnections
+
         const loserPayload = {
           key: 'pong:match:lost',
           userId: loserId,
-          winnerId,
-          loserId,
-          matchId,
-          vsAI: isAIMatch,
-          aiDifficulty: isAIMatch ? PongStatsService.getAIDifficultyFromId(winnerId) : undefined,
-          wager: wagerAmount,
-          winnerScore: winnerScore || 11,
-          loserScore: loserScore || 0,
-          duration,
-          eloChange: calculations?.loserEloChange?.totalChange,
-          newElo: calculations?.loserEloChange?.newRating,
           occurredAt: new Date().toISOString(),
+          idempotencyKey: `pong:match:lost:${loserId}:${matchId}`,
+          payload: {
+            // Direct properties in payload, not wrapped in 'data'
+            winnerId,
+            loserId,
+            matchId,
+            vsAI: isAIMatch,
+            aiDifficulty: isAIMatch ? PongStatsService.getAIDifficultyFromId(winnerId) : undefined,
+            wager: wagerAmount, // Keep as BigInt - let rule evaluation handle conversion
+            winnerScore: winnerScore || 5, // Pong games go to 5, not 11
+            loserScore: loserScore || 0,
+            duration: duration || 0,
+            ragequit: ragequit || false,
+            eloChange: calculations?.loserEloChange?.totalChange,
+            newElo: calculations?.loserEloChange?.newRating,
+          },
         };
 
         await eventBus.publish('pong:match:lost', loserPayload);
@@ -440,11 +459,16 @@ export class PongStatsService {
             const milestonePayload = {
               key: 'pong:elo:milestone',
               userId: winnerId,
-              milestone,
-              newElo,
-              oldElo,
-              matchId,
               occurredAt: new Date().toISOString(),
+              idempotencyKey: `pong:elo:milestone:${winnerId}:${milestone}:${matchId}`,
+              payload: {
+                // Direct properties in payload, not wrapped in 'data'
+                milestone,
+                newElo,
+                oldElo,
+                matchId,
+                userId: winnerId,
+              },
             };
 
             await eventBus.publish('pong:elo:milestone', milestonePayload);

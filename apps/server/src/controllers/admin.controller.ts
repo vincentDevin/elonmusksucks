@@ -4,6 +4,7 @@ import * as adminService from '../services/admin.service';
 import { payoutService } from '../services/payout.service';
 import { adminAchievementService } from '../services/adminAchievement.service';
 import { shameWallService } from '../services/shameWall.service';
+import { serializeBigInt } from '../utils/bigintSerializer';
 import {
   toAdminUserView,
   toAdminBetView,
@@ -11,7 +12,6 @@ import {
   toAdminUserSearchResponse,
   toAdminFinancialDataResponse,
   toAdminFinancialAnalyticsResponse,
-  toAdminPredictionSearchResponse,
   toAdminBulkPredictionsResponse,
   toAdminAchievementView,
   toAdminBulkOperationResponse,
@@ -35,7 +35,6 @@ import type {
   AdminUserSearchResponse,
   AdminFinancialDataResponse,
   AdminFinancialAnalyticsResponse,
-  AdminPredictionSearchResponse,
   AdminBulkPredictionsResponse,
   AdminAchievementView,
   AdminBulkOperationResponse,
@@ -236,8 +235,10 @@ export async function searchPredictions(
     };
 
     const result = await adminService.searchPredictions(params);
-    const payload = toAdminPredictionSearchResponse(result) satisfies AdminPredictionSearchResponse;
-    res.json(payload);
+
+    // Use the existing BigInt serialization utility
+    const serializedResult = serializeBigInt(result);
+    res.json(serializedResult);
   } catch (err) {
     next(err);
   }

@@ -19,8 +19,10 @@ import type {
 import { PrismaAdminRepository } from '../repositories/AdminRepository';
 import type { UserStatsDTO } from '@ems/types';
 import redisClient from '../lib/redis';
+import { EventBus } from '../lib/EventBus';
 
 const repo: IAdminRepository = new PrismaAdminRepository();
+const eventBus = new EventBus();
 
 // -- Enhanced User Management --
 export const listUsers = async () => {
@@ -91,6 +93,27 @@ export const bulkUpdatePredictions = async (
             timestamp: new Date().toISOString(),
           }),
         );
+
+        // Publish JSON rule achievement event for bulk prediction approval
+        try {
+          await eventBus.publish('prediction:approved', {
+            key: 'prediction:approved',
+            userId: prediction.creatorId,
+            occurredAt: new Date().toISOString(),
+            idempotencyKey: `prediction:${prediction.id}:approved:bulk`,
+            payload: {
+              predictionId: prediction.id,
+              title: prediction.title,
+              category: prediction.category,
+              bulkOperation: true,
+            },
+          });
+        } catch (achievementError) {
+          console.error(
+            '[admin] Error publishing bulk prediction approval achievement event:',
+            achievementError,
+          );
+        }
       } else if (operation.operation === 'resolve') {
         await redisClient.publish(
           'prediction:resolved',
@@ -101,6 +124,28 @@ export const bulkUpdatePredictions = async (
             timestamp: new Date().toISOString(),
           }),
         );
+
+        // Publish JSON rule achievement event for prediction resolution
+        try {
+          await eventBus.publish('prediction:resolved', {
+            key: 'prediction:resolved',
+            userId: prediction.creatorId,
+            occurredAt: new Date().toISOString(),
+            idempotencyKey: `prediction:${prediction.id}:resolved:bulk`,
+            payload: {
+              predictionId: prediction.id,
+              title: prediction.title,
+              category: prediction.category,
+              winningOptionId: prediction.resolutionData?.winningOptionId,
+              bulkOperation: true,
+            },
+          });
+        } catch (achievementError) {
+          console.error(
+            '[admin] Error publishing prediction resolution achievement event:',
+            achievementError,
+          );
+        }
       }
     }
   }
@@ -129,6 +174,29 @@ export const setPredictionStatus = async (
         timestamp: new Date().toISOString(),
       }),
     );
+
+    // Publish JSON rule achievement event for prediction approval
+    try {
+      await eventBus.publish('prediction:approved', {
+        key: 'prediction:approved',
+        userId: updated.creatorId,
+        occurredAt: new Date().toISOString(),
+        idempotencyKey: `prediction:${updated.id}:approved`,
+        payload: {
+          predictionId: updated.id,
+          title: updated.title,
+          category: updated.category,
+          description: updated.description,
+          type: updated.type,
+        },
+      });
+    } catch (achievementError) {
+      console.error(
+        '[admin] Error publishing prediction approval achievement event:',
+        achievementError,
+      );
+      // Don't fail the approval if achievement event fails
+    }
   }
 
   return updated;

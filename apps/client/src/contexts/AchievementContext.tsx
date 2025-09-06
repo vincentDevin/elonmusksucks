@@ -2,31 +2,19 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import api from '../api/axios';
+import {
+  transformAchievementArray,
+  transformRecentAchievementData,
+} from '../utils/achievementDataTransform';
+import type {
+  ApiAchievementData,
+  ComponentAchievement,
+  ComponentRecentAchievement,
+} from '../utils/achievementDataTransform';
 
-interface Achievement {
-  id: string;
-  achievementId: number;
-  name: string;
-  title: string;
-  description: string;
-  category: string;
-  rarity?: string;
-  progress: number;
-  targetValue: number;
-  isCompleted: boolean;
-  completedAt?: string;
-}
-
-interface RecentAchievement {
-  id: string;
-  name: string;
-  title: string;
-  description: string;
-  category: string;
-  rarity: string;
-  iconUrl?: string | null;
-  completedAt: string;
-}
+// Use the standardized interfaces from the transformation utility
+type Achievement = ComponentAchievement;
+type RecentAchievement = ComponentRecentAchievement;
 
 interface AchievementContextType {
   // Achievement data
@@ -68,18 +56,36 @@ export function AchievementProvider({ children }: AchievementProviderProps) {
     setError(null);
 
     try {
-      const [achievementsRes, recentRes, allRes] = await Promise.all([
-        api.get(`/api/users/${user.id}/achievements`),
-        api.get(`/api/users/${user.id}/achievements/recent?limit=5`),
-        api.get('/api/users/achievements/all'),
-      ]);
+      // Main user achievements endpoint (this exists and returns UserAchievementProgressView[])
+      const achievementsRes = await api.get(`/api/users/${user.id}/achievements`);
+      const apiAchievements: ApiAchievementData[] = achievementsRes.data || [];
+      console.log(apiAchievements);
+      // Transform API data to component format
+      const transformedAchievements = transformAchievementArray(apiAchievements);
+      setAchievements(transformedAchievements);
 
-      setAchievements(achievementsRes.data || []);
-      setRecentAchievements(recentRes.data || []);
-      setAllAchievements(allRes.data || []);
+      // For recent achievements, filter completed ones from main achievements and sort by completion date
+      const completedAchievements = apiAchievements
+        .filter((a) => a.isCompleted && a.completedAt)
+        .sort((a, b) => new Date(b.completedAt!).getTime() - new Date(a.completedAt!).getTime())
+        .slice(0, 5); // Get the 5 most recent
+
+      const transformedRecent = completedAchievements.map(transformRecentAchievementData);
+      setRecentAchievements(transformedRecent);
+
+      // All achievements is the same as user achievements (since we get progress for all)
+      setAllAchievements(transformedAchievements);
     } catch (err: any) {
       console.error('Failed to fetch achievements:', err);
-      setError(err.message || 'Failed to load achievements');
+
+      // Provide more specific error messages
+      if (err.response?.status === 404) {
+        setError('Achievement data not found. Please try refreshing the page.');
+      } else if (err.response?.status === 403) {
+        setError('Unable to access achievement data. Please log in again.');
+      } else {
+        setError(err.message || 'Failed to load achievements');
+      }
     } finally {
       setLoading(false);
     }

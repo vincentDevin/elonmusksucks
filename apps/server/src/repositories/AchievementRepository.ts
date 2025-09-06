@@ -107,10 +107,19 @@ export class AchievementRepository implements IAchievementRepository {
   }
 
   async findUserAchievementsByAchievementId(achievementId: number, params?: any) {
-    return this.prisma.userAchievement.findMany({
-      where: { achievementId },
-      ...params,
+    const baseWhere = { achievementId };
+    const finalWhere = params?.where ? { ...baseWhere, ...params.where } : baseWhere;
+
+    // Remove the 'where: undefined' which was overriding our where clause
+    const queryParams = params ? { ...params } : {};
+    delete queryParams.where; // Ensure we don't override the where clause
+
+    const results = await this.prisma.userAchievement.findMany({
+      where: finalWhere,
+      ...queryParams,
     });
+
+    return results;
   }
 
   async createUserAchievement(data: any) {

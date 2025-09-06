@@ -165,7 +165,7 @@ const PredictionRow: React.FC<PredictionRowProps> = ({ index, style, data }) => 
 
       {/* Expires */}
       <div className="col-span-1 text-xs text-tertiary">
-        {formatDate(prediction.expiresAt.toString())}
+        {(prediction as any).closesAt ? formatDate((prediction as any).closesAt) : 'No expiration'}
       </div>
 
       {/* Actions */}

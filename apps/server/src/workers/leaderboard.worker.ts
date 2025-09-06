@@ -10,10 +10,11 @@ const EVENT_CONCURRENCY = parseInt(process.env.WORKER_LEADERBOARD_EVENT_CONCURRE
 import { LeaderboardRepository } from '../repositories/LeaderboardRepository';
 import type { Job } from 'bullmq';
 import type { LeaderboardMetrics } from '@ems/types';
-import { achievementService } from '../services/achievement.service';
 import { metricsCollector } from '../lib/metrics';
+import { EventBus } from '../lib/EventBus';
 
 const repo = new LeaderboardRepository();
+const eventBus = new EventBus();
 
 // Create queue instance for metrics collection
 const leaderboardQueue = new Queue('leaderboard-refresh', { connection: redisClient });
@@ -62,31 +63,48 @@ const refreshWorker = new Worker(
         const currentRank = i + 1;
         const previousRank = previousRankings.get(entry.userId) || 999;
 
-        // If user improved their ranking significantly
-        if (previousRank > currentRank) {
+        // If user's ranking changed (improved or declined)
+        if (previousRank !== currentRank) {
           console.log(
-            `[leaderboard] User ${entry.userId} improved from rank ${previousRank} to ${currentRank}`,
+            `[leaderboard] User ${entry.userId} rank changed from ${previousRank} to ${currentRank}`,
           );
 
-          // Trigger ranking achievement check
+          // Publish JSON rule achievement event for leaderboard rank update
           try {
-            await achievementService.checkAndUpdateAchievements({
-              type: 'ranking_updated',
+            await eventBus.publish('leaderboard:rank:update', {
+              key: 'leaderboard:rank:update',
               userId: entry.userId,
-              data: {
-                currentRank,
+              occurredAt: new Date().toISOString(),
+              idempotencyKey: `leaderboard:rank:${entry.userId}:${currentRank}:${Date.now()}`,
+              payload: {
+                rank: currentRank,
                 previousRank,
-                improvement: previousRank - currentRank,
+                rankChange: previousRank - currentRank, // positive = improved, negative = declined
+                isImprovement: previousRank > currentRank,
+                profitAll: entry.profitAll,
+                profitPeriod: entry.profitPeriod,
+                winRate: entry.winRate,
+                totalBets: entry.totalBets,
+                balance: entry.balance,
+                roi: entry.roi,
+                currentStreak: entry.currentStreak,
+                longestStreak: entry.longestStreak,
+                // Include tier breakpoints for achievements
                 isTopHundred: currentRank <= 100,
+                isTopFifty: currentRank <= 50,
+                isTopTwenty: currentRank <= 20,
                 isTopTen: currentRank <= 10,
+                isTopFive: currentRank <= 5,
                 isTopThree: currentRank <= 3,
+                isFirst: currentRank === 1,
               },
             });
-          } catch (error) {
+          } catch (achievementError) {
             console.error(
-              `[leaderboard] Error checking ranking achievements for user ${entry.userId}:`,
-              error,
+              '[leaderboard] Error publishing rank update achievement event:',
+              achievementError,
             );
+            // Don't fail the leaderboard refresh if achievement event fails
           }
         }
       }

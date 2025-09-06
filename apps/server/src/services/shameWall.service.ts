@@ -2,7 +2,6 @@
 // Manages banned users and shame achievements
 
 import { PrismaClient, BanType } from '@prisma/client';
-import { achievementEvaluatorService } from './achievementEvaluator.service';
 import { adminAchievementService } from './adminAchievement.service';
 import { UserRepository } from '../repositories/UserRepository';
 import { ModerationRepository } from '../repositories/ModerationRepository';
@@ -125,19 +124,6 @@ class ShameWallService {
       );
       shameAchievementsAwarded.push('community-menace');
     }
-
-    // Trigger achievement evaluation for ban event
-    await achievementEvaluatorService.processAchievementEvent({
-      type: 'user_banned',
-      userId,
-      timestamp: new Date().toISOString(),
-      data: {
-        banType,
-        durationDays,
-        reason,
-        banCount,
-      },
-    });
 
     return {
       id: ban.id,

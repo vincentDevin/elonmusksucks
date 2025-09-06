@@ -81,6 +81,11 @@ export class AchievementEngine {
       const rules = this.rulesCache.get(event.key) || [];
       result.rulesEvaluated = rules.length;
 
+      console.log(
+        `[AchievementEngine] Processing ${event.key} for user ${event.userId}: ${rules.length} rules`,
+      );
+      console.log(`[AchievementEngine] Event payload:`, JSON.stringify(event.payload, null, 2));
+
       if (rules.length === 0) {
         return result; // No rules for this event type
       }
@@ -94,8 +99,10 @@ export class AchievementEngine {
           const unlocked = await this.evaluateRule(event, rule, userCounters);
           if (unlocked) {
             result.achievementsUnlocked++;
+            console.log(`[AchievementEngine] ✅ ${rule.achievementName} UNLOCKED`);
           }
         } catch (error) {
+          console.error(`[AchievementEngine] ❌ Error evaluating ${rule.achievementName}:`, error);
           result.errors.push(`Rule evaluation failed: ${error}`);
         }
       }
@@ -178,13 +185,11 @@ export class AchievementEngine {
       );
 
       let currentProgress = 0;
-      let userAchievementId: number | null = null;
       let isCompleted = false;
 
       if (userAchievements.length > 0) {
         const userAchievement = userAchievements[0];
         currentProgress = userAchievement.progress;
-        userAchievementId = userAchievement.id;
         isCompleted = !!userAchievement.completedAt;
       }
 
@@ -193,7 +198,6 @@ export class AchievementEngine {
         return false;
       }
 
-      // Evaluate the rule
       const evaluation = this.ruleEvaluator.evaluateRule(
         event,
         compiledRule,
@@ -207,18 +211,12 @@ export class AchievementEngine {
           event.userId,
           rule.achievementId,
           evaluation.newProgress,
-          userAchievementId,
         );
       }
 
       // Handle achievement unlock
       if (evaluation.shouldUnlock && !isCompleted) {
-        await this.unlockAchievement(
-          event.userId,
-          rule.achievementId,
-          evaluation.newProgress,
-          userAchievementId,
-        );
+        await this.unlockAchievement(event.userId, rule.achievementId, evaluation.newProgress);
 
         // Emit socket event for unlock
         const achievement = await this.achievementRepo.findById(rule.achievementId);
@@ -261,7 +259,14 @@ export class AchievementEngine {
 
       return false; // No unlock occurred
     } catch (error) {
-      console.error(`Rule evaluation failed for achievement ${rule.achievementId}:`, error);
+      console.error(
+        `[AchievementEngine] ❌ EXCEPTION in rule evaluation for achievement ${rule.achievementName}:`,
+        error,
+      );
+      console.error(
+        `[AchievementEngine] Exception stack:`,
+        (error as Error)?.stack || 'No stack trace available',
+      );
       return false;
     }
   }
@@ -273,27 +278,19 @@ export class AchievementEngine {
     userId: number,
     achievementId: number,
     newProgress: number,
-    existingId: number | null,
   ): Promise<void> {
-    if (existingId) {
-      // Update existing progress
-      await this.achievementRepo.updateUserAchievement({
-        where: { id: existingId },
-        data: { progress: newProgress },
-        create: {
-          userId,
-          achievementId,
-          progress: newProgress,
-        },
-      });
-    } else {
-      // Create new progress record
-      await this.achievementRepo.createUserAchievement({
+    // Always use upsert to handle race conditions
+    await this.achievementRepo.updateUserAchievement({
+      where: {
+        userId_achievementId: { userId, achievementId },
+      },
+      update: { progress: newProgress },
+      create: {
         userId,
         achievementId,
         progress: newProgress,
-      });
-    }
+      },
+    });
   }
 
   /**
@@ -303,34 +300,25 @@ export class AchievementEngine {
     userId: number,
     achievementId: number,
     finalProgress: number,
-    existingId: number | null,
   ): Promise<void> {
     const completedAt = new Date();
 
-    if (existingId) {
-      // Update existing record with completion
-      await this.achievementRepo.updateUserAchievement({
-        where: { id: existingId },
-        data: {
-          progress: finalProgress,
-          completedAt,
-        },
-        create: {
-          userId,
-          achievementId,
-          progress: finalProgress,
-          completedAt,
-        },
-      });
-    } else {
-      // Create new completed achievement
-      await this.achievementRepo.createUserAchievement({
+    // Always use upsert to handle race conditions
+    await this.achievementRepo.updateUserAchievement({
+      where: {
+        userId_achievementId: { userId, achievementId },
+      },
+      update: {
+        progress: finalProgress,
+        completedAt,
+      },
+      create: {
         userId,
         achievementId,
         progress: finalProgress,
         completedAt,
-      });
-    }
+      },
+    });
   }
 
   /**

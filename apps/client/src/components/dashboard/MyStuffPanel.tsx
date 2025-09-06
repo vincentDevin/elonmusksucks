@@ -5,7 +5,6 @@ import { useLeaderboard } from '../../hooks/useLeaderboard';
 import MetricsCard from './analytics/PerformanceMetricsCard';
 import StatsGrid from './analytics/QuickStatsGrid';
 import SmartInsights from './analytics/SmartInsights';
-import AchievementProgress from './analytics/AchievementProgress';
 
 type ViewMode = 'analytics' | 'activity';
 
@@ -88,9 +87,6 @@ const MyStuffPanel = memo(function MyStuffPanel() {
 
           {/* Smart Insights - Full Width */}
           <SmartInsights insights={smartInsights || []} />
-
-          {/* Achievement Progress - Full Width */}
-          <AchievementProgress />
         </div>
       ) : (
         /* Legacy Activity View */

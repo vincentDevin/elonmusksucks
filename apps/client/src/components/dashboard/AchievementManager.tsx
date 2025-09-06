@@ -3,6 +3,7 @@ import { useState, memo, useMemo } from 'react';
 import { useAchievements } from '../../contexts/AchievementContext';
 import { useAchievementTheme } from '../../theme/hooks/useAchievementTheme';
 import type { AchievementRarity } from '../../theme/utils/achievement-colors';
+import { calculateProgressPercentage } from '../../utils/achievementDataTransform';
 
 import AchievementList from './AchievementManager/AchievementList';
 
@@ -67,7 +68,7 @@ const AchievementManager = memo(function AchievementManager() {
 
     progressToNext.forEach((achievement) => {
       const category = achievement.category || 'general';
-      const rarity = achievement.rarity || 'common';
+      const rarity = achievement.rarity;
 
       // Category stats
       if (!categoryStats[category]) {
@@ -87,8 +88,8 @@ const AchievementManager = memo(function AchievementManager() {
     // Find rarest achievement (highest rarity in order)
     const rarityOrder = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'secret', 'shame'];
     const rarestAchievement = completedAchievements.sort((a, b) => {
-      const aRarityIndex = rarityOrder.indexOf(a.rarity || 'common');
-      const bRarityIndex = rarityOrder.indexOf(b.rarity || 'common');
+      const aRarityIndex = rarityOrder.indexOf(a.rarity);
+      const bRarityIndex = rarityOrder.indexOf(b.rarity);
       return bRarityIndex - aRarityIndex; // Descending order (rarest first)
     })[0];
 
@@ -161,7 +162,7 @@ const AchievementManager = memo(function AchievementManager() {
             </h2>
             {(() => {
               const achievement = stats.rarestAchievement;
-              const rarity = achievement.rarity || 'common';
+              const rarity = achievement.rarity;
               const rarityClasses = utils.isValidRarity(rarity)
                 ? getRarityClasses(rarity as AchievementRarity)
                 : getRarityClasses('common');
@@ -234,7 +235,7 @@ const AchievementManager = memo(function AchievementManager() {
             {recentAchievements.length > 0 ? (
               <div className="space-y-3">
                 {recentAchievements.slice(0, 2).map((achievement) => {
-                  const rarity = achievement.rarity || 'common';
+                  const rarity = achievement.rarity;
                   const rarityClasses = utils.isValidRarity(rarity)
                     ? getRarityClasses(rarity as AchievementRarity)
                     : getRarityClasses('common');
@@ -363,10 +364,10 @@ const AchievementManager = memo(function AchievementManager() {
                 );
                 if (!achievement) return null;
 
-                const progressPercent =
-                  achievement.targetValue > 0
-                    ? Math.min((achievement.progress / achievement.targetValue) * 100, 100)
-                    : 0;
+                const progressPercent = calculateProgressPercentage(
+                  achievement.progress,
+                  achievement.targetValue,
+                );
 
                 return (
                   <div

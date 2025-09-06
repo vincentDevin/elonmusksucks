@@ -2286,10 +2286,14 @@ export interface MarketOverviewView {
 // ——— Achievement Events ————————————————————————————————————
 export type AchievementEventKey =
   | 'bet:placed'
-  | 'bet:resolved'
+  | 'bet:resolved' 
+  | 'bet:won'
+  | 'bet:lost'
   | 'prediction:resolved'
   | 'payout:completed'
+  | 'parlay:placed'
   | 'parlay:won'
+  | 'parlay:lost'
   | 'pong:match:recorded'
   | 'pong:match:completed'
   | 'pong:match:lost'
@@ -2299,11 +2303,20 @@ export type AchievementEventKey =
   | 'pong:win:ai'
   | 'user:login'
   | 'user:follow'
+  | 'user:balance:snapshot'
+  | 'user:streak:update'
   | 'prediction:created'
+  | 'prediction:approved'
   | 'prediction:bet:placed'
   | 'prediction:bet:settled'
   | 'prediction:market:created'
-  | 'prediction:market:settled';
+  | 'prediction:market:settled'
+  | 'chat:message:sent'
+  | 'chat:typing:start'
+  | 'chat:typing:stop'
+  | 'leaderboard:rank:update'
+  | 'leaderboard:daily:close'
+  | 'leaderboard:weekly:close';
 
 export interface AchievementEvent {
   key: AchievementEventKey;

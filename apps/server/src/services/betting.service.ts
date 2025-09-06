@@ -19,8 +19,6 @@ import { EventBus } from '../lib/EventBus';
 import { EventCoalescer } from '../lib/EventCoalescer';
 import { unifiedActivityService } from './unifiedActivity.service';
 import { UserService } from './user.service';
-import { achievementService } from './achievement.service';
-import { achievementEvaluatorService } from './achievementEvaluator.service';
 import { broadcastRealtimeMetrics } from './admin.service';
 import { tracingCollector } from '../lib/tracing';
 
@@ -159,29 +157,19 @@ export class BettingService {
               },
             ),
 
-            // Check for achievement unlocks (legacy system)
-            achievementService.checkAndUpdateAchievements({
-              type: 'bet_placed',
+            // Publish JSON rule achievement event
+            this.eventBus.publish('bet:placed', {
+              key: 'bet:placed',
               userId,
-              data: {
+              occurredAt: new Date().toISOString(),
+              idempotencyKey: `bet:${bet.id}:placed`,
+              payload: {
                 betId: bet.id,
                 predictionId: opt.prediction.id,
                 amount,
                 category: opt.prediction.category,
-              },
-            }),
-
-            // Check for achievement unlocks (advanced evaluator)
-            achievementEvaluatorService.processAchievementEvent({
-              type: 'bet_placed',
-              userId,
-              timestamp: new Date().toISOString(),
-              data: {
-                betId: bet.id,
-                predictionId: opt.prediction.id,
-                amount,
-                category: opt.prediction.category,
-                wasAllIn: false, // We'll need to calculate this
+                odds: finalOdds,
+                optionLabel: opt.label,
               },
             }),
 
@@ -306,28 +294,22 @@ export class BettingService {
           },
         ),
 
-        // Check for achievement unlocks (legacy system)
-        achievementService.checkAndUpdateAchievements({
-          type: 'parlay_completed',
+        // Publish JSON rule achievement event for parlay placement
+        this.eventBus.publish('parlay:placed', {
+          key: 'parlay:placed',
           userId,
-          data: {
+          occurredAt: new Date().toISOString(),
+          idempotencyKey: `parlay:${parlay.id}:placed`,
+          payload: {
             parlayId: parlay.id,
-            amount,
+            amount, // Amount is already a number here (validated input), not BigInt
             legCount: oddsCalculation.legCount,
-            won: false, // Will be updated when parlay is resolved
-          },
-        }),
-
-        // Check for achievement unlocks (advanced evaluator)
-        achievementEvaluatorService.processAchievementEvent({
-          type: 'bet_placed', // Parlay is a type of bet in the advanced system
-          userId,
-          timestamp: new Date().toISOString(),
-          data: {
-            parlayId: parlay.id,
-            amount,
-            legCount: oddsCalculation.legCount,
-            isParlay: true,
+            combinedOdds: oddsCalculation.finalOdds,
+            predictions: validLegs.map((leg) => ({
+              id: leg.prediction.id,
+              title: leg.prediction.title,
+              category: leg.prediction.category,
+            })),
           },
         }),
 

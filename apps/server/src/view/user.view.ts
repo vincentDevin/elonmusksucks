@@ -188,6 +188,7 @@ export const toUserAchievementProgressView = (achievement: {
   title: string;
   description: string;
   category: string;
+  rarity: string;
   progress: number;
   targetValue: number;
   isCompleted: boolean;
@@ -204,5 +205,5 @@ export const toUserAchievementProgressView = (achievement: {
   isCompleted: achievement.isCompleted,
   completedAt: achievement.completedAt || null,
   iconUrl: null, // Not available in current interface
-  rarity: 'common', // Default rarity since not available
+  rarity: achievement.rarity,
 });
