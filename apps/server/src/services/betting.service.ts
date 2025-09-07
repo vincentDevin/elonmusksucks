@@ -5,7 +5,10 @@
 // • No direct io.emit — real‑time fan‑out handled by redisEventHandlers.ts.
 // -----------------------------------------------------------------------------
 
-import type { IBettingRepository, OptionWithPrediction } from '../repositories/IBettingRepository';
+import type {
+  IBettingRepository,
+  OptionWithPrediction,
+} from '../repositories/interfaces/IBettingRepository';
 import type {
   DbBet,
   DbParlay,
@@ -21,8 +24,8 @@ import { unifiedActivityService } from './unifiedActivity.service';
 import { UserService } from './user.service';
 import { broadcastRealtimeMetrics } from './admin.service';
 import { tracingCollector } from '../lib/tracing';
-import { streakManager } from './StreakManager.service';
-import { financialTracker } from './FinancialTracker.service';
+import { streakManager } from './streakManager.service';
+import { financialTracker } from './financialTracker.service';
 
 export class BettingService {
   private userService = new UserService();

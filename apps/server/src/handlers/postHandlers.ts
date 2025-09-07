@@ -8,11 +8,13 @@
 // -----------------------------------------------------------------------------
 
 import type { AuthenticatedSocket } from '../middleware/socketAuthMiddleware';
-import redisClient from '../lib/redis';
 import { PostService } from '../services/post.service';
 import type { PostContentType, PostVisibility } from '@ems/types';
+import { REDIS_CHANNELS } from '@ems/types';
+import { EventBus } from '../lib/EventBus';
 
 const postService = new PostService();
+const eventBus = new EventBus();
 
 /**
  * Register all post-related socket handlers
@@ -53,13 +55,10 @@ async function handlePostCreate(
     const newPost = await postService.createPost(userId, payload);
 
     // Publish to Redis for cross-server broadcasting
-    await redisClient.publish(
-      'post:created',
-      JSON.stringify({
-        post: newPost,
-        authorId: userId,
-      }),
-    );
+    await eventBus.publish(REDIS_CHANNELS.POST_CREATED, {
+      post: newPost,
+      authorId: userId,
+    });
 
     callback?.({ success: true, post: newPost });
   } catch (error: any) {
@@ -87,13 +86,10 @@ async function handlePostEdit(
     const updatedPost = await postService.updatePost(payload.postId, userId, payload.content);
 
     // Publish to Redis for cross-server broadcasting
-    await redisClient.publish(
-      'post:updated',
-      JSON.stringify({
-        post: updatedPost,
-        editedBy: userId,
-      }),
-    );
+    await eventBus.publish(REDIS_CHANNELS.POST_UPDATED, {
+      post: updatedPost,
+      editedBy: userId,
+    });
 
     callback?.({ success: true, post: updatedPost });
   } catch (error: any) {
@@ -121,13 +117,10 @@ async function handlePostDelete(
     await postService.deletePost(payload.postId, userId, false); // TODO: check admin status
 
     // Publish to Redis for cross-server broadcasting
-    await redisClient.publish(
-      'post:deleted',
-      JSON.stringify({
-        postId: payload.postId,
-        deletedBy: userId,
-      }),
-    );
+    await eventBus.publish(REDIS_CHANNELS.POST_DELETED, {
+      postId: payload.postId,
+      deletedBy: userId,
+    });
 
     callback?.({ success: true });
   } catch (error: any) {
@@ -153,14 +146,11 @@ async function handlePostReact(
 
     // This would typically call a reaction service
     // For now, just publish the event
-    await redisClient.publish(
-      'post:reaction',
-      JSON.stringify({
-        postId: payload.postId,
-        userId,
-        type: payload.type,
-      }),
-    );
+    await eventBus.publish(REDIS_CHANNELS.POST_REACTION, {
+      postId: payload.postId,
+      userId,
+      type: payload.type,
+    });
 
     callback?.({ success: true });
   } catch (error: any) {
@@ -217,14 +207,11 @@ async function handleCommentCreate(
     });
 
     // Publish to Redis for cross-server broadcasting
-    await redisClient.publish(
-      'comment:created',
-      JSON.stringify({
-        comment: newComment,
-        postId: payload.postId,
-        authorId: userId,
-      }),
-    );
+    await eventBus.publish(REDIS_CHANNELS.COMMENT_CREATED, {
+      comment: newComment,
+      postId: payload.postId,
+      authorId: userId,
+    });
 
     callback?.({ success: true, comment: newComment });
   } catch (error: any) {
@@ -252,13 +239,10 @@ async function handleCommentDelete(
     await postService.deletePost(payload.commentId, userId, false); // TODO: check admin status
 
     // Publish to Redis for cross-server broadcasting
-    await redisClient.publish(
-      'comment:deleted',
-      JSON.stringify({
-        commentId: payload.commentId,
-        deletedBy: userId,
-      }),
-    );
+    await eventBus.publish(REDIS_CHANNELS.COMMENT_DELETED, {
+      commentId: payload.commentId,
+      deletedBy: userId,
+    });
 
     callback?.({ success: true });
   } catch (error: any) {

@@ -1,5 +1,5 @@
 import prisma from '../db';
-import type { IMarketRepository } from './IMarketRepository';
+import type { IMarketRepository } from './interfaces/IMarketRepository';
 
 export class MarketRepository implements IMarketRepository {
   async getTotalVolume(): Promise<bigint> {

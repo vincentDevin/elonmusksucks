@@ -1,7 +1,6 @@
 // apps/server/src/controllers/predictions.controller.ts
 import type { Request, Response, NextFunction } from 'express';
 import { predictionService } from '../services/predictions.service';
-import { UserService } from '../services/user.service';
 import {
   PredictionType,
   CreatePredictionPayload,
@@ -9,8 +8,6 @@ import {
   PredictionView,
 } from '@ems/types';
 import { toPredictionView } from '../view/prediction.view';
-
-const userService = new UserService();
 
 /**
  * GET /api/predictions
@@ -154,11 +151,6 @@ export const createPrediction = async (
       options: finalOptions,
       type,
       threshold,
-    });
-
-    await userService.createUserActivity(creatorId, 'PREDICTION_CREATED', {
-      predictionId: pred.id,
-      title: pred.title,
     });
 
     res.status(201).json(pred);

@@ -1,7 +1,12 @@
 // apps/server/src/workers/leaderboard.worker.ts
 import 'dotenv/config';
 import { Worker, Queue } from 'bullmq';
-import { RefreshJobData, IncrementalUpdateData, BatchUserUpdateData } from '@ems/types';
+import {
+  RefreshJobData,
+  IncrementalUpdateData,
+  BatchUserUpdateData,
+  REDIS_CHANNELS,
+} from '@ems/types';
 import redisClient from '../lib/redis';
 
 // Configurable concurrency to keep CPU saturation <70%
@@ -111,8 +116,8 @@ const refreshWorker = new Worker(
 
       // Publish to Redis channels
       await Promise.all([
-        redisClient.publish('leaderboard:allTime', JSON.stringify(topAllTime)),
-        redisClient.publish('leaderboard:daily', JSON.stringify(topDaily)),
+        eventBus.publish(REDIS_CHANNELS.LEADERBOARD_ALL_TIME, topAllTime),
+        eventBus.publish(REDIS_CHANNELS.LEADERBOARD_DAILY, topDaily),
       ]);
 
       const duration = Date.now() - startTime;
@@ -187,14 +192,11 @@ async function handleIncrementalUpdate(data: IncrementalUpdateData): Promise<voi
     console.log(`[leaderboard] User ${userId} is in top rankings, triggering refresh`);
     // We would trigger a refresh here, but to avoid circular dependencies,
     // we'll publish an event instead
-    await redisClient.publish(
-      'leaderboard:refresh_needed',
-      JSON.stringify({
-        reason: 'top_user_update',
-        userId,
-        metrics,
-      }),
-    );
+    await eventBus.publish(REDIS_CHANNELS.LEADERBOARD_REFRESH_NEEDED, {
+      reason: 'top_user_update',
+      userId,
+      metrics,
+    });
   }
 }
 

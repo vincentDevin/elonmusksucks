@@ -6,7 +6,7 @@
 // -----------------------------------------------------------------------------
 
 import prisma from '../db';
-import type { IPredictionRepository } from './IPredictionRepository';
+import type { IPredictionRepository } from './interfaces/IPredictionRepository';
 import type {
   DbPrediction,
   DbPredictionOption,

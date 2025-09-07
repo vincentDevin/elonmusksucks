@@ -2,7 +2,6 @@
 // Rollback: Remove socket event constants import and restore string literals
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useSocket } from './SocketContext';
-import { SocketEvents } from '@ems/types';
 import { useVisibilityGuard } from '../lib/visibilityGuard';
 import { getRecentActivities } from '../api/activity';
 import type { ActivityEventType } from '@ems/types';
@@ -412,11 +411,11 @@ export function ActivityProvider({ children }: { children: React.ReactNode }) {
     setIsConnected(socket.connected);
 
     // Register Socket.IO listeners
-    socket.on(SocketEvents.Connect, handleConnect);
-    socket.on(SocketEvents.Disconnect, handleDisconnect);
-    socket.on(SocketEvents.Error, handleError);
-    socket.on(SocketEvents.ActivityResponse, handleActivityFeedResponse);
-    socket.on(SocketEvents.ActivityUpdate, handleActivityUpdate);
+    socket.on('connect', handleConnect);
+    socket.on('disconnect', handleDisconnect);
+    socket.on('error', handleError);
+    socket.on('unified:activity:response', handleActivityFeedResponse);
+    socket.on('unified:activity:update', handleActivityUpdate);
 
     // Just set connected state if already connected
     if (socket.connected) {
@@ -424,11 +423,11 @@ export function ActivityProvider({ children }: { children: React.ReactNode }) {
     }
 
     return () => {
-      socket.off(SocketEvents.Connect, handleConnect);
-      socket.off(SocketEvents.Disconnect, handleDisconnect);
-      socket.off(SocketEvents.Error, handleError);
-      socket.off(SocketEvents.ActivityResponse, handleActivityFeedResponse);
-      socket.off(SocketEvents.ActivityUpdate, handleActivityUpdate);
+      socket.off('connect', handleConnect);
+      socket.off('disconnect', handleDisconnect);
+      socket.off('error', handleError);
+      socket.off('unified:activity:response', handleActivityFeedResponse);
+      socket.off('unified:activity:update', handleActivityUpdate);
     };
   }, [
     socket,

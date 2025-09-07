@@ -1,7 +1,8 @@
 // apps/server/src/routes/feeds.routes.simple.ts
 // Simplified feeds routes for Phase 2 - basic functionality
 import { Router } from 'express';
-import redisClient from '../lib/redis';
+import { eventBus } from '../services/eventBus.service';
+import { REDIS_CHANNELS } from '@ems/types';
 import {
   listFeeds,
   getFeedStats,
@@ -84,17 +85,14 @@ router.post('/retag', async (req: any, res: any) => {
 
     // Publish real-time updates to admin room
     try {
-      await redisClient.publish(
-        'admin:retagging:bulk',
-        JSON.stringify({
-          ids,
-          addTags: add,
-          removeTags: remove,
-          processed,
-          tagged,
-          timestamp: new Date().toISOString(),
-        }),
-      );
+      await eventBus.publish(REDIS_CHANNELS.ADMIN_RETAGGING_BULK, {
+        ids,
+        addTags: add,
+        removeTags: remove,
+        processed,
+        tagged,
+        timestamp: new Date().toISOString(),
+      });
     } catch (redisError) {
       console.error('Failed to publish retagging updates:', redisError);
       // Don't fail the request if Redis publish fails

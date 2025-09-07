@@ -1,18 +1,11 @@
 import redisClient from '../lib/redis';
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import type { IUserRepository } from '../repositories/IUserRepository';
+import type { IUserRepository } from '../repositories/interfaces/IUserRepository';
 import { UserRepository } from '../repositories/UserRepository';
-import type {
-  DbUser,
-  DbUserBadge,
-  DbBadge,
-  DbUserStats,
-  DbUserPost,
-  DbUserActivity,
-} from '@ems/types';
+import type { DbUser, DbUserBadge, DbBadge, DbUserStats, DbUserPost } from '@ems/types';
 // TODO: Branded types available: UserId, PredictionId, ISODateString, TimestampMs
-import type { PublicUserProfile, UserFeedPost, UserActivity, UserStatsDTO } from '@ems/types';
+import type { PublicUserProfile, UserFeedPost, UserStatsDTO } from '@ems/types';
 import { PostService } from './post.service';
 import { unifiedActivityService } from './unifiedActivity.service';
 import { ImageProcessingService, ProcessedImageSizes } from './imageProcessing.service';
@@ -362,13 +355,6 @@ export class UserService {
       parentId: parentId || null,
     });
 
-    // Create legacy activity record (still needed for getUserActivity endpoint)
-    await this.repo.createUserActivity({
-      userId: authorId,
-      type: 'COMMENT_CREATED',
-      details: { postId: post.id },
-    });
-
     // Create unified activity event
     const author = await this.getPublicSocketUser(authorId);
     if (author) {
@@ -400,44 +386,7 @@ export class UserService {
     };
   }
 
-  // --- ACTIVITY ---
-
-  async getUserActivity(userId: number, viewerId?: number): Promise<UserActivity[]> {
-    const user = await this.repo.findById(userId);
-    if (!user) throw new Error('User not found');
-    if (user.feedPrivate && user.id !== viewerId) throw new Error('Activity feed is private');
-
-    const activity: DbUserActivity[] = await this.repo.getUserActivity(userId);
-    return activity.map(toActivityDTO);
-  }
-
-  async createUserActivity(userId: number, type: string, details?: any): Promise<UserActivity> {
-    const activity = await this.repo.createUserActivity({ userId, type, details });
-
-    // Legacy ticker publishing removed - now handled by unified activity system
-    // The unified activity service broadcasts all activities globally
-    // if (
-    //   [
-    //     'PREDICTION_CREATED',
-    //     'PREDICTION_RESOLVED',
-    //     'BET_PLACED',
-    //     'PARLAY_PLACED',
-    //     'POST_CREATED',
-    //     'COMMENT_CREATED',
-    //     'BADGE_EARNED',
-    //   ].includes(type)
-    // ) {
-    //   publishTicker({
-    //     id: activity.id,
-    //     userId,
-    //     type,
-    //     details,
-    //     createdAt: new Date().toISOString(),
-    //   });
-    // }
-
-    return toActivityDTO(activity);
-  }
+  // --- ACTIVITY (Legacy methods removed - use unifiedActivityService instead) ---
 
   // --- STATS ---
 
@@ -739,16 +688,6 @@ function toFeedPostDTO(
       : undefined,
     children: post.children ? post.children.map(toFeedPostDTO) : undefined,
     authorName: post.authorName,
-  };
-}
-
-function toActivityDTO(a: DbUserActivity): UserActivity {
-  return {
-    id: a.id,
-    userId: a.userId,
-    type: a.type,
-    details: a.details,
-    createdAt: a.createdAt instanceof Date ? a.createdAt.toISOString() : a.createdAt,
   };
 }
 

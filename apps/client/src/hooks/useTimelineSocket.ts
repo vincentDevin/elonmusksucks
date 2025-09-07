@@ -2,7 +2,7 @@
 // Rollback: Revert to string literals in socket handlers, remove typed imports
 import { useEffect, useCallback } from 'react';
 import { useSocket } from '../contexts/SocketContext';
-import { TimelineSocketEvents, type TimelineUpdatePayload } from '@ems/types';
+import { type TimelineUpdatePayload } from '@ems/types';
 
 interface UseTimelineSocketProps {
   activeTab: 'articles' | 'tweets';
@@ -74,16 +74,16 @@ export const useTimelineSocket = ({
     if (!socket || !isConnected) return;
 
     // Subscribe to timeline events
-    socket.on(TimelineSocketEvents.ArticleAdded, handleNewArticles);
+    socket.on('timeline:article:added', handleNewArticles);
     socket.on('timeline:tweets:new', handleNewTweets);
-    socket.on(TimelineSocketEvents.ArticleUpdated, handleArticleUpdate);
-    socket.on(TimelineSocketEvents.ArticleRemoved, handleModerationUpdate);
+    socket.on('timeline:article:updated', handleArticleUpdate);
+    socket.on('timeline:article:removed', handleModerationUpdate);
 
     return () => {
-      socket.off(TimelineSocketEvents.ArticleAdded, handleNewArticles);
+      socket.off('timeline:article:added', handleNewArticles);
       socket.off('timeline:tweets:new', handleNewTweets);
-      socket.off(TimelineSocketEvents.ArticleUpdated, handleArticleUpdate);
-      socket.off(TimelineSocketEvents.ArticleRemoved, handleModerationUpdate);
+      socket.off('timeline:article:updated', handleArticleUpdate);
+      socket.off('timeline:article:removed', handleModerationUpdate);
     };
   }, [
     socket,

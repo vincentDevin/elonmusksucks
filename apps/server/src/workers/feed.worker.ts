@@ -1,9 +1,10 @@
 // apps/server/src/workers/feed.worker.ts
 import 'dotenv/config';
 import { Worker } from 'bullmq';
-import { FeedFetchJobData, FeedHealthCheckData } from '@ems/types';
+import { FeedFetchJobData, FeedHealthCheckData, REDIS_CHANNELS } from '@ems/types';
 import { PrismaClient } from '@prisma/client';
 import redisClient from '../lib/redis';
+import { eventBus } from '../services/eventBus.service';
 
 // Configurable concurrency to keep CPU saturation <70%
 const FEED_CONCURRENCY = parseInt(process.env.WORKER_FEED_CONCURRENCY || '3');
@@ -255,14 +256,11 @@ async function processFeedFetch(job: Job<FeedFetchJobData>): Promise<{
         articlesCreated++;
 
         // Publish event for admin moderation queue
-        await redisClient.publish(
-          'feed:article:new',
-          JSON.stringify({
-            articleId: article.id,
-            title: article.title,
-            publisher: await getFeedName(feedId),
-          }),
-        );
+        await eventBus.publish(REDIS_CHANNELS.FEED_ARTICLE_NEW, {
+          articleId: article.id,
+          title: article.title,
+          publisher: await getFeedName(feedId),
+        });
 
         // Queue article enrichment job
         // TODO: Add to article enrichment queue

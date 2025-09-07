@@ -66,7 +66,7 @@ import type {
   PaginatedLeaderboard,
   UserRank,
   LeaderboardStats,
-} from '../repositories/ILeaderboardRepository';
+} from '../repositories/interfaces/ILeaderboardRepository';
 import type { LeaderboardTrigger, LeaderboardMetrics, ScheduleConfig } from '@ems/types';
 import { QUEUE_NAMES } from '@ems/types';
 import { LeaderboardRepository } from '../repositories/LeaderboardRepository';

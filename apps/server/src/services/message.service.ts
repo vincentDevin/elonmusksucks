@@ -1,6 +1,6 @@
 // apps/server/src/services/message.service.ts
 import { MessageRepository } from '../repositories/MessageRepository';
-import type { MessageWithUser } from '../repositories/IMessageRepository';
+import type { MessageWithUser } from '../repositories/interfaces/IMessageRepository';
 import { eventBus } from './eventBus.service';
 
 const repo = new MessageRepository();

@@ -1,4 +1,3 @@
-import { Server as SocketIOServer } from 'socket.io';
 import { ReactionRepository, IReactionRepository } from '../repositories/ReactionRepository';
 import { PostRepository } from '../repositories/PostRepository';
 import prisma from '../db';
@@ -8,12 +7,10 @@ import { NotFoundError, ValidationError } from '../errors';
 export class ReactionService {
   private reactionRepository: IReactionRepository;
   private postRepository: PostRepository;
-  private io?: SocketIOServer;
 
-  constructor(io?: SocketIOServer) {
+  constructor() {
     this.reactionRepository = new ReactionRepository(prisma);
     this.postRepository = new PostRepository(prisma);
-    this.io = io;
   }
 
   /**
@@ -60,18 +57,7 @@ export class ReactionService {
     // Get updated counts
     const counts = await this.reactionRepository.getReactionCounts(postId);
 
-    // Emit real-time event
-    if (this.io) {
-      this.io.emit('post:reaction', {
-        postId,
-        userId,
-        type,
-        action,
-        counts,
-        userName: (reaction as any)?.user?.name,
-        userAvatar: (reaction as any)?.user?.avatarUrl,
-      });
-    }
+    // Real-time events are now handled by postHandlers.ts → eventBus → postRedisEventHandlers.ts
 
     return {
       reaction: this.toReactionDTO(reaction),
@@ -103,16 +89,7 @@ export class ReactionService {
     // Get updated counts
     const counts = await this.reactionRepository.getReactionCounts(postId);
 
-    // Emit real-time event
-    if (this.io && success) {
-      this.io.emit('post:reaction', {
-        postId,
-        userId,
-        type,
-        action: 'removed',
-        counts,
-      });
-    }
+    // Real-time events are now handled by postHandlers.ts → eventBus → postRedisEventHandlers.ts
 
     return { success, counts };
   }
@@ -146,19 +123,7 @@ export class ReactionService {
     // Get updated counts
     const counts = await this.reactionRepository.getReactionCounts(postId);
 
-    // Emit real-time event
-    if (this.io) {
-      this.io.emit('post:reaction', {
-        postId,
-        userId,
-        type,
-        action: result.action,
-        counts,
-        previousType: result.previousType,
-        userName: (result.reaction as any)?.user?.name,
-        userAvatar: (result.reaction as any)?.user?.avatarUrl,
-      });
-    }
+    // Real-time events are now handled by postHandlers.ts → eventBus → postRedisEventHandlers.ts
 
     return {
       action: result.action,

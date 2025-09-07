@@ -1,4 +1,3 @@
-import { Server as SocketIOServer } from 'socket.io';
 import { PostRepository } from '../repositories/PostRepository';
 import prisma from '../db';
 import type { UserFeedPost, PostContentType, PostVisibility, ReactionType } from '@ems/types';
@@ -7,12 +6,10 @@ import { unifiedActivityService } from './unifiedActivity.service';
 
 export class PostService {
   private postRepository: PostRepository;
-  private io?: SocketIOServer;
   private unifiedActivityService = unifiedActivityService;
 
-  constructor(io?: SocketIOServer) {
+  constructor() {
     this.postRepository = new PostRepository(prisma);
-    this.io = io;
   }
 
   /**
@@ -82,19 +79,8 @@ export class PostService {
     // Convert to API format
     const feedPost = this.toFeedPost(post);
 
-    // Emit socket event for real-time updates
-    if (this.io) {
-      if (data.parentId) {
-        // Emit comment created event
-        this.io.emit('comment:created', {
-          postId: data.parentId,
-          comment: feedPost,
-        });
-      } else if (data.visibility === 'PUBLIC') {
-        // Emit new post event for public timeline
-        this.io.emit('post:created', feedPost);
-      }
-    }
+    // Real-time events are now handled by postHandlers.ts → eventBus → postRedisEventHandlers.ts
+    // This eliminates duplicate emissions and follows the unified event system pattern
 
     return feedPost;
   }
@@ -119,14 +105,7 @@ export class PostService {
 
     const feedPost = this.toFeedPost(updatedPost);
 
-    // Emit update event
-    if (this.io) {
-      this.io.emit('post:updated', {
-        postId,
-        content,
-        editedAt: feedPost.editedAt,
-      });
-    }
+    // Real-time events are now handled by postHandlers.ts → eventBus → postRedisEventHandlers.ts
 
     return feedPost;
   }
@@ -141,10 +120,7 @@ export class PostService {
       throw new ForbiddenError('Cannot delete this post');
     }
 
-    // Emit delete event
-    if (this.io) {
-      this.io.emit('post:deleted', { postId, deletedBy: userId });
-    }
+    // Real-time events are now handled by postHandlers.ts → eventBus → postRedisEventHandlers.ts
   }
 
   /**
@@ -261,14 +237,7 @@ export class PostService {
     // TODO: Send notification to post author
     // TODO: Add to user's activity log
 
-    // Emit real-time update
-    if (this.io) {
-      this.io.emit('post:shared', {
-        postId,
-        sharesCount: updatedPost.sharesCount,
-        sharedBy: userId,
-      });
-    }
+    // Real-time events are now handled by postHandlers.ts → eventBus → postRedisEventHandlers.ts
 
     return {
       success: true,
@@ -330,15 +299,7 @@ export class PostService {
     // TODO: Send notification to moderators
     // TODO: Add to moderation queue
 
-    // Emit real-time update for admins
-    if (this.io) {
-      this.io.to('admin').emit('post:reported', {
-        postId,
-        reportId: report.id,
-        reason,
-        reportCount: post.reportCount + 1,
-      });
-    }
+    // Real-time events for admin notifications now handled by unified event system
 
     return {
       success: true,
@@ -515,18 +476,7 @@ export class PostService {
         },
       });
 
-      // Emit real-time notification to mentioned user
-      if (this.io) {
-        this.io.to(`user:${mentionedUserId}`).emit('mention:received', {
-          postId,
-          mentionId: `${postId}-${mentionedUserId}`,
-          authorId: post.author.id,
-          authorName: post.author.name,
-          authorAvatar: post.author.avatarUrl,
-          content: contentPreview,
-          createdAt: post.createdAt.toISOString(),
-        });
-      }
+      // Real-time mention notifications now handled by unified event system
     } catch (error) {
       console.error(`Failed to create mention notification:`, error);
     }

@@ -3,7 +3,9 @@ import { FeedService } from '../services/feed.service';
 import redisClient from '../lib/redis';
 import { Queue } from 'bullmq';
 import { toFeedView, toFeedsListResponse } from '../view/feed.view';
+import { eventBus } from '../services/eventBus.service';
 import type { FeedView, FeedsListResponse, CreateFeedRequest, UpdateFeedRequest } from '@ems/types';
+import { REDIS_CHANNELS } from '@ems/types';
 
 const feedService = new FeedService();
 const feedQueue = new Queue('feed', { connection: redisClient });
@@ -113,38 +115,32 @@ export const bulkModerate = async (req: Request, res: Response) => {
     // Publish real-time updates
     try {
       // Notify admin room of bulk moderation
-      await redisClient.publish(
-        'admin:moderation:bulk',
-        JSON.stringify({
-          ids,
-          action,
-          processed: updateResult.count,
-          timestamp: new Date().toISOString(),
-        }),
-      );
+      await eventBus.publish(REDIS_CHANNELS.ADMIN_MODERATION_BULK, {
+        ids,
+        action,
+        processed: updateResult.count,
+        timestamp: new Date().toISOString(),
+      });
 
       // If articles were approved, notify public timeline
       if (action === 'APPROVED' && updateResult.count > 0) {
         // Publish each approved article to timeline
         for (const article of approvedArticles) {
-          await redisClient.publish(
-            'timeline:articles:new',
-            JSON.stringify({
-              id: article.id,
-              feedId: article.feedId,
-              title: article.title,
-              excerpt: article.excerpt,
-              url: article.url,
-              leadImageUrl: article.leadImageUrl,
-              publishedAt: article.publishedAt?.toISOString() || null,
-              tags: article.tags,
-              feed: {
-                id: article.feed.id,
-                name: article.feed.name,
-                siteUrl: article.feed.siteUrl,
-              },
-            }),
-          );
+          await eventBus.publish(REDIS_CHANNELS.TIMELINE_ARTICLES_NEW, {
+            id: article.id,
+            feedId: article.feedId,
+            title: article.title,
+            excerpt: article.excerpt,
+            url: article.url,
+            leadImageUrl: article.leadImageUrl,
+            publishedAt: article.publishedAt?.toISOString() || null,
+            tags: article.tags,
+            feed: {
+              id: article.feed.id,
+              name: article.feed.name,
+              siteUrl: article.feed.siteUrl,
+            },
+          });
         }
       }
     } catch (publishError) {

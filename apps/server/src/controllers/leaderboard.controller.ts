@@ -7,7 +7,7 @@ import type {
   UserRank,
   LeaderboardStats,
   LeaderboardQuery,
-} from '../repositories/ILeaderboardRepository';
+} from '../repositories/interfaces/ILeaderboardRepository';
 import { toLeaderboardEntryView } from '../view/leaderboard.view';
 
 /**

@@ -4,7 +4,7 @@ import * as adminService from '../services/admin.service';
 import { payoutService } from '../services/payout.service';
 import { adminAchievementService } from '../services/adminAchievement.service';
 import { shameWallService } from '../services/shameWall.service';
-import { RuleSimulationService } from '../services/RuleSimulationService';
+import { RuleSimulationService } from '../services/ruleSimulation.service';
 
 const ruleSimulationService = new RuleSimulationService();
 import { serializeBigInt } from '../utils/bigintSerializer';
@@ -54,7 +54,7 @@ import type {
   BulkUserOperation,
   PredictionSearchParams,
   BulkPredictionOperation,
-} from '../repositories/IAdminRepository';
+} from '../repositories/interfaces/IAdminRepository';
 
 // -- Enhanced User Management --
 export async function getUsers(req: Request, res: Response, next: NextFunction): Promise<void> {

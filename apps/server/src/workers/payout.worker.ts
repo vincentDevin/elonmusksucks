@@ -7,9 +7,10 @@
 
 import 'dotenv/config';
 import { Worker, Job } from 'bullmq';
-import { PayoutJobData } from '@ems/types';
+import { PayoutJobData, REDIS_CHANNELS } from '@ems/types';
 // TODO: Use QUEUE_NAMES and QueueOptions from @ems/types once imports resolve
 import redisClient from '../lib/redis';
+import { EventBus } from '../lib/EventBus';
 
 // Configurable concurrency to keep CPU saturation <70%
 const PAYOUT_CONCURRENCY = parseInt(process.env.WORKER_PAYOUT_CONCURRENCY || '2');
@@ -19,6 +20,7 @@ import { leaderboardService } from '../services/leaderboard.service';
 import type { LeaderboardTrigger } from '../services/leaderboard.service';
 
 const payoutRepo = new PayoutRepository();
+const eventBus = new EventBus();
 
 const payoutWorker = new Worker<PayoutJobData>(
   'payouts',
@@ -34,7 +36,7 @@ const payoutWorker = new Worker<PayoutJobData>(
       );
 
       // 2. Publish present‑tense event so all socket gateways rebroadcast
-      await redisClient.publish('prediction:resolve', JSON.stringify(updated));
+      await eventBus.publish(REDIS_CHANNELS.PREDICTION_RESOLVE, updated);
 
       // 3. Trigger leaderboard update for the resolved prediction
       const trigger: LeaderboardTrigger = {
@@ -58,7 +60,7 @@ const payoutWorker = new Worker<PayoutJobData>(
         timestamp: new Date().toISOString(),
       };
 
-      await redisClient.publish('payout:completed', JSON.stringify(payoutData));
+      await eventBus.publish(REDIS_CHANNELS.PAYOUT_COMPLETED, payoutData);
 
       console.log(
         `[worker] Prediction ${predictionId} resolved, events published, leaderboard triggered`,

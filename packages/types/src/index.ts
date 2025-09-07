@@ -46,7 +46,6 @@ export interface TimelineUpdatePayload {
 }
 
 // Event-specific payload types can be added here as needed
-export type SocketEventMap = typeof SocketEvents;
 
 import type {
   User as PrismaUser,
@@ -70,7 +69,6 @@ import type {
   TransactionType as PrismaTransactionType,
   // Homepage Timeline Models
   FeedSource as PrismaFeedSource,
-  FeedStatus as PrismaFeedStatus,
   Article as PrismaArticle,
   ArticleStatus as PrismaArticleStatus,
   Tweet as PrismaTweet,
@@ -1067,21 +1065,6 @@ export type UserFeedPost = {
   canDelete?: boolean;
 };
 
-// ——— Legacy Activity (for backwards compatibility) ————————————————————
-export type DbUserActivity = {
-  id:        number;
-  userId:    number;
-  type:      string;
-  details?:  unknown;
-  createdAt: Date;
-};
-export type UserActivity = {
-  id:        number;
-  userId:    number;
-  type:      string;
-  details?:  unknown;
-  createdAt: string;
-};
 
 // ——— Normalized Activity Events ————————————————————————————————————
 export const ActivityEventType = {
@@ -1095,6 +1078,13 @@ export const ActivityEventType = {
   BIG_WIN: 'big_win',
   LEADERBOARD_UPDATE: 'leaderboard_update',
   USER_MENTIONED: 'user_mentioned',
+  // Additional types from UnifiedActivityEvent
+  LIVE_BET: 'live_bet',
+  LIVE_PARLAY: 'live_parlay',
+  MARKET_MOVEMENT: 'market_movement',
+  BIG_BET_ALERT: 'big_bet_alert',
+  ACHIEVEMENT_UNLOCKED: 'achievement_unlocked',
+  USER_FOLLOWED: 'user_followed',
 } as const;
 export type ActivityEventType = (typeof ActivityEventType)[keyof typeof ActivityEventType];
 
@@ -1395,6 +1385,8 @@ export const REDIS_CHANNELS = {
   CHAT_MESSAGE_SENT: 'chat:message:sent',
   CHAT_TYPING_START: 'chat:typing:start',
   CHAT_TYPING_STOP: 'chat:typing:stop',
+  CHAT_JOIN: 'chat:join',
+  CHAT_LEAVE: 'chat:leave',
 
   // Pong channels
   PONG_ELO_UPDATE: 'pong:elo:update',
@@ -1450,6 +1442,7 @@ export const REDIS_CHANNELS = {
   // Admin channels
   ADMIN_METRICS_UPDATE: 'admin:metrics:update',
   ADMIN_MODERATION_BULK: 'admin:moderation:bulk',
+  ADMIN_RETAGGING_BULK: 'admin:retagging:bulk',
   ADMIN_FEED_REFRESH: 'admin:feed:refresh',
   MODERATION_USER_BAN: 'moderation:userBan',
   MODERATION_USER_UNBAN: 'moderation:userUnban',
@@ -1461,6 +1454,7 @@ export const REDIS_CHANNELS = {
   // Leaderboard channels (additional)
   LEADERBOARD_RANK_UPDATE: 'leaderboard:rank:update',
   LEADERBOARD_POSITION_REACHED: 'leaderboard:position:reached',
+  LEADERBOARD_REFRESH_NEEDED: 'leaderboard:refresh_needed',
   LEADERBOARD_COMEBACK_MAJOR: 'leaderboard:comeback:major',
   LEADERBOARD_COMEBACK_MODERATE: 'leaderboard:comeback:moderate',
 
@@ -2804,7 +2798,7 @@ export interface PongTierDistributionView {
 
 // Activity Stream Service Types
 export interface ActivityEventData {
-  type: string;
+  type: ActivityEventType;  // Now strongly typed
   title: string;
   description?: string;
   metadata?: Record<string, any>;
@@ -2886,7 +2880,7 @@ export interface ActivityStreamQuery {
 
 export interface ActivityStreamEntry {
   id: number;
-  type: string;
+  type: ActivityEventType;  // Now strongly typed
   title: string;
   description?: string;
   details?: any;
@@ -2902,15 +2896,7 @@ export interface ActivityStreamEntry {
 
 export interface UnifiedActivityEvent {
   id: string;
-  type:
-    | ActivityEventType
-    | 'live_bet'
-    | 'live_parlay'
-    | 'market_movement'
-    | 'big_bet_alert'
-    | 'achievement_unlocked'
-    | 'user_followed'
-    | 'user_mentioned';
+  type: ActivityEventType;  // Now uses only typed constants
   timestamp: string;
   priority: 'high' | 'medium' | 'low';
   userId: number;

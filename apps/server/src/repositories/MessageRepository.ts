@@ -1,7 +1,7 @@
 // apps/server/src/repositories/MessageRepository.ts
 
 import { PrismaClient, Message } from '@prisma/client';
-import type { IMessageRepository, MessageWithUser } from './IMessageRepository';
+import type { IMessageRepository, MessageWithUser } from './interfaces/IMessageRepository';
 
 const prisma = new PrismaClient();
 

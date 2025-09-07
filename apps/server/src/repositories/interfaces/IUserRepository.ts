@@ -1,13 +1,6 @@
 // apps/server/src/repositories/IUserRepository.ts
 
-import type {
-  DbUser,
-  DbUserBadge,
-  DbBadge,
-  DbUserStats,
-  DbUserActivity,
-  DbUserPost,
-} from '@ems/types';
+import type { DbUser, DbUserBadge, DbBadge, DbUserStats, DbUserPost } from '@ems/types';
 import type { Prisma } from '@prisma/client';
 
 export interface IUserRepository {
@@ -51,13 +44,6 @@ export interface IUserRepository {
   }): Promise<DbUserPost>;
 
   getUserPostThread(postId: number): Promise<(DbUserPost & { children: DbUserPost[] }) | null>;
-
-  getUserActivity(userId: number): Promise<DbUserActivity[]>;
-  createUserActivity(data: {
-    userId: number;
-    type: string;
-    details?: Prisma.InputJsonValue | null;
-  }): Promise<DbUserActivity>;
 
   /** stats stored in the database */
   getUserStats(userId: number): Promise<DbUserStats | null>;

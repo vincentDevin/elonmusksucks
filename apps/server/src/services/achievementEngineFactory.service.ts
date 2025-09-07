@@ -1,8 +1,7 @@
 import { PrismaClient } from '@prisma/client';
-import type { Server as SocketServer } from 'socket.io';
 
-import { AchievementEngine } from './AchievementEngine';
-import { AchievementSocketEmitter } from './AchievementSocketEmitter';
+import { AchievementEngine } from './achievementEngine.service';
+import { AchievementSocketEmitter } from './achievementSocketEmitter.service';
 import { AchievementRepository } from '../repositories/AchievementRepository';
 import { ActivityRepository } from '../repositories/ActivityRepository';
 import { StatsRepository } from '../repositories/StatsRepository';
@@ -17,7 +16,7 @@ export class AchievementEngineFactory {
   /**
    * Create or get singleton AchievementEngine instance
    */
-  static create(io: SocketServer, prisma?: PrismaClient): AchievementEngine {
+  static create(prisma?: PrismaClient): AchievementEngine {
     if (!this.instance) {
       const client = prisma || new PrismaClient();
 
@@ -27,7 +26,7 @@ export class AchievementEngineFactory {
       const statsRepo = new StatsRepository(client);
 
       // Create socket emitter
-      const socketEmitter = new AchievementSocketEmitter(io);
+      const socketEmitter = new AchievementSocketEmitter();
 
       // Wire everything together
       this.instance = new AchievementEngine(
@@ -64,6 +63,6 @@ export class AchievementEngineFactory {
 /**
  * Convenience function for getting the engine instance
  */
-export function getAchievementEngine(io: SocketServer): AchievementEngine {
-  return AchievementEngineFactory.create(io);
+export function getAchievementEngine(): AchievementEngine {
+  return AchievementEngineFactory.create();
 }

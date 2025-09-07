@@ -17,7 +17,6 @@ import { socketAuthMiddleware } from './middleware/socketAuthMiddleware';
 import { registerChatHandlers } from './handlers/chatHandlers';
 import { registerBetHandlers } from './handlers/betSocketHandlers';
 import { registerRedisEventHandlers } from './handlers/redisEventHandlers';
-import { registerRedisChatHandlers } from './handlers/redisChatEventHandlers';
 import { registerModerationHandlers } from './handlers/moderationHandlers';
 import { registerStatisticsRedisHandlers } from './handlers/statisticsSocketHandlers';
 import { setupUnifiedActivityHandlers } from './handlers/unifiedActivityHandlers';
@@ -134,7 +133,7 @@ export async function initSocket(httpServer: HTTPServer) {
   unifiedActivityService.setSocketIO(io);
 
   // ── Achievement Redis subscriber ──────────────────────────────────────────
-  const achievementSub = setupAchievementRedisHandlers(io);
+  const achievementSub = setupAchievementRedisHandlers();
   redisClients.push(achievementSub);
 
   // ── Timeline event handlers ───────────────────────────────────────────────
@@ -144,10 +143,7 @@ export async function initSocket(httpServer: HTTPServer) {
   const postSub = registerPostRedisHandlers(io);
   redisClients.push(postSub);
 
-  // ── Chat event subscriptions ──────────────────────────────────────────────
-  const chatSub = redisClient.duplicate();
-  redisClients.push(chatSub);
-  registerRedisChatHandlers(io, chatSub);
+  // Chat events are now handled by main redisEventHandlers.ts using REDIS_CHANNELS constants
 
   // ── Auth middleware must run before per‑socket handlers ───────────────────
   io.use(socketAuthMiddleware);

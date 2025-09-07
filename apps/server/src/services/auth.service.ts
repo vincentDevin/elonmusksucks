@@ -11,9 +11,9 @@ export type {
 } from '@ems/types';
 
 import type { User } from '@prisma/client';
-import type { IAuthRepository } from '../repositories/IAuthRepository';
+import type { IAuthRepository } from '../repositories/interfaces/IAuthRepository';
 import { PrismaAuthRepository } from '../repositories/AuthRepository';
-import type { IUserRepository } from '../repositories/IUserRepository';
+import type { IUserRepository } from '../repositories/interfaces/IUserRepository';
 import { UserRepository } from '../repositories/UserRepository';
 import { userCache } from '../utils/userCache';
 

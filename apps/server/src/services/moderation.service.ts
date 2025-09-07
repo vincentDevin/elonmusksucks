@@ -1,7 +1,7 @@
 // apps/server/src/services/moderation.service.ts
 import { PrismaClient } from '@prisma/client';
 import { ModerationRepository } from '../repositories/ModerationRepository';
-import type { IModerationRepository } from '../repositories/IModerationRepository';
+import type { IModerationRepository } from '../repositories/interfaces/IModerationRepository';
 import type { BanType, ModerationAction } from '@prisma/client';
 import { REDIS_CHANNELS } from '@ems/types';
 import { eventBus } from './eventBus.service';

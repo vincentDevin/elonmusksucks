@@ -1,6 +1,6 @@
 import { PrismaClient, Prisma } from '@prisma/client';
 import type { JsonRuleAchievementData } from '@ems/types';
-import { RuleComplexityTracker } from '../services/RuleComplexityTracker';
+import { RuleComplexityTracker } from '../services/ruleComplexityTracker.service';
 
 export interface IAchievementRepository {
   findMany(params?: any): Promise<any[]>;

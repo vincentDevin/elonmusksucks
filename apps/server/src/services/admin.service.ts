@@ -1,6 +1,6 @@
 // apps/server/src/services/admin.service.ts
 import type { Role } from '@prisma/client';
-import type { IAdminRepository } from '../repositories/IAdminRepository';
+import type { IAdminRepository } from '../repositories/interfaces/IAdminRepository';
 import type {
   QueryParams,
   UserSearchParams,
@@ -16,7 +16,7 @@ import type {
   DetailedPrediction,
   BulkPredictionOperation,
   BulkPredictionResult,
-} from '../repositories/IAdminRepository';
+} from '../repositories/interfaces/IAdminRepository';
 import { PrismaAdminRepository } from '../repositories/AdminRepository';
 import type { UserStatsDTO } from '@ems/types';
 import { EventBus } from '../lib/EventBus';

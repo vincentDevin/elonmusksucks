@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import type { IStatsRepository } from '../services/AchievementEngine';
+import type { IStatsRepository } from '../services/achievementEngine.service';
 import { serializeBigInt } from '../utils/bigintSerializer';
 
 /**

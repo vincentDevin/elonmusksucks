@@ -22,8 +22,8 @@ import {
   type CreatePredictionPayload,
 } from '../api/predictions';
 import type { BetWithUser, ParlayLegWithUser, PublicPredictionOption } from '@ems/types';
+import { REDIS_CHANNELS } from '@ems/types';
 import { socketRequest } from '../lib/socketRequest';
-import { SocketEvents } from '@ems/types';
 
 // Extended option type with client-side properties
 type ExtendedOption = PublicPredictionOption & {
@@ -199,7 +199,7 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
       );
 
       try {
-        const result = await socketRequest(SocketEvents.BetPlace as any, payload);
+        const result = await socketRequest(REDIS_CHANNELS.BET_PLACE, payload);
         console.log('PredictionContext placeBet success', result);
 
         // Clean up optimistic bet and replace with real data
@@ -268,7 +268,7 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
       setLatestParlay(optimisticParlay as any);
 
       try {
-        const result = await socketRequest(SocketEvents.ParlayPlace as any, payload);
+        const result = await socketRequest(REDIS_CHANNELS.PARLAY_PLACE, payload);
 
         // Clean up optimistic parlay
         optimisticBetsRef.current.delete(optimisticParlayId);

@@ -1,4 +1,4 @@
-import type { IMarketRepository } from '../repositories/IMarketRepository';
+import type { IMarketRepository } from '../repositories/interfaces/IMarketRepository';
 import { MarketRepository } from '../repositories/MarketRepository';
 
 const repo: IMarketRepository = new MarketRepository();

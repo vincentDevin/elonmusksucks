@@ -7,7 +7,7 @@ import type {
   PaginatedLeaderboard,
   UserRank,
   LeaderboardStats,
-} from './ILeaderboardRepository';
+} from './interfaces/ILeaderboardRepository';
 import { UserService } from '../services/user.service';
 import redisClient from '../lib/redis';
 

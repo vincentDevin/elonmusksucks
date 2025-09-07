@@ -1,17 +1,10 @@
 // apps/server/src/repositories/UserRepository.ts
 
 import { PrismaClient, Prisma } from '@prisma/client';
-import type { IUserRepository } from './IUserRepository';
+import type { IUserRepository } from './interfaces/IUserRepository';
 
 export type { IUserRepository };
-import type {
-  DbUser,
-  DbUserBadge,
-  DbBadge,
-  DbUserStats,
-  DbUserActivity,
-  DbUserPost,
-} from '@ems/types';
+import type { DbUser, DbUserBadge, DbBadge, DbUserStats, DbUserPost } from '@ems/types';
 
 const prisma = new PrismaClient();
 
@@ -166,32 +159,6 @@ export class UserRepository implements IUserRepository {
     });
     if (!post) return null;
     return { ...post, children: post.children ?? [] };
-  }
-
-  async getUserActivity(userId: number): Promise<DbUserActivity[]> {
-    return prisma.userActivity.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-    });
-  }
-
-  async createUserActivity(data: {
-    userId: number;
-    type: string;
-    details?: Prisma.InputJsonValue | null;
-  }): Promise<DbUserActivity> {
-    const payload: Prisma.UserActivityUncheckedCreateInput = {
-      userId: data.userId,
-      type: data.type,
-      ...(data.details === null
-        ? { details: Prisma.JsonNull }
-        : data.details !== undefined
-          ? { details: data.details }
-          : {}),
-    };
-
-    const activity = await prisma.userActivity.create({ data: payload });
-    return activity as DbUserActivity;
   }
 
   async updateUserStats(

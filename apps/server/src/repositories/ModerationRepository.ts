@@ -6,7 +6,7 @@ import type {
   CreateModerationLogData,
   BanWithUser,
   ModerationLogWithUsers,
-} from './IModerationRepository';
+} from './interfaces/IModerationRepository';
 import type { UserBan, ModerationLog, User, Message, UserPost } from '@prisma/client';
 
 export class ModerationRepository implements IModerationRepository {

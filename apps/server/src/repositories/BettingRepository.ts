@@ -1,6 +1,6 @@
 // apps/server/src/repositories/BettingRepository.ts
 import { PrismaClient } from '@prisma/client';
-import type { IBettingRepository, OptionWithPrediction } from './IBettingRepository';
+import type { IBettingRepository, OptionWithPrediction } from './interfaces/IBettingRepository';
 import type { DbBet, DbParlay } from '@ems/types';
 import { EventBus } from '../lib/EventBus';
 

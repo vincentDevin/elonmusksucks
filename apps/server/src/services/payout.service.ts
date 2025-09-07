@@ -4,12 +4,13 @@
 // published when the resolution happens synchronously (tests / dev mode).
 // -----------------------------------------------------------------------------
 
-import type { IPayoutRepository } from '../repositories/IPayoutRepository';
+import type { IPayoutRepository } from '../repositories/interfaces/IPayoutRepository';
 import type { PublicPrediction } from '@ems/types';
 import { QUEUE_NAMES, REDIS_CHANNELS } from '@ems/types';
 import { PayoutRepository } from '../repositories/PayoutRepository';
 import { Queue } from 'bullmq';
 import IORedis from 'ioredis';
+import redisClient from '../lib/redis';
 import { leaderboardService } from './leaderboard.service';
 import type { LeaderboardTrigger } from './leaderboard.service';
 import { unifiedActivityService } from './unifiedActivity.service';
@@ -34,7 +35,7 @@ subscriptionRedis.on('connect', () => {
 });
 
 export class PayoutService {
-  private payoutQueue = new Queue(QUEUE_NAMES.PAYOUTS, { connection: redis });
+  private payoutQueue = new Queue(QUEUE_NAMES.PAYOUTS, { connection: redisClient });
 
   constructor(private repo: IPayoutRepository = new PayoutRepository()) {}
 

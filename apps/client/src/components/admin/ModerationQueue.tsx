@@ -2,7 +2,6 @@
 // apps/client/src/components/admin/ModerationQueue.tsx
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { ArticleModerationData } from '@ems/types';
-import { AdminSocketEvents } from '@ems/types';
 import { useSocket } from '../../contexts/SocketContext';
 import * as feedsAPI from '../../api/feeds';
 
@@ -101,13 +100,13 @@ export const ModerationQueue: React.FC<ModerationQueueProps> = ({ className = ''
 
     // Register event listeners
     socket.on('feed:article:new', handleNewArticle);
-    socket.on(AdminSocketEvents.ModerationBulk, handleSocketBulkModeration);
-    socket.on(AdminSocketEvents.RetaggingBulk, handleSocketBulkRetagging);
+    socket.on('admin:moderation:bulk', handleSocketBulkModeration);
+    socket.on('admin:retagging:bulk', handleSocketBulkRetagging);
 
     return () => {
       socket.off('feed:article:new', handleNewArticle);
-      socket.off(AdminSocketEvents.ModerationBulk, handleSocketBulkModeration);
-      socket.off(AdminSocketEvents.RetaggingBulk, handleSocketBulkRetagging);
+      socket.off('admin:moderation:bulk', handleSocketBulkModeration);
+      socket.off('admin:retagging:bulk', handleSocketBulkRetagging);
     };
   }, [socket, handleNewArticle, handleSocketBulkModeration, handleSocketBulkRetagging]);
 

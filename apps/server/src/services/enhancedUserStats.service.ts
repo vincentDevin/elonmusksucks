@@ -5,9 +5,10 @@ import {
   CategoryStats,
   UserRanking,
   EnhancedUserStats,
+  REDIS_CHANNELS,
 } from '@ems/types';
 import { leaderboardService } from './leaderboard.service';
-import redisClient from '../lib/redis';
+import { eventBus } from './eventBus.service';
 import { UserRepository } from '../repositories/UserRepository';
 import { BettingRepository } from '../repositories/BettingRepository';
 import { StatsRepository } from '../repositories/StatsRepository';
@@ -307,7 +308,7 @@ export class EnhancedUserStatsService {
         timestamp: new Date().toISOString(),
       };
 
-      await redisClient.publish('stats:update', JSON.stringify(statsPayload));
+      await eventBus.publish(REDIS_CHANNELS.STATS_UPDATE, statsPayload);
       console.log(`[enhancedUserStats] Published stats update for user ${userId}`);
     } catch (error) {
       console.error('[enhancedUserStats] Error publishing stats update:', error);
@@ -327,7 +328,7 @@ export class EnhancedUserStatsService {
         timestamp: new Date().toISOString(),
       };
 
-      await redisClient.publish('stats:refresh', JSON.stringify(refreshPayload));
+      await eventBus.publish(REDIS_CHANNELS.STATS_REFRESH, refreshPayload);
       console.log(`[enhancedUserStats] Published stats refresh for user ${userId}`);
     } catch (error) {
       console.error('[enhancedUserStats] Error publishing stats refresh:', error);
@@ -353,7 +354,7 @@ export class EnhancedUserStatsService {
         timestamp: new Date().toISOString(),
       };
 
-      await redisClient.publish('ranking:change', JSON.stringify(rankingPayload));
+      await eventBus.publish(REDIS_CHANNELS.RANKING_CHANGE, rankingPayload);
       console.log(
         `[enhancedUserStats] Published ranking change for user ${userId}: ${oldRank} -> ${newRank}`,
       );

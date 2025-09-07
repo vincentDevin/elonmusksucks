@@ -2,7 +2,7 @@
 // Rollback: Restore any types in socket handlers and error handling
 import { useUserData } from '../contexts/UserDataContext';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { SocketEvents, StatsSocketEvents, type StatsUpdatePayload } from '@ems/types';
+import { type StatsUpdatePayload } from '@ems/types';
 import { useAuth } from '../contexts/AuthContext';
 import { useVisibilityGuard } from '../lib/visibilityGuard';
 import { useSocket } from '../contexts/SocketContext';
@@ -581,23 +581,23 @@ export function useUserStats() {
     if (!user?.id || !socket) return;
 
     // Listen to new event names from backend
-    socket.on(StatsSocketEvents.StatsUpdate, handleStatsUpdate);
+    socket.on('stats:updated', handleStatsUpdate);
     socket.on('stats:refresh', handleStatsRefresh);
     socket.on('user:stats_update', handleUserStatsUpdate);
-    socket.on(StatsSocketEvents.RankingUpdate, handleRankingChange);
-    socket.on(StatsSocketEvents.AchievementUnlock, handleAchievementUnlocked);
+    socket.on('ranking:changed', handleRankingChange);
+    socket.on('achievement:unlocked', handleAchievementUnlocked);
 
     // Keep some legacy events for backward compatibility
-    socket.on(SocketEvents.BetPlaced, handleBetEvent);
+    socket.on('betPlaced', handleBetEvent);
     socket.on('betResolved', handleBetEvent);
 
     return () => {
-      socket.off(StatsSocketEvents.StatsUpdate, handleStatsUpdate);
+      socket.off('stats:updated', handleStatsUpdate);
       socket.off('stats:refresh', handleStatsRefresh);
       socket.off('user:stats_update', handleUserStatsUpdate);
-      socket.off(StatsSocketEvents.RankingUpdate, handleRankingChange);
-      socket.off(StatsSocketEvents.AchievementUnlock, handleAchievementUnlocked);
-      socket.off(SocketEvents.BetPlaced, handleBetEvent);
+      socket.off('ranking:changed', handleRankingChange);
+      socket.off('achievement:unlocked', handleAchievementUnlocked);
+      socket.off('betPlaced', handleBetEvent);
       socket.off('betResolved', handleBetEvent);
     };
   }, [

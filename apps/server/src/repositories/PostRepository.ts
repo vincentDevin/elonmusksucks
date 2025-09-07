@@ -1,5 +1,5 @@
 import { UserPost, PostVisibility, PostContentType, Prisma, PrismaClient } from '@prisma/client';
-import { IPostRepository } from './IPostRepository';
+import { IPostRepository } from './interfaces/IPostRepository';
 
 export class PostRepository implements IPostRepository {
   constructor(private readonly prisma: PrismaClient) {}

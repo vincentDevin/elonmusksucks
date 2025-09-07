@@ -1,6 +1,6 @@
 import prisma from '../db';
 import type { User, EmailVerification, PasswordReset, RefreshToken } from '@prisma/client';
-import type { IAuthRepository } from './IAuthRepository';
+import type { IAuthRepository } from './interfaces/IAuthRepository';
 
 export class PrismaAuthRepository implements IAuthRepository {
   // --- Users ---

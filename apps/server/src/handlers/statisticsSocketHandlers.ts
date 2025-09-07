@@ -1,9 +1,9 @@
 import { Socket, Server as IOServer } from 'socket.io';
 import {
-  StatsSocketEvents,
   StatsUpdatePayload,
   RankingChangePayload,
   AchievementUnlockedPayload,
+  REDIS_CHANNELS,
 } from '@ems/types';
 
 // TEMP: Re-export shared ACK types for backwards compatibility during migration
@@ -13,7 +13,7 @@ import { UserRepository } from '../repositories/UserRepository';
 import { BettingRepository } from '../repositories/BettingRepository';
 import { StatsRepository } from '../repositories/StatsRepository';
 import { PrismaClient } from '@prisma/client';
-import redisClient from '../lib/redis';
+import { EventBus } from '../lib/EventBus';
 
 const userRepository = new UserRepository();
 const bettingRepository = new BettingRepository();
@@ -24,6 +24,7 @@ const enhancedUserStatsService = new EnhancedUserStatsService(
   bettingRepository,
   statsRepository,
 );
+const eventBus = new EventBus();
 
 /**
  * Register real-time statistics handlers for individual socket connections
@@ -43,13 +44,13 @@ export function registerStatisticsHandlers(socket: Socket): void {
 
       // Send current stats immediately
       const currentStats = await enhancedUserStatsService.getEnhancedStats(user.id);
-      socket.emit(StatsSocketEvents.CURRENT, {
+      socket.emit('stats:current', {
         stats: currentStats,
         timestamp: new Date().toISOString(),
       });
     } catch (error) {
       console.error('[stats-socket] Error fetching current stats:', error);
-      socket.emit(StatsSocketEvents.ERROR, { message: 'Failed to fetch current statistics' });
+      socket.emit('stats:error', { message: 'Failed to fetch current statistics' });
     }
   });
 
@@ -89,16 +90,16 @@ export function registerStatisticsRedisHandlers(io: IOServer, redisSub: any): vo
       const data = JSON.parse(message);
 
       switch (channel) {
-        case 'stats:update':
+        case REDIS_CHANNELS.STATS_UPDATE:
           handleStatsUpdate(io, data);
           break;
-        case 'ranking:change':
+        case REDIS_CHANNELS.RANKING_CHANGE:
           handleRankingChange(io, data);
           break;
-        case 'achievement:unlocked':
+        case REDIS_CHANNELS.ACHIEVEMENT_UNLOCKED:
           handleAchievementUnlocked(io, data);
           break;
-        case 'stats:refresh':
+        case REDIS_CHANNELS.STATS_REFRESH:
           handleStatsRefresh(io, data);
           break;
         default:
@@ -117,7 +118,7 @@ function handleStatsUpdate(io: IOServer, payload: StatsUpdatePayload): void {
   const { userId, changes, achievements, timestamp } = payload;
 
   // Emit to user's personal stats room
-  io.to(`user:${userId}:stats`).emit(StatsSocketEvents.UPDATED, {
+  io.to(`user:${userId}:stats`).emit('stats:updated', {
     changes,
     achievements,
     timestamp,
@@ -133,7 +134,7 @@ function handleRankingChange(io: IOServer, payload: RankingChangePayload): void 
   const { userId, oldRank, newRank, change, category, percentile } = payload;
 
   // Emit to user's ranking room
-  io.to(`user:${userId}:ranking`).emit(StatsSocketEvents.RANKING_CHANGED, {
+  io.to(`user:${userId}:ranking`).emit('ranking:changed', {
     oldRank,
     newRank,
     change,
@@ -143,7 +144,7 @@ function handleRankingChange(io: IOServer, payload: RankingChangePayload): void 
   });
 
   // Also emit to stats room for general updates
-  io.to(`user:${userId}:stats`).emit(StatsSocketEvents.RANKING, {
+  io.to(`user:${userId}:stats`).emit('stats:ranking', {
     rank: newRank,
     change,
     category,
@@ -183,14 +184,14 @@ function handleAchievementUnlocked(io: IOServer, payload: any): void {
   const timestamp = payload.timestamp || new Date().toISOString();
 
   // Emit to user's achievement room
-  io.to(`user:${userId}:achievements`).emit(StatsSocketEvents.ACHIEVEMENT_UNLOCKED, {
+  io.to(`user:${userId}:achievements`).emit('achievement:unlocked', {
     achievement,
     progress,
     timestamp,
   });
 
   // Also emit to stats room for general updates
-  io.to(`user:${userId}:stats`).emit(StatsSocketEvents.ACHIEVEMENT, {
+  io.to(`user:${userId}:stats`).emit('stats:achievement', {
     achievement,
     progress,
   });
@@ -210,7 +211,7 @@ function handleStatsRefresh(io: IOServer, payload: { userId: number }): void {
   enhancedUserStatsService
     .getEnhancedStats(userId)
     .then((stats) => {
-      io.to(`user:${userId}:stats`).emit(StatsSocketEvents.REFRESHED, {
+      io.to(`user:${userId}:stats`).emit('stats:refreshed', {
         stats,
         timestamp: new Date().toISOString(),
       });
@@ -235,7 +236,7 @@ export class StatisticsEventEmitter {
       timestamp: new Date().toISOString(),
     };
 
-    await redisClient.publish('stats:update', JSON.stringify(payload));
+    await eventBus.publish(REDIS_CHANNELS.STATS_UPDATE, payload);
   }
 
   static async emitRankingChange(
@@ -254,7 +255,7 @@ export class StatisticsEventEmitter {
       percentile: 0, // This would be calculated by the leaderboard service
     };
 
-    await redisClient.publish('ranking:change', JSON.stringify(payload));
+    await eventBus.publish(REDIS_CHANNELS.RANKING_CHANGE, payload);
   }
 
   static async emitAchievementUnlocked(
@@ -269,10 +270,10 @@ export class StatisticsEventEmitter {
       timestamp: new Date().toISOString(),
     };
 
-    await redisClient.publish('achievement:unlocked', JSON.stringify(payload));
+    await eventBus.publish(REDIS_CHANNELS.ACHIEVEMENT_UNLOCKED, payload);
   }
 
   static async emitStatsRefresh(userId: number): Promise<void> {
-    await redisClient.publish('stats:refresh', JSON.stringify({ userId }));
+    await eventBus.publish(REDIS_CHANNELS.STATS_REFRESH, { userId });
   }
 }

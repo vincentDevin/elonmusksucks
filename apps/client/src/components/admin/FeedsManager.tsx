@@ -7,7 +7,6 @@ import type {
   UpdateFeedRequest,
   FeedStatsResponse,
 } from '@ems/types';
-import { AdminSocketEvents } from '@ems/types';
 import { useSocket } from '../../contexts/SocketContext';
 import * as feedsAPI from '../../api/feeds';
 
@@ -66,11 +65,11 @@ export const FeedsManager: React.FC<FeedsManagerProps> = ({ className = '' }) =>
     if (!socket) return;
 
     // Register event listeners
-    socket.on(AdminSocketEvents.FeedRefresh, handleAdminFeedRefresh);
+    socket.on('admin:feed:refresh', handleAdminFeedRefresh);
     socket.on('timeline:feed:refresh', handleFeedRefresh);
 
     return () => {
-      socket.off(AdminSocketEvents.FeedRefresh, handleAdminFeedRefresh);
+      socket.off('admin:feed:refresh', handleAdminFeedRefresh);
       socket.off('timeline:feed:refresh', handleFeedRefresh);
     };
   }, [socket, handleAdminFeedRefresh, handleFeedRefresh]);

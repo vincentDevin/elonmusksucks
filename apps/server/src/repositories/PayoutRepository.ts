@@ -1,8 +1,8 @@
 // apps/server/src/repositories/PayoutRepository.ts
 import { PrismaClient, Prisma } from '@prisma/client';
-import type { IPayoutRepository } from './IPayoutRepository';
+import type { IPayoutRepository } from './interfaces/IPayoutRepository';
 import type { PublicPrediction, DbUserStats } from '@ems/types';
-import redisClient from '../lib/redis';
+import { REDIS_CHANNELS } from '@ems/types';
 import { serializeBigInt } from '../utils/bigintSerializer';
 import { EventBus } from '../lib/EventBus';
 
@@ -76,7 +76,7 @@ export class PayoutRepository implements IPayoutRepository {
             const serializedPayload = serializeBigInt(betStatusPayload);
 
             // Publish to single channel - handler will route to user room
-            await redisClient.publish('bet:status_change', JSON.stringify(serializedPayload));
+            await this.eventBus.publish(REDIS_CHANNELS.BET_STATUS_CHANGE, serializedPayload);
           } catch (error) {
             console.error('[payout] Error publishing bet status change:', error);
           }
@@ -207,7 +207,7 @@ export class PayoutRepository implements IPayoutRepository {
               timestamp: new Date().toISOString(),
             };
 
-            await redisClient.publish('user:stats_update', JSON.stringify(statsUpdatePayload));
+            await this.eventBus.publish(REDIS_CHANNELS.USER_STATS_UPDATE, statsUpdatePayload);
           } catch (error) {
             console.error('[payout] Error publishing stats update event:', error);
           }
@@ -278,7 +278,7 @@ export class PayoutRepository implements IPayoutRepository {
             };
 
             // Publish to single channel - handler will route to user room
-            await redisClient.publish('parlay:status_change', JSON.stringify(parlayStatusPayload));
+            await this.eventBus.publish(REDIS_CHANNELS.PARLAY_STATUS_CHANGE, parlayStatusPayload);
           } catch (error) {
             console.error('[payout] Error publishing parlay status change:', error);
           }
@@ -410,7 +410,7 @@ export class PayoutRepository implements IPayoutRepository {
               timestamp: new Date().toISOString(),
             };
 
-            await redisClient.publish('user:stats_update', JSON.stringify(statsUpdatePayload));
+            await this.eventBus.publish(REDIS_CHANNELS.USER_STATS_UPDATE, statsUpdatePayload);
           } catch (error) {
             console.error('[payout] Error publishing parlay stats update event:', error);
           }

@@ -10,12 +10,12 @@
 import { Socket } from 'socket.io';
 import type { AuthenticatedSocket } from '../middleware/socketAuthMiddleware';
 import { createMessage, getRecentMessages } from '../services/message.service';
-import type { MessageWithUser } from '../repositories/IMessageRepository';
+import type { MessageWithUser } from '../repositories/interfaces/IMessageRepository';
 import { UserService } from '../services/user.service';
 import redisClient from '../lib/redis';
 import { socketCleanupManager } from '../lib/SocketCleanupManager';
 import { chatRateLimiter, createRateLimitMiddleware } from '../middleware/rateLimitMiddleware';
-import { InputSizeLimits } from '@ems/types';
+import { InputSizeLimits, REDIS_CHANNELS } from '@ems/types';
 import { EventBus } from '../lib/EventBus';
 
 const GLOBAL_CHAT_ROOM = 'global';
@@ -72,15 +72,12 @@ export async function registerChatHandlers(socket: Socket) {
     }
     await publishOnlineUsers();
 
-    await redisClient.publish(
-      'chat:join',
-      JSON.stringify({
-        id: authSock.user.id,
-        name: authSock.user.name,
-        avatarUrl: authSock.user.avatarUrl ?? null,
-        role: authSock.user.role ?? 'USER',
-      }),
-    );
+    await eventBus.publish(REDIS_CHANNELS.CHAT_JOIN, {
+      id: authSock.user.id,
+      name: authSock.user.name,
+      avatarUrl: authSock.user.avatarUrl ?? null,
+      role: authSock.user.role ?? 'USER',
+    });
   } else {
     await publishOnlineUsers(); // guest connects
   }
@@ -202,11 +199,11 @@ export async function registerChatHandlers(socket: Socket) {
         // Don't fail the message send if achievement event fails
       }
 
-      await redisClient.publish('chat:message', JSON.stringify(chatMsg));
+      await eventBus.publish(REDIS_CHANNELS.CHAT_MESSAGE, chatMsg);
 
       // clear typing state
       typingUsers.delete(authSock.user.id);
-      await redisClient.publish('chat:stopTyping', JSON.stringify({ id: authSock.user.id }));
+      await eventBus.publish(REDIS_CHANNELS.CHAT_STOP_TYPING, { id: authSock.user.id });
     } catch (err) {
       console.error('[chat] send error:', err);
       socket.emit('chat:error', { message: 'SEND_FAILED' });
@@ -225,7 +222,7 @@ export async function registerChatHandlers(socket: Socket) {
 
     if (!typingUsers.has(uid)) {
       typingUsers.add(uid);
-      redisClient.publish('chat:typing', JSON.stringify({ id: uid, name: authSock.user.name }));
+      await eventBus.publish(REDIS_CHANNELS.CHAT_TYPING, { id: uid, name: authSock.user.name });
 
       // Publish JSON rule achievement event for typing start
       try {
@@ -247,7 +244,7 @@ export async function registerChatHandlers(socket: Socket) {
 
     const t = setTimeout(async () => {
       typingUsers.delete(uid);
-      redisClient.publish('chat:stopTyping', JSON.stringify({ id: uid }));
+      await eventBus.publish(REDIS_CHANNELS.CHAT_STOP_TYPING, { id: uid });
       typingTimeout.delete(uid);
 
       // Publish JSON rule achievement event for typing stop
@@ -277,7 +274,7 @@ export async function registerChatHandlers(socket: Socket) {
     const uid = authSock.user.id;
     if (typingUsers.has(uid)) {
       typingUsers.delete(uid);
-      redisClient.publish('chat:stopTyping', JSON.stringify({ id: uid }));
+      await eventBus.publish(REDIS_CHANNELS.CHAT_STOP_TYPING, { id: uid });
       if (typingTimeout.has(uid)) {
         clearTimeout(typingTimeout.get(uid));
         typingTimeout.delete(uid);
@@ -321,17 +318,17 @@ export async function registerChatHandlers(socket: Socket) {
     }
 
     await publishOnlineUsers();
-    await redisClient.publish(
-      'chat:leave',
-      JSON.stringify({ id: authSock.user.id, name: authSock.user.name }),
-    );
+    await eventBus.publish(REDIS_CHANNELS.CHAT_LEAVE, {
+      id: authSock.user.id,
+      name: authSock.user.name,
+    });
 
     typingUsers.delete(authSock.user.id);
     if (typingTimeout.has(authSock.user.id)) {
       clearTimeout(typingTimeout.get(authSock.user.id));
       typingTimeout.delete(authSock.user.id);
     }
-    redisClient.publish('chat:stopTyping', JSON.stringify({ id: authSock.user.id }));
+    await eventBus.publish(REDIS_CHANNELS.CHAT_STOP_TYPING, { id: authSock.user.id });
   });
 
   // Log total registered listeners for monitoring
@@ -353,5 +350,5 @@ async function publishOnlineUsers() {
       role: info.role ?? 'USER',
     };
   });
-  await redisClient.publish('chat:usersOnline', JSON.stringify(parsed));
+  await eventBus.publish(REDIS_CHANNELS.CHAT_USERS_ONLINE, parsed);
 }

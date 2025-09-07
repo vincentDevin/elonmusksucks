@@ -1,5 +1,5 @@
 import prisma from '../db';
-import type { IActivityRepository } from './IActivityRepository';
+import type { IActivityRepository } from './interfaces/IActivityRepository';
 
 export class ActivityRepository implements IActivityRepository {
   async createActivity(data: {

@@ -7,7 +7,7 @@ import type {
   PongMatchData,
   PongStatsWithUser,
   PongMatchWithPlayers,
-} from './IPongRepository';
+} from './interfaces/IPongRepository';
 
 const prisma = new PrismaClient();
 

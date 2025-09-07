@@ -5,7 +5,7 @@
 import redisClient from '../lib/redis';
 import { randomUUID } from 'crypto';
 import type { UnifiedActivityEvent } from '@ems/types';
-import type { IActivityRepository } from '../repositories/IActivityRepository';
+import type { IActivityRepository } from '../repositories/interfaces/IActivityRepository';
 import { ActivityRepository } from '../repositories/ActivityRepository';
 
 export class UnifiedActivityService {

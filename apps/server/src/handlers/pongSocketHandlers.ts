@@ -1,5 +1,5 @@
 import { type Server as IOServer, type Socket } from 'socket.io';
-import { IEventBus } from '@ems/types';
+import { IEventBus, REDIS_CHANNELS } from '@ems/types';
 
 /**
  * Register Pong-specific Socket.IO event handlers
@@ -62,16 +62,16 @@ export function registerPongRedisHandlers(io: IOServer, redisSub: any) {
       const data = JSON.parse(message);
 
       switch (channel) {
-        case 'pong:elo:update':
+        case REDIS_CHANNELS.PONG_ELO_UPDATE:
           handleEloUpdate(io, data);
           break;
-        case 'pong:tier:change':
+        case REDIS_CHANNELS.PONG_TIER_CHANGE:
           handleTierChange(io, data);
           break;
-        case 'pong:stats:update':
+        case REDIS_CHANNELS.PONG_STATS_UPDATE:
           handleStatsUpdate(io, data);
           break;
-        case 'pong:leaderboard:update':
+        case REDIS_CHANNELS.PONG_LEADERBOARD_UPDATE:
           handleLeaderboardUpdate(io, data);
           break;
         default:
@@ -202,7 +202,7 @@ export class PongSocketEmitter {
       matchId,
     };
 
-    await this.eventBus.publish('pong:elo:update', data);
+    await this.eventBus.publish(REDIS_CHANNELS.PONG_ELO_UPDATE, data);
   }
 
   /**
@@ -217,7 +217,7 @@ export class PongSocketEmitter {
       isPromotion: this.getTierRank(newTier) > this.getTierRank(oldTier),
     };
 
-    await this.eventBus.publish('pong:tier:change', data);
+    await this.eventBus.publish(REDIS_CHANNELS.PONG_TIER_CHANGE, data);
   }
 
   /**
@@ -230,7 +230,7 @@ export class PongSocketEmitter {
       matchResult,
     };
 
-    await this.eventBus.publish('pong:stats:update', data);
+    await this.eventBus.publish(REDIS_CHANNELS.PONG_STATS_UPDATE, data);
   }
 
   /**
@@ -243,7 +243,7 @@ export class PongSocketEmitter {
       totalPlayers,
     };
 
-    await this.eventBus.publish('pong:leaderboard:update', data);
+    await this.eventBus.publish(REDIS_CHANNELS.PONG_LEADERBOARD_UPDATE, data);
   }
 
   /**

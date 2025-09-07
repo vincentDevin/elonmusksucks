@@ -15,7 +15,7 @@ import type {
   ParlayLegWithUser,
 } from '@ems/types';
 import { REDIS_CHANNELS } from '@ems/types';
-import type { IPredictionRepository } from '../repositories/IPredictionRepository';
+import type { IPredictionRepository } from '../repositories/interfaces/IPredictionRepository';
 import { PredictionRepository } from '../repositories/PredictionRepository';
 import { PredictionType } from '@prisma/client';
 import { UserService } from '../services/user.service';
@@ -147,7 +147,7 @@ export class PredictionService {
 
       // Publish JSON rule achievement event for prediction creation
       try {
-        await this.eventBus.publish('prediction:created', {
+        await eventBus.publish(REDIS_CHANNELS.PREDICTION_CREATED, {
           key: 'prediction:created',
           userId: params.creatorId,
           occurredAt: pred.createdAt.toISOString(),

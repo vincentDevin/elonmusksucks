@@ -4,7 +4,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useSocket } from '../../contexts/SocketContext';
 import * as moderationApi from '../../api/moderation';
 import type { ModerationLogEntry } from '../../api/moderation';
-import { AdminSocketEvents } from '@ems/types';
 
 interface QuickActionForm {
   userId: number;
@@ -170,20 +169,20 @@ const ModerationPanel: React.FC = () => {
   // Listen for real-time updates
   useEffect(() => {
     if (socket) {
-      socket.on(AdminSocketEvents.ModerationUserBan, handleModerationAction);
-      socket.on(AdminSocketEvents.ModerationUserUnban, handleModerationAction);
-      socket.on(AdminSocketEvents.ModerationUserMute, handleModerationAction);
-      socket.on(AdminSocketEvents.ModerationUserKick, handleModerationAction);
-      socket.on(AdminSocketEvents.ModerationMessageDelete, handleModerationAction);
-      socket.on(AdminSocketEvents.ModerationPostDelete, handleModerationAction);
+      socket.on('moderation:userBan', handleModerationAction);
+      socket.on('moderation:userUnban', handleModerationAction);
+      socket.on('moderation:userMute', handleModerationAction);
+      socket.on('moderation:userKick', handleModerationAction);
+      socket.on('moderation:messageDelete', handleModerationAction);
+      socket.on('moderation:postDelete', handleModerationAction);
 
       return () => {
-        socket.off(AdminSocketEvents.ModerationUserBan, handleModerationAction);
-        socket.off(AdminSocketEvents.ModerationUserUnban, handleModerationAction);
-        socket.off(AdminSocketEvents.ModerationUserMute, handleModerationAction);
-        socket.off(AdminSocketEvents.ModerationUserKick, handleModerationAction);
-        socket.off(AdminSocketEvents.ModerationMessageDelete, handleModerationAction);
-        socket.off(AdminSocketEvents.ModerationPostDelete, handleModerationAction);
+        socket.off('moderation:userBan', handleModerationAction);
+        socket.off('moderation:userUnban', handleModerationAction);
+        socket.off('moderation:userMute', handleModerationAction);
+        socket.off('moderation:userKick', handleModerationAction);
+        socket.off('moderation:messageDelete', handleModerationAction);
+        socket.off('moderation:postDelete', handleModerationAction);
       };
     }
   }, [socket, handleModerationAction]);

@@ -10,7 +10,6 @@ import { adminAchievementService } from '../services/adminAchievement.service';
 import type {
   PublicUserProfile,
   UserFeedPost,
-  UserActivity,
   UserStatsDTO,
   UserStatsView,
   UserProfileView,
@@ -20,6 +19,7 @@ import type {
   UserParlayView,
   UserEnhancedStatsView,
   UserAchievementProgressView,
+  UnifiedActivityEvent,
 } from '@ems/types';
 import {
   toUserStatsView,
@@ -134,9 +134,6 @@ export async function followUserHandler(
     }
     await userService.followUser(followerId, followingId);
 
-    // Record activity (legacy)
-    await userService.createUserActivity(followerId, 'USER_FOLLOWED', { followingId });
-
     // Publish follow activity through unified system
     const followedUser = await userService.getUserProfile(followingId);
     const followerUser = await userService.getUserProfile(followerId);
@@ -183,9 +180,6 @@ export async function unfollowUserHandler(
       return;
     }
     await userService.unfollowUser(followerId, followingId);
-
-    // Record activity
-    await userService.createUserActivity(followerId, 'USER_UNFOLLOWED', { followingId });
 
     res.sendStatus(204);
   } catch (err) {
@@ -293,9 +287,22 @@ export async function getUserActivityHandler(
 ): Promise<void> {
   try {
     const userId = Number(req.params.userId);
-    const viewerId = req.user?.id;
-    const activity: UserActivity[] = await userService.getUserActivity(userId, viewerId);
-    res.json(activity);
+
+    // Check user privacy settings
+    const user = await userService.getUserProfile(userId);
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    // For now, return all public activities - in future this could be filtered by userId
+    // when the unified activity service adds user-specific query support
+    const activities: UnifiedActivityEvent[] = await unifiedActivityService.getPublicActivities(50);
+
+    // Filter activities for this specific user (temporary solution)
+    const userActivities = activities.filter((activity) => activity.userId === userId);
+
+    res.json(userActivities);
   } catch (err) {
     next(err);
   }

@@ -1,7 +1,7 @@
 import type { AchievementEvent } from '@ems/types';
 import type { IAchievementRepository } from '../repositories/AchievementRepository';
-import type { IActivityRepository } from '../repositories/IActivityRepository';
-import { RuleEvaluator } from './RuleEvaluator';
+import type { IActivityRepository } from '../repositories/interfaces/IActivityRepository';
+import { RuleEvaluator } from './ruleEvaluator.service';
 
 // Socket emitter interface for dependency injection
 export interface IAchievementSocketEmitter {

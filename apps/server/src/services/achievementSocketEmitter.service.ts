@@ -1,13 +1,15 @@
-import type { Server as SocketServer } from 'socket.io';
-import { AchievementSocketEvents } from '@ems/types';
-import type { IAchievementSocketEmitter } from './AchievementEngine';
+import { AchievementSocketEvents, REDIS_CHANNELS } from '@ems/types';
+import type { IAchievementSocketEmitter } from './achievementEngine.service';
+import { eventBus } from './eventBus.service';
 
 /**
- * Socket.IO implementation of the achievement emitter
- * Handles real-time achievement unlock notifications
+ * EventBus-based implementation of the achievement emitter
+ * Uses unified event system instead of direct Socket.IO emissions
  */
 export class AchievementSocketEmitter implements IAchievementSocketEmitter {
-  constructor(private readonly io: SocketServer) {}
+  constructor() {
+    // Events now go through eventBus → Redis → redisEventHandlers.ts → Socket.IO
+  }
 
   /**
    * Emit achievement unlock to specific user
@@ -22,25 +24,18 @@ export class AchievementSocketEmitter implements IAchievementSocketEmitter {
     },
   ): Promise<void> {
     try {
-      // Emit to user-specific room
-      this.io.to(`user:${userId}`).emit(AchievementSocketEvents.UNLOCKED, {
+      // Publish through unified event system - redisEventHandlers.ts will handle Socket.IO emission
+      await eventBus.publish(REDIS_CHANNELS.ACHIEVEMENT_UNLOCKED, {
         type: AchievementSocketEvents.UNLOCKED,
         userId,
         timestamp: new Date().toISOString(),
         data: payload,
-      });
-
-      // Also emit to general achievement room for celebration effects
-      this.io.to('achievements').emit(AchievementSocketEvents.CELEBRATION, {
-        type: AchievementSocketEvents.CELEBRATION,
-        userId,
         achievementName: payload.achievement.name,
         rarity: payload.achievement.rarity,
-        timestamp: new Date().toISOString(),
       });
     } catch (error) {
-      console.error('Failed to emit achievement unlock:', error);
-      // Don't throw - socket failures shouldn't break achievement processing
+      console.error('Failed to publish achievement unlock event:', error);
+      // Don't throw - event bus failures shouldn't break achievement processing
     }
   }
 
@@ -57,14 +52,16 @@ export class AchievementSocketEmitter implements IAchievementSocketEmitter {
     },
   ): Promise<void> {
     try {
-      this.io.to(`user:${userId}`).emit(AchievementSocketEvents.PROGRESS, {
+      // Note: Progress updates may need a dedicated REDIS_CHANNELS constant
+      // For now using ACHIEVEMENT_UNLOCKED with type differentiation
+      await eventBus.publish(REDIS_CHANNELS.ACHIEVEMENT_UNLOCKED, {
         type: AchievementSocketEvents.PROGRESS,
         userId,
         timestamp: new Date().toISOString(),
         data: payload,
       });
     } catch (error) {
-      console.error('Failed to emit achievement progress:', error);
+      console.error('Failed to publish achievement progress event:', error);
     }
   }
 
@@ -75,7 +72,8 @@ export class AchievementSocketEmitter implements IAchievementSocketEmitter {
     try {
       if (achievements.length === 0) return;
 
-      this.io.to(`user:${userId}`).emit(AchievementSocketEvents.BATCH_UNLOCKED, {
+      // Publish through unified event system - redisEventHandlers.ts will handle Socket.IO emission
+      await eventBus.publish(REDIS_CHANNELS.ACHIEVEMENT_UNLOCKED, {
         type: AchievementSocketEvents.BATCH_UNLOCKED,
         userId,
         count: achievements.length,
@@ -83,7 +81,8 @@ export class AchievementSocketEmitter implements IAchievementSocketEmitter {
         timestamp: new Date().toISOString(),
       });
     } catch (error) {
-      console.error('Failed to emit batch unlock:', error);
+      console.error('Failed to publish batch unlock event:', error);
+      // Don't throw - event bus failures shouldn't break achievement processing
     }
   }
 }

@@ -1,7 +1,6 @@
 // apps/server/src/handlers/achievementEventHandler.ts
-import { Server as SocketServer } from 'socket.io';
 import redis from '../lib/redis';
-import { getAchievementEngine } from '../services/AchievementEngineFactory';
+import { getAchievementEngine } from '../services/achievementEngineFactory.service';
 import { REDIS_CHANNELS } from '@ems/types';
 import type { AchievementEvent } from '@ems/types';
 
@@ -77,7 +76,7 @@ const ACHIEVEMENT_CHANNELS = [
   REDIS_CHANNELS.ACTIVITY_SPEED_BURST,
 ] as const;
 
-export function setupAchievementRedisHandlers(io: SocketServer) {
+export function setupAchievementRedisHandlers() {
   const sub = redis.duplicate();
   sub.on('error', (e) => console.error('[AchievementEventHandler] Redis error', e));
 
@@ -109,7 +108,7 @@ export function setupAchievementRedisHandlers(io: SocketServer) {
       );
 
       // Process through achievement engine
-      const engine = getAchievementEngine(io);
+      const engine = getAchievementEngine();
       const result = await engine.handle(achievementEvent);
 
       if (result.achievementsUnlocked > 0) {
