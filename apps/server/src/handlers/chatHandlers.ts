@@ -17,6 +17,7 @@ import { socketCleanupManager } from '../lib/SocketCleanupManager';
 import { chatRateLimiter, createRateLimitMiddleware } from '../middleware/rateLimitMiddleware';
 import { InputSizeLimits, REDIS_CHANNELS } from '@ems/types';
 import { EventBus } from '../lib/EventBus';
+import { CACHE_TTL } from '../lib/cacheTTL';
 
 const GLOBAL_CHAT_ROOM = 'global';
 const GLOBAL_ROOM_ID = 1;
@@ -69,6 +70,13 @@ export async function registerChatHandlers(socket: Socket) {
           role: authSock.user.role ?? 'USER',
         }),
       );
+
+      // Set TTL on presence data to prevent stale entries
+      await Promise.all([
+        redisClient.expire(ONLINE_USERS_SET_KEY, CACHE_TTL.CHAT_PRESENCE),
+        redisClient.expire(USER_INFO_HASH_KEY, CACHE_TTL.CHAT_PRESENCE),
+        redisClient.expire(CONNECTIONS + uid, CACHE_TTL.CHAT_PRESENCE),
+      ]);
     }
     await publishOnlineUsers();
 

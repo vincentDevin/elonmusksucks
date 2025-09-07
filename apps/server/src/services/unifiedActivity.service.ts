@@ -16,9 +16,10 @@ export class UnifiedActivityService {
   private eventBus: IEventBus;
   // private io: any = null; // Removed - using Redis pub/sub only to avoid duplicates
 
-  // Activity storage
+  // Activity storage with TTL
   private readonly ACTIVITY_LIST = 'unified:activity:recent';
   private readonly ACTIVITY_MAX = 100;
+  private readonly ACTIVITY_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days
 
   constructor(
     repo: IActivityRepository = new ActivityRepository(),
@@ -108,10 +109,11 @@ export class UnifiedActivityService {
     // Using eventBus instead of direct Redis publishing for consistency
     await this.eventBus.publish(REDIS_CHANNELS.UNIFIED_ACTIVITY_GLOBAL, activity);
 
-    // Store in recent activities list for new connections
+    // Store in recent activities list for new connections with TTL
     await Promise.all([
       this.redis.lpush(this.ACTIVITY_LIST, json),
       this.redis.ltrim(this.ACTIVITY_LIST, 0, this.ACTIVITY_MAX - 1),
+      this.redis.expire(this.ACTIVITY_LIST, this.ACTIVITY_TTL_SECONDS),
     ]);
   }
 

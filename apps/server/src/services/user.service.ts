@@ -1,4 +1,5 @@
 import redisClient from '../lib/redis';
+import { CACHE_KEYS, getProfileImageTTL, getTTLUntilMidnight } from '../lib/cacheTTL';
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { IUserRepository } from '../repositories/interfaces/IUserRepository';
@@ -53,7 +54,7 @@ export class UserService {
     };
   }> {
     // Clear cached URLs
-    await redisClient.del(`profileImageUrl:userId:${userId}`);
+    await redisClient.del(CACHE_KEYS.PROFILE_IMAGE_URL(userId));
 
     // Get current user to check for existing profile picture
     const user = await this.repo.findById(userId);
@@ -190,7 +191,7 @@ export class UserService {
     profilePictureKey: string,
     expiresInSeconds = 3600,
   ): Promise<string> {
-    const redisKey = `profileImageUrl:userId:${userId}`;
+    const redisKey = CACHE_KEYS.PROFILE_IMAGE_URL(userId);
     // Try Redis first
     const cached = await redisClient.get(redisKey);
     if (cached) return cached;
@@ -198,8 +199,9 @@ export class UserService {
     // Not cached: generate signed URL
     const url = await this.getSignedAvatarUrl(profilePictureKey, expiresInSeconds);
 
-    // Store in Redis, TTL matches URL expiry
-    await redisClient.set(redisKey, url, 'EX', expiresInSeconds);
+    // Store in Redis with intelligent TTL based on signature expiry
+    const cacheTTL = getProfileImageTTL(expiresInSeconds);
+    await redisClient.setex(redisKey, cacheTTL, url);
 
     return url;
   }
@@ -484,19 +486,15 @@ export class UserService {
   async trackDailyLogin(userId: number): Promise<void> {
     try {
       const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
-      const loginKey = `daily_login:${userId}:${today}`;
+      const loginKey = CACHE_KEYS.DAILY_LOGIN(userId, today);
 
       // Check if user already logged in today using Redis for fast lookups
       const alreadyLoggedToday = await redisClient.get(loginKey);
 
       if (!alreadyLoggedToday) {
-        // Mark as logged in today (expires at end of day)
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        tomorrow.setHours(0, 0, 0, 0);
-        const secondsUntilMidnight = Math.floor((tomorrow.getTime() - Date.now()) / 1000);
-
-        await redisClient.setex(loginKey, secondsUntilMidnight, '1');
+        // Mark as logged in today (expires at midnight)
+        const ttlUntilMidnight = getTTLUntilMidnight();
+        await redisClient.setex(loginKey, ttlUntilMidnight, '1');
 
         // Log activity for time-based tracking
         await eventBus.publish('user:activity:log', {
@@ -565,7 +563,7 @@ export class UserService {
         checkDate.setDate(today.getDate() - i);
         const dateKey = checkDate.toISOString().split('T')[0];
 
-        const loginKey = `daily_login:${userId}:${dateKey}`;
+        const loginKey = CACHE_KEYS.DAILY_LOGIN(userId, dateKey);
         const loggedIn = await redisClient.get(loginKey);
 
         if (loggedIn) {
@@ -595,7 +593,7 @@ export class UserService {
   }> {
     try {
       const today = new Date().toISOString().split('T')[0];
-      const loginKey = `daily_login:${userId}:${today}`;
+      const loginKey = CACHE_KEYS.DAILY_LOGIN(userId, today);
 
       const todaysLogin = !!(await redisClient.get(loginKey));
       const currentStreak = await this.calculateConsecutiveLoginDays(userId);
@@ -610,7 +608,7 @@ export class UserService {
       for (let i = 0; i < 7; i++) {
         // Check last 7 days
         const dateKey = checkDate.toISOString().split('T')[0];
-        const loginKey = `daily_login:${userId}:${dateKey}`;
+        const loginKey = CACHE_KEYS.DAILY_LOGIN(userId, dateKey);
         const loggedIn = await redisClient.get(loginKey);
 
         if (loggedIn) {

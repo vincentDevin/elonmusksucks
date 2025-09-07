@@ -9,7 +9,7 @@ import 'dotenv/config';
 import { Worker, Job } from 'bullmq';
 import { PayoutJobData, REDIS_CHANNELS } from '@ems/types';
 // TODO: Use QUEUE_NAMES and QueueOptions from @ems/types once imports resolve
-import redisClient from '../lib/redis';
+import { createWorkerOptions } from '../lib/bullmqConfig';
 import { EventBus } from '../lib/EventBus';
 
 // Configurable concurrency to keep CPU saturation <70%
@@ -70,10 +70,7 @@ const payoutWorker = new Worker<PayoutJobData>(
       throw error; // Re-throw to mark job as failed
     }
   },
-  {
-    connection: redisClient,
-    concurrency: PAYOUT_CONCURRENCY,
-  },
+  createWorkerOptions('PAYOUTS', PAYOUT_CONCURRENCY),
 );
 
 // Log configured concurrency on startup

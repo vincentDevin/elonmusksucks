@@ -10,7 +10,7 @@ import { QUEUE_NAMES, REDIS_CHANNELS } from '@ems/types';
 import { PayoutRepository } from '../repositories/PayoutRepository';
 import { Queue } from 'bullmq';
 import IORedis from 'ioredis';
-import redisClient from '../lib/redis';
+import { createQueueOptions } from '../lib/bullmqConfig';
 import { leaderboardService } from './leaderboard.service';
 import type { LeaderboardTrigger } from './leaderboard.service';
 import { unifiedActivityService } from './unifiedActivity.service';
@@ -35,7 +35,7 @@ subscriptionRedis.on('connect', () => {
 });
 
 export class PayoutService {
-  private payoutQueue = new Queue(QUEUE_NAMES.PAYOUTS, { connection: redisClient });
+  private payoutQueue = new Queue(QUEUE_NAMES.PAYOUTS, createQueueOptions('PAYOUTS'));
 
   constructor(private repo: IPayoutRepository = new PayoutRepository()) {}
 

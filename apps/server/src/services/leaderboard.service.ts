@@ -58,7 +58,7 @@ export async function reconcileLeaderboard(
 }
 
 import { Queue } from 'bullmq';
-import redisClient from '../lib/redis';
+import { createQueueOptions } from '../lib/bullmqConfig';
 import type { PublicLeaderboardEntry } from '@ems/types';
 import type {
   ILeaderboardRepository,
@@ -80,8 +80,14 @@ export type { LeaderboardTrigger, LeaderboardMetrics, ScheduleConfig } from '@em
  * Enhanced leaderboard service with event-driven updates and intelligent scheduling
  */
 export class LeaderboardService {
-  private refreshQueue = new Queue(QUEUE_NAMES.LEADERBOARD_REFRESH, { connection: redisClient });
-  private eventQueue = new Queue(QUEUE_NAMES.LEADERBOARD_EVENTS, { connection: redisClient });
+  private refreshQueue = new Queue(
+    QUEUE_NAMES.LEADERBOARD_REFRESH,
+    createQueueOptions('LEADERBOARD_REFRESH'),
+  );
+  private eventQueue = new Queue(
+    QUEUE_NAMES.LEADERBOARD_EVENTS,
+    createQueueOptions('LEADERBOARD_EVENTS'),
+  );
   private repo: ILeaderboardRepository;
   private batchBuffer: Map<number, LeaderboardTrigger[]> = new Map();
   private batchTimeout: NodeJS.Timeout | null = null;
@@ -132,8 +138,6 @@ export class LeaderboardService {
       { config },
       {
         repeat: { pattern: interval, tz: timezone },
-        removeOnComplete: 10,
-        removeOnFail: 5,
       },
     );
 
@@ -209,10 +213,7 @@ export class LeaderboardService {
    * Enqueue a leaderboard refresh job
    */
   async enqueueRefresh(data: Record<string, any> = {}): Promise<void> {
-    await this.refreshQueue.add('refreshAll', data, {
-      removeOnComplete: 5,
-      removeOnFail: 3,
-    });
+    await this.refreshQueue.add('refreshAll', data);
   }
 
   /**

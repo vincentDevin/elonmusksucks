@@ -1,0 +1,35 @@
+# apps/server/src/config/redis-users.acl
+# -----------------------------------------------------------------------------
+# Redis ACL (Access Control List) configuration
+# Defines user permissions for fine-grained access control
+# -----------------------------------------------------------------------------
+
+# Default user - disable for security
+user default off
+
+# Application user - full read/write access for normal operations
+user app_user on >app_strong_password_here ~* &* +@all -@dangerous
+
+# Read-only user for monitoring/analytics
+user readonly_user on >readonly_password_here ~* +@read -@dangerous
+
+# Admin user - full access including dangerous commands
+user admin_user on >admin_strong_password_here ~* &* +@all
+
+# Worker user - specific permissions for background jobs
+user worker_user on >worker_password_here ~bull:* ~PAYOUTS* ~LEADERBOARD* ~FEED* ~PONG_PAYOUTS* +@all -@dangerous
+
+# Monitoring user - limited to info and stats
+user monitor_user on >monitor_password_here ~* +info +client +memory +slowlog +latency -@all
+
+# Categories definition for reference:
+# @read: GET, HGET, LRANGE, SISMEMBER, etc.
+# @write: SET, HSET, LPUSH, SADD, etc. 
+# @list: List operations
+# @set: Set operations
+# @hash: Hash operations
+# @string: String operations
+# @dangerous: FLUSHALL, FLUSHDB, KEYS, CONFIG, etc.
+# @admin: Administrative commands
+# @fast: O(1) and O(log N) commands
+# @slow: O(N) commands

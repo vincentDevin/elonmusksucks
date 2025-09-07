@@ -1,15 +1,16 @@
 import { Queue } from 'bullmq';
 import { PongPayoutData, QUEUE_NAMES } from '@ems/types';
-import redisClient from '../lib/redis';
+import { createQueueOptions } from '../lib/bullmqConfig';
 
 export class PongPayoutQueueService {
   private static instance: PongPayoutQueueService;
   private queue: Queue<PongPayoutData>;
 
   constructor() {
-    this.queue = new Queue<PongPayoutData>(QUEUE_NAMES.PONG_PAYOUTS, {
-      connection: redisClient,
-    });
+    this.queue = new Queue<PongPayoutData>(
+      QUEUE_NAMES.PONG_PAYOUTS,
+      createQueueOptions('PONG_PAYOUTS'),
+    );
   }
 
   static getInstance(): PongPayoutQueueService {
@@ -27,13 +28,6 @@ export class PongPayoutQueueService {
 
     await this.queue.add('pong-payout', data, {
       jobId, // Use matchId as job ID for idempotency
-      attempts: 3,
-      backoff: {
-        type: 'exponential',
-        delay: 2000,
-      },
-      removeOnComplete: 100,
-      removeOnFail: 50,
     });
 
     console.log(`[PongPayoutQueue] Enqueued payout job for match ${data.matchId}`);

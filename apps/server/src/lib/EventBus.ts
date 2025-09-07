@@ -10,19 +10,27 @@ import { RedisPool } from './RedisPool';
 export class EventBus implements IEventBus {
   private redisPool?: IRedisPool;
 
-  constructor(usePooling = false) {
+  constructor(usePooling = true) {
+    // Enable pooling by default for production
     if (usePooling) {
       // Extract connection config from existing client for pooling
       const options = {
         host: redisClient.options.host,
         port: redisClient.options.port,
         password: redisClient.options.password,
+        username: redisClient.options.username, // Support ACL usernames
         maxRetriesPerRequest: null,
         enableOfflineQueue: true,
+        // Optimize for managed Redis (Upstash) with longer keepalive
+        keepAlive: 30000, // 30 seconds
+        connectTimeout: 10000, // 10 seconds
+        lazyConnect: true, // Connect when first command is issued
       };
       this.redisPool = new RedisPool(options, {
-        maxConnections: 5,
+        maxConnections: 8, // Optimized for Upstash connection limits
         minConnections: 2,
+        acquireTimeoutMs: 10000, // Longer timeout for managed Redis
+        idleTimeoutMs: 60000, // Keep connections alive longer
       });
     }
   }
