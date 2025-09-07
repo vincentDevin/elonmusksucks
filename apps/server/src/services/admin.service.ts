@@ -8,6 +8,7 @@ import type {
   DetailedUser,
   PredictionSearchParams,
 } from '@ems/types';
+import { REDIS_CHANNELS } from '@ems/types';
 import type {
   BulkUserOperation,
   BulkOperationResult,
@@ -18,7 +19,6 @@ import type {
 } from '../repositories/IAdminRepository';
 import { PrismaAdminRepository } from '../repositories/AdminRepository';
 import type { UserStatsDTO } from '@ems/types';
-import redisClient from '../lib/redis';
 import { EventBus } from '../lib/EventBus';
 
 const repo: IAdminRepository = new PrismaAdminRepository();
@@ -80,23 +80,18 @@ export const bulkUpdatePredictions = async (
 
   // Broadcast events for successful operations
   if (result.successCount > 0) {
-    const redisClient = require('../lib/redis').default;
-
     for (const prediction of result.updatedPredictions) {
       if (operation.operation === 'approve') {
-        await redisClient.publish(
-          'prediction:approved',
-          JSON.stringify({
-            id: prediction.id,
-            title: prediction.title,
-            category: prediction.category,
-            timestamp: new Date().toISOString(),
-          }),
-        );
+        await eventBus.publish(REDIS_CHANNELS.PREDICTION_APPROVED, {
+          id: prediction.id,
+          title: prediction.title,
+          category: prediction.category,
+          timestamp: new Date().toISOString(),
+        });
 
         // Publish JSON rule achievement event for bulk prediction approval
         try {
-          await eventBus.publish('prediction:approved', {
+          await eventBus.publish(REDIS_CHANNELS.PREDICTION_APPROVED, {
             key: 'prediction:approved',
             userId: prediction.creatorId,
             occurredAt: new Date().toISOString(),
@@ -115,19 +110,16 @@ export const bulkUpdatePredictions = async (
           );
         }
       } else if (operation.operation === 'resolve') {
-        await redisClient.publish(
-          'prediction:resolved',
-          JSON.stringify({
-            id: prediction.id,
-            title: prediction.title,
-            winningOptionId: prediction.resolutionData?.winningOptionId,
-            timestamp: new Date().toISOString(),
-          }),
-        );
+        await eventBus.publish(REDIS_CHANNELS.PREDICTION_RESOLVE, {
+          id: prediction.id,
+          title: prediction.title,
+          winningOptionId: prediction.resolutionData?.winningOptionId,
+          timestamp: new Date().toISOString(),
+        });
 
         // Publish JSON rule achievement event for prediction resolution
         try {
-          await eventBus.publish('prediction:resolved', {
+          await eventBus.publish(REDIS_CHANNELS.PREDICTION_RESOLVE, {
             key: 'prediction:resolved',
             userId: prediction.creatorId,
             occurredAt: new Date().toISOString(),
@@ -161,23 +153,19 @@ export const setPredictionStatus = async (
 
   // 🎊 Broadcast prediction approval/rejection event
   if (status === 'approved') {
-    const redisClient = require('../lib/redis').default;
-    await redisClient.publish(
-      'prediction:approved',
-      JSON.stringify({
-        id: updated.id,
-        title: updated.title,
-        description: updated.description,
-        category: updated.category,
-        type: updated.type,
-        approved: true,
-        timestamp: new Date().toISOString(),
-      }),
-    );
+    await eventBus.publish(REDIS_CHANNELS.PREDICTION_APPROVED, {
+      id: updated.id,
+      title: updated.title,
+      description: updated.description,
+      category: updated.category,
+      type: updated.type,
+      approved: true,
+      timestamp: new Date().toISOString(),
+    });
 
     // Publish JSON rule achievement event for prediction approval
     try {
-      await eventBus.publish('prediction:approved', {
+      await eventBus.publish(REDIS_CHANNELS.PREDICTION_APPROVED, {
         key: 'prediction:approved',
         userId: updated.creatorId,
         occurredAt: new Date().toISOString(),
@@ -388,14 +376,11 @@ export const broadcastRealtimeMetrics = async () => {
     const metrics = await repo.getRealtimeMetrics();
 
     // Publish to Redis for Socket.IO broadcasting
-    await redisClient.publish(
-      'admin:metrics:update',
-      JSON.stringify({
-        metrics,
-        timestamp: new Date().toISOString(),
-        type: 'realtime_update',
-      }),
-    );
+    await eventBus.publish(REDIS_CHANNELS.ADMIN_METRICS_UPDATE, {
+      metrics,
+      timestamp: new Date().toISOString(),
+      type: 'realtime_update',
+    });
 
     console.log('[admin-service] Broadcast real-time metrics update');
   } catch (error) {

@@ -14,20 +14,18 @@ import type {
   PublicPrediction,
   ParlayLegWithUser,
 } from '@ems/types';
+import { REDIS_CHANNELS } from '@ems/types';
 import type { IPredictionRepository } from '../repositories/IPredictionRepository';
 import { PredictionRepository } from '../repositories/PredictionRepository';
 import { PredictionType } from '@prisma/client';
-import redisClient from '../lib/redis';
 import { UserService } from '../services/user.service';
 import { unifiedActivityService } from './unifiedActivity.service';
-import { EventBus } from '../lib/EventBus';
 import { eventBus } from './eventBus.service';
 
 // Using the global ParlayLegWithUser type from @ems/types
 
 export class PredictionService {
   private userService = new UserService();
-  private eventBus = new EventBus();
 
   constructor(private repo: IPredictionRepository = new PredictionRepository()) {}
 
@@ -125,8 +123,8 @@ export class PredictionService {
       createdAt: pred.createdAt,
     };
 
-    // Publish legacy format
-    await redisClient.publish('prediction:create', JSON.stringify(dto));
+    // Publish via eventBus
+    await eventBus.publish(REDIS_CHANNELS.PREDICTION_CREATE, dto);
 
     // Publish to unified activity system
     const creator = await this.userService.getPublicSocketUser(params.creatorId);

@@ -3,7 +3,8 @@ import { PrismaClient } from '@prisma/client';
 import { ModerationRepository } from '../repositories/ModerationRepository';
 import type { IModerationRepository } from '../repositories/IModerationRepository';
 import type { BanType, ModerationAction } from '@prisma/client';
-import redisClient from '../lib/redis';
+import { REDIS_CHANNELS } from '@ems/types';
+import { eventBus } from './eventBus.service';
 
 const prisma = new PrismaClient();
 const moderationRepo: IModerationRepository = new ModerationRepository(prisma);
@@ -33,7 +34,7 @@ interface ModerationEventData {
 // Publish moderation events to Redis
 async function publishModerationEvent(channel: string, data: ModerationEventData): Promise<void> {
   try {
-    await redisClient.publish(channel, JSON.stringify(data));
+    await eventBus.publish(channel, data);
   } catch (error) {
     console.error(`[moderation] Failed to publish to ${channel}:`, error);
   }
@@ -104,7 +105,7 @@ export const moderationService = {
     await logAndPublishAction(
       'USER_BAN',
       moderatorId,
-      'moderation:userBan',
+      REDIS_CHANNELS.MODERATION_USER_BAN,
       userId,
       { reason, duration, banId: ban.id },
       ipAddress,
@@ -131,7 +132,7 @@ export const moderationService = {
     await logAndPublishAction(
       'USER_UNBAN',
       moderatorId,
-      'moderation:userUnban',
+      REDIS_CHANNELS.MODERATION_USER_UNBAN,
       userId,
       { banId: ban.id },
       ipAddress,
@@ -162,7 +163,7 @@ export const moderationService = {
     await logAndPublishAction(
       'USER_MUTE',
       moderatorId,
-      'moderation:userMute',
+      REDIS_CHANNELS.MODERATION_USER_MUTE,
       userId,
       { reason, duration, banId: ban.id },
       ipAddress,
@@ -184,7 +185,7 @@ export const moderationService = {
     await logAndPublishAction(
       'USER_KICK',
       moderatorId,
-      'moderation:userKick',
+      REDIS_CHANNELS.MODERATION_USER_KICK,
       userId,
       { reason },
       ipAddress,
@@ -216,7 +217,7 @@ export const moderationService = {
     await logAndPublishAction(
       'MESSAGE_DELETE',
       moderatorId,
-      'moderation:messageDelete',
+      REDIS_CHANNELS.MODERATION_MESSAGE_DELETE,
       message.userId,
       { messageId, reason, content: message.content },
       ipAddress,
@@ -248,7 +249,7 @@ export const moderationService = {
     await logAndPublishAction(
       'POST_DELETE',
       moderatorId,
-      'moderation:postDelete',
+      REDIS_CHANNELS.MODERATION_POST_DELETE,
       post.authorId,
       { postId, reason, content: post.content },
       ipAddress,

@@ -6,14 +6,14 @@
 
 import type { IPayoutRepository } from '../repositories/IPayoutRepository';
 import type { PublicPrediction } from '@ems/types';
-import { QUEUE_NAMES } from '@ems/types';
+import { QUEUE_NAMES, REDIS_CHANNELS } from '@ems/types';
 import { PayoutRepository } from '../repositories/PayoutRepository';
 import { Queue } from 'bullmq';
-import redis from '../lib/redis';
 import IORedis from 'ioredis';
 import { leaderboardService } from './leaderboard.service';
 import type { LeaderboardTrigger } from './leaderboard.service';
 import { unifiedActivityService } from './unifiedActivity.service';
+import { eventBus } from './eventBus.service';
 
 // Create a separate Redis client for subscriptions to avoid conflicts
 const subscriptionRedis = new IORedis({
@@ -52,8 +52,8 @@ export class PayoutService {
     if (typeof this.repo.markResolving !== 'function') {
       const resolved = await this.repo.resolvePrediction(predictionId, winningOptionId);
 
-      // Publish real‑time update so front‑end sees result instantly (legacy)
-      await redis.publish('prediction:resolve', JSON.stringify(resolved));
+      // Publish real‑time update so front‑end sees result instantly
+      await eventBus.publish(REDIS_CHANNELS.PREDICTION_RESOLVE, resolved);
 
       // The resolved prediction from the repository includes options
       const resolvedWithOptions = resolved as PublicPrediction & {

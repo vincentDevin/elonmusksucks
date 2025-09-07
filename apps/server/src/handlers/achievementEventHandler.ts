@@ -2,101 +2,79 @@
 import { Server as SocketServer } from 'socket.io';
 import redis from '../lib/redis';
 import { getAchievementEngine } from '../services/AchievementEngineFactory';
+import { REDIS_CHANNELS } from '@ems/types';
 import type { AchievementEvent } from '@ems/types';
 
 // Comprehensive list of Redis channels that should trigger achievement evaluation
 const ACHIEVEMENT_CHANNELS = [
   // Betting events
-  'bet:placed',
-  'bet:resolved',
-  'bet:won',
-  'bet:lost',
-  'parlay:placed',
-  'parlay:won',
-  'parlay:lost',
-  'payout:completed',
+  REDIS_CHANNELS.BET_PLACED,
+  REDIS_CHANNELS.BET_WON,
+  REDIS_CHANNELS.BET_LOST,
+  REDIS_CHANNELS.PARLAY_PLACED,
+  REDIS_CHANNELS.PAYOUT_COMPLETED,
 
   // Pong events
-  'pong:match:recorded',
-  'pong:match:completed',
-  'pong:match:lost',
-  'pong:elo:update',
-  'pong:elo:milestone',
-  'pong:win:pvp',
-  'pong:win:ai',
+  REDIS_CHANNELS.PONG_MATCH_COMPLETED,
+  REDIS_CHANNELS.PONG_MATCH_LOST,
+  REDIS_CHANNELS.PONG_ELO_UPDATE,
+  REDIS_CHANNELS.PONG_ELO_MILESTONE,
 
   // User events
-  'user:login',
-  'user:follow',
-  'user:balance:snapshot',
-  'user:streak:update',
+  REDIS_CHANNELS.USER_FOLLOWED,
+  REDIS_CHANNELS.USER_BALANCE_SNAPSHOT,
+  REDIS_CHANNELS.USER_DAILY_LOGIN,
 
   // Prediction events
-  'prediction:created',
-  'prediction:approved',
-  'prediction:bet:placed',
-  'prediction:bet:settled',
-  'prediction:market:created',
-  'prediction:market:settled',
-  'prediction:resolved',
+  REDIS_CHANNELS.PREDICTION_CREATED,
+  REDIS_CHANNELS.PREDICTION_APPROVED,
+  REDIS_CHANNELS.PREDICTION_VIEWED,
+  REDIS_CHANNELS.PREDICTION_FIRST_CORRECT_BET,
+  REDIS_CHANNELS.PREDICTION_RESOLVED_FAST,
+  REDIS_CHANNELS.PREDICTION_VIRAL,
 
   // Chat events
-  'chat:message:sent',
-  'chat:typing:start',
-  'chat:typing:stop',
+  REDIS_CHANNELS.CHAT_MESSAGE_SENT,
+  REDIS_CHANNELS.CHAT_TYPING_START,
+  REDIS_CHANNELS.CHAT_TYPING_STOP,
 
   // Leaderboard events
-  'leaderboard:rank:update',
-  'leaderboard:daily:close',
-  'leaderboard:weekly:close',
-  'leaderboard:position:reached',
-  'leaderboard:comeback:major',
-  'leaderboard:comeback:moderate',
+  REDIS_CHANNELS.LEADERBOARD_RANK_UPDATE,
+  REDIS_CHANNELS.LEADERBOARD_POSITION_REACHED,
+  REDIS_CHANNELS.LEADERBOARD_COMEBACK_MAJOR,
+  REDIS_CHANNELS.LEADERBOARD_COMEBACK_MODERATE,
 
   // Streak events (from StreakManager)
-  'streak:updated',
-  'streak:broken',
-  'streak:milestone:reached',
-  'streak:reset',
+  REDIS_CHANNELS.STREAK_UPDATED,
+  REDIS_CHANNELS.STREAK_BROKEN,
+  REDIS_CHANNELS.STREAK_MILESTONE_REACHED,
+  REDIS_CHANNELS.STREAK_RESET,
 
   // Financial events (from FinancialTracker)
-  'balance:milestone:reached',
-  'bankruptcy:detected',
-  'rags:to:riches',
-  'massive:loss:detected',
-  'massive:gain:detected',
-  'comeback:detected',
-  'profit:snapshot:daily',
+  REDIS_CHANNELS.BALANCE_MILESTONE_REACHED,
+  REDIS_CHANNELS.BANKRUPTCY_DETECTED,
+  REDIS_CHANNELS.RAGS_TO_RICHES,
+  REDIS_CHANNELS.MASSIVE_LOSS_DETECTED,
+  REDIS_CHANNELS.MASSIVE_GAIN_DETECTED,
+  REDIS_CHANNELS.COMEBACK_DETECTED,
+  REDIS_CHANNELS.PROFIT_SNAPSHOT_DAILY,
 
   // Complex event correlation (from EventCorrelator)
-  'event:sequence:completed',
-  'pattern:matched',
-  'achievement:statistical:anomaly',
-  'achievement:probability:defier',
-  'achievement:yolo:all:in',
-  'achievement:galaxy:brain:parlay',
-  'achievement:pong:comeback',
-
-  // Daily activity events
-  'user:daily:login',
-  'user:daily:summary',
+  REDIS_CHANNELS.EVENT_SEQUENCE_COMPLETED,
+  REDIS_CHANNELS.PATTERN_MATCHED,
+  REDIS_CHANNELS.ACHIEVEMENT_STATISTICAL_ANOMALY,
+  REDIS_CHANNELS.ACHIEVEMENT_PROBABILITY_DEFIER,
+  REDIS_CHANNELS.ACHIEVEMENT_YOLO_ALL_IN,
+  REDIS_CHANNELS.ACHIEVEMENT_GALAXY_BRAIN_PARLAY,
+  REDIS_CHANNELS.ACHIEVEMENT_PONG_COMEBACK,
 
   // Social events
-  'emoji:used',
-  'thread:participation',
-  'post:upvoted',
-  'post:reaction:added',
-  'user:followed',
-
-  // Prediction tracking events
-  'prediction:viewed',
-  'prediction:first:correct:bet',
-  'prediction:resolved:fast',
-  'prediction:viral',
+  REDIS_CHANNELS.EMOJI_USED,
+  REDIS_CHANNELS.THREAD_PARTICIPATION,
 
   // Time-based activity events
-  'activity:time:pattern',
-  'activity:speed:burst',
+  REDIS_CHANNELS.ACTIVITY_TIME_PATTERN,
+  REDIS_CHANNELS.ACTIVITY_SPEED_BURST,
 ] as const;
 
 export function setupAchievementRedisHandlers(io: SocketServer) {

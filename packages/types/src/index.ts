@@ -1,102 +1,13 @@
 // System constants
 export const SYSTEM_AI_USER_ID = -1; // Canonical AI user ID for Pong matches
 
-// Rollback: Remove StatsSocketEvents, TimelineSocketEvents, and payload types
-// Socket Event Constants - centralized type-safe event names
-export const SocketEvents = {
-  // Core connection events
-  Connect: 'connect',
-  Disconnect: 'disconnect',
-  Error: 'error',
-  
-  // Betting events
-  BetPlace: 'bet:place',
-  BetPlaced: 'betPlaced',
-  BetUpdate: 'betUpdate',
-  
-  // Parlay events
-  ParlayPlace: 'parlay:place',
-  ParlayPlaced: 'parlayPlaced',
-  
-  // Stats events
-  StatsUpdate: 'stats:update',
-  StatsUpdated: 'stats:updated',
-  RankingChanged: 'ranking:changed',
-  
-  // Activity events
-  ActivityUpdate: 'unified:activity:update',
-  ActivityResponse: 'unified:activity:response',
-  
-  // Leaderboard events
-  LeaderboardAllTime: 'leaderboardAllTime',
-  LeaderboardDaily: 'leaderboardDaily',
-  LeaderboardRankChange: 'leaderboard:rankChange',
-  
-  // Post events
-  PostCreate: 'post:create',
-  PostCreated: 'post:created',
-  PostUpdate: 'post:update',
-  PostUpdated: 'post:updated',
-  PostDelete: 'post:delete',
-  PostDeleted: 'post:deleted',
-  PostReact: 'post:react',
-  PostReaction: 'post:reaction',
-  PostReport: 'post:report',
-  PostReported: 'post:reported',
-  CommentCreate: 'comment:create',
-  CommentCreated: 'comment:created',
-  CommentDelete: 'comment:delete',
-  CommentDeleted: 'comment:deleted',
-  TimelineUpdate: 'timeline:update',
-} as const;
+// Socket Event Constants removed - use REDIS_CHANNELS for all event names
 
-// Stats socket events with typed payloads
-export const StatsSocketEvents = {
-  StatsUpdate: 'stats:update',
-  RankingUpdate: 'ranking:update',
-  AchievementUnlock: 'achievement:unlock',
-  CURRENT: 'stats:current',
-  ERROR: 'stats:error',
-  UPDATED: 'stats:updated',
-  RANKING: 'stats:ranking',
-  ACHIEVEMENT: 'stats:achievement',
-  REFRESHED: 'stats:refreshed',
-  RANKING_CHANGED: 'ranking:changed',
-  ACHIEVEMENT_UNLOCKED: 'achievement:unlocked'
-} as const;
+// StatsSocketEvents removed - use REDIS_CHANNELS for all event names
 
-export type StatsSocketEvent = typeof StatsSocketEvents[keyof typeof StatsSocketEvents];
+// TimelineSocketEvents removed - use REDIS_CHANNELS for all event names
 
-// Timeline socket events with typed payloads
-export const TimelineSocketEvents = {
-  ArticleAdded: 'timeline:article:added',
-  ArticleUpdated: 'timeline:article:updated',
-  ArticleRemoved: 'timeline:article:removed',
-} as const;
-
-export type TimelineSocketEvent = typeof TimelineSocketEvents[keyof typeof TimelineSocketEvents];
-
-// Rollback: Remove AdminSocketEvents constant and type export
-// Admin socket events with typed payloads
-export const AdminSocketEvents = {
-  // Moderation events
-  ModerationUserBan: 'adminModerationUserBan',
-  ModerationUserUnban: 'adminModerationUserUnban', 
-  ModerationUserMute: 'adminModerationUserMute',
-  ModerationUserKick: 'adminModerationUserKick',
-  ModerationMessageDelete: 'adminModerationMessageDelete',
-  ModerationPostDelete: 'adminModerationPostDelete',
-  ModerationBulk: 'admin:moderation:bulk',
-  RetaggingBulk: 'admin:retagging:bulk',
-  
-  // Feed management events
-  FeedRefresh: 'admin:feed:refresh',
-  
-  // Metrics events
-  MetricsUpdate: 'admin:metrics:update',
-} as const;
-
-export type AdminSocketEvent = typeof AdminSocketEvents[keyof typeof AdminSocketEvents];
+// AdminSocketEvents removed - use REDIS_CHANNELS for all event names
 
 // Socket payload interfaces
 export interface StatsUpdatePayload {
@@ -1435,6 +1346,7 @@ export type SocketRoom = typeof SOCKET_ROOMS[keyof typeof SOCKET_ROOMS];
  * Redis channel names for event publishing
  */
 export const REDIS_CHANNELS = {
+  // Existing channels (keep as-is)
   PREDICTION_CREATE: 'prediction:create',
   PREDICTION_RESOLVE: 'prediction:resolve',
   BET_PLACE: 'bet:place',
@@ -1449,29 +1361,125 @@ export const REDIS_CHANNELS = {
   RANKING_CHANGE: 'ranking:change',
   ACHIEVEMENT_UNLOCKED: 'achievement:unlocked',
   USER_STATS_UPDATE: 'user:stats_update',
+
+  // Achievement channels
+  ACHIEVEMENT_STATISTICAL_ANOMALY: 'achievement:statistical:anomaly',
+  ACHIEVEMENT_PROBABILITY_DEFIER: 'achievement:probability:defier',
+  ACHIEVEMENT_YOLO_ALL_IN: 'achievement:yolo:all:in',
+  ACHIEVEMENT_GALAXY_BRAIN_PARLAY: 'achievement:galaxy:brain:parlay',
+  ACHIEVEMENT_PONG_COMEBACK: 'achievement:pong:comeback',
+
+  // Activity channels
+  UNIFIED_ACTIVITY_GLOBAL: 'unified:activity:global',
+  UNIFIED_ACTIVITY_UPDATE: 'unified:activity:update',
+  UNIFIED_ACTIVITY_RESPONSE: 'unified:activity:response',
+  ACTIVITY_GLOBAL: 'activity:global',
+  ACTIVITY_PERSONAL: 'activity:personal',
+  ACTIVITY_SPEED_BURST: 'activity:speed:burst',
+  ACTIVITY_TIME_PATTERN: 'activity:time:pattern',
+
+  // Financial channels
+  BALANCE_MILESTONE_REACHED: 'balance:milestone:reached',
+  BANKRUPTCY_DETECTED: 'bankruptcy:detected',
+  RAGS_TO_RICHES: 'rags:to:riches',
+  MASSIVE_LOSS_DETECTED: 'massive:loss:detected',
+  MASSIVE_GAIN_DETECTED: 'massive:gain:detected',
+  COMEBACK_DETECTED: 'comeback:detected',
+  PROFIT_SNAPSHOT_DAILY: 'profit:snapshot:daily',
+
+  // Chat channels
+  CHAT_MESSAGE: 'chat:message',
+  CHAT_TYPING: 'chat:typing',
+  CHAT_STOP_TYPING: 'chat:stopTyping',
+  CHAT_USERS_ONLINE: 'chat:usersOnline',
+  CHAT_MESSAGE_SENT: 'chat:message:sent',
+  CHAT_TYPING_START: 'chat:typing:start',
+  CHAT_TYPING_STOP: 'chat:typing:stop',
+
+  // Pong channels
+  PONG_ELO_UPDATE: 'pong:elo:update',
+  PONG_TIER_CHANGE: 'pong:tier:change',
+  PONG_STATS_UPDATE: 'pong:stats:update',
+  PONG_LEADERBOARD_UPDATE: 'pong:leaderboard:update',
+  PONG_MATCH_COMPLETED: 'pong:match:completed',
+  PONG_MATCH_LOST: 'pong:match:lost',
+  PONG_ELO_MILESTONE: 'pong:elo:milestone',
+
+  // User activity channels
+  USER_ACTIVITY_LOG: 'user:activity:log',
+  USER_DAILY_LOGIN: 'user:daily:login',
+  USER_WEEKEND_LOGIN: 'user:weekend:login',
+  USER_BALANCE_SNAPSHOT: 'user:balance:snapshot',
+  USER_FOLLOWED: 'user:followed',
+
+  // Prediction channels
+  PREDICTION_CREATED: 'prediction:created',
+  PREDICTION_VIEWED: 'prediction:viewed',
+  PREDICTION_APPROVED: 'prediction:approved',
+  PREDICTION_RESOLVED_FAST: 'prediction:resolved:fast',
+  PREDICTION_VIRAL: 'prediction:viral',
+  PREDICTION_FIRST_CORRECT_BET: 'prediction:first:correct:bet',
+
+  // Betting channels
+  BET_PLACED: 'bet:placed',
+  BET_STATUS_CHANGE: 'bet:status_change',
+  BET_WON: 'bet:won',
+  BET_LOST: 'bet:lost',
+  PARLAY_PLACED: 'parlay:placed',
+  PARLAY_STATUS_CHANGE: 'parlay:status_change',
+
+  // Post channels
+  POST_CREATED: 'post:created',
+  POST_UPDATED: 'post:updated',
+  POST_DELETED: 'post:deleted',
+  POST_REACTION: 'post:reaction',
+  COMMENT_CREATED: 'comment:created',
+  COMMENT_DELETED: 'comment:deleted',
+
+  // Timeline/Feed channels
+  FEED_ARTICLE_APPROVED: 'feed:article:approved',
+  FEED_ARTICLE_REJECTED: 'feed:article:rejected',
+  FEED_ARTICLE_NEW: 'feed:article:new',
+  FEED_TWEET_NEW: 'feed:tweet:new',
+  FEED_TWEET_HIDDEN: 'feed:tweet:hidden',
+  FEED_SOURCE_CREATED: 'feed:source:created',
+  FEED_SOURCE_UPDATED: 'feed:source:updated',
+  FEED_SOURCE_DELETED: 'feed:source:deleted',
+  TIMELINE_ARTICLES_NEW: 'timeline:articles:new',
+
+  // Admin channels
+  ADMIN_METRICS_UPDATE: 'admin:metrics:update',
+  ADMIN_MODERATION_BULK: 'admin:moderation:bulk',
+  ADMIN_FEED_REFRESH: 'admin:feed:refresh',
+  MODERATION_USER_BAN: 'moderation:userBan',
+  MODERATION_USER_UNBAN: 'moderation:userUnban',
+  MODERATION_USER_MUTE: 'moderation:userMute',
+  MODERATION_USER_KICK: 'moderation:userKick',
+  MODERATION_MESSAGE_DELETE: 'moderation:messageDelete',
+  MODERATION_POST_DELETE: 'moderation:postDelete',
+
+  // Leaderboard channels (additional)
+  LEADERBOARD_RANK_UPDATE: 'leaderboard:rank:update',
+  LEADERBOARD_POSITION_REACHED: 'leaderboard:position:reached',
+  LEADERBOARD_COMEBACK_MAJOR: 'leaderboard:comeback:major',
+  LEADERBOARD_COMEBACK_MODERATE: 'leaderboard:comeback:moderate',
+
+  // Streak channels
+  STREAK_UPDATED: 'streak:updated',
+  STREAK_BROKEN: 'streak:broken',
+  STREAK_RESET: 'streak:reset',
+  STREAK_MILESTONE_REACHED: 'streak:milestone:reached',
+
+  // Other channels
+  PAYOUT_COMPLETED: 'payout:completed',
+  EVENT_SEQUENCE_COMPLETED: 'event:sequence:completed',
+  PATTERN_MATCHED: 'pattern:matched',
+  EMOJI_USED: 'emoji:used',
+  THREAD_PARTICIPATION: 'thread:participation',
 } as const;
 export type RedisChannel = typeof REDIS_CHANNELS[keyof typeof REDIS_CHANNELS];
 
-/**
- * Socket.IO event names with type safety
- * Maps to the events emitted in redisEventHandlers.ts
- */
-export enum SocketEvent {
-  // Prediction events
-  PREDICTION_CREATED = 'predictionCreated',
-  PREDICTION_RESOLVED = 'predictionResolved',
-  ODDS_UPDATED = 'oddsUpdatedEnhanced',
-  
-  // Betting events  
-  BET_PLACED = 'betPlaced',
-  PARLAY_PLACED = 'parlayPlaced',
-  
-  // Leaderboard events
-  LEADERBOARD_ALL_TIME = 'leaderboardAllTime',
-  LEADERBOARD_DAILY = 'leaderboardDaily',
-  LEADERBOARD_RANK_CHANGE = 'leaderboard:rankChange',
-  LEADERBOARD_MILESTONE = 'leaderboard:milestone',
-}
+// SocketEvent enum removed - use REDIS_CHANNELS for all event names
 
 /**
  * Event bus interface for Redis publish/subscribe abstraction
