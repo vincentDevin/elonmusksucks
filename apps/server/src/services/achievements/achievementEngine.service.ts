@@ -1,6 +1,7 @@
 import type { AchievementEvent } from '@ems/types';
-import type { IAchievementRepository } from '../repositories/AchievementRepository';
-import type { IActivityRepository } from '../repositories/interfaces/IActivityRepository';
+import type { IAchievementRepository } from '../../repositories/interfaces/IAchievementRepository';
+import type { IActivityRepository } from '../../repositories/interfaces/IActivityRepository';
+import type { IStatsRepository } from '../../repositories/interfaces/IStatsRepository';
 import { RuleEvaluator } from './ruleEvaluator.service';
 
 // Socket emitter interface for dependency injection
@@ -14,12 +15,6 @@ export interface IAchievementSocketEmitter {
       unlockedAt: string;
     },
   ): Promise<void>;
-}
-
-// Stats repository interface for user counters
-export interface IStatsRepository {
-  getUserCounters(userId: number): Promise<Record<string, number>>;
-  updateUserCounters(userId: number, updates: Record<string, number>): Promise<void>;
 }
 
 export interface AchievementEngineHandleResult {

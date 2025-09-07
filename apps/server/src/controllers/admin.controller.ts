@@ -2,9 +2,9 @@
 import { Request, Response, NextFunction } from 'express';
 import * as adminService from '../services/admin.service';
 import { payoutService } from '../services/payout.service';
-import { adminAchievementService } from '../services/adminAchievement.service';
+import { adminAchievementService } from '../services/achievements/adminAchievement.service';
 import { shameWallService } from '../services/shameWall.service';
-import { RuleSimulationService } from '../services/ruleSimulation.service';
+import { RuleSimulationService } from '../services/achievements/ruleSimulation.service';
 
 const ruleSimulationService = new RuleSimulationService();
 import { serializeBigInt } from '../utils/bigintSerializer';

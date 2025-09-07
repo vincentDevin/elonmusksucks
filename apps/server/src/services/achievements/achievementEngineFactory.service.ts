@@ -2,9 +2,12 @@ import { PrismaClient } from '@prisma/client';
 
 import { AchievementEngine } from './achievementEngine.service';
 import { AchievementSocketEmitter } from './achievementSocketEmitter.service';
-import { AchievementRepository } from '../repositories/AchievementRepository';
-import { ActivityRepository } from '../repositories/ActivityRepository';
-import { StatsRepository } from '../repositories/StatsRepository';
+import { AchievementRepository } from '../../repositories/AchievementRepository';
+import { ActivityRepository } from '../../repositories/ActivityRepository';
+import { StatsRepository } from '../../repositories/StatsRepository';
+import type { IAchievementRepository } from '../../repositories/interfaces/IAchievementRepository';
+import type { IActivityRepository } from '../../repositories/interfaces/IActivityRepository';
+import type { IStatsRepository } from '../../repositories/interfaces/IStatsRepository';
 
 /**
  * Factory for creating properly wired AchievementEngine instances
@@ -21,9 +24,9 @@ export class AchievementEngineFactory {
       const client = prisma || new PrismaClient();
 
       // Create repositories
-      const achievementRepo = new AchievementRepository(client);
-      const activityRepo = new ActivityRepository();
-      const statsRepo = new StatsRepository(client);
+      const achievementRepo: IAchievementRepository = new AchievementRepository(client);
+      const activityRepo: IActivityRepository = new ActivityRepository();
+      const statsRepo: IStatsRepository = new StatsRepository(client);
 
       // Create socket emitter
       const socketEmitter = new AchievementSocketEmitter();
@@ -51,9 +54,9 @@ export class AchievementEngineFactory {
    * Create engine for testing with mocks
    */
   static createForTesting(
-    achievementRepo: any,
-    activityRepo: any,
-    statsRepo: any,
+    achievementRepo: IAchievementRepository,
+    activityRepo: IActivityRepository,
+    statsRepo: IStatsRepository,
     socketEmitter: any,
   ): AchievementEngine {
     return new AchievementEngine(achievementRepo, activityRepo, statsRepo, socketEmitter);

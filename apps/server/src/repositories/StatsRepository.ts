@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import type { IStatsRepository } from '../services/achievementEngine.service';
+import type { IStatsRepository } from './interfaces/IStatsRepository';
 import { serializeBigInt } from '../utils/bigintSerializer';
 
 /**
@@ -609,29 +609,5 @@ export class StatsRepository implements IStatsRepository {
       predictionGuru: 0,
       allRounder: 0,
     };
-  }
-}
-
-/**
- * Mock implementation for testing
- */
-export class MockStatsRepository implements IStatsRepository {
-  private counters = new Map<number, Record<string, number>>();
-
-  async getUserCounters(userId: number): Promise<Record<string, number>> {
-    return this.counters.get(userId) || {};
-  }
-
-  async updateUserCounters(userId: number, updates: Record<string, number>): Promise<void> {
-    const current = this.counters.get(userId) || {};
-    this.counters.set(userId, { ...current, ...updates });
-  }
-
-  setCounters(userId: number, counters: Record<string, number>): void {
-    this.counters.set(userId, counters);
-  }
-
-  clear(): void {
-    this.counters.clear();
   }
 }

@@ -2,10 +2,11 @@
 // Manages banned users and shame achievements
 
 import { PrismaClient, BanType } from '@prisma/client';
-import { adminAchievementService } from './adminAchievement.service';
+import { adminAchievementService } from './achievements/adminAchievement.service';
 import { UserRepository } from '../repositories/UserRepository';
 import { ModerationRepository } from '../repositories/ModerationRepository';
 import { AchievementRepository } from '../repositories/AchievementRepository';
+import type { IAchievementRepository } from '../repositories/interfaces/IAchievementRepository';
 import type { BanRequest } from '@ems/types';
 
 const prisma = new PrismaClient();
@@ -47,7 +48,7 @@ export interface BanHistory {
 }
 
 class ShameWallService {
-  private achievementRepository = new AchievementRepository(prisma);
+  private achievementRepository: IAchievementRepository = new AchievementRepository(prisma);
   private moderationRepository = new ModerationRepository(prisma);
   /**
    * Issue a ban and award appropriate shame achievements

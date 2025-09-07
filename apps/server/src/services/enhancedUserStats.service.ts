@@ -11,19 +11,19 @@ import { leaderboardService } from './leaderboard.service';
 import { eventBus } from './eventBus.service';
 import { UserRepository } from '../repositories/UserRepository';
 import { BettingRepository } from '../repositories/BettingRepository';
-import { StatsRepository } from '../repositories/StatsRepository';
+import type { IStatsRepository } from '../repositories/interfaces/IStatsRepository';
 
 // Note: User stats service interfaces now imported from @ems/types
 
 export class EnhancedUserStatsService {
   private userRepository: UserRepository;
   private bettingRepository: BettingRepository;
-  private statsRepository: StatsRepository;
+  private statsRepository: IStatsRepository;
 
   constructor(
     userRepository: UserRepository,
     bettingRepository: BettingRepository,
-    statsRepository: StatsRepository,
+    statsRepository: IStatsRepository,
   ) {
     this.userRepository = userRepository;
     this.bettingRepository = bettingRepository;

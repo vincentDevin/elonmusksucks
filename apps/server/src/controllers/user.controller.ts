@@ -6,7 +6,7 @@ import { BettingRepository } from '../repositories/BettingRepository';
 import { StatsRepository } from '../repositories/StatsRepository';
 import { PrismaClient } from '@prisma/client';
 import { unifiedActivityService } from '../services/unifiedActivity.service';
-import { adminAchievementService } from '../services/adminAchievement.service';
+import { adminAchievementService } from '../services/achievements/adminAchievement.service';
 import type {
   PublicUserProfile,
   UserFeedPost,

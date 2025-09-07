@@ -4,24 +4,28 @@
 
 import redisClient from '../lib/redis';
 import { randomUUID } from 'crypto';
-import type { UnifiedActivityEvent } from '@ems/types';
+import type { UnifiedActivityEvent, IEventBus } from '@ems/types';
+import { REDIS_CHANNELS } from '@ems/types';
 import type { IActivityRepository } from '../repositories/interfaces/IActivityRepository';
 import { ActivityRepository } from '../repositories/ActivityRepository';
+import { EventBus } from '../lib/EventBus';
 
 export class UnifiedActivityService {
   private repo: IActivityRepository;
   private redis = redisClient;
+  private eventBus: IEventBus;
   // private io: any = null; // Removed - using Redis pub/sub only to avoid duplicates
-
-  // Redis channels (Global Broadcast Model)
-  private readonly GLOBAL_CHANNEL = 'unified:activity:global';
 
   // Activity storage
   private readonly ACTIVITY_LIST = 'unified:activity:recent';
   private readonly ACTIVITY_MAX = 100;
 
-  constructor(repo: IActivityRepository = new ActivityRepository()) {
+  constructor(
+    repo: IActivityRepository = new ActivityRepository(),
+    eventBus: IEventBus = new EventBus(),
+  ) {
     this.repo = repo;
+    this.eventBus = eventBus;
   }
 
   /**
@@ -101,7 +105,8 @@ export class UnifiedActivityService {
     const json = JSON.stringify(activity);
 
     // ALL activities publish to global channel (no user filtering)
-    await this.redis.publish(this.GLOBAL_CHANNEL, json);
+    // Using eventBus instead of direct Redis publishing for consistency
+    await this.eventBus.publish(REDIS_CHANNELS.UNIFIED_ACTIVITY_GLOBAL, activity);
 
     // Store in recent activities list for new connections
     await Promise.all([

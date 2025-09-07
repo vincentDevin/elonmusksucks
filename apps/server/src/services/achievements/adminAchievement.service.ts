@@ -1,9 +1,7 @@
 import { PrismaClient } from '@prisma/client';
-import { unifiedActivityService } from './unifiedActivity.service';
-import {
-  AchievementRepository,
-  IAchievementRepository,
-} from '../repositories/AchievementRepository';
+import { unifiedActivityService } from '../unifiedActivity.service';
+import { AchievementRepository } from '../../repositories/AchievementRepository';
+import type { IAchievementRepository } from '../../repositories/interfaces/IAchievementRepository';
 
 const prisma = new PrismaClient();
 const achievementRepository = new AchievementRepository(prisma);

@@ -1,6 +1,6 @@
 // apps/server/src/handlers/achievementEventHandler.ts
 import redis from '../lib/redis';
-import { getAchievementEngine } from '../services/achievementEngineFactory.service';
+import { getAchievementEngine } from '../services/achievements/achievementEngineFactory.service';
 import { REDIS_CHANNELS } from '@ems/types';
 import type { AchievementEvent } from '@ems/types';
 

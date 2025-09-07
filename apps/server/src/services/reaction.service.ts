@@ -1,4 +1,5 @@
-import { ReactionRepository, IReactionRepository } from '../repositories/ReactionRepository';
+import { ReactionRepository } from '../repositories/ReactionRepository';
+import type { IReactionRepository } from '../repositories/interfaces/IReactionRepository';
 import { PostRepository } from '../repositories/PostRepository';
 import prisma from '../db';
 import type { PostReaction, ReactionType } from '@ems/types';
