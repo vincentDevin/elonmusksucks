@@ -180,26 +180,39 @@ export class PongStatsService {
     ]);
 
     // 2. Prepare simplified match data
+    // Determine the actual AI player ID and human player ID
+    const aiPlayerId = winnerIsAI ? winnerId : loserIsAI ? loserId : null;
+    const humanPlayerId = winnerIsAI ? loserId : loserIsAI ? winnerId : winnerId || loserId;
+
+    // For AI matches, ensure human is always playerOne (host) for consistency
     const matchData = {
       id: matchId,
-      playerOneId: winnerId || 0, // Simplified - winner is always tracked
-      playerTwoId: loserId || null, // Loser (could be AI with negative ID)
+      playerOneId: isAIMatch && humanPlayerId ? humanPlayerId : winnerId || 0,
+      playerTwoId: isAIMatch && aiPlayerId ? aiPlayerId : loserId || null,
       winnerId,
       wagerAmount: BigInt(wagerAmount),
       mode: isAIMatch ? 'PVE_AI' : 'PVP',
-      aiDifficulty: isAIMatch ? this.getAIDifficultyFromId(loserId || winnerId) : undefined,
-      playerOneScore: winnerScore || 11, // Use actual winner score
-      playerTwoScore: loserScore || 0, // Use actual loser score
+      aiDifficulty: isAIMatch ? this.getAIDifficultyFromId(aiPlayerId) : undefined,
+      playerOneScore: isAIMatch && humanPlayerId === loserId ? loserScore : winnerScore || 5,
+      playerTwoScore: isAIMatch && aiPlayerId === winnerId ? winnerScore : loserScore || 0,
       startedAt: new Date(Date.now() - duration * 1000),
       completedAt: new Date(),
       status: 'COMPLETED' as const,
       gameDuration: duration,
       playerOnePing: 0,
       playerTwoPing: 0,
+      // Set proper canonical fields for AI matches
+      hostUserId: isAIMatch && humanPlayerId ? humanPlayerId : undefined,
+      aiUserId: aiPlayerId || undefined,
       // Store the names we received directly
-      hostDisplayName: winnerName,
-      joinerDisplayName: loserName,
-      aiDisplayName: isAIMatch ? loserName || winnerName || 'Elon AI' : null,
+      hostDisplayName:
+        isAIMatch && humanPlayerId === winnerId
+          ? winnerName
+          : humanPlayerId === loserId
+            ? loserName
+            : winnerName,
+      joinerDisplayName: !isAIMatch ? loserName : null,
+      aiDisplayName: isAIMatch ? (aiPlayerId === winnerId ? winnerName : loserName) : null,
     };
 
     // 3. If no winner but there's a loser, it means they lost (likely to AI)
@@ -226,7 +239,7 @@ export class PongStatsService {
         matchId,
         winnerId: winnerId!,
         loserId: loserId || undefined,
-        winnerScore: winnerScore || 11, // Use actual winner score
+        winnerScore: winnerScore || 5, // Use actual winner score
         loserScore: loserScore || 0, // Use actual loser score
         wagerAmount: BigInt(wagerAmount),
         payoutAmount: BigInt(payoutAmount),
@@ -240,19 +253,37 @@ export class PongStatsService {
     }
 
     // 7. Prepare enhanced match data with Elo calculations
+    // Handle AI ELO ratings properly based on who is AI
+    const getStartElo = (playerId: number | null, stats: any) => {
+      if (!playerId) return PongEloService.getDefaultElo();
+      if (playerId < 0) {
+        // AI player - get AI ELO based on difficulty
+        const aiDiff = this.getAIDifficultyFromId(playerId);
+        return PongEloService.getAiElo(aiDiff || 'MEDIUM');
+      }
+      // Human player
+      return stats?.eloRating || PongEloService.getDefaultElo();
+    };
+
     const enhancedMatchData = {
       ...matchData,
-      player1EloStart: winnerStats?.eloRating || PongEloService.getDefaultElo(),
-      player2EloStart:
-        loserStats?.eloRating ||
-        (isAIMatch ? PongEloService.getAiElo('MEDIUM') : PongEloService.getDefaultElo()),
-      player1EloEnd: calculations?.winnerEloChange.newRating || PongEloService.getDefaultElo(),
-      player2EloEnd:
-        calculations?.loserEloChange?.newRating ||
-        (isAIMatch ? PongEloService.getAiElo('MEDIUM') : PongEloService.getDefaultElo()),
-      eloChange: Math.abs(calculations?.winnerEloChange.totalChange || 0),
-      skillComponent: calculations?.winnerEloChange.skillChange || 0,
-      economyComponent: calculations?.winnerEloChange.economyComponent || 0,
+      player1EloStart: getStartElo(winnerId, winnerStats),
+      player2EloStart: getStartElo(loserId, loserStats),
+      player1EloEnd: calculations?.winnerEloChange?.newRating || getStartElo(winnerId, winnerStats),
+      player2EloEnd: calculations?.loserEloChange?.newRating || getStartElo(loserId, loserStats),
+      eloChange: Math.abs(
+        calculations?.winnerEloChange?.totalChange ||
+          calculations?.loserEloChange?.totalChange ||
+          0,
+      ),
+      skillComponent:
+        calculations?.winnerEloChange?.skillChange ||
+        calculations?.loserEloChange?.skillChange ||
+        0,
+      economyComponent:
+        calculations?.winnerEloChange?.economyComponent ||
+        calculations?.loserEloChange?.economyComponent ||
+        0,
     };
 
     // 8. Prepare stats data - only for human players
@@ -306,6 +337,18 @@ export class PongStatsService {
     }
 
     // 9. Record the complete match with all data
+    console.log(`[PongStats] Recording match with data:`, {
+      matchId,
+      winnerId,
+      loserId,
+      winnerIsAI,
+      loserIsAI,
+      hasWinnerStats: !!winnerStatsData,
+      hasLoserStats: !!loserStatsData,
+      loserEloChange: loserStatsData?.eloRating,
+      loserEloChangeAmount: loserStatsData?.lastEloChange,
+    });
+
     const result = await repository.recordCompleteMatch(
       enhancedMatchData,
       winnerStatsData,
@@ -324,8 +367,8 @@ export class PongStatsService {
           wager: wagerAmount,
         });
 
-        // Check for comeback achievement (win from 0-9 deficit)
-        if (loserScore && winnerScore && loserScore >= 9 && winnerScore === 11) {
+        // Check for comeback achievement (win from 0-4 deficit)
+        if (loserScore && winnerScore && loserScore >= 4 && winnerScore === 5) {
           await eventCorrelator.detectComplexScenario(winnerId, 'pong_comeback');
         }
 
@@ -449,7 +492,7 @@ export class PongStatsService {
     if (winnerId && winnerId > 0) {
       try {
         // Determine comeback and defensive win flags
-        const comeback = loserScore && winnerScore && loserScore >= 8 && winnerScore === 11;
+        const comeback = loserScore && winnerScore && loserScore >= 4 && winnerScore === 5;
         const defensiveWin = duration && duration > 300000; // 5+ minute games are defensive
         const ragequit = false; // Would need to track disconnections
 
@@ -576,16 +619,22 @@ export class PongStatsService {
     } = result;
 
     const isPerfectGame = loserScore === 0;
-    const isComeback = winnerScore === 11 && loserScore >= 5;
+    const isComeback = winnerScore === 5 && loserScore >= 3;
 
     // Determine match mode
     const mode = aiDifficulty || loserId === SYSTEM_AI_USER_ID ? 'PVE_AI' : 'PVP';
     const isRated = PureEloService.isRatedMatch(wagerAmount);
 
     // Get current Elo ratings
-    const winnerElo = winnerStats?.eloRating || 1200; // Default starting Elo
+    // If winner is AI (negative ID), use AI ELO; otherwise use human stats or default
+    const winnerElo =
+      winnerId < 0 ? PongEloService.getAiElo(aiDifficulty as any) : winnerStats?.eloRating || 1200;
+
+    // If loser is AI (negative ID), use AI ELO; otherwise use human stats or default
     const loserElo =
-      loserStats?.eloRating || (aiDifficulty ? PongEloService.getAiElo(aiDifficulty as any) : 1200);
+      loserId && loserId < 0
+        ? PongEloService.getAiElo(aiDifficulty as any)
+        : loserStats?.eloRating || 1200;
 
     // Calculate Elo changes using pure Elo service if match is rated
     let winnerEloChange: EloChangeComponents;

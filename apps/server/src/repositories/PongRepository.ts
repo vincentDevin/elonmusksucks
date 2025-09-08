@@ -394,6 +394,19 @@ export class PongRepository implements IPongRepository {
     winnerStatsData?: Partial<PongStatsData>,
     loserStatsData?: Partial<PongStatsData>,
   ): Promise<{ isLossOnly: boolean; winnerId?: number; loserId?: number }> {
+    console.log(`[PongRepo] recordCompleteMatch called with:`, {
+      matchId: matchData.id,
+      winnerId: matchData.winnerId,
+      playerOneId: matchData.playerOneId,
+      playerTwoId: matchData.playerTwoId,
+      hostUserId: matchData.hostUserId,
+      aiUserId: matchData.aiUserId,
+      mode: matchData.mode,
+      hasWinnerStats: !!winnerStatsData,
+      hasLoserStats: !!loserStatsData,
+      loserElo: loserStatsData?.eloRating,
+    });
+
     return await this.executeInTransaction(async (tx) => {
       // 1. Create the match record
       await tx.pongMatch.create({ data: this.preparePongMatchData(matchData) });
@@ -406,14 +419,16 @@ export class PongRepository implements IPongRepository {
       let actualLoserId: number | undefined;
 
       if (isAIMatch) {
-        // In AI matches, host is always the human player
+        // In AI matches, we need to properly identify the human and AI
         const humanId = matchData.hostUserId || matchData.playerOneId;
-        const aiId = matchData.aiUserId || -1;
+        const aiId = matchData.aiUserId || matchData.playerTwoId;
 
         // Winner is already determined by game server
         if (actualWinnerId === humanId) {
+          // Human won
           actualLoserId = aiId;
-        } else if (actualWinnerId === aiId) {
+        } else {
+          // AI won (actualWinnerId is the AI's negative ID)
           actualLoserId = humanId;
         }
       } else {
@@ -472,6 +487,12 @@ export class PongRepository implements IPongRepository {
 
       // Update/create loser stats (only for human losers)
       if (actualLoserId && actualLoserId > 0 && loserStatsData) {
+        console.log(`[PongRepo] Updating human loser stats for user ${actualLoserId}:`, {
+          eloRating: loserStatsData.eloRating,
+          lastEloChange: loserStatsData.lastEloChange,
+          losses: loserStatsData.losses,
+        });
+
         const existingLoserStats = await tx.pongStats.findUnique({
           where: { userId: actualLoserId },
         });
@@ -481,6 +502,7 @@ export class PongRepository implements IPongRepository {
             where: { userId: actualLoserId },
             data: loserStatsData,
           });
+          console.log(`[PongRepo] Updated existing stats for loser ${actualLoserId}`);
         } else {
           await tx.pongStats.create({
             data: {
@@ -488,31 +510,38 @@ export class PongRepository implements IPongRepository {
               ...loserStatsData,
             },
           });
+          console.log(`[PongRepo] Created new stats for loser ${actualLoserId}`);
         }
+      } else {
+        console.log(`[PongRepo] NOT updating loser stats:`, {
+          actualLoserId,
+          hasLoserStatsData: !!loserStatsData,
+          isHumanLoser: actualLoserId && actualLoserId > 0,
+        });
       }
 
-      // Update AI stats if AI was involved
-      if (isAIMatch && actualWinnerId === -1) {
+      // Update AI stats if AI was involved (AI has negative IDs)
+      if (isAIMatch && actualWinnerId && actualWinnerId < 0) {
         // AI won - update AI's stats
         const aiStats = await tx.pongStats.findUnique({
-          where: { userId: -1 },
+          where: { userId: actualWinnerId },
         });
 
         if (aiStats && winnerStatsData) {
           await tx.pongStats.update({
-            where: { userId: -1 },
+            where: { userId: actualWinnerId },
             data: winnerStatsData,
           });
         }
-      } else if (isAIMatch && actualLoserId === -1) {
+      } else if (isAIMatch && actualLoserId && actualLoserId < 0) {
         // AI lost - update AI's stats
         const aiStats = await tx.pongStats.findUnique({
-          where: { userId: -1 },
+          where: { userId: actualLoserId },
         });
 
         if (aiStats && loserStatsData) {
           await tx.pongStats.update({
-            where: { userId: -1 },
+            where: { userId: actualLoserId },
             data: loserStatsData,
           });
         }
