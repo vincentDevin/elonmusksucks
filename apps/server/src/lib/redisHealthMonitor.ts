@@ -5,7 +5,8 @@
 // -----------------------------------------------------------------------------
 
 import redisClient from './redis';
-import { EventBus } from './EventBus';
+import { eventBus as defaultEventBus } from './EventBus';
+import type { IEventBus } from '@ems/types';
 
 export interface RedisHealthMetrics {
   isConnected: boolean;
@@ -42,7 +43,7 @@ export interface RedisHealthMetrics {
 }
 
 export class RedisHealthMonitor {
-  private eventBus: EventBus;
+  private eventBus: IEventBus;
   private monitoringInterval?: NodeJS.Timeout;
   private lastMetrics?: RedisHealthMetrics;
 
@@ -54,7 +55,7 @@ export class RedisHealthMonitor {
     maxFragmentation: 2.0, // 2x fragmentation ratio
   };
 
-  constructor(eventBus: EventBus = new EventBus()) {
+  constructor(eventBus: IEventBus = defaultEventBus) {
     this.eventBus = eventBus;
   }
 

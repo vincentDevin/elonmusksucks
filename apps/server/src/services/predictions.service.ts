@@ -20,7 +20,7 @@ import { PredictionRepository } from '../repositories/PredictionRepository';
 import { PredictionType } from '@prisma/client';
 import { UserService } from '../services/user.service';
 import { unifiedActivityService } from './unifiedActivity.service';
-import { eventBus } from './eventBus.service';
+import { eventBus } from '../lib/EventBus';
 
 // Using the global ParlayLegWithUser type from @ems/types
 

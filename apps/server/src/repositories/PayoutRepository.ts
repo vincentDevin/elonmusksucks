@@ -4,12 +4,12 @@ import type { IPayoutRepository } from './interfaces/IPayoutRepository';
 import type { PublicPrediction, DbUserStats } from '@ems/types';
 import { REDIS_CHANNELS } from '@ems/types';
 import { serializeBigInt } from '../utils/bigintSerializer';
-import { EventBus } from '../lib/EventBus';
+import { eventBus } from '../lib/EventBus';
 
 const prisma = new PrismaClient();
 
 export class PayoutRepository implements IPayoutRepository {
-  private eventBus = new EventBus();
+  private eventBus = eventBus;
   /**
    * Quickly set the winning option so the worker can process payouts.
    * Does not mark the prediction fully resolved.

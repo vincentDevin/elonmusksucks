@@ -19,10 +19,9 @@ import type {
 } from '../repositories/interfaces/IAdminRepository';
 import { PrismaAdminRepository } from '../repositories/AdminRepository';
 import type { UserStatsDTO } from '@ems/types';
-import { EventBus } from '../lib/EventBus';
+import { eventBus } from '../lib/EventBus';
 
 const repo: IAdminRepository = new PrismaAdminRepository();
-const eventBus = new EventBus();
 
 // -- Enhanced User Management --
 export const listUsers = async () => {

@@ -8,7 +8,7 @@ import {
   REDIS_CHANNELS,
 } from '@ems/types';
 import { leaderboardService } from './leaderboard.service';
-import { eventBus } from './eventBus.service';
+import { eventBus } from '../lib/EventBus';
 import { UserRepository } from '../repositories/UserRepository';
 import { BettingRepository } from '../repositories/BettingRepository';
 import type { IStatsRepository } from '../repositories/interfaces/IStatsRepository';

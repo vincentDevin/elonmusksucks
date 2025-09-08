@@ -18,7 +18,7 @@ import type {
   IEventCoalescer,
 } from '@ems/types';
 import { BettingRepository } from '../repositories/BettingRepository';
-import { EventBus } from '../lib/EventBus';
+import { eventBus } from '../lib/EventBus';
 import { EventCoalescer } from '../lib/EventCoalescer';
 import { unifiedActivityService } from './unifiedActivity.service';
 import { UserService } from './user.service';
@@ -33,7 +33,7 @@ export class BettingService {
 
   constructor(
     private repo: IBettingRepository = new BettingRepository(),
-    private eventBus: IEventBus = new EventBus(),
+    private eventBus: IEventBus = eventBus,
   ) {
     // Optimized coalescing windows: stats updates 1s (vs default 2s) for better p95 latency
     this.eventCoalescer = new EventCoalescer(this.eventBus, {

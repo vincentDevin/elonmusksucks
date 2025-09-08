@@ -13,7 +13,7 @@ import { UserRepository } from '../repositories/UserRepository';
 import { BettingRepository } from '../repositories/BettingRepository';
 import { StatsRepository } from '../repositories/StatsRepository';
 import { PrismaClient } from '@prisma/client';
-import { EventBus } from '../lib/EventBus';
+import { eventBus } from '../lib/EventBus';
 
 const userRepository = new UserRepository();
 const bettingRepository = new BettingRepository();
@@ -24,7 +24,6 @@ const enhancedUserStatsService = new EnhancedUserStatsService(
   bettingRepository,
   statsRepository,
 );
-const eventBus = new EventBus();
 
 /**
  * Register real-time statistics handlers for individual socket connections

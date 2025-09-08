@@ -1,7 +1,7 @@
 // apps/server/src/routes/feeds.routes.simple.ts
 // Simplified feeds routes for Phase 2 - basic functionality
 import { Router } from 'express';
-import { eventBus } from '../services/eventBus.service';
+import { eventBus } from '../lib/EventBus';
 import { REDIS_CHANNELS } from '@ems/types';
 import {
   listFeeds,

@@ -4,7 +4,7 @@ import { Worker } from 'bullmq';
 import { FeedFetchJobData, FeedHealthCheckData, REDIS_CHANNELS } from '@ems/types';
 import { PrismaClient } from '@prisma/client';
 import redisClient from '../lib/redis';
-import { eventBus } from '../services/eventBus.service';
+import { eventBus } from '../lib/EventBus';
 
 // Configurable concurrency to keep CPU saturation <70%
 const FEED_CONCURRENCY = parseInt(process.env.WORKER_FEED_CONCURRENCY || '3');

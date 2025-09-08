@@ -3,7 +3,7 @@ import 'dotenv/config';
 import { Worker, Queue } from 'bullmq';
 import { PrismaClient } from '@prisma/client';
 import { LeaderboardRepository } from '../repositories/LeaderboardRepository';
-import { eventBus } from '../services/eventBus.service';
+import { eventBus } from '../lib/EventBus';
 import redisClient from '../lib/redis';
 import type { Job } from 'bullmq';
 
