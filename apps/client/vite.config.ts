@@ -3,10 +3,19 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig(() => {
-  console.log('Vite running on 127.0.0.1:3000 with API and Socket.IO proxy');
+  console.log('Vite running in middleware mode on 127.0.0.1:3000');
   return {
     plugins: [react(), tailwindcss()],
+    build: {
+      rollupOptions: {
+        input: {
+          main: './index.html',
+          app: './app.html',
+        },
+      },
+    },
     server: {
+      middlewareMode: true,
       host: '127.0.0.1',
       strictPort: true,
       port: 3000,
@@ -20,11 +29,16 @@ export default defineConfig(() => {
         // Socket.IO long polling/WebSocket (main server)
         '/socket.io': {
           target: 'http://127.0.0.1:5000',
-          ws: true, // <--- IMPORTANT! This enables WebSocket proxying
+          ws: true,
           changeOrigin: true,
           secure: false,
         },
       },
+    },
+    appType: 'custom',
+    ssr: {
+      format: 'esm',
+      target: 'node',
     },
   };
 });

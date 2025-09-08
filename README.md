@@ -53,25 +53,10 @@ elonmusksucks/
 │   │   │   ├── contexts/    # React contexts (Auth, Theme, Socket, Chat, etc.)
 │   │   │   ├── hooks/       # Custom hooks (activity, stats, profiles, pong)
 │   │   │   ├── pages/       # Route components (Dashboard, Profile, Admin, Pong)
+│   │   │   ├── public/      # SSR marketing pages
 │   │   │   ├── theme/       # Unified theme system with CSS variables
 │   │   │   └── api/         # Axios API clients with auto-refresh tokens
 │   │   └── dist/            # Production build output
-│   ├── public-site/     # SSR marketing site for non-authenticated users (port 5173)
-│   │   ├── src/
-│   │   │   ├── components/  # SSR components (13 components)
-│   │   │   │   ├── LandingPage.tsx      # Homepage with stats & previews
-│   │   │   │   ├── PredictionsPage.tsx  # Public predictions view
-│   │   │   │   ├── LeaderboardPage.tsx  # Public leaderboard
-│   │   │   │   ├── TimelinePage.tsx     # Public timeline/news
-│   │   │   │   ├── Navigation.tsx       # Site nav with theme toggle
-│   │   │   │   ├── ThemeToggle.tsx      # Light/dark theme switcher
-│   │   │   │   └── *Preview.tsx         # Preview components for homepage
-│   │   │   ├── types/       # SSR-specific TypeScript types
-│   │   │   ├── entry-client.tsx   # Client hydration entry point
-│   │   │   ├── entry-server.tsx   # SSR entry point
-│   │   │   └── index.css          # Global styles with theme variables
-│   │   ├── server.ts        # SSR server with API data fetching
-│   │   └── dist/            # SSR build output
 │   ├── server/          # Express backend (TypeScript, Prisma)
 │   │   ├── src/
 │   │   │   ├── controllers/ # REST endpoint handlers (auth, predictions, feeds)
@@ -192,7 +177,7 @@ npm run dev
 - **👑 Admin Dashboard:** [http://localhost:3000/admin](http://localhost:3000/admin)
 
 **Development Features:**
-- 🔄 Hot reload on all applications (client, public-site, server)
+- 🔄 Hot reload on all applications (client, server)
 - 🔌 Real-time WebSocket connections across both frontend apps
 - 📊 Live prediction markets with dynamic odds calculation
 - 💬 Real-time chat functionality (desktop only currently)
@@ -233,7 +218,7 @@ npm run format
 ### **Code Quality**
 - **ESLint:** Zero-warning policy enforced across all applications
 - **Prettier:** Consistent code formatting
-- **TypeScript:** Strict type checking across all packages (client, public-site, server)
+- **TypeScript:** Strict type checking across all packages (client, server)
 - **Pre-commit Hooks:** Automated linting and formatting
 
 ---
@@ -316,8 +301,8 @@ npm run format
 | Command | Description |
 |---------|-------------|
 | `npm run setup` | Complete initial setup: install deps, migrate DB, seed data, build types |
-| `npm run dev` | Start all services: client (3000), public-site (5173), server (5000), pong (5001) |
-| `npm run build` | Production build: generate types → build client → build public-site → build server |
+| `npm run dev` | Start all services: client (3000), server (5000), pong (5001) |
+| `npm run build` | Production build: generate types → build client → build server |
 | `npm run lint` | ESLint check with zero-warning policy across all apps |
 | `npm run format` | Prettier formatting across all code |
 | `npm test` | Run Jest test suite (limited coverage currently) |
@@ -333,16 +318,13 @@ npm run format
 | `npm run seed:achievements` | Seed achievement catalog (77 achievements) |
 | `npm run worker` | Start payout + leaderboard + feed workers manually |
 | `npm run dev:pong` | Start pong game server only (port 5001) |
-| `npm run dev:public` | Start public-site SSR server only (port 5173) |
 
 ### **Workspace-Specific Commands**
 
 **Client (`apps/client/`):**
-- `npm run dev` - Vite development server (authenticated users)
-- `npm run build` - Production build  
+- `npm run dev` - Development server (SSR marketing pages + authenticated app)
+- `npm run build` - Production build
 - `npm run preview` - Preview production build
-
-**Public Site (`apps/public-site/`):**
 - `npm run dev` - Vite SSR development server (marketing site)
 - `npm run build` - SSR production build
 - `npm run preview` - Preview SSR build
@@ -381,7 +363,6 @@ npm run format
 - Check REDIS_URL format: `redis://localhost:6379`
 
 **SSR/Public Site Issues**
-- Ensure public-site server is running on port 5173: `npm run dev:public`
 - Check that API server is accessible from SSR server
 - Verify theme hydration is working (no flash on page load)
 - **Fixed Issue:** All hardcoded colors replaced with theme variables
@@ -393,7 +374,7 @@ npm run format
 
 **Socket.IO/WebSocket Issues**
 - Check that both client and server are running
-- Verify ports 3000 (client), 5173 (public-site), 5000 (server), and 5001 (pong server) are not blocked
+- Verify ports 3000 (client), 5000 (server), and 5001 (pong server) are not blocked
 - Monitor browser console and server logs for connection errors
 - **Fixed Issue:** All Socket.IO memory leaks and event handling resolved
 
@@ -475,8 +456,8 @@ git commit -m "feat: add your feature description"
 
 **Commit Style:** `type(scope): message`
 - Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
-- Scopes: `client`, `public-site`, `server`, `pong`, `theme`, `auth`
-- Example: `feat(public-site): add dark mode theme toggle`
+- Scopes: `client`, `server`, `pong`, `theme`, `auth`
+- Example: `feat(client): add dark mode theme toggle`
 
 ---
 
