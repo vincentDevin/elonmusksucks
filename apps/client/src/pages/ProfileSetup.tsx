@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { getUserProfile, updateUserProfile } from '../api/users';
 import type { UpdateProfilePayload } from '../api/users';
@@ -79,7 +79,7 @@ export default function ProfileSetup() {
       if (!currentUser?.id) throw new Error('User not authenticated');
       await updateUserProfile(currentUser.id, { ...formData, profileComplete: true });
       await refreshUser();
-      window.location.href = '/dashboard';
+      navigate('/dashboard');
     } catch (e: unknown) {
       const errorMessage = e instanceof Error ? e.message : 'Failed to update profile';
       setError(errorMessage);

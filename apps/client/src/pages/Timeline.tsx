@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { TimelineProvider } from '../contexts/TimelineContext';
 import { TimelineWithPosts } from '../components/timeline/TimelineWithPosts';
 import { TrendingHashtags } from '../components/posts/TrendingHashtags';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function Timeline() {
   const { user } = useAuth();

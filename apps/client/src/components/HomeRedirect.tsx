@@ -1,28 +1,23 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../contexts/AuthContext';
 
 /**
  * HomeRedirect component handles routing logic for the home page
- * - Authenticated users are redirected to /timeline (social hub)
- * - Anonymous users are redirected to the public SSR site
+ * - Authenticated users are redirected to /dashboard
+ * - Non-authenticated users are redirected to /public (landing page)
  */
 export default function HomeRedirect() {
   const { accessToken, user } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Only redirect if user is fully authenticated (has both token and user data)
     if (accessToken && user) {
-      // Redirect authenticated users to Timeline (social hub)
-      navigate('/timeline', { replace: true });
-    } else if (!accessToken) {
-      // Redirect non-authenticated users to the public SSR site
-      const publicSiteUrl =
-        process.env.NODE_ENV === 'production'
-          ? 'https://public.elonmusksucks.net' // Update this for production
-          : 'http://127.0.0.1:5173';
-      window.location.href = publicSiteUrl;
+      // Redirect authenticated users to Dashboard
+      navigate('/dashboard', { replace: true });
+    } else {
+      // Redirect non-authenticated users to public landing page
+      navigate('/public', { replace: true });
     }
   }, [accessToken, user, navigate]);
 

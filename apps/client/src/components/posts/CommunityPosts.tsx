@@ -4,7 +4,7 @@ import { getTimeline } from '../../api/posts';
 import { ProfileFeed } from '../profile/ProfileFeed';
 import { CreatePostForm } from '../profile/CreatePostForm';
 import { createPost } from '../../api/posts';
-import { useAuth } from '../../hooks/useAuth';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface CommunityPostsProps {
   className?: string;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function Login() {
   const { login, user } = useAuth();
@@ -11,16 +11,28 @@ export default function Login() {
 
   useEffect(() => {
     if (user) {
-      navigate('/dashboard');
+      // Use window.location.href for a full page refresh to ensure proper theme and state loading
+      if (user.profileComplete) {
+        window.location.href = '/dashboard';
+      } else {
+        window.location.href = '/setup-profile';
+      }
     }
-  }, [user, navigate]);
+  }, [user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     try {
       await login(email, password);
-      window.location.href = '/dashboard';
+      // Navigation will happen automatically via useEffect when user state updates
+
+      // Fallback redirect in case useEffect doesn't trigger properly
+      setTimeout(() => {
+        if (window.location.pathname === '/login') {
+          window.location.href = '/dashboard';
+        }
+      }, 1000);
     } catch (err) {
       setError('Login failed');
     }

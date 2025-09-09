@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import CreatePredictionForm from '../CreatePredictionForm';
 import { createPrediction } from '../../api/predictions';
-import { useAuth } from '../../hooks/useAuth';
+import { useAuth } from '../../contexts/AuthContext';
 import api from '../../api/axios';
 // Removed unused import
 

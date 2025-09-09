@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import ThemeToggle from './ThemeToggle';
 
 interface NavigationProps {
@@ -15,103 +16,103 @@ export default function Navigation({ currentPath, clientAppUrl }: NavigationProp
         <div className="flex items-center justify-between h-16">
           {/* Logo/Home */}
           <div className="flex items-center space-x-8">
-            <a
-              href="/"
+            <Link
+              to="/public"
               className="text-xl font-bold text-content hover:text-primary transition-colors"
             >
               ElonMuskSucks.net
-            </a>
+            </Link>
 
             {/* Main Nav Links */}
             <div className="hidden md:flex items-center space-x-6">
-              <a
-                href="/"
+              <Link
+                to="/public"
                 className={`font-medium transition-colors ${
                   isActive('/') ? 'text-primary' : 'text-content hover:text-primary'
                 }`}
               >
                 Home
-              </a>
-              <a
-                href="/predictions"
+              </Link>
+              <Link
+                to="/public/predictions"
                 className={`font-medium transition-colors ${
                   isActive('/predictions') ? 'text-primary' : 'text-content hover:text-primary'
                 }`}
               >
                 Predictions
-              </a>
-              <a
-                href="/leaderboard"
+              </Link>
+              <Link
+                to="/public/leaderboard"
                 className={`font-medium transition-colors ${
                   isActive('/leaderboard') ? 'text-primary' : 'text-content hover:text-primary'
                 }`}
               >
                 Leaderboard
-              </a>
-              <a
-                href="/timeline"
+              </Link>
+              <Link
+                to="/public/timeline"
                 className={`font-medium transition-colors ${
                   isActive('/timeline') ? 'text-primary' : 'text-content hover:text-primary'
                 }`}
               >
                 Timeline
-              </a>
+              </Link>
             </div>
           </div>
 
           {/* Theme Toggle and Auth Links */}
           <div className="flex items-center space-x-4">
             <ThemeToggle />
-            <a
-              href={`${clientAppUrl}/login`}
+            <Link
+              to="/login"
               className="font-medium text-content hover:text-primary transition-colors"
             >
               Login
-            </a>
-            <a
-              href={`${clientAppUrl}/register`}
+            </Link>
+            <Link
+              to="/register"
               className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover font-medium transition-colors"
             >
               Sign Up
-            </a>
+            </Link>
           </div>
         </div>
 
         {/* Mobile Menu */}
         <div className="md:hidden border-t border-border">
           <div className="flex flex-col space-y-2 py-3">
-            <a
-              href="/"
+            <Link
+              to="/public"
               className={`px-4 py-2 font-medium transition-colors ${
                 isActive('/') ? 'text-primary bg-muted/20' : 'text-content'
               }`}
             >
               Home
-            </a>
-            <a
-              href="/predictions"
+            </Link>
+            <Link
+              to="/public/predictions"
               className={`px-4 py-2 font-medium transition-colors ${
                 isActive('/predictions') ? 'text-primary bg-muted/20' : 'text-content'
               }`}
             >
               Predictions
-            </a>
-            <a
-              href="/leaderboard"
+            </Link>
+            <Link
+              to="/public/leaderboard"
               className={`px-4 py-2 font-medium transition-colors ${
                 isActive('/leaderboard') ? 'text-primary bg-muted/20' : 'text-content'
               }`}
             >
               Leaderboard
-            </a>
-            <a
-              href="/timeline"
+            </Link>
+            <Link
+              to="/public/timeline"
               className={`px-4 py-2 font-medium transition-colors ${
                 isActive('/timeline') ? 'text-primary bg-muted/20' : 'text-content'
               }`}
             >
               Timeline
-            </a>
+            </Link>
           </div>
         </div>
       </div>

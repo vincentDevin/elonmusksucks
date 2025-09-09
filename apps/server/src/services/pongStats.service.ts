@@ -33,8 +33,8 @@ import { SYSTEM_AI_USER_ID } from '@ems/types';
 import type { PongStatsData } from '../repositories/interfaces/IPongRepository';
 import { pongPayoutQueueService } from './pongPayoutQueue.service';
 import { eventBus } from '../lib/EventBus';
-import { streakManager } from './streakManager.service';
-import { eventCorrelator } from './eventCorrelator.service';
+import { streakManager } from './StreakManager.service';
+import { eventCorrelator } from './EventCorrelator.service';
 
 // Note: Pong service interfaces now imported from @ems/types
 // MatchResult -> PongMatchResult, other interfaces imported directly

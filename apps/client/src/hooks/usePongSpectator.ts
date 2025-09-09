@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import type { ServerEvents, ClientEvents } from '@ems/types';
 import { PONG_PHYSICS } from '@ems/types';
-import { useAuth } from './useAuth';
+import { useAuth } from '../contexts/AuthContext';
 
 // Spectator-only game state (no player slot, no input)
 interface SpectatorGameState {

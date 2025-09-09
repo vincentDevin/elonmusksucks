@@ -43,10 +43,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setAccessToken(token);
         const currentUser = await meApi();
         setUser(currentUser);
-      } catch {
+      } catch (error) {
         setToken(null);
         setAccessToken('');
         setUser(null);
+
+        // If we're on a protected route and refresh fails, redirect to public home
+        const currentPath = window.location.pathname;
+        if (
+          !currentPath.includes('/login') &&
+          !currentPath.includes('/register') &&
+          !currentPath.includes('/public')
+        ) {
+          window.location.href = '/public';
+        }
       } finally {
         setLoading(false);
       }

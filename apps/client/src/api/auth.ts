@@ -22,8 +22,8 @@ export interface LoginPayload {
  * the new access token.
  */
 export async function login(data: LoginPayload): Promise<string> {
-  const res = await api.post<{ accessToken: string }>('/api/auth/login', data);
-  const { accessToken } = res.data;
+  const res = await api.post<{ data: { accessToken: string } }>('/api/auth/login', data);
+  const { accessToken } = res.data.data;
   setAccessToken(accessToken);
   return accessToken;
 }

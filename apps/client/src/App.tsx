@@ -27,13 +27,11 @@ function AppContent() {
             <PredictionProvider>
               <ParlayProvider>
                 <ChatProvider>
-                  <MainLayout>
-                    <AppRoutes />
-                    {/* Global Pong Elo notifications */}
-                    <PongEloNotification />
-                    {/* Global Achievement celebrations */}
-                    <AchievementCelebrationContainer />
-                  </MainLayout>
+                  <AppRoutes />
+                  {/* Global Pong Elo notifications */}
+                  <PongEloNotification />
+                  {/* Global Achievement celebrations */}
+                  <AchievementCelebrationContainer />
                 </ChatProvider>
               </ParlayProvider>
             </PredictionProvider>

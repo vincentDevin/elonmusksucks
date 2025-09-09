@@ -24,17 +24,20 @@ import { unifiedActivityService } from './unifiedActivity.service';
 import { UserService } from './user.service';
 import { broadcastRealtimeMetrics } from './admin.service';
 import { tracingCollector } from '../lib/tracing';
-import { streakManager } from './streakManager.service';
-import { financialTracker } from './financialTracker.service';
+import { streakManager } from './StreakManager.service';
+import { financialTracker } from './FinancialTracker.service';
 
 export class BettingService {
   private userService = new UserService();
   private eventCoalescer: IEventCoalescer;
+  private eventBus: IEventBus;
 
   constructor(
     private repo: IBettingRepository = new BettingRepository(),
-    private eventBus: IEventBus = eventBus,
+    eventBusParam?: IEventBus,
   ) {
+    // Use the provided eventBus or import the singleton
+    this.eventBus = eventBusParam || eventBus;
     // Optimized coalescing windows: stats updates 1s (vs default 2s) for better p95 latency
     this.eventCoalescer = new EventCoalescer(this.eventBus, {
       windowMs: 2000, // Default 2s for general events

@@ -9,7 +9,7 @@ import type {
   ServerEvents,
 } from '@ems/types';
 import { PONG_PHYSICS } from '@ems/types';
-import { useAuth } from './useAuth';
+import { useAuth } from '../contexts/AuthContext';
 import { GameStateBuffer, type GameStateSnapshot } from '../types/pongInterpolation';
 
 // Per-user socket management to prevent duplicate connections within same user session

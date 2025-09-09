@@ -1,7 +1,7 @@
 // Rollback: Restore any type for form error handling
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../contexts/AuthContext';
 import { requestPasswordReset } from '../api/auth';
 
 export default function ForgotPassword() {

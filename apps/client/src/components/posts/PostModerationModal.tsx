@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { UserFeedPost, ReportReason } from '@ems/types';
-import { useAuth } from '../../hooks/useAuth';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface PostModerationModalProps {
   post: UserFeedPost | null;

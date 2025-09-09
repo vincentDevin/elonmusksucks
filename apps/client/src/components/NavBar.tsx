@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { FaBars, FaTimes } from 'react-icons/fa';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../contexts/AuthContext';
 import { LightDarkToggle } from '../theme';
 import { formatMuskBucks, getMuskBucksColorClasses } from '../utils/formatting';
 
@@ -123,6 +123,18 @@ export default function NavBar() {
             )
           ) : (
             <>
+              <Link to="/public" className={linkClasses('/public')}>
+                Home
+              </Link>
+              <Link to="/public/predictions" className={linkClasses('/public/predictions')}>
+                Predictions
+              </Link>
+              <Link to="/public/leaderboard" className={linkClasses('/public/leaderboard')}>
+                Leaderboard
+              </Link>
+              <Link to="/public/timeline" className={linkClasses('/public/timeline')}>
+                Timeline
+              </Link>
               <Link to="/login" className={linkClasses('/login')}>
                 Login
               </Link>
@@ -240,19 +252,49 @@ export default function NavBar() {
             ) : (
               <>
                 <Link
-                  to="/login"
-                  className={mobileLinkClasses('/login')}
+                  to="/public"
+                  className={mobileLinkClasses('/public')}
                   onClick={() => setMobileMenuOpen(false)}
                 >
-                  Login
+                  Home
                 </Link>
                 <Link
-                  to="/register"
-                  className={mobileLinkClasses('/register')}
+                  to="/public/predictions"
+                  className={mobileLinkClasses('/public/predictions')}
                   onClick={() => setMobileMenuOpen(false)}
                 >
-                  Register
+                  Predictions
                 </Link>
+                <Link
+                  to="/public/leaderboard"
+                  className={mobileLinkClasses('/public/leaderboard')}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Leaderboard
+                </Link>
+                <Link
+                  to="/public/timeline"
+                  className={mobileLinkClasses('/public/timeline')}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Timeline
+                </Link>
+                <div className="border-t border-muted pt-2 mt-2">
+                  <Link
+                    to="/login"
+                    className={mobileLinkClasses('/login')}
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Login
+                  </Link>
+                  <Link
+                    to="/register"
+                    className={mobileLinkClasses('/register')}
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Register
+                  </Link>
+                </div>
               </>
             )}
           </div>

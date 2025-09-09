@@ -195,11 +195,15 @@ api.interceptors.response.use(
         authFailureCallback();
       }
 
-      // Only redirect if we're not already on auth pages
+      // Only redirect if we're not already on auth or public pages
       const currentPath = window.location.pathname;
-      if (!currentPath.includes('/login') && !currentPath.includes('/register')) {
-        console.log('Session expired, redirecting to login');
-        window.location.href = '/login';
+      if (
+        !currentPath.includes('/login') &&
+        !currentPath.includes('/register') &&
+        !currentPath.includes('/public')
+      ) {
+        console.log('Session expired, redirecting to public home');
+        window.location.href = '/public';
       }
 
       return Promise.reject(refreshError);

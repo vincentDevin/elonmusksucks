@@ -3,21 +3,10 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig(() => {
-  console.log('Vite running in middleware mode on 127.0.0.1:3000');
   return {
     plugins: [react(), tailwindcss()],
-    build: {
-      rollupOptions: {
-        input: {
-          main: './index.html',
-          app: './app.html',
-        },
-      },
-    },
     server: {
-      middlewareMode: true,
       host: '127.0.0.1',
-      strictPort: true,
       port: 3000,
       proxy: {
         // REST API requests
@@ -35,10 +24,8 @@ export default defineConfig(() => {
         },
       },
     },
-    appType: 'custom',
-    ssr: {
-      format: 'esm',
-      target: 'node',
+    build: {
+      sourcemap: true,
     },
   };
 });

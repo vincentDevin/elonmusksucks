@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../contexts/AuthContext';
 import { useAdmin } from '../contexts/AdminContext';
 import UserManagement from '../components/admin/UserManagement';
 import PredictionQueue from '../components/admin/PredictionQueue';

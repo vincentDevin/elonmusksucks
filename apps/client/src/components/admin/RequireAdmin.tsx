@@ -1,5 +1,5 @@
 // Rollback: Delete this file and restore Navigate redirect in AppRoutes.tsx
-import { useAuth } from '../../hooks/useAuth';
+import { useAuth } from '../../contexts/AuthContext';
 import { AdminProvider } from '../../contexts/AdminContext';
 
 interface RequireAdminProps {
