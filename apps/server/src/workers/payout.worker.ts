@@ -10,7 +10,7 @@ import { Worker, Job } from 'bullmq';
 import { PayoutJobData, REDIS_CHANNELS } from '@ems/types';
 // TODO: Use QUEUE_NAMES and QueueOptions from @ems/types once imports resolve
 import { createWorkerOptions } from '../lib/bullmqConfig';
-import { EventBus } from '../lib/EventBus';
+import { eventBus } from '../lib/EventBus';
 
 // Configurable concurrency to keep CPU saturation <70%
 const PAYOUT_CONCURRENCY = parseInt(process.env.WORKER_PAYOUT_CONCURRENCY || '2');
@@ -20,7 +20,6 @@ import { leaderboardService } from '../services/leaderboard.service';
 import type { LeaderboardTrigger } from '../services/leaderboard.service';
 
 const payoutRepo = new PayoutRepository();
-const eventBus = new EventBus();
 
 const payoutWorker = new Worker<PayoutJobData>(
   'payouts',

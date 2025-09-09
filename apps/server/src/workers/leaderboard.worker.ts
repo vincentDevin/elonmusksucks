@@ -16,10 +16,9 @@ import { LeaderboardRepository } from '../repositories/LeaderboardRepository';
 import type { Job } from 'bullmq';
 import type { LeaderboardMetrics } from '@ems/types';
 import { metricsCollector } from '../lib/metrics';
-import { EventBus } from '../lib/EventBus';
+import { eventBus } from '../lib/EventBus';
 
 const repo = new LeaderboardRepository();
-const eventBus = new EventBus();
 
 // Create queue instance for metrics collection
 const leaderboardQueue = new Queue('leaderboard-refresh', { connection: redisClient });

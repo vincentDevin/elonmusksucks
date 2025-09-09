@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { eventBus } from './eventBus.service';
+import { eventBus } from '../lib/EventBus';
 import type { IEventBus } from '@ems/types';
 
 const prisma = new PrismaClient();

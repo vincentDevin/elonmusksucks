@@ -32,7 +32,7 @@ import { PureEloService } from './pureElo.service';
 import { SYSTEM_AI_USER_ID } from '@ems/types';
 import type { PongStatsData } from '../repositories/interfaces/IPongRepository';
 import { pongPayoutQueueService } from './pongPayoutQueue.service';
-import { eventBus } from './eventBus.service';
+import { eventBus } from '../lib/EventBus';
 import { streakManager } from './streakManager.service';
 import { eventCorrelator } from './eventCorrelator.service';
 

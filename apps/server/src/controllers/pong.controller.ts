@@ -4,7 +4,7 @@ import { PongStatsService } from '../services/pongStats.service';
 import { PongEloService } from '../services/pongElo.service';
 import { PongRepository } from '../repositories/PongRepository';
 import { PongSocketEmitter } from '../handlers/pongSocketHandlers';
-import { eventBus } from '../services/eventBus.service';
+import { eventBus } from '../lib/EventBus';
 import {
   toUserPongStatsView,
   toPongMatchHistoryView,

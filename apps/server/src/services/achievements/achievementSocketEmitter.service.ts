@@ -1,8 +1,6 @@
 import { AchievementSocketEvents, REDIS_CHANNELS } from '@ems/types';
 import type { IAchievementSocketEmitter } from './achievementEngine.service';
-import { EventBus } from '../../lib/EventBus';
-
-const eventBus = new EventBus();
+import { eventBus } from '../../lib/EventBus';
 
 /**
  * EventBus-based implementation of the achievement emitter

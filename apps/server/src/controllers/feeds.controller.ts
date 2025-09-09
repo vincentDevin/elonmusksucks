@@ -3,7 +3,7 @@ import { FeedService } from '../services/feed.service';
 import redisClient from '../lib/redis';
 import { Queue } from 'bullmq';
 import { toFeedView, toFeedsListResponse } from '../view/feed.view';
-import { eventBus } from '../services/eventBus.service';
+import { eventBus } from '../lib/EventBus';
 import type { FeedView, FeedsListResponse, CreateFeedRequest, UpdateFeedRequest } from '@ems/types';
 import { REDIS_CHANNELS } from '@ems/types';
 

@@ -4,7 +4,7 @@ import { ModerationRepository } from '../repositories/ModerationRepository';
 import type { IModerationRepository } from '../repositories/interfaces/IModerationRepository';
 import type { BanType, ModerationAction } from '@prisma/client';
 import { REDIS_CHANNELS } from '@ems/types';
-import { eventBus } from './eventBus.service';
+import { eventBus } from '../lib/EventBus';
 
 const prisma = new PrismaClient();
 const moderationRepo: IModerationRepository = new ModerationRepository(prisma);

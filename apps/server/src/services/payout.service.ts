@@ -14,7 +14,7 @@ import { createQueueOptions } from '../lib/bullmqConfig';
 import { leaderboardService } from './leaderboard.service';
 import type { LeaderboardTrigger } from './leaderboard.service';
 import { unifiedActivityService } from './unifiedActivity.service';
-import { eventBus } from './eventBus.service';
+import { eventBus } from '../lib/EventBus';
 
 // Create a separate Redis client for subscriptions to avoid conflicts
 const subscriptionRedis = new IORedis({

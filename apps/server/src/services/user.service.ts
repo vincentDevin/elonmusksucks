@@ -11,7 +11,7 @@ import { PostService } from './post.service';
 import { unifiedActivityService } from './unifiedActivity.service';
 import { ImageProcessingService, ProcessedImageSizes } from './imageProcessing.service';
 import { DeleteObjectCommand } from '@aws-sdk/client-s3';
-import { eventBus } from './eventBus.service';
+import { eventBus } from '../lib/EventBus';
 
 // Define a minimal file interface matching Multer's in-memory buffer
 export type UploadedFile = {

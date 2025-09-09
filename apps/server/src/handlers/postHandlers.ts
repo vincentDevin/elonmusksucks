@@ -11,10 +11,9 @@ import type { AuthenticatedSocket } from '../middleware/socketAuthMiddleware';
 import { PostService } from '../services/post.service';
 import type { PostContentType, PostVisibility } from '@ems/types';
 import { REDIS_CHANNELS } from '@ems/types';
-import { EventBus } from '../lib/EventBus';
+import { eventBus } from '../lib/EventBus';
 
 const postService = new PostService();
-const eventBus = new EventBus();
 
 /**
  * Register all post-related socket handlers

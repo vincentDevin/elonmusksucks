@@ -8,7 +8,7 @@ import type { UnifiedActivityEvent, IEventBus } from '@ems/types';
 import { REDIS_CHANNELS } from '@ems/types';
 import type { IActivityRepository } from '../repositories/interfaces/IActivityRepository';
 import { ActivityRepository } from '../repositories/ActivityRepository';
-import { EventBus } from '../lib/EventBus';
+import { eventBus as defaultEventBus } from '../lib/EventBus';
 
 export class UnifiedActivityService {
   private repo: IActivityRepository;
@@ -23,7 +23,7 @@ export class UnifiedActivityService {
 
   constructor(
     repo: IActivityRepository = new ActivityRepository(),
-    eventBus: IEventBus = new EventBus(),
+    eventBus: IEventBus = defaultEventBus,
   ) {
     this.repo = repo;
     this.eventBus = eventBus;

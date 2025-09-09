@@ -16,7 +16,7 @@ import redisClient from '../lib/redis';
 import { socketCleanupManager } from '../lib/SocketCleanupManager';
 import { chatRateLimiter, createRateLimitMiddleware } from '../middleware/rateLimitMiddleware';
 import { InputSizeLimits, REDIS_CHANNELS } from '@ems/types';
-import { EventBus } from '../lib/EventBus';
+import { eventBus } from '../lib/EventBus';
 import { CACHE_TTL } from '../lib/cacheTTL';
 
 const GLOBAL_CHAT_ROOM = 'global';
@@ -44,7 +44,6 @@ export type ChatMessageDTO = {
 };
 
 const userService = new UserService();
-const eventBus = new EventBus();
 
 export async function registerChatHandlers(socket: Socket) {
   const authSock = socket as AuthenticatedSocket;
@@ -186,26 +185,6 @@ export async function registerChatHandlers(socket: Socket) {
         timestamp:
           saved.timestamp instanceof Date ? saved.timestamp.toISOString() : `${saved.timestamp}`,
       };
-
-      // Publish JSON rule achievement event for chat message
-      try {
-        await eventBus.publish('chat:message:sent', {
-          key: 'chat:message:sent',
-          userId: authSock.user.id,
-          occurredAt:
-            saved.timestamp instanceof Date ? saved.timestamp.toISOString() : `${saved.timestamp}`,
-          idempotencyKey: `chat:message:${saved.id}:sent`,
-          payload: {
-            messageId: saved.id,
-            messageLength: saved.content.length,
-            roomId: GLOBAL_ROOM_ID,
-            content: saved.content, // For future content analysis achievements
-          },
-        });
-      } catch (achievementError) {
-        console.error('[chat] Error publishing achievement event:', achievementError);
-        // Don't fail the message send if achievement event fails
-      }
 
       await eventBus.publish(REDIS_CHANNELS.CHAT_MESSAGE, chatMsg);
 

@@ -2,7 +2,7 @@
 // Validates that the unified event system is working correctly
 // Run with: ts-node src/scripts/eventFlowValidation.ts
 
-import { eventBus } from '../services/eventBus.service';
+import { eventBus } from '../lib/EventBus';
 import { unifiedActivityService } from '../services/unifiedActivity.service';
 import { REDIS_CHANNELS, ActivityEventType } from '@ems/types';
 import redisClient from '../lib/redis';
