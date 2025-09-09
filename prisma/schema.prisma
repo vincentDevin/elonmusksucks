@@ -255,6 +255,7 @@ model Bet {
   optionId        Int?
   won             Boolean? // null until resolved
   payout          BigInt? // null until resolved
+  wasAllIn        Boolean           @default(false) // true if bet amount was >= 95% of user balance
   createdAt       DateTime          @default(now())
   activities      UserActivity[]
   // Rollback: Remove idempotencyKey field and unique constraint
@@ -285,31 +286,6 @@ model RefreshToken {
   expiresAt DateTime
 }
 
-model LeaderboardEntry {
-  userId    Int     @id @map("user_id")
-  userName  String  @map("user_name")
-  avatarUrl String? @map("avatar_url")
-  balance   BigInt  @map("balance")
-
-  totalBets    Int     @map("total_bets")
-  winRate      Float   @map("win_rate")
-  profitAll    BigInt  @map("profit_all")
-  profitPeriod BigInt  @map("profit_period")
-  roi          Float @map("roi")
-
-  longestStreak Int @map("longest_streak")
-  currentStreak Int @map("current_streak")
-
-  parlaysStarted Int @map("parlays_started")
-  parlaysWon     Int @map("parlays_won")
-
-  totalParlayLegs Int @map("total_parlay_legs")
-  parlayLegsWon   Int @map("parlay_legs_won")
-
-  rankChange Int? @map("rank_change")
-
-  @@map("leaderboard_view")
-}
 
 model Badge {
   id          Int         @id @default(autoincrement())

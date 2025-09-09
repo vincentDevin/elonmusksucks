@@ -53,10 +53,10 @@ const refreshWorker = new Worker(
         previousTopAllTime.map((entry, index) => [entry.userId, index + 1]),
       );
 
-      // Refresh materialized view
-      await repo.refreshMaterializedView();
+      // Clear caches (no more materialized view to refresh!)
+      await repo.refreshMaterializedView(); // This now just clears caches
 
-      // Fetch updated data with enhanced limits
+      // Fetch updated data with enhanced limits (now always fresh from UserStats)
       const topAllTime = await repo.getTopAllTime(50); // Increased from 25
       const topDaily = await repo.getTopDaily(50);
 

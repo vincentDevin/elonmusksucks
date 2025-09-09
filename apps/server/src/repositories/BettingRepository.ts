@@ -34,6 +34,7 @@ export class BettingRepository implements IBettingRepository {
     amount: number,
     oddsAtPlacement: number,
     potentialPayout: bigint,
+    wasAllIn: boolean,
     idempotencyKey?: string,
   ): Promise<DbBet> {
     // Critical transaction: only financial operations to reduce lock contention
@@ -63,6 +64,7 @@ export class BettingRepository implements IBettingRepository {
           amount: BigInt(amount),
           oddsAtPlacement,
           potentialPayout,
+          wasAllIn,
           idempotencyKey,
         },
       });

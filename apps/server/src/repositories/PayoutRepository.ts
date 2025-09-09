@@ -227,6 +227,7 @@ export class PayoutRepository implements IPayoutRepository {
                 won: isWinner,
                 category: updatedPrediction.category,
                 odds: Number(b.oddsAtPlacement),
+                wasAllIn: b.wasAllIn,
               },
             });
           } catch (error) {
@@ -278,7 +279,11 @@ export class PayoutRepository implements IPayoutRepository {
             };
 
             // Publish to single channel - handler will route to user room
-            await this.eventBus.publish(REDIS_CHANNELS.PARLAY_STATUS_CHANGE, parlayStatusPayload);
+            const serializedParlayStatusPayload = serializeBigInt(parlayStatusPayload);
+            await this.eventBus.publish(
+              REDIS_CHANNELS.PARLAY_STATUS_CHANGE,
+              serializedParlayStatusPayload,
+            );
           } catch (error) {
             console.error('[payout] Error publishing parlay status change:', error);
           }

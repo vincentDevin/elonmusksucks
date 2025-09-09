@@ -39,6 +39,7 @@ export interface IBettingRepository {
     amount: number,
     oddsAtPlacement: number,
     potentialPayout: bigint,
+    wasAllIn: boolean,
     idempotencyKey?: string,
   ): Promise<DbBet>;
 

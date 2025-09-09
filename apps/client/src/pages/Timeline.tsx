@@ -11,32 +11,6 @@ export default function Timeline() {
     <div className="container mx-auto px-4 bg-background text-content min-h-screen transition-colors duration-300">
       <TimelineProvider>
         <div className="max-w-7xl mx-auto">
-          {/* Welcome Header */}
-          <div className="bg-surface shadow rounded-lg p-6 mb-8 transition-colors duration-300">
-            <div className="flex justify-between items-center">
-              <div>
-                <h1 className="text-3xl font-bold mb-2">Timeline</h1>
-                <p className="text-content/70">
-                  Connect with the community, share your thoughts, and track Musk news
-                </p>
-              </div>
-              <div className="flex space-x-4">
-                <Link
-                  to="/dashboard"
-                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-medium text-sm"
-                >
-                  Your Dashboard
-                </Link>
-                <Link
-                  to="/predictions"
-                  className="px-4 py-2 bg-surface border border-border text-content rounded hover:bg-hover font-medium text-sm"
-                >
-                  Browse Predictions
-                </Link>
-              </div>
-            </div>
-          </div>
-
           {/* Main Content Layout */}
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
             {/* Main Timeline Content - Takes up 3 columns on large screens */}

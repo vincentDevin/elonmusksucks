@@ -86,7 +86,7 @@ const AchievementManager = memo(function AchievementManager() {
     });
 
     // Find rarest achievement (highest rarity in order)
-    const rarityOrder = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'secret', 'shame'];
+    const rarityOrder = ['common', 'uncommon', 'rare', 'epic', 'shame', 'legendary', 'secret'];
     const rarestAchievement = completedAchievements.sort((a, b) => {
       const aRarityIndex = rarityOrder.indexOf(a.rarity);
       const bRarityIndex = rarityOrder.indexOf(b.rarity);
@@ -234,7 +234,7 @@ const AchievementManager = memo(function AchievementManager() {
             </h3>
             {recentAchievements.length > 0 ? (
               <div className="space-y-3">
-                {recentAchievements.slice(0, 2).map((achievement) => {
+                {recentAchievements.slice(0, 4).map((achievement) => {
                   const rarity = achievement.rarity;
                   const rarityClasses = utils.isValidRarity(rarity)
                     ? getRarityClasses(rarity as AchievementRarity)

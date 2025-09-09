@@ -151,7 +151,10 @@ export class EventCorrelator {
           return await this.checkProbabilityDefier(userId);
 
         case 'yolo_all_in':
-          return await this.checkYoloAllIn(userId);
+          // Check both single bets and parlays for YOLO All-In
+          const singleBetYolo = await this.checkYoloAllIn(userId);
+          const parlayYolo = await this.checkYoloAllInParlay(userId);
+          return singleBetYolo || parlayYolo;
 
         case 'galaxy_brain_parlay':
           return await this.checkGalaxyBrainParlay(userId);
@@ -455,6 +458,69 @@ export class EventCorrelator {
     }
 
     return true;
+  }
+  /**
+   * Check for YOLO All-In Parlay: Win a parlay after betting >95% of balance
+   */
+  private async checkYoloAllInParlay(userId: number): Promise<boolean> {
+    // Get recent winning parlays
+    const recentWinningParlays = await prisma.parlay.findMany({
+      where: {
+        userId,
+        status: 'WON',
+        createdAt: {
+          gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // Last 30 days
+        },
+      },
+      include: {
+        user: {
+          select: {
+            transactions: {
+              where: {
+                createdAt: {
+                  gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+                },
+              },
+              orderBy: {
+                createdAt: 'desc',
+              },
+            },
+          },
+        },
+      },
+    });
+
+    for (const parlay of recentWinningParlays) {
+      // Find the transaction for this parlay
+      const parlayTransaction = parlay.user.transactions.find(
+        (t) => t.relatedParlayId === parlay.id && t.type === 'DEBIT',
+      );
+
+      if (parlayTransaction) {
+        const balanceBeforeParlay = parlayTransaction.balanceAfter + parlayTransaction.amount;
+        const parlayAmountRatio = Number(parlayTransaction.amount) / Number(balanceBeforeParlay);
+
+        // If they bet >95% of their balance and won the parlay
+        if (parlayAmountRatio >= 0.95) {
+          await this.eventBus.publish('achievement:yolo:all:in', {
+            key: 'achievement:yolo:all:in',
+            userId,
+            occurredAt: new Date().toISOString(),
+            idempotencyKey: `yolo:all:in:parlay:${userId}:${parlay.id}`,
+            payload: {
+              parlayId: parlay.id,
+              parlayAmount: parlayTransaction.amount.toString(),
+              balanceBeforeParlay: balanceBeforeParlay.toString(),
+              balanceRatio: parlayAmountRatio,
+              payout: parlay.potentialPayout?.toString(),
+              scenario: 'yolo_all_in_parlay',
+            },
+          });
+          return true;
+        }
+      }
+    }
+    return false;
   }
 }
 

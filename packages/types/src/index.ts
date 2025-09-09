@@ -56,7 +56,6 @@ import type {
   Bet as PrismaBet,
   AITweet as PrismaAITweet,
   RefreshToken as PrismaRefreshToken,
-  LeaderboardEntry as PrismaLeaderboardEntry,
   Badge as PrismaBadge,
   UserBadge as PrismaUserBadge,
   Follow as PrismaFollow,
@@ -761,7 +760,6 @@ export type PublicAITweet = PrismaAITweet;
 export type DbRefreshToken = PrismaRefreshToken;
 
 // ——— LeaderboardEntry —————————————————————————————————————————
-export type DbLeaderboardEntry = PrismaLeaderboardEntry;
 export interface PublicLeaderboardEntry {
   userId:           number;
   userName:         string;
@@ -1419,6 +1417,8 @@ export const REDIS_CHANNELS = {
   BET_LOST: 'bet:lost',
   PARLAY_PLACED: 'parlay:placed',
   PARLAY_STATUS_CHANGE: 'parlay:status_change',
+  PARLAY_WON: 'parlay:won',
+  PARLAY_LOST: 'parlay:lost',
 
   // Post channels
   POST_CREATED: 'post:created',

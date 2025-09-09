@@ -100,7 +100,8 @@ export class BettingService {
         // 2) Calculate enhanced odds (before transaction)
         let finalOdds = opt.odds;
         let allInBonus = 1.0;
-        if (amount >= Number(user.muskBucks) * 0.95) {
+        const wasAllIn = amount >= Number(user.muskBucks) * 0.95;
+        if (wasAllIn) {
           allInBonus = 2.5; // 🚀 MASSIVE 150% ALL-IN BONUS!
           finalOdds = opt.odds * allInBonus;
         }
@@ -115,6 +116,7 @@ export class BettingService {
           amount,
           finalOdds,
           potentialPayout,
+          wasAllIn,
         );
 
         // 4) Post-transaction operations (safe to fail without data corruption)
