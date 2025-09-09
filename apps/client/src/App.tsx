@@ -8,7 +8,6 @@ import { ParlayProvider } from './contexts/ParlayContext';
 import { ChatProvider } from './contexts/ChatContext';
 import { ActivityProvider } from './contexts/ActivityContext';
 import { AchievementProvider } from './contexts/AchievementContext';
-import MainLayout from './components/MainLayout';
 import AppRoutes from './routes/AppRoutes';
 import { useAuth } from './contexts/AuthContext';
 import PongEloNotification from './components/pong/PongEloNotification';
