@@ -3,13 +3,13 @@ import express, { Request, Response } from 'express';
 import { createServer as createViteServer, ViteDevServer } from 'vite';
 
 const isProduction = process.env.NODE_ENV === 'production';
-const port = process.env.PORT || 5173;
+const port = process.env.PORT || 3000;
 const base = process.env.BASE || '/';
 
 // Your existing server API base URL
 const API_BASE_URL = process.env.API_BASE_URL || 'http://127.0.0.1:5000';
 // Client app URL for redirects
-const CLIENT_APP_URL = process.env.CLIENT_APP_URL || 'http://127.0.0.1:3000';
+const CLIENT_APP_URL = process.env.CLIENT_APP_URL || '/';
 
 // Import types
 import type {
@@ -20,7 +20,7 @@ import type {
   RecentActivity,
   TimelineArticle,
   TimelinePost,
-} from './src/types/index.js';
+} from './src/public/types/index.js';
 
 // API client for server-side data fetching
 async function fetchFromAPI(endpoint: string): Promise<any> {
@@ -37,8 +37,9 @@ async function fetchFromAPI(endpoint: string): Promise<any> {
   }
 }
 
-// Cached template
+// Cached templates
 let cachedTemplate: string;
+let cachedAppTemplate: string;
 
 interface CreateServerResult {
   app: express.Application;
@@ -73,13 +74,55 @@ async function createServer(): Promise<CreateServerResult> {
 
       console.log('SSR handling path:', path);
 
+      // Check authentication via refresh token cookie
+      let isAuthenticated = false;
+      if (req.headers.cookie?.includes('refreshToken')) {
+        try {
+          const authResponse = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+            method: 'POST',
+            headers: { cookie: req.headers.cookie },
+          });
+          if (authResponse.ok) {
+            isAuthenticated = true;
+          }
+        } catch (err) {
+          console.warn('Auth check failed:', err);
+        }
+      }
+
+      // Serve SPA for authenticated users (React Router handles routes)
+      if (isAuthenticated) {
+        let appHtml: string;
+        if (!isProduction) {
+          appHtml = await fs.readFile('./app.html', 'utf-8');
+          appHtml = await vite.transformIndexHtml(url, appHtml);
+        } else {
+          appHtml = cachedAppTemplate;
+        }
+        res.status(200).set({ 'Content-Type': 'text/html' }).send(appHtml);
+        return;
+      }
+
+      // Serve SPA for auth routes
+      if (path.startsWith('/login') || path.startsWith('/register')) {
+        let appHtml: string;
+        if (!isProduction) {
+          appHtml = await fs.readFile('./app.html', 'utf-8');
+          appHtml = await vite.transformIndexHtml(url, appHtml);
+        } else {
+          appHtml = cachedAppTemplate;
+        }
+        res.status(200).set({ 'Content-Type': 'text/html' }).send(appHtml);
+        return;
+      }
+
       let template: string;
       let render: (data: ServerData) => { html: string };
       if (!isProduction) {
         // Always read fresh template in dev
         template = await fs.readFile('./index.html', 'utf-8');
         template = await vite.transformIndexHtml(url, template);
-        render = (await vite.ssrLoadModule('/src/entry-server.tsx')).render;
+        render = (await vite.ssrLoadModule('/src/public/entry-server.tsx')).render;
       } else {
         template = cachedTemplate;
         render = (await import('./dist/server/entry-server.js')).render;
@@ -194,7 +237,7 @@ async function createServer(): Promise<CreateServerResult> {
       const { html } = render(serverData);
 
       const finalHtml = template.replace('<!--app-html-->', html).replace(
-        '<script type="module" src="/src/entry-client.tsx"></script>',
+        '<script type="module" src="/src/public/entry-client.tsx"></script>',
         `<script>
           // Initialize theme before any rendering to prevent flash
           (function() {
@@ -209,7 +252,7 @@ async function createServer(): Promise<CreateServerResult> {
           })();
           window.__SERVER_DATA__ = ${JSON.stringify(serverData, null, 2)};
         </script>
-        <script type="module" src="/src/entry-client.tsx"></script>`,
+        <script type="module" src="/src/public/entry-client.tsx"></script>`,
       );
 
       res.status(200).set({ 'Content-Type': 'text/html' }).send(finalHtml);
@@ -232,6 +275,7 @@ if (!isProduction) {
 } else {
   // Production
   cachedTemplate = await fs.readFile('./dist/client/index.html', 'utf-8');
+  cachedAppTemplate = await fs.readFile('./dist/client/app.html', 'utf-8');
   createServer().then(({ app }) => {
     app.use(express.static('./dist/client'));
     app.listen(port, '127.0.0.1', () => {
