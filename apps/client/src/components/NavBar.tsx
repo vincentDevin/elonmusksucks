@@ -123,18 +123,30 @@ export default function NavBar() {
             )
           ) : (
             <>
-              <Link to="/public" className={linkClasses('/public')}>
+              <a
+                href="http://127.0.0.1:5173"
+                className="px-3 py-2 rounded hover:bg-muted transition-colors"
+              >
                 Home
-              </Link>
-              <Link to="/public/predictions" className={linkClasses('/public/predictions')}>
+              </a>
+              <a
+                href="http://127.0.0.1:5173/predictions"
+                className="px-3 py-2 rounded hover:bg-muted transition-colors"
+              >
                 Predictions
-              </Link>
-              <Link to="/public/leaderboard" className={linkClasses('/public/leaderboard')}>
+              </a>
+              <a
+                href="http://127.0.0.1:5173/leaderboard"
+                className="px-3 py-2 rounded hover:bg-muted transition-colors"
+              >
                 Leaderboard
-              </Link>
-              <Link to="/public/timeline" className={linkClasses('/public/timeline')}>
+              </a>
+              <a
+                href="http://127.0.0.1:5173/timeline"
+                className="px-3 py-2 rounded hover:bg-muted transition-colors"
+              >
                 Timeline
-              </Link>
+              </a>
               <Link to="/login" className={linkClasses('/login')}>
                 Login
               </Link>
@@ -251,34 +263,34 @@ export default function NavBar() {
               )
             ) : (
               <>
-                <Link
-                  to="/public"
-                  className={mobileLinkClasses('/public')}
+                <a
+                  href="http://127.0.0.1:5173"
+                  className="block px-4 py-3 rounded-lg hover:bg-muted transition-colors"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Home
-                </Link>
-                <Link
-                  to="/public/predictions"
-                  className={mobileLinkClasses('/public/predictions')}
+                </a>
+                <a
+                  href="http://127.0.0.1:5173/predictions"
+                  className="block px-4 py-3 rounded-lg hover:bg-muted transition-colors"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Predictions
-                </Link>
-                <Link
-                  to="/public/leaderboard"
-                  className={mobileLinkClasses('/public/leaderboard')}
+                </a>
+                <a
+                  href="http://127.0.0.1:5173/leaderboard"
+                  className="block px-4 py-3 rounded-lg hover:bg-muted transition-colors"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Leaderboard
-                </Link>
-                <Link
-                  to="/public/timeline"
-                  className={mobileLinkClasses('/public/timeline')}
+                </a>
+                <a
+                  href="http://127.0.0.1:5173/timeline"
+                  className="block px-4 py-3 rounded-lg hover:bg-muted transition-colors"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Timeline
-                </Link>
+                </a>
                 <div className="border-t border-muted pt-2 mt-2">
                   <Link
                     to="/login"

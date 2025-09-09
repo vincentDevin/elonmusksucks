@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 /**
  * HomeRedirect component handles routing logic for the home page
  * - Authenticated users are redirected to /dashboard
- * - Non-authenticated users are redirected to /public (landing page)
+ * - Non-authenticated users are redirected to SSR public site
  */
 export default function HomeRedirect() {
   const { accessToken, user } = useAuth();
@@ -16,8 +16,8 @@ export default function HomeRedirect() {
       // Redirect authenticated users to Dashboard
       navigate('/dashboard', { replace: true });
     } else {
-      // Redirect non-authenticated users to public landing page
-      navigate('/public', { replace: true });
+      // Redirect non-authenticated users to SSR public site
+      window.location.href = 'http://127.0.0.1:5173';
     }
   }, [accessToken, user, navigate]);
 

@@ -1,0 +1,47 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* CSS Variables for theme system */
+:root {
+  --color-primary: #3b82f6;
+  --color-primary-hover: #2563eb;
+  --color-secondary: #8b5cf6;
+  --color-accent: #10b981;
+  --color-background: #ffffff;
+  --color-surface: #f8fafc;
+  --color-content: #1e293b;
+  --color-tertiary: #64748b;
+  --color-muted: #f1f5f9;
+  --color-border: #e2e8f0;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+  --color-info: #3b82f6;
+}
+
+.dark {
+  --color-primary: #60a5fa;
+  --color-primary-hover: #3b82f6;
+  --color-secondary: #a78bfa;
+  --color-accent: #34d399;
+  --color-background: #0f172a;
+  --color-surface: #1e293b;
+  --color-content: #f1f5f9;
+  --color-tertiary: #94a3b8;
+  --color-muted: #334155;
+  --color-border: #475569;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+  --color-info: #3b82f6;
+}
+
+/* Apply theme immediately on load */
+body {
+  background-color: var(--color-background);
+  color: var(--color-content);
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease;
+}

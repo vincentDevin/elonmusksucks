@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Suspense, lazy } from 'react';
+import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import Login from '../pages/Login';
 import Register from '../pages/Register';
@@ -20,13 +21,20 @@ const Profile = lazy(() => import('../pages/Profile'));
 const AdminDashboard = lazy(() => import('../pages/AdminDashboard'));
 const Pong = lazy(() => import('../pages/Pong'));
 
-// Lazy-loaded public routes (using converted SSR components)
-const PublicLanding = lazy(() => import('../pages/public/PublicLanding'));
-const PublicPredictions = lazy(() => import('../pages/public/PublicPredictions'));
-const PublicLeaderboard = lazy(() => import('../pages/public/PublicLeaderboard'));
-const PublicTimeline = lazy(() => import('../pages/public/PublicTimeline'));
-
 import HashtagFeed from '../components/posts/HashtagFeed';
+
+// Redirect to public site component
+const PublicSiteRedirect = () => {
+  React.useEffect(() => {
+    window.location.href = 'http://127.0.0.1:5173';
+  }, []);
+
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-background">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+    </div>
+  );
+};
 
 // Suspense fallback component
 const RouteFallback = () => (
@@ -42,48 +50,6 @@ export default function AppRoutes() {
     <Routes>
       {/* Home route - shows public landing or redirects if authenticated */}
       <Route path="/" element={<HomeRedirect />} />
-
-      {/* Public routes - accessible to all */}
-      <Route
-        path="/public"
-        element={
-          <MainLayout>
-            <Suspense fallback={<RouteFallback />}>
-              <PublicLanding />
-            </Suspense>
-          </MainLayout>
-        }
-      />
-      <Route
-        path="/public/predictions"
-        element={
-          <MainLayout>
-            <Suspense fallback={<RouteFallback />}>
-              <PublicPredictions />
-            </Suspense>
-          </MainLayout>
-        }
-      />
-      <Route
-        path="/public/leaderboard"
-        element={
-          <MainLayout>
-            <Suspense fallback={<RouteFallback />}>
-              <PublicLeaderboard />
-            </Suspense>
-          </MainLayout>
-        }
-      />
-      <Route
-        path="/public/timeline"
-        element={
-          <MainLayout>
-            <Suspense fallback={<RouteFallback />}>
-              <PublicTimeline />
-            </Suspense>
-          </MainLayout>
-        }
-      />
 
       {/* Auth routes */}
       <Route
@@ -218,7 +184,10 @@ export default function AppRoutes() {
       </Route>
 
       {/* Fallback - redirect unknown routes */}
-      <Route path="*" element={<Navigate to={accessToken ? '/dashboard' : '/public'} replace />} />
+      <Route
+        path="*"
+        element={accessToken ? <Navigate to="/dashboard" replace /> : <PublicSiteRedirect />}
+      />
     </Routes>
   );
 }
