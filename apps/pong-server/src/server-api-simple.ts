@@ -1241,7 +1241,7 @@ export class PongGameServer {
             lastInputTime: Date.now(),
           };
 
-          const gameId = `game-${Date.now()}`;
+          const gameId = `game-${Date.now()}-${Math.random().toString(36).slice(2)}`;
           socket.join(`game:${gameId}`);
 
           socket.emit('match_joined', {
@@ -1269,7 +1269,7 @@ export class PongGameServer {
           this.lobby.deleteLobby(lobbyId);
         } else {
           // PvP: Create game immediately and put creator in waiting state
-          const gameId = `game-${Date.now()}`;
+          const gameId = `game-${Date.now()}-${Math.random().toString(36).slice(2)}`;
           socket.join(`game:${gameId}`);
 
           // Notify creator they've joined the match

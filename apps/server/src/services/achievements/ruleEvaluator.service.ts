@@ -126,6 +126,17 @@ export class RuleEvaluator {
   ): boolean {
     if (!condition) return true; // No condition means always true
 
+    // Debug logging for Bot Breaker: Easy (event key includes pong:match:completed and userId is 5)
+    const isBotBreakerEasyDebug = event.key === 'pong:match:completed' && event.userId === 5;
+
+    // Debug logging for Cable Pulled achievement (event key includes pong:match:lost and userId is 5)
+    const isCablePulledDebug = event.key === 'pong:match:lost' && event.userId === 5;
+    if (isBotBreakerEasyDebug || isCablePulledDebug) {
+      console.log(`[RuleEvaluator] 🐛 Evaluating condition:`, JSON.stringify(condition, null, 2));
+      console.log(`[RuleEvaluator] 🐛 Event structure:`, JSON.stringify(event, null, 2));
+      console.log(`[RuleEvaluator] 🐛 Event payload:`, JSON.stringify(event.payload, null, 2));
+    }
+
     for (const [key, expectedValue] of Object.entries(condition)) {
       // Check if the key contains an operator (e.g., "data.wager >=")
       const operatorMatch = key.match(/^(.+)\s+(>=|<=|==|!=|>|<)$/);
@@ -156,7 +167,20 @@ export class RuleEvaluator {
 
         const result = actualValue === resolvedExpectedValue;
 
+        if (isBotBreakerEasyDebug || isCablePulledDebug) {
+          console.log(`[RuleEvaluator] 🐛 Condition check: ${key}`);
+          console.log(`[RuleEvaluator] 🐛   Expected: ${JSON.stringify(expectedValue)}`);
+          console.log(
+            `[RuleEvaluator] 🐛   Resolved Expected: ${JSON.stringify(resolvedExpectedValue)}`,
+          );
+          console.log(`[RuleEvaluator] 🐛   Actual: ${JSON.stringify(actualValue)}`);
+          console.log(`[RuleEvaluator] 🐛   Result: ${result}`);
+        }
+
         if (!result) {
+          if (isBotBreakerEasyDebug || isCablePulledDebug) {
+            console.log(`[RuleEvaluator] 🐛 ❌ Condition FAILED: ${key}`);
+          }
           return false;
         }
       }
@@ -273,37 +297,59 @@ export class RuleEvaluator {
     event: AchievementEvent,
     userCounters: Record<string, number>,
   ): any {
+    const isBotBreakerEasyDebug = event.key === 'pong:match:completed' && event.userId === 5;
+
     // Handle placeholders
     if (path === '$.userId') {
+      if (isBotBreakerEasyDebug)
+        console.log(`[RuleEvaluator] 🐛 getValue(${path}) -> userId: ${event.userId}`);
       return event.userId;
     }
 
     // Handle counter references
     if (path.startsWith('counter.')) {
       const counterName = path.substring(8);
-      return userCounters[counterName] || 0;
+      const value = userCounters[counterName] || 0;
+      if (isBotBreakerEasyDebug)
+        console.log(`[RuleEvaluator] 🐛 getValue(${path}) -> counter: ${value}`);
+      return value;
     }
 
     // Handle payload references
     if (path.startsWith('payload.')) {
       const payloadPath = path.substring(8);
-      return this.getNestedValue(event.payload, payloadPath);
+      const value = this.getNestedValue(event.payload, payloadPath);
+      if (isBotBreakerEasyDebug)
+        console.log(`[RuleEvaluator] 🐛 getValue(${path}) -> payload path: ${value}`);
+      return value;
     }
 
     // Handle data references (common in achievement rules)
     if (path.startsWith('data.')) {
       const dataPath = path.substring(5);
-      return this.getNestedValue(event.payload, dataPath);
+      const value = this.getNestedValue(event.payload, dataPath);
+      if (isBotBreakerEasyDebug)
+        console.log(`[RuleEvaluator] 🐛 getValue(${path}) -> data path: ${value}`);
+      return value;
     }
 
     // Handle event properties
     if (path.startsWith('event.')) {
       const eventPath = path.substring(6);
-      return this.getNestedValue(event, eventPath);
+      const value = this.getNestedValue(event, eventPath);
+      if (isBotBreakerEasyDebug)
+        console.log(`[RuleEvaluator] 🐛 getValue(${path}) -> event path: ${value}`);
+      return value;
     }
 
     // Direct payload access (for backwards compatibility)
-    return this.getNestedValue(event.payload, path);
+    const value = this.getNestedValue(event.payload, path);
+    if (isBotBreakerEasyDebug) {
+      console.log(`[RuleEvaluator] 🐛 getValue(${path}) -> direct payload access:`);
+      console.log(`[RuleEvaluator] 🐛   event.payload:`, JSON.stringify(event.payload, null, 2));
+      console.log(`[RuleEvaluator] 🐛   getNestedValue result: ${value}`);
+    }
+    return value;
   }
 
   /**

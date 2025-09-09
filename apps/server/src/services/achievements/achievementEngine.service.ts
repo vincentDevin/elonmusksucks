@@ -166,11 +166,26 @@ export class AchievementEngine {
     userCounters: Record<string, number>,
   ): Promise<boolean> {
     try {
+      // Debug logging for Bot Breaker: Easy
+      const isBotBreakerEasy = rule.achievementId === 292;
+      if (isBotBreakerEasy) {
+        console.log(`[AchievementEngine] 🐛 DEBUG Bot Breaker: Easy rule evaluation`);
+        console.log(`[AchievementEngine] 🐛 Rule:`, JSON.stringify(rule.rule, null, 2));
+      }
+
       // Compile the rule
       const compiledRule = this.ruleEvaluator.compileRule(rule.rule);
       if (!compiledRule) {
         console.warn(`Invalid rule structure for achievement ${rule.achievementId}`);
+        if (isBotBreakerEasy) {
+          console.log(`[AchievementEngine] 🐛 Bot Breaker: Easy rule compilation FAILED`);
+        }
         return false;
+      }
+
+      if (isBotBreakerEasy) {
+        console.log(`[AchievementEngine] 🐛 Bot Breaker: Easy rule compiled successfully`);
+        console.log(`[AchievementEngine] 🐛 Compiled rule:`, JSON.stringify(compiledRule, null, 2));
       }
 
       // Get current user achievement progress
@@ -188,8 +203,17 @@ export class AchievementEngine {
         isCompleted = !!userAchievement.completedAt;
       }
 
+      if (isBotBreakerEasy) {
+        console.log(
+          `[AchievementEngine] 🐛 Bot Breaker: Easy user progress: ${currentProgress}, completed: ${isCompleted}`,
+        );
+      }
+
       // Skip if already completed
       if (isCompleted) {
+        if (isBotBreakerEasy) {
+          console.log(`[AchievementEngine] 🐛 Bot Breaker: Easy already completed, skipping`);
+        }
         return false;
       }
 
@@ -200,8 +224,20 @@ export class AchievementEngine {
         userCounters,
       );
 
+      if (isBotBreakerEasy) {
+        console.log(
+          `[AchievementEngine] 🐛 Bot Breaker: Easy evaluation result:`,
+          JSON.stringify(evaluation, null, 2),
+        );
+      }
+
       // Update progress if needed
       if (evaluation.newProgress !== currentProgress) {
+        if (isBotBreakerEasy) {
+          console.log(
+            `[AchievementEngine] 🐛 Bot Breaker: Easy updating progress: ${currentProgress} -> ${evaluation.newProgress}`,
+          );
+        }
         await this.updateUserAchievementProgress(
           event.userId,
           rule.achievementId,
@@ -211,6 +247,9 @@ export class AchievementEngine {
 
       // Handle achievement unlock
       if (evaluation.shouldUnlock && !isCompleted) {
+        if (isBotBreakerEasy) {
+          console.log(`[AchievementEngine] 🐛 Bot Breaker: Easy UNLOCKING!`);
+        }
         await this.unlockAchievement(event.userId, rule.achievementId, evaluation.newProgress);
 
         // Emit socket event for unlock

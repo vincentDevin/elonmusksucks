@@ -493,7 +493,7 @@ export class PongStatsService {
       try {
         // Determine comeback and defensive win flags
         const comeback = loserScore && winnerScore && loserScore >= 4 && winnerScore === 5;
-        const defensiveWin = duration && duration > 300000; // 5+ minute games are defensive
+        const defensiveWin = loserScore !== undefined && loserScore <= 2; // Wall Builder: hold opponent to ≤2 points
         const ragequit = false; // Would need to track disconnections
 
         const achievementPayload = {
@@ -530,7 +530,17 @@ export class PongStatsService {
     // 14. Emit achievement events for loser (for loss tracking/shame achievements)
     if (loserId && loserId > 0) {
       try {
-        const ragequit = false; // Would need to track disconnections
+        // Detect ragequit: AI winner, short duration, low human score
+        const ragequit =
+          isAIMatch &&
+          winnerId &&
+          winnerId < 0 && // AI is winner
+          (duration < 30 || // Very short match (less than 30 seconds)
+            (loserScore !== undefined && loserScore <= 1)); // Human scored 0 or 1 points
+
+        console.log(
+          `[PongStats] Ragequit detection for ${matchId}: isAI=${isAIMatch}, aiWinner=${winnerId && winnerId < 0}, duration=${duration}s, loserScore=${loserScore}, ragequit=${ragequit}`,
+        );
 
         const loserPayload = {
           key: 'pong:match:lost',
@@ -548,7 +558,7 @@ export class PongStatsService {
             winnerScore: winnerScore || 5, // Pong games go to 5, not 11
             loserScore: loserScore || 0,
             duration: duration || 0,
-            ragequit: ragequit || false,
+            ragequit: ragequit,
             eloChange: calculations?.loserEloChange?.totalChange,
             newElo: calculations?.loserEloChange?.newRating,
           },

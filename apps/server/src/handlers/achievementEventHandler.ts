@@ -98,7 +98,7 @@ export function setupAchievementRedisHandlers() {
         userId: payload.userId,
         occurredAt: payload.occurredAt || new Date().toISOString(),
         idempotencyKey: payload.idempotencyKey || `${channel}:${payload.userId}:${Date.now()}`,
-        payload: payload,
+        payload: payload.payload || payload, // Extract nested payload or fallback to entire payload
       };
 
       console.log(
