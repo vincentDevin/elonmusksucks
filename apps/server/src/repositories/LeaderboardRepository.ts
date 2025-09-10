@@ -128,7 +128,7 @@ export class LeaderboardRepository implements ILeaderboardRepository {
     // Use raw query to get daily profits and join with UserStats for other data
     const rows = await prisma.$queryRaw<any[]>`
       SELECT 
-        us."userId",
+        us."userId" as user_id,
         u.name as user_name,
         u."avatarUrl" as avatar_url,
         u."profilePictureKey" as avatar_key,
