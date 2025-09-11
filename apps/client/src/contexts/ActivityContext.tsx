@@ -1,9 +1,10 @@
 // apps/client/src/contexts/ActivityContext.tsx
-// Rollback: Remove socket event constants import and restore string literals
+// Migrated to use EventBus system for centralized event handling
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { useSocket } from './SocketContext';
+import { useEventBus, useSocketEvent } from './EventBusContext';
 import { useVisibilityGuard } from '../lib/visibilityGuard';
 import { getRecentActivities } from '../api/activity';
+import { REDIS_CHANNELS } from '../types/events';
 import type { ActivityEventType } from '@ems/types';
 
 // Enhanced activity interface that combines all data sources
@@ -138,12 +139,11 @@ let globalActivities: Activity[] = getStoredActivities();
 let globalHasInitialized = getStoredHasInitialized();
 
 export function ActivityProvider({ children }: { children: React.ReactNode }) {
-  const socket = useSocket();
+  const { isConnected } = useEventBus();
   const { shouldRefresh, updateLastFetch } = useVisibilityGuard(5 * 60 * 1000); // 5 minutes
   const [activities, setActivities] = useState<Activity[]>(globalActivities);
   const [loading, setLoading] = useState(!globalHasInitialized);
   const [error, setError] = useState<string | null>(null);
-  const [isConnected, setIsConnected] = useState(false);
   const [hasInitialized, setHasInitialized] = useState(globalHasInitialized);
 
   // Handle unified activity feed response
@@ -378,65 +378,27 @@ export function ActivityProvider({ children }: { children: React.ReactNode }) {
     }
   }, [shouldRefresh, updateLastFetch]);
 
-  // Handle connection events
-  const handleConnect = useCallback(() => {
-    setIsConnected(true);
-    setError(null);
-
-    // Load initial data from server if not already done
-    if (!globalHasInitialized) {
-      loadInitialData();
-    } else {
-      // Use existing global data
-      setActivities(globalActivities);
-      setHasInitialized(true);
-      setLoading(false);
-    }
-  }, [loadInitialData]);
-
-  const handleDisconnect = useCallback(() => {
-    setIsConnected(false);
-    setError('Connection lost');
-  }, []);
-
-  const handleError = useCallback((error: any) => {
-    setLoading(false);
-    setError(error?.message || 'Failed to load activities');
-  }, []);
-
-  // Unified Socket.IO activity feed - single data source
+  // Handle connection state changes via EventBus
   useEffect(() => {
-    if (!socket) return;
-
-    setIsConnected(socket.connected);
-
-    // Register Socket.IO listeners
-    socket.on('connect', handleConnect);
-    socket.on('disconnect', handleDisconnect);
-    socket.on('error', handleError);
-    socket.on('unified:activity:response', handleActivityFeedResponse);
-    socket.on('unified:activity:update', handleActivityUpdate);
-
-    // Just set connected state if already connected
-    if (socket.connected) {
-      handleConnect();
+    if (isConnected) {
+      setError(null);
+      // Load initial data from server if not already done
+      if (!globalHasInitialized) {
+        loadInitialData();
+      } else {
+        // Use existing global data
+        setActivities(globalActivities);
+        setHasInitialized(true);
+        setLoading(false);
+      }
+    } else {
+      setError('Connection lost');
     }
+  }, [isConnected, loadInitialData]);
 
-    return () => {
-      socket.off('connect', handleConnect);
-      socket.off('disconnect', handleDisconnect);
-      socket.off('error', handleError);
-      socket.off('unified:activity:response', handleActivityFeedResponse);
-      socket.off('unified:activity:update', handleActivityUpdate);
-    };
-  }, [
-    socket,
-    handleConnect,
-    handleDisconnect,
-    handleError,
-    handleActivityFeedResponse,
-    handleActivityUpdate,
-  ]);
+  // Subscribe to activity events via EventBus
+  useSocketEvent(REDIS_CHANNELS.UNIFIED_ACTIVITY_RESPONSE, handleActivityFeedResponse);
+  useSocketEvent(REDIS_CHANNELS.UNIFIED_ACTIVITY_UPDATE, handleActivityUpdate);
 
   const refresh = useCallback(() => {
     // In event-driven system, we don't request - we just clear and wait for new events
@@ -452,7 +414,7 @@ export function ActivityProvider({ children }: { children: React.ReactNode }) {
       // Note: We intentionally don't clear storage here to preserve data across page refreshes
       // Storage will auto-expire after CACHE_EXPIRY_MS or be cleared on browser close
     };
-  }, [socket]);
+  }, []);
 
   return (
     <ActivityContext.Provider

@@ -105,6 +105,13 @@ export async function initSocket(httpServer: HTTPServer) {
     'admin:retagging:bulk',
     'admin:feed:refresh',
     'timeline:articles:new',
+    // Chat events
+    'chat:message',
+    'chat:typing',
+    'chat:stopTyping',
+    'chat:usersOnline',
+    'chat:join',
+    'chat:leave',
     // Pong events
     'pong:elo:update',
     'pong:tier:change',

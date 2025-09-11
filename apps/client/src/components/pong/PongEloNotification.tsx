@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   TrophyIcon,
   ArrowTrendingUpIcon,
@@ -8,8 +8,9 @@ import {
   FireIcon,
   ChartBarIcon,
 } from '@heroicons/react/24/outline';
-import { useSocket } from '../../contexts/SocketContext';
+import { useSocketEvent } from '../../contexts/EventBusContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { REDIS_CHANNELS } from '../../types/events';
 
 interface EloUpdateEvent {
   userId: number;
@@ -89,16 +90,13 @@ const getAchievementIcon = (type: PongAchievementEvent['type']) => {
 
 export default function PongEloNotification() {
   const [notifications, setNotifications] = useState<NotificationData[]>([]);
-  const socket = useSocket();
   const { user } = useAuth();
 
-  useEffect(() => {
-    if (!socket || !user) return;
-
-    // Listen for Elo updates
-    const handleEloUpdate = (data: EloUpdateEvent) => {
+  // Handle Elo updates via EventBus
+  const handleEloUpdate = useCallback(
+    (data: EloUpdateEvent) => {
       // Only show notifications for the current user
-      if (data.userId !== user.id) return;
+      if (!user || data.userId !== user.id) return;
 
       const timestamp = Date.now();
       const notification: NotificationData = {
@@ -124,12 +122,15 @@ export default function PongEloNotification() {
         // Add new notification
         return [notification, ...prev.slice(0, 4)]; // Keep only 5 notifications
       });
-    };
+    },
+    [user],
+  );
 
-    // Listen for tier changes
-    const handleTierChange = (data: TierChangeEvent) => {
+  // Handle tier changes via EventBus
+  const handleTierChange = useCallback(
+    (data: TierChangeEvent) => {
       // Only show notifications for the current user
-      if (data.userId !== user.id) return;
+      if (!user || data.userId !== user.id) return;
 
       // Find the most recent Elo update to combine with tier change
       setNotifications((prev) => {
@@ -158,12 +159,15 @@ export default function PongEloNotification() {
           return [notification, ...prev.slice(0, 4)];
         }
       });
-    };
+    },
+    [user],
+  );
 
-    // Listen for Pong achievements
-    const handlePongAchievement = (data: PongAchievementEvent) => {
+  // Handle Pong achievements via EventBus
+  const handlePongAchievement = useCallback(
+    (data: PongAchievementEvent) => {
       // Only show notifications for the current user
-      if (data.userId !== user.id) return;
+      if (!user || data.userId !== user.id) return;
 
       const notification: NotificationData = {
         userId: data.userId,
@@ -179,18 +183,14 @@ export default function PongEloNotification() {
       };
 
       setNotifications((prev) => [notification, ...prev.slice(0, 4)]);
-    };
+    },
+    [user],
+  );
 
-    socket.on('pong:elo:update', handleEloUpdate);
-    socket.on('pong:tier:change', handleTierChange);
-    socket.on('pong:achievement:unlocked', handlePongAchievement);
-
-    return () => {
-      socket.off('pong:elo:update', handleEloUpdate);
-      socket.off('pong:tier:change', handleTierChange);
-      socket.off('pong:achievement:unlocked', handlePongAchievement);
-    };
-  }, [socket, user]);
+  // Subscribe to Pong events via EventBus
+  useSocketEvent(REDIS_CHANNELS.PONG_ELO_UPDATE, handleEloUpdate);
+  useSocketEvent(REDIS_CHANNELS.PONG_TIER_CHANGE, handleTierChange);
+  useSocketEvent('pong:achievement:unlocked', handlePongAchievement);
 
   // Auto-dismiss notifications after 10 seconds
   useEffect(() => {
@@ -385,28 +385,24 @@ export default function PongEloNotification() {
 export function PongEloMiniNotification() {
   const [lastUpdate, setLastUpdate] = useState<EloUpdateEvent | null>(null);
   const [show, setShow] = useState(false);
-  const socket = useSocket();
   const { user } = useAuth();
 
-  useEffect(() => {
-    if (!socket || !user) return;
-
-    const handleEloUpdate = (data: EloUpdateEvent) => {
-      if (data.userId !== user.id) return;
+  // Handle Elo updates via EventBus
+  const handleEloUpdate = useCallback(
+    (data: EloUpdateEvent) => {
+      if (!user || data.userId !== user.id) return;
 
       setLastUpdate(data);
       setShow(true);
 
       // Auto-hide after 5 seconds
       setTimeout(() => setShow(false), 5000);
-    };
+    },
+    [user],
+  );
 
-    socket.on('pong:elo:update', handleEloUpdate);
-
-    return () => {
-      socket.off('pong:elo:update', handleEloUpdate);
-    };
-  }, [socket, user]);
+  // Subscribe to Pong Elo updates via EventBus
+  useSocketEvent(REDIS_CHANNELS.PONG_ELO_UPDATE, handleEloUpdate);
 
   if (!show || !lastUpdate) {
     return null;

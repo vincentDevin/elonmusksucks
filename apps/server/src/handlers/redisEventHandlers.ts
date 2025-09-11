@@ -161,6 +161,32 @@ export function registerRedisEventHandlers(io: Server, eventSub: any) {
       // NOTE: Pong achievement events (pong:match:completed, pong:match:lost, pong:elo:milestone)
       // are handled exclusively by achievementEventHandler.ts and are not subscribed to by this handler
 
+      // Chat events - emit using Redis channel names for EventBus compatibility
+      case REDIS_CHANNELS.CHAT_MESSAGE:
+        // Broadcast chat messages to all connected clients
+        io.emit(REDIS_CHANNELS.CHAT_MESSAGE, payload);
+        break;
+      case REDIS_CHANNELS.CHAT_TYPING:
+        // Broadcast typing indicators to all clients
+        io.emit(REDIS_CHANNELS.CHAT_TYPING, payload);
+        break;
+      case REDIS_CHANNELS.CHAT_STOP_TYPING:
+        // Broadcast stop typing indicators to all clients
+        io.emit(REDIS_CHANNELS.CHAT_STOP_TYPING, payload);
+        break;
+      case REDIS_CHANNELS.CHAT_USERS_ONLINE:
+        // Broadcast online users list to all clients
+        io.emit(REDIS_CHANNELS.CHAT_USERS_ONLINE, payload);
+        break;
+      case REDIS_CHANNELS.CHAT_JOIN:
+        // Broadcast user join events to all clients
+        io.emit(REDIS_CHANNELS.CHAT_JOIN, payload);
+        break;
+      case REDIS_CHANNELS.CHAT_LEAVE:
+        // Broadcast user leave events to all clients
+        io.emit(REDIS_CHANNELS.CHAT_LEAVE, payload);
+        break;
+
       default:
         console.warn('[socket] Unhandled Redis channel', channel);
     }
