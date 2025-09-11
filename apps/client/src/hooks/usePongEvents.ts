@@ -5,7 +5,7 @@
 // -----------------------------------------------------------------------------
 
 import { useState, useCallback, useEffect } from 'react';
-import { useEventBus } from '../contexts/EventBusContext';
+import { useEventBusCore } from '../contexts/EventBusCoreContext';
 import { useAuth } from '../contexts/AuthContext';
 import { REDIS_CHANNELS } from '../types/events';
 
@@ -56,7 +56,7 @@ export interface PongMetrics {
 }
 
 export function usePongEvents() {
-  const { subscribe } = useEventBus();
+  const { subscribe } = useEventBusCore();
   const { user } = useAuth();
   const [pongAlerts, setPongAlerts] = useState<PongAlert[]>([]);
   const [metrics, setMetrics] = useState<PongMetrics>({

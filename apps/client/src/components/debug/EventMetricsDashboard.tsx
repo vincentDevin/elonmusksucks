@@ -5,7 +5,7 @@
 // -----------------------------------------------------------------------------
 
 import { useState, useEffect, useMemo } from 'react';
-import { useEventMetrics } from '../../contexts/EventBusContext';
+import { useEventBusMetrics } from '../../contexts/EventBusMetricsContext';
 
 interface EventMetricsDashboardProps {
   showDetailed?: boolean;
@@ -18,8 +18,19 @@ export function EventMetricsDashboard({
   autoRefresh = true,
   refreshInterval = 1000,
 }: EventMetricsDashboardProps) {
-  const { metrics, clearMetrics, activeEvents, totalHandlers, getHandlerCount } = useEventMetrics();
+  const {
+    eventMetrics,
+    clearMetrics,
+    getTopEvents,
+    getAverageLatency,
+    getActiveEvents,
+    getHandlerCount,
+  } = useEventBusMetrics();
   const [isVisible, setIsVisible] = useState(false);
+
+  // Derived values for compatibility
+  const activeEvents = getActiveEvents();
+  const totalHandlers = getHandlerCount();
 
   // Auto-refresh metrics
   useEffect(() => {
@@ -37,24 +48,24 @@ export function EventMetricsDashboard({
   // Calculate derived metrics
   const derivedMetrics = useMemo(() => {
     const errorRate =
-      metrics.eventsReceived > 0
-        ? ((metrics.errors / metrics.eventsReceived) * 100).toFixed(2)
+      eventMetrics.eventsReceived > 0
+        ? ((eventMetrics.errors / eventMetrics.eventsReceived) * 100).toFixed(2)
         : '0.00';
 
     const processedRate =
-      metrics.eventsReceived > 0
-        ? ((metrics.eventsProcessed / metrics.eventsReceived) * 100).toFixed(2)
+      eventMetrics.eventsReceived > 0
+        ? ((eventMetrics.eventsProcessed / eventMetrics.eventsReceived) * 100).toFixed(2)
         : '0.00';
 
     const avgProcessingTimeFormatted =
-      metrics.averageProcessingTime > 0
-        ? metrics.averageProcessingTime < 1
-          ? `${(metrics.averageProcessingTime * 1000).toFixed(2)}μs`
-          : `${metrics.averageProcessingTime.toFixed(2)}ms`
+      eventMetrics.averageProcessingTime > 0
+        ? eventMetrics.averageProcessingTime < 1
+          ? `${(eventMetrics.averageProcessingTime * 1000).toFixed(2)}μs`
+          : `${eventMetrics.averageProcessingTime.toFixed(2)}ms`
         : '0ms';
 
-    const lastEventFormatted = metrics.lastEventTime
-      ? new Date(metrics.lastEventTime).toLocaleTimeString()
+    const lastEventFormatted = eventMetrics.lastEventTime
+      ? new Date(eventMetrics.lastEventTime).toLocaleTimeString()
       : 'Never';
 
     return {
@@ -63,14 +74,15 @@ export function EventMetricsDashboard({
       avgProcessingTimeFormatted,
       lastEventFormatted,
     };
-  }, [metrics]);
+  }, [eventMetrics]);
 
   // Performance status
   const performanceStatus = useMemo(() => {
-    if (metrics.averageProcessingTime > 10) return { status: 'poor', color: 'text-red-500' };
-    if (metrics.averageProcessingTime > 5) return { status: 'warning', color: 'text-yellow-500' };
+    if (eventMetrics.averageProcessingTime > 10) return { status: 'poor', color: 'text-red-500' };
+    if (eventMetrics.averageProcessingTime > 5)
+      return { status: 'warning', color: 'text-yellow-500' };
     return { status: 'good', color: 'text-green-500' };
-  }, [metrics.averageProcessingTime]);
+  }, [eventMetrics.averageProcessingTime]);
 
   if (!showDetailed && totalHandlers === 0) {
     return null; // Don't show if no events are being handled
@@ -83,7 +95,7 @@ export function EventMetricsDashboard({
         <div className="flex items-center space-x-2">
           <div
             className={`w-2 h-2 rounded-full ${
-              metrics.lastEventTime && Date.now() - metrics.lastEventTime < 5000
+              eventMetrics.lastEventTime && Date.now() - eventMetrics.lastEventTime < 5000
                 ? 'bg-green-500 animate-pulse'
                 : 'bg-gray-400'
             }`}
@@ -102,12 +114,16 @@ export function EventMetricsDashboard({
       <div className="grid grid-cols-2 gap-3 text-xs">
         <div className="bg-background/50 rounded p-2">
           <div className="text-tertiary">Events Received</div>
-          <div className="font-bold text-content">{metrics.eventsReceived.toLocaleString()}</div>
+          <div className="font-bold text-content">
+            {eventMetrics.eventsReceived.toLocaleString()}
+          </div>
         </div>
 
         <div className="bg-background/50 rounded p-2">
           <div className="text-tertiary">Events Processed</div>
-          <div className="font-bold text-content">{metrics.eventsProcessed.toLocaleString()}</div>
+          <div className="font-bold text-content">
+            {eventMetrics.eventsProcessed.toLocaleString()}
+          </div>
         </div>
 
         <div className="bg-background/50 rounded p-2">
@@ -136,7 +152,7 @@ export function EventMetricsDashboard({
             <span className="font-medium text-content">{derivedMetrics.processedRate}%</span>
           </div>
 
-          {metrics.errors > 0 && (
+          {eventMetrics.errors > 0 && (
             <div className="flex justify-between">
               <span className="text-tertiary">Error Rate:</span>
               <span className="font-medium text-red-500">{derivedMetrics.errorRate}%</span>
@@ -204,16 +220,16 @@ export function CompactEventMetrics() {
       <div className="flex items-center space-x-3">
         <div
           className={`w-2 h-2 rounded-full ${
-            metrics.lastEventTime && Date.now() - metrics.lastEventTime < 5000
+            eventMetrics.lastEventTime && Date.now() - eventMetrics.lastEventTime < 5000
               ? 'bg-green-500 animate-pulse'
               : 'bg-gray-400'
           }`}
         />
         <span className="text-tertiary">
-          {metrics.eventsReceived}R / {metrics.eventsProcessed}P
+          {eventMetrics.eventsReceived}R / {eventMetrics.eventsProcessed}P
         </span>
-        {metrics.errors > 0 && <span className="text-red-500">{metrics.errors}E</span>}
-        <span className="text-tertiary">{metrics.averageProcessingTime.toFixed(1)}ms</span>
+        {eventMetrics.errors > 0 && <span className="text-red-500">{eventMetrics.errors}E</span>}
+        <span className="text-tertiary">{eventMetrics.averageProcessingTime.toFixed(1)}ms</span>
       </div>
     </div>
   );

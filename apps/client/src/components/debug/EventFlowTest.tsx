@@ -5,7 +5,8 @@
 // -----------------------------------------------------------------------------
 
 import { useState, useCallback, useEffect } from 'react';
-import { useEventBus, useSocketEvent } from '../../contexts/EventBusContext';
+import { useEventBusCore, useSocketEvent } from '../../contexts/EventBusCoreContext';
+import { useEventBusMetrics } from '../../contexts/EventBusMetricsContext';
 import { REDIS_CHANNELS } from '@ems/types';
 import type {
   BetPlacedPayload,
@@ -28,7 +29,8 @@ interface TestResult {
 }
 
 export default function EventFlowTest() {
-  const { emit, isConnected, eventMetrics } = useEventBus();
+  const { emit, isConnected } = useEventBusCore();
+  const { eventMetrics } = useEventBusMetrics();
   const [testResults, setTestResults] = useState<TestResult[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [receivedEvents, setReceivedEvents] = useState<string[]>([]);

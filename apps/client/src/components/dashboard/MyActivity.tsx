@@ -1,7 +1,7 @@
 // Rollback: git checkout HEAD -- apps/client/src/components/dashboard/MyActivity.tsx
 import { useCallback, useState } from 'react';
 import { useMyBets, useMyParlays, useMyPredictions } from '../../hooks/useMeStubs';
-import { useSocketEvent } from '../../contexts/EventBusContext';
+import { useSocketEvent } from '../../contexts/EventBusCoreContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { REDIS_CHANNELS } from '@ems/types';
 

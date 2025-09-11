@@ -5,7 +5,7 @@
 // -----------------------------------------------------------------------------
 
 import { useState, useCallback, useEffect } from 'react';
-import { useEventBus } from '../contexts/EventBusContext';
+import { useEventBusCore } from '../contexts/EventBusCoreContext';
 import { useAuth } from '../contexts/AuthContext';
 import { REDIS_CHANNELS } from '../types/events';
 
@@ -62,7 +62,7 @@ export interface UserRanking {
 }
 
 export function useLeaderboardEvents() {
-  const { subscribe } = useEventBus();
+  const { subscribe } = useEventBusCore();
   const { user } = useAuth();
   const [rankUpdates, setRankUpdates] = useState<RankUpdate[]>([]);
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardData>({

@@ -1,7 +1,8 @@
 // apps/client/src/App.tsx
 import { BrowserRouter } from 'react-router-dom';
 import { SocketProvider } from './contexts/SocketContext';
-import { EventBusProvider } from './contexts/EventBusContext';
+import { EventBusCoreProvider } from './contexts/EventBusCoreContext';
+import { EventBusMetricsProvider } from './contexts/EventBusMetricsContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { UnifiedThemeProvider } from './theme';
 import { PredictionProvider } from './contexts/PredictionContext';
@@ -23,35 +24,38 @@ function AppContent() {
 
   return (
     <SocketProvider>
-      <EventBusProvider>
-        <UnifiedThemeProvider userId={user?.id}>
-          {/* domain state that depends on socket/auth */}
-          <ActivityProvider>
-            <AchievementProvider>
-              <PredictionProvider>
-                <ParlayProvider>
-                  <ChatProvider>
-                    {/* Central event handlers for all 73+ Redis channels */}
-                    <EventHandlers />
-                    <AppRoutes />
-                    {/* Global Pong Elo notifications */}
-                    <PongEloNotification />
-                    {/* Global Achievement celebrations */}
-                    <AchievementCelebrationContainer />
-                    {/* Development tools - only in development */}
-                    {process.env.NODE_ENV === 'development' && (
-                      <>
-                        <EventFlowTest />
-                        <EventMetricsDashboard />
-                      </>
-                    )}
-                  </ChatProvider>
-                </ParlayProvider>
-              </PredictionProvider>
-            </AchievementProvider>
-          </ActivityProvider>
-        </UnifiedThemeProvider>
-      </EventBusProvider>
+      <EventBusCoreProvider>
+        {/* Metrics context only for debug components - isolated re-renders */}
+        <EventBusMetricsProvider>
+          <UnifiedThemeProvider userId={user?.id}>
+            {/* domain state that depends on socket/auth */}
+            <ActivityProvider>
+              <AchievementProvider>
+                <PredictionProvider>
+                  <ParlayProvider>
+                    <ChatProvider>
+                      {/* Central event handlers for all 73+ Redis channels */}
+                      <EventHandlers />
+                      <AppRoutes />
+                      {/* Global Pong Elo notifications */}
+                      <PongEloNotification />
+                      {/* Global Achievement celebrations */}
+                      <AchievementCelebrationContainer />
+                      {/* Development tools - only in development */}
+                      {process.env.NODE_ENV === 'development' && (
+                        <>
+                          <EventFlowTest />
+                          <EventMetricsDashboard />
+                        </>
+                      )}
+                    </ChatProvider>
+                  </ParlayProvider>
+                </PredictionProvider>
+              </AchievementProvider>
+            </ActivityProvider>
+          </UnifiedThemeProvider>
+        </EventBusMetricsProvider>
+      </EventBusCoreProvider>
     </SocketProvider>
   );
 }

@@ -5,7 +5,7 @@
 // -----------------------------------------------------------------------------
 
 import { useState, useCallback, useEffect } from 'react';
-import { useEventBus } from '../contexts/EventBusContext';
+import { useEventBusCore } from '../contexts/EventBusCoreContext';
 import { useAuth } from '../contexts/AuthContext';
 import { REDIS_CHANNELS } from '../types/events';
 
@@ -65,7 +65,7 @@ export interface SocialMetrics {
 }
 
 export function useSocialEvents() {
-  const { subscribe } = useEventBus();
+  const { subscribe } = useEventBusCore();
   const { user } = useAuth();
   const [socialNotifications, setSocialNotifications] = useState<SocialNotification[]>([]);
   const [socialActivity, setSocialActivity] = useState<SocialActivity[]>([]);

@@ -5,7 +5,7 @@
 // -----------------------------------------------------------------------------
 
 import { useState, useCallback, useEffect } from 'react';
-import { useEventBus } from '../contexts/EventBusContext';
+import { useEventBusCore } from '../contexts/EventBusCoreContext';
 import { useAuth } from '../contexts/AuthContext';
 import { REDIS_CHANNELS } from '../types/events';
 
@@ -46,7 +46,7 @@ export interface BettingMetrics {
 }
 
 export function useBettingEvents() {
-  const { subscribe } = useEventBus();
+  const { subscribe } = useEventBusCore();
   const { user, updateUser } = useAuth();
   const [bettingAlerts, setBettingAlerts] = useState<BettingAlert[]>([]);
   const [metrics, setMetrics] = useState<BettingMetrics>({

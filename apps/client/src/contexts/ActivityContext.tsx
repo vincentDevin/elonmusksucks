@@ -1,7 +1,7 @@
 // apps/client/src/contexts/ActivityContext.tsx
 // Migrated to use EventBus system for centralized event handling
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { useEventBus, useSocketEvent } from './EventBusContext';
+import { useEventBusCore, useSocketEvent } from './EventBusCoreContext';
 import { useVisibilityGuard } from '../lib/visibilityGuard';
 import { getRecentActivities } from '../api/activity';
 import { REDIS_CHANNELS } from '../types/events';
@@ -139,7 +139,7 @@ let globalActivities: Activity[] = getStoredActivities();
 let globalHasInitialized = getStoredHasInitialized();
 
 export function ActivityProvider({ children }: { children: React.ReactNode }) {
-  const { isConnected } = useEventBus();
+  const { isConnected } = useEventBusCore();
   const { shouldRefresh, updateLastFetch } = useVisibilityGuard(5 * 60 * 1000); // 5 minutes
   const [activities, setActivities] = useState<Activity[]>(globalActivities);
   const [loading, setLoading] = useState(!globalHasInitialized);

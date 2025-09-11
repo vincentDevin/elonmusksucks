@@ -1,5 +1,13 @@
 // Rollback: Remove refreshUserData call from login/logout handlers
-import React, { createContext, useState, useEffect, useCallback, useContext } from 'react';
+import React, {
+  createContext,
+  useState,
+  useEffect,
+  useCallback,
+  useContext,
+  useOptimistic,
+  startTransition,
+} from 'react';
 import {
   login as loginApi,
   register as registerApi,
@@ -30,7 +38,45 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [accessToken, setToken] = useState<string | null>(null);
-  const [user, setUser] = useState<User | null>(null);
+  const [baseUser, setBaseUser] = useState<User | null>(null);
+  const [user, optimisticUpdateUser] = useOptimistic(
+    baseUser,
+    (
+      current: User | null,
+      action: { type: 'bet' | 'parlay' | 'payout' | 'refresh'; payload: any },
+    ) => {
+      if (!current) return current;
+
+      switch (action.type) {
+        case 'bet':
+          // Optimistically subtract bet amount
+          return {
+            ...current,
+            muskBucks: Math.max(0, current.muskBucks - action.payload.amount),
+          };
+        case 'parlay':
+          // Optimistically subtract parlay amount
+          return {
+            ...current,
+            muskBucks: Math.max(0, current.muskBucks - action.payload.amount),
+          };
+        case 'payout':
+          // Optimistically add payout amount
+          return {
+            ...current,
+            muskBucks: current.muskBucks + action.payload.amount,
+          };
+        case 'refresh':
+          // Set exact balance from server (not optimistic)
+          return {
+            ...current,
+            muskBucks: action.payload.newBalance,
+          };
+        default:
+          return current;
+      }
+    },
+  );
   const [loading, setLoading] = useState(true);
   const [onUserDataRefresh] = useState<(() => Promise<void>) | undefined>();
 
@@ -42,11 +88,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setToken(token);
         setAccessToken(token);
         const currentUser = await meApi();
-        setUser(currentUser);
+        setBaseUser(currentUser);
       } catch (error) {
         setToken(null);
         setAccessToken('');
-        setUser(null);
+        setBaseUser(null);
 
         // If we're on a protected route and refresh fails, redirect to public home
         const currentPath = window.location.pathname;
@@ -70,7 +116,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setToken(token);
       setAccessToken(token);
       const currentUser = await meApi();
-      setUser(currentUser);
+      setBaseUser(currentUser);
       if (onUserDataRefresh) {
         await onUserDataRefresh();
       }
@@ -83,7 +129,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     await registerApi({ name, email, password });
     setToken(null);
     setAccessToken('');
-    setUser(null);
+    setBaseUser(null);
   }, []);
 
   // Logout and clear all user/auth state
@@ -91,13 +137,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     await logoutApi();
     setToken(null);
     setAccessToken('');
-    setUser(null);
+    setBaseUser(null);
   }, []);
 
   // Manually refresh user profile
   const refreshUser = useCallback(async () => {
     const currentUser = await meApi();
-    setUser(currentUser);
+    setBaseUser(currentUser);
   }, []);
 
   // Refresh only user balance without affecting auth state
@@ -105,9 +151,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       if (!user?.id) return;
       const balanceData = await getBalanceApi();
-      // Only update the balance, preserve other user data and avoid token refresh
-      // Convert string to number since server returns muskBucks as string
-      setUser((prevUser) =>
+      // Update base user balance (not optimistic)
+      setBaseUser((prevUser) =>
         prevUser ? { ...prevUser, muskBucks: parseInt(balanceData.muskBucks) } : null,
       );
     } catch (error) {
@@ -120,7 +165,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const clearAuth = useCallback(() => {
     setToken(null);
     setAccessToken('');
-    setUser(null);
+    setBaseUser(null);
   }, []);
 
   // Handle token refresh from axios interceptor
@@ -156,44 +201,42 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const handleUserBalanceUpdate = (data: { userId: number; newBalance: number }) => {
       // Only update if this balance change belongs to the current user
       if (data.userId === user.id) {
-        setUser((prevUser) => (prevUser ? { ...prevUser, muskBucks: data.newBalance } : null));
+        // Use React 19's useOptimistic for balance refresh
+        startTransition(() => {
+          optimisticUpdateUser({
+            type: 'refresh',
+            payload: { newBalance: data.newBalance },
+          });
+        });
       }
     };
 
     const handleBetPlaced = (betData: { user?: { id: number }; amount?: number }) => {
-      // Only refresh if this bet belongs to the current user
-      if (betData.user?.id === user.id) {
-        // Optimistic update - subtract bet amount immediately
-        if (betData.amount && user.muskBucks >= betData.amount) {
-          setUser((prevUser) =>
-            prevUser
-              ? {
-                  ...prevUser,
-                  muskBucks: prevUser.muskBucks - betData.amount!,
-                }
-              : null,
-          );
-        }
-        // Also refresh from server to ensure accuracy
+      // Only update if this bet belongs to the current user
+      if (betData.user?.id === user.id && betData.amount) {
+        // Use React 19's useOptimistic for immediate balance update
+        startTransition(() => {
+          optimisticUpdateUser({
+            type: 'bet',
+            payload: { amount: betData.amount },
+          });
+        });
+        // Refresh from server to ensure accuracy
         refreshUser();
       }
     };
 
     const handleParlayPlaced = (parlayData: { user?: { id: number }; amount?: number }) => {
-      // Only refresh if this parlay belongs to the current user
-      if (parlayData.user?.id === user.id) {
-        // Optimistic update - subtract parlay amount immediately
-        if (parlayData.amount && user.muskBucks >= parlayData.amount) {
-          setUser((prevUser) =>
-            prevUser
-              ? {
-                  ...prevUser,
-                  muskBucks: prevUser.muskBucks - parlayData.amount!,
-                }
-              : null,
-          );
-        }
-        // Also refresh from server to ensure accuracy
+      // Only update if this parlay belongs to the current user
+      if (parlayData.user?.id === user.id && parlayData.amount) {
+        // Use React 19's useOptimistic for immediate balance update
+        startTransition(() => {
+          optimisticUpdateUser({
+            type: 'parlay',
+            payload: { amount: parlayData.amount },
+          });
+        });
+        // Refresh from server to ensure accuracy
         refreshUser();
       }
     };
@@ -201,14 +244,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const handleBetResolved = (data: { userId: number; payout?: number; amount?: number }) => {
       // Handle bet resolution payouts
       if (data.userId === user.id && data.payout) {
-        setUser((prevUser) =>
-          prevUser
-            ? {
-                ...prevUser,
-                muskBucks: prevUser.muskBucks + data.payout!,
-              }
-            : null,
-        );
+        // Use React 19's useOptimistic for immediate payout update
+        startTransition(() => {
+          optimisticUpdateUser({
+            type: 'payout',
+            payload: { amount: data.payout },
+          });
+        });
         // Refresh from server to ensure accuracy
         refreshUser();
       }
@@ -217,14 +259,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const handleParlayResolved = (data: { userId: number; payout?: number }) => {
       // Handle parlay resolution payouts
       if (data.userId === user.id && data.payout) {
-        setUser((prevUser) =>
-          prevUser
-            ? {
-                ...prevUser,
-                muskBucks: prevUser.muskBucks + data.payout!,
-              }
-            : null,
-        );
+        // Use React 19's useOptimistic for immediate payout update
+        startTransition(() => {
+          optimisticUpdateUser({
+            type: 'payout',
+            payload: { amount: data.payout },
+          });
+        });
         // Refresh from server to ensure accuracy
         refreshUser();
       }
@@ -233,14 +274,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const handlePongWager = (data: { userId: number; amount: number }) => {
       // Handle pong wager deduction (when games start)
       if (data.userId === user.id) {
-        setUser((prevUser) =>
-          prevUser
-            ? {
-                ...prevUser,
-                muskBucks: prevUser.muskBucks - data.amount,
-              }
-            : null,
-        );
+        // Use React 19's useOptimistic for immediate wager deduction
+        startTransition(() => {
+          optimisticUpdateUser({
+            type: 'bet',
+            payload: { amount: data.amount },
+          });
+        });
         // Refresh from server to ensure accuracy
         refreshUser();
       }
@@ -249,14 +289,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const handlePongPayout = (data: { userId: number; payout: number }) => {
       // Handle pong game payouts (when games end)
       if (data.userId === user.id) {
-        setUser((prevUser) =>
-          prevUser
-            ? {
-                ...prevUser,
-                muskBucks: prevUser.muskBucks + data.payout,
-              }
-            : null,
-        );
+        // Use React 19's useOptimistic for immediate payout update
+        startTransition(() => {
+          optimisticUpdateUser({
+            type: 'payout',
+            payload: { amount: data.payout },
+          });
+        });
         // Refresh from server to ensure accuracy
         refreshUser();
       }
@@ -281,7 +320,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       socket.off('pongPayout', handlePongPayout);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [user?.id, user?.muskBucks, refreshUser, refreshUserBalance]);
+  }, [user?.id, user?.muskBucks, refreshUser, refreshUserBalance, optimisticUpdateUser]);
 
   return (
     <AuthContext.Provider

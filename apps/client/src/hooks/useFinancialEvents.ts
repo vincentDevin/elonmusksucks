@@ -5,7 +5,7 @@
 // -----------------------------------------------------------------------------
 
 import { useState, useCallback, useEffect } from 'react';
-import { useEventBus } from '../contexts/EventBusContext';
+import { useEventBusCore } from '../contexts/EventBusCoreContext';
 import { useAuth } from '../contexts/AuthContext';
 import { REDIS_CHANNELS } from '../types/events';
 
@@ -40,7 +40,7 @@ export interface FinancialMetrics {
 }
 
 export function useFinancialEvents() {
-  const { subscribe } = useEventBus();
+  const { subscribe } = useEventBusCore();
   const { user, updateUser } = useAuth();
   const [financialAlerts, setFinancialAlerts] = useState<FinancialAlert[]>([]);
   const [metrics, setMetrics] = useState<FinancialMetrics>({

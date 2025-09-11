@@ -13,7 +13,7 @@ import {
   useMemo,
   type ReactNode,
 } from 'react';
-import { useEventBus, useSocketEvent } from './EventBusContext';
+import { useSocketEvent } from './EventBusCoreContext';
 import { useSocket } from './SocketContext';
 import { useAuth } from './AuthContext';
 import { REDIS_CHANNELS } from '../types/events';
@@ -55,7 +55,6 @@ const ChatContext = createContext<ChatCtx | undefined>(undefined);
 /* ---------- Provider ---------- */
 export function ChatProvider({ children }: { children: ReactNode }) {
   const socket = useSocket();
-  const { emit } = useEventBus();
   const { user } = useAuth();
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);

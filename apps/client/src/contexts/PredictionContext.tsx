@@ -13,6 +13,8 @@ import {
   useState,
   useMemo,
   useRef,
+  startTransition,
+  useOptimistic,
   type ReactNode,
 } from 'react';
 import {
@@ -53,8 +55,85 @@ const PredictionCtx = createContext<Ctx | undefined>(undefined);
 export function PredictionProvider({ children }: { children: ReactNode }) {
   const socket = useSocket();
   const { refreshUser } = useAuth();
-  const optimisticBetsRef = useRef<Map<string, any>>(new Map());
-  const [predictions, setPredictions] = useState<PredictionView[]>([]);
+  const [basePredictions, setBasePredictions] = useState<PredictionView[]>([]);
+  const [predictions, optimisticUpdatePredictions] = useOptimistic(
+    basePredictions,
+    (
+      current: PredictionView[],
+      action: {
+        type:
+          | 'placeBet'
+          | 'placeParlay'
+          | 'revertBet'
+          | 'revertParlay'
+          | 'createPrediction'
+          | 'revertPrediction';
+        payload: any;
+      },
+    ) => {
+      switch (action.type) {
+        case 'placeBet':
+          return current.map((pred) => ({
+            ...pred,
+            options:
+              pred.options?.map((opt) =>
+                opt.id === action.payload.optionId
+                  ? {
+                      ...opt,
+                      userBet: action.payload.optimisticBet,
+                      totalBets: ((opt as ExtendedOption).totalBets || 0) + 1,
+                    }
+                  : opt,
+              ) || [],
+          }));
+        case 'revertBet':
+          return current.map((pred) => ({
+            ...pred,
+            options:
+              pred.options?.map((opt) =>
+                opt.id === action.payload.optionId && (opt as ExtendedOption).userBet?.isOptimistic
+                  ? {
+                      ...opt,
+                      userBet: undefined,
+                      totalBets: Math.max(0, ((opt as ExtendedOption).totalBets || 0) - 1),
+                    }
+                  : opt,
+              ) || [],
+          }));
+        case 'placeParlay':
+          // Optimistically update all prediction legs with parlay data
+          const { parlay } = action.payload;
+          return current.map((pred) => {
+            const hasLegInPrediction = parlay.legs.some((leg: any) =>
+              pred.options?.some((opt) => opt.id === leg.optionId),
+            );
+            if (hasLegInPrediction) {
+              return {
+                ...pred,
+                parlayLegs: [...(pred.parlayLegs ?? []), parlay],
+              };
+            }
+            return pred;
+          });
+        case 'revertParlay':
+          // Remove optimistic parlay legs on error
+          return current.map((pred) => ({
+            ...pred,
+            parlayLegs: pred.parlayLegs?.filter((leg) => !(leg as any).isOptimistic) ?? [],
+          }));
+        case 'createPrediction':
+          // Add optimistic prediction to the beginning of the list
+          const { prediction } = action.payload;
+          return [prediction, ...current];
+        case 'revertPrediction':
+          // Remove optimistic prediction on error
+          const { predictionId } = action.payload;
+          return current.filter((pred) => !(pred as any).isOptimistic || pred.id !== predictionId);
+        default:
+          return current;
+      }
+    },
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
@@ -66,7 +145,7 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     try {
       const data = await getPredictions();
-      setPredictions(data);
+      setBasePredictions(data);
     } catch (err: any) {
       setError(err);
     } finally {
@@ -80,13 +159,13 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
 
   // ── Live socket updates ───────────────────────────────────────────────────
   useEffect(() => {
-    const onCreated = (p: PredictionView) => setPredictions((prev) => [p, ...prev]);
+    const onCreated = (p: PredictionView) => setBasePredictions((prev) => [p, ...prev]);
     const onResolved = (p: PredictionView) =>
-      setPredictions((prev) => prev.map((x) => (x.id === p.id ? p : x)));
+      setBasePredictions((prev) => prev.map((x) => (x.id === p.id ? p : x)));
 
     const onBet = (bet: BetWithUser) => {
       setLatestBet(bet);
-      setPredictions((prev) =>
+      setBasePredictions((prev) =>
         prev.map((pred) =>
           pred.id === bet.predictionId ? { ...pred, bets: [...(pred.bets ?? []), bet] } : pred,
         ),
@@ -95,7 +174,7 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
 
     const onParlay = (leg: ParlayLegWithUser & { predictionId: number }) => {
       setLatestParlay(leg);
-      setPredictions((prev) =>
+      setBasePredictions((prev) =>
         prev.map((p) =>
           p.id === leg.predictionId ? { ...p, parlayLegs: [...(p.parlayLegs ?? []), leg] } : p,
         ),
@@ -117,7 +196,7 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
       console.log('🎯 Enhanced odds updated for prediction:', data.predictionId, data);
 
       // Update the specific prediction with new odds and market status
-      setPredictions((prev) =>
+      setBasePredictions((prev) =>
         prev.map((p) => {
           if (p.id === data.predictionId) {
             const updatedOptions = p.options.map((option: any) => {
@@ -150,16 +229,68 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
   const createPrediction = useCallback(
     async (input: CreatePredictionPayload) => {
       setLoading(true);
+
+      // Create optimistic prediction for immediate UI feedback
+      const optimisticPredictionId = Math.floor(Date.now() / 1000); // Temporary ID
+      const optimisticPrediction: PredictionView = {
+        id: optimisticPredictionId,
+        title: input.title,
+        description: input.description,
+        category: input.category,
+        type: input.type,
+        threshold: input.threshold,
+        expiresAt: input.expiresAt,
+        resolved: false,
+        approved: false,
+        resolvedAt: null,
+        winningOptionId: null,
+        viewCount: 0,
+        firstCorrectBetUserId: null,
+        resolvedWithinHour: null,
+        createdAt: new Date(),
+        creatorId: 0, // Will be set by server
+        options: input.options.map((opt, index) => ({
+          id: optimisticPredictionId * 10 + index, // Temporary ID
+          label: opt.label,
+          odds: opt.odds,
+          predictionId: optimisticPredictionId,
+          createdAt: new Date(),
+        })),
+        bets: [],
+        parlayLegs: [],
+        sourceLinks: [],
+        isOptimistic: true, // Mark as optimistic for potential rollback
+      };
+
+      // Apply optimistic update within startTransition
+      startTransition(() => {
+        optimisticUpdatePredictions({
+          type: 'createPrediction',
+          payload: {
+            prediction: optimisticPrediction,
+          },
+        });
+      });
+
       try {
-        await createPredictionApi(input); // if you have helper, else call fetch.
-        await fetchAll();
+        await createPredictionApi(input);
+        await fetchAll(); // This will replace optimistic prediction with real data
       } catch (err: any) {
         setError(err);
+        // Revert optimistic prediction on error
+        startTransition(() => {
+          optimisticUpdatePredictions({
+            type: 'revertPrediction',
+            payload: {
+              predictionId: optimisticPredictionId,
+            },
+          });
+        });
       } finally {
         setLoading(false);
       }
     },
-    [fetchAll],
+    [fetchAll, optimisticUpdatePredictions],
   );
 
   // ── Bet/parlay helpers via socketRequest ──────────────────────────────────
@@ -167,7 +298,7 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
     async (payload: { optionId: number; amount: number }) => {
       console.log('PredictionContext placeBet called', payload);
 
-      // Create optimistic bet for immediate UI feedback
+      // Create optimistic bet for immediate UI feedback using React 19 useOptimistic
       const optimisticBetId = `optimistic_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       const optimisticBet = {
         id: optimisticBetId,
@@ -178,36 +309,25 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
         isOptimistic: true,
       };
 
-      // Store optimistic bet for rollback if needed
-      optimisticBetsRef.current.set(optimisticBetId, optimisticBet);
-
-      // Optimistically update predictions state
-      setPredictions((prev) =>
-        prev.map((pred) => ({
-          ...pred,
-          options:
-            pred.options?.map((opt) =>
-              opt.id === payload.optionId
-                ? {
-                    ...opt,
-                    userBet: optimisticBet,
-                    totalBets: ((opt as ExtendedOption).totalBets || 0) + 1,
-                  }
-                : opt,
-            ) || [],
-        })),
-      );
+      // Apply optimistic update using React 19's useOptimistic within startTransition
+      startTransition(() => {
+        optimisticUpdatePredictions({
+          type: 'placeBet',
+          payload: {
+            optionId: payload.optionId,
+            optimisticBet,
+          },
+        });
+      });
 
       try {
         const result = await socketRequest(REDIS_CHANNELS.BET_PLACE, payload);
         console.log('PredictionContext placeBet success', result);
 
-        // Clean up optimistic bet and replace with real data
-        optimisticBetsRef.current.delete(optimisticBetId);
-
         // Replace optimistic bet with real bet data if available
         if (result && typeof result === 'object' && 'bet' in result) {
-          setPredictions((prev) =>
+          console.log('Updating with real bet data from server:', result.bet);
+          setBasePredictions((prev) =>
             prev.map((pred) => ({
               ...pred,
               options:
@@ -216,36 +336,33 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
                 ) || [],
             })),
           );
+        } else {
+          console.log('Server response does not contain bet data, keeping optimistic state');
+          // The optimistic bet will be replaced when socket events arrive
         }
 
-        // Trigger user refresh to update balance and stats
+        // React 19 Optimization: Use startTransition for non-blocking user refresh
         // Note: AuthContext already handles optimistic updates via Socket.IO events
-        setTimeout(() => refreshUser(), 100);
+        startTransition(() => {
+          refreshUser();
+        });
       } catch (error) {
         console.error('PredictionContext placeBet error', error);
 
-        // Clean up optimistic bet and rollback optimistic update on error
-        optimisticBetsRef.current.delete(optimisticBetId);
-        setPredictions((prev) =>
-          prev.map((pred) => ({
-            ...pred,
-            options:
-              pred.options?.map((opt) =>
-                opt.id === payload.optionId && (opt as ExtendedOption).userBet?.isOptimistic
-                  ? {
-                      ...opt,
-                      userBet: undefined,
-                      totalBets: Math.max(0, ((opt as ExtendedOption).totalBets || 0) - 1),
-                    }
-                  : opt,
-              ) || [],
-          })),
-        );
+        // Revert optimistic update on error using React 19's useOptimistic
+        startTransition(() => {
+          optimisticUpdatePredictions({
+            type: 'revertBet',
+            payload: {
+              optionId: payload.optionId,
+            },
+          });
+        });
 
         throw error;
       }
     },
-    [refreshUser],
+    [refreshUser, optimisticUpdatePredictions],
   );
 
   const placeParlay = useCallback(
@@ -261,8 +378,15 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
         isOptimistic: true,
       };
 
-      // Store for potential rollback
-      optimisticBetsRef.current.set(optimisticParlayId, optimisticParlay);
+      // Apply optimistic update using React 19's useOptimistic within startTransition
+      startTransition(() => {
+        optimisticUpdatePredictions({
+          type: 'placeParlay',
+          payload: {
+            parlay: optimisticParlay,
+          },
+        });
+      });
 
       // Set latest parlay optimistically
       setLatestParlay(optimisticParlay as any);
@@ -270,28 +394,32 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
       try {
         const result = await socketRequest(REDIS_CHANNELS.PARLAY_PLACE, payload);
 
-        // Clean up optimistic parlay
-        optimisticBetsRef.current.delete(optimisticParlayId);
-
         // Replace with real parlay data if available
         if (result && typeof result === 'object' && 'parlay' in result) {
           setLatestParlay((result as any).parlay);
         }
 
-        // Trigger user refresh to update balance and stats
+        // React 19 Optimization: Use startTransition for non-blocking user refresh
         // Note: AuthContext already handles optimistic updates via Socket.IO events
-        setTimeout(() => refreshUser(), 100);
+        startTransition(() => {
+          refreshUser();
+        });
       } catch (error) {
         console.error('PredictionContext placeParlay error', error);
 
-        // Clean up optimistic parlay and rollback
-        optimisticBetsRef.current.delete(optimisticParlayId);
-        setLatestParlay(null);
+        // Revert optimistic update on error using React 19's useOptimistic
+        startTransition(() => {
+          optimisticUpdatePredictions({
+            type: 'revertParlay',
+            payload: {},
+          });
+        });
 
+        setLatestParlay(null);
         throw error;
       }
     },
-    [refreshUser],
+    [refreshUser, optimisticUpdatePredictions],
   );
 
   const value = useMemo<Ctx>(

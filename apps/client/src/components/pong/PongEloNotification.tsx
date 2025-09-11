@@ -8,7 +8,7 @@ import {
   FireIcon,
   ChartBarIcon,
 } from '@heroicons/react/24/outline';
-import { useSocketEvent } from '../../contexts/EventBusContext';
+import { useSocketEvent } from '../../contexts/EventBusCoreContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { REDIS_CHANNELS } from '../../types/events';
 
