@@ -381,54 +381,6 @@ export default function PongEloNotification() {
   );
 }
 
-// Mini version for embedding in other components
-export function PongEloMiniNotification() {
-  const [lastUpdate, setLastUpdate] = useState<EloUpdateEvent | null>(null);
-  const [show, setShow] = useState(false);
-  const { user } = useAuth();
-
-  // Handle Elo updates via EventBus
-  const handleEloUpdate = useCallback(
-    (data: EloUpdateEvent) => {
-      if (!user || data.userId !== user.id) return;
-
-      setLastUpdate(data);
-      setShow(true);
-
-      // Auto-hide after 5 seconds
-      setTimeout(() => setShow(false), 5000);
-    },
-    [user],
-  );
-
-  // Subscribe to Pong Elo updates via EventBus
-  useSocketEvent(REDIS_CHANNELS.PONG_ELO_UPDATE, handleEloUpdate);
-
-  if (!show || !lastUpdate) {
-    return null;
-  }
-
-  return (
-    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 animate-in slide-in-from-top duration-300">
-      <div className="flex items-center space-x-3">
-        <TrophyIcon className="w-5 h-5 text-blue-500" />
-        <div className="flex-1">
-          <div className="text-sm font-medium text-blue-800">
-            Elo Updated: {lastUpdate.oldElo} → {lastUpdate.newElo}
-          </div>
-          <div
-            className={`text-xs font-bold ${
-              lastUpdate.change > 0 ? 'text-green-600' : 'text-red-600'
-            }`}
-          >
-            {lastUpdate.change > 0 ? '+' : ''}
-            {lastUpdate.change} points
-          </div>
-        </div>
-        <button onClick={() => setShow(false)} className="text-blue-400 hover:text-blue-600">
-          <XMarkIcon className="w-4 h-4" />
-        </button>
-      </div>
-    </div>
-  );
-}
+// NOTE: PongEloMiniNotification component removed to prevent duplicate listeners
+// The main PongEloNotification component handles all Pong notifications
+// If a mini version is needed, it should reuse the same event subscriptions

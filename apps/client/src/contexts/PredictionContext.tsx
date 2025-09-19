@@ -26,13 +26,18 @@ import {
 import type { BetWithUser, ParlayLegWithUser, PublicPredictionOption } from '@ems/types';
 import { REDIS_CHANNELS } from '@ems/types';
 import { socketRequest } from '../lib/socketRequest';
+import { useEventBusCore } from './EventBusCoreContext';
+import type {
+  PredictionCreatedPayload,
+  PredictionResolvedPayload,
+  BetPlacedPayload,
+} from '@ems/types';
 
 // Extended option type with client-side properties
 type ExtendedOption = PublicPredictionOption & {
   userBet?: any;
   totalBets?: number;
 };
-import { useSocket } from './SocketContext';
 import { useAuth } from './AuthContext';
 
 // ---- Context shape ----
@@ -53,7 +58,7 @@ interface Ctx {
 const PredictionCtx = createContext<Ctx | undefined>(undefined);
 
 export function PredictionProvider({ children }: { children: ReactNode }) {
-  const socket = useSocket();
+  const { subscribe } = useEventBusCore();
   const { refreshUser } = useAuth();
   const [basePredictions, setBasePredictions] = useState<PredictionView[]>([]);
   const [predictions, optimisticUpdatePredictions] = useOptimistic(
@@ -142,12 +147,29 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
 
   // ── Initial fetch ─────────────────────────────────────────────────────────
   const fetchAll = useCallback(async () => {
+    console.log('[PredictionContext] Starting predictions fetch...');
     setLoading(true);
+    setError(null);
+
+    // Add timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      console.warn('[PredictionContext] Fetch timeout after 10s, using empty predictions');
+      setBasePredictions([]);
+      setLoading(false);
+      setError(new Error('Request timeout - predictions may be temporarily unavailable'));
+    }, 10000);
+
     try {
       const data = await getPredictions();
-      setBasePredictions(data);
+      clearTimeout(timeoutId);
+      console.log('[PredictionContext] Fetched predictions:', data?.length || 0);
+      setBasePredictions(data || []);
+      setError(null);
     } catch (err: any) {
+      clearTimeout(timeoutId);
+      console.error('[PredictionContext] Failed to fetch predictions:', err);
       setError(err);
+      setBasePredictions([]); // Set empty array on error to prevent infinite loading
     } finally {
       setLoading(false);
     }
@@ -157,81 +179,105 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
     fetchAll();
   }, [fetchAll]);
 
-  // ── Live socket updates ───────────────────────────────────────────────────
+  // ── Live EventBusCore updates ─────────────────────────────────────────────
   useEffect(() => {
-    const onCreated = (p: PredictionView) => setBasePredictions((prev) => [p, ...prev]);
-    const onResolved = (p: PredictionView) =>
-      setBasePredictions((prev) => prev.map((x) => (x.id === p.id ? p : x)));
+    const unsubscribers = [
+      // Prediction created events
+      subscribe(REDIS_CHANNELS.PREDICTION_CREATED, (p: PredictionCreatedPayload) => {
+        // Convert payload to PredictionView format (might need server updates)
+        setBasePredictions((prev) => [p as any, ...prev]);
+      }),
 
-    const onBet = (bet: BetWithUser) => {
-      setLatestBet(bet);
-      setBasePredictions((prev) =>
-        prev.map((pred) =>
-          pred.id === bet.predictionId ? { ...pred, bets: [...(pred.bets ?? []), bet] } : pred,
-        ),
-      );
-    };
+      // Prediction resolved events
+      subscribe(REDIS_CHANNELS.PREDICTION_RESOLVE, (p: PredictionResolvedPayload) => {
+        // Convert payload to PredictionView format (might need server updates)
+        setBasePredictions((prev) =>
+          prev.map((x) => (x.id === p.predictionId ? ({ ...x, ...p } as any) : x)),
+        );
+      }),
 
-    const onParlay = (leg: ParlayLegWithUser & { predictionId: number }) => {
-      setLatestParlay(leg);
-      setBasePredictions((prev) =>
-        prev.map((p) =>
-          p.id === leg.predictionId ? { ...p, parlayLegs: [...(p.parlayLegs ?? []), leg] } : p,
-        ),
-      );
-    };
+      // Bet placed events
+      subscribe(REDIS_CHANNELS.BET_PLACED, (betPayload: BetPlacedPayload) => {
+        // Note: BetPlacedPayload doesn't match BetWithUser structure
+        // Need server updates to provide proper payload structure
+        console.log('🎯 Bet placed event received:', betPayload);
+        // For now, refresh predictions to get updated data
+        fetchAll();
+      }),
 
-    // 🎮 Enhanced odds updates with excitement data
-    const onEnhancedOddsUpdate = (data: {
-      predictionId: number;
-      hotMarket: boolean;
-      options: Array<{
-        id: number;
-        odds: number;
-        label: string;
-        change: number;
-        changePercent: number;
-      }>;
-    }) => {
-      console.log('🎯 Enhanced odds updated for prediction:', data.predictionId, data);
+      // Parlay placed events
+      subscribe(REDIS_CHANNELS.PARLAY_PLACED, (parlayPayload: any) => {
+        // Note: Need proper payload type definition
+        console.log('🎯 Parlay placed event received:', parlayPayload);
+        // For now, refresh predictions to get updated data
+        fetchAll();
+      }),
 
-      // Update the specific prediction with new odds and market status
-      setBasePredictions((prev) =>
-        prev.map((p) => {
-          if (p.id === data.predictionId) {
-            const updatedOptions = p.options.map((option: any) => {
-              const updatedOption = data.options.find((opt: any) => opt.id === option.id);
-              return updatedOption ? { ...option, odds: updatedOption.odds } : option;
-            });
-            return { ...p, options: updatedOptions, hotMarket: data.hotMarket };
-          }
-          return p;
-        }),
-      );
-    };
+      // Enhanced odds updates
+      subscribe(
+        REDIS_CHANNELS.ODDS_UPDATE_ENHANCED,
+        (data: {
+          predictionId: number;
+          hotMarket: boolean;
+          options: Array<{
+            id: number;
+            odds: number;
+            label: string;
+            change: number;
+            changePercent: number;
+          }>;
+        }) => {
+          console.log('🎯 Enhanced odds updated for prediction:', data.predictionId, data);
 
-    socket.on('predictionCreated', onCreated);
-    socket.on('predictionResolved', onResolved);
-    socket.on('betPlaced', onBet);
-    socket.on('parlayPlaced', onParlay);
-    socket.on('oddsUpdatedEnhanced', onEnhancedOddsUpdate);
+          // Update the specific prediction with new odds and market status
+          setBasePredictions((prev) =>
+            prev.map((p) => {
+              if (p.id === data.predictionId) {
+                const updatedOptions = p.options.map((option: any) => {
+                  const updatedOption = data.options.find((opt: any) => opt.id === option.id);
+                  return updatedOption ? { ...option, odds: updatedOption.odds } : option;
+                });
+                return { ...p, options: updatedOptions, hotMarket: data.hotMarket };
+              }
+              return p;
+            }),
+          );
+        },
+      ),
+    ];
 
     return () => {
-      socket.off('predictionCreated', onCreated);
-      socket.off('predictionResolved', onResolved);
-      socket.off('betPlaced', onBet);
-      socket.off('parlayPlaced', onParlay);
-      socket.off('oddsUpdatedEnhanced', onEnhancedOddsUpdate);
+      unsubscribers.forEach((unsub) => unsub());
     };
-  }, [socket]);
+  }, [subscribe, fetchAll]);
 
   // ── Create prediction via REST (admin tool) ───────────────────────────────
   const createPrediction = useCallback(
     async (input: CreatePredictionPayload) => {
+      console.log('[PredictionContext] Creating prediction:', input);
       setLoading(true);
 
       // Create optimistic prediction for immediate UI feedback
       const optimisticPredictionId = Math.floor(Date.now() / 1000); // Temporary ID
+
+      // Determine final options based on type (matching server logic)
+      let finalOptions: Array<{ label: string }> = [];
+      if (input.type === 'binary') {
+        finalOptions = [{ label: 'Yes' }, { label: 'No' }];
+      } else if (input.type === 'over_under') {
+        if (input.threshold != null) {
+          finalOptions = [
+            { label: `Over ${input.threshold}` },
+            { label: `Under ${input.threshold}` },
+          ];
+        }
+      } else {
+        // For 'multiple' type, use provided options
+        finalOptions = input.options || [];
+      }
+
+      console.log('[PredictionContext] Final options for prediction:', finalOptions);
+
       const optimisticPrediction: PredictionView = {
         id: optimisticPredictionId,
         title: input.title,
@@ -249,10 +295,10 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
         resolvedWithinHour: null,
         createdAt: new Date(),
         creatorId: 0, // Will be set by server
-        options: input.options.map((opt, index) => ({
+        options: finalOptions.map((opt, index) => ({
           id: optimisticPredictionId * 10 + index, // Temporary ID
           label: opt.label,
-          odds: opt.odds,
+          odds: 2.0, // Default odds
           predictionId: optimisticPredictionId,
           createdAt: new Date(),
         })),

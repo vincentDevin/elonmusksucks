@@ -16,56 +16,71 @@ import PongEloNotification from './components/pong/PongEloNotification';
 import { AchievementCelebrationContainer } from './components/achievements/AchievementCelebrationContainer';
 import EventFlowTest from './components/debug/EventFlowTest';
 import { EventMetricsDashboard } from './components/debug/EventMetricsDashboard';
+import { LeakDetectionPanel } from './components/debug/LeakDetectionPanel';
 import EventHandlers from './components/EventHandlers';
+import HydrationMarker from './components/HydrationMarker';
+import { useListenerMonitoring } from './hooks/useListenerMonitoring';
+
+// Development-only listener monitoring component
+function ListenerMonitor() {
+  useListenerMonitoring();
+  return null; // No UI needed
+}
 
 // Inner component that has access to auth context
 function AppContent() {
   const { user } = useAuth();
 
   return (
-    <SocketProvider>
-      <EventBusCoreProvider>
-        {/* Metrics context only for debug components - isolated re-renders */}
-        <EventBusMetricsProvider>
-          <UnifiedThemeProvider userId={user?.id}>
-            {/* domain state that depends on socket/auth */}
-            <ActivityProvider>
-              <AchievementProvider>
-                <PredictionProvider>
-                  <ParlayProvider>
-                    <ChatProvider>
-                      {/* Central event handlers for all 73+ Redis channels */}
-                      <EventHandlers />
-                      <AppRoutes />
-                      {/* Global Pong Elo notifications */}
-                      <PongEloNotification />
-                      {/* Global Achievement celebrations */}
-                      <AchievementCelebrationContainer />
-                      {/* Development tools - only in development */}
-                      {process.env.NODE_ENV === 'development' && (
-                        <>
-                          <EventFlowTest />
-                          <EventMetricsDashboard />
-                        </>
-                      )}
-                    </ChatProvider>
-                  </ParlayProvider>
-                </PredictionProvider>
-              </AchievementProvider>
-            </ActivityProvider>
-          </UnifiedThemeProvider>
-        </EventBusMetricsProvider>
-      </EventBusCoreProvider>
-    </SocketProvider>
+    <>
+      {/* Metrics context only for debug components - isolated re-renders */}
+      <EventBusMetricsProvider>
+        <UnifiedThemeProvider userId={user?.id}>
+          {/* domain state that depends on socket/auth */}
+          <ActivityProvider>
+            <AchievementProvider>
+              <PredictionProvider>
+                <ParlayProvider>
+                  <ChatProvider>
+                    {/* Hydration marker to enable safe event processing */}
+                    <HydrationMarker />
+                    {/* Central event handlers for all 73+ Redis channels */}
+                    <EventHandlers />
+                    <AppRoutes />
+                    {/* Global Pong Elo notifications */}
+                    <PongEloNotification />
+                    {/* Global Achievement celebrations */}
+                    <AchievementCelebrationContainer />
+                    {/* Development tools - only in development */}
+                    {(import.meta.env.DEV || process.env.NODE_ENV === 'development') && (
+                      <>
+                        <ListenerMonitor />
+                        {/* <EventFlowTest /> - DISABLED to reduce duplicate listeners */}
+                        <EventMetricsDashboard />
+                        <LeakDetectionPanel />
+                      </>
+                    )}
+                  </ChatProvider>
+                </ParlayProvider>
+              </PredictionProvider>
+            </AchievementProvider>
+          </ActivityProvider>
+        </UnifiedThemeProvider>
+      </EventBusMetricsProvider>
+    </>
   );
 }
 
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <AppContent />
-      </AuthProvider>
+      <SocketProvider>
+        <EventBusCoreProvider>
+          <AuthProvider>
+            <AppContent />
+          </AuthProvider>
+        </EventBusCoreProvider>
+      </SocketProvider>
     </BrowserRouter>
   );
 }

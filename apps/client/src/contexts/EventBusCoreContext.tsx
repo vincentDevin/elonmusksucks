@@ -15,6 +15,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useSocket } from './SocketContext';
+import { hydrationWatermark } from '../lib/hydrationWatermark';
 import {
   REDIS_CHANNELS,
   EVENT_SYSTEM_CONFIG,
@@ -107,8 +108,23 @@ export function EventBusCoreProvider({ children }: { children: ReactNode }) {
 
         // Create socket listener for this event (single listener per event)
         const socketListener = (payload: any) => {
+          // HYDRATION SAFETY: Route events through watermark to prevent pre-boot races
+          if (hydrationWatermark.isHydrated()) {
+            // Process immediately if hydrated
+            processEventHandlers(event, payload);
+          } else {
+            // Queue for post-hydration processing
+            hydrationWatermark.registerEventProcessor(event, (queuedPayload: any) => {
+              processEventHandlers(event, queuedPayload);
+            });
+            hydrationWatermark.processEvent(event, payload);
+          }
+        };
+
+        // Extract event processing logic for reuse in hydration watermark
+        const processEventHandlers = (eventName: string, payload: any) => {
           // Process handlers by priority
-          const handlers = handlersRef.current.get(event);
+          const handlers = handlersRef.current.get(eventName as RedisChannel);
           if (!handlers || handlers.size === 0) return;
 
           // Sort handlers by priority (this is where React 19 startTransition will help)

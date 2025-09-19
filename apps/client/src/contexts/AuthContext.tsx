@@ -19,7 +19,17 @@ import {
 import type { User } from '../api/auth';
 import type { ReactNode } from 'react';
 import { setAccessToken, setAuthFailureCallback, setTokenRefreshCallback } from '../api/axios';
-import { socket } from '../lib/socket';
+import { useEventBusCore } from './EventBusCoreContext';
+import { useSocket } from './SocketContext';
+import { REDIS_CHANNELS } from '../types/events';
+import type {
+  BalanceUpdatePayload,
+  BetPlacedPayload,
+  BetResolvedPayload,
+  PayoutCompletedPayload,
+  PongWagerPayload,
+  PongPayoutPayload,
+} from '@ems/types';
 
 interface AuthContextType {
   accessToken: string | null;
@@ -37,6 +47,8 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { subscribe } = useEventBusCore();
+  const socket = useSocket();
   const [accessToken, setToken] = useState<string | null>(null);
   const [baseUser, setBaseUser] = useState<User | null>(null);
   const [user, optimisticUpdateUser] = useOptimistic(
@@ -184,9 +196,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
   }, [clearAuth, handleTokenRefresh]);
 
-  // Listen for balance-affecting events to update user balance in real-time
+  // Handle socket authentication when token changes
   useEffect(() => {
-    if (!user?.id || !socket) return;
+    if (socket) {
+      socket.auth = accessToken ? { token: accessToken } : {};
+      // Reconnect with new auth if socket is already connected
+      if (socket.connected) {
+        socket.disconnect();
+        socket.connect();
+      }
+    }
+  }, [socket, accessToken]);
+
+  // Listen for balance-affecting events to update user balance in real-time using EventBusCore
+  useEffect(() => {
+    if (!user?.id) return;
 
     // Only refresh balance when user navigates back to the app (not during gameplay)
     const handleVisibilityChange = () => {
@@ -198,129 +222,84 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    const handleUserBalanceUpdate = (data: { userId: number; newBalance: number }) => {
-      // Only update if this balance change belongs to the current user
-      if (data.userId === user.id) {
-        // Use React 19's useOptimistic for balance refresh
-        startTransition(() => {
-          optimisticUpdateUser({
-            type: 'refresh',
-            payload: { newBalance: data.newBalance },
+    // EventBusCore subscriptions - properly typed with new payload interfaces
+    const unsubscribers = [
+      // Balance updates
+      subscribe(REDIS_CHANNELS.BALANCE_UPDATE, (data: BalanceUpdatePayload) => {
+        if (data.userId === user.id) {
+          startTransition(() => {
+            optimisticUpdateUser({
+              type: 'refresh',
+              payload: { newBalance: data.newBalance },
+            });
           });
-        });
-      }
-    };
+        }
+      }),
 
-    const handleBetPlaced = (betData: { user?: { id: number }; amount?: number }) => {
-      // Only update if this bet belongs to the current user
-      if (betData.user?.id === user.id && betData.amount) {
-        // Use React 19's useOptimistic for immediate balance update
-        startTransition(() => {
-          optimisticUpdateUser({
-            type: 'bet',
-            payload: { amount: betData.amount },
-          });
-        });
-        // Refresh from server to ensure accuracy
+      // Bet placed events
+      subscribe(REDIS_CHANNELS.BET_PLACED, (data: BetPlacedPayload) => {
+        // Note: BetPlacedPayload doesn't have userId, might need server update
+        // For now, refresh user to get accurate balance
         refreshUser();
-      }
-    };
+      }),
 
-    const handleParlayPlaced = (parlayData: { user?: { id: number }; amount?: number }) => {
-      // Only update if this parlay belongs to the current user
-      if (parlayData.user?.id === user.id && parlayData.amount) {
-        // Use React 19's useOptimistic for immediate balance update
-        startTransition(() => {
-          optimisticUpdateUser({
-            type: 'parlay',
-            payload: { amount: parlayData.amount },
-          });
-        });
-        // Refresh from server to ensure accuracy
+      // Parlay placed events
+      subscribe(REDIS_CHANNELS.PARLAY_PLACED, (data: any) => {
+        // Note: Need to check payload structure, might need server update
         refreshUser();
-      }
-    };
+      }),
 
-    const handleBetResolved = (data: { userId: number; payout?: number; amount?: number }) => {
-      // Handle bet resolution payouts
-      if (data.userId === user.id && data.payout) {
-        // Use React 19's useOptimistic for immediate payout update
-        startTransition(() => {
-          optimisticUpdateUser({
-            type: 'payout',
-            payload: { amount: data.payout },
-          });
-        });
-        // Refresh from server to ensure accuracy
+      // Bet resolved events
+      subscribe(REDIS_CHANNELS.BET_RESOLVED, (data: BetResolvedPayload) => {
+        // Note: BetResolvedPayload doesn't have userId, need server updates
         refreshUser();
-      }
-    };
+      }),
 
-    const handleParlayResolved = (data: { userId: number; payout?: number }) => {
-      // Handle parlay resolution payouts
-      if (data.userId === user.id && data.payout) {
-        // Use React 19's useOptimistic for immediate payout update
-        startTransition(() => {
-          optimisticUpdateUser({
-            type: 'payout',
-            payload: { amount: data.payout },
+      // Parlay resolved events
+      subscribe(REDIS_CHANNELS.PARLAY_RESOLVED, (data: PayoutCompletedPayload) => {
+        if (data.userId === user.id && data.amount) {
+          startTransition(() => {
+            optimisticUpdateUser({
+              type: 'payout',
+              payload: { amount: data.amount },
+            });
           });
-        });
-        // Refresh from server to ensure accuracy
-        refreshUser();
-      }
-    };
+          refreshUser();
+        }
+      }),
 
-    const handlePongWager = (data: { userId: number; amount: number }) => {
-      // Handle pong wager deduction (when games start)
-      if (data.userId === user.id) {
-        // Use React 19's useOptimistic for immediate wager deduction
-        startTransition(() => {
-          optimisticUpdateUser({
-            type: 'bet',
-            payload: { amount: data.amount },
+      // Pong wager events
+      subscribe(REDIS_CHANNELS.PONG_WAGER, (data: PongWagerPayload) => {
+        if (data.userId === user.id) {
+          startTransition(() => {
+            optimisticUpdateUser({
+              type: 'bet',
+              payload: { amount: data.amount },
+            });
           });
-        });
-        // Refresh from server to ensure accuracy
-        refreshUser();
-      }
-    };
+          refreshUser();
+        }
+      }),
 
-    const handlePongPayout = (data: { userId: number; payout: number }) => {
-      // Handle pong game payouts (when games end)
-      if (data.userId === user.id) {
-        // Use React 19's useOptimistic for immediate payout update
-        startTransition(() => {
-          optimisticUpdateUser({
-            type: 'payout',
-            payload: { amount: data.payout },
+      // Pong payout events
+      subscribe(REDIS_CHANNELS.PONG_PAYOUT, (data: PongPayoutPayload) => {
+        if (data.userId === user.id) {
+          startTransition(() => {
+            optimisticUpdateUser({
+              type: 'payout',
+              payload: { amount: data.payout },
+            });
           });
-        });
-        // Refresh from server to ensure accuracy
-        refreshUser();
-      }
-    };
-
-    // Listen for various balance-affecting events
-    socket.on('userBalanceUpdate', handleUserBalanceUpdate);
-    socket.on('betPlaced', handleBetPlaced);
-    socket.on('parlayPlaced', handleParlayPlaced);
-    socket.on('betResolved', handleBetResolved);
-    socket.on('parlayResolved', handleParlayResolved);
-    socket.on('pongWager', handlePongWager);
-    socket.on('pongPayout', handlePongPayout);
+          refreshUser();
+        }
+      }),
+    ];
 
     return () => {
-      socket.off('userBalanceUpdate', handleUserBalanceUpdate);
-      socket.off('betPlaced', handleBetPlaced);
-      socket.off('parlayPlaced', handleParlayPlaced);
-      socket.off('betResolved', handleBetResolved);
-      socket.off('parlayResolved', handleParlayResolved);
-      socket.off('pongWager', handlePongWager);
-      socket.off('pongPayout', handlePongPayout);
+      unsubscribers.forEach((unsub) => unsub());
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [user?.id, user?.muskBucks, refreshUser, refreshUserBalance, optimisticUpdateUser]);
+  }, [user?.id, subscribe, refreshUser, refreshUserBalance, optimisticUpdateUser]);
 
   return (
     <AuthContext.Provider

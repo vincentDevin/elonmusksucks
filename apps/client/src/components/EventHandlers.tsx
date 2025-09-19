@@ -6,6 +6,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import EventHandlerErrorBoundary from './EventHandlerErrorBoundary';
 
 // Import notification/alert-only event handler hooks (Smart Hybrid approach)
 // Note: Chat, Prediction, Achievement, Activity, Parlay use dedicated contexts for state management
@@ -16,19 +17,31 @@ import { useSocialEvents } from '../hooks/useSocialEvents';
 import { useLeaderboardEvents } from '../hooks/useLeaderboardEvents';
 import { useTimelineEvents } from '../hooks/useTimelineEvents';
 
-// Notification display component for debugging (optional)
-interface NotificationDisplayProps {
-  show: boolean;
+// EMERGENCY FIX: Updated to prevent duplicate hook calls
+interface NotificationDisplayData {
+  bettingEvents: any;
+  pongEvents: any;
+  financialEvents: any;
+  socialEvents: any;
+  leaderboardEvents: any;
+  timelineEvents: any;
 }
 
-function NotificationDisplay({ show }: NotificationDisplayProps) {
-  // Get notification/alert data from hooks (Smart Hybrid approach)
-  const bettingEvents = useBettingEvents();
-  const pongEvents = usePongEvents();
-  const financialEvents = useFinancialEvents();
-  const socialEvents = useSocialEvents();
-  const leaderboardEvents = useLeaderboardEvents();
-  const timelineEvents = useTimelineEvents();
+interface NotificationDisplayProps {
+  show: boolean;
+  eventData: NotificationDisplayData;
+}
+
+function NotificationDisplay({ show, eventData }: NotificationDisplayProps) {
+  // EMERGENCY FIX: Receive data as props instead of calling hooks again
+  const {
+    bettingEvents,
+    pongEvents,
+    financialEvents,
+    socialEvents,
+    leaderboardEvents,
+    timelineEvents,
+  } = eventData;
 
   if (!show) return null;
 
@@ -132,11 +145,11 @@ function NotificationDisplay({ show }: NotificationDisplayProps) {
 }
 
 // Main event handlers component (Smart Hybrid approach)
-export default function EventHandlers() {
+function EventHandlersCore() {
   const { user } = useAuth();
   const [showNotifications, setShowNotifications] = useState(false);
 
-  // Initialize notification/alert-only event handler hooks
+  // Initialize notification/alert-only event handler hooks with error boundaries
   // State management handled by dedicated contexts: Chat, Prediction, Achievement, Activity, Parlay
   const bettingEvents = useBettingEvents();
   const pongEvents = usePongEvents();
@@ -197,7 +210,38 @@ export default function EventHandlers() {
       </div>
 
       {/* Debug notification display (Ctrl+Shift+E to toggle) */}
-      <NotificationDisplay show={showNotifications} />
+      <NotificationDisplay
+        show={showNotifications}
+        eventData={{
+          bettingEvents,
+          pongEvents,
+          financialEvents,
+          socialEvents,
+          leaderboardEvents,
+          timelineEvents,
+        }}
+      />
     </>
+  );
+}
+
+// Export wrapped with comprehensive error boundaries
+export default function EventHandlers() {
+  return (
+    <EventHandlerErrorBoundary eventType="EventHandlers">
+      <EventHandlerErrorBoundary eventType="BettingEvents">
+        <EventHandlerErrorBoundary eventType="PongEvents">
+          <EventHandlerErrorBoundary eventType="FinancialEvents">
+            <EventHandlerErrorBoundary eventType="SocialEvents">
+              <EventHandlerErrorBoundary eventType="LeaderboardEvents">
+                <EventHandlerErrorBoundary eventType="TimelineEvents">
+                  <EventHandlersCore />
+                </EventHandlerErrorBoundary>
+              </EventHandlerErrorBoundary>
+            </EventHandlerErrorBoundary>
+          </EventHandlerErrorBoundary>
+        </EventHandlerErrorBoundary>
+      </EventHandlerErrorBoundary>
+    </EventHandlerErrorBoundary>
   );
 }

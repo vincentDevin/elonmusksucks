@@ -8,6 +8,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { useEventBusCore } from '../contexts/EventBusCoreContext';
 import { useAuth } from '../contexts/AuthContext';
 import { REDIS_CHANNELS } from '../types/events';
+import { safeEventHandler } from '../lib/safeEventHandler';
 
 // Betting alert interface
 export interface BettingAlert {
@@ -115,49 +116,54 @@ export function useBettingEvents() {
 
     const unsubscribers = [
       // Bet placement events
-      subscribe(REDIS_CHANNELS.BET_PLACE, (payload: any) => {
-        if (payload.userId === user.id) {
-          console.log('[BettingEvents] Bet placed:', payload);
+      subscribe(
+        REDIS_CHANNELS.BET_PLACE,
+        safeEventHandler(
+          (payload: any) => {
+            if (payload.userId === user.id) {
+              console.log('[BettingEvents] Bet placed:', payload);
 
-          addAlert({
-            type: 'bet_placed',
-            title: `🎯 Bet Placed`,
-            description: `Bet of ${payload.amount.toLocaleString()} Musk Bucks placed successfully!`,
-            amount: payload.amount,
-            timestamp: payload.timestamp || new Date().toISOString(),
-            severity: 'info',
-            icon: '🎲',
-            duration: 4000,
-            predictionId: payload.predictionId,
-            betId: payload.betId,
-            actions: [
-              {
-                label: 'View Bet',
-                action: () => (window.location.href = `/dashboard?bet=${payload.betId}`),
-                variant: 'primary',
-              },
-            ],
-          });
+              addAlert({
+                type: 'bet_placed',
+                title: `🎯 Bet Placed`,
+                description: `Bet of ${payload.amount.toLocaleString()} Musk Bucks placed successfully!`,
+                amount: payload.amount,
+                timestamp: payload.timestamp || new Date().toISOString(),
+                severity: 'info',
+                icon: '🎲',
+                duration: 4000,
+                predictionId: payload.predictionId,
+                betId: payload.betId,
+                actions: [
+                  {
+                    label: 'View Bet',
+                    action: () => (window.location.href = `/dashboard?bet=${payload.betId}`),
+                    variant: 'primary',
+                  },
+                ],
+              });
 
-          // Update metrics
-          updateMetrics({
-            totalBets: metrics.totalBets + 1,
-            totalWagered: metrics.totalWagered + payload.amount,
-          });
+              // Update metrics
+              updateMetrics({
+                totalBets: metrics.totalBets + 1,
+                totalWagered: metrics.totalWagered + payload.amount,
+              });
 
-          // Update user balance optimistically
-          if (updateUser && payload.newBalance !== undefined) {
-            updateUser({ ...user, muskBucks: payload.newBalance });
-          }
-        }
-      }),
+              // Update user balance optimistically
+              if (updateUser && payload.newBalance !== undefined) {
+                updateUser({ ...user, muskBucks: payload.newBalance });
+              }
+            }
+          },
+          { eventType: 'BET_PLACE', userId: user.id },
+        ),
+      ),
 
-      subscribe(REDIS_CHANNELS.BET_PLACED, (payload: any) => {
-        if (payload.userId === user.id) {
-          console.log('[BettingEvents] Bet placed confirmation:', payload);
-          // This is the confirmed version of BET_PLACE
-        }
-      }),
+      // NOTE: Removed REDIS_CHANNELS.BET_PLACED subscription to reduce duplicate listeners
+      // This was only doing console logging which is redundant since:
+      // - AuthContext handles balance updates
+      // - PredictionContext handles prediction data updates
+      // - User feedback is provided through UI notifications
 
       // Bet win events
       subscribe(REDIS_CHANNELS.BET_WON, (payload: any) => {

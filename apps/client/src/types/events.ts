@@ -22,6 +22,9 @@ import type {
   UserLoginPayload,
   UserFollowPayload,
   PredictionCreatedPayload,
+  BalanceUpdatePayload,
+  PongWagerPayload,
+  PongPayoutPayload,
 } from '@ems/types';
 
 // Define ChatMessagePayload locally since it's not in shared types yet
@@ -117,9 +120,15 @@ export interface EventPayloadMap {
   // User Events
   [REDIS_CHANNELS.USER_FOLLOWED]: UserFollowPayload;
   [REDIS_CHANNELS.USER_DAILY_LOGIN]: UserLoginPayload;
+  [REDIS_CHANNELS.BALANCE_UPDATE]: BalanceUpdatePayload;
+  [REDIS_CHANNELS.BET_RESOLVED]: BetResolvedPayload;
+  [REDIS_CHANNELS.PARLAY_RESOLVED]: PayoutCompletedPayload;
+  [REDIS_CHANNELS.PONG_WAGER]: PongWagerPayload;
+  [REDIS_CHANNELS.PONG_PAYOUT]: PongPayoutPayload;
 
   // Timeline Events
   [REDIS_CHANNELS.TIMELINE_ARTICLES_NEW]: TimelineUpdatePayload;
+  [REDIS_CHANNELS.TIMELINE_ARTICLES_APPROVED]: TimelineUpdatePayload;
   [REDIS_CHANNELS.FEED_ARTICLE_NEW]: TimelineUpdatePayload;
 
   // Chat Events
@@ -129,6 +138,8 @@ export interface EventPayloadMap {
   [REDIS_CHANNELS.CHAT_USERS_ONLINE]: any;
   [REDIS_CHANNELS.CHAT_JOIN]: any;
   [REDIS_CHANNELS.CHAT_LEAVE]: any;
+  [REDIS_CHANNELS.CHAT_HISTORY]: ChatMessagePayload[];
+  [REDIS_CHANNELS.CHAT_ERROR]: { error: string; code?: string; timestamp: string };
 
   // Financial Events
   [REDIS_CHANNELS.BALANCE_MILESTONE_REACHED]: {
@@ -207,6 +218,11 @@ export const EVENT_CATEGORIES = {
     REDIS_CHANNELS.MASSIVE_LOSS_DETECTED,
     REDIS_CHANNELS.COMEBACK_DETECTED,
     REDIS_CHANNELS.PAYOUT_COMPLETED,
+    REDIS_CHANNELS.BALANCE_UPDATE,
+    REDIS_CHANNELS.BET_RESOLVED,
+    REDIS_CHANNELS.PARLAY_RESOLVED,
+    REDIS_CHANNELS.PONG_WAGER,
+    REDIS_CHANNELS.PONG_PAYOUT,
   ],
 
   SOCIAL: [
@@ -242,6 +258,8 @@ export const EVENT_CATEGORIES = {
     REDIS_CHANNELS.CHAT_USERS_ONLINE,
     REDIS_CHANNELS.CHAT_JOIN,
     REDIS_CHANNELS.CHAT_LEAVE,
+    REDIS_CHANNELS.CHAT_HISTORY,
+    REDIS_CHANNELS.CHAT_ERROR,
   ],
 
   ACTIVITY: [
@@ -253,6 +271,7 @@ export const EVENT_CATEGORIES = {
 
   TIMELINE: [
     REDIS_CHANNELS.TIMELINE_ARTICLES_NEW,
+    REDIS_CHANNELS.TIMELINE_ARTICLES_APPROVED,
     REDIS_CHANNELS.FEED_ARTICLE_NEW,
     REDIS_CHANNELS.FEED_TWEET_NEW,
     REDIS_CHANNELS.FEED_SOURCE_CREATED,
@@ -270,6 +289,11 @@ export const EVENT_PRIORITIES: Record<string, EventPriority> = {
   [REDIS_CHANNELS.ACHIEVEMENT_UNLOCKED]: 'high',
   [REDIS_CHANNELS.PONG_ELO_UPDATE]: 'high',
   [REDIS_CHANNELS.CHAT_MESSAGE]: 'high',
+  [REDIS_CHANNELS.BALANCE_UPDATE]: 'high',
+  [REDIS_CHANNELS.BET_RESOLVED]: 'high',
+  [REDIS_CHANNELS.PARLAY_RESOLVED]: 'high',
+  [REDIS_CHANNELS.PONG_WAGER]: 'high',
+  [REDIS_CHANNELS.PONG_PAYOUT]: 'high',
 
   // Normal priority - standard updates
   [REDIS_CHANNELS.STATS_UPDATE]: 'normal',

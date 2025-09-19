@@ -1385,6 +1385,8 @@ export const REDIS_CHANNELS = {
   CHAT_TYPING_STOP: 'chat:typing:stop',
   CHAT_JOIN: 'chat:join',
   CHAT_LEAVE: 'chat:leave',
+  CHAT_HISTORY: 'chat:history',
+  CHAT_ERROR: 'chat:error',
 
   // Pong channels
   PONG_ELO_UPDATE: 'pong:elo:update',
@@ -1400,6 +1402,11 @@ export const REDIS_CHANNELS = {
   USER_DAILY_LOGIN: 'user:daily:login',
   USER_WEEKEND_LOGIN: 'user:weekend:login',
   USER_BALANCE_SNAPSHOT: 'user:balance:snapshot',
+  BALANCE_UPDATE: 'balance:update',
+  BET_RESOLVED: 'bet:resolved',
+  PARLAY_RESOLVED: 'parlay:resolved',
+  PONG_WAGER: 'pong:wager',
+  PONG_PAYOUT: 'pong:payout',
   USER_FOLLOWED: 'user:followed',
 
   // Prediction channels
@@ -1438,6 +1445,7 @@ export const REDIS_CHANNELS = {
   FEED_SOURCE_UPDATED: 'feed:source:updated',
   FEED_SOURCE_DELETED: 'feed:source:deleted',
   TIMELINE_ARTICLES_NEW: 'timeline:articles:new',
+  TIMELINE_ARTICLES_APPROVED: 'timeline:articles:approved',
 
   // Admin channels
   ADMIN_METRICS_UPDATE: 'admin:metrics:update',
@@ -2398,6 +2406,29 @@ export interface UserLoginPayload {
   userId: number;
   consecutiveDays: number;
   isFirstLogin: boolean;
+}
+
+export interface BalanceUpdatePayload {
+  userId: number;
+  oldBalance: number;
+  newBalance: number;
+  change: number;
+  reason: string;
+  timestamp: string;
+}
+
+export interface PongWagerPayload {
+  userId: number;
+  amount: number;
+  matchId: number;
+  timestamp: string;
+}
+
+export interface PongPayoutPayload {
+  userId: number;
+  payout: number;
+  matchId: number;
+  timestamp: string;
 }
 
 export interface UserFollowPayload {

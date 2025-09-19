@@ -13,7 +13,7 @@ import {
   useMemo,
   type ReactNode,
 } from 'react';
-import { useSocketEvent } from './EventBusCoreContext';
+import { useSocketEvent, useEventBusCore } from './EventBusCoreContext';
 import { useSocket } from './SocketContext';
 import { useAuth } from './AuthContext';
 import { REDIS_CHANNELS } from '../types/events';
@@ -76,18 +76,18 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setLoading(false);
   }, []);
 
+  // Migrated to EventBusCore: Chat history loading
+  useSocketEvent(REDIS_CHANNELS.CHAT_HISTORY, handleHistory);
+
   useEffect(() => {
     if (!socket || !user) return;
 
-    // Set up direct socket listener for chat history (not a Redis channel)
-    socket.on('chat:history', handleHistory);
-
-    // Wait for socket to be connected before requesting history
+    // Request chat history when socket is connected
     if (socket.connected) {
       console.log('[ChatContext] Requesting chat history...');
       socket.emit('chat:history', {});
     } else {
-      // Wait for connection
+      // Wait for connection - keeping this direct socket listener as it's Socket.IO internal
       const onConnect = () => {
         console.log('[ChatContext] Socket connected, requesting chat history...');
         socket.emit('chat:history', {});
@@ -95,15 +95,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       socket.on('connect', onConnect);
 
       return () => {
-        socket.off('chat:history', handleHistory);
         socket.off('connect', onConnect);
       };
     }
-
-    return () => {
-      socket.off('chat:history', handleHistory);
-    };
-  }, [socket, user, handleHistory]);
+  }, [socket, user]);
 
   /* ---------------------------------------------------------------------- */
   /* 2. Live message stream                                                 */
@@ -117,14 +112,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Set up direct socket listener for chat errors (not a Redis channel)
-  useEffect(() => {
-    if (!socket) return;
-
-    socket.on('chat:error', handleChatError);
-    return () => {
-      socket.off('chat:error', handleChatError);
-    };
-  }, [socket, handleChatError]);
+  // Migrated to EventBusCore: Chat error handling
+  useSocketEvent(REDIS_CHANNELS.CHAT_ERROR, handleChatError);
 
   // Use EventBus for incoming chat messages (Redis channel)
   useSocketEvent(REDIS_CHANNELS.CHAT_MESSAGE, handleMessage);

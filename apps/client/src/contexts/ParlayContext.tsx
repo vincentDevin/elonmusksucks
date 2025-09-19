@@ -8,7 +8,8 @@
 
 import { createContext, useContext, useReducer, useEffect, useCallback } from 'react';
 import type { ReactNode } from 'react';
-import { useSocket } from './SocketContext';
+import { useEventBusCore } from './EventBusCoreContext';
+import { REDIS_CHANNELS } from '../types/events';
 import { useAuth } from './AuthContext';
 
 /* ---------- Types ---------- */
@@ -94,19 +95,18 @@ export function ParlayProvider({ children }: { children: ReactNode }) {
   }, [state]);
 
   /* ---------- Clear builder when *our* parlay is placed ---------- */
-  const socket = useSocket();
+  const { subscribe } = useEventBusCore();
   const { user } = useAuth();
 
   useEffect(() => {
-    if (!socket || !user) return;
+    if (!user) return;
     const handlePlaced = (parlay: { userId: number }) => {
       if (parlay.userId === user.id) dispatch({ type: 'CLEAR' });
     };
-    socket.on('parlayPlaced', handlePlaced);
-    return () => {
-      socket.off('parlayPlaced', handlePlaced);
-    };
-  }, [socket, user?.id]);
+    // Migrated to EventBusCore: Parlay placed events
+    const unsubscribe = subscribe(REDIS_CHANNELS.PARLAY_PLACED, handlePlaced);
+    return unsubscribe;
+  }, [subscribe, user?.id]);
 
   /* ---------- Convenience callbacks ---------- */
   const addLeg = useCallback((leg: Leg) => dispatch({ type: 'ADD_LEG', leg }), []);

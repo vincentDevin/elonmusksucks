@@ -26,7 +26,7 @@ import { registerPostHandlers } from './handlers/postHandlers';
 import { registerPostRedisHandlers } from './handlers/postRedisEventHandlers';
 import { socketCleanupManager } from './lib/SocketCleanupManager';
 import { setupAchievementRedisHandlers } from './handlers/achievementEventHandler';
-// import { registerRoomHandlers } from './handlers/roomHandlers'; // future rooms
+import { registerRoomHandlers } from './handlers/roomHandlers';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -174,7 +174,7 @@ export async function initSocket(httpServer: HTTPServer) {
       }
 
       // Register event handlers (tracked for cleanup)
-      // registerRoomHandlers(io, socket); // Uncomment when multi‑room is live
+      registerRoomHandlers(io, socket);
       registerChatHandlers(socket);
       registerBetHandlers(socket);
       registerModerationHandlers(socket);

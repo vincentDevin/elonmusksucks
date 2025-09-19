@@ -6,6 +6,8 @@ import { type StatsUpdatePayload } from '@ems/types';
 import { useAuth } from '../contexts/AuthContext';
 import { useVisibilityGuard } from '../lib/visibilityGuard';
 import { useSocket } from '../contexts/SocketContext';
+import { useEventBusCore } from '../contexts/EventBusCoreContext';
+import { REDIS_CHANNELS } from '../types/events';
 import { useMyBets, useMyParlays, useMyPredictions } from './useMeStubs';
 import { useLeaderboard } from './useLeaderboard';
 import { createAbortableRequest } from '../api/axios';
@@ -576,6 +578,9 @@ export function useUserStats() {
     fetchEnhancedStats(true);
   }, [fetchEnhancedStats]);
 
+  // Get EventBusCore for centralized event handling
+  const { subscribe } = useEventBusCore();
+
   // Listen for real-time updates with stable handlers
   useEffect(() => {
     if (!user?.id || !socket) return;
@@ -587,9 +592,11 @@ export function useUserStats() {
     socket.on('ranking:changed', handleRankingChange);
     socket.on('achievement:unlocked', handleAchievementUnlocked);
 
-    // Keep some legacy events for backward compatibility
-    socket.on('betPlaced', handleBetEvent);
-    socket.on('betResolved', handleBetEvent);
+    // MIGRATED: Convert legacy direct socket events to EventBusCore
+    const unsubscribers = [
+      subscribe(REDIS_CHANNELS.BET_PLACED, handleBetEvent),
+      subscribe(REDIS_CHANNELS.BET_RESOLVED, handleBetEvent),
+    ];
 
     return () => {
       socket.off('stats:updated', handleStatsUpdate);
@@ -597,8 +604,8 @@ export function useUserStats() {
       socket.off('user:stats_update', handleUserStatsUpdate);
       socket.off('ranking:changed', handleRankingChange);
       socket.off('achievement:unlocked', handleAchievementUnlocked);
-      socket.off('betPlaced', handleBetEvent);
-      socket.off('betResolved', handleBetEvent);
+      // EventBusCore subscriptions cleanup
+      unsubscribers.forEach((unsub) => unsub());
     };
   }, [
     socket,

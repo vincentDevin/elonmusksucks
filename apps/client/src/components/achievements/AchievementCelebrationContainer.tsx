@@ -1,8 +1,12 @@
-import { useActivityStream } from '../../hooks/useActivityStream';
+// EMERGENCY FIX: Temporarily disabled to stop useActivityStream memory leak
+// TODO: Migrate to dedicated achievement celebration system
 import { AchievementCelebrationComponent } from './AchievementCelebration';
 
 export function AchievementCelebrationContainer() {
-  const { activeCelebrations, dismissCelebration } = useActivityStream();
+  // EMERGENCY: Disable celebration features to stop memory leak
+  // This component was using useActivityStream which had 20+ socket listeners
+  const activeCelebrations: any[] = [];
+  const dismissCelebration = () => {};
 
   if (activeCelebrations.length === 0) {
     return null;

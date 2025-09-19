@@ -3,12 +3,37 @@ import { useMemo, memo } from 'react';
 import type { UserStats } from '../../../hooks/useUserStats';
 
 interface MetricsCardProps {
-  stats: UserStats;
+  stats: UserStats | null | undefined;
   className?: string;
 }
 
 const MetricsCard = memo(function MetricsCard({ stats, className = '' }: MetricsCardProps) {
-  const { performance } = stats;
+  // Early return if no stats available
+  if (!stats) {
+    return (
+      <div className={`bg-background/50 rounded-xl p-4 border border-muted ${className}`}>
+        <h3 className="font-semibold text-content mb-3 flex items-center">
+          📈 Performance Metrics
+        </h3>
+        <div className="text-center text-tertiary py-8">
+          <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full mx-auto mb-2"></div>
+          <p>Loading performance data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Safely extract performance with defaults
+  const performance = stats.performance || {
+    winRate: 0,
+    profitLoss: 0,
+    avgBetSize: 0,
+    totalBets: 0,
+    totalWagered: 0,
+    currentStreak: { type: 'none', count: 0, isActive: false },
+    bestCategory: null,
+    accuracyByCategory: [],
+  };
 
   // Calculate trend indicators (placeholder for now)
   const winRateTrend = useMemo(() => {

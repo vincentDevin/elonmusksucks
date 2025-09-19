@@ -8,6 +8,7 @@ import AchievementManager from '../components/admin/AchievementManager';
 import AdvancedAnalyticsDashboard from '../components/admin/AdvancedAnalyticsDashboard';
 import FeedsManager from '../components/admin/FeedsManager';
 import ModerationQueue from '../components/admin/ModerationQueue';
+import EventSystemMonitor from '../components/admin/EventSystemMonitor';
 
 const AdminDashboard: React.FC = () => {
   const { user } = useAuth();
@@ -21,6 +22,7 @@ const AdminDashboard: React.FC = () => {
     { key: 'feeds', label: 'RSS Feeds Management', component: <FeedsManager /> },
     { key: 'moderation', label: 'Content Moderation', component: <ModerationQueue /> },
     { key: 'analytics', label: 'Advanced Analytics', component: <AdvancedAnalyticsDashboard /> },
+    { key: 'events', label: 'Event System Monitor', component: <EventSystemMonitor /> },
   ];
 
   const [activeTab, setActiveTab] = useState<string>(tabs[0].key);

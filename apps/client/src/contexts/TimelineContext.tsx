@@ -4,6 +4,8 @@
 import React, { createContext, useContext, useReducer, useEffect, useRef } from 'react';
 import type { TimelineItem, TimelineResponse } from '@ems/types';
 import { useSocket } from './SocketContext';
+import { useEventBusCore } from './EventBusCoreContext';
+import { REDIS_CHANNELS } from '../types/events';
 import { sessionCache } from '../lib/sessionCache';
 
 // State interface
@@ -177,6 +179,7 @@ const TimelineContext = createContext<
 export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(timelineReducer, initialState);
   const socket = useSocket();
+  const { subscribe } = useEventBusCore();
 
   // Cache keys for timeline data
   const getCacheKey = (type: 'articles' | 'tweets', filters: any) => {
@@ -465,15 +468,16 @@ export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       }
     };
 
-    // Register event listeners based on the Redis events from redisEventHandlers.ts
-    socket.on('timeline:articles:approved', handleNewArticle);
-    socket.on('feed:tweet:new', handleNewTweet);
+    // Migrated to EventBusCore: Timeline events
+    const unsubscribers = [
+      subscribe(REDIS_CHANNELS.TIMELINE_ARTICLES_APPROVED, handleNewArticle),
+      subscribe(REDIS_CHANNELS.FEED_TWEET_NEW, handleNewTweet),
+    ];
 
     return () => {
-      socket.off('timeline:articles:approved', handleNewArticle);
-      socket.off('feed:tweet:new', handleNewTweet);
+      unsubscribers.forEach((unsub) => unsub());
     };
-  }, [socket, state.activeTab]);
+  }, [subscribe, state.activeTab]);
 
   // Cleanup: abort any pending requests on unmount
   useEffect(() => {

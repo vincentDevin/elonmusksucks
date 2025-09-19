@@ -1,14 +1,34 @@
-import { AchievementSocketEvents, REDIS_CHANNELS } from '@ems/types';
+import {
+  AchievementSocketEvents,
+  REDIS_CHANNELS,
+  type IEventBus,
+  type IEventCoalescer,
+} from '@ems/types';
 import type { IAchievementSocketEmitter } from './achievementEngine.service';
 import { eventBus } from '../../lib/EventBus';
+import { EventCoalescer } from '../../lib/EventCoalescer';
 
 /**
  * EventBus-based implementation of the achievement emitter
- * Uses unified event system instead of direct Socket.IO emissions
+ * Uses unified event system with coalescing for performance optimization
  */
 export class AchievementSocketEmitter implements IAchievementSocketEmitter {
-  constructor() {
-    // Events now go through eventBus → Redis → redisEventHandlers.ts → Socket.IO
+  private eventCoalescer: IEventCoalescer;
+  private eventBus: IEventBus;
+
+  constructor(eventBusParam?: IEventBus) {
+    this.eventBus = eventBusParam || eventBus;
+
+    // Configure coalescing for achievement events
+    this.eventCoalescer = new EventCoalescer(this.eventBus, {
+      windowMs: 1000, // 1s default window for achievements
+      topicWindows: {
+        // Achievement unlocks: immediate delivery (no coalescing) for celebration
+        [REDIS_CHANNELS.ACHIEVEMENT_UNLOCKED]: 100, // 100ms minimal batching for unlocks
+        // Achievement progress: longer batching to reduce noise during active periods
+        'achievement:progress': 2000, // 2s for progress updates
+      },
+    });
   }
 
   /**
@@ -24,15 +44,20 @@ export class AchievementSocketEmitter implements IAchievementSocketEmitter {
     },
   ): Promise<void> {
     try {
-      // Publish through unified event system - redisEventHandlers.ts will handle Socket.IO emission
-      await eventBus.publish(REDIS_CHANNELS.ACHIEVEMENT_UNLOCKED, {
-        type: AchievementSocketEvents.UNLOCKED,
+      // Use coalescer with minimal batching (100ms) for achievement unlocks
+      // This provides near-immediate delivery while allowing micro-batching
+      await this.eventCoalescer.addEvent(
+        REDIS_CHANNELS.ACHIEVEMENT_UNLOCKED,
+        {
+          type: AchievementSocketEvents.UNLOCKED,
+          userId,
+          timestamp: new Date().toISOString(),
+          data: payload,
+          achievementName: payload.achievement.name,
+          rarity: payload.achievement.rarity,
+        },
         userId,
-        timestamp: new Date().toISOString(),
-        data: payload,
-        achievementName: payload.achievement.name,
-        rarity: payload.achievement.rarity,
-      });
+      );
     } catch (error) {
       console.error('Failed to publish achievement unlock event:', error);
       // Don't throw - event bus failures shouldn't break achievement processing
@@ -52,14 +77,18 @@ export class AchievementSocketEmitter implements IAchievementSocketEmitter {
     },
   ): Promise<void> {
     try {
-      // Note: Progress updates may need a dedicated REDIS_CHANNELS constant
-      // For now using ACHIEVEMENT_UNLOCKED with type differentiation
-      await eventBus.publish(REDIS_CHANNELS.ACHIEVEMENT_UNLOCKED, {
-        type: AchievementSocketEvents.PROGRESS,
+      // Use coalescer with longer batching (2s) for progress updates
+      // Progress updates are frequent and can be safely batched for better performance
+      await this.eventCoalescer.addEvent(
+        'achievement:progress',
+        {
+          type: AchievementSocketEvents.PROGRESS,
+          userId,
+          timestamp: new Date().toISOString(),
+          data: payload,
+        },
         userId,
-        timestamp: new Date().toISOString(),
-        data: payload,
-      });
+      );
     } catch (error) {
       console.error('Failed to publish achievement progress event:', error);
     }
@@ -72,14 +101,18 @@ export class AchievementSocketEmitter implements IAchievementSocketEmitter {
     try {
       if (achievements.length === 0) return;
 
-      // Publish through unified event system - redisEventHandlers.ts will handle Socket.IO emission
-      await eventBus.publish(REDIS_CHANNELS.ACHIEVEMENT_UNLOCKED, {
-        type: AchievementSocketEvents.BATCH_UNLOCKED,
+      // Batch unlocks use minimal batching since they're typically rare events
+      await this.eventCoalescer.addEvent(
+        REDIS_CHANNELS.ACHIEVEMENT_UNLOCKED,
+        {
+          type: AchievementSocketEvents.BATCH_UNLOCKED,
+          userId,
+          count: achievements.length,
+          achievements,
+          timestamp: new Date().toISOString(),
+        },
         userId,
-        count: achievements.length,
-        achievements,
-        timestamp: new Date().toISOString(),
-      });
+      );
     } catch (error) {
       console.error('Failed to publish batch unlock event:', error);
       // Don't throw - event bus failures shouldn't break achievement processing
