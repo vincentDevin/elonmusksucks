@@ -22,7 +22,7 @@ const ACTIVITY_TYPE_LABELS: Record<ActivityItem['type'], string> = {
   parlay_lost: 'Parlays Lost',
   prediction_created: 'Predictions Created',
   prediction_resolved: 'Predictions Resolved',
-  achievement_earned: 'Achievements',
+  achievement_unlocked: 'Achievements',
   rank_changed: 'Rank Changes',
   big_bet: 'Big Bets',
   big_win: 'Big Wins',

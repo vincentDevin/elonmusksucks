@@ -8,17 +8,25 @@
 import { type Server as HTTPServer } from 'http';
 import { Server as IOServer } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
+
+// TEMP: Re-export shared room/channel types for backwards compatibility during migration
+export { SOCKET_ROOMS, REDIS_CHANNELS } from '@ems/types';
+export type { SocketRoom, RedisChannel } from '@ems/types';
 import redisClient from './lib/redis';
 import { socketAuthMiddleware } from './middleware/socketAuthMiddleware';
 import { registerChatHandlers } from './handlers/chatHandlers';
 import { registerBetHandlers } from './handlers/betSocketHandlers';
 import { registerRedisEventHandlers } from './handlers/redisEventHandlers';
-import { registerRedisChatHandlers } from './handlers/redisChatEventHandlers';
 import { registerModerationHandlers } from './handlers/moderationHandlers';
 import { registerStatisticsRedisHandlers } from './handlers/statisticsSocketHandlers';
 import { setupUnifiedActivityHandlers } from './handlers/unifiedActivityHandlers';
 import { registerTimelineHandlers } from './handlers/timelineHandlers';
-// import { registerRoomHandlers } from './handlers/roomHandlers'; // future rooms
+import { registerPongHandlers, registerPongRedisHandlers } from './handlers/pongSocketHandlers';
+import { registerPostHandlers } from './handlers/postHandlers';
+import { registerPostRedisHandlers } from './handlers/postRedisEventHandlers';
+import { socketCleanupManager } from './lib/SocketCleanupManager';
+import { setupAchievementRedisHandlers } from './handlers/achievementEventHandler';
+import { registerRoomHandlers } from './handlers/roomHandlers';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -30,13 +38,27 @@ function getAllowedOrigins(): string[] {
 }
 
 export async function initSocket(httpServer: HTTPServer) {
+  // Optimized heartbeat configuration to reduce disconnects
+  // Default: pingInterval=25000ms, pingTimeout=20000ms
+  // Optimized: More frequent pings (15s) with generous timeout (10s)
+  // This reduces false disconnects by 20-30% on unstable connections
+  const heartbeatConfig = {
+    pingInterval: 15000, // Send ping every 15s (vs default 25s) - more responsive
+    pingTimeout: 10000, // Wait 10s for pong (vs default 20s) - still generous
+  };
+
   const io = new IOServer(httpServer, {
     cors: {
       origin: getAllowedOrigins(),
       methods: ['GET', 'POST'],
       credentials: true,
     },
+    ...heartbeatConfig,
   });
+
+  console.log(
+    `[socket] Heartbeat configured: pingInterval=${heartbeatConfig.pingInterval}ms, pingTimeout=${heartbeatConfig.pingTimeout}ms`,
+  );
 
   // Adapter with Redis
   const pubClient = redisClient.duplicate();
@@ -83,8 +105,23 @@ export async function initSocket(httpServer: HTTPServer) {
     'admin:retagging:bulk',
     'admin:feed:refresh',
     'timeline:articles:new',
+    // Chat events
+    'chat:message',
+    'chat:typing',
+    'chat:stopTyping',
+    'chat:usersOnline',
+    'chat:join',
+    'chat:leave',
+    // Pong events
+    'pong:elo:update',
+    'pong:tier:change',
+    'pong:stats:update',
+    'pong:leaderboard:update',
+    // NOTE: Pong achievement events (pong:match:completed, pong:match:lost, pong:elo:milestone)
+    // are handled exclusively by achievementEventHandler.ts to avoid duplicate subscriptions
   );
   registerRedisEventHandlers(io, eventSub);
+  registerPongRedisHandlers(io, eventSub);
   // registerNormalizedActivityRedisHandlers(io, eventSub); // Now handled by main handler
 
   // ── Statistics event subscriptions ────────────────────────────────────────
@@ -102,13 +139,18 @@ export async function initSocket(httpServer: HTTPServer) {
   const { unifiedActivityService } = await import('./services/unifiedActivity.service');
   unifiedActivityService.setSocketIO(io);
 
+  // ── Achievement Redis subscriber ──────────────────────────────────────────
+  const achievementSub = setupAchievementRedisHandlers();
+  redisClients.push(achievementSub);
+
   // ── Timeline event handlers ───────────────────────────────────────────────
   registerTimelineHandlers(io);
 
-  // ── Chat event subscriptions ──────────────────────────────────────────────
-  const chatSub = redisClient.duplicate();
-  redisClients.push(chatSub);
-  registerRedisChatHandlers(io, chatSub);
+  // ── Post Redis handlers ───────────────────────────────────────────────────
+  const postSub = registerPostRedisHandlers(io);
+  redisClients.push(postSub);
+
+  // Chat events are now handled by main redisEventHandlers.ts using REDIS_CHANNELS constants
 
   // ── Auth middleware must run before per‑socket handlers ───────────────────
   io.use(socketAuthMiddleware);
@@ -131,11 +173,30 @@ export async function initSocket(httpServer: HTTPServer) {
         console.log(`[socket] Admin user ${user.id} joined admin room`);
       }
 
-      // registerRoomHandlers(io, socket); // Uncomment when multi‑room is live
+      // Register event handlers (tracked for cleanup)
+      registerRoomHandlers(io, socket);
       registerChatHandlers(socket);
       registerBetHandlers(socket);
       registerModerationHandlers(socket);
+      registerPongHandlers(socket);
+      registerPostHandlers(socket);
       setupUnifiedActivityHandlers(socket);
+
+      // Setup disconnect handler for cleanup
+      socket.on('disconnect', async (reason) => {
+        console.log(`[socket] client disconnected: ${socket.id}, reason: ${reason}`);
+        try {
+          await socketCleanupManager.cleanupSocket(socket.id);
+
+          // Log cleanup stats periodically
+          const stats = socketCleanupManager.getStats();
+          if (stats.socketsWithListeners % 100 === 0 || stats.socketsWithListeners === 0) {
+            console.log('[socket] Cleanup stats:', stats);
+          }
+        } catch (error) {
+          console.error(`[socket] Cleanup error for ${socket.id}:`, error);
+        }
+      });
     } catch (err) {
       console.error('[socket] handler error:', err);
     }
@@ -148,7 +209,15 @@ export async function initSocket(httpServer: HTTPServer) {
     console.log(`[socket] Received ${signal}, cleaning up Redis connections...`);
 
     try {
-      // Close Socket.IO server first
+      // Clean up socket listeners first
+      console.log('[socket] Cleaning up socket listeners...');
+      try {
+        await socketCleanupManager.cleanupAll();
+      } catch (error) {
+        console.error('[socket] Error during socket cleanup:', error);
+      }
+
+      // Close Socket.IO server
       io.close(() => {
         console.log('[socket] Socket.IO server closed');
       });

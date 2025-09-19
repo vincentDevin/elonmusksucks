@@ -1,6 +1,64 @@
 // apps/server/src/services/leaderboard.service.ts
+// -----------------------------------------------------------------------------
+// Leaderboard Service - Drift Detection and Reconciliation
+// -----------------------------------------------------------------------------
+
+import type { ReconciliationResult, DriftDetail } from '@ems/types';
+
+/**
+ * Detect leaderboard drift by comparing expected vs actual rankings
+ */
+export async function detectLeaderboardDrift(repository: any): Promise<DriftDetail[]> {
+  // Get current leaderboard from database
+  const currentLeaderboard = await repository.getLeaderboard({ limit: 100 });
+
+  // Sort by Elo rating to get expected order
+  const expectedOrder = [...currentLeaderboard].sort((a: any, b: any) => b.eloRating - a.eloRating);
+
+  const driftDetails: DriftDetail[] = [];
+
+  // Check each user's position vs expected position
+  currentLeaderboard.forEach((user: any, actualIndex: number) => {
+    const expectedIndex = expectedOrder.findIndex((u: any) => u.userId === user.userId);
+    if (expectedIndex !== actualIndex) {
+      driftDetails.push({
+        userId: user.userId,
+        expectedRank: expectedIndex + 1,
+        actualRank: actualIndex + 1,
+        eloRating: user.eloRating,
+      });
+    }
+  });
+
+  return driftDetails;
+}
+
+/**
+ * Reconcile leaderboard by fixing drift
+ */
+export async function reconcileLeaderboard(
+  repository: any,
+  dryRun: boolean = true,
+): Promise<ReconciliationResult> {
+  const driftDetails = await detectLeaderboardDrift(repository);
+
+  let fixesApplied = 0;
+  if (!dryRun && driftDetails.length > 0) {
+    await repository.refreshLeaderboard();
+    fixesApplied = driftDetails.length;
+    console.log(`[leaderboard-reconcile] Applied ${fixesApplied} drift fixes`);
+  }
+
+  return {
+    usersDrifted: driftDetails.length,
+    driftDetails,
+    fixesApplied,
+    dryRun,
+  };
+}
+
 import { Queue } from 'bullmq';
-import redisClient from '../lib/redis';
+import { createQueueOptions } from '../lib/bullmqConfig';
 import type { PublicLeaderboardEntry } from '@ems/types';
 import type {
   ILeaderboardRepository,
@@ -8,38 +66,28 @@ import type {
   PaginatedLeaderboard,
   UserRank,
   LeaderboardStats,
-} from '../repositories/ILeaderboardRepository';
+} from '../repositories/interfaces/ILeaderboardRepository';
+import type { LeaderboardTrigger, LeaderboardMetrics, ScheduleConfig } from '@ems/types';
+import { QUEUE_NAMES } from '@ems/types';
 import { LeaderboardRepository } from '../repositories/LeaderboardRepository';
 
-// New interfaces for enhanced functionality
-export interface LeaderboardTrigger {
-  event: 'bet:resolved' | 'prediction:completed' | 'user:milestone' | 'scheduled:refresh';
-  priority: 'immediate' | 'batched' | 'scheduled';
-  userId?: number;
-  affectedMetrics: ('profit' | 'winRate' | 'streak' | 'volume')[];
-  metadata?: Record<string, any>;
-}
+// TEMP: Re-export for backwards compatibility during migration
+export type { LeaderboardTrigger, LeaderboardMetrics, ScheduleConfig } from '@ems/types';
 
-export interface LeaderboardMetrics {
-  profit: number;
-  winRate: number;
-  streak: number;
-  volume: number;
-  roi: number;
-}
-
-export interface ScheduleConfig {
-  interval: string; // cron expression
-  timezone?: string;
-  enabled: boolean;
-}
+// LeaderboardTrigger, LeaderboardMetrics, ScheduleConfig moved to @ems/types - see import above
 
 /**
  * Enhanced leaderboard service with event-driven updates and intelligent scheduling
  */
 export class LeaderboardService {
-  private refreshQueue = new Queue('leaderboard-refresh', { connection: redisClient });
-  private eventQueue = new Queue('leaderboard-events', { connection: redisClient });
+  private refreshQueue = new Queue(
+    QUEUE_NAMES.LEADERBOARD_REFRESH,
+    createQueueOptions('LEADERBOARD_REFRESH'),
+  );
+  private eventQueue = new Queue(
+    QUEUE_NAMES.LEADERBOARD_EVENTS,
+    createQueueOptions('LEADERBOARD_EVENTS'),
+  );
   private repo: ILeaderboardRepository;
   private batchBuffer: Map<number, LeaderboardTrigger[]> = new Map();
   private batchTimeout: NodeJS.Timeout | null = null;
@@ -90,8 +138,6 @@ export class LeaderboardService {
       { config },
       {
         repeat: { pattern: interval, tz: timezone },
-        removeOnComplete: 10,
-        removeOnFail: 5,
       },
     );
 
@@ -167,10 +213,7 @@ export class LeaderboardService {
    * Enqueue a leaderboard refresh job
    */
   async enqueueRefresh(data: Record<string, any> = {}): Promise<void> {
-    await this.refreshQueue.add('refreshAll', data, {
-      removeOnComplete: 5,
-      removeOnFail: 3,
-    });
+    await this.refreshQueue.add('refreshAll', data);
   }
 
   /**

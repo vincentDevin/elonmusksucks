@@ -9,6 +9,7 @@ export interface PredictionFilter {
   difficulties: ('easy' | 'medium' | 'hard' | 'expert')[];
   timeRemaining: 'all' | '1h' | '1d' | '1w';
   activity: 'all' | 'high' | 'medium' | 'low';
+  status: 'all' | 'open' | 'pending' | 'expired' | 'resolved';
   search: string;
 }
 
@@ -59,6 +60,7 @@ export function usePredictionDiscovery() {
     difficulties: [],
     timeRemaining: 'all',
     activity: 'all',
+    status: 'open',
     search: '',
   });
 
@@ -231,11 +233,34 @@ export function usePredictionDiscovery() {
     if (!predictions) return [];
 
     return predictions.filter((prediction) => {
-      // Basic filters (approved, not resolved, not expired)
       const now = Date.now();
       const expires = new Date(prediction.expiresAt).getTime();
-      if (!prediction.approved || prediction.resolved || now > expires) {
-        return false;
+
+      // Status filter logic
+      if (filters.status !== 'all') {
+        switch (filters.status) {
+          case 'pending':
+            if (prediction.status !== 'PENDING') return false;
+            break;
+          case 'open':
+            if (prediction.status !== 'APPROVED' || now > expires) return false;
+            break;
+          case 'expired':
+            if (prediction.status !== 'APPROVED' || now <= expires || prediction.resolved)
+              return false;
+            break;
+          case 'resolved':
+            if (!prediction.resolved) return false;
+            break;
+        }
+      } else {
+        // Default: show approved, non-resolved predictions that haven't expired (unless filtering by status)
+        if (prediction.status === 'PENDING') {
+          // Only show pending predictions if user is the creator
+          if (prediction.creatorUserId !== user?.id) {
+            return false;
+          }
+        }
       }
 
       // Category filter
@@ -298,7 +323,7 @@ export function usePredictionDiscovery() {
 
       return true;
     });
-  }, [predictions, filters, calculateDifficulty]);
+  }, [predictions, filters, calculateDifficulty, user?.id]);
 
   // Enhance predictions with recommendations and metadata
   const enhancedPredictions = useMemo((): EnhancedPrediction[] => {
@@ -459,6 +484,7 @@ export function usePredictionDiscovery() {
       difficulties: [],
       timeRemaining: 'all',
       activity: 'all',
+      status: 'open',
       search: '',
     });
   }, []);

@@ -88,3 +88,21 @@ export async function getUserStats(userId: number): Promise<UserStatsDTO> {
   const res = await api.get<UserStatsDTO>(`/api/users/${userId}/stats`);
   return res.data;
 }
+
+/** ----------- SEARCH ----------- */
+export interface SearchUserResult {
+  id: number;
+  name: string;
+  avatarUrl?: string;
+}
+
+export async function searchUsers(query: string): Promise<SearchUserResult[]> {
+  if (!query || query.trim().length === 0) {
+    return [];
+  }
+
+  const res = await api.get<SearchUserResult[]>(
+    `/api/users/search?q=${encodeURIComponent(query.trim())}`,
+  );
+  return res.data;
+}

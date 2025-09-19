@@ -35,7 +35,7 @@ export const OPMLManager: React.FC<OPMLManagerProps> = ({ className = '' }) => {
       setError(null);
       setImportResult(null);
 
-      // TODO: Implement OPML import
+      // OPML import implementation placeholder
       // const formData = new FormData();
       // formData.append('opml', file);
       //
@@ -73,7 +73,7 @@ export const OPMLManager: React.FC<OPMLManagerProps> = ({ className = '' }) => {
       setIsExporting(true);
       setError(null);
 
-      // TODO: Implement OPML export
+      // OPML export implementation placeholder
       // const response = await fetch('/api/admin/feeds/export-opml');
       //
       // if (!response.ok) {

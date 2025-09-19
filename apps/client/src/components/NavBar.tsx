@@ -1,16 +1,19 @@
 // apps/client/src/components/NavBar.tsx
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { FaSun, FaMoon, FaBars, FaTimes } from 'react-icons/fa';
-import { useAuth } from '../hooks/useAuth';
-import { useThemeContext } from '../contexts/ThemeContext';
+import { FaBars, FaTimes } from 'react-icons/fa';
+import { useAuth } from '../contexts/AuthContext';
+import { LightDarkToggle } from '../theme';
 import { formatMuskBucks, getMuskBucksColorClasses } from '../utils/formatting';
 
+/**
+ * Updated NavBar component using the unified theme system
+ * Replaces the old NavBar with conflicting theme toggle
+ */
 export default function NavBar() {
   const { accessToken, logout, user } = useAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { theme, toggleTheme } = useThemeContext();
   const navigate = useNavigate();
   const loc = useLocation();
 
@@ -21,12 +24,12 @@ export default function NavBar() {
 
   const linkClasses = (path: string) =>
     `px-3 py-2 rounded ${
-      loc.pathname === path ? 'bg-primary text-surface' : 'hover:bg-muted transition-colors'
+      loc.pathname === path ? 'bg-primary text-white' : 'hover:bg-muted transition-colors'
     }`;
 
   const mobileLinkClasses = (path: string) =>
     `block px-4 py-3 rounded-lg ${
-      loc.pathname === path ? 'bg-primary text-surface' : 'hover:bg-muted transition-colors'
+      loc.pathname === path ? 'bg-primary text-white' : 'hover:bg-muted transition-colors'
     }`;
 
   return (
@@ -44,11 +47,17 @@ export default function NavBar() {
                 <Link to="/dashboard" className={linkClasses('/dashboard')}>
                   Dashboard
                 </Link>
+                <Link to="/timeline" className={linkClasses('/timeline')}>
+                  Timeline
+                </Link>
                 <Link to="/predictions" className={linkClasses('/predictions')}>
                   Predictions
                 </Link>
                 <Link to="/leaderboard" className={linkClasses('/leaderboard')}>
                   Leaderboard
+                </Link>
+                <Link to="/pong" className={linkClasses('/pong')}>
+                  🏓 Pong
                 </Link>
                 <div className="relative">
                   <button
@@ -66,11 +75,11 @@ export default function NavBar() {
                   {dropdownOpen && (
                     <ul
                       className="
-                        absolute z-60 right-0 mt-2
+                        absolute right-0 mt-2 z-[100]
                         bg-surface text-content
-                        border border-muted rounded shadow
+                        border border-muted rounded shadow-xl
                         space-y-1 p-2 w-40
-                        transition-colors 
+                        transition-colors
                       "
                     >
                       {user.role === 'ADMIN' && (
@@ -98,7 +107,7 @@ export default function NavBar() {
                           onClick={handleLogout}
                           className="
                             w-full text-left px-3 py-2 rounded
-                            hover:bg-error hover:text-surface
+                            hover:bg-error hover:text-white
                             transition-colors
                           "
                         >
@@ -114,6 +123,30 @@ export default function NavBar() {
             )
           ) : (
             <>
+              <a
+                href="http://127.0.0.1:5173"
+                className="px-3 py-2 rounded hover:bg-muted transition-colors"
+              >
+                Home
+              </a>
+              <a
+                href="http://127.0.0.1:5173/predictions"
+                className="px-3 py-2 rounded hover:bg-muted transition-colors"
+              >
+                Predictions
+              </a>
+              <a
+                href="http://127.0.0.1:5173/leaderboard"
+                className="px-3 py-2 rounded hover:bg-muted transition-colors"
+              >
+                Leaderboard
+              </a>
+              <a
+                href="http://127.0.0.1:5173/timeline"
+                className="px-3 py-2 rounded hover:bg-muted transition-colors"
+              >
+                Timeline
+              </a>
               <Link to="/login" className={linkClasses('/login')}>
                 Login
               </Link>
@@ -123,27 +156,14 @@ export default function NavBar() {
             </>
           )}
 
-          <button
-            onClick={toggleTheme}
-            aria-label={theme === 'light' ? 'Activate dark mode' : 'Activate light mode'}
-            aria-pressed={theme === 'dark'}
-            title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
-            className="ml-4 flex items-center space-x-1 p-2 rounded hover:bg-muted transition-colors"
-          >
-            <span className="text-lg">{theme === 'light' ? <FaMoon /> : <FaSun />}</span>
-            <span className="sr-only">{theme === 'light' ? 'Dark mode' : 'Light mode'}</span>
-          </button>
+          {/* Unified Theme Toggle - Simple light/dark mode */}
+          <LightDarkToggle variant="icon" size="md" className="ml-4" />
         </nav>
 
         {/* Mobile Controls */}
         <div className="md:hidden flex items-center space-x-2">
-          <button
-            onClick={toggleTheme}
-            aria-label={theme === 'light' ? 'Activate dark mode' : 'Activate light mode'}
-            className="p-2 rounded hover:bg-muted transition-colors"
-          >
-            <span className="text-lg">{theme === 'light' ? <FaMoon /> : <FaSun />}</span>
-          </button>
+          {/* Mobile Theme Toggle */}
+          <LightDarkToggle variant="icon" size="sm" />
 
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -170,6 +190,13 @@ export default function NavBar() {
                     Dashboard
                   </Link>
                   <Link
+                    to="/timeline"
+                    className={mobileLinkClasses('/timeline')}
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Timeline
+                  </Link>
+                  <Link
                     to="/predictions"
                     className={mobileLinkClasses('/predictions')}
                     onClick={() => setMobileMenuOpen(false)}
@@ -182,6 +209,13 @@ export default function NavBar() {
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     Leaderboard
+                  </Link>
+                  <Link
+                    to="/pong"
+                    className={mobileLinkClasses('/pong')}
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    🏓 Pong
                   </Link>
 
                   <div className="border-t border-muted pt-2 mt-2">
@@ -218,7 +252,7 @@ export default function NavBar() {
                         handleLogout();
                         setMobileMenuOpen(false);
                       }}
-                      className="w-full text-left px-4 py-3 rounded-lg hover:bg-error hover:text-surface transition-colors"
+                      className="w-full text-left px-4 py-3 rounded-lg hover:bg-error hover:text-white transition-colors"
                     >
                       Logout
                     </button>
@@ -229,20 +263,50 @@ export default function NavBar() {
               )
             ) : (
               <>
-                <Link
-                  to="/login"
-                  className={mobileLinkClasses('/login')}
+                <a
+                  href="http://127.0.0.1:5173"
+                  className="block px-4 py-3 rounded-lg hover:bg-muted transition-colors"
                   onClick={() => setMobileMenuOpen(false)}
                 >
-                  Login
-                </Link>
-                <Link
-                  to="/register"
-                  className={mobileLinkClasses('/register')}
+                  Home
+                </a>
+                <a
+                  href="http://127.0.0.1:5173/predictions"
+                  className="block px-4 py-3 rounded-lg hover:bg-muted transition-colors"
                   onClick={() => setMobileMenuOpen(false)}
                 >
-                  Register
-                </Link>
+                  Predictions
+                </a>
+                <a
+                  href="http://127.0.0.1:5173/leaderboard"
+                  className="block px-4 py-3 rounded-lg hover:bg-muted transition-colors"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Leaderboard
+                </a>
+                <a
+                  href="http://127.0.0.1:5173/timeline"
+                  className="block px-4 py-3 rounded-lg hover:bg-muted transition-colors"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Timeline
+                </a>
+                <div className="border-t border-muted pt-2 mt-2">
+                  <Link
+                    to="/login"
+                    className={mobileLinkClasses('/login')}
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Login
+                  </Link>
+                  <Link
+                    to="/register"
+                    className={mobileLinkClasses('/register')}
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Register
+                  </Link>
+                </div>
               </>
             )}
           </div>

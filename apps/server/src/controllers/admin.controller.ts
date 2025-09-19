@@ -2,9 +2,28 @@
 import { Request, Response, NextFunction } from 'express';
 import * as adminService from '../services/admin.service';
 import { payoutService } from '../services/payout.service';
-import { adminAchievementService } from '../services/adminAchievement.service';
+import { adminAchievementService } from '../services/achievements/adminAchievement.service';
 import { shameWallService } from '../services/shameWall.service';
+import { RuleSimulationService } from '../services/achievements/ruleSimulation.service';
+
+const ruleSimulationService = new RuleSimulationService();
 import { serializeBigInt } from '../utils/bigintSerializer';
+import {
+  toAdminUserView,
+  toAdminBetView,
+  toAdminTransactionView,
+  toAdminUserSearchResponse,
+  toAdminFinancialDataResponse,
+  toAdminFinancialAnalyticsResponse,
+  toAdminBulkPredictionsResponse,
+  toAdminAchievementView,
+  toAdminBulkOperationResponse,
+  toAdminUserAchievementView,
+  toAdminAchievementAnalyticsResponse,
+  toAdminBanHistoryView,
+} from '../view/admin.view';
+import { AdminActions } from '@ems/types';
+import type { JsonRuleAchievementData } from '@ems/types';
 import type {
   PublicUser,
   PublicPrediction,
@@ -14,6 +33,19 @@ import type {
   PublicUserBadge,
   PublicAITweet,
   AdminTransaction,
+  AdminUserView,
+  AdminBetView,
+  AdminTransactionView,
+  AdminUserSearchResponse,
+  AdminFinancialDataResponse,
+  AdminFinancialAnalyticsResponse,
+  AdminBulkPredictionsResponse,
+  AdminAchievementView,
+  AdminBulkOperationResponse,
+  AdminUserAchievementView,
+  AdminAchievementAnalyticsResponse,
+  AdminBanHistoryView,
+  ResolvePredictionPayload,
 } from '@ems/types';
 import type { Role } from '@prisma/client';
 import type {
@@ -22,14 +54,22 @@ import type {
   BulkUserOperation,
   PredictionSearchParams,
   BulkPredictionOperation,
-} from '../repositories/IAdminRepository';
+} from '../repositories/interfaces/IAdminRepository';
 
 // -- Enhanced User Management --
-export async function getUsers(_req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function getUsers(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    // Legacy endpoint - kept for backward compatibility
+    // Log permission check for audit trail
+    const authReq = req as any;
+    console.log(
+      `[admin-rbac] ${AdminActions.ManageUsers} requested by user ${authReq.user?.id} (role: ${authReq.user?.role})`,
+    );
+
+    // RBAC: Only ADMIN role can manage users
+    // This is enforced by requireAdmin middleware, but logged here for audit
     const users: PublicUser[] = await adminService.listUsers();
-    res.json(serializeBigInt(users));
+    const payload = users.map(toAdminUserView) satisfies AdminUserView[];
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -51,7 +91,8 @@ export async function searchUsers(req: Request, res: Response, next: NextFunctio
     };
 
     const result = await adminService.searchUsers(params);
-    res.json(serializeBigInt(result));
+    const payload = toAdminUserSearchResponse(result) satisfies AdminUserSearchResponse;
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -97,7 +138,8 @@ export async function bulkUpdateUsers(
     }
 
     const result = await adminService.bulkUpdateUsers(operation);
-    res.json(serializeBigInt(result));
+    const payload = toAdminBulkOperationResponse(result) satisfies AdminBulkOperationResponse;
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -197,7 +239,10 @@ export async function searchPredictions(
     };
 
     const result = await adminService.searchPredictions(params);
-    res.json(serializeBigInt(result));
+
+    // Use the existing BigInt serialization utility
+    const serializedResult = serializeBigInt(result);
+    res.json(serializedResult);
   } catch (err) {
     next(err);
   }
@@ -247,7 +292,8 @@ export async function bulkUpdatePredictions(
     }
 
     const result = await adminService.bulkUpdatePredictions(operation);
-    res.json(serializeBigInt(result));
+    const payload = toAdminBulkPredictionsResponse(result) satisfies AdminBulkPredictionsResponse;
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -287,11 +333,15 @@ export async function resolvePrediction(
   next: NextFunction,
 ): Promise<void> {
   try {
+    console.log(
+      `[admin-rbac] ${AdminActions.ManagePredictions} requested by user ${(req as any).user?.id} (role: ${(req as any).user?.role})`,
+    );
+
     const id = Number(req.params.id);
-    const { winningOptionId } = req.body as { winningOptionId: number };
+    const { winningOptionId } = req.body as ResolvePredictionPayload;
     // enqueue the payout job (no return value)
     await payoutService.resolvePrediction(id, winningOptionId);
-    // 202 Accepted indicates “we got it, working in background”
+    // 202 Accepted indicates "we got it, working in background"
     res.status(202).json({ message: 'Payout job enqueued' });
   } catch (err) {
     next(err);
@@ -301,9 +351,14 @@ export async function resolvePrediction(
 // -- Bet & Transaction Oversight --
 export async function getBets(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
+    console.log(
+      `[admin-rbac] ${AdminActions.ManageBets} requested by user ${(req as any).user?.id} (role: ${(req as any).user?.role})`,
+    );
+
     const filters = req.query as unknown as QueryParams;
     const bets = await adminService.listBets(filters);
-    res.json(serializeBigInt(bets));
+    const payload = bets.map(toAdminBetView) satisfies AdminBetView[];
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -334,7 +389,8 @@ export async function getTransactions(
       userName: users.find((u) => u.id === t.userId)?.name ?? 'Unknown',
     }));
 
-    res.json(serializeBigInt(detailedTxns));
+    const payload = detailedTxns.map(toAdminTransactionView) satisfies AdminTransactionView[];
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -349,7 +405,8 @@ export async function searchFinancialData(
   try {
     const params = req.query as unknown as any; // Will be typed properly in service
     const data = await adminService.searchFinancialData(params);
-    res.json(serializeBigInt(data));
+    const payload = toAdminFinancialDataResponse(data) satisfies AdminFinancialDataResponse;
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -363,7 +420,10 @@ export async function getFinancialAnalytics(
   try {
     const params = req.query as unknown as any;
     const analytics = await adminService.getFinancialAnalytics(params);
-    res.json(serializeBigInt(analytics));
+    const payload = toAdminFinancialAnalyticsResponse(
+      analytics,
+    ) satisfies AdminFinancialAnalyticsResponse;
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -789,7 +849,8 @@ export async function getAllAchievements(
 ): Promise<void> {
   try {
     const achievements = await adminAchievementService.getAllAchievements();
-    res.json(serializeBigInt(achievements));
+    const payload = achievements.map(toAdminAchievementView) satisfies AdminAchievementView[];
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -802,6 +863,12 @@ export async function getAchievementById(
 ): Promise<void> {
   try {
     const achievementId = parseInt(req.params.id);
+
+    if (isNaN(achievementId)) {
+      res.status(400).json({ error: 'Invalid achievement ID' });
+      return;
+    }
+
     const achievement = await adminAchievementService.getAchievementById(achievementId);
 
     if (!achievement) {
@@ -809,7 +876,8 @@ export async function getAchievementById(
       return;
     }
 
-    res.json(serializeBigInt(achievement));
+    const payload = toAdminAchievementView(achievement) satisfies AdminAchievementView;
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -823,7 +891,8 @@ export async function createAchievement(
   try {
     const data = req.body;
     const achievement = await adminAchievementService.createAchievement(data);
-    res.status(201).json(serializeBigInt(achievement));
+    const payload = toAdminAchievementView(achievement) satisfies AdminAchievementView;
+    res.status(201).json(payload);
   } catch (err) {
     next(err);
   }
@@ -838,7 +907,8 @@ export async function updateAchievement(
     const achievementId = parseInt(req.params.id);
     const data = req.body;
     const achievement = await adminAchievementService.updateAchievement(achievementId, data);
-    res.json(serializeBigInt(achievement));
+    const payload = toAdminAchievementView(achievement) satisfies AdminAchievementView;
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -917,7 +987,8 @@ export async function getUsersWithAchievement(
   try {
     const achievementId = parseInt(req.params.id);
     const users = await adminAchievementService.getUsersWithAchievement(achievementId);
-    res.json(serializeBigInt(users));
+    const payload = users.map(toAdminUserAchievementView) satisfies AdminUserAchievementView[];
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -930,7 +1001,10 @@ export async function getAchievementAnalytics(
 ): Promise<void> {
   try {
     const analytics = await adminAchievementService.getAchievementAnalytics();
-    res.json(serializeBigInt(analytics));
+    const payload = toAdminAchievementAnalyticsResponse(
+      analytics,
+    ) satisfies AdminAchievementAnalyticsResponse;
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -960,7 +1034,8 @@ export async function issueBan(req: Request, res: Response, next: NextFunction):
       moderatorId,
     });
 
-    res.status(201).json(serializeBigInt(banHistory));
+    const payload = toAdminBanHistoryView(banHistory) satisfies AdminBanHistoryView;
+    res.status(201).json(payload);
   } catch (err) {
     next(err);
   }
@@ -991,7 +1066,8 @@ export async function getBanHistory(
 ): Promise<void> {
   try {
     const history = await shameWallService.getBanHistory();
-    res.json(serializeBigInt(history));
+    const payload = history.map(toAdminBanHistoryView) satisfies AdminBanHistoryView[];
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -1018,3 +1094,121 @@ export async function awardShameAchievement(
     next(err);
   }
 }
+
+export const simulateRule = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const { rule, events, scenario, eventCount } = req.body;
+
+    if (!rule) {
+      res.status(400).json({ error: 'Rule is required' });
+      return;
+    }
+
+    let simulationEvents = events;
+
+    if (!simulationEvents) {
+      simulationEvents = await ruleSimulationService.generateTestEvents(
+        rule as JsonRuleAchievementData,
+        scenario || 'mixed',
+        eventCount || 50,
+      );
+    }
+
+    const result = await ruleSimulationService.simulateRule(
+      rule as JsonRuleAchievementData,
+      simulationEvents,
+    );
+
+    res.json({
+      success: true,
+      simulation: result,
+      generatedEvents: !events,
+    });
+  } catch (err) {
+    console.error('Rule simulation failed:', err);
+    next(err);
+  }
+};
+
+export const generateTestEvents = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const { rule, scenario, eventCount } = req.body;
+
+    if (!rule) {
+      res.status(400).json({ error: 'Rule is required' });
+      return;
+    }
+
+    const events = await ruleSimulationService.generateTestEvents(
+      rule as JsonRuleAchievementData,
+      scenario || 'mixed',
+      eventCount || 50,
+    );
+
+    res.json({
+      success: true,
+      events,
+      scenario: scenario || 'mixed',
+      count: events.length,
+    });
+  } catch (err) {
+    console.error('Test event generation failed:', err);
+    next(err);
+  }
+};
+
+export const quickSimulate = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const { rule } = req.body;
+
+    if (!rule) {
+      res.status(400).json({ error: 'Rule is required' });
+      return;
+    }
+
+    const scenarios = ['success', 'failure', 'mixed'] as const;
+    const results: Record<string, any> = {};
+
+    for (const scenario of scenarios) {
+      const events = await ruleSimulationService.generateTestEvents(
+        rule as JsonRuleAchievementData,
+        scenario,
+        30,
+      );
+      const result = await ruleSimulationService.simulateRule(
+        rule as JsonRuleAchievementData,
+        events,
+      );
+
+      results[scenario] = {
+        ...result,
+        eventCount: events.length,
+      };
+    }
+
+    res.json({
+      success: true,
+      scenarios: results,
+      rule: {
+        eventKeys: rule.eventKeys,
+        progressType: rule.progress.kind,
+        complexity: results.mixed.complexity,
+      },
+    });
+  } catch (err) {
+    console.error('Quick simulation failed:', err);
+    next(err);
+  }
+};

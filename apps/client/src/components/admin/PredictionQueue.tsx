@@ -1,185 +1,585 @@
-// apps/client/src/components/admin/PredictionQueue.tsx
-import { useEffect, useState, useCallback } from 'react';
-import { useAdmin } from '../../contexts/AdminContext';
-import * as adminApi from '../../api/admin';
-import { useSocket } from '../../contexts/SocketContext';
-import type { PublicPrediction, PublicPredictionOption } from '@ems/types';
-import { format } from 'date-fns';
+import React, { useState, useEffect, useCallback } from 'react';
+import { FixedSizeList as List } from 'react-window';
+import {
+  searchPredictions,
+  bulkUpdatePredictions,
+  getPredictionDetails,
+  resolvePrediction,
+} from '../../api/admin';
+import type {
+  PredictionSearchParams,
+  DetailedPrediction,
+  PaginatedPredictions,
+  BulkPredictionOperation,
+} from '../../api/admin';
+import ResolvePredictionModal from './ResolvePredictionModal';
 
-interface AdminPrediction extends PublicPrediction {
-  options: PublicPredictionOption[];
+interface PredictionQueueProps {
+  className?: string;
 }
 
-export default function PredictionQueue() {
-  const { approvePrediction, rejectPrediction, resolvePrediction } = useAdmin();
-  const socket = useSocket();
+type TabType = 'pending' | 'approved' | 'resolved' | 'rejected';
 
-  const [allPredictions, setAllPredictions] = useState<AdminPrediction[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [resolvingId, setResolvingId] = useState<number | null>(null);
-  const [selectedOption, setSelectedOption] = useState<Record<number, number>>({});
+interface PredictionRowProps {
+  index: number;
+  style: React.CSSProperties;
+  data: {
+    predictions: DetailedPrediction[];
+    selectedPredictions: Set<number>;
+    onPredictionSelect: (predictionId: number, selected: boolean) => void;
+    onPredictionAction: (predictionId: number, action: string) => void;
+    currentTab: TabType;
+  };
+}
 
-  // reload from server
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const preds = await adminApi.listPredictions();
-      setAllPredictions(preds as AdminPrediction[]);
-    } finally {
-      setLoading(false);
+const PredictionRow: React.FC<PredictionRowProps> = ({ index, style, data }) => {
+  const { predictions, selectedPredictions, onPredictionSelect, onPredictionAction, currentTab } =
+    data;
+  const prediction = predictions[index];
+  const isSelected = selectedPredictions.has(prediction.id);
+  const isEven = index % 2 === 0;
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString();
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return 'text-warning';
+      case 'approved':
+        return 'text-success';
+      case 'resolved':
+        return 'text-primary';
+      case 'rejected':
+        return 'text-error';
+      default:
+        return 'text-content';
     }
-  }, []);
+  };
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  const getControversyLevel = (score: number) => {
+    if (score > 70) return 'High';
+    if (score > 40) return 'Medium';
+    return 'Low';
+  };
 
-  // listen for the queue-worker’s “prediction:resolved” broadcast
-  useEffect(() => {
-    function onResolved(payload: { id: number }) {
-      if (payload.id === resolvingId) {
-        // the job finished!
-        load();
-        setResolvingId(null);
-      }
-    }
-    socket.on('predictionResolved', onResolved);
-    return () => {
-      socket.off('predictionResolved', onResolved);
-    };
-  }, [socket, resolvingId, load]);
+  const getPopularityLevel = (score: number) => {
+    if (score > 70) return 'Hot';
+    if (score > 40) return 'Popular';
+    return 'Quiet';
+  };
 
-  const pending = allPredictions.filter((p) => !p.approved);
-  const resolvable = allPredictions.filter((p) => p.approved && !p.resolved);
-
-  if (loading) {
-    return <p className="p-4 text-center">Loading…</p>;
-  }
+  const currentStatus = prediction.resolved
+    ? 'resolved'
+    : prediction.approved
+      ? 'approved'
+      : !prediction.approved && currentTab === 'rejected'
+        ? 'rejected'
+        : 'pending';
 
   return (
-    <section className="space-y-8">
-      {/* Approval Queue */}
-      <div>
-        <h2 className="text-xl font-semibold mb-2">Approval Queue</h2>
-        <ul className="space-y-2">
-          {pending.length > 0 ? (
-            pending.map((p) => (
-              <li
-                key={p.id}
-                className="flex items-center justify-between border border-muted p-2 rounded bg-surface"
-              >
-                <span>{p.title}</span>
-                <div className="space-x-2">
-                  <button
-                    onClick={async () => {
-                      await approvePrediction(p.id);
-                      await load();
-                    }}
-                    className="px-3 py-1 bg-green-500 text-surface rounded hover:opacity-90 transition"
-                  >
-                    Approve
-                  </button>
-                  <button
-                    onClick={async () => {
-                      await rejectPrediction(p.id);
-                      await load();
-                    }}
-                    className="px-3 py-1 bg-red-500 text-surface rounded hover:opacity-90 transition"
-                  >
-                    Reject
-                  </button>
-                </div>
-              </li>
-            ))
-          ) : (
-            <li className="text-tertiary">No pending predictions.</li>
-          )}
-        </ul>
+    <div
+      style={style}
+      className={`grid grid-cols-12 gap-3 px-4 py-3 border-b border-muted text-sm items-center ${
+        isEven ? 'bg-surface' : 'bg-muted'
+      } ${isSelected ? 'ring-2 ring-primary' : ''} hover:bg-accent hover:bg-opacity-10 transition-colors`}
+    >
+      {/* Checkbox */}
+      <div className="col-span-1 flex justify-center">
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={(e) => onPredictionSelect(prediction.id, e.target.checked)}
+          className="rounded border-muted"
+        />
       </div>
 
-      {/* Resolution Queue */}
-      <div>
-        <h2 className="text-xl font-semibold mb-2">Resolution Queue</h2>
-        {resolvable.length > 0 ? (
-          <ul className="space-y-4">
-            {resolvable.map((p) => {
-              const isExpired = new Date(p.expiresAt) < new Date();
-              return (
-                <li key={p.id} className="bg-surface rounded-lg shadow p-4">
-                  <div className="flex justify-between items-center mb-2">
-                    <h3 className="font-semibold">{p.title}</h3>
-                    <span
-                      className={`px-2 py-1 text-sm rounded-full ${
-                        isExpired ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
-                      }`}
-                    >
-                      {isExpired ? 'Expired' : 'Open'} until{' '}
-                      {format(new Date(p.expiresAt), 'yyyy-MM-dd')}
-                    </span>
-                  </div>
-                  <p className="text-sm text-tertiary mb-3">{p.description}</p>
+      {/* Prediction Info */}
+      <div className="col-span-3">
+        <div className="font-medium text-content truncate mb-1">{prediction.title}</div>
+        <div className="text-xs text-tertiary truncate">{prediction.description}</div>
+        <div className="flex items-center space-x-2 mt-1">
+          <span className="px-2 py-0.5 text-xs bg-secondary text-surface rounded">
+            {prediction.category}
+          </span>
+          {prediction.qualityFlags?.needsReview && (
+            <span className="px-2 py-0.5 text-xs bg-warning text-surface rounded">
+              Needs Review
+            </span>
+          )}
+        </div>
+      </div>
 
-                  {/* Options */}
-                  <div className="flex space-x-3 overflow-x-auto py-2">
-                    {p.options.map((opt) => {
-                      const isSelected = selectedOption[p.id] === opt.id;
-                      return (
-                        <label
-                          key={opt.id}
-                          className={`flex-shrink-0 cursor-pointer select-none
-                            flex flex-col items-center px-4 py-2 border rounded-lg transition
-                            ${
-                              isSelected
-                                ? 'border-primary bg-primary text-surface'
-                                : 'border-muted bg-background text-content hover:shadow-md'
-                            }
-                          `}
-                        >
-                          <input
-                            type="radio"
-                            name={`winner-${p.id}`}
-                            value={opt.id}
-                            checked={isSelected}
-                            onChange={() =>
-                              setSelectedOption((m) => ({
-                                ...m,
-                                [p.id]: opt.id,
-                              }))
-                            }
-                            className="sr-only"
-                          />
-                          <span className="font-medium">{opt.label}</span>
-                          <span className="text-sm text-tertiary">{opt.odds.toFixed(2)}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
+      {/* Creator */}
+      <div className="col-span-1">
+        <div className="text-xs text-content">{prediction.creator?.name || 'Unknown'}</div>
+        <div className="text-xs text-tertiary">{formatDate(prediction.createdAt.toString())}</div>
+      </div>
 
-                  {/* Resolve button */}
-                  <button
-                    onClick={() => {
-                      const win = selectedOption[p.id];
-                      if (!win) return;
-                      setResolvingId(p.id);
-                      resolvePrediction(p.id, win);
-                    }}
-                    disabled={resolvingId === p.id || !selectedOption[p.id]}
-                    className={`mt-3 w-full py-2 rounded font-medium transition ${
-                      selectedOption[p.id]
-                        ? 'bg-primary text-surface hover:opacity-90'
-                        : 'bg-muted text-tertiary cursor-not-allowed'
-                    }`}
-                  >
-                    {resolvingId === p.id ? 'Resolving…' : 'Resolve Prediction'}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        ) : (
-          <p className="text-tertiary">No approved predictions awaiting resolution.</p>
+      {/* Status */}
+      <div className="col-span-1 text-center">
+        <span className={`text-xs font-medium ${getStatusColor(currentStatus)}`}>
+          {currentStatus.charAt(0).toUpperCase() + currentStatus.slice(1)}
+        </span>
+      </div>
+
+      {/* Analytics */}
+      <div className="col-span-2 text-xs text-tertiary">
+        <div>Bets: {prediction.analytics?.totalBets || 0}</div>
+        <div>Volume: {prediction.analytics?.totalVolume?.toFixed(0) || 0}</div>
+        <div>Bettors: {prediction.analytics?.uniqueBettors || 0}</div>
+      </div>
+
+      {/* Engagement Metrics */}
+      <div className="col-span-2 text-xs">
+        <div className="flex items-center space-x-2">
+          <span className="text-tertiary">Controversy:</span>
+          <span
+            className={`font-medium ${
+              (prediction.analytics?.controversyScore || 0) > 70
+                ? 'text-error'
+                : (prediction.analytics?.controversyScore || 0) > 40
+                  ? 'text-warning'
+                  : 'text-success'
+            }`}
+          >
+            {getControversyLevel(prediction.analytics?.controversyScore || 0)}
+          </span>
+        </div>
+        <div className="flex items-center space-x-2">
+          <span className="text-tertiary">Interest:</span>
+          <span
+            className={`font-medium ${
+              (prediction.analytics?.popularityScore || 0) > 70
+                ? 'text-error'
+                : (prediction.analytics?.popularityScore || 0) > 40
+                  ? 'text-primary'
+                  : 'text-tertiary'
+            }`}
+          >
+            {getPopularityLevel(prediction.analytics?.popularityScore || 0)}
+          </span>
+        </div>
+      </div>
+
+      {/* Expires */}
+      <div className="col-span-1 text-xs text-tertiary">
+        {(prediction as any).closesAt ? formatDate((prediction as any).closesAt) : 'No expiration'}
+      </div>
+
+      {/* Actions */}
+      <div className="col-span-1 flex justify-center space-x-1">
+        {currentTab === 'pending' && (
+          <>
+            <button
+              onClick={() => onPredictionAction(prediction.id, 'approve')}
+              className="p-1 text-success hover:bg-success hover:text-surface rounded transition"
+              title="Approve"
+            >
+              ✓
+            </button>
+            <button
+              onClick={() => onPredictionAction(prediction.id, 'reject')}
+              className="p-1 text-error hover:bg-error hover:text-surface rounded transition"
+              title="Reject"
+            >
+              ✗
+            </button>
+          </>
+        )}
+        {currentTab === 'approved' && (
+          <button
+            onClick={() => onPredictionAction(prediction.id, 'resolve')}
+            className="p-1 text-primary hover:bg-primary hover:text-surface rounded transition"
+            title="Resolve"
+          >
+            ⚡
+          </button>
+        )}
+        <button
+          onClick={() => onPredictionAction(prediction.id, 'details')}
+          className="p-1 text-tertiary hover:text-content rounded hover:bg-muted transition"
+          title="View Details"
+        >
+          👁
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const PredictionQueue: React.FC<PredictionQueueProps> = ({ className = '' }) => {
+  const [activeTab, setActiveTab] = useState<TabType>('pending');
+  const [predictions, setPredictions] = useState<DetailedPrediction[]>([]);
+  const [paginationInfo, setPaginationInfo] = useState<Omit<PaginatedPredictions, 'predictions'>>({
+    totalCount: 0,
+    totalPages: 0,
+    currentPage: 0,
+    hasNextPage: false,
+    hasPreviousPage: false,
+    analytics: {
+      totalPending: 0,
+      totalApproved: 0,
+      totalResolved: 0,
+      totalRejected: 0,
+      avgResolutionTime: 0,
+    },
+  });
+  const [loading, setLoading] = useState(false);
+  const [selectedPredictions, setSelectedPredictions] = useState<Set<number>>(new Set());
+  const [searchText, setSearchText] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [bulkOperation, setBulkOperation] = useState<BulkPredictionOperation['operation'] | ''>('');
+
+  // Resolve modal state
+  const [resolveModalOpen, setResolveModalOpen] = useState(false);
+  const [predictionToResolve, setPredictionToResolve] = useState<DetailedPrediction | null>(null);
+  const [isResolving, setIsResolving] = useState(false);
+
+  const categories = ['Politics', 'Sports', 'Technology', 'Entertainment', 'Economics', 'Science'];
+
+  const fetchPredictions = useCallback(
+    async (page = 0) => {
+      setLoading(true);
+      try {
+        const params: PredictionSearchParams = {
+          search: searchText.trim() || undefined,
+          category: selectedCategory ? [selectedCategory] : undefined,
+          status: [activeTab],
+          page,
+          limit: 25,
+          sortBy: 'createdAt',
+          sortOrder: 'desc',
+        };
+
+        const results = await searchPredictions(params);
+        setPredictions(results.predictions);
+        setPaginationInfo({
+          totalCount: results.totalCount,
+          totalPages: results.totalPages,
+          currentPage: results.currentPage,
+          hasNextPage: results.hasNextPage,
+          hasPreviousPage: results.hasPreviousPage,
+          analytics: results.analytics,
+        });
+      } catch (error) {
+        console.error('Failed to fetch predictions:', error);
+        setPredictions([]);
+        setPaginationInfo({
+          totalCount: 0,
+          totalPages: 0,
+          currentPage: 0,
+          hasNextPage: false,
+          hasPreviousPage: false,
+        });
+      } finally {
+        setLoading(false);
+      }
+    },
+    [activeTab, searchText, selectedCategory],
+  );
+
+  useEffect(() => {
+    fetchPredictions(0);
+    setSelectedPredictions(new Set());
+  }, [fetchPredictions]);
+
+  const handlePredictionSelect = useCallback((predictionId: number, selected: boolean) => {
+    setSelectedPredictions((prev) => {
+      const newSet = new Set(prev);
+      if (selected) {
+        newSet.add(predictionId);
+      } else {
+        newSet.delete(predictionId);
+      }
+      return newSet;
+    });
+  }, []);
+
+  const handleSelectAll = () => {
+    if (selectedPredictions.size === predictions.length) {
+      setSelectedPredictions(new Set());
+    } else {
+      setSelectedPredictions(new Set(predictions.map((p) => p.id)));
+    }
+  };
+
+  const handlePredictionAction = async (predictionId: number, action: string) => {
+    if (action === 'details') {
+      // Open details modal/panel
+      const details = await getPredictionDetails(predictionId);
+      console.log('Prediction details:', details);
+      return;
+    }
+
+    if (action === 'resolve') {
+      // Find the prediction and open resolve modal
+      const prediction = predictions.find((p) => p.id === predictionId);
+      if (prediction) {
+        setPredictionToResolve(prediction);
+        setResolveModalOpen(true);
+      }
+      return;
+    }
+
+    try {
+      const operation: BulkPredictionOperation = {
+        predictionIds: [predictionId],
+        operation: action as any,
+      };
+
+      await bulkUpdatePredictions(operation);
+      fetchPredictions(paginationInfo.currentPage);
+    } catch (error) {
+      console.error(`Failed to ${action} prediction:`, error);
+    }
+  };
+
+  const handleResolve = async (winningOptionId: number) => {
+    if (!predictionToResolve) return;
+
+    setIsResolving(true);
+    try {
+      await resolvePrediction(predictionToResolve.id, winningOptionId);
+      fetchPredictions(paginationInfo.currentPage);
+      setResolveModalOpen(false);
+      setPredictionToResolve(null);
+    } catch (error) {
+      console.error('Failed to resolve prediction:', error);
+      throw error; // Re-throw so modal can handle it
+    } finally {
+      setIsResolving(false);
+    }
+  };
+
+  const handleBulkOperation = async () => {
+    if (selectedPredictions.size === 0 || !bulkOperation) return;
+
+    try {
+      const operation: BulkPredictionOperation = {
+        predictionIds: Array.from(selectedPredictions),
+        operation: bulkOperation,
+      };
+
+      await bulkUpdatePredictions(operation);
+      setSelectedPredictions(new Set());
+      setBulkOperation('');
+      fetchPredictions(paginationInfo.currentPage);
+    } catch (error) {
+      console.error('Bulk operation failed:', error);
+    }
+  };
+
+  const rowData = {
+    predictions,
+    selectedPredictions,
+    onPredictionSelect: handlePredictionSelect,
+    onPredictionAction: handlePredictionAction,
+    currentTab: activeTab,
+  };
+
+  const tabs: { key: TabType; label: string; count: number }[] = [
+    { key: 'pending', label: 'Pending', count: paginationInfo.analytics?.totalPending || 0 },
+    { key: 'approved', label: 'Approved', count: paginationInfo.analytics?.totalApproved || 0 },
+    { key: 'resolved', label: 'Resolved', count: paginationInfo.analytics?.totalResolved || 0 },
+    { key: 'rejected', label: 'Rejected', count: paginationInfo.analytics?.totalRejected || 0 },
+  ];
+
+  return (
+    <div className={`space-y-6 ${className}`}>
+      {/* Header with Analytics */}
+      <div className="bg-surface border border-muted rounded-lg p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-2xl font-bold text-content">Prediction Management</h2>
+            <p className="text-tertiary">
+              Advanced prediction queue with analytics and bulk operations
+            </p>
+          </div>
+          <div className="text-right">
+            <div className="text-sm text-tertiary">
+              Avg Resolution Time: {paginationInfo.analytics?.avgResolutionTime || 0}h
+            </div>
+            {loading && <div className="text-sm text-primary mt-1">Loading...</div>}
+          </div>
+        </div>
+
+        {/* Quick Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {tabs.map((tab) => (
+            <div
+              key={tab.key}
+              className={`p-3 rounded-lg text-center cursor-pointer transition-colors ${
+                activeTab === tab.key
+                  ? 'bg-primary text-surface'
+                  : 'bg-muted hover:bg-accent hover:bg-opacity-20'
+              }`}
+              onClick={() => setActiveTab(tab.key)}
+            >
+              <div className="text-lg font-semibold">{tab.count.toLocaleString()}</div>
+              <div className="text-xs">{tab.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Search and Filters */}
+      <div className="bg-surface border border-muted rounded-lg p-4">
+        <div className="flex items-center space-x-4 mb-4">
+          <div className="flex-1">
+            <input
+              type="text"
+              placeholder="Search predictions..."
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              className="w-full px-4 py-2 border border-muted rounded-lg bg-surface text-content focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+            />
+          </div>
+          <select
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            className="px-3 py-2 border border-muted rounded-lg bg-surface text-content"
+          >
+            <option value="">All Categories</option>
+            {categories.map((category) => (
+              <option key={category} value={category}>
+                {category}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Bulk Operations */}
+        {selectedPredictions.size > 0 && (
+          <div className="flex items-center space-x-4 p-3 bg-muted rounded-lg">
+            <span className="text-sm text-content">{selectedPredictions.size} selected</span>
+
+            <select
+              value={bulkOperation}
+              onChange={(e) => setBulkOperation(e.target.value as any)}
+              className="px-3 py-2 border border-muted rounded bg-surface"
+            >
+              <option value="">Select action...</option>
+              {activeTab === 'pending' && (
+                <>
+                  <option value="approve">Approve All</option>
+                  <option value="reject">Reject All</option>
+                </>
+              )}
+              {activeTab === 'approved' && <option value="resolve">Resolve All</option>}
+              <option value="delete">Delete All</option>
+            </select>
+
+            <button
+              onClick={handleBulkOperation}
+              disabled={!bulkOperation}
+              className="px-4 py-2 bg-primary text-surface rounded disabled:opacity-50 hover:opacity-90 transition"
+            >
+              Apply to {selectedPredictions.size} predictions
+            </button>
+          </div>
         )}
       </div>
-    </section>
+
+      {/* Prediction List */}
+      <div className="bg-surface border border-muted rounded-lg">
+        {/* Column Headers */}
+        <div className="grid grid-cols-12 gap-3 px-4 py-3 bg-secondary text-surface text-sm font-medium border-b border-muted">
+          <div className="col-span-1 flex justify-center">
+            <input
+              type="checkbox"
+              checked={predictions.length > 0 && selectedPredictions.size === predictions.length}
+              onChange={handleSelectAll}
+              className="rounded border-muted"
+            />
+          </div>
+          <div className="col-span-3">Prediction</div>
+          <div className="col-span-1">Creator</div>
+          <div className="col-span-1">Status</div>
+          <div className="col-span-2">Analytics</div>
+          <div className="col-span-2">Engagement</div>
+          <div className="col-span-1">Expires</div>
+          <div className="col-span-1">Actions</div>
+        </div>
+
+        {/* Virtual Scrolling List */}
+        <div className="h-96">
+          {predictions.length > 0 ? (
+            <List
+              height={384}
+              width="100%"
+              itemCount={predictions.length}
+              itemSize={80}
+              itemData={rowData}
+            >
+              {PredictionRow}
+            </List>
+          ) : (
+            <div className="flex items-center justify-center h-full text-tertiary">
+              {loading ? 'Loading predictions...' : 'No predictions found'}
+            </div>
+          )}
+        </div>
+
+        {/* Pagination */}
+        {paginationInfo.totalPages > 1 && (
+          <div className="flex items-center justify-between p-4 border-t border-muted">
+            <div className="text-sm text-tertiary">
+              Showing {paginationInfo.currentPage * 25 + 1}-
+              {Math.min((paginationInfo.currentPage + 1) * 25, paginationInfo.totalCount)} of{' '}
+              {paginationInfo.totalCount}
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <button
+                disabled={!paginationInfo.hasPreviousPage}
+                onClick={() => fetchPredictions(paginationInfo.currentPage - 1)}
+                className="px-3 py-1 text-sm border border-muted rounded disabled:opacity-50 hover:bg-muted transition"
+              >
+                Previous
+              </button>
+
+              <span className="text-sm text-content">
+                Page {paginationInfo.currentPage + 1} of {paginationInfo.totalPages}
+              </span>
+
+              <button
+                disabled={!paginationInfo.hasNextPage}
+                onClick={() => fetchPredictions(paginationInfo.currentPage + 1)}
+                className="px-3 py-1 text-sm border border-muted rounded disabled:opacity-50 hover:bg-muted transition"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Resolve Prediction Modal */}
+      {resolveModalOpen && predictionToResolve && (
+        <ResolvePredictionModal
+          prediction={{
+            ...predictionToResolve,
+            createdAt:
+              predictionToResolve.createdAt instanceof Date
+                ? predictionToResolve.createdAt.toISOString()
+                : predictionToResolve.createdAt,
+            expiresAt:
+              predictionToResolve.expiresAt instanceof Date
+                ? predictionToResolve.expiresAt.toISOString()
+                : predictionToResolve.expiresAt,
+          }}
+          onResolve={handleResolve}
+          onClose={() => {
+            setResolveModalOpen(false);
+            setPredictionToResolve(null);
+          }}
+          isResolving={isResolving}
+        />
+      )}
+    </div>
   );
-}
+};
+
+export default PredictionQueue;

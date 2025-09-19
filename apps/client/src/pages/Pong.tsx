@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
-import { PongGameOptimized } from '../components/pong/PongGameOptimized';
-import { useAuth } from '../hooks/useAuth';
+import { PongGame } from '../components/pong/PongGame';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function Pong() {
   const { user, refreshUserBalance } = useAuth();
@@ -24,5 +24,5 @@ export default function Pong() {
     );
   }
 
-  return <PongGameOptimized />;
+  return <PongGame />;
 }

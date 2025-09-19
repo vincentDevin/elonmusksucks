@@ -4,6 +4,12 @@ dotenv.config();
 
 import { PrismaClient, TransactionType, BetStatus } from '@prisma/client';
 import { SEED_ACHIEVEMENTS } from './achievement-catalog.ts';
+const AI_USERS = [
+  { id: -1, name: "Grimes' Laptop", difficulty: 'EASY' },
+  { id: -2, name: "Zuck's Metaverse", difficulty: 'MEDIUM' },
+  { id: -3, name: "Bezos' Rocket", difficulty: 'HARD' },
+  { id: -4, name: "X Æ A-XII", difficulty: 'IMPOSSIBLE' },
+];
 
 const prisma = new PrismaClient();
 
@@ -36,7 +42,7 @@ async function main() {
   await clear('ModerationLog',    () => prisma.moderationLog.deleteMany());
   await clear('UserBan',          () => prisma.userBan.deleteMany());
 
-  console.log('👥 Creating users Alice, Bob, Carol, and Admin…');
+  console.log('👥 Creating users Alice, Bob, Carol, Admin, and AI system user…');
   const [alice, bob, carol, admin] = await Promise.all([
     prisma.user.upsert({ where: { email: 'alice@example.com' }, update: {}, create: {
       email: 'alice@example.com', name: 'Alice', passwordHash: 'hash', emailVerified: true,
@@ -59,6 +65,37 @@ async function main() {
       location: 'Server Room', timezone: 'UTC', muskBucks: 100000,
     }}),
   ]);
+  
+  // Create AI system users with special IDs (using raw SQL for specific IDs)
+  console.log('🤖 Creating AI system users for Pong matches...');
+  for (const aiUser of AI_USERS) {
+    await prisma.$executeRaw`
+      INSERT INTO "User" (id, email, name, "passwordHash", "emailVerified", "isSystemAccount", "muskBucks", role, active, bio)
+      VALUES (${aiUser.id}, ${`ai${aiUser.id}@system.internal`}, ${aiUser.name}, 'system-account-no-login', true, true, 0, 'USER', true, ${`AI opponent (${aiUser.difficulty}) for Pong matches`})
+      ON CONFLICT (id) DO UPDATE SET 
+        name = EXCLUDED.name,
+        "isSystemAccount" = EXCLUDED."isSystemAccount",
+        bio = EXCLUDED.bio
+    `;
+    
+    // Initialize PongStats for each AI user with appropriate Elo
+    const baseElo = aiUser.difficulty === 'EASY' ? 1200 : 
+                   aiUser.difficulty === 'MEDIUM' ? 1400 :
+                   aiUser.difficulty === 'HARD' ? 1600 : 1800; // IMPOSSIBLE
+    
+    await prisma.pongStats.upsert({
+      where: { userId: aiUser.id },
+      update: {},
+      create: {
+        userId: aiUser.id,
+        eloRating: baseElo,
+        peakElo: baseElo,
+        tier: aiUser.difficulty === 'EASY' ? 'SILVER' :
+              aiUser.difficulty === 'MEDIUM' ? 'GOLD' :
+              aiUser.difficulty === 'HARD' ? 'PLATINUM' : 'DIAMOND',
+      }
+    });
+  }
 
   console.log('🏆 Seeding comprehensive achievement catalog...');
   console.log(`Upserting ${SEED_ACHIEVEMENTS.length} achievements by slug...`);

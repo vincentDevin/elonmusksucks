@@ -68,22 +68,22 @@ export const UnifiedThemeProvider: React.FC<UnifiedThemeProviderProps> = ({ chil
   const [error, setError] = useState<string | null>(null);
   const [initializedFromUser, setInitializedFromUser] = useState(false);
 
-  // Initialize theme on mount
+  // Initialize theme on mount - only run once
   useEffect(() => {
     const initializeTheme = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        // 1. Try to get stored theme
-        let storedThemeId = getStoredThemeId(userId);
+        // 1. Try to get stored theme (without user ID first, then with current user if available)
+        let storedThemeId = getStoredThemeId() || getStoredThemeId(userId);
 
         // 2. Migrate legacy theme ID if needed
         if (storedThemeId) {
           storedThemeId = migrateLegacyThemeId(storedThemeId);
         }
 
-        // 3. Try to load stored preferences
+        // 3. Try to load stored preferences from current user if available
         let storedPreferences: ThemePreferences | null = null;
         if (userId) {
           try {
@@ -96,15 +96,7 @@ export const UnifiedThemeProvider: React.FC<UnifiedThemeProviderProps> = ({ chil
           }
         }
 
-        // 4. Try to load theme from user context (no API call needed)
-        // let userTheme: string | null = null;
-        // Get theme from user context instead of making API call
-        // The AuthContext has already loaded user data
-        // We'll check for it after the component has user prop
-        // This will be handled in the useEffect dependency on user prop
-
-        // 5. Determine initial theme (prioritize localStorage > system for now)
-        // User theme will be handled in a separate useEffect when user context loads
+        // 4. Determine initial theme (prioritize localStorage > system)
         let initialTheme: UnifiedTheme;
 
         if (storedThemeId) {
@@ -117,7 +109,7 @@ export const UnifiedThemeProvider: React.FC<UnifiedThemeProviderProps> = ({ chil
           initialTheme = getDefaultThemeForCategory(systemCategory);
         }
 
-        // 6. Set initial state
+        // 5. Set initial state
         setCurrentTheme(initialTheme);
         setPreferences(
           storedPreferences || {
@@ -127,10 +119,10 @@ export const UnifiedThemeProvider: React.FC<UnifiedThemeProviderProps> = ({ chil
           },
         );
 
-        // 7. Apply theme to document
+        // 6. Apply theme to document
         applyThemeToDocument(initialTheme);
 
-        // 8. Clean up legacy storage
+        // 7. Clean up legacy storage
         cleanupLegacyThemeStorage(userId);
 
         console.log(`🎨 Theme initialized: ${initialTheme.name} (${initialTheme.id})`);
@@ -148,7 +140,7 @@ export const UnifiedThemeProvider: React.FC<UnifiedThemeProviderProps> = ({ chil
     };
 
     initializeTheme();
-  }, [userId]);
+  }, []); // Remove userId dependency to prevent re-initialization
 
   // Load theme from user context when user data becomes available (no API call)
   useEffect(() => {
@@ -328,7 +320,7 @@ export const UnifiedThemeProvider: React.FC<UnifiedThemeProviderProps> = ({ chil
 
     const handleChange = (e: MediaQueryListEvent) => {
       // Only auto-switch if user hasn't explicitly set a preference
-      const hasExplicitPreference = getStoredThemeId(userId) !== null;
+      const hasExplicitPreference = getStoredThemeId() || getStoredThemeId(userId);
       if (!hasExplicitPreference) {
         const systemCategory = e.matches ? 'dark' : 'light';
         setThemeCategory(systemCategory);
@@ -337,7 +329,7 @@ export const UnifiedThemeProvider: React.FC<UnifiedThemeProviderProps> = ({ chil
 
     mediaQuery.addEventListener('change', handleChange);
     return () => mediaQuery.removeEventListener('change', handleChange);
-  }, [setThemeCategory, userId]);
+  }, [setThemeCategory, userId]); // Keep userId here for the hasExplicitPreference check
 
   return (
     <UnifiedThemeContext.Provider value={contextValue}>

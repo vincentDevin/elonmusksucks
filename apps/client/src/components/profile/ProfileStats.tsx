@@ -1,4 +1,7 @@
 import { useState } from 'react';
+
+// Helper to convert string/number to number
+const asNum = (v: string | number | bigint | undefined | null) => Number(v ?? 0);
 import type { UserStatsDTO } from '@ems/types';
 import { WinLossPieChart } from './graphs/WinLossPieChart';
 import { FinancialBarChart } from './graphs/FinancialBarChart';
@@ -14,7 +17,6 @@ export function ProfileStats({
   isOwn: boolean;
 }) {
   const [showRawStats, setShowRawStats] = useState(false);
-  const [expanded, setExpanded] = useState(false);
 
   const betWinRate = stats.totalBets > 0 ? stats.betsWon / stats.totalBets : 0;
   const parlayWinRate = stats.totalParlays > 0 ? stats.parlaysWon / stats.totalParlays : 0;
@@ -28,25 +30,9 @@ export function ProfileStats({
 
   return (
     <div className="bg-surface border border-muted rounded-2xl p-4 sm:p-6 shadow-lg hover:shadow-xl transition-shadow duration-300">
-      {/* Header with expand/collapse button */}
-      <div className="flex items-center justify-between mb-6">
+      {/* Header */}
+      <div className="mb-6">
         <h3 className="text-lg font-semibold text-content">User Stats Overview</h3>
-        <button
-          onClick={() => setExpanded(!expanded)}
-          className="flex items-center gap-2 text-primary hover:text-primary/80 transition-colors"
-        >
-          <span className="text-sm font-medium">{expanded ? 'Collapse' : 'Expand'}</span>
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth={1.5}
-            stroke="currentColor"
-            className={`w-5 h-5 transition-transform ${expanded ? 'rotate-180' : ''}`}
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-          </svg>
-        </button>
       </div>
 
       {/* Quick Stats Summary - always visible */}
@@ -67,46 +53,44 @@ export function ProfileStats({
         </div>
         <div className="text-center">
           <div
-            className={`text-lg font-bold ${stats.profit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
+            className={`text-lg font-bold ${asNum(stats.profit) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
           >
-            {stats.profit >= 0 ? '+' : ''}${stats.profit.toLocaleString()}
+            {asNum(stats.profit) >= 0 ? '+' : ''}${asNum(stats.profit).toLocaleString()}
           </div>
           <div className="text-xs text-tertiary">Profit</div>
         </div>
       </div>
 
-      {/* Expandable Charts Section */}
-      {expanded && (
-        <div className="mt-6">
-          {/* Charts Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-            <div className="bg-background/50 border border-muted rounded-xl p-4 hover:bg-background/70 transition-colors duration-200">
-              <WinLossPieChart
-                wins={stats.betsWon + stats.parlaysWon}
-                losses={stats.betsLost + stats.parlaysLost}
-                title="Overall Win/Loss"
-              />
-            </div>
+      {/* Charts Section - Always Visible */}
+      <div className="mt-6">
+        {/* Charts Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          <div className="bg-background/50 border border-muted rounded-xl p-4 hover:bg-background/70 transition-colors duration-200">
+            <WinLossPieChart
+              wins={stats.betsWon + stats.parlaysWon}
+              losses={stats.betsLost + stats.parlaysLost}
+              title="Overall Win/Loss"
+            />
+          </div>
 
-            <div className="bg-background/50 border border-muted rounded-xl p-4 hover:bg-background/70 transition-colors duration-200">
-              <FinancialBarChart
-                wagered={stats.totalWagered}
-                won={stats.totalWon}
-                profit={stats.profit}
-              />
-            </div>
+          <div className="bg-background/50 border border-muted rounded-xl p-4 hover:bg-background/70 transition-colors duration-200">
+            <FinancialBarChart
+              wagered={asNum(stats.totalWagered)}
+              won={asNum(stats.totalWon)}
+              profit={asNum(stats.profit)}
+            />
+          </div>
 
-            <div className="bg-background/50 border border-muted rounded-xl p-4 hover:bg-background/70 transition-colors duration-200">
-              <PerformanceProgressBars
-                roi={stats.roi}
-                betWinRate={betWinRate}
-                parlayWinRate={parlayWinRate}
-                parlayAccuracy={parlayAccuracy}
-              />
-            </div>
+          <div className="bg-background/50 border border-muted rounded-xl p-4 hover:bg-background/70 transition-colors duration-200">
+            <PerformanceProgressBars
+              roi={stats.roi}
+              betWinRate={betWinRate}
+              parlayWinRate={parlayWinRate}
+              parlayAccuracy={parlayAccuracy}
+            />
           </div>
         </div>
-      )}
+      </div>
 
       {/* Raw Stats Section - now collapsible inside the same card */}
       <div className="border-t border-muted pt-4 mt-4">

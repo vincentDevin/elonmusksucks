@@ -3,6 +3,9 @@ import 'dotenv/config';
 import { Worker } from 'bullmq';
 import { PrismaClient } from '@prisma/client';
 import redisClient from '../lib/redis';
+
+// Configurable concurrency to keep CPU saturation <70%
+const ARTICLE_CONCURRENCY = parseInt(process.env.WORKER_ARTICLE_CONCURRENCY || '5');
 import type { Job } from 'bullmq';
 import type { ArticleProcessingJob } from '@ems/types';
 import ogs from 'open-graph-scraper';
@@ -52,7 +55,7 @@ const articleWorker = new Worker(
   },
   {
     connection: redisClient,
-    concurrency: 10, // Process multiple articles simultaneously
+    concurrency: ARTICLE_CONCURRENCY, // Process articles with controlled concurrency
     removeOnComplete: { count: 100 },
     removeOnFail: { count: 200 },
   },
@@ -239,6 +242,9 @@ async function processBulkTagging(job: Job<BulkTaggingData>): Promise<{
     errors: ['Bulk tagging not yet implemented'],
   };
 }
+
+// Log configured concurrency on startup
+console.log(`[article-worker] Configured concurrency: ${ARTICLE_CONCURRENCY}`);
 
 // Event handlers
 articleWorker.on('completed', (job) => {

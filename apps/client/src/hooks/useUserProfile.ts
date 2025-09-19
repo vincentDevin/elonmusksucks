@@ -96,14 +96,14 @@ export function useUserProfile(userId?: number | null): UseUserProfileResult {
                 totalParlayLegs: 0,
                 parlayLegsWon: 0,
                 parlayLegsLost: 0,
-                totalWagered: 0,
-                totalWon: 0,
-                profit: 0,
+                totalWagered: '0',
+                totalWon: '0',
+                profit: '0',
                 roi: 0,
                 currentStreak: 0,
                 longestStreak: 0,
                 mostCommonBet: null,
-                biggestWin: 0,
+                biggestWin: '0',
                 updatedAt: new Date().toISOString(),
               };
             }

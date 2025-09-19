@@ -4,6 +4,16 @@
 import { Request, Response, NextFunction } from 'express';
 import { getQueryMetrics, clearQueryMetrics, isDbConnected } from '../db';
 import redisClient from '../lib/redis';
+import {
+  toDatabaseMetricsResponse,
+  toClearMetricsResponse,
+  toHealthCheckResponse,
+} from '../view/monitoring.view';
+import type {
+  DatabaseMetricsResponse,
+  ClearMetricsResponse,
+  HealthCheckResponse,
+} from '@ems/types';
 
 /**
  * Get current database query performance metrics
@@ -20,7 +30,7 @@ export async function getDatabaseMetrics(
     // Add database connection status
     const dbStatus = {
       connected: isDbConnected(),
-      timestamp: new Date().toISOString(),
+      timestamp: new Date(),
     };
 
     // Get Redis status as well
@@ -38,14 +48,13 @@ export async function getDatabaseMetrics(
       };
     }
 
-    res.json({
-      database: {
-        ...metrics,
-        status: dbStatus,
-      },
-      redis: redisStatus,
-      timestamp: new Date().toISOString(),
-    });
+    const payload = toDatabaseMetricsResponse({
+      metrics,
+      dbStatus,
+      redisStatus,
+      timestamp: new Date(),
+    }) satisfies DatabaseMetricsResponse;
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -62,11 +71,12 @@ export async function clearDatabaseMetrics(
 ): Promise<void> {
   try {
     clearQueryMetrics();
-    res.json({
+    const payload = toClearMetricsResponse({
       success: true,
       message: 'Query metrics cleared',
-      timestamp: new Date().toISOString(),
-    });
+      timestamp: new Date(),
+    }) satisfies ClearMetricsResponse;
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -104,9 +114,10 @@ export async function healthCheck(
   const isHealthy = checks.database && checks.redis;
   const statusCode = isHealthy ? 200 : 503;
 
-  res.status(statusCode).json({
+  const payload = toHealthCheckResponse({
     status: isHealthy ? 'healthy' : 'unhealthy',
     checks,
-    timestamp: new Date().toISOString(),
-  });
+    timestamp: new Date(),
+  }) satisfies HealthCheckResponse;
+  res.status(statusCode).json(payload);
 }

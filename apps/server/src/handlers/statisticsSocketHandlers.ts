@@ -1,51 +1,29 @@
 import { Socket, Server as IOServer } from 'socket.io';
+import {
+  StatsUpdatePayload,
+  RankingChangePayload,
+  AchievementUnlockedPayload,
+  REDIS_CHANNELS,
+} from '@ems/types';
+
+// TEMP: Re-export shared ACK types for backwards compatibility during migration
+export type { AckCallback, AckCallbackObj, AckResult, AckOk, AckErr } from '@ems/types';
 import { EnhancedUserStatsService } from '../services/enhancedUserStats.service';
-import redisClient from '../lib/redis';
+import { UserRepository } from '../repositories/UserRepository';
+import { BettingRepository } from '../repositories/BettingRepository';
+import { StatsRepository } from '../repositories/StatsRepository';
+import { PrismaClient } from '@prisma/client';
+import { eventBus } from '../lib/EventBus';
 
-const enhancedUserStatsService = new EnhancedUserStatsService();
-
-export interface StatsUpdatePayload {
-  userId: number;
-  changes: {
-    winRate?: number;
-    profit?: number;
-    rank?: number;
-    streak?: number;
-    totalBets?: number;
-  };
-  achievements?: Array<{
-    id: string;
-    title: string;
-    description: string;
-    isUnlocked: boolean;
-  }>;
-  timestamp: string;
-}
-
-export interface RankingChangePayload {
-  userId: number;
-  oldRank: number;
-  newRank: number;
-  change: number;
-  category: 'allTime' | 'daily';
-  percentile: number;
-}
-
-export interface AchievementUnlockedPayload {
-  userId: number;
-  achievement: {
-    id: string;
-    title: string;
-    description: string;
-    category: string;
-  };
-  progress: {
-    previous: number;
-    current: number;
-    target: number;
-  };
-  timestamp: string;
-}
+const userRepository = new UserRepository();
+const bettingRepository = new BettingRepository();
+const prisma = new PrismaClient();
+const statsRepository = new StatsRepository(prisma);
+const enhancedUserStatsService = new EnhancedUserStatsService(
+  userRepository,
+  bettingRepository,
+  statsRepository,
+);
 
 /**
  * Register real-time statistics handlers for individual socket connections
@@ -111,16 +89,16 @@ export function registerStatisticsRedisHandlers(io: IOServer, redisSub: any): vo
       const data = JSON.parse(message);
 
       switch (channel) {
-        case 'stats:update':
+        case REDIS_CHANNELS.STATS_UPDATE:
           handleStatsUpdate(io, data);
           break;
-        case 'ranking:change':
+        case REDIS_CHANNELS.RANKING_CHANGE:
           handleRankingChange(io, data);
           break;
-        case 'achievement:unlocked':
+        case REDIS_CHANNELS.ACHIEVEMENT_UNLOCKED:
           handleAchievementUnlocked(io, data);
           break;
-        case 'stats:refresh':
+        case REDIS_CHANNELS.STATS_REFRESH:
           handleStatsRefresh(io, data);
           break;
         default:
@@ -257,7 +235,7 @@ export class StatisticsEventEmitter {
       timestamp: new Date().toISOString(),
     };
 
-    await redisClient.publish('stats:update', JSON.stringify(payload));
+    await eventBus.publish(REDIS_CHANNELS.STATS_UPDATE, payload);
   }
 
   static async emitRankingChange(
@@ -276,7 +254,7 @@ export class StatisticsEventEmitter {
       percentile: 0, // This would be calculated by the leaderboard service
     };
 
-    await redisClient.publish('ranking:change', JSON.stringify(payload));
+    await eventBus.publish(REDIS_CHANNELS.RANKING_CHANGE, payload);
   }
 
   static async emitAchievementUnlocked(
@@ -291,10 +269,10 @@ export class StatisticsEventEmitter {
       timestamp: new Date().toISOString(),
     };
 
-    await redisClient.publish('achievement:unlocked', JSON.stringify(payload));
+    await eventBus.publish(REDIS_CHANNELS.ACHIEVEMENT_UNLOCKED, payload);
   }
 
   static async emitStatsRefresh(userId: number): Promise<void> {
-    await redisClient.publish('stats:refresh', JSON.stringify({ userId }));
+    await eventBus.publish(REDIS_CHANNELS.STATS_REFRESH, { userId });
   }
 }

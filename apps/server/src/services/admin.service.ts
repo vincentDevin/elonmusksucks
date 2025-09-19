@@ -1,22 +1,25 @@
 // apps/server/src/services/admin.service.ts
 import type { Role } from '@prisma/client';
+import type { IAdminRepository } from '../repositories/interfaces/IAdminRepository';
 import type {
-  IAdminRepository,
   QueryParams,
   UserSearchParams,
   PaginatedUsers,
   DetailedUser,
+  PredictionSearchParams,
+} from '@ems/types';
+import { REDIS_CHANNELS } from '@ems/types';
+import type {
   BulkUserOperation,
   BulkOperationResult,
-  PredictionSearchParams,
   PaginatedPredictions,
   DetailedPrediction,
   BulkPredictionOperation,
   BulkPredictionResult,
-} from '../repositories/IAdminRepository';
+} from '../repositories/interfaces/IAdminRepository';
 import { PrismaAdminRepository } from '../repositories/AdminRepository';
 import type { UserStatsDTO } from '@ems/types';
-import redisClient from '../lib/redis';
+import { eventBus } from '../lib/EventBus';
 
 const repo: IAdminRepository = new PrismaAdminRepository();
 
@@ -76,29 +79,64 @@ export const bulkUpdatePredictions = async (
 
   // Broadcast events for successful operations
   if (result.successCount > 0) {
-    const redisClient = require('../lib/redis').default;
-
     for (const prediction of result.updatedPredictions) {
       if (operation.operation === 'approve') {
-        await redisClient.publish(
-          'prediction:approved',
-          JSON.stringify({
-            id: prediction.id,
-            title: prediction.title,
-            category: prediction.category,
-            timestamp: new Date().toISOString(),
-          }),
-        );
+        await eventBus.publish(REDIS_CHANNELS.PREDICTION_APPROVED, {
+          id: prediction.id,
+          title: prediction.title,
+          category: prediction.category,
+          timestamp: new Date().toISOString(),
+        });
+
+        // Publish JSON rule achievement event for bulk prediction approval
+        try {
+          await eventBus.publish(REDIS_CHANNELS.PREDICTION_APPROVED, {
+            key: 'prediction:approved',
+            userId: prediction.creatorId,
+            occurredAt: new Date().toISOString(),
+            idempotencyKey: `prediction:${prediction.id}:approved:bulk`,
+            payload: {
+              predictionId: prediction.id,
+              title: prediction.title,
+              category: prediction.category,
+              bulkOperation: true,
+            },
+          });
+        } catch (achievementError) {
+          console.error(
+            '[admin] Error publishing bulk prediction approval achievement event:',
+            achievementError,
+          );
+        }
       } else if (operation.operation === 'resolve') {
-        await redisClient.publish(
-          'prediction:resolved',
-          JSON.stringify({
-            id: prediction.id,
-            title: prediction.title,
-            winningOptionId: prediction.resolutionData?.winningOptionId,
-            timestamp: new Date().toISOString(),
-          }),
-        );
+        await eventBus.publish(REDIS_CHANNELS.PREDICTION_RESOLVE, {
+          id: prediction.id,
+          title: prediction.title,
+          winningOptionId: prediction.resolutionData?.winningOptionId,
+          timestamp: new Date().toISOString(),
+        });
+
+        // Publish JSON rule achievement event for prediction resolution
+        try {
+          await eventBus.publish(REDIS_CHANNELS.PREDICTION_RESOLVE, {
+            key: 'prediction:resolved',
+            userId: prediction.creatorId,
+            occurredAt: new Date().toISOString(),
+            idempotencyKey: `prediction:${prediction.id}:resolved:bulk`,
+            payload: {
+              predictionId: prediction.id,
+              title: prediction.title,
+              category: prediction.category,
+              winningOptionId: prediction.resolutionData?.winningOptionId,
+              bulkOperation: true,
+            },
+          });
+        } catch (achievementError) {
+          console.error(
+            '[admin] Error publishing prediction resolution achievement event:',
+            achievementError,
+          );
+        }
       }
     }
   }
@@ -114,19 +152,38 @@ export const setPredictionStatus = async (
 
   // 🎊 Broadcast prediction approval/rejection event
   if (status === 'approved') {
-    const redisClient = require('../lib/redis').default;
-    await redisClient.publish(
-      'prediction:approved',
-      JSON.stringify({
-        id: updated.id,
-        title: updated.title,
-        description: updated.description,
-        category: updated.category,
-        type: updated.type,
-        approved: true,
-        timestamp: new Date().toISOString(),
-      }),
-    );
+    await eventBus.publish(REDIS_CHANNELS.PREDICTION_APPROVED, {
+      id: updated.id,
+      title: updated.title,
+      description: updated.description,
+      category: updated.category,
+      type: updated.type,
+      approved: true,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Publish JSON rule achievement event for prediction approval
+    try {
+      await eventBus.publish(REDIS_CHANNELS.PREDICTION_APPROVED, {
+        key: 'prediction:approved',
+        userId: updated.creatorId,
+        occurredAt: new Date().toISOString(),
+        idempotencyKey: `prediction:${updated.id}:approved`,
+        payload: {
+          predictionId: updated.id,
+          title: updated.title,
+          category: updated.category,
+          description: updated.description,
+          type: updated.type,
+        },
+      });
+    } catch (achievementError) {
+      console.error(
+        '[admin] Error publishing prediction approval achievement event:',
+        achievementError,
+      );
+      // Don't fail the approval if achievement event fails
+    }
   }
 
   return updated;
@@ -318,14 +375,11 @@ export const broadcastRealtimeMetrics = async () => {
     const metrics = await repo.getRealtimeMetrics();
 
     // Publish to Redis for Socket.IO broadcasting
-    await redisClient.publish(
-      'admin:metrics:update',
-      JSON.stringify({
-        metrics,
-        timestamp: new Date().toISOString(),
-        type: 'realtime_update',
-      }),
-    );
+    await eventBus.publish(REDIS_CHANNELS.ADMIN_METRICS_UPDATE, {
+      metrics,
+      timestamp: new Date().toISOString(),
+      type: 'realtime_update',
+    });
 
     console.log('[admin-service] Broadcast real-time metrics update');
   } catch (error) {

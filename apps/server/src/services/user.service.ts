@@ -1,21 +1,17 @@
-import { PrismaClient } from '@prisma/client';
 import redisClient from '../lib/redis';
+import { CACHE_KEYS, getProfileImageTTL, getTTLUntilMidnight } from '../lib/cacheTTL';
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import type { IUserRepository } from '../repositories/IUserRepository';
+import type { IUserRepository } from '../repositories/interfaces/IUserRepository';
 import { UserRepository } from '../repositories/UserRepository';
-import type {
-  DbUser,
-  DbUserBadge,
-  DbBadge,
-  DbUserStats,
-  DbUserPost,
-  DbUserActivity,
-} from '@ems/types';
-import type { PublicUserProfile, UserFeedPost, UserActivity, UserStatsDTO } from '@ems/types';
+import type { DbUser, DbUserBadge, DbBadge, DbUserStats, DbUserPost } from '@ems/types';
+// TODO: Branded types available: UserId, PredictionId, ISODateString, TimestampMs
+import type { PublicUserProfile, UserFeedPost, UserStatsDTO } from '@ems/types';
+import { PostService } from './post.service';
 import { unifiedActivityService } from './unifiedActivity.service';
 import { ImageProcessingService, ProcessedImageSizes } from './imageProcessing.service';
 import { DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { eventBus } from '../lib/EventBus';
 
 // Define a minimal file interface matching Multer's in-memory buffer
 export type UploadedFile = {
@@ -24,15 +20,15 @@ export type UploadedFile = {
   mimetype: string;
 };
 
-const prisma = new PrismaClient();
-
 export class UserService {
   private repo: IUserRepository;
+  private postService: PostService;
   private s3: S3Client;
   private bucket: string;
 
   constructor(repo: IUserRepository = new UserRepository()) {
     this.repo = repo;
+    this.postService = new PostService();
     this.s3 = new S3Client({
       region: 'auto',
       endpoint: process.env.TIGRIS_S3_ENDPOINT,
@@ -47,7 +43,7 @@ export class UserService {
 
   // --- ENHANCED: Upload profile image with processing ---
   async uploadUserProfileImage(
-    userId: number,
+    userId: number, // TODO: Use UserId branded type when call sites are updated
     file: UploadedFile,
   ): Promise<{
     avatarUrl: string;
@@ -58,7 +54,7 @@ export class UserService {
     };
   }> {
     // Clear cached URLs
-    await redisClient.del(`profileImageUrl:userId:${userId}`);
+    await redisClient.del(CACHE_KEYS.PROFILE_IMAGE_URL(userId));
 
     // Get current user to check for existing profile picture
     const user = await this.repo.findById(userId);
@@ -195,7 +191,7 @@ export class UserService {
     profilePictureKey: string,
     expiresInSeconds = 3600,
   ): Promise<string> {
-    const redisKey = `profileImageUrl:userId:${userId}`;
+    const redisKey = CACHE_KEYS.PROFILE_IMAGE_URL(userId);
     // Try Redis first
     const cached = await redisClient.get(redisKey);
     if (cached) return cached;
@@ -203,8 +199,9 @@ export class UserService {
     // Not cached: generate signed URL
     const url = await this.getSignedAvatarUrl(profilePictureKey, expiresInSeconds);
 
-    // Store in Redis, TTL matches URL expiry
-    await redisClient.set(redisKey, url, 'EX', expiresInSeconds);
+    // Store in Redis with intelligent TTL based on signature expiry
+    const cacheTTL = getProfileImageTTL(expiresInSeconds);
+    await redisClient.setex(redisKey, cacheTTL, url);
 
     return url;
   }
@@ -214,6 +211,7 @@ export class UserService {
    * Used for socket auth and chat events.
    */
   async getPublicSocketUser(userId: number): Promise<{
+    // TODO: Use UserId branded type when call sites are updated
     id: number;
     name: string;
     role: string;
@@ -234,20 +232,14 @@ export class UserService {
     const user = await this.repo.findById(userId);
     if (!user) throw new Error('User not found');
 
-    const [followersCount, followingCount, userBadges] = await Promise.all([
+    const [followersCount, followingCount, userBadges, userAchievements] = await Promise.all([
       this.repo.getFollowersCount(userId),
       this.repo.getFollowingCount(userId),
       this.repo.findUserBadges(userId),
+      this.repo.findUserAchievements(userId),
     ]);
 
-    const rawRank = (await prisma.$queryRawUnsafe(
-      `SELECT rank FROM (
-         SELECT id, RANK() OVER (ORDER BY "muskBucks" DESC) AS rank
-         FROM "User"
-       ) u WHERE u.id = $1;`,
-      userId,
-    )) as { rank: bigint }[];
-    const rank = Array.isArray(rawRank) && rawRank.length > 0 ? Number(rawRank[0].rank) : undefined;
+    const rank = await this.repo.getUserRank(userId);
     const isFollowing = viewerId ? await this.repo.existsFollow(viewerId, userId) : false;
 
     // Generate signed avatar URL if we have a storage key
@@ -289,6 +281,25 @@ export class UserService {
             ? ub.badge.createdAt
             : ub.badge.createdAt.toISOString(),
         awardedAt: typeof ub.awardedAt === 'string' ? ub.awardedAt : ub.awardedAt.toISOString(),
+      })),
+      achievements: userAchievements.map((ua: any) => ({
+        id: ua.achievement.id,
+        name: ua.achievement.name,
+        title: ua.achievement.title || ua.achievement.name,
+        description: ua.achievement.description,
+        category: ua.achievement.category || 'general',
+        rarity: ua.achievement.rarity || 'common',
+        iconUrl: ua.achievement.iconUrl || null,
+        completedAt: ua.completedAt
+          ? typeof ua.completedAt === 'string'
+            ? ua.completedAt
+            : ua.completedAt.toISOString()
+          : null,
+        awardedAt: ua.completedAt
+          ? typeof ua.completedAt === 'string'
+            ? ua.completedAt
+            : ua.completedAt.toISOString()
+          : null,
       })),
       followersCount,
       followingCount,
@@ -337,20 +348,13 @@ export class UserService {
     authorId: number,
     content: string,
     parentId?: number | null,
-    ownerId?: number,
+    _profileOwnerId?: number, // Legacy parameter for backward compatibility
   ): Promise<UserFeedPost> {
-    const feedOwnerId = ownerId ?? authorId;
-    const post: DbUserPost = await this.repo.createUserPost({
-      authorId,
-      ownerId: feedOwnerId,
+    // Always use the new PostService for consistency
+    const post = await this.postService.createPost(authorId, {
       content,
-      parentId: typeof parentId === 'undefined' ? null : parentId,
-    });
-    // Create legacy activity record (still needed for getUserActivity endpoint)
-    await this.repo.createUserActivity({
-      userId: authorId,
-      type: parentId ? 'COMMENT_CREATED' : 'POST_CREATED',
-      details: { postId: post.id },
+      visibility: 'PUBLIC', // Default to public for user feed posts
+      parentId: parentId || null,
     });
 
     // Create unified activity event
@@ -359,18 +363,18 @@ export class UserService {
       await unifiedActivityService.createPostActivity(
         {
           id: author.id,
-          name: author.name,
-          avatarUrl: author.avatarUrl,
+          name: author.name || 'Unknown User',
+          avatarUrl: author.avatarUrl || null,
         },
         {
           id: post.id,
           content,
-          isComment: Boolean(parentId),
+          isComment: !!parentId,
         },
       );
     }
 
-    return toFeedPostDTO(post);
+    return post;
   }
 
   async getUserPostThread(
@@ -384,44 +388,7 @@ export class UserService {
     };
   }
 
-  // --- ACTIVITY ---
-
-  async getUserActivity(userId: number, viewerId?: number): Promise<UserActivity[]> {
-    const user = await this.repo.findById(userId);
-    if (!user) throw new Error('User not found');
-    if (user.feedPrivate && user.id !== viewerId) throw new Error('Activity feed is private');
-
-    const activity: DbUserActivity[] = await this.repo.getUserActivity(userId);
-    return activity.map(toActivityDTO);
-  }
-
-  async createUserActivity(userId: number, type: string, details?: any): Promise<UserActivity> {
-    const activity = await this.repo.createUserActivity({ userId, type, details });
-
-    // Legacy ticker publishing removed - now handled by unified activity system
-    // The unified activity service broadcasts all activities globally
-    // if (
-    //   [
-    //     'PREDICTION_CREATED',
-    //     'PREDICTION_RESOLVED',
-    //     'BET_PLACED',
-    //     'PARLAY_PLACED',
-    //     'POST_CREATED',
-    //     'COMMENT_CREATED',
-    //     'BADGE_EARNED',
-    //   ].includes(type)
-    // ) {
-    //   publishTicker({
-    //     id: activity.id,
-    //     userId,
-    //     type,
-    //     details,
-    //     createdAt: new Date().toISOString(),
-    //   });
-    // }
-
-    return toActivityDTO(activity);
-  }
+  // --- ACTIVITY (Legacy methods removed - use unifiedActivityService instead) ---
 
   // --- STATS ---
 
@@ -483,186 +450,242 @@ export class UserService {
   /**
    * Get user's active bets (pending/open bets only)
    */
-  async getUserActiveBets(userId: number): Promise<
-    Array<{
-      id: number;
-      predictionId: number;
-      predictionTitle: string;
-      amount: string;
-      odds: number;
-      optionLabel?: string;
-      status: string;
-      createdAt: string;
-    }>
-  > {
-    const bets = await prisma.bet.findMany({
-      where: {
-        userId,
-        status: 'PENDING', // Only active/pending bets
-      },
-      include: {
-        prediction: {
-          select: {
-            id: true,
-            title: true,
-            resolved: true,
-          },
-        },
-        optionOption: {
-          select: {
-            label: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-      take: 10, // Limit to recent bets
-    });
-
-    return bets.map((bet) => ({
-      id: bet.id,
-      predictionId: bet.predictionId,
-      predictionTitle: bet.prediction.title,
-      amount: bet.amount.toString(),
-      odds: bet.oddsAtPlacement || 1.0,
-      optionLabel: bet.optionOption?.label,
-      status: bet.status,
-      createdAt: bet.createdAt.toISOString(),
-    }));
+  async getUserActiveBets(userId: number) {
+    return this.repo.getUserActiveBets(userId);
   }
 
   /**
    * Get user's active parlays (pending parlays only)
    */
-  async getUserActiveParlays(userId: number): Promise<
-    Array<{
-      id: number;
-      amount: string;
-      combinedOdds: number;
-      potentialPayout: string;
-      legCount: number;
-      status: string;
-      createdAt: string;
-      legs: Array<{
-        predictionTitle: string;
-        optionLabel: string;
-      }>;
-    }>
-  > {
-    const parlays = await prisma.parlay.findMany({
-      where: {
-        userId,
-        status: 'PENDING', // Only active/pending parlays
-      },
-      include: {
-        legs: {
-          include: {
-            option: {
-              include: {
-                prediction: {
-                  select: {
-                    title: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-      take: 10, // Limit to recent parlays
-    });
-
-    return parlays.map((parlay) => ({
-      id: parlay.id,
-      amount: parlay.amount.toString(),
-      combinedOdds: parlay.combinedOdds,
-      potentialPayout: parlay.potentialPayout.toString(),
-      legCount: parlay.legs.length,
-      status: parlay.status,
-      createdAt: parlay.createdAt.toISOString(),
-      legs: parlay.legs.map((leg: any) => ({
-        predictionTitle: leg.option.prediction.title,
-        optionLabel: leg.option.label,
-      })),
-    }));
+  async getUserActiveParlays(userId: number) {
+    return this.repo.getUserActiveParlays(userId);
   }
 
   /**
    * Get user's created predictions (approved and pending)
    */
-  async getUserPredictions(userId: number): Promise<
-    Array<{
-      id: number;
-      title: string;
-      category: string;
-      type: string;
-      approved: boolean;
-      resolved: boolean;
-      expiresAt: string;
-      createdAt: string;
-      totalBets?: number;
-    }>
-  > {
-    const predictions = await prisma.prediction.findMany({
-      where: {
-        creatorId: userId,
-      },
-      include: {
-        _count: {
-          select: {
-            bets: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-      take: 10, // Limit to recent predictions
-    });
+  async getUserPredictions(userId: number) {
+    return this.repo.getUserPredictions(userId);
+  }
 
-    return predictions.map((prediction) => ({
-      id: prediction.id,
-      title: prediction.title,
-      category: prediction.category,
-      type: prediction.type,
-      approved: prediction.approved,
-      resolved: prediction.resolved,
-      expiresAt: prediction.expiresAt.toISOString(),
-      createdAt: prediction.createdAt.toISOString(),
-      totalBets: prediction._count.bets,
-    }));
+  /**
+   * Search users by name for mentions
+   */
+  async searchUsers(query: string): Promise<{ id: number; name: string; avatarUrl?: string }[]> {
+    if (!query || query.trim().length < 2) {
+      return [];
+    }
+
+    return this.repo.searchUsersByName(query.trim());
+  }
+
+  /**
+   * Track daily login for achievements and streak management
+   * This should be called whenever a user authenticates or accesses the system
+   */
+  async trackDailyLogin(userId: number): Promise<void> {
+    try {
+      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+      const loginKey = CACHE_KEYS.DAILY_LOGIN(userId, today);
+
+      // Check if user already logged in today using Redis for fast lookups
+      const alreadyLoggedToday = await redisClient.get(loginKey);
+
+      if (!alreadyLoggedToday) {
+        // Mark as logged in today (expires at midnight)
+        const ttlUntilMidnight = getTTLUntilMidnight();
+        await redisClient.setex(loginKey, ttlUntilMidnight, '1');
+
+        // Log activity for time-based tracking
+        await eventBus.publish('user:activity:log', {
+          userId,
+          activityType: 'daily_login',
+          metadata: {
+            loginDate: today,
+            timestamp: new Date().toISOString(),
+            isFirstLoginOfDay: true,
+          },
+          occurredAt: new Date().toISOString(),
+          dateKey: today,
+          idempotencyKey: `activity:login:${userId}:${today}`,
+        });
+
+        // Publish daily login event for achievement system
+        await eventBus.publish('user:daily:login', {
+          key: 'user:daily:login',
+          userId,
+          occurredAt: new Date().toISOString(),
+          idempotencyKey: `daily:login:${userId}:${today}`,
+          payload: {
+            loginDate: today,
+            consecutiveDays: await this.calculateConsecutiveLoginDays(userId),
+            timestamp: new Date().toISOString(),
+          },
+        });
+
+        // Check for weekend warrior achievement (login on Saturday/Sunday)
+        const dayOfWeek = new Date().getDay();
+        if (dayOfWeek === 0 || dayOfWeek === 6) {
+          // Sunday = 0, Saturday = 6
+          await eventBus.publish('user:weekend:login', {
+            key: 'user:weekend:login',
+            userId,
+            occurredAt: new Date().toISOString(),
+            idempotencyKey: `weekend:login:${userId}:${today}`,
+            payload: {
+              loginDate: today,
+              dayOfWeek: dayOfWeek === 0 ? 'sunday' : 'saturday',
+              timestamp: new Date().toISOString(),
+            },
+          });
+        }
+
+        console.log(`[user] Daily login tracked for user ${userId} on ${today}`);
+      }
+    } catch (error) {
+      console.error(`[user] Error tracking daily login for user ${userId}:`, error);
+      // Don't throw - login tracking failure shouldn't block authentication
+    }
+  }
+
+  /**
+   * Calculate consecutive login days for streak achievements
+   * This looks back through recent days to count the current streak
+   */
+  private async calculateConsecutiveLoginDays(userId: number): Promise<number> {
+    try {
+      let consecutiveDays = 0;
+      const today = new Date();
+
+      // Check last 30 days for consecutive logins
+      for (let i = 0; i < 30; i++) {
+        const checkDate = new Date(today);
+        checkDate.setDate(today.getDate() - i);
+        const dateKey = checkDate.toISOString().split('T')[0];
+
+        const loginKey = CACHE_KEYS.DAILY_LOGIN(userId, dateKey);
+        const loggedIn = await redisClient.get(loginKey);
+
+        if (loggedIn) {
+          consecutiveDays++;
+        } else {
+          // Break on first day without login (except today, which we just set)
+          if (i > 0) break;
+        }
+      }
+
+      return consecutiveDays;
+    } catch (error) {
+      console.error(`[user] Error calculating consecutive login days for user ${userId}:`, error);
+      return 1; // Default to 1 if calculation fails
+    }
+  }
+
+  /**
+   * Get login streak information for a user
+   * This can be used for dashboard displays or achievement checking
+   */
+  async getLoginStreakInfo(userId: number): Promise<{
+    currentStreak: number;
+    longestStreak: number;
+    lastLoginDate: string | null;
+    todaysLogin: boolean;
+  }> {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const loginKey = CACHE_KEYS.DAILY_LOGIN(userId, today);
+
+      const todaysLogin = !!(await redisClient.get(loginKey));
+      const currentStreak = await this.calculateConsecutiveLoginDays(userId);
+
+      // For longest streak, we'd need to implement a more sophisticated tracking system
+      // For now, return current streak as longest (placeholder)
+      const longestStreak = currentStreak; // TODO: Implement proper longest streak tracking
+
+      // Find last login date
+      let lastLoginDate: string | null = null;
+      const checkDate = new Date();
+      for (let i = 0; i < 7; i++) {
+        // Check last 7 days
+        const dateKey = checkDate.toISOString().split('T')[0];
+        const loginKey = CACHE_KEYS.DAILY_LOGIN(userId, dateKey);
+        const loggedIn = await redisClient.get(loginKey);
+
+        if (loggedIn) {
+          lastLoginDate = dateKey;
+          break;
+        }
+
+        checkDate.setDate(checkDate.getDate() - 1);
+      }
+
+      return {
+        currentStreak,
+        longestStreak,
+        lastLoginDate,
+        todaysLogin,
+      };
+    } catch (error) {
+      console.error(`[user] Error getting login streak info for user ${userId}:`, error);
+      return {
+        currentStreak: 0,
+        longestStreak: 0,
+        lastLoginDate: null,
+        todaysLogin: false,
+      };
+    }
   }
 }
 
 // --- Helpers: always map DB types to DTOs used on frontend ---
 
+function calculateReactionCounts(reactions: any[]): Record<any, number> {
+  const counts: Record<any, number> = {
+    LIKE: 0,
+    LOVE: 0,
+    LAUGH: 0,
+    WOW: 0,
+    SAD: 0,
+    ANGRY: 0,
+  };
+
+  reactions.forEach((reaction: any) => {
+    if (reaction.type && reaction.type in counts) {
+      counts[reaction.type]++;
+    }
+  });
+
+  return counts;
+}
+
 function toFeedPostDTO(
-  post: DbUserPost & { children?: DbUserPost[]; authorName?: string },
+  post: DbUserPost & { children?: DbUserPost[]; authorName?: string; reactions?: any[] },
 ): UserFeedPost {
   return {
     id: post.id,
     authorId: post.authorId,
-    ownerId: post.ownerId,
     content: post.content,
+    contentType: post.contentType,
+    visibility: post.visibility,
     parentId: post.parentId,
+    threadDepth: post.threadDepth,
+    likesCount: post.likesCount,
+    commentsCount: post.commentsCount,
+    sharesCount: post.sharesCount,
+    viewsCount: post.viewsCount.toString(),
+    reactionCounts: calculateReactionCounts(post.reactions || []),
+    userReaction: undefined, // TODO: Pass viewerId to calculate user reaction
+    isDeleted: post.isDeleted,
+    isFlagged: post.isFlagged,
     createdAt: post.createdAt instanceof Date ? post.createdAt.toISOString() : post.createdAt,
     updatedAt: post.updatedAt instanceof Date ? post.updatedAt.toISOString() : post.updatedAt,
+    editedAt: post.editedAt
+      ? post.editedAt instanceof Date
+        ? post.editedAt.toISOString()
+        : post.editedAt
+      : undefined,
     children: post.children ? post.children.map(toFeedPostDTO) : undefined,
     authorName: post.authorName,
-  };
-}
-
-function toActivityDTO(a: DbUserActivity): UserActivity {
-  return {
-    id: a.id,
-    userId: a.userId,
-    type: a.type,
-    details: a.details,
-    createdAt: a.createdAt instanceof Date ? a.createdAt.toISOString() : a.createdAt,
   };
 }
 

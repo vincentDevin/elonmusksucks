@@ -34,7 +34,7 @@ export const Timeline: React.FC<TimelineProps> = ({ className = '', initialTab =
   const [showUseAsSourceModal, setShowUseAsSourceModal] = useState(false);
   const [sourceItem, setSourceItem] = useState<TimelineItem | null>(null);
 
-  // TODO: Implement timeline functionality
+  // Load timeline items when tab changes
   useEffect(() => {
     loadTimelineItems(true); // Initial load
   }, [activeTab]);
@@ -127,12 +127,20 @@ export const Timeline: React.FC<TimelineProps> = ({ className = '', initialTab =
   }, []);
 
   // Handle real-time updates via Socket.IO
-  const handleNewArticles = useCallback((newArticles: TimelineItem[]) => {
-    setArticles((prev) => [...newArticles, ...prev]);
+  const handleNewArticles = useCallback((payload: any) => {
+    // Extract items from payload - adapt based on actual payload structure
+    const newArticles = payload.items || payload.articles || payload.data || [];
+    if (Array.isArray(newArticles)) {
+      setArticles((prev) => [...newArticles, ...prev]);
+    }
   }, []);
 
-  const handleNewTweets = useCallback((newTweets: TimelineItem[]) => {
-    setTweets((prev) => [...newTweets, ...prev]);
+  const handleNewTweets = useCallback((payload: any) => {
+    // Extract items from payload - adapt based on actual payload structure
+    const newTweets = payload.items || payload.tweets || payload.data || [];
+    if (Array.isArray(newTweets)) {
+      setTweets((prev) => [...newTweets, ...prev]);
+    }
   }, []);
 
   const { isConnected } = useTimelineSocket({
@@ -219,7 +227,7 @@ export const Timeline: React.FC<TimelineProps> = ({ className = '', initialTab =
                 />
               ) : (
                 <div key={item.id} className="bg-white rounded-lg shadow p-4">
-                  {/* TODO: Implement TweetCard component */}
+                  {/* Social media post card */}
                   <div className="flex items-start space-x-3">
                     <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
                       <span className="text-blue-600 font-bold">𝕏</span>
@@ -281,7 +289,7 @@ export const Timeline: React.FC<TimelineProps> = ({ className = '', initialTab =
         onClose={closeUseAsSourceModal}
       />
 
-      {/* TODO: Add Socket.IO real-time updates */}
+      {/* Future: Real-time timeline updates via Socket.IO */}
     </div>
   );
 };

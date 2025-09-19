@@ -1,0 +1,19 @@
+-- Rollback: This is a documentation-only migration, no changes to revert
+-- Migration: Harden Money Precision Policy
+-- 
+-- This migration documents the money precision hardening changes made to repository layer:
+-- 
+-- 1. Changed amount parameters from `number` to `bigint` in IBettingRepository and BettingRepository
+-- 2. Eliminated BigInt() conversions that could introduce precision errors
+-- 3. All monetary values now use native bigint arithmetic throughout the stack
+--
+-- Database schema already uses BigInt for storage, this change ensures type safety
+-- and precision in the application layer.
+--
+-- No actual schema changes required - this is a code-level precision improvement.
+
+-- Verification query: Check that money fields use BigInt storage
+-- SELECT column_name, data_type 
+-- FROM information_schema.columns 
+-- WHERE table_name IN ('Bet', 'User', 'Transaction', 'Parlay', 'LeaderboardEntry')
+-- AND column_name IN ('amount', 'muskBucks', 'balance', 'payout', 'potentialPayout');

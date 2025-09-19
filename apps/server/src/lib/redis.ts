@@ -8,7 +8,13 @@
 import 'dotenv/config';
 import IORedis, { type RedisOptions } from 'ioredis';
 
-const { REDIS_URL, REDIS_HOST = '127.0.0.1', REDIS_PORT = '6379', REDIS_PASSWORD } = process.env;
+const {
+  REDIS_URL,
+  REDIS_HOST = '127.0.0.1',
+  REDIS_PORT = '6379',
+  REDIS_PASSWORD,
+  REDIS_USERNAME,
+} = process.env;
 
 // ── Retry strategy: exponential back-off capped at 2 seconds ────────────────
 const retryStrategy = (times: number) => Math.min(times * 50, 2000);
@@ -25,11 +31,12 @@ if (REDIS_URL) {
     tls: REDIS_URL.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined,
   });
 } else {
-  // Local dev fallback
+  // Local dev fallback with authentication support
   const options: RedisOptions = {
     host: REDIS_HOST,
     port: Number.parseInt(REDIS_PORT, 10) || 6379,
     password: REDIS_PASSWORD,
+    username: REDIS_USERNAME, // ACL username if provided
     maxRetriesPerRequest: null,
     enableOfflineQueue: true,
     retryStrategy,

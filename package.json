@@ -12,7 +12,7 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "concurrently \"npm run dev --workspace=apps/client\" \"npm run dev --workspace=apps/server\" \"npm run worker\" \"npm run dev --workspace=apps/pong-server\"",
+    "dev": "concurrently \"npm run dev --workspace=apps/client\" \"npm run dev --workspace=apps/public-site\" \"npm run dev --workspace=apps/server\" \"npm run worker\" \"npm run dev --workspace=apps/pong-server\"",
     "dev:with-pong": "concurrently \"npm run dev --workspace=apps/client\" \"npm run dev --workspace=apps/server\" \"npm run worker\" \"npm run dev --workspace=apps/pong-server\" \"npm run pong:worker\"",
     "build": "npm run prisma:generate && cd packages/types && npm run build && cd ../../ && npm run build --workspace=apps/client && npm run build --workspace=apps/server",
     "lint": "eslint apps/**/*.{ts,tsx} --max-warnings=0",
@@ -20,7 +20,7 @@
     "setup": "npm install && npm run prisma:generate && cd packages/types && npm run build && cd ../../apps/server && npm install && npm run prisma:migrate:dev && npm run seed:dev",
     "prisma:generate": "dotenv -e .env -- prisma generate --schema prisma/schema.prisma",
     "prisma:migrate:dev": "dotenv -e .env -- prisma migrate reset --force --skip-generate --schema prisma/schema.prisma",
-    "seed:dev": "ts-node --transpile-only prisma/seed.ts",
+    "seed:dev": "tsx prisma/seed.ts",
     "seed:prod": "ts-node --transpile-only scripts/prod-seed.ts",
     "seed:achievements": "node scripts/seed-achievements.cjs",
     "test": "jest",
@@ -52,6 +52,9 @@
     "ts-node": "^10.9.2"
   },
   "dependencies": {
-    "recharts": "^3.1.0"
+    "@tailwindcss/vite": "^4.1.13",
+    "lightningcss": "^1.30.1",
+    "recharts": "^3.1.0",
+    "typescript": "^5.9.2"
   }
 }

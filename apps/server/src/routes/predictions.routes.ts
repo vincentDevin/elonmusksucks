@@ -3,12 +3,12 @@ import {
   getAllPredictions,
   getPredictionById,
   createPrediction,
+  getSourceLinks,
 } from '../controllers/predictions.controller';
-import { requireAuth, type AuthRequest } from '../middleware/auth.middleware';
-import { PrismaClient } from '@prisma/client';
+import { requireAuth } from '../middleware/auth.middleware';
+import type { AuthRequest } from '../middleware/auth.middleware';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // Public routes
 router.get('/', getAllPredictions);
@@ -35,10 +35,8 @@ router.post('/source-links', requireAuth, async (req: AuthRequest, res: any) => 
     }
 
     // Check if prediction exists and user has permission to link sources
-    const prediction = await prisma.prediction.findUnique({
-      where: { id: predictionId },
-      select: { id: true, creatorId: true, resolved: true },
-    });
+    const { findPredictionById } = require('../controllers/predictions.controller');
+    const prediction = await findPredictionById(predictionId);
 
     if (!prediction) {
       res.status(404).json({ error: 'Prediction not found' });
@@ -54,12 +52,8 @@ router.post('/source-links', requireAuth, async (req: AuthRequest, res: any) => 
     // Later we might restrict to prediction creator or admins
 
     // Check if this link already exists
-    const existingLink = await prisma.predictionSourceLink.findFirst({
-      where: {
-        predictionId,
-        ...(articleId ? { articleId } : { tweetId }),
-      },
-    });
+    const { findExistingSourceLink } = require('../controllers/predictions.controller');
+    const existingLink = await findExistingSourceLink(predictionId, articleId, tweetId);
 
     if (existingLink) {
       res.status(409).json({ error: 'This source is already linked to this prediction' });
@@ -67,39 +61,15 @@ router.post('/source-links', requireAuth, async (req: AuthRequest, res: any) => 
     }
 
     // Create the source link
-    const sourceLink = await prisma.predictionSourceLink.create({
-      data: {
-        predictionId,
-        articleId: articleId || null,
-        tweetId: tweetId || null,
-        url,
-        title: title || null,
-        publisher: publisher || null,
-      },
-      include: {
-        article: {
-          select: {
-            id: true,
-            title: true,
-            url: true,
-            feed: {
-              select: {
-                name: true,
-                siteUrl: true,
-              },
-            },
-          },
-        },
-        tweet: {
-          select: {
-            id: true,
-            text: true,
-            permalink: true,
-            authorHandle: true,
-          },
-        },
-      },
-    });
+    const { createSourceLink } = require('../controllers/predictions.controller');
+    const sourceLink = await createSourceLink(
+      predictionId,
+      articleId,
+      tweetId,
+      url,
+      title,
+      publisher,
+    );
 
     res.status(201).json({
       id: sourceLink.id,
@@ -119,60 +89,6 @@ router.post('/source-links', requireAuth, async (req: AuthRequest, res: any) => 
 });
 
 // GET /api/predictions/:id/source-links - Get source links for a prediction
-router.get('/:id/source-links', async (req: any, res: any) => {
-  try {
-    const predictionId = parseInt(req.params.id);
-
-    if (isNaN(predictionId)) {
-      res.status(400).json({ error: 'Invalid prediction ID' });
-      return;
-    }
-
-    const sourceLinks = await prisma.predictionSourceLink.findMany({
-      where: { predictionId },
-      include: {
-        article: {
-          select: {
-            id: true,
-            title: true,
-            url: true,
-            leadImageUrl: true,
-            feed: {
-              select: {
-                name: true,
-                siteUrl: true,
-              },
-            },
-          },
-        },
-        tweet: {
-          select: {
-            id: true,
-            text: true,
-            permalink: true,
-            authorHandle: true,
-          },
-        },
-      },
-      orderBy: { capturedAt: 'desc' },
-    });
-
-    const formattedLinks = sourceLinks.map((link) => ({
-      id: link.id,
-      predictionId: link.predictionId,
-      url: link.url,
-      title: link.title,
-      publisher: link.publisher,
-      capturedAt: link.capturedAt.toISOString(),
-      type: link.articleId ? 'article' : 'tweet',
-      source: link.article || link.tweet || null,
-    }));
-
-    res.json(formattedLinks);
-  } catch (error) {
-    console.error('[predictions] Error fetching source links:', error);
-    res.status(500).json({ error: 'Failed to fetch source links' });
-  }
-});
+router.get('/:id/source-links', getSourceLinks);
 
 export default router;

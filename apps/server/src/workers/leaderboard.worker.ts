@@ -1,32 +1,29 @@
 // apps/server/src/workers/leaderboard.worker.ts
 import 'dotenv/config';
-import { Worker } from 'bullmq';
+import { Worker, Queue } from 'bullmq';
+import {
+  RefreshJobData,
+  IncrementalUpdateData,
+  BatchUserUpdateData,
+  REDIS_CHANNELS,
+} from '@ems/types';
 import redisClient from '../lib/redis';
+
+// Configurable concurrency to keep CPU saturation <70%
+const REFRESH_CONCURRENCY = parseInt(process.env.WORKER_LEADERBOARD_REFRESH_CONCURRENCY || '1');
+const EVENT_CONCURRENCY = parseInt(process.env.WORKER_LEADERBOARD_EVENT_CONCURRENCY || '3');
 import { LeaderboardRepository } from '../repositories/LeaderboardRepository';
 import type { Job } from 'bullmq';
-import type { LeaderboardTrigger, LeaderboardMetrics } from '../services/leaderboard.service';
-import { achievementService } from '../services/achievement.service';
+import type { LeaderboardMetrics } from '@ems/types';
+import { metricsCollector } from '../lib/metrics';
+import { eventBus } from '../lib/EventBus';
 
 const repo = new LeaderboardRepository();
 
-// Job data interfaces
-interface RefreshJobData {
-  trigger?: LeaderboardTrigger;
-  batchData?: Record<string, LeaderboardTrigger[]>;
-  config?: any;
-}
+// Create queue instance for metrics collection
+const leaderboardQueue = new Queue('leaderboard-refresh', { connection: redisClient });
 
-interface IncrementalUpdateData {
-  userId: number;
-  metrics: Partial<LeaderboardMetrics>;
-  timestamp: string;
-}
-
-interface BatchUserUpdateData {
-  userId: number;
-  triggers: LeaderboardTrigger[];
-  timestamp: string;
-}
+// Note: Job data interfaces now imported from @ems/types
 
 /**
  * Enhanced worker that handles different types of leaderboard updates
@@ -44,6 +41,11 @@ const refreshWorker = new Worker(
 
     const startTime = Date.now();
 
+    // Update queue depth before processing
+    const waiting = await leaderboardQueue.getWaiting();
+    const oldestWaiting = waiting.length > 0 ? Date.now() - waiting[0].timestamp : 0;
+    metricsCollector.updateQueueDepth('leaderboard-refresh', waiting.length, oldestWaiting);
+
     try {
       // Get previous rankings before refresh (for comparison)
       const previousTopAllTime = await repo.getTopAllTime(100);
@@ -51,10 +53,10 @@ const refreshWorker = new Worker(
         previousTopAllTime.map((entry, index) => [entry.userId, index + 1]),
       );
 
-      // Refresh materialized view
-      await repo.refreshMaterializedView();
+      // Clear caches (no more materialized view to refresh!)
+      await repo.refreshMaterializedView(); // This now just clears caches
 
-      // Fetch updated data with enhanced limits
+      // Fetch updated data with enhanced limits (now always fresh from UserStats)
       const topAllTime = await repo.getTopAllTime(50); // Increased from 25
       const topDaily = await repo.getTopDaily(50);
 
@@ -65,39 +67,56 @@ const refreshWorker = new Worker(
         const currentRank = i + 1;
         const previousRank = previousRankings.get(entry.userId) || 999;
 
-        // If user improved their ranking significantly
-        if (previousRank > currentRank) {
+        // If user's ranking changed (improved or declined)
+        if (previousRank !== currentRank) {
           console.log(
-            `[leaderboard] User ${entry.userId} improved from rank ${previousRank} to ${currentRank}`,
+            `[leaderboard] User ${entry.userId} rank changed from ${previousRank} to ${currentRank}`,
           );
 
-          // Trigger ranking achievement check
+          // Publish JSON rule achievement event for leaderboard rank update
           try {
-            await achievementService.checkAndUpdateAchievements({
-              type: 'ranking_updated',
+            await eventBus.publish('leaderboard:rank:update', {
+              key: 'leaderboard:rank:update',
               userId: entry.userId,
-              data: {
-                currentRank,
+              occurredAt: new Date().toISOString(),
+              idempotencyKey: `leaderboard:rank:${entry.userId}:${currentRank}:${Date.now()}`,
+              payload: {
+                rank: currentRank,
                 previousRank,
-                improvement: previousRank - currentRank,
+                rankChange: previousRank - currentRank, // positive = improved, negative = declined
+                isImprovement: previousRank > currentRank,
+                profitAll: entry.profitAll,
+                profitPeriod: entry.profitPeriod,
+                winRate: entry.winRate,
+                totalBets: entry.totalBets,
+                balance: entry.balance,
+                roi: entry.roi,
+                currentStreak: entry.currentStreak,
+                longestStreak: entry.longestStreak,
+                // Include tier breakpoints for achievements
                 isTopHundred: currentRank <= 100,
+                isTopFifty: currentRank <= 50,
+                isTopTwenty: currentRank <= 20,
                 isTopTen: currentRank <= 10,
+                isTopFive: currentRank <= 5,
                 isTopThree: currentRank <= 3,
+                isFirst: currentRank === 1,
               },
             });
-          } catch (error) {
+          } catch (achievementError) {
             console.error(
-              `[leaderboard] Error checking ranking achievements for user ${entry.userId}:`,
-              error,
+              '[leaderboard] Error publishing rank update achievement event:',
+              achievementError,
             );
+            // Don't fail the leaderboard refresh if achievement event fails
           }
         }
       }
 
       // Publish to Redis channels
       await Promise.all([
-        redisClient.publish('leaderboard:allTime', JSON.stringify(topAllTime)),
-        redisClient.publish('leaderboard:daily', JSON.stringify(topDaily)),
+        eventBus.publish(REDIS_CHANNELS.LEADERBOARD_ALL_TIME, topAllTime),
+        eventBus.publish(REDIS_CHANNELS.LEADERBOARD_DAILY, topDaily),
       ]);
 
       const duration = Date.now() - startTime;
@@ -114,14 +133,19 @@ const refreshWorker = new Worker(
           entriesUpdated: Math.max(topAllTime.length, topDaily.length),
         }),
       );
+
+      // Record successful job completion
+      metricsCollector.recordJobComplete('leaderboard-refresh', true);
     } catch (error) {
       console.error('[leaderboard] Refresh failed:', error);
+      // Record failed job completion
+      metricsCollector.recordJobComplete('leaderboard-refresh', false);
       throw error;
     }
   },
   {
     connection: redisClient,
-    concurrency: 1,
+    concurrency: REFRESH_CONCURRENCY,
   },
 );
 
@@ -145,7 +169,7 @@ const eventWorker = new Worker(
   },
   {
     connection: redisClient,
-    concurrency: 5, // Allow multiple incremental updates
+    concurrency: EVENT_CONCURRENCY, // Allow multiple incremental updates
   },
 );
 
@@ -167,14 +191,11 @@ async function handleIncrementalUpdate(data: IncrementalUpdateData): Promise<voi
     console.log(`[leaderboard] User ${userId} is in top rankings, triggering refresh`);
     // We would trigger a refresh here, but to avoid circular dependencies,
     // we'll publish an event instead
-    await redisClient.publish(
-      'leaderboard:refresh_needed',
-      JSON.stringify({
-        reason: 'top_user_update',
-        userId,
-        metrics,
-      }),
-    );
+    await eventBus.publish(REDIS_CHANNELS.LEADERBOARD_REFRESH_NEEDED, {
+      reason: 'top_user_update',
+      userId,
+      metrics,
+    });
   }
 }
 
@@ -201,6 +222,11 @@ async function handleBatchUserUpdate(data: BatchUserUpdateData): Promise<void> {
     timestamp: data.timestamp,
   });
 }
+
+// Log configured concurrency on startup
+console.log(
+  `[leaderboard-worker] Configured concurrency - Refresh: ${REFRESH_CONCURRENCY}, Events: ${EVENT_CONCURRENCY}`,
+);
 
 // Event handlers
 refreshWorker.on('completed', (job) => {

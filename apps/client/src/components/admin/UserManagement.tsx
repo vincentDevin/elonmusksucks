@@ -1,143 +1,363 @@
-import React, { useState, useEffect } from 'react';
-import { useAdmin } from '../../contexts/AdminContext';
-import type { PublicUser, PublicBadge } from '@ems/types';
+import React, { useState, useEffect, useCallback } from 'react';
+import UserSearchBar from './UserSearchBar';
+import UserDataGrid from './UserDataGrid';
+import type { DetailedUser, PaginatedUsers } from '../../api/admin';
+import type { PublicBadge } from '@ems/types';
+import { listBadges } from '../../api/admin';
+import { useSocket } from '../../contexts/SocketContext';
+import * as moderationApi from '../../api/moderation';
+import type { ModerationLogEntry } from '../../api/moderation';
 
-const UserManagement: React.FC = () => {
-  const {
-    users,
-    badges,
-    updateUserRole,
-    activateUser,
-    updateUserBalance,
-    assignBadge,
-    revokeBadge,
-  } = useAdmin();
-  const [balances, setBalances] = useState<Record<number, number>>({});
-  const [selectedAssign, setSelectedAssign] = useState<Record<number, number>>({});
-  const [selectedRevoke, setSelectedRevoke] = useState<Record<number, number>>({});
+interface UserManagementProps {
+  className?: string;
+}
 
+const UserManagement: React.FC<UserManagementProps> = ({ className = '' }) => {
+  const [users, setUsers] = useState<DetailedUser[]>([]);
+  const [badges, setBadges] = useState<PublicBadge[]>([]);
+  const [paginationInfo, setPaginationInfo] = useState<Omit<PaginatedUsers, 'users'>>({
+    totalCount: 0,
+    totalPages: 0,
+    currentPage: 0,
+    hasNextPage: false,
+    hasPreviousPage: false,
+  });
+  const [loading, setLoading] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [recentModerationActions, setRecentModerationActions] = useState<ModerationLogEntry[]>([]);
+  const [showModerationLog, setShowModerationLog] = useState(false);
+  const socket = useSocket();
+
+  // Load badges and moderation log on component mount
   useEffect(() => {
-    const map: Record<number, number> = {};
-    users.forEach((u: PublicUser) => {
-      map[u.id] = u.muskBucks;
+    const loadBadges = async () => {
+      try {
+        const badgeData = await listBadges();
+        setBadges(badgeData);
+      } catch (error) {
+        console.error('Failed to load badges:', error);
+        setBadges([]);
+      }
+    };
+
+    const loadModerationActions = async () => {
+      try {
+        const actions = await moderationApi.getRecentModerationActions(10);
+        setRecentModerationActions(actions);
+      } catch (error) {
+        console.error('Failed to load moderation actions:', error);
+      }
+    };
+
+    loadBadges();
+    loadModerationActions();
+  }, []);
+
+  // Stable handler for socket events
+  const handleModerationUpdate = useCallback(async () => {
+    try {
+      const actions = await moderationApi.getRecentModerationActions(10);
+      setRecentModerationActions(actions);
+      setRefreshTrigger((prev) => prev + 1);
+    } catch (error) {
+      console.error('Failed to reload moderation actions:', error);
+    }
+  }, []);
+
+  // Listen for real-time moderation updates
+  useEffect(() => {
+    if (socket) {
+      socket.on('adminModerationUserBan', handleModerationUpdate);
+      socket.on('adminModerationUserUnban', handleModerationUpdate);
+      socket.on('adminModerationUserMute', handleModerationUpdate);
+      socket.on('adminModerationUserKick', handleModerationUpdate);
+
+      return () => {
+        socket.off('adminModerationUserBan', handleModerationUpdate);
+        socket.off('adminModerationUserUnban', handleModerationUpdate);
+        socket.off('adminModerationUserMute', handleModerationUpdate);
+        socket.off('adminModerationUserKick', handleModerationUpdate);
+      };
+    }
+  }, [socket, handleModerationUpdate]);
+
+  const handleSearchResults = useCallback((results: PaginatedUsers) => {
+    setUsers(results.users);
+    setPaginationInfo({
+      totalCount: results.totalCount,
+      totalPages: results.totalPages,
+      currentPage: results.currentPage,
+      hasNextPage: results.hasNextPage,
+      hasPreviousPage: results.hasPreviousPage,
     });
-    setBalances(map);
-  }, [users]);
+  }, []);
+
+  const handleLoadingChange = useCallback((isLoading: boolean) => {
+    setLoading(isLoading);
+  }, []);
+
+  const handleUserUpdate = useCallback((_userId: number) => {
+    // Trigger a refresh of the search results
+    setRefreshTrigger((prev) => prev + 1);
+  }, []);
+
+  const handleBulkUpdate = useCallback(() => {
+    // Trigger a refresh of the search results after bulk operations
+    setRefreshTrigger((prev) => prev + 1);
+  }, []);
+
+  const formatPaginationInfo = () => {
+    if (paginationInfo.totalCount === 0) return 'No users found';
+
+    const start = paginationInfo.currentPage * 25 + 1;
+    const end = Math.min((paginationInfo.currentPage + 1) * 25, paginationInfo.totalCount);
+
+    return `Showing ${start}-${end} of ${paginationInfo.totalCount} users`;
+  };
+
+  const getPerformanceMetrics = () => {
+    const totalBets = users.reduce((sum, user) => sum + (user.stats?.totalBets || 0), 0);
+    const totalWagered = users.reduce((sum, user) => sum + (user.stats?.totalWagered || 0), 0);
+    const activeUsers = users.filter((user) => user.active).length;
+    const adminUsers = users.filter((user) => user.role === 'ADMIN').length;
+
+    return {
+      totalBets,
+      totalWagered,
+      activeUsers,
+      adminUsers,
+      totalUsers: paginationInfo.totalCount,
+    };
+  };
+
+  const metrics = getPerformanceMetrics();
 
   return (
-    <section>
-      <h2 className="text-xl font-semibold mb-2">User Management</h2>
-      <table className="w-full bg-[var(--color-surface)] border border-[var(--color-muted)]">
-        <thead className="bg-[var(--color-secondary)]">
-          <tr>
-            {['ID', 'Name', 'Email', 'Role', 'Active', 'Balance', 'Badges'].map((h) => (
-              <th key={h} className="border border-[var(--color-muted)] px-2 py-1">
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {users.map((u: PublicUser) => (
-            <tr key={u.id} className="even:bg-[var(--color-muted)] odd:bg-[var(--color-surface)]">
-              <td className="border px-2 py-1">{u.id}</td>
-              <td className="border px-2 py-1">{u.name}</td>
-              <td className="border px-2 py-1">{u.email}</td>
-              <td className="border px-2 py-1">
-                <select
-                  value={u.role}
-                  onChange={(e) => updateUserRole(u.id, e.target.value as any)}
-                  className="border px-1 py-1 bg-[var(--color-surface)] cursor-pointer transition"
+    <div className={`space-y-6 ${className}`}>
+      {/* Header with Stats */}
+      <div className="bg-surface border border-muted rounded-lg p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-2xl font-bold text-content">User Management & Moderation</h2>
+            <p className="text-tertiary">
+              Unified interface for managing users, roles, permissions, and moderation actions
+            </p>
+          </div>
+          <div className="text-right">
+            <div className="text-sm text-tertiary">{formatPaginationInfo()}</div>
+            {loading && <div className="text-sm text-primary mt-1">Loading...</div>}
+          </div>
+        </div>
+
+        {/* Quick Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="bg-muted rounded-lg p-3 text-center">
+            <div className="text-lg font-semibold text-content">
+              {metrics.totalUsers.toLocaleString()}
+            </div>
+            <div className="text-xs text-tertiary">Total Users</div>
+          </div>
+          <div className="bg-muted rounded-lg p-3 text-center">
+            <div className="text-lg font-semibold text-success">
+              {metrics.activeUsers.toLocaleString()}
+            </div>
+            <div className="text-xs text-tertiary">Active</div>
+          </div>
+          <div className="bg-muted rounded-lg p-3 text-center">
+            <div className="text-lg font-semibold text-warning">
+              {metrics.adminUsers.toLocaleString()}
+            </div>
+            <div className="text-xs text-tertiary">Admins</div>
+          </div>
+          <div className="bg-muted rounded-lg p-3 text-center">
+            <div className="text-lg font-semibold text-primary">
+              {metrics.totalBets.toLocaleString()}
+            </div>
+            <div className="text-xs text-tertiary">Total Bets</div>
+          </div>
+          <div className="bg-muted rounded-lg p-3 text-center">
+            <div className="text-lg font-semibold text-accent">
+              {metrics.totalWagered.toFixed(0)}
+            </div>
+            <div className="text-xs text-tertiary">Total Wagered</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Search Interface */}
+      <UserSearchBar
+        onSearchResults={handleSearchResults}
+        onLoadingChange={handleLoadingChange}
+        key={refreshTrigger} // Force re-render to refresh search
+      />
+
+      {/* Data Grid */}
+      <UserDataGrid
+        users={users}
+        badges={badges}
+        onUserUpdate={handleUserUpdate}
+        onBulkUpdate={handleBulkUpdate}
+        loading={loading}
+      />
+
+      {/* Pagination Controls */}
+      {paginationInfo.totalPages > 1 && (
+        <div className="bg-surface border border-muted rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-tertiary">
+              Page {paginationInfo.currentPage + 1} of {paginationInfo.totalPages}
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <button
+                disabled={!paginationInfo.hasPreviousPage}
+                className="px-3 py-1 text-sm border border-muted rounded disabled:opacity-50 hover:bg-muted transition"
+              >
+                Previous
+              </button>
+
+              {/* Page Numbers */}
+              <div className="flex items-center space-x-1">
+                {Array.from({ length: Math.min(5, paginationInfo.totalPages) }, (_, i) => {
+                  const pageNum = paginationInfo.currentPage - 2 + i;
+                  if (pageNum < 0 || pageNum >= paginationInfo.totalPages) return null;
+
+                  return (
+                    <button
+                      key={pageNum}
+                      className={`px-3 py-1 text-sm rounded transition ${
+                        pageNum === paginationInfo.currentPage
+                          ? 'bg-primary text-surface'
+                          : 'border border-muted hover:bg-muted'
+                      }`}
+                    >
+                      {pageNum + 1}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                disabled={!paginationInfo.hasNextPage}
+                className="px-3 py-1 text-sm border border-muted rounded disabled:opacity-50 hover:bg-muted transition"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Performance Notes */}
+      {users.length > 0 && (
+        <div className="bg-muted border border-muted rounded-lg p-4">
+          <div className="flex items-start space-x-3">
+            <div className="text-accent">⚡</div>
+            <div>
+              <div className="text-sm font-medium text-content">Performance Optimized</div>
+              <div className="text-xs text-tertiary mt-1">
+                This interface uses virtual scrolling and database-level pagination to efficiently
+                handle large user datasets. Search results are debounced and cached for optimal
+                performance.
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Recent Moderation Actions */}
+      <div className="bg-surface border border-muted rounded-lg p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-content">Recent Moderation Actions</h3>
+          <button
+            onClick={() => setShowModerationLog(!showModerationLog)}
+            className="text-sm text-primary hover:text-primary/80 transition-colors"
+          >
+            {showModerationLog ? 'Hide' : 'Show'} Log
+          </button>
+        </div>
+
+        {showModerationLog && (
+          <div className="space-y-2">
+            {recentModerationActions.length === 0 ? (
+              <div className="text-center py-8 text-tertiary">No recent moderation actions</div>
+            ) : (
+              recentModerationActions.map((action) => (
+                <div
+                  key={action.id}
+                  className="flex items-center justify-between p-3 bg-muted rounded-lg"
                 >
-                  <option value="USER">USER</option>
-                  <option value="ADMIN">ADMIN</option>
-                </select>
-              </td>
-              <td className="border px-2 py-1 text-center">
-                <input
-                  type="checkbox"
-                  checked={(u as any).active}
-                  onChange={(e) => activateUser(u.id, e.target.checked)}
-                  className="cursor-pointer"
-                />
-              </td>
-              <td className="border px-2 py-1">
-                <div className="flex items-center space-x-1">
-                  <input
-                    type="number"
-                    className="w-20 border px-1 py-1 bg-[var(--color-surface)]"
-                    value={balances[u.id] ?? u.muskBucks}
-                    onChange={(e) => setBalances((b) => ({ ...b, [u.id]: Number(e.target.value) }))}
-                  />
-                  <button
-                    className="px-2 py-1 bg-[var(--color-primary)] text-[var(--color-surface)] rounded cursor-pointer hover:opacity-90 transition"
-                    onClick={() => updateUserBalance(u.id, balances[u.id] ?? u.muskBucks)}
-                  >
-                    Set
-                  </button>
-                </div>
-              </td>
-              <td className="border px-2 py-1">
-                <div className="flex flex-col space-y-1">
-                  <div className="flex items-center space-x-2">
-                    <select
-                      value={selectedAssign[u.id] ?? ''}
-                      onChange={(e) =>
-                        setSelectedAssign((p) => ({ ...p, [u.id]: Number(e.target.value) }))
-                      }
-                      className="border px-1 py-1 bg-[var(--color-surface)] cursor-pointer transition"
-                    >
-                      <option value="">— assign badge —</option>
-                      {badges.map((b: PublicBadge) => (
-                        <option key={b.id} value={b.id}>
-                          {b.name}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      className="px-2 py-1 bg-[var(--color-primary)] text-[var(--color-surface)] rounded disabled:opacity-50 cursor-pointer hover:opacity-90 transition"
-                      disabled={!selectedAssign[u.id]}
-                      onClick={() => {
-                        assignBadge(u.id, selectedAssign[u.id]);
-                        setSelectedAssign((p) => ({ ...p, [u.id]: 0 }));
-                      }}
-                    >
-                      Assign
-                    </button>
+                  <div className="flex items-center space-x-3">
+                    <span className="text-lg">
+                      {action.action === 'USER_BAN'
+                        ? '🚫'
+                        : action.action === 'USER_UNBAN'
+                          ? '✅'
+                          : action.action === 'USER_MUTE'
+                            ? '🔇'
+                            : action.action === 'USER_KICK'
+                              ? '👟'
+                              : '⚠️'}
+                    </span>
+                    <div>
+                      <div className="text-sm font-medium text-content">
+                        <span className="text-primary">{action.moderator.name}</span>{' '}
+                        {action.action === 'USER_BAN'
+                          ? 'banned'
+                          : action.action === 'USER_UNBAN'
+                            ? 'unbanned'
+                            : action.action === 'USER_MUTE'
+                              ? 'muted'
+                              : action.action === 'USER_KICK'
+                                ? 'kicked'
+                                : action.action}{' '}
+                        {action.targetUser && (
+                          <span className="text-accent">{action.targetUser.name}</span>
+                        )}
+                      </div>
+                      {action.reason && (
+                        <div className="text-xs text-tertiary mt-1">Reason: {action.reason}</div>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <select
-                      value={selectedRevoke[u.id] ?? ''}
-                      onChange={(e) =>
-                        setSelectedRevoke((p) => ({ ...p, [u.id]: Number(e.target.value) }))
-                      }
-                      className="border px-1 py-1 bg-[var(--color-surface)] cursor-pointer transition"
-                    >
-                      <option value="">— revoke badge —</option>
-                      {badges.map((b: PublicBadge) => (
-                        <option key={b.id} value={b.id}>
-                          {b.name}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      className="px-2 py-1 bg-red-600 text-[var(--color-surface)] rounded disabled:opacity-50 cursor-pointer hover:opacity-90 transition"
-                      disabled={!selectedRevoke[u.id]}
-                      onClick={() => {
-                        revokeBadge(u.id, selectedRevoke[u.id]);
-                        setSelectedRevoke((p) => ({ ...p, [u.id]: 0 }));
-                      }}
-                    >
-                      Revoke
-                    </button>
+                  <div className="text-xs text-tertiary">
+                    {new Date(action.createdAt).toLocaleString()}
                   </div>
                 </div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </section>
+              ))
+            )}
+          </div>
+        )}
+
+        {/* Quick Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 pt-4 border-t border-muted">
+          <div className="text-center">
+            <div className="text-lg font-semibold text-error">
+              {recentModerationActions.filter((a) => a.action === 'USER_BAN').length}
+            </div>
+            <div className="text-xs text-tertiary">Recent Bans</div>
+          </div>
+          <div className="text-center">
+            <div className="text-lg font-semibold text-warning">
+              {recentModerationActions.filter((a) => a.action === 'USER_MUTE').length}
+            </div>
+            <div className="text-xs text-tertiary">Recent Mutes</div>
+          </div>
+          <div className="text-center">
+            <div className="text-lg font-semibold text-info">
+              {recentModerationActions.filter((a) => a.action === 'USER_KICK').length}
+            </div>
+            <div className="text-xs text-tertiary">Recent Kicks</div>
+          </div>
+          <div className="text-center">
+            <div className="text-lg font-semibold text-success">
+              {recentModerationActions.filter((a) => a.action === 'USER_UNBAN').length}
+            </div>
+            <div className="text-xs text-tertiary">Recent Unbans</div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 };
 

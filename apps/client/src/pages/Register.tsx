@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
+import { Link } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function Register() {
   const { register, user } = useAuth();
-  const navigate = useNavigate();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -14,9 +13,9 @@ export default function Register() {
 
   useEffect(() => {
     if (user) {
-      navigate('/dashboard');
+      window.location.href = '/dashboard';
     }
-  }, [user, navigate]);
+  }, [user]);
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const isEmailValid = email === '' ? true : emailRegex.test(email);
@@ -58,13 +57,14 @@ export default function Register() {
           <p>
             Please check <strong>{email}</strong> for a verification link.
           </p>
-          <p>
-            Once verified, you can{' '}
-            <Link to="/login" className="text-blue-600 hover:underline">
-              log in here
+          <div className="mt-4">
+            <Link
+              to="/login"
+              className="inline-block w-full text-center px-4 py-2 bg-primary text-white rounded hover:bg-primary-hover transition-colors font-medium"
+            >
+              Go to Login Page
             </Link>
-            .
-          </p>
+          </div>
         </div>
       </div>
     );

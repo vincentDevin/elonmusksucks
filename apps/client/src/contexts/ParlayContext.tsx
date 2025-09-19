@@ -1,4 +1,5 @@
 // apps/client/src/contexts/ParlayContext.tsx
+// Rollback: Remove optimistic UI updates and restore original parlay creation behavior
 // -----------------------------------------------------------------------------
 // Holds local state for the parlay bet builder (legs + amount).
 // Clears itself when a parlay is successfully placed by the current user,
@@ -7,7 +8,8 @@
 
 import { createContext, useContext, useReducer, useEffect, useCallback } from 'react';
 import type { ReactNode } from 'react';
-import { useSocket } from './SocketContext';
+import { useEventBusCore } from './EventBusCoreContext';
+import { REDIS_CHANNELS } from '../types/events';
 import { useAuth } from './AuthContext';
 
 /* ---------- Types ---------- */
@@ -19,6 +21,7 @@ export interface Leg {
 interface State {
   legs: Leg[];
   amount: number;
+  isOptimisticPending?: boolean;
 }
 
 type Action =
@@ -26,6 +29,8 @@ type Action =
   | { type: 'REMOVE_LEG'; optionId: number }
   | { type: 'SET_AMOUNT'; amount: number }
   | { type: 'SET_PARLAY'; state: State }
+  | { type: 'SET_OPTIMISTIC_PENDING' }
+  | { type: 'CLEAR_OPTIMISTIC' }
   | { type: 'CLEAR' };
 
 /* ---------- Reducer ---------- */
@@ -43,6 +48,10 @@ function reducer(state: State, action: Action): State {
       return { ...state, amount: action.amount };
     case 'SET_PARLAY':
       return action.state;
+    case 'SET_OPTIMISTIC_PENDING':
+      return { ...state, isOptimisticPending: true };
+    case 'CLEAR_OPTIMISTIC':
+      return { ...state, isOptimisticPending: false };
     case 'CLEAR':
       return initial;
     default:
@@ -57,6 +66,8 @@ interface Ctx {
   addLeg: (leg: Leg) => void;
   removeLeg: (optionId: number) => void;
   setAmount: (amt: number) => void;
+  setOptimisticPending: () => void;
+  clearOptimistic: () => void;
   clear: () => void;
 }
 
@@ -66,6 +77,8 @@ const ParlayCtx = createContext<Ctx>({
   addLeg: () => {},
   removeLeg: () => {},
   setAmount: () => {},
+  setOptimisticPending: () => {},
+  clearOptimistic: () => {},
   clear: () => {},
 });
 
@@ -82,19 +95,18 @@ export function ParlayProvider({ children }: { children: ReactNode }) {
   }, [state]);
 
   /* ---------- Clear builder when *our* parlay is placed ---------- */
-  const socket = useSocket();
+  const { subscribe } = useEventBusCore();
   const { user } = useAuth();
 
   useEffect(() => {
-    if (!socket || !user) return;
+    if (!user) return;
     const handlePlaced = (parlay: { userId: number }) => {
       if (parlay.userId === user.id) dispatch({ type: 'CLEAR' });
     };
-    socket.on('parlayPlaced', handlePlaced);
-    return () => {
-      socket.off('parlayPlaced', handlePlaced);
-    };
-  }, [socket, user?.id]);
+    // Migrated to EventBusCore: Parlay placed events
+    const unsubscribe = subscribe(REDIS_CHANNELS.PARLAY_PLACED, handlePlaced);
+    return unsubscribe;
+  }, [subscribe, user?.id]);
 
   /* ---------- Convenience callbacks ---------- */
   const addLeg = useCallback((leg: Leg) => dispatch({ type: 'ADD_LEG', leg }), []);
@@ -103,10 +115,23 @@ export function ParlayProvider({ children }: { children: ReactNode }) {
     [],
   );
   const setAmount = useCallback((amt: number) => dispatch({ type: 'SET_AMOUNT', amount: amt }), []);
+  const setOptimisticPending = useCallback(() => dispatch({ type: 'SET_OPTIMISTIC_PENDING' }), []);
+  const clearOptimistic = useCallback(() => dispatch({ type: 'CLEAR_OPTIMISTIC' }), []);
   const clear = useCallback(() => dispatch({ type: 'CLEAR' }), []);
 
   return (
-    <ParlayCtx.Provider value={{ state, dispatch, addLeg, removeLeg, setAmount, clear }}>
+    <ParlayCtx.Provider
+      value={{
+        state,
+        dispatch,
+        addLeg,
+        removeLeg,
+        setAmount,
+        setOptimisticPending,
+        clearOptimistic,
+        clear,
+      }}
+    >
       {children}
     </ParlayCtx.Provider>
   );

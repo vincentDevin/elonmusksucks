@@ -1,6 +1,7 @@
 // apps/server/src/handlers/unifiedActivityHandlers.ts
 import type { Socket } from 'socket.io';
 import { unifiedActivityService } from '../services/unifiedActivity.service';
+import { REDIS_CHANNELS } from '@ems/types';
 import redisClient from '../lib/redis';
 
 interface UnifiedActivityRequest {
@@ -288,13 +289,13 @@ export function setupUnifiedActivityRedisHandlers(io: any) {
   const redisSub = redisClient.duplicate();
 
   // Subscribe to single global channel only
-  redisSub.subscribe('unified:activity:global');
+  redisSub.subscribe(REDIS_CHANNELS.UNIFIED_ACTIVITY_GLOBAL);
 
   redisSub.on('message', (channel: string, message: string) => {
     try {
       const activityData = JSON.parse(message);
 
-      if (channel === 'unified:activity:global') {
+      if (channel === REDIS_CHANNELS.UNIFIED_ACTIVITY_GLOBAL) {
         // Global broadcast to ALL connected clients
         io.emit('unified:activity:update', activityData);
       }

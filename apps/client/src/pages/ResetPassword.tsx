@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
+import { useLocation } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import { performPasswordReset } from '../api/auth';
 
 function useQuery() {
@@ -9,7 +9,6 @@ function useQuery() {
 
 export default function ResetPassword() {
   const query = useQuery();
-  const navigate = useNavigate();
   const { user } = useAuth();
   const token = query.get('token') || '';
   const [password, setPassword] = useState('');
@@ -23,9 +22,9 @@ export default function ResetPassword() {
 
   useEffect(() => {
     if (user) {
-      navigate('/dashboard');
+      window.location.href = '/dashboard';
     }
-  }, [user, navigate]);
+  }, [user]);
 
   useEffect(() => {
     if (!token) {
@@ -55,7 +54,7 @@ export default function ResetPassword() {
       setStatus('success');
       // you could use a toast here instead of alert
       alert('Password reset! You can now log in.');
-      navigate('/login');
+      window.location.href = '/login';
     } catch (err: any) {
       setError(err.message || 'Failed to reset password.');
       setStatus('idle');

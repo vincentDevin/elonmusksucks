@@ -1,4 +1,5 @@
 // apps/client/src/contexts/PredictionContext.tsx
+// Rollback: Remove optimistic UI updates and restore original bet placement behavior
 // -----------------------------------------------------------------------------
 // Unified context for predictions list + live betting/parlay actions.
 // Replaces previous usePredictions / useBetting hooks.
@@ -11,22 +12,37 @@ import {
   useCallback,
   useState,
   useMemo,
+  useRef,
+  startTransition,
+  useOptimistic,
   type ReactNode,
 } from 'react';
 import {
   getPredictions,
   createPrediction as createPredictionApi,
-  type PredictionFull,
+  type PredictionView,
   type CreatePredictionPayload,
 } from '../api/predictions';
-import type { BetWithUser, ParlayLegWithUser } from '@ems/types';
+import type { BetWithUser, ParlayLegWithUser, PublicPredictionOption } from '@ems/types';
+import { REDIS_CHANNELS } from '@ems/types';
 import { socketRequest } from '../lib/socketRequest';
-import { useSocket } from './SocketContext';
+import { useEventBusCore } from './EventBusCoreContext';
+import type {
+  PredictionCreatedPayload,
+  PredictionResolvedPayload,
+  BetPlacedPayload,
+} from '@ems/types';
+
+// Extended option type with client-side properties
+type ExtendedOption = PublicPredictionOption & {
+  userBet?: any;
+  totalBets?: number;
+};
 import { useAuth } from './AuthContext';
 
 // ---- Context shape ----
 interface Ctx {
-  predictions: PredictionFull[];
+  predictions: PredictionView[];
   loading: boolean;
   error: Error | null;
   refresh: () => Promise<void>;
@@ -42,9 +58,87 @@ interface Ctx {
 const PredictionCtx = createContext<Ctx | undefined>(undefined);
 
 export function PredictionProvider({ children }: { children: ReactNode }) {
-  const socket = useSocket();
+  const { subscribe } = useEventBusCore();
   const { refreshUser } = useAuth();
-  const [predictions, setPredictions] = useState<PredictionFull[]>([]);
+  const [basePredictions, setBasePredictions] = useState<PredictionView[]>([]);
+  const [predictions, optimisticUpdatePredictions] = useOptimistic(
+    basePredictions,
+    (
+      current: PredictionView[],
+      action: {
+        type:
+          | 'placeBet'
+          | 'placeParlay'
+          | 'revertBet'
+          | 'revertParlay'
+          | 'createPrediction'
+          | 'revertPrediction';
+        payload: any;
+      },
+    ) => {
+      switch (action.type) {
+        case 'placeBet':
+          return current.map((pred) => ({
+            ...pred,
+            options:
+              pred.options?.map((opt) =>
+                opt.id === action.payload.optionId
+                  ? {
+                      ...opt,
+                      userBet: action.payload.optimisticBet,
+                      totalBets: ((opt as ExtendedOption).totalBets || 0) + 1,
+                    }
+                  : opt,
+              ) || [],
+          }));
+        case 'revertBet':
+          return current.map((pred) => ({
+            ...pred,
+            options:
+              pred.options?.map((opt) =>
+                opt.id === action.payload.optionId && (opt as ExtendedOption).userBet?.isOptimistic
+                  ? {
+                      ...opt,
+                      userBet: undefined,
+                      totalBets: Math.max(0, ((opt as ExtendedOption).totalBets || 0) - 1),
+                    }
+                  : opt,
+              ) || [],
+          }));
+        case 'placeParlay':
+          // Optimistically update all prediction legs with parlay data
+          const { parlay } = action.payload;
+          return current.map((pred) => {
+            const hasLegInPrediction = parlay.legs.some((leg: any) =>
+              pred.options?.some((opt) => opt.id === leg.optionId),
+            );
+            if (hasLegInPrediction) {
+              return {
+                ...pred,
+                parlayLegs: [...(pred.parlayLegs ?? []), parlay],
+              };
+            }
+            return pred;
+          });
+        case 'revertParlay':
+          // Remove optimistic parlay legs on error
+          return current.map((pred) => ({
+            ...pred,
+            parlayLegs: pred.parlayLegs?.filter((leg) => !(leg as any).isOptimistic) ?? [],
+          }));
+        case 'createPrediction':
+          // Add optimistic prediction to the beginning of the list
+          const { prediction } = action.payload;
+          return [prediction, ...current];
+        case 'revertPrediction':
+          // Remove optimistic prediction on error
+          const { predictionId } = action.payload;
+          return current.filter((pred) => !(pred as any).isOptimistic || pred.id !== predictionId);
+        default:
+          return current;
+      }
+    },
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
@@ -53,12 +147,29 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
 
   // ── Initial fetch ─────────────────────────────────────────────────────────
   const fetchAll = useCallback(async () => {
+    console.log('[PredictionContext] Starting predictions fetch...');
     setLoading(true);
+    setError(null);
+
+    // Add timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      console.warn('[PredictionContext] Fetch timeout after 10s, using empty predictions');
+      setBasePredictions([]);
+      setLoading(false);
+      setError(new Error('Request timeout - predictions may be temporarily unavailable'));
+    }, 10000);
+
     try {
       const data = await getPredictions();
-      setPredictions(data);
+      clearTimeout(timeoutId);
+      console.log('[PredictionContext] Fetched predictions:', data?.length || 0);
+      setBasePredictions(data || []);
+      setError(null);
     } catch (err: any) {
+      clearTimeout(timeoutId);
+      console.error('[PredictionContext] Failed to fetch predictions:', err);
       setError(err);
+      setBasePredictions([]); // Set empty array on error to prevent infinite loading
     } finally {
       setLoading(false);
     }
@@ -68,123 +179,293 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
     fetchAll();
   }, [fetchAll]);
 
-  // ── Live socket updates ───────────────────────────────────────────────────
+  // ── Live EventBusCore updates ─────────────────────────────────────────────
   useEffect(() => {
-    const onCreated = (p: PredictionFull) => setPredictions((prev) => [p, ...prev]);
-    const onResolved = (p: PredictionFull) =>
-      setPredictions((prev) => prev.map((x) => (x.id === p.id ? p : x)));
+    const unsubscribers = [
+      // Prediction created events
+      subscribe(REDIS_CHANNELS.PREDICTION_CREATED, (p: PredictionCreatedPayload) => {
+        // Convert payload to PredictionView format (might need server updates)
+        setBasePredictions((prev) => [p as any, ...prev]);
+      }),
 
-    const onBet = (bet: BetWithUser) => {
-      setLatestBet(bet);
-      setPredictions((prev) =>
-        prev.map((pred) =>
-          pred.id === bet.predictionId ? { ...pred, bets: [...(pred.bets ?? []), bet] } : pred,
-        ),
-      );
-    };
+      // Prediction resolved events
+      subscribe(REDIS_CHANNELS.PREDICTION_RESOLVE, (p: PredictionResolvedPayload) => {
+        // Convert payload to PredictionView format (might need server updates)
+        setBasePredictions((prev) =>
+          prev.map((x) => (x.id === p.predictionId ? ({ ...x, ...p } as any) : x)),
+        );
+      }),
 
-    const onParlay = (leg: ParlayLegWithUser & { predictionId: number }) => {
-      setLatestParlay(leg);
-      setPredictions((prev) =>
-        prev.map((p) =>
-          p.id === leg.predictionId ? { ...p, parlayLegs: [...(p.parlayLegs ?? []), leg] } : p,
-        ),
-      );
-    };
+      // Bet placed events
+      subscribe(REDIS_CHANNELS.BET_PLACED, (betPayload: BetPlacedPayload) => {
+        // Note: BetPlacedPayload doesn't match BetWithUser structure
+        // Need server updates to provide proper payload structure
+        console.log('🎯 Bet placed event received:', betPayload);
+        // For now, refresh predictions to get updated data
+        fetchAll();
+      }),
 
-    // 🎮 Enhanced odds updates with excitement data
-    const onEnhancedOddsUpdate = (data: {
-      predictionId: number;
-      hotMarket: boolean;
-      options: Array<{
-        id: number;
-        odds: number;
-        label: string;
-        change: number;
-        changePercent: number;
-      }>;
-    }) => {
-      console.log('🎯 Enhanced odds updated for prediction:', data.predictionId, data);
+      // Parlay placed events
+      subscribe(REDIS_CHANNELS.PARLAY_PLACED, (parlayPayload: any) => {
+        // Note: Need proper payload type definition
+        console.log('🎯 Parlay placed event received:', parlayPayload);
+        // For now, refresh predictions to get updated data
+        fetchAll();
+      }),
 
-      // Update the specific prediction with new odds and market status
-      setPredictions((prev) =>
-        prev.map((p) => {
-          if (p.id === data.predictionId) {
-            const updatedOptions = p.options.map((option: any) => {
-              const updatedOption = data.options.find((opt: any) => opt.id === option.id);
-              return updatedOption ? { ...option, odds: updatedOption.odds } : option;
-            });
-            return { ...p, options: updatedOptions, hotMarket: data.hotMarket };
-          }
-          return p;
-        }),
-      );
-    };
+      // Enhanced odds updates
+      subscribe(
+        REDIS_CHANNELS.ODDS_UPDATE_ENHANCED,
+        (data: {
+          predictionId: number;
+          hotMarket: boolean;
+          options: Array<{
+            id: number;
+            odds: number;
+            label: string;
+            change: number;
+            changePercent: number;
+          }>;
+        }) => {
+          console.log('🎯 Enhanced odds updated for prediction:', data.predictionId, data);
 
-    socket.on('predictionCreated', onCreated);
-    socket.on('predictionResolved', onResolved);
-    socket.on('betPlaced', onBet);
-    socket.on('parlayPlaced', onParlay);
-    socket.on('oddsUpdatedEnhanced', onEnhancedOddsUpdate);
+          // Update the specific prediction with new odds and market status
+          setBasePredictions((prev) =>
+            prev.map((p) => {
+              if (p.id === data.predictionId) {
+                const updatedOptions = p.options.map((option: any) => {
+                  const updatedOption = data.options.find((opt: any) => opt.id === option.id);
+                  return updatedOption ? { ...option, odds: updatedOption.odds } : option;
+                });
+                return { ...p, options: updatedOptions, hotMarket: data.hotMarket };
+              }
+              return p;
+            }),
+          );
+        },
+      ),
+    ];
 
     return () => {
-      socket.off('predictionCreated', onCreated);
-      socket.off('predictionResolved', onResolved);
-      socket.off('betPlaced', onBet);
-      socket.off('parlayPlaced', onParlay);
-      socket.off('oddsUpdatedEnhanced', onEnhancedOddsUpdate);
+      unsubscribers.forEach((unsub) => unsub());
     };
-  }, [socket]);
+  }, [subscribe, fetchAll]);
 
   // ── Create prediction via REST (admin tool) ───────────────────────────────
   const createPrediction = useCallback(
     async (input: CreatePredictionPayload) => {
+      console.log('[PredictionContext] Creating prediction:', input);
       setLoading(true);
+
+      // Create optimistic prediction for immediate UI feedback
+      const optimisticPredictionId = Math.floor(Date.now() / 1000); // Temporary ID
+
+      // Determine final options based on type (matching server logic)
+      let finalOptions: Array<{ label: string }> = [];
+      if (input.type === 'binary') {
+        finalOptions = [{ label: 'Yes' }, { label: 'No' }];
+      } else if (input.type === 'over_under') {
+        if (input.threshold != null) {
+          finalOptions = [
+            { label: `Over ${input.threshold}` },
+            { label: `Under ${input.threshold}` },
+          ];
+        }
+      } else {
+        // For 'multiple' type, use provided options
+        finalOptions = input.options || [];
+      }
+
+      console.log('[PredictionContext] Final options for prediction:', finalOptions);
+
+      const optimisticPrediction: PredictionView = {
+        id: optimisticPredictionId,
+        title: input.title,
+        description: input.description,
+        category: input.category,
+        type: input.type,
+        threshold: input.threshold,
+        expiresAt: input.expiresAt,
+        resolved: false,
+        approved: false,
+        resolvedAt: null,
+        winningOptionId: null,
+        viewCount: 0,
+        firstCorrectBetUserId: null,
+        resolvedWithinHour: null,
+        createdAt: new Date(),
+        creatorId: 0, // Will be set by server
+        options: finalOptions.map((opt, index) => ({
+          id: optimisticPredictionId * 10 + index, // Temporary ID
+          label: opt.label,
+          odds: 2.0, // Default odds
+          predictionId: optimisticPredictionId,
+          createdAt: new Date(),
+        })),
+        bets: [],
+        parlayLegs: [],
+        sourceLinks: [],
+        isOptimistic: true, // Mark as optimistic for potential rollback
+      };
+
+      // Apply optimistic update within startTransition
+      startTransition(() => {
+        optimisticUpdatePredictions({
+          type: 'createPrediction',
+          payload: {
+            prediction: optimisticPrediction,
+          },
+        });
+      });
+
       try {
-        await createPredictionApi(input); // if you have helper, else call fetch.
-        await fetchAll();
+        await createPredictionApi(input);
+        await fetchAll(); // This will replace optimistic prediction with real data
       } catch (err: any) {
         setError(err);
+        // Revert optimistic prediction on error
+        startTransition(() => {
+          optimisticUpdatePredictions({
+            type: 'revertPrediction',
+            payload: {
+              predictionId: optimisticPredictionId,
+            },
+          });
+        });
       } finally {
         setLoading(false);
       }
     },
-    [fetchAll],
+    [fetchAll, optimisticUpdatePredictions],
   );
 
   // ── Bet/parlay helpers via socketRequest ──────────────────────────────────
   const placeBet = useCallback(
     async (payload: { optionId: number; amount: number }) => {
       console.log('PredictionContext placeBet called', payload);
-      try {
-        await socketRequest('bet:place', payload);
-        console.log('PredictionContext placeBet success');
 
-        // Trigger user refresh to update balance and stats
+      // Create optimistic bet for immediate UI feedback using React 19 useOptimistic
+      const optimisticBetId = `optimistic_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const optimisticBet = {
+        id: optimisticBetId,
+        amount: payload.amount,
+        status: 'pending' as const,
+        createdAt: new Date().toISOString(),
+        optionId: payload.optionId,
+        isOptimistic: true,
+      };
+
+      // Apply optimistic update using React 19's useOptimistic within startTransition
+      startTransition(() => {
+        optimisticUpdatePredictions({
+          type: 'placeBet',
+          payload: {
+            optionId: payload.optionId,
+            optimisticBet,
+          },
+        });
+      });
+
+      try {
+        const result = await socketRequest(REDIS_CHANNELS.BET_PLACE, payload);
+        console.log('PredictionContext placeBet success', result);
+
+        // Replace optimistic bet with real bet data if available
+        if (result && typeof result === 'object' && 'bet' in result) {
+          console.log('Updating with real bet data from server:', result.bet);
+          setBasePredictions((prev) =>
+            prev.map((pred) => ({
+              ...pred,
+              options:
+                pred.options?.map((opt) =>
+                  opt.id === payload.optionId ? { ...opt, userBet: result.bet } : opt,
+                ) || [],
+            })),
+          );
+        } else {
+          console.log('Server response does not contain bet data, keeping optimistic state');
+          // The optimistic bet will be replaced when socket events arrive
+        }
+
+        // React 19 Optimization: Use startTransition for non-blocking user refresh
         // Note: AuthContext already handles optimistic updates via Socket.IO events
-        setTimeout(() => refreshUser(), 100);
+        startTransition(() => {
+          refreshUser();
+        });
       } catch (error) {
         console.error('PredictionContext placeBet error', error);
+
+        // Revert optimistic update on error using React 19's useOptimistic
+        startTransition(() => {
+          optimisticUpdatePredictions({
+            type: 'revertBet',
+            payload: {
+              optionId: payload.optionId,
+            },
+          });
+        });
+
         throw error;
       }
     },
-    [refreshUser],
+    [refreshUser, optimisticUpdatePredictions],
   );
 
   const placeParlay = useCallback(
     async (payload: { legs: { optionId: number }[]; amount: number }) => {
-      try {
-        await socketRequest('parlay:place', payload);
+      // Create optimistic parlay for immediate UI feedback
+      const optimisticParlayId = `optimistic_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const optimisticParlay = {
+        id: optimisticParlayId,
+        legs: payload.legs,
+        totalAmount: payload.amount,
+        status: 'pending' as const,
+        createdAt: new Date().toISOString(),
+        isOptimistic: true,
+      };
 
-        // Trigger user refresh to update balance and stats
+      // Apply optimistic update using React 19's useOptimistic within startTransition
+      startTransition(() => {
+        optimisticUpdatePredictions({
+          type: 'placeParlay',
+          payload: {
+            parlay: optimisticParlay,
+          },
+        });
+      });
+
+      // Set latest parlay optimistically
+      setLatestParlay(optimisticParlay as any);
+
+      try {
+        const result = await socketRequest(REDIS_CHANNELS.PARLAY_PLACE, payload);
+
+        // Replace with real parlay data if available
+        if (result && typeof result === 'object' && 'parlay' in result) {
+          setLatestParlay((result as any).parlay);
+        }
+
+        // React 19 Optimization: Use startTransition for non-blocking user refresh
         // Note: AuthContext already handles optimistic updates via Socket.IO events
-        setTimeout(() => refreshUser(), 100);
+        startTransition(() => {
+          refreshUser();
+        });
       } catch (error) {
         console.error('PredictionContext placeParlay error', error);
+
+        // Revert optimistic update on error using React 19's useOptimistic
+        startTransition(() => {
+          optimisticUpdatePredictions({
+            type: 'revertParlay',
+            payload: {},
+          });
+        });
+
+        setLatestParlay(null);
         throw error;
       }
     },
-    [refreshUser],
+    [refreshUser, optimisticUpdatePredictions],
   );
 
   const value = useMemo<Ctx>(

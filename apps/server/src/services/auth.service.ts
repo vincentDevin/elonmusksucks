@@ -2,9 +2,19 @@ import bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
 import jwt from 'jsonwebtoken';
 
+// TEMP: Re-export shared auth payload types for backwards compatibility during migration
+export type {
+  RegisterPayload,
+  LoginPayload,
+  PasswordResetRequestPayload,
+  PasswordResetPayload,
+} from '@ems/types';
+
 import type { User } from '@prisma/client';
-import type { IAuthRepository } from '../repositories/IAuthRepository';
+import type { IAuthRepository } from '../repositories/interfaces/IAuthRepository';
 import { PrismaAuthRepository } from '../repositories/AuthRepository';
+import type { IUserRepository } from '../repositories/interfaces/IUserRepository';
+import { UserRepository } from '../repositories/UserRepository';
 import { userCache } from '../utils/userCache';
 
 const SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS) || 12;
@@ -12,6 +22,7 @@ const DUMMY_HASH = '$2b$10$KIXh1g4myh5j9hFSUVjdaeQXG7q3NDy4W8P4Y8XxYQCEhiqbz0R4e
 const skipEmailFlow = process.env.SKIP_EMAIL_FLOW === 'true';
 
 const repo: IAuthRepository = new PrismaAuthRepository();
+const userRepo: IUserRepository = new UserRepository();
 
 /**
  * Create a new user (hashing & salting their password).
@@ -189,4 +200,27 @@ export async function resetPassword(token: string, newPassword: string): Promise
 
 export async function getUserByEmail(email: string): Promise<User | null> {
   return repo.findByEmail(email.trim().toLowerCase());
+}
+
+export async function getUserBalance(userId: number) {
+  return repo.findUserBalance(userId);
+}
+
+/**
+ * Update user's theme preference
+ */
+export async function updateUserTheme(
+  userId: number,
+  themeId: string,
+): Promise<{ id: number; theme: string | null }> {
+  await userRepo.updateProfile(userId, { theme: themeId });
+
+  // Invalidate user cache since data changed
+  userCache.invalidate(userId);
+
+  // Fetch updated user to return theme
+  const updatedUser = await userRepo.findById(userId);
+  if (!updatedUser) throw new Error('USER_NOT_FOUND');
+
+  return { id: updatedUser.id, theme: updatedUser.theme };
 }

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import type { ServerEvents, ClientEvents } from '@ems/types';
 import { PONG_PHYSICS } from '@ems/types';
-import { useAuth } from './useAuth';
+import { useAuth } from '../contexts/AuthContext';
 
 // Spectator-only game state (no player slot, no input)
 interface SpectatorGameState {
@@ -54,10 +54,10 @@ export function usePongSpectator(): SpectatorHook {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [gameState, setGameState] = useState<SpectatorGameState | null>(null);
   const [connectionError, setConnectionError] = useState<string | null>(null);
-  const [spectatorCount, setSpectatorCount] = useState(0);
+  const [spectatorCount] = useState(0);
   const [shouldReturnToLobby, setShouldReturnToLobby] = useState(false);
 
-  const cleanupRef = useRef<() => void>();
+  const cleanupRef = useRef<(() => void) | undefined>(undefined);
   const currentGameIdRef = useRef<string | null>(null);
 
   const connect = useCallback(() => {
@@ -132,7 +132,7 @@ export function usePongSpectator(): SpectatorHook {
           ...prev,
           ball: data.ball,
           scores: data.scores,
-          status: 'active',
+          status: 'active' as const,
           tick: data.tick,
           timestamp: data.timestamp,
           wager: data.wager,

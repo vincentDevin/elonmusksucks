@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../hooks/useAuth';
-import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import { getUserProfile, updateUserProfile } from '../api/users';
 import type { UpdateProfilePayload } from '../api/users';
 import { ProfileImageUpload } from '../components/profile/ProfileImageUpload';
@@ -19,7 +18,6 @@ export default function ProfileSetup() {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const navigate = useNavigate();
 
   useEffect(() => {
     if (!currentUser) return;
@@ -42,9 +40,9 @@ export default function ProfileSetup() {
 
   useEffect(() => {
     if (!loading && formData.profileComplete) {
-      navigate('/');
+      window.location.href = '/dashboard';
     }
-  }, [loading, formData.profileComplete, navigate]);
+  }, [loading, formData.profileComplete]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
@@ -76,15 +74,19 @@ export default function ProfileSetup() {
     e.preventDefault();
     setError(null);
     try {
-      await updateUserProfile(currentUser!.id, { ...formData, profileComplete: true });
+      if (!currentUser?.id) throw new Error('User not authenticated');
+      await updateUserProfile(currentUser.id, { ...formData, profileComplete: true });
       await refreshUser();
-      navigate('/');
-    } catch (e: any) {
-      setError(e.message);
+      window.location.href = '/dashboard';
+    } catch (e: unknown) {
+      const errorMessage = e instanceof Error ? e.message : 'Failed to update profile';
+      setError(errorMessage);
     }
   };
 
+  // Rollback: git checkout HEAD -- apps/client/src/pages/ProfileSetup.tsx
   if (loading) return <p>Loading...</p>;
+  if (!currentUser) return <p>Please log in to continue.</p>;
 
   return (
     <div className="max-w-lg mx-auto p-6 bg-surface rounded-lg shadow space-y-6">
@@ -94,7 +96,7 @@ export default function ProfileSetup() {
         <div>
           <label className="block text-sm font-medium mb-2">Profile Picture</label>
           <ProfileImageUpload
-            userId={currentUser!.id}
+            userId={currentUser.id}
             currentAvatarUrl={formData.avatarUrl}
             onUploadSuccess={handleUploadSuccess}
             onUploadError={handleUploadError}

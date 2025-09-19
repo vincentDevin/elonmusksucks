@@ -1,10 +1,33 @@
 import { Request, Response, NextFunction } from 'express';
 import { UserService } from '../services/user.service';
 import { EnhancedUserStatsService } from '../services/enhancedUserStats.service';
+import { UserRepository } from '../repositories/UserRepository';
+import { BettingRepository } from '../repositories/BettingRepository';
+import { StatsRepository } from '../repositories/StatsRepository';
+import { PrismaClient } from '@prisma/client';
 import { unifiedActivityService } from '../services/unifiedActivity.service';
-import { achievementService } from '../services/achievement.service';
-import { adminAchievementService } from '../services/adminAchievement.service';
-import type { PublicUserProfile, UserFeedPost, UserActivity, UserStatsDTO } from '@ems/types';
+import { adminAchievementService } from '../services/achievements/adminAchievement.service';
+import type {
+  PublicUserProfile,
+  UserFeedPost,
+  UserStatsDTO,
+  UserStatsView,
+  UserProfileView,
+  UpdateProfilePayload,
+  CreateUserPostPayload,
+  UserBetView,
+  UserParlayView,
+  UserEnhancedStatsView,
+  UserAchievementProgressView,
+  UnifiedActivityEvent,
+} from '@ems/types';
+import {
+  toUserStatsView,
+  toUserProfileView,
+  toUserEnhancedStatsView,
+  toUserAchievementProgressView,
+} from '../view/user.view';
+import { toUserBetView, toUserParlayView } from '../view/betting.view';
 
 // Define MulterFile type explicitly to avoid mismatched declarations
 export type MulterFile = {
@@ -18,16 +41,24 @@ export type MulterFile = {
 
 // Extend Request to include authenticated user and optionally an uploaded file
 export type ReqWithUser = Request & {
-  user?: { id: number };
+  user?: { id: number; role?: string };
   file?: MulterFile;
 };
 
 // Instantiate the services (uses Prisma-backed repository by default)
 const userService = new UserService();
-const enhancedUserStatsService = new EnhancedUserStatsService();
+const userRepository = new UserRepository();
+const bettingRepository = new BettingRepository();
+const prisma = new PrismaClient();
+const statsRepository = new StatsRepository(prisma);
+const enhancedUserStatsService = new EnhancedUserStatsService(
+  userRepository,
+  bettingRepository,
+  statsRepository,
+);
 
 /**
- * GET /api/users/:userId
+ * GET /api/users/profile/:userId
  * Fetch a user's profile
  */
 export async function getProfile(
@@ -44,8 +75,11 @@ export async function getProfile(
     }
 
     const viewerId = req.user?.id;
-    const profileDTO: PublicUserProfile = await userService.getUserProfile(targetUserId, viewerId);
-    res.json(profileDTO);
+    const profileData: PublicUserProfile = await userService.getUserProfile(targetUserId, viewerId);
+
+    // Map to standardized DTO with BigInt → string conversion
+    const payload = toUserProfileView(profileData) satisfies UserProfileView;
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -100,9 +134,6 @@ export async function followUserHandler(
     }
     await userService.followUser(followerId, followingId);
 
-    // Record activity (legacy)
-    await userService.createUserActivity(followerId, 'USER_FOLLOWED', { followingId });
-
     // Publish follow activity through unified system
     const followedUser = await userService.getUserProfile(followingId);
     const followerUser = await userService.getUserProfile(followerId);
@@ -125,16 +156,6 @@ export async function followUserHandler(
         },
       });
     }
-
-    // Check for achievement unlocks
-    await achievementService.checkAndUpdateAchievements({
-      type: 'user_followed',
-      userId: followerId,
-      data: {
-        followedUserId: followingId,
-        followedUserName: followedUser?.name || 'Unknown',
-      },
-    });
 
     res.sendStatus(204);
   } catch (err) {
@@ -160,9 +181,6 @@ export async function unfollowUserHandler(
     }
     await userService.unfollowUser(followerId, followingId);
 
-    // Record activity
-    await userService.createUserActivity(followerId, 'USER_UNFOLLOWED', { followingId });
-
     res.sendStatus(204);
   } catch (err) {
     next(err);
@@ -187,8 +205,14 @@ export async function updateProfileHandler(
       return;
     }
 
-    const updated: PublicUserProfile = await userService.updateUserProfile(targetUserId, req.body);
-    res.json(updated);
+    const updateData = req.body as UpdateProfilePayload;
+    const updated: PublicUserProfile = await userService.updateUserProfile(
+      targetUserId,
+      updateData,
+    );
+
+    const payload = toUserProfileView(updated) satisfies UserProfileView;
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -225,7 +249,7 @@ export async function createUserPostHandler(
   try {
     const profileUserId = Number(req.params.userId); // whose profile
     const authUserId = req.user?.id; // who is posting
-    const { content, parentId } = req.body;
+    const { content, parentId } = req.body as CreateUserPostPayload;
     if (!authUserId) {
       res.status(401).json({ error: 'Not authenticated' });
       return;
@@ -239,7 +263,7 @@ export async function createUserPostHandler(
       res.status(403).json({ error: 'Forbidden' });
       return;
     }
-    // Create post/comment (pass ownerId=profileUserId, authorId=authUserId)
+    // Create post/comment
     const post: UserFeedPost = await userService.createUserPost(
       authUserId,
       content,
@@ -263,9 +287,22 @@ export async function getUserActivityHandler(
 ): Promise<void> {
   try {
     const userId = Number(req.params.userId);
-    const viewerId = req.user?.id;
-    const activity: UserActivity[] = await userService.getUserActivity(userId, viewerId);
-    res.json(activity);
+
+    // Check user privacy settings
+    const user = await userService.getUserProfile(userId);
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    // For now, return all public activities - in future this could be filtered by userId
+    // when the unified activity service adds user-specific query support
+    const activities: UnifiedActivityEvent[] = await unifiedActivityService.getPublicActivities(50);
+
+    // Filter activities for this specific user (temporary solution)
+    const userActivities = activities.filter((activity) => activity.userId === userId);
+
+    res.json(userActivities);
   } catch (err) {
     next(err);
   }
@@ -293,7 +330,9 @@ export async function getUserStatsHandler(
       res.status(404).json({ error: 'Stats not found' });
       return;
     }
-    res.json(stats);
+
+    const payload = toUserStatsView(stats) satisfies UserStatsView;
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -319,7 +358,8 @@ export async function getUserBetsHandler(
     }
 
     const bets = await userService.getUserActiveBets(targetUserId);
-    res.json(bets);
+    const payload = bets.map(toUserBetView) satisfies UserBetView[];
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -345,7 +385,8 @@ export async function getUserParlaysHandler(
     }
 
     const parlays = await userService.getUserActiveParlays(targetUserId);
-    res.json(parlays);
+    const payload = parlays.map(toUserParlayView) satisfies UserParlayView[];
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -399,7 +440,8 @@ export async function getEnhancedUserStatsHandler(
     // Get enhanced stats using the new service with real data calculations
     const enhancedStats = await enhancedUserStatsService.getEnhancedStats(targetUserId);
 
-    res.json(enhancedStats);
+    const payload = toUserEnhancedStatsView(enhancedStats) satisfies UserEnhancedStatsView;
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -424,10 +466,13 @@ export async function getUserAchievementsHandler(
       return;
     }
 
-    // Get user achievement progress
-    const achievements = await achievementService.getUserAchievementProgress(targetUserId);
+    // Get user achievement progress using the modern system
+    const achievements = await adminAchievementService.getUserAchievementProgress(targetUserId);
 
-    res.json(achievements);
+    const payload = achievements.map(
+      toUserAchievementProgressView,
+    ) satisfies UserAchievementProgressView[];
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -454,6 +499,49 @@ export async function getRecentAchievementsHandler(
       limit,
     );
     res.json(recentAchievements);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getAllAchievementsHandler(
+  _req: ReqWithUser,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    // Get all available achievements (public endpoint)
+    const achievements = await adminAchievementService.getAllAchievements();
+    res.json(achievements);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Search users by name/username
+ * GET /api/users/search?q=searchterm
+ */
+export async function searchUsersHandler(
+  req: ReqWithUser,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const query = req.query.q as string;
+
+    if (!query || query.trim().length === 0) {
+      res.json([]);
+      return;
+    }
+
+    if (query.length < 2) {
+      res.status(400).json({ error: 'Search query must be at least 2 characters' });
+      return;
+    }
+
+    const users = await userService.searchUsers(query.trim());
+    res.json(users);
   } catch (err) {
     next(err);
   }

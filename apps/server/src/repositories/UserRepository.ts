@@ -1,21 +1,27 @@
 // apps/server/src/repositories/UserRepository.ts
 
 import { PrismaClient, Prisma } from '@prisma/client';
-import type { IUserRepository } from './IUserRepository';
-import type {
-  DbUser,
-  DbUserBadge,
-  DbBadge,
-  DbUserStats,
-  DbUserActivity,
-  DbUserPost,
-} from '@ems/types';
+import type { IUserRepository } from './interfaces/IUserRepository';
+
+export type { IUserRepository };
+import type { DbUser, DbUserBadge, DbBadge, DbUserStats, DbUserPost } from '@ems/types';
 
 const prisma = new PrismaClient();
 
 export class UserRepository implements IUserRepository {
   async findById(id: number): Promise<DbUser | null> {
     return prisma.user.findUnique({ where: { id } }) as Promise<DbUser | null>;
+  }
+
+  async findUserBasicById(id: number): Promise<{ id: number; name: string } | null> {
+    return prisma.user.findUnique({
+      where: { id },
+      select: { id: true, name: true },
+    });
+  }
+
+  async getUserStats(userId: number): Promise<DbUserStats | null> {
+    return prisma.userStats.findUnique({ where: { userId } }) as Promise<DbUserStats | null>;
   }
 
   async getFollowersCount(userId: number): Promise<number> {
@@ -31,6 +37,16 @@ export class UserRepository implements IUserRepository {
       where: { userId },
       include: { badge: true },
     }) as Promise<Array<DbUserBadge & { badge: DbBadge }>>;
+  }
+
+  async findUserAchievements(userId: number): Promise<any[]> {
+    return prisma.userAchievement.findMany({
+      where: { userId, completedAt: { not: null } },
+      include: {
+        achievement: true,
+      },
+      orderBy: [{ achievement: { category: 'asc' } }, { achievement: { sortOrder: 'asc' } }],
+    });
   }
 
   async existsFollow(followerId: number, followingId: number): Promise<boolean> {
@@ -71,7 +87,7 @@ export class UserRepository implements IUserRepository {
   }
 
   async getUserFeed(userId: number, options?: { parentId: number | null }): Promise<DbUserPost[]> {
-    const where: any = { ownerId: userId };
+    const where: any = { authorId: userId };
     if (options && 'parentId' in options) {
       where.parentId = options.parentId;
     }
@@ -79,7 +95,20 @@ export class UserRepository implements IUserRepository {
     const posts = await prisma.userPost.findMany({
       where,
       orderBy: { createdAt: 'desc' },
-      include: { author: true },
+      include: {
+        author: true,
+        reactions: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                avatarUrl: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     // Nest into a tree
@@ -99,11 +128,26 @@ export class UserRepository implements IUserRepository {
 
   async createUserPost(data: {
     authorId: number;
-    ownerId: number;
     content: string;
     parentId: number | null;
   }): Promise<DbUserPost> {
-    return prisma.userPost.create({ data }) as Promise<DbUserPost>;
+    // Legacy method - now redirects to new PostRepository for consistency
+    return prisma.userPost.create({
+      data: {
+        authorId: data.authorId,
+        content: data.content,
+        parentId: data.parentId,
+        contentType: 'TEXT',
+        visibility: 'PUBLIC',
+        threadDepth: 0, // Will be calculated properly in new PostRepository
+        likesCount: 0,
+        commentsCount: 0,
+        sharesCount: 0,
+        viewsCount: 0,
+        isDeleted: false,
+        isFlagged: false,
+      },
+    }) as Promise<DbUserPost>;
   }
 
   async getUserPostThread(
@@ -115,36 +159,6 @@ export class UserRepository implements IUserRepository {
     });
     if (!post) return null;
     return { ...post, children: post.children ?? [] };
-  }
-
-  async getUserActivity(userId: number): Promise<DbUserActivity[]> {
-    return prisma.userActivity.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-    });
-  }
-
-  async createUserActivity(data: {
-    userId: number;
-    type: string;
-    details?: Prisma.InputJsonValue | null;
-  }): Promise<DbUserActivity> {
-    const payload: Prisma.UserActivityUncheckedCreateInput = {
-      userId: data.userId,
-      type: data.type,
-      ...(data.details === null
-        ? { details: Prisma.JsonNull }
-        : data.details !== undefined
-          ? { details: data.details }
-          : {}),
-    };
-
-    const activity = await prisma.userActivity.create({ data: payload });
-    return activity as DbUserActivity;
-  }
-
-  async getUserStats(userId: number): Promise<DbUserStats | null> {
-    return prisma.userStats.findUnique({ where: { userId } }) as Promise<DbUserStats | null>;
   }
 
   async updateUserStats(
@@ -194,6 +208,177 @@ export class UserRepository implements IUserRepository {
 
   async setFeedPrivacy(userId: number, feedPrivate: boolean): Promise<void> {
     await prisma.user.update({ where: { id: userId }, data: { feedPrivate } });
+  }
+
+  async getUserRank(userId: number): Promise<number | undefined> {
+    const rawRank = (await prisma.$queryRawUnsafe(
+      `SELECT rank FROM (
+         SELECT id, RANK() OVER (ORDER BY "muskBucks" DESC) AS rank
+         FROM "User"
+       ) u WHERE u.id = $1;`,
+      userId,
+    )) as { rank: bigint }[];
+    return Array.isArray(rawRank) && rawRank.length > 0 ? Number(rawRank[0].rank) : undefined;
+  }
+
+  async getUserActiveBets(userId: number): Promise<
+    Array<{
+      id: number;
+      predictionId: number;
+      predictionTitle: string;
+      amount: string;
+      odds: number;
+      optionLabel?: string;
+      status: string;
+      createdAt: string;
+    }>
+  > {
+    const bets = await prisma.bet.findMany({
+      where: { userId, status: 'PENDING' },
+      include: {
+        prediction: { select: { id: true, title: true, resolved: true } },
+        optionOption: { select: { label: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+    });
+
+    return bets.map((bet) => ({
+      id: bet.id,
+      predictionId: bet.predictionId,
+      predictionTitle: bet.prediction.title,
+      amount: bet.amount.toString(),
+      odds: bet.oddsAtPlacement || 1.0,
+      optionLabel: bet.optionOption?.label,
+      status: bet.status,
+      createdAt: bet.createdAt.toISOString(),
+    }));
+  }
+
+  async getUserActiveParlays(userId: number): Promise<
+    Array<{
+      id: number;
+      amount: string;
+      combinedOdds: number;
+      potentialPayout: string;
+      legCount: number;
+      status: string;
+      createdAt: string;
+      legs: Array<{ predictionTitle: string; optionLabel: string }>;
+    }>
+  > {
+    const parlays = await prisma.parlay.findMany({
+      where: { userId, status: 'PENDING' },
+      include: {
+        legs: {
+          include: {
+            option: {
+              include: {
+                prediction: { select: { title: true } },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+    });
+
+    return parlays.map((parlay) => ({
+      id: parlay.id,
+      amount: parlay.amount.toString(),
+      combinedOdds: parlay.combinedOdds,
+      potentialPayout: parlay.potentialPayout.toString(),
+      legCount: parlay.legs.length,
+      status: parlay.status,
+      createdAt: parlay.createdAt.toISOString(),
+      legs: parlay.legs.map((leg: any) => ({
+        predictionTitle: leg.option.prediction.title,
+        optionLabel: leg.option.label,
+      })),
+    }));
+  }
+
+  async getUserPredictions(userId: number): Promise<
+    Array<{
+      id: number;
+      title: string;
+      category: string;
+      type: string;
+      approved: boolean;
+      resolved: boolean;
+      expiresAt: string;
+      createdAt: string;
+      totalBets?: number;
+    }>
+  > {
+    const predictions = await prisma.prediction.findMany({
+      where: { creatorId: userId },
+      include: { _count: { select: { bets: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+    });
+
+    return predictions.map((prediction) => ({
+      id: prediction.id,
+      title: prediction.title,
+      category: prediction.category,
+      type: prediction.type,
+      approved: prediction.approved,
+      resolved: prediction.resolved,
+      expiresAt: prediction.expiresAt.toISOString(),
+      createdAt: prediction.createdAt.toISOString(),
+      totalBets: prediction._count.bets,
+    }));
+  }
+
+  // Achievement-related methods
+  async getUserTotalBetsCount(userId: number): Promise<number> {
+    return prisma.bet.count({ where: { userId } });
+  }
+
+  async getUserCategoryWinsCount(userId: number, category: string): Promise<number> {
+    return prisma.bet.count({
+      where: {
+        userId,
+        status: 'WON',
+        prediction: { category },
+      },
+    });
+  }
+
+  async getUserParlayWinsCount(userId: number): Promise<number> {
+    return prisma.parlay.count({
+      where: { userId, status: 'WON' },
+    });
+  }
+
+  async searchUsersByName(
+    query: string,
+  ): Promise<{ id: number; name: string; avatarUrl?: string }[]> {
+    const users = await prisma.user.findMany({
+      where: {
+        name: {
+          contains: query,
+          mode: 'insensitive',
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        avatarUrl: true,
+      },
+      take: 10, // Limit results for performance
+      orderBy: {
+        name: 'asc',
+      },
+    });
+
+    return users.map((user) => ({
+      id: user.id,
+      name: user.name,
+      avatarUrl: user.avatarUrl || undefined,
+    }));
   }
 }
 

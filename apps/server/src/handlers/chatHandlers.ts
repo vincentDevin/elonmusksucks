@@ -10,9 +10,14 @@
 import { Socket } from 'socket.io';
 import type { AuthenticatedSocket } from '../middleware/socketAuthMiddleware';
 import { createMessage, getRecentMessages } from '../services/message.service';
-import type { MessageWithUser } from '../repositories/IMessageRepository';
+import type { MessageWithUser } from '../repositories/interfaces/IMessageRepository';
 import { UserService } from '../services/user.service';
 import redisClient from '../lib/redis';
+import { socketCleanupManager } from '../lib/SocketCleanupManager';
+import { chatRateLimiter, createRateLimitMiddleware } from '../middleware/rateLimitMiddleware';
+import { InputSizeLimits, REDIS_CHANNELS } from '@ems/types';
+import { eventBus } from '../lib/EventBus';
+import { CACHE_TTL } from '../lib/cacheTTL';
 
 const GLOBAL_CHAT_ROOM = 'global';
 const GLOBAL_ROOM_ID = 1;
@@ -44,6 +49,9 @@ export async function registerChatHandlers(socket: Socket) {
   const authSock = socket as AuthenticatedSocket;
   socket.join(GLOBAL_CHAT_ROOM);
 
+  // Track listeners for memory leak prevention
+  let listenerCount = 0;
+
   // ────────────────────────────────────────────────────────────────────────────
   // 1. Presence handling (join)
   // ────────────────────────────────────────────────────────────────────────────
@@ -61,18 +69,22 @@ export async function registerChatHandlers(socket: Socket) {
           role: authSock.user.role ?? 'USER',
         }),
       );
+
+      // Set TTL on presence data to prevent stale entries
+      await Promise.all([
+        redisClient.expire(ONLINE_USERS_SET_KEY, CACHE_TTL.CHAT_PRESENCE),
+        redisClient.expire(USER_INFO_HASH_KEY, CACHE_TTL.CHAT_PRESENCE),
+        redisClient.expire(CONNECTIONS + uid, CACHE_TTL.CHAT_PRESENCE),
+      ]);
     }
     await publishOnlineUsers();
 
-    await redisClient.publish(
-      'chat:join',
-      JSON.stringify({
-        id: authSock.user.id,
-        name: authSock.user.name,
-        avatarUrl: authSock.user.avatarUrl ?? null,
-        role: authSock.user.role ?? 'USER',
-      }),
-    );
+    await eventBus.publish(REDIS_CHANNELS.CHAT_JOIN, {
+      id: authSock.user.id,
+      name: authSock.user.name,
+      avatarUrl: authSock.user.avatarUrl ?? null,
+      role: authSock.user.role ?? 'USER',
+    });
   } else {
     await publishOnlineUsers(); // guest connects
   }
@@ -80,7 +92,7 @@ export async function registerChatHandlers(socket: Socket) {
   // ────────────────────────────────────────────────────────────────────────────
   // 2. History request (no Redis needed)
   // ────────────────────────────────────────────────────────────────────────────
-  socket.on('chat:history', async () => {
+  const historyHandler = async () => {
     try {
       const history: MessageWithUser[] = await getRecentMessages(GLOBAL_ROOM_ID, 50);
       const messages: ChatMessageDTO[] = await Promise.all(
@@ -118,20 +130,46 @@ export async function registerChatHandlers(socket: Socket) {
       console.error('[chat] Failed to fetch history:', err);
       socket.emit('chat:error', { message: 'Failed to fetch chat history' });
     }
-  });
+  };
+  socket.on('chat:history', historyHandler);
+  socketCleanupManager.registerHandler(socket.id, 'chat:history', historyHandler);
+  listenerCount++;
 
   // ────────────────────────────────────────────────────────────────────────────
   // 3. Send message → publish `chat:message`
   // ────────────────────────────────────────────────────────────────────────────
-  socket.on('chat:message', async (payload: { message: string }) => {
+  const messageHandler = async (payload: { message: string }) => {
     try {
       if (!authSock.user) return socket.emit('chat:error', { message: 'NOT_AUTHENTICATED' });
-      if (
-        !payload.message ||
-        typeof payload.message !== 'string' ||
-        payload.message.length > 1000
-      ) {
+
+      // Apply rate limiting
+      const rateLimitCheck = createRateLimitMiddleware(chatRateLimiter, 'chat:message');
+      await new Promise<void>((resolve, reject) => {
+        rateLimitCheck(authSock.user!.id, (error?: string) => {
+          if (error) {
+            console.warn(`[chat] Rate limit exceeded for user ${authSock.user!.id}: ${error}`);
+            socket.emit('chat:error', { message: error });
+            reject(new Error(error));
+          } else {
+            resolve();
+          }
+        });
+      });
+
+      if (!payload.message || typeof payload.message !== 'string') {
         return socket.emit('chat:error', { message: 'INVALID_MESSAGE' });
+      }
+
+      // Input size validation
+      if (payload.message.length > InputSizeLimits.ChatMessage) {
+        console.warn(
+          `[input-caps] Chat message rejected: ${payload.message.length} chars (limit: ${InputSizeLimits.ChatMessage})`,
+        );
+        return socket.emit('chat:error', {
+          message: 'MESSAGE_TOO_LONG',
+          limit: InputSizeLimits.ChatMessage,
+          actual: payload.message.length,
+        });
       }
 
       const saved = await createMessage(authSock.user.id, GLOBAL_ROOM_ID, payload.message);
@@ -148,52 +186,110 @@ export async function registerChatHandlers(socket: Socket) {
           saved.timestamp instanceof Date ? saved.timestamp.toISOString() : `${saved.timestamp}`,
       };
 
-      await redisClient.publish('chat:message', JSON.stringify(chatMsg));
+      await eventBus.publish(REDIS_CHANNELS.CHAT_MESSAGE, chatMsg);
 
       // clear typing state
       typingUsers.delete(authSock.user.id);
-      await redisClient.publish('chat:stopTyping', JSON.stringify({ id: authSock.user.id }));
+      await eventBus.publish(REDIS_CHANNELS.CHAT_STOP_TYPING, { id: authSock.user.id });
     } catch (err) {
       console.error('[chat] send error:', err);
       socket.emit('chat:error', { message: 'SEND_FAILED' });
     }
-  });
+  };
+  socket.on('chat:message', messageHandler);
+  socketCleanupManager.registerHandler(socket.id, 'chat:message', messageHandler);
+  listenerCount++;
 
   // ────────────────────────────────────────────────────────────────────────────
   // 4. Typing indicators
   // ────────────────────────────────────────────────────────────────────────────
-  socket.on('chat:typing', () => {
+  const typingHandler = async () => {
     if (!authSock.user) return;
     const uid = authSock.user.id;
 
     if (!typingUsers.has(uid)) {
       typingUsers.add(uid);
-      redisClient.publish('chat:typing', JSON.stringify({ id: uid, name: authSock.user.name }));
+      await eventBus.publish(REDIS_CHANNELS.CHAT_TYPING, { id: uid, name: authSock.user.name });
+
+      // Publish JSON rule achievement event for typing start
+      try {
+        await eventBus.publish('chat:typing:start', {
+          key: 'chat:typing:start',
+          userId: uid,
+          occurredAt: new Date().toISOString(),
+          idempotencyKey: `chat:typing:${uid}:${Date.now()}`,
+          payload: {
+            roomId: GLOBAL_ROOM_ID,
+          },
+        });
+      } catch (achievementError) {
+        console.error('[chat] Error publishing typing achievement event:', achievementError);
+      }
     }
 
     if (typingTimeout.has(uid)) clearTimeout(typingTimeout.get(uid));
 
-    const t = setTimeout(() => {
+    const t = setTimeout(async () => {
       typingUsers.delete(uid);
-      redisClient.publish('chat:stopTyping', JSON.stringify({ id: uid }));
+      await eventBus.publish(REDIS_CHANNELS.CHAT_STOP_TYPING, { id: uid });
       typingTimeout.delete(uid);
+
+      // Publish JSON rule achievement event for typing stop
+      try {
+        await eventBus.publish('chat:typing:stop', {
+          key: 'chat:typing:stop',
+          userId: uid,
+          occurredAt: new Date().toISOString(),
+          idempotencyKey: `chat:typing:stop:${uid}:${Date.now()}`,
+          payload: {
+            roomId: GLOBAL_ROOM_ID,
+          },
+        });
+      } catch (achievementError) {
+        console.error('[chat] Error publishing typing stop achievement event:', achievementError);
+      }
     }, 4000);
 
     typingTimeout.set(uid, t);
-  });
+  };
+  socket.on('chat:typing', typingHandler);
+  socketCleanupManager.registerHandler(socket.id, 'chat:typing', typingHandler);
+  listenerCount++;
 
-  socket.on('chat:stopTyping', () => {
+  const stopTypingHandler = async () => {
     if (!authSock.user) return;
     const uid = authSock.user.id;
     if (typingUsers.has(uid)) {
       typingUsers.delete(uid);
-      redisClient.publish('chat:stopTyping', JSON.stringify({ id: uid }));
+      await eventBus.publish(REDIS_CHANNELS.CHAT_STOP_TYPING, { id: uid });
       if (typingTimeout.has(uid)) {
         clearTimeout(typingTimeout.get(uid));
         typingTimeout.delete(uid);
       }
+
+      // Publish JSON rule achievement event for explicit typing stop
+      try {
+        await eventBus.publish('chat:typing:stop', {
+          key: 'chat:typing:stop',
+          userId: uid,
+          occurredAt: new Date().toISOString(),
+          idempotencyKey: `chat:typing:stop:${uid}:${Date.now()}`,
+          payload: {
+            roomId: GLOBAL_ROOM_ID,
+            explicit: true, // User explicitly stopped typing vs timeout
+          },
+        });
+      } catch (achievementError) {
+        console.error(
+          '[chat] Error publishing explicit typing stop achievement event:',
+          achievementError,
+        );
+      }
     }
-  });
+  };
+  socket.on('chat:stopTyping', stopTypingHandler);
+  socketCleanupManager.registerHandler(socket.id, 'chat:stopTyping', stopTypingHandler);
+  listenerCount++;
 
   // ────────────────────────────────────────────────────────────────────────────
   // 5. Disconnect → leave logic
@@ -209,18 +305,23 @@ export async function registerChatHandlers(socket: Socket) {
     }
 
     await publishOnlineUsers();
-    await redisClient.publish(
-      'chat:leave',
-      JSON.stringify({ id: authSock.user.id, name: authSock.user.name }),
-    );
+    await eventBus.publish(REDIS_CHANNELS.CHAT_LEAVE, {
+      id: authSock.user.id,
+      name: authSock.user.name,
+    });
 
     typingUsers.delete(authSock.user.id);
     if (typingTimeout.has(authSock.user.id)) {
       clearTimeout(typingTimeout.get(authSock.user.id));
       typingTimeout.delete(authSock.user.id);
     }
-    redisClient.publish('chat:stopTyping', JSON.stringify({ id: authSock.user.id }));
+    await eventBus.publish(REDIS_CHANNELS.CHAT_STOP_TYPING, { id: authSock.user.id });
   });
+
+  // Log total registered listeners for monitoring
+  console.log(
+    `[chat] Registered ${listenerCount} listeners for socket ${socket.id} (heap monitoring)`,
+  );
 }
 
 // Helper: broadcast current online list via Redis
@@ -236,5 +337,5 @@ async function publishOnlineUsers() {
       role: info.role ?? 'USER',
     };
   });
-  await redisClient.publish('chat:usersOnline', JSON.stringify(parsed));
+  await eventBus.publish(REDIS_CHANNELS.CHAT_USERS_ONLINE, parsed);
 }

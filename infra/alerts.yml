@@ -1,0 +1,121 @@
+# infra/alerts.yml
+# Alert configuration for Elon Musk Sucks prediction market platform
+# Based on SLO targets defined in docs/SLO.md
+
+version: "1.0"
+
+alerts:
+  # Queue Lag & Depth Alerts
+  - name: queue_depth_critical
+    description: "BullMQ queue depth exceeds critical threshold"
+    query: "bullmq.queue.depth > 25"
+    severity: critical
+    threshold: 25
+    evaluation_window: "5m"
+    notification_channels:
+      - pagerduty
+      - slack-critical
+    runbook_url: "https://docs.internal/runbooks/queue-depth-high"
+
+  - name: queue_age_warning
+    description: "BullMQ queue oldest job age exceeds warning threshold"
+    query: "bullmq.queue.age_ms > 60000"
+    severity: warning
+    threshold: 60000  # 60 seconds in ms
+    evaluation_window: "10m"
+    notification_channels:
+      - slack-alerts
+    runbook_url: "https://docs.internal/runbooks/queue-lag"
+
+  - name: queue_success_rate_low
+    description: "BullMQ queue success rate below SLO"
+    query: "bullmq.queue.success_rate < 0.95"
+    severity: warning
+    threshold: 0.95  # 95% success rate
+    evaluation_window: "15m"
+    notification_channels:
+      - slack-alerts
+
+  # Socket Handler Alerts
+  - name: socket_error_rate_high
+    description: "Socket handler error rate exceeds threshold"
+    query: "socket.handler.error_rate > 2.0"
+    severity: warning
+    threshold: 2.0  # 2% error rate
+    evaluation_window: "5m"
+    notification_channels:
+      - slack-alerts
+    runbook_url: "https://docs.internal/runbooks/socket-errors"
+
+  - name: socket_p99_latency_critical
+    description: "Socket handler P99 latency exceeds critical threshold"
+    query: "socket.handler.duration_ms.p99 > 500"
+    severity: critical
+    threshold: 500  # 500ms
+    evaluation_window: "2m"
+    notification_channels:
+      - pagerduty
+      - slack-critical
+
+  - name: socket_p99_latency_warning
+    description: "Socket handler P99 latency exceeds warning threshold"
+    query: "socket.handler.duration_ms.p99 > 300"
+    severity: warning
+    threshold: 300  # 300ms
+    evaluation_window: "2m"
+    notification_channels:
+      - slack-alerts
+
+  # System Health Alerts
+  - name: database_unavailable
+    description: "Database connection failures detected"
+    query: "database.connection.error_rate > 1.0"
+    severity: critical
+    threshold: 1.0  # 1% error rate
+    evaluation_window: "2m"
+    notification_channels:
+      - pagerduty
+      - slack-critical
+
+  - name: api_error_rate_high
+    description: "API 5xx error rate exceeds threshold"
+    query: "api.response.5xx_rate > 1.0"
+    severity: critical
+    threshold: 1.0  # 1% error rate
+    evaluation_window: "5m"
+    notification_channels:
+      - pagerduty
+      - slack-critical
+
+notification_channels:
+  slack-critical:
+    type: slack
+    webhook_url: "${SLACK_CRITICAL_WEBHOOK}"
+    channel: "#alerts-critical"
+    
+  slack-alerts:
+    type: slack
+    webhook_url: "${SLACK_ALERTS_WEBHOOK}"
+    channel: "#alerts"
+    
+  pagerduty:
+    type: pagerduty
+    integration_key: "${PAGERDUTY_INTEGRATION_KEY}"
+    service_id: "elonmusksucks-production"
+
+# Monitoring Integration
+# Configure your monitoring system (Prometheus, DataDog, etc.) to:
+# 1. Collect metrics using the metric names defined above
+# 2. Evaluate alert rules based on the queries and thresholds
+# 3. Send notifications to the configured channels
+# 4. Include runbook links for operational guidance
+
+# Example Prometheus AlertManager config:
+# - alert: QueueDepthCritical
+#   expr: bullmq_queue_depth > 25
+#   for: 5m
+#   labels:
+#     severity: critical
+#   annotations:
+#     summary: "BullMQ queue depth exceeds critical threshold"
+#     runbook_url: "https://docs.internal/runbooks/queue-depth-high"

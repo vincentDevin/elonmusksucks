@@ -2,9 +2,9 @@
 import { useState, useEffect } from 'react';
 import CreatePredictionForm from '../CreatePredictionForm';
 import { createPrediction } from '../../api/predictions';
-import { useAuth } from '../../hooks/useAuth';
+import { useAuth } from '../../contexts/AuthContext';
 import api from '../../api/axios';
-import type { PredictionFull } from '@ems/types';
+// Removed unused import
 
 interface CreatePredictionModalProps {
   isOpen: boolean;
@@ -141,15 +141,15 @@ export default function CreatePredictionModal({
 
           const response = await api.post('/api/predictions/source-links', linkData);
           console.log('Source link created successfully:', response.data);
-        } catch (linkError) {
+        } catch (linkError: any) {
           console.error('Failed to link source to prediction:', linkError);
-          if (linkError.response) {
+          if (linkError?.response) {
             console.error('Response status:', linkError.response.status);
             console.error('Response data:', linkError.response.data);
           }
           // Don't fail the creation if linking fails - show error but continue
           setError(
-            `Prediction created successfully, but failed to link source: ${linkError.response?.data?.error || linkError.message}`,
+            `Prediction created successfully, but failed to link source: ${linkError?.response?.data?.error || linkError?.message}`,
           );
           return; // Don't close modal if there's an error
         }

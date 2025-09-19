@@ -10,6 +10,7 @@ import type {
   UserStatsDTO,
   PublicAITweet,
   Role,
+  AdminFinancialAnalyticsResponse,
 } from '@ems/types';
 
 /** — Enhanced User Management — **/
@@ -348,45 +349,6 @@ export interface PaginatedFinancialData {
   hasPreviousPage: boolean;
 }
 
-export interface FinancialAnalytics {
-  overview: {
-    totalBettingVolume: number;
-    totalPayouts: number;
-    totalRefunds: number;
-    netRevenue: number;
-    activeBettors: number;
-    avgBetSize: number;
-  };
-  timeSeriesData: Array<{
-    date: string;
-    volume: number;
-    payouts: number;
-    profit: number;
-    betCount: number;
-  }>;
-  categoryBreakdown: Array<{
-    category: string;
-    volume: number;
-    betCount: number;
-    profitMargin: number;
-  }>;
-  userSegments: Array<{
-    segment: string;
-    userCount: number;
-    avgLifetimeValue: number;
-    churnRate: number;
-  }>;
-  fraudDetection: {
-    suspiciousBets: number;
-    flaggedUsers: number;
-    riskPatterns: Array<{
-      pattern: string;
-      count: number;
-      severity: 'low' | 'medium' | 'high';
-    }>;
-  };
-}
-
 export interface BulkFinancialOperation {
   betIds?: number[];
   userIds?: number[];
@@ -437,13 +399,15 @@ export async function getFinancialAnalytics(params?: {
   startDate?: string;
   endDate?: string;
   category?: string;
-}): Promise<FinancialAnalytics> {
+}): Promise<AdminFinancialAnalyticsResponse> {
   const queryParams = new URLSearchParams();
   if (params?.startDate) queryParams.append('startDate', params.startDate);
   if (params?.endDate) queryParams.append('endDate', params.endDate);
   if (params?.category) queryParams.append('category', params.category);
 
-  const res = await api.get<FinancialAnalytics>(`/api/admin/financial/analytics?${queryParams}`);
+  const res = await api.get<AdminFinancialAnalyticsResponse>(
+    `/api/admin/financial/analytics?${queryParams}`,
+  );
   return res.data;
 }
 
@@ -1120,5 +1084,281 @@ export async function getUsersWithAchievement(achievementId: number): Promise<
 
 export async function getAchievementAnalytics(): Promise<AchievementAnalytics> {
   const res = await api.get<AchievementAnalytics>('/api/admin/achievements/analytics');
+  return res.data;
+}
+
+/** — Enhanced JSON Rule Achievement System — **/
+
+// Enhanced interfaces for JSON rule-based achievements
+export interface JsonRuleAchievement extends Achievement {
+  ruleData: {
+    eventKeys: string[];
+    progress: {
+      kind: 'count' | 'streak' | 'threshold' | 'binary';
+      incrementIf?: Record<string, unknown>;
+      setIf?: Record<string, unknown>;
+      resetIf?: Record<string, unknown>;
+    };
+    unlockWhen: Record<string, unknown>;
+    counters?: string[];
+  };
+}
+
+export interface AchievementTemplate {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  rarity: 'common' | 'uncommon' | 'rare' | 'legendary' | 'secret' | 'shame';
+  ruleTemplate: JsonRuleAchievement['ruleData'];
+  variables: Record<string, string>; // Template variables like {{streakLength}}
+  usage: number; // How many times this template has been used
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RuleValidationResult {
+  isValid: boolean;
+  errors: string[];
+  warnings: string[];
+  estimatedComplexity: 'low' | 'medium' | 'high';
+  complexityScore: number;
+  optimizationSuggestions: string[];
+  estimatedPerformanceImpact: 'minimal' | 'moderate' | 'high';
+}
+
+export interface EventKeyOption {
+  key: string;
+  description: string;
+  category: 'betting' | 'chat' | 'prediction' | 'leaderboard' | 'pong' | 'user' | 'admin';
+  payloadSchema: Record<string, string>; // field name -> type
+  volume: 'low' | 'medium' | 'high' | 'critical';
+  examples: Record<string, unknown>[]; // Sample payloads
+}
+
+export interface SimulationResult {
+  userId?: number;
+  userName?: string;
+  simulatedEvents: Array<{
+    eventKey: string;
+    payload: Record<string, unknown>;
+    timestamp: string;
+  }>;
+  progressHistory: Array<{
+    step: number;
+    progress: number;
+    unlocked: boolean;
+    timestamp: string;
+    triggerEvent?: string;
+  }>;
+  finalProgress: number;
+  unlocked: boolean;
+  unlockTimestamp?: string;
+  estimatedUnlockRate: number; // Percentage of users expected to unlock
+}
+
+export interface RuleMetrics {
+  achievementId: number;
+  achievementTitle: string;
+  totalUsers: number;
+  completedUsers: number;
+  completionRate: number;
+  averageTimeToComplete: number; // in hours
+  processingLatency: {
+    p50: number;
+    p95: number;
+    p99: number;
+  };
+  eventVolume: {
+    daily: number;
+    weekly: number;
+    monthly: number;
+  };
+  complexityScore: number;
+  performanceScore: number; // 0-100, higher is better
+  lastAnalyzed: string;
+}
+
+export interface CreateJsonRuleAchievementData {
+  name: string;
+  title: string;
+  description: string;
+  category: string;
+  rarity: 'common' | 'uncommon' | 'rare' | 'legendary' | 'secret' | 'shame';
+  iconUrl?: string;
+  isActive?: boolean;
+  autoAward?: boolean;
+  manualOnly?: boolean;
+  isShame?: boolean;
+  sortOrder?: number;
+  ruleData: JsonRuleAchievement['ruleData'];
+}
+
+export interface UpdateJsonRuleAchievementData {
+  title?: string;
+  description?: string;
+  category?: string;
+  rarity?: 'common' | 'uncommon' | 'rare' | 'legendary' | 'secret' | 'shame';
+  iconUrl?: string;
+  isActive?: boolean;
+  autoAward?: boolean;
+  manualOnly?: boolean;
+  isShame?: boolean;
+  sortOrder?: number;
+  ruleData?: JsonRuleAchievement['ruleData'];
+}
+
+// New API Functions for JSON Rule Achievement System
+
+export async function validateAchievementRule(
+  rule: JsonRuleAchievement['ruleData'],
+): Promise<RuleValidationResult> {
+  const res = await api.post<RuleValidationResult>('/api/admin/achievements/validate-rule', {
+    rule,
+  });
+  return res.data;
+}
+
+export async function getAchievementTemplates(): Promise<AchievementTemplate[]> {
+  const res = await api.get<AchievementTemplate[]>('/api/admin/achievements/templates');
+  return res.data;
+}
+
+export async function createAchievementTemplate(
+  template: Omit<AchievementTemplate, 'id' | 'usage' | 'createdAt' | 'updatedAt'>,
+): Promise<AchievementTemplate> {
+  const res = await api.post<AchievementTemplate>('/api/admin/achievements/templates', template);
+  return res.data;
+}
+
+export async function updateAchievementTemplate(
+  templateId: string,
+  updates: Partial<Omit<AchievementTemplate, 'id' | 'usage' | 'createdAt' | 'updatedAt'>>,
+): Promise<AchievementTemplate> {
+  const res = await api.put<AchievementTemplate>(
+    `/api/admin/achievements/templates/${templateId}`,
+    updates,
+  );
+  return res.data;
+}
+
+export async function deleteAchievementTemplate(templateId: string): Promise<void> {
+  await api.delete(`/api/admin/achievements/templates/${templateId}`);
+}
+
+export async function simulateRuleProgress(
+  rule: JsonRuleAchievement['ruleData'],
+  userId?: number,
+  scenarioType?: 'historical' | 'synthetic' | 'edge-case',
+): Promise<SimulationResult> {
+  const res = await api.post<SimulationResult>('/api/admin/achievements/simulate', {
+    rule,
+    userId,
+    scenarioType,
+  });
+  return res.data;
+}
+
+export async function getEventKeyOptions(): Promise<EventKeyOption[]> {
+  const res = await api.get<EventKeyOption[]>('/api/admin/achievements/event-keys');
+  return res.data;
+}
+
+export async function getRulePerformanceMetrics(achievementId: number): Promise<RuleMetrics> {
+  const res = await api.get<RuleMetrics>(`/api/admin/achievements/${achievementId}/metrics`);
+  return res.data;
+}
+
+export async function createJsonRuleAchievement(
+  data: CreateJsonRuleAchievementData,
+): Promise<JsonRuleAchievement> {
+  const res = await api.post<JsonRuleAchievement>('/api/admin/achievements/json-rule', data);
+  return res.data;
+}
+
+export async function updateJsonRuleAchievement(
+  achievementId: number,
+  data: UpdateJsonRuleAchievementData,
+): Promise<JsonRuleAchievement> {
+  const res = await api.put<JsonRuleAchievement>(
+    `/api/admin/achievements/${achievementId}/json-rule`,
+    data,
+  );
+  return res.data;
+}
+
+export async function getJsonRuleAchievement(achievementId: number): Promise<JsonRuleAchievement> {
+  const res = await api.get<JsonRuleAchievement>(
+    `/api/admin/achievements/${achievementId}/json-rule`,
+  );
+  return res.data;
+}
+
+export async function getAllJsonRuleAchievements(): Promise<JsonRuleAchievement[]> {
+  const res = await api.get<JsonRuleAchievement[]>('/api/admin/achievements/json-rule');
+  return res.data;
+}
+
+export async function migrateAchievementToJsonRule(
+  achievementId: number,
+  rule: JsonRuleAchievement['ruleData'],
+): Promise<JsonRuleAchievement> {
+  const res = await api.post<JsonRuleAchievement>(
+    `/api/admin/achievements/${achievementId}/migrate-to-json`,
+    { rule },
+  );
+  return res.data;
+}
+
+export async function cloneAchievementFromTemplate(
+  templateId: string,
+  variables: Record<string, unknown>,
+  metadata: {
+    title: string;
+    description?: string;
+    category?: string;
+    rarity?: 'common' | 'uncommon' | 'rare' | 'legendary' | 'secret' | 'shame';
+  },
+): Promise<JsonRuleAchievement> {
+  const res = await api.post<JsonRuleAchievement>('/api/admin/achievements/clone-from-template', {
+    templateId,
+    variables,
+    metadata,
+  });
+  return res.data;
+}
+
+export async function bulkUpdateAchievementRules(
+  updates: Array<{
+    achievementId: number;
+    ruleData: JsonRuleAchievement['ruleData'];
+  }>,
+): Promise<{
+  successful: number;
+  failed: number;
+  errors: Array<{ achievementId: number; error: string }>;
+}> {
+  const res = await api.post('/api/admin/achievements/bulk-update-rules', { updates });
+  return res.data;
+}
+
+export async function getAchievementRuleAnalytics(): Promise<{
+  totalRuleAchievements: number;
+  rulesByComplexity: Record<'low' | 'medium' | 'high', number>;
+  rulesByCategory: Record<string, number>;
+  averageProcessingLatency: number;
+  topPerformingRules: Array<{
+    achievementId: number;
+    title: string;
+    completionRate: number;
+    performanceScore: number;
+  }>;
+  recentMigrations: Array<{
+    achievementId: number;
+    title: string;
+    migratedAt: string;
+  }>;
+}> {
+  const res = await api.get('/api/admin/achievements/rule-analytics');
   return res.data;
 }

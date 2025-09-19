@@ -2,65 +2,31 @@
 // Single source of truth for ALL activity events in the system
 // Handles both database storage and Redis publishing for real-time updates
 
-import { PrismaClient } from '@prisma/client';
 import redisClient from '../lib/redis';
 import { randomUUID } from 'crypto';
-import type { ActivityEventType } from '@ems/types';
-
-export interface UnifiedActivityEvent {
-  id: string;
-  type:
-    | ActivityEventType
-    | 'live_bet'
-    | 'live_parlay'
-    | 'market_movement'
-    | 'big_bet_alert'
-    | 'achievement_unlocked'
-    | 'user_followed';
-  timestamp: string;
-  priority: 'high' | 'medium' | 'low';
-
-  // User context
-  userId: number;
-  userName: string;
-  userAvatar?: string;
-
-  // Rich content
-  title: string;
-  description: string;
-  icon: string;
-  color?: string;
-
-  // Activity-specific data
-  amount?: number;
-  odds?: number;
-  predictionId?: number;
-  predictionTitle?: string;
-  category?: string;
-  optionLabel?: string;
-
-  // Metadata
-  isPersonal: boolean;
-  isHighValue: boolean;
-  isWin?: boolean;
-  streak?: number;
-  meta?: Record<string, any>;
-}
+import type { UnifiedActivityEvent, IEventBus } from '@ems/types';
+import { REDIS_CHANNELS } from '@ems/types';
+import type { IActivityRepository } from '../repositories/interfaces/IActivityRepository';
+import { ActivityRepository } from '../repositories/ActivityRepository';
+import { eventBus as defaultEventBus } from '../lib/EventBus';
 
 export class UnifiedActivityService {
-  private prisma: PrismaClient;
+  private repo: IActivityRepository;
   private redis = redisClient;
+  private eventBus: IEventBus;
   // private io: any = null; // Removed - using Redis pub/sub only to avoid duplicates
 
-  // Redis channels (Global Broadcast Model)
-  private readonly GLOBAL_CHANNEL = 'unified:activity:global';
-
-  // Activity storage
+  // Activity storage with TTL
   private readonly ACTIVITY_LIST = 'unified:activity:recent';
   private readonly ACTIVITY_MAX = 100;
+  private readonly ACTIVITY_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days
 
-  constructor() {
-    this.prisma = new PrismaClient();
+  constructor(
+    repo: IActivityRepository = new ActivityRepository(),
+    eventBus: IEventBus = defaultEventBus,
+  ) {
+    this.repo = repo;
+    this.eventBus = eventBus;
   }
 
   /**
@@ -109,31 +75,27 @@ export class UnifiedActivityService {
    * Store activity in database
    */
   private async storeActivityInDB(activity: UnifiedActivityEvent): Promise<void> {
-    await this.prisma.userActivity.create({
-      data: {
-        userId: activity.userId,
-        type: activity.type as string,
-        title: activity.title,
-        description: activity.description,
-        details: {
-          icon: activity.icon,
-          color: activity.color,
-          amount: activity.amount,
-          odds: activity.odds,
-          predictionTitle: activity.predictionTitle,
-          category: activity.category,
-          optionLabel: activity.optionLabel,
-          isHighValue: activity.isHighValue,
-          isWin: activity.isWin,
-          streak: activity.streak,
-          ...activity.meta,
-        },
-        isPersonal: activity.isPersonal,
-        priority: activity.priority,
-        relatedUserId: undefined, // Can be extended if needed
-        predictionId: activity.predictionId,
-        betId: undefined, // Can be extended if needed
+    await this.repo.createActivity({
+      userId: activity.userId,
+      type: activity.type as string,
+      title: activity.title,
+      description: activity.description,
+      details: {
+        icon: activity.icon,
+        color: activity.color,
+        amount: activity.amount,
+        odds: activity.odds,
+        predictionTitle: activity.predictionTitle,
+        category: activity.category,
+        optionLabel: activity.optionLabel,
+        isHighValue: activity.isHighValue,
+        isWin: activity.isWin,
+        streak: activity.streak,
+        ...activity.meta,
       },
+      isPersonal: activity.isPersonal,
+      priority: activity.priority,
+      predictionId: activity.predictionId,
     });
   }
 
@@ -144,12 +106,14 @@ export class UnifiedActivityService {
     const json = JSON.stringify(activity);
 
     // ALL activities publish to global channel (no user filtering)
-    await this.redis.publish(this.GLOBAL_CHANNEL, json);
+    // Using eventBus instead of direct Redis publishing for consistency
+    await this.eventBus.publish(REDIS_CHANNELS.UNIFIED_ACTIVITY_GLOBAL, activity);
 
-    // Store in recent activities list for new connections
+    // Store in recent activities list for new connections with TTL
     await Promise.all([
       this.redis.lpush(this.ACTIVITY_LIST, json),
       this.redis.ltrim(this.ACTIVITY_LIST, 0, this.ACTIVITY_MAX - 1),
+      this.redis.expire(this.ACTIVITY_LIST, this.ACTIVITY_TTL_SECONDS),
     ]);
   }
 
@@ -166,49 +130,7 @@ export class UnifiedActivityService {
    * Returns data in unified Redis format for consistency
    */
   async getPublicActivities(limit = 50): Promise<UnifiedActivityEvent[]> {
-    const activities = await this.prisma.userActivity.findMany({
-      where: {
-        isPersonal: false,
-        // Only include activities with proper unified service formatting
-        OR: [
-          { type: 'bet_placed' },
-          { type: 'parlay_started' },
-          { type: 'prediction_created' },
-          { type: 'prediction_resolved' },
-          { type: 'post_created' },
-          { type: 'comment_created' },
-          { type: 'big_win' },
-          { type: 'achievement_unlocked' },
-          { type: 'user_followed' },
-        ],
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-      take: limit,
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            avatarUrl: true,
-          },
-        },
-        prediction: {
-          select: {
-            id: true,
-            title: true,
-            category: true,
-          },
-        },
-        bet: {
-          select: {
-            id: true,
-            amount: true,
-          },
-        },
-      },
-    });
+    const activities = await this.repo.getPublicActivities(limit);
 
     // Transform to unified Redis format for consistency
     return activities.map((activity) => {

@@ -1,8 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { TimelineProvider } from '../contexts/TimelineContext';
 import Timeline from '../components/timeline/Timeline';
-import { useAuth } from '../hooks/useAuth';
+import { useMarketOverview } from '../hooks/useMarketOverview';
+import {
+  TrendingPreview,
+  LeaderboardPreview,
+  ActivityPreview,
+  StatsDisplay,
+} from '../components/landing';
 
 interface HomeStats {
   totalPredictions: number;
@@ -10,100 +16,39 @@ interface HomeStats {
   muskBucksInCirculation: string;
 }
 
+/**
+ * Public Home/Landing Page - Pure marketing and conversion focus
+ * Authenticated users are redirected to /timeline for social features
+ */
 export default function Home() {
-  const { user } = useAuth();
+  const { data: marketData, loading: loadingStats, error } = useMarketOverview();
+
   const [stats, setStats] = useState<HomeStats>({
     totalPredictions: 0,
     activeUsers: 0,
     muskBucksInCirculation: '0',
   });
-  const [loadingStats, setLoadingStats] = useState(true);
 
   useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        // Fetch real stats from market overview API
-        const response = await fetch('/api/market/overview');
-        if (response.ok) {
-          const data = await response.json();
-          setStats({
-            totalPredictions: data.totalPredictions || 0,
-            activeUsers: data.totalUsers || 0,
-            muskBucksInCirculation: data.totalVolume
-              ? `${(data.totalVolume / 1000000).toFixed(1)}M`
-              : '0',
-          });
-        } else {
-          // Fallback to placeholder values
-          setStats({
-            totalPredictions: 247,
-            activeUsers: 1423,
-            muskBucksInCirculation: '12.8M',
-          });
-        }
-      } catch (error) {
-        console.error('Failed to fetch market stats:', error);
-        // Fallback to placeholder values
-        setStats({
-          totalPredictions: 247,
-          activeUsers: 1423,
-          muskBucksInCirculation: '12.8M',
-        });
-      } finally {
-        setLoadingStats(false);
-      }
-    };
+    if (marketData) {
+      setStats({
+        totalPredictions: marketData.activeMarkets || 0,
+        activeUsers: marketData.totalUsers || 0,
+        muskBucksInCirculation: marketData.totalVolume
+          ? `${(marketData.totalVolume / 1000000).toFixed(1)}M`
+          : '0',
+      });
+    } else if (error) {
+      // Fallback to placeholder values on error
+      setStats({
+        totalPredictions: 247,
+        activeUsers: 1423,
+        muskBucksInCirculation: '12.8M',
+      });
+    }
+  }, [marketData, error]);
 
-    fetchStats();
-  }, []);
-
-  // If user is logged in, redirect to dashboard or show different layout
-  if (user) {
-    return (
-      <div className="container mx-auto px-4 bg-background text-content min-h-screen transition-colors duration-300">
-        <TimelineProvider>
-          <div className="max-w-6xl mx-auto">
-            {/* Welcome Back Hero */}
-            <div className="bg-surface shadow rounded-lg p-6 mb-8 transition-colors duration-300">
-              <div className="text-center">
-                <h1 className="text-3xl font-bold mb-2">Welcome back, {user.name}!</h1>
-                <p className="text-content/70 mb-4">Ready for more Musk chaos predictions?</p>
-                <div className="flex justify-center space-x-4">
-                  <Link
-                    to="/dashboard"
-                    className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-medium"
-                  >
-                    Your Dashboard
-                  </Link>
-                  <Link
-                    to="/predictions"
-                    className="px-6 py-2 bg-surface border border-border text-content rounded hover:bg-hover font-medium"
-                  >
-                    Browse Predictions
-                  </Link>
-                </div>
-              </div>
-            </div>
-
-            {/* Timeline Section */}
-            <div className="bg-surface shadow rounded-lg transition-colors duration-300">
-              <div className="p-6 border-b border-border">
-                <h2 className="text-2xl font-bold mb-2">Latest Musk Timeline</h2>
-                <p className="text-content/70">
-                  Stay updated with the latest chaos from the Musk-verse
-                </p>
-              </div>
-              <div className="p-6">
-                <Timeline />
-              </div>
-            </div>
-          </div>
-        </TimelineProvider>
-      </div>
-    );
-  }
-
-  // Landing page for non-logged in users
+  // Pure public landing page - authenticated users should go to /timeline
   return (
     <div className="bg-background text-content min-h-screen transition-colors duration-300">
       <TimelineProvider>
@@ -117,33 +62,20 @@ export default function Home() {
               </p>
               <p className="text-lg text-content/70 mb-6">Forecast: erratic.</p>
 
-              {/* Stats Row */}
-              <div className="flex justify-center space-x-8 mb-8">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-primary">
-                    {loadingStats ? '...' : stats.totalPredictions}
-                  </div>
-                  <div className="text-sm text-content/60">Active Predictions</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-primary">
-                    {loadingStats ? '...' : stats.activeUsers}
-                  </div>
-                  <div className="text-sm text-content/60">Chaos Observers</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-primary">
-                    {loadingStats ? '...' : stats.muskBucksInCirculation}
-                  </div>
-                  <div className="text-sm text-content/60">MuskBucks in Play</div>
-                </div>
-              </div>
+              {/* Enhanced Stats Display */}
+              <StatsDisplay
+                totalPredictions={stats.totalPredictions}
+                activeUsers={stats.activeUsers}
+                muskBucksInCirculation={stats.muskBucksInCirculation}
+                loading={loadingStats}
+                className="mb-8"
+              />
 
               {/* CTAs */}
               <div className="flex justify-center space-x-4 mb-6">
                 <Link
                   to="/register"
-                  className="px-8 py-3 bg-primary text-white rounded-lg hover:bg-primary-hover font-semibold text-lg transition-colors"
+                  className="px-8 py-3 bg-primary text-white rounded-lg hover:bg-primary-hover font-semibold text-lg transition-colors shadow-lg hover:shadow-xl transform hover:scale-105"
                 >
                   Join the Community
                 </Link>
@@ -167,6 +99,17 @@ export default function Home() {
             </div>
           </div>
 
+          {/* Public Content Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            <TrendingPreview />
+            <LeaderboardPreview />
+          </div>
+
+          {/* Activity Preview */}
+          <div className="mb-8">
+            <ActivityPreview />
+          </div>
+
           {/* Timeline Section */}
           <div className="bg-surface shadow rounded-lg mb-8 transition-colors duration-300">
             <div className="p-6 border-b border-border">
@@ -181,7 +124,7 @@ export default function Home() {
                   to="/register"
                   className="px-4 py-2 bg-primary text-white rounded hover:bg-primary-hover font-medium text-sm"
                 >
-                  Sign up to predict
+                  Join the community
                 </Link>
               </div>
             </div>
@@ -198,9 +141,9 @@ export default function Home() {
                 <div className="w-12 h-12 bg-primary text-white rounded-full flex items-center justify-center mx-auto mb-4 text-xl font-bold">
                   1
                 </div>
-                <h3 className="font-semibold mb-2">Track the Timeline</h3>
+                <h3 className="font-semibold mb-2">Join the Community</h3>
                 <p className="text-content/70 text-sm">
-                  Follow real-time articles and tweets about Elon Musk's ventures
+                  Connect with fellow Musk watchers, share insights, and react to community posts
                 </p>
               </div>
               <div className="text-center">
@@ -209,8 +152,8 @@ export default function Home() {
                 </div>
                 <h3 className="font-semibold mb-2">Make Predictions</h3>
                 <p className="text-content/70 text-sm">
-                  Use timeline events to predict Tesla stock moves, SpaceX launches, and Twitter
-                  chaos
+                  Use timeline events and community insights to predict Tesla stock moves, SpaceX
+                  launches, and Twitter chaos
                 </p>
               </div>
               <div className="text-center">

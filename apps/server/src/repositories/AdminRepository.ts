@@ -50,7 +50,7 @@ import type {
   PredictiveAnalytics,
   CustomReportData,
   RealtimeMetrics,
-} from './IAdminRepository';
+} from './interfaces/IAdminRepository';
 
 export class PrismaAdminRepository implements IAdminRepository {
   private prisma = new PrismaClient();

@@ -1,5 +1,16 @@
 // apps/server/src/controllers/auth.controller.ts
 import type { RequestHandler } from 'express';
+import type {
+  APIResponse,
+  ApiError,
+  RegisterPayload,
+  LoginPayload,
+  PasswordResetRequestPayload,
+  PasswordResetPayload,
+  AuthUserView,
+  UserBalanceView,
+} from '@ems/types';
+import { toAuthUserView, toUserBalanceView } from '../view/auth.view';
 import {
   createUser,
   validateUser,
@@ -12,24 +23,22 @@ import {
   getUserByEmail,
   createPasswordReset,
   resetPassword,
+  getUserBalance,
 } from '../services/auth.service';
 import { sendEmail } from '../services/email.service';
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '../utils/jwtHelpers';
 
-// Standardize error payloads
+// Standardize error payloads using shared types
 function sendError(res: any, status: number, message: string) {
-  return res.status(status).json({ error: message });
+  const errorResponse: ApiError = { error: message };
+  return res.status(status).json(errorResponse);
 }
 
 /**
  * POST /api/auth/register
  */
 export const registerUser: RequestHandler = async (req, res) => {
-  const { name, email, password } = req.body as {
-    name?: string;
-    email?: string;
-    password?: string;
-  };
+  const { name, email, password } = req.body as RegisterPayload;
   if (!name || !email || !password) {
     return sendError(res, 400, 'Name, email, and password are required');
   }
@@ -54,7 +63,8 @@ export const registerUser: RequestHandler = async (req, res) => {
       }
     })();
 
-    return res.status(201).json({ message: 'Registered. Please check your email.' });
+    const successResponse: APIResponse = { message: 'Registered. Please check your email.' };
+    return res.status(201).json(successResponse);
   } catch (err: any) {
     console.error('Registration error:', err);
     return sendError(res, 400, 'Registration failed');
@@ -65,10 +75,7 @@ export const registerUser: RequestHandler = async (req, res) => {
  * POST /api/auth/login
  */
 export const loginUser: RequestHandler = async (req, res, next) => {
-  const { email, password } = req.body as {
-    email?: string;
-    password?: string;
-  };
+  const { email, password } = req.body as LoginPayload;
   if (!email || !password) {
     return sendError(res, 400, 'Email and password required');
   }
@@ -86,6 +93,9 @@ export const loginUser: RequestHandler = async (req, res, next) => {
     const refreshToken = generateRefreshToken(user);
     await saveRefreshToken(user.id, refreshToken);
 
+    const loginResponse: APIResponse<{ accessToken: string }> = {
+      data: { accessToken },
+    };
     return res
       .cookie('refreshToken', refreshToken, {
         httpOnly: true,
@@ -93,7 +103,7 @@ export const loginUser: RequestHandler = async (req, res, next) => {
         sameSite: 'strict',
         maxAge: 7 * 24 * 60 * 60 * 1000,
       })
-      .json({ accessToken });
+      .json(loginResponse);
   } catch (err) {
     next(err);
   }
@@ -114,16 +124,8 @@ export const me: RequestHandler = async (req, res, next) => {
       return sendError(res, 404, 'User not found');
     }
 
-    return res.json({
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      muskBucks: user.muskBucks.toString(),
-      profileComplete: user.profileComplete,
-      avatarUrl: user.avatarUrl,
-      theme: user.theme,
-    });
+    const payload = toAuthUserView(user) satisfies AuthUserView;
+    return res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -140,26 +142,13 @@ export const getBalance: RequestHandler = async (req, res, next) => {
       return sendError(res, 401, 'Authentication required');
     }
 
-    // Import prisma client for direct balance query
-    const { PrismaClient } = await import('@prisma/client');
-    const prisma = new PrismaClient();
-
-    try {
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { muskBucks: true },
-      });
-
-      if (!user) {
-        return sendError(res, 404, 'User not found');
-      }
-
-      return res.json({
-        muskBucks: user.muskBucks.toString(),
-      });
-    } finally {
-      await prisma.$disconnect();
+    const user = await getUserBalance(userId);
+    if (!user) {
+      return sendError(res, 404, 'User not found');
     }
+
+    const payload = toUserBalanceView(user) satisfies UserBalanceView;
+    return res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -185,29 +174,14 @@ export const updateTheme: RequestHandler = async (req, res, next) => {
       return sendError(res, 400, 'Theme ID is too long');
     }
 
-    // Import prisma client and user cache
-    const { PrismaClient } = await import('@prisma/client');
-    const { userCache } = await import('../utils/userCache');
-    const prisma = new PrismaClient();
+    // Update user's theme preference using auth service
+    const authService = await import('../services/auth.service');
+    const updatedUser = await authService.updateUserTheme(userId, themeId);
 
-    try {
-      // Update user's theme preference
-      const updatedUser = await prisma.user.update({
-        where: { id: userId },
-        data: { theme: themeId },
-        select: { id: true, theme: true },
-      });
-
-      // Invalidate user cache since data changed
-      userCache.invalidate(userId);
-
-      return res.json({
-        success: true,
-        theme: updatedUser.theme,
-      });
-    } finally {
-      await prisma.$disconnect();
-    }
+    return res.json({
+      success: true,
+      theme: updatedUser.theme,
+    });
   } catch (err) {
     next(err);
   }
@@ -282,7 +256,7 @@ export const verifyEmail: RequestHandler = async (req, res) => {
  * POST /api/auth/request-password-reset
  */
 export const requestPasswordReset: RequestHandler = async (req, res) => {
-  const { email } = req.body as { email?: string };
+  const { email } = req.body as PasswordResetRequestPayload;
   if (!email) {
     return sendError(res, 400, 'Email required');
   }
@@ -316,10 +290,7 @@ export const requestPasswordReset: RequestHandler = async (req, res) => {
  * POST /api/auth/reset-password
  */
 export const performPasswordReset: RequestHandler = async (req, res) => {
-  const { token, newPassword } = req.body as {
-    token?: string;
-    newPassword?: string;
-  };
+  const { token, newPassword } = req.body as PasswordResetPayload;
   if (typeof token !== 'string' || typeof newPassword !== 'string') {
     return sendError(res, 400, 'Token and newPassword required');
   }

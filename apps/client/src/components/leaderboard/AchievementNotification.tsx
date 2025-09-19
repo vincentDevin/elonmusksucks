@@ -3,6 +3,8 @@ import { useState, useEffect } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { TrophyIcon, FireIcon, ChartBarIcon, CurrencyDollarIcon } from '@heroicons/react/24/solid';
 import type { Achievement } from '../../hooks/useEnhancedLeaderboard';
+import { useAchievementTheme } from '../../theme/hooks/useAchievementTheme';
+import type { AchievementRarity } from '../../theme/utils/achievement-colors';
 
 interface AchievementNotificationProps {
   achievements: Achievement[];
@@ -15,6 +17,7 @@ export default function AchievementNotification({
 }: AchievementNotificationProps) {
   const [visibleAchievements, setVisibleAchievements] = useState<Achievement[]>([]);
   const [animatingOut, setAnimatingOut] = useState<Set<string>>(new Set());
+  const { getRarityClasses, utils } = useAchievementTheme();
 
   useEffect(() => {
     // Show new achievements
@@ -25,32 +28,34 @@ export default function AchievementNotification({
   }, [achievements]);
 
   const getAchievementIcon = (type: Achievement['type']) => {
+    // Uses theme semantic colors that automatically adapt to current theme
     switch (type) {
       case 'rank_milestone':
-        return <TrophyIcon className="w-6 h-6 text-yellow-400" />;
+        return <TrophyIcon className="w-6 h-6 text-accent" />;
       case 'streak':
-        return <FireIcon className="w-6 h-6 text-orange-400" />;
+        return <FireIcon className="w-6 h-6 text-warning" />;
       case 'volume':
-        return <ChartBarIcon className="w-6 h-6 text-blue-400" />;
+        return <ChartBarIcon className="w-6 h-6 text-info" />;
       case 'profit':
-        return <CurrencyDollarIcon className="w-6 h-6 text-green-400" />;
+        return <CurrencyDollarIcon className="w-6 h-6 text-success" />;
       default:
-        return <TrophyIcon className="w-6 h-6 text-yellow-400" />;
+        return <TrophyIcon className="w-6 h-6 text-accent" />;
     }
   };
 
   const getAchievementColor = (type: Achievement['type']) => {
+    // Map achievement types to theme semantic colors
     switch (type) {
       case 'rank_milestone':
-        return 'from-yellow-500/20 to-yellow-600/20 border-yellow-400/50';
+        return 'from-accent/20 to-accent/30 border-accent/50';
       case 'streak':
-        return 'from-orange-500/20 to-red-600/20 border-orange-400/50';
+        return 'from-warning/20 to-warning/30 border-warning/50';
       case 'volume':
-        return 'from-blue-500/20 to-blue-600/20 border-blue-400/50';
+        return 'from-info/20 to-info/30 border-info/50';
       case 'profit':
-        return 'from-green-500/20 to-green-600/20 border-green-400/50';
+        return 'from-success/20 to-success/30 border-success/50';
       default:
-        return 'from-yellow-500/20 to-yellow-600/20 border-yellow-400/50';
+        return 'from-accent/20 to-accent/30 border-accent/50';
     }
   };
 

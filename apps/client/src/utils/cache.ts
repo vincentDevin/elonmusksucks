@@ -1,9 +1,13 @@
 // apps/client/src/utils/cache.ts
+// Rollback: Remove timeline cache integration and restore original cache utility
 interface CacheEntry<T> {
   data: T;
   timestamp: number;
   ttl: number; // Time to live in milliseconds
 }
+
+// Timeline cache TTL (5 minutes)
+export const TIMELINE_CACHE_TTL = 5 * 60 * 1000;
 
 class MemoryCache {
   private cache = new Map<string, CacheEntry<any>>();
@@ -73,6 +77,8 @@ export const CACHE_KEYS = {
   USER_RECENT_ACHIEVEMENTS: (userId: number) => `user_recent_achievements_${userId}`,
   MARKET_OVERVIEW: 'market_overview',
   PREDICTIONS: 'predictions',
+  TIMELINE_ARTICLES: 'timeline_articles',
+  TIMELINE_TWEETS: 'timeline_tweets',
 } as const;
 
 // Cache TTL constants

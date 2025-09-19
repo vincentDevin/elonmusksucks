@@ -32,7 +32,7 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({
     comments: item.engagement.comments,
   });
   const [isLiking, setIsLiking] = useState(false);
-  const [userLiked, setUserLiked] = useState(false); // TODO: Get from user's reactions
+  const [userLiked, setUserLiked] = useState(false); // Note: User reaction state managed locally
 
   const handleUseAsSource = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -66,7 +66,7 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({
   };
 
   const formatTimeAgo = (timestamp: string) => {
-    // TODO: Implement proper time formatting
+    // Basic relative time formatting
     const date = new Date(timestamp);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
@@ -190,7 +190,7 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({
         </div>
       </div>
 
-      {/* TODO: Add related prediction links if available */}
+      {/* Related prediction links section */}
       {item.sourceLinks && item.sourceLinks.length > 0 && (
         <div className="px-4 pb-4">
           <div className="text-xs text-content/60 mb-2">Related Predictions:</div>

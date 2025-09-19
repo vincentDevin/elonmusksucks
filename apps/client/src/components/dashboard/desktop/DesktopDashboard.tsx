@@ -2,18 +2,15 @@
 import { Suspense, lazy, useState, memo, useMemo, useEffect } from 'react';
 import { useAdvancedThemes } from '../../../theme/hooks/useUnifiedTheme';
 import { useMobileOptimization } from '../../../hooks/useMobileOptimization';
-import { useAuth } from '../../../contexts/AuthContext';
-import { useEnhancedUserStats } from '../../../hooks/useEnhancedUserStats';
-import { useEnhancedLeaderboard } from '../../../hooks/useEnhancedLeaderboard';
-import MyStuffPanel from '../MyStuffPanel';
 import PredictionPanel from '../PredictionPanel';
-import UnifiedActivityFeed from '../../UnifiedActivityFeed';
+import ActivityFeed from '../../ActivityFeed';
 import ParlayPanel from '../ParlayPanel';
-import UnifiedDashboardSettings from '../customization/UnifiedDashboardSettings';
+import PersonalStatsPanel from '../PersonalStatsPanel';
+import AchievementProgressPanel from '../AchievementProgressPanel';
+import DashboardSettings from '../customization/DashboardSettings';
 import DesktopWidgets from './DesktopWidgets';
 import MarketOverview from './MarketOverview';
 import QuickBetModal from '../QuickBetModal';
-import { formatMuskBucks } from '../../../utils/formatting';
 import CreatePredictionModal from '../CreatePredictionModal';
 
 const ChatPanel = lazy(() => import('../ChatPanel'));
@@ -27,11 +24,11 @@ const DesktopDashboard = memo(function DesktopDashboard({ className = '' }: Desk
   const [showQuickBetModal, setShowQuickBetModal] = useState(false);
   const [showCreatePredictionModal, setShowCreatePredictionModal] = useState(false);
   const [pendingSourceData, setPendingSourceData] = useState<any>(null);
+  const [activeMainTab, setActiveMainTab] = useState<
+    'predictions' | 'achievements' | 'market' | 'stats'
+  >('predictions');
   const { preferences } = useAdvancedThemes();
   const { screenWidth } = useMobileOptimization();
-  const { user } = useAuth();
-  const { stats, loading: statsLoading } = useEnhancedUserStats();
-  const { userRank } = useEnhancedLeaderboard('all-time');
 
   // Performance preferences
   const { reducedAnimations, reducedData } = preferences.performance;
@@ -93,131 +90,13 @@ const DesktopDashboard = memo(function DesktopDashboard({ className = '' }: Desk
 
   return (
     <div className={`min-h-screen bg-background ${className}`}>
-      {/* Desktop Header Bar */}
-      <header className="h-16 z-50 bg-surface border-b border-muted flex items-center justify-between px-6 sticky top-0">
-        <div className="flex items-center space-x-6">
-          <div>
-            <h1 className="text-xl font-bold text-content">Elite Command Center</h1>
-            <p className="text-sm text-tertiary">
-              {is5K
-                ? 'Ultra-Wide 5K'
-                : is1440p
-                  ? '1440p Optimized'
-                  : is1080p
-                    ? '1080p Balanced'
-                    : isWide
-                      ? 'Wide Layout'
-                      : 'Compact'}{' '}
-              •{screenWidth}px • Modular Grid
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center space-x-4">
-          {/* Quick Stats - Real Data */}
-          <div className="hidden lg:flex items-center space-x-6 text-sm">
-            {statsLoading ? (
-              <div className="flex items-center space-x-6">
-                <div className={reducedAnimations ? '' : 'animate-pulse'}>
-                  <div className="h-4 bg-muted rounded w-12 mb-1"></div>
-                  <div className="h-3 bg-muted rounded w-8"></div>
-                </div>
-                <div className={reducedAnimations ? '' : 'animate-pulse'}>
-                  <div className="h-4 bg-muted rounded w-16 mb-1"></div>
-                  <div className="h-3 bg-muted rounded w-12"></div>
-                </div>
-                <div className={reducedAnimations ? '' : 'animate-pulse'}>
-                  <div className="h-4 bg-muted rounded w-8 mb-1"></div>
-                  <div className="h-3 bg-muted rounded w-8"></div>
-                </div>
-              </div>
-            ) : (
-              <>
-                <div className="text-center">
-                  <div
-                    className={`font-bold ${
-                      stats?.performance.profitLoss && stats.performance.profitLoss > 0
-                        ? 'text-green-500'
-                        : stats?.performance.profitLoss && stats.performance.profitLoss < 0
-                          ? 'text-red-500'
-                          : 'text-content'
-                    }`}
-                  >
-                    {stats?.performance.profitLoss !== undefined
-                      ? `${stats.performance.profitLoss >= 0 ? '+' : ''}${stats.performance.profitLoss.toLocaleString()}🪙`
-                      : '—'}
-                  </div>
-                  <div className="text-tertiary">P&L</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-content font-bold">
-                    {user?.muskBucks ? formatMuskBucks(user.muskBucks) : '—'}🪙
-                  </div>
-                  <div className="text-tertiary">Balance</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-primary font-bold">
-                    {userRank && userRank.allTimeRank ? `#${userRank.allTimeRank}` : '—'}
-                  </div>
-                  <div className="text-tertiary">Rank</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-content font-bold">
-                    {stats?.performance.winRate !== undefined
-                      ? `${(stats.performance.winRate * 100).toFixed(1)}%`
-                      : '—'}
-                  </div>
-                  <div className="text-tertiary">Win Rate</div>
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Header Actions */}
-          <div className="flex items-center space-x-2">
-            <button
-              className={`p-2 rounded-lg ${
-                reducedAnimations ? 'hover:bg-background' : 'hover:bg-background transition-colors'
-              }`}
-              title="Notifications"
-            >
-              <span className="text-lg">🔔</span>
-            </button>
-            <button
-              className={`p-2 rounded-lg ${
-                reducedAnimations ? 'hover:bg-background' : 'hover:bg-background transition-colors'
-              }`}
-              title="Search"
-            >
-              <span className="text-lg">🔍</span>
-            </button>
-            <button
-              onClick={() => setShowSettings(true)}
-              className={`p-2 rounded-lg ${
-                reducedAnimations ? 'hover:bg-background' : 'hover:bg-background transition-colors'
-              }`}
-              title="Settings"
-            >
-              <span className="text-lg">⚙️</span>
-            </button>
-          </div>
-        </div>
-      </header>
-
       {/* Main Dashboard Grid - Modular Layout System */}
       <main className={`grid gap-6 p-6 ${gridLayout}`}>
-        {/* Column 1: Analytics Hub - Personal Command Center + Market Overview */}
+        {/* Column 1: Analytics Hub - Combined Personal Stats */}
         {isWide && (
-          <aside className="space-y-6 overflow-y-auto scrollbar-thin scrollbar-track-secondary/20 scrollbar-thumb-primary/40">
-            {/* Personal Command Center - Now gets full width (600px @ 1440p) */}
-            <div className="bg-surface border border-muted rounded-2xl">
-              <MyStuffPanel />
-            </div>
-
-            {/* Market Overview - Dedicated space below Personal Command Center */}
-            <div className="bg-surface border border-muted rounded-2xl">
-              <MarketOverview />
-            </div>
+          <aside className="space-y-4 overflow-y-auto scrollbar-thin scrollbar-track-secondary/20 scrollbar-thumb-primary/40">
+            {/* Combined Personal Stats Panel */}
+            <PersonalStatsPanel />
 
             {/* Desktop Widgets - Compact bottom section */}
             {(is1440p || is5K) && !reducedData && (
@@ -228,22 +107,112 @@ const DesktopDashboard = memo(function DesktopDashboard({ className = '' }: Desk
           </aside>
         )}
 
-        {/* Column 2: Content Discovery - Predictions + Live Trading */}
+        {/* Column 2: Main Content Area with Enhanced Header */}
         <div className="space-y-6 overflow-y-auto scrollbar-thin scrollbar-track-secondary/20 scrollbar-thumb-primary/40">
-          {/* For smaller screens, show Market Overview here if not in sidebar */}
-          {!isWide && (
-            <div className="bg-surface border border-muted rounded-2xl">
-              <MarketOverview />
-            </div>
-          )}
+          {/* Enhanced Dashboard Header with Navigation */}
+          <header className="bg-surface border border-muted rounded-2xl p-6 shadow-lg">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h1 className="text-2xl font-bold text-content">Elite Command Center</h1>
+                <p className="text-sm text-tertiary mt-1">Your personalized prediction dashboard</p>
+              </div>
 
-          {/* Predictions Panel - Primary content, gets full remaining width */}
+              {/* Header Actions */}
+              <div className="flex items-center space-x-2">
+                <button
+                  className={`p-2 rounded-lg ${
+                    reducedAnimations
+                      ? 'hover:bg-background'
+                      : 'hover:bg-background transition-colors'
+                  }`}
+                  title="Notifications"
+                >
+                  <span className="text-lg">🔔</span>
+                </button>
+                <button
+                  className={`p-2 rounded-lg ${
+                    reducedAnimations
+                      ? 'hover:bg-background'
+                      : 'hover:bg-background transition-colors'
+                  }`}
+                  title="Search"
+                >
+                  <span className="text-lg">🔍</span>
+                </button>
+                <button
+                  onClick={() => setShowSettings(true)}
+                  className={`p-2 rounded-lg ${
+                    reducedAnimations
+                      ? 'hover:bg-background'
+                      : 'hover:bg-background transition-colors'
+                  }`}
+                  title="Dashboard Settings"
+                >
+                  <span className="text-lg">⚙️</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Tab Navigation */}
+            <div className="border-t border-muted pt-4">
+              <div className="flex space-x-2 flex-wrap">
+                <button
+                  onClick={() => setActiveMainTab('predictions')}
+                  className={`px-4 py-3 rounded-lg font-medium transition-all duration-200 ${
+                    activeMainTab === 'predictions'
+                      ? 'bg-primary text-white shadow-md'
+                      : 'bg-background text-tertiary hover:text-content hover:bg-background/80'
+                  }`}
+                >
+                  🎯 Smart Predictions
+                </button>
+                <button
+                  onClick={() => setActiveMainTab('market')}
+                  className={`px-4 py-3 rounded-lg font-medium transition-all duration-200 ${
+                    activeMainTab === 'market'
+                      ? 'bg-primary text-white shadow-md'
+                      : 'bg-background text-tertiary hover:text-content hover:bg-background/80'
+                  }`}
+                >
+                  📊 Market Overview
+                </button>
+                <button
+                  onClick={() => setActiveMainTab('achievements')}
+                  className={`px-4 py-3 rounded-lg font-medium transition-all duration-200 ${
+                    activeMainTab === 'achievements'
+                      ? 'bg-primary text-white shadow-md'
+                      : 'bg-background text-tertiary hover:text-content hover:bg-background/80'
+                  }`}
+                >
+                  🏆 Achievements
+                </button>
+                {/* Personal Stats tab - only on compact screens */}
+                {!isWide && (
+                  <button
+                    onClick={() => setActiveMainTab('stats')}
+                    className={`px-4 py-3 rounded-lg font-medium transition-all duration-200 ${
+                      activeMainTab === 'stats'
+                        ? 'bg-primary text-white shadow-md'
+                        : 'bg-background text-tertiary hover:text-content hover:bg-background/80'
+                    }`}
+                  >
+                    📈 Personal Stats
+                  </button>
+                )}
+              </div>
+            </div>
+          </header>
+
+          {/* Tab Content */}
           <div className="bg-surface border border-muted rounded-2xl">
-            <PredictionPanel />
+            {activeMainTab === 'predictions' && <PredictionPanel />}
+            {activeMainTab === 'market' && <MarketOverview />}
+            {activeMainTab === 'achievements' && <AchievementProgressPanel />}
+            {activeMainTab === 'stats' && !isWide && <PersonalStatsPanel />}
           </div>
         </div>
 
-        {/* Column 3: Social Interaction - Chat + Activity + Trading + Parlay */}
+        {/* Column 3: Social Interaction - Chat + Parlay + Activity */}
         {isWide && (
           <aside className="space-y-4 overflow-y-auto scrollbar-thin scrollbar-track-secondary/20 scrollbar-thumb-primary/40">
             {/* Chat Panel - Primary social feature at top */}
@@ -265,14 +234,14 @@ const DesktopDashboard = memo(function DesktopDashboard({ className = '' }: Desk
               </Suspense>
             </div>
 
-            {/* Parlay Panel - Tool section */}
+            {/* Parlay Panel - Under chat on wide screens */}
             <div className="bg-surface border border-muted rounded-2xl">
               <ParlayPanel />
             </div>
 
-            {/* Unified Activity Feed - Adaptive height */}
+            {/* Unified Activity Feed */}
             <div className="flex flex-col min-h-0">
-              <UnifiedActivityFeed />
+              <ActivityFeed />
             </div>
           </aside>
         )}
@@ -325,18 +294,8 @@ const DesktopDashboard = memo(function DesktopDashboard({ className = '' }: Desk
 
         {/* Fallback for compact desktop - Show essential components only */}
         {!isWide && !is5K && (
-          <aside className="space-y-6 overflow-y-auto scrollbar-thin scrollbar-track-secondary/20 scrollbar-thumb-primary/40">
-            {/* Personal Command Center for smaller screens */}
-            <div className="bg-surface border border-muted rounded-2xl">
-              <MyStuffPanel />
-            </div>
-
-            {/* Unified Activity Feed - Compact for smaller screens */}
-            <div className="flex flex-col min-h-0">
-              <UnifiedActivityFeed />
-            </div>
-
-            {/* Chat Panel */}
+          <aside className="space-y-4 overflow-y-auto scrollbar-thin scrollbar-track-secondary/20 scrollbar-thumb-primary/40">
+            {/* Chat Panel - Top priority on compact */}
             <div className="bg-surface border border-muted rounded-2xl">
               <Suspense
                 fallback={
@@ -347,6 +306,16 @@ const DesktopDashboard = memo(function DesktopDashboard({ className = '' }: Desk
               >
                 <ChatPanel />
               </Suspense>
+            </div>
+
+            {/* Parlay Panel - Always visible under chat */}
+            <div className="bg-surface border border-muted rounded-2xl">
+              <ParlayPanel />
+            </div>
+
+            {/* Activity Feed - At bottom */}
+            <div className="flex flex-col min-h-0">
+              <ActivityFeed />
             </div>
           </aside>
         )}
@@ -386,7 +355,7 @@ const DesktopDashboard = memo(function DesktopDashboard({ className = '' }: Desk
       </div>
 
       {/* Modals */}
-      <UnifiedDashboardSettings isOpen={showSettings} onClose={() => setShowSettings(false)} />
+      <DashboardSettings isOpen={showSettings} onClose={() => setShowSettings(false)} />
       <QuickBetModal isOpen={showQuickBetModal} onClose={() => setShowQuickBetModal(false)} />
       <CreatePredictionModal
         isOpen={showCreatePredictionModal}

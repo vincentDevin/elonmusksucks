@@ -3,12 +3,10 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig(() => {
-  console.log('Vite running on 127.0.0.1:3000 with API and Socket.IO proxy');
   return {
     plugins: [react(), tailwindcss()],
     server: {
       host: '127.0.0.1',
-      strictPort: true,
       port: 3000,
       proxy: {
         // REST API requests
@@ -20,11 +18,14 @@ export default defineConfig(() => {
         // Socket.IO long polling/WebSocket (main server)
         '/socket.io': {
           target: 'http://127.0.0.1:5000',
-          ws: true, // <--- IMPORTANT! This enables WebSocket proxying
+          ws: true,
           changeOrigin: true,
           secure: false,
         },
       },
+    },
+    build: {
+      sourcemap: true,
     },
   };
 });

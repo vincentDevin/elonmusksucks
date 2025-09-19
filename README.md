@@ -1,14 +1,22 @@
 # elonmusksucks.net 🚀
 
-A satirical prediction market platform parodying Elon Musk's ventures. Users bet "MuskBucks" on outrageous predictions, compete on leaderboards, and engage in real-time chat. Features a comprehensive RSS feed timeline system, achievement badges, and dynamic odds calculation. Production-ready TypeScript monorepo with real-time Socket.IO updates.
+A satirical prediction market platform parodying Elon Musk's ventures with dual-application architecture. Users bet "MuskBucks" on outrageous predictions, compete on leaderboards, engage in real-time chat, and play multiplayer Pong. Features comprehensive RSS feed timeline system, achievement badges, dynamic odds calculation, and server-side rendered public site for SEO optimization.
 
 ## 🏗️ Architecture & Tech Stack
 
+**Dual-Application Architecture:**
+- **Client App** (Port 3000): Authenticated user SPA with dashboard, predictions, pong
+- **Public Site** (Port 5173): Server-side rendered marketing site for SEO
+- **Single API Backend**: Serves both applications with shared authentication
+
+> 📊 **[View Complete System Architecture](./docs/SYSTEM_ARCHITECTURE.md)** - Visual diagrams of all systems and data flows
+
 **Frontend:**
 - **Vite 6** + **React 19** + **TypeScript 5.8** + **TailwindCSS 4**
-- **Socket.IO Client** for real-time updates
-- **Unified Theme System** with 10 themes across light/dark/high-contrast categories
-- **Responsive Design** with separate desktop/mobile dashboard variants
+- **Server-Side Rendering** with Vite SSR for public marketing site
+- **Socket.IO Client** for real-time updates across both applications  
+- **Unified Theme System** with dark/light modes and CSS variables
+- **Responsive Design** with desktop/mobile dashboard variants
 
 **Backend:**
 - **Express 5** + **TypeScript** + **Prisma 6.11** ORM
@@ -21,7 +29,7 @@ A satirical prediction market platform parodying Elon Musk's ventures. Users bet
 - **Real-time Updates:** Socket.IO with Redis pub/sub for cross-server broadcasting
 - **Background Jobs:** BullMQ workers for payouts, leaderboards, RSS feeds, and statistics
 - **File Storage:** Tigris S3-compatible object storage with image processing
-- **Authentication:** JWT (access + refresh tokens) with bcrypt hashing
+- **Authentication:** JWT (access + refresh tokens) with bcrypt hashing and full page refresh
 - **Email Service:** SendGrid integration for auth flows (verification, password reset)
 - **Deployment:** Docker containers ready for Fly.io or similar platforms
 
@@ -32,13 +40,21 @@ A satirical prediction market platform parodying Elon Musk's ventures. Users bet
 ```
 elonmusksucks/
 ├── apps/
-│   ├── client/          # Vite + React frontend (TypeScript, TailwindCSS)
+│   ├── client/          # React SPA for authenticated users (port 3000)
 │   │   ├── src/
-│   │   │   ├── components/  # UI components (unified cards, timeline, admin panels, pong)
-│   │   │   ├── contexts/    # React contexts (Auth, Parlay, Chat, Socket, Timeline)
-│   │   │   ├── hooks/       # Custom hooks (activity streams, stats, profiles, pong)
-│   │   │   ├── pages/       # Route components (Dashboard, Profile, Admin, Timeline, Pong)
-│   │   │   ├── theme/       # Unified theme system (10 themes, semantic colors)
+│   │   │   ├── components/  # UI components organized by feature
+│   │   │   │   ├── admin/       # Admin dashboard (17+ components)
+│   │   │   │   ├── dashboard/   # Main dashboard (20+ components)
+│   │   │   │   ├── pong/        # Pong game components (7 components)
+│   │   │   │   ├── profile/     # Profile & stats (13+ components)
+│   │   │   │   ├── timeline/    # Timeline & content (5 components)
+│   │   │   │   ├── theme/       # Theme system (6 components)
+│   │   │   │   └── prediction/  # Prediction components
+│   │   │   ├── contexts/    # React contexts (Auth, Theme, Socket, Chat, etc.)
+│   │   │   ├── hooks/       # Custom hooks (activity, stats, profiles, pong)
+│   │   │   ├── pages/       # Route components (Dashboard, Profile, Admin, Pong)
+│   │   │   ├── public/      # SSR marketing pages
+│   │   │   ├── theme/       # Unified theme system with CSS variables
 │   │   │   └── api/         # Axios API clients with auto-refresh tokens
 │   │   └── dist/            # Production build output
 │   ├── server/          # Express backend (TypeScript, Prisma)
@@ -115,6 +131,13 @@ REDIS_URL=redis://localhost:6379
 ACCESS_TOKEN_SECRET=your_secure_access_token_secret_here
 REFRESH_TOKEN_SECRET=your_secure_refresh_token_secret_here
 
+# Application URLs
+CLIENT_APP_URL=http://localhost:3000
+BASE_URL_CLIENT=http://localhost:3000
+BASE_URL_SERVER=http://localhost:5000
+BASE_URL_PUBLIC=http://localhost:5173
+API_BASE_URL=http://localhost:5000
+
 # Tigris S3 Storage
 TIGRIS_S3_ENDPOINT=https://fly.storage.tigris.dev
 TIGRIS_ACCESS_KEY_ID=tid_your_access_key
@@ -147,22 +170,23 @@ npm run dev
 ```
 
 **Access Points:**
-- **Frontend (Client):** [http://localhost:3000](http://localhost:3000)
-- **Backend API:** [http://localhost:5000](http://localhost:5000)
-- **Pong Game Server:** [http://localhost:5001](http://localhost:5001)
-- **Admin Dashboard:** [http://localhost:3000/admin](http://localhost:3000/admin)
-- **Pong Arena:** [http://localhost:3000/pong](http://localhost:3000/pong)
+- **🎯 Client App (Authenticated):** [http://localhost:3000](http://localhost:3000)
+- **🌐 Public Site (Marketing):** [http://localhost:5173](http://localhost:5173)
+- **🔌 Backend API:** [http://localhost:5000](http://localhost:5000)
+- **🏓 Pong Game Server:** [http://localhost:5001](http://localhost:5001)
+- **👑 Admin Dashboard:** [http://localhost:3000/admin](http://localhost:3000/admin)
 
 **Development Features:**
-- 🔄 Hot reload on both client and server
-- 🔌 Real-time WebSocket connections
+- 🔄 Hot reload on all applications (client, server)
+- 🔌 Real-time WebSocket connections across both frontend apps
 - 📊 Live prediction markets with dynamic odds calculation
 - 💬 Real-time chat functionality (desktop only currently)
 - 🏓 **Real-time multiplayer Pong game** with MuskBucks wagering
-- 🎨 Theme system with 10 themes across light/dark/high-contrast
+- 🎨 **Unified theme system** with dark/light modes across both apps
 - 📰 RSS feed timeline with admin moderation
 - 🏆 Achievement system with 77 unlockable badges
 - 🎯 Parlay betting system with multipliers
+- 🌍 **SEO-optimized public site** with server-side rendering
 
 ---
 
@@ -192,14 +216,35 @@ npm run format
 - Uses separate `.env.test` environment for isolated testing
 
 ### **Code Quality**
-- **ESLint:** Zero-warning policy enforced
+- **ESLint:** Zero-warning policy enforced across all applications
 - **Prettier:** Consistent code formatting
-- **TypeScript:** Strict type checking across all packages
+- **TypeScript:** Strict type checking across all packages (client, server)
 - **Pre-commit Hooks:** Automated linting and formatting
 
 ---
 
 ## ⚡ Core Features & Architecture
+
+### **🌐 Dual-Application Architecture**
+- **Public Site (SSR):** Marketing-focused content for non-authenticated users with SEO optimization
+- **Client App (SPA):** Full-featured application for authenticated users with real-time updates
+- **Unified Authentication:** Seamless flow between public marketing and private application
+- **Shared Theme System:** Consistent dark/light theming across both applications
+- **Performance Optimized:** SSR for fast initial loads, SPA for rich interactions
+
+### **🔐 Enhanced Authentication System**
+- **Multi-step Registration:** Email verification with enhanced verification screen
+- **Secure Login Flow:** JWT tokens with full page refresh for proper state initialization
+- **Profile Setup:** Mandatory completion flow with image upload and form validation
+- **Token Management:** Automatic refresh with axios interceptors and failure handling
+- **Dual-Application Security:** Public routes open, private routes protected with guards
+
+### **🎨 Unified Theme System**
+- **CSS Variables:** Semantic color tokens shared across applications
+- **Dark Mode Default:** Both apps default to dark theme with toggle options
+- **Flash Prevention:** Theme applied before hydration to prevent visual flash
+- **Consistent Styling:** Identical color schemes and component patterns
+- **Theme Persistence:** localStorage saves user preferences across sessions
 
 ### **Prediction Market Engine**
 - **Multi-option Predictions:** Users create and bet on complex prediction markets
@@ -219,12 +264,11 @@ npm run format
 ### **Content & Timeline**
 - **RSS Feed Ingestion:** BullMQ workers fetch and process feeds with deduplication
 - **Admin Moderation Queue:** Bulk approve/reject articles with keyboard shortcuts
-- **Homepage Timeline:** Infinite-scroll articles with "Use as prediction source"
+- **Public Timeline:** Server-side rendered timeline for SEO with infinite-scroll
 - **Auto-tagging System:** Rule-based categorization (Tesla, SpaceX, Legal, Markets, AI)
 - **OPML Import/Export:** Manage feed subscriptions efficiently
 
 ### **User Experience**
-- **Unified Theme System:** 10 themes across light/dark/high-contrast categories
 - **Responsive Dashboard:** Desktop and mobile-optimized layouts (chat desktop-only)
 - **Profile System:** Avatar uploads with automatic image processing via Tigris S3
 - **Achievement System:** 77 achievements across 8 categories with real-time unlocking
@@ -257,9 +301,9 @@ npm run format
 | Command | Description |
 |---------|-------------|
 | `npm run setup` | Complete initial setup: install deps, migrate DB, seed data, build types |
-| `npm run dev` | Start all services concurrently (client:3000, server:5000, workers) |
+| `npm run dev` | Start all services: client (3000), server (5000), pong (5001) |
 | `npm run build` | Production build: generate types → build client → build server |
-| `npm run lint` | ESLint check with zero-warning policy |
+| `npm run lint` | ESLint check with zero-warning policy across all apps |
 | `npm run format` | Prettier formatting across all code |
 | `npm test` | Run Jest test suite (limited coverage currently) |
 | `npm run test:server` | Server-only Jest tests |
@@ -278,9 +322,12 @@ npm run format
 ### **Workspace-Specific Commands**
 
 **Client (`apps/client/`):**
-- `npm run dev` - Vite development server
-- `npm run build` - Production build  
+- `npm run dev` - Development server (SSR marketing pages + authenticated app)
+- `npm run build` - Production build
 - `npm run preview` - Preview production build
+- `npm run dev` - Vite SSR development server (marketing site)
+- `npm run build` - SSR production build
+- `npm run preview` - Preview SSR build
 
 **Server (`apps/server/`):**
 - `npm run dev` - Express server with hot reload
@@ -315,11 +362,15 @@ npm run format
 - Verify Redis is accessible: `redis-cli ping` should return `PONG`
 - Check REDIS_URL format: `redis://localhost:6379`
 
-**Tigris/S3 Upload Errors**
-- Verify Tigris credentials are correct in `.env`
-- Ensure bucket exists and is accessible
-- Check network connectivity to Tigris endpoint
-- **Fixed Issue:** Profile image uploads now properly handle authentication tokens
+**SSR/Public Site Issues**
+- Check that API server is accessible from SSR server
+- Verify theme hydration is working (no flash on page load)
+- **Fixed Issue:** All hardcoded colors replaced with theme variables
+
+**Authentication Flow Issues**
+- **Fixed Issue:** Login/register/profile-setup now use full page refresh for proper state initialization
+- **Fixed Issue:** Enhanced verification screen with prominent login button
+- **Fixed Issue:** Profile setup redirects properly after completion
 
 **Socket.IO/WebSocket Issues**
 - Check that both client and server are running
@@ -327,12 +378,10 @@ npm run format
 - Monitor browser console and server logs for connection errors
 - **Fixed Issue:** All Socket.IO memory leaks and event handling resolved
 
-**Pong Game Issues**
-- Ensure pong server is running on port 5001: `npm run dev:pong`
-- Check that user has sufficient MuskBucks balance for wagering
-- Verify WebSocket connection to pong server in browser dev tools
-- **Fixed Issue:** Auth context refresh no longer breaks pong gameplay
-- **Fixed Issue:** Paddle movement and physics prediction working perfectly
+**Theme System Issues**
+- **Fixed Issue:** Consistent theming across client app and public site
+- **Fixed Issue:** Theme toggle works properly with persistence
+- **Fixed Issue:** No theme flash during SSR hydration or SPA navigation
 
 **Node.js Version Issues**
 - Use Node.js ≥24.x: `node --version`
@@ -343,6 +392,7 @@ npm run format
 - **Large Bundle Size:** Code splitting is implemented for admin dashboard
 - **Database Queries:** Optimized with proper indexes and includes
 - **Memory Usage:** Socket.IO cleanup and Redis connection pooling implemented
+- **SSR Performance:** Server-side rendering optimized for fast initial loads
 
 ### **Getting Help**
 - Check `CLAUDE.md` for comprehensive architecture documentation
@@ -354,39 +404,42 @@ npm run format
 ## 🚀 Production Status & Roadmap
 
 ### **✅ Production Ready Features**
+- **Dual-Application Architecture:** Complete SSR public site + authenticated client app
+- **Enhanced Authentication System:** Secure login/register/profile flows with full page refresh
+- **Unified Theme System:** Dark/light themes with CSS variables across both applications
 - **Dynamic Betting System:** 6-factor odds engine with real-time updates
 - **Real-time Pong Arena:** Complete multiplayer game system with secure wagering
 - **Achievement System:** 77 achievements across 8 categories fully operational
-- **Homepage Timeline:** RSS feed ingestion with admin moderation
+- **SSR Public Timeline:** Server-side rendered news feed with admin moderation
 - **Prediction Source Links:** Articles/tweets linked to predictions
-- **Unified Theme System:** 10 themes with semantic color classes
 - **Unified Activity System:** Real-time global activity feed
 - **Socket.IO Infrastructure:** 21+ event types with Redis adapter
 - **Transaction Atomicity:** All money operations wrapped in Prisma transactions
 - **BigInt Migration:** Unlimited monetary precision for all financial values
 - **Email Service:** SendGrid integration for auth flows
 - **Database Performance:** 44 production indexes covering all query patterns
-- **Pong Scaling Architecture:** Fly.io multi-region auto-scaling for 10,000+ players
+- **Theme Compatibility:** All components support light/dark theme switching
 
 ### **🚧 Current Priority Tasks**
 - **Mobile Chat Integration:** Add chat panel to mobile dashboard (currently desktop-only)
-- **Logging Infrastructure:** Replace 50+ console.logs with structured logging
-- **Performance Monitoring:** Load testing for timeline and betting systems
-- **SSR Implementation:** Server-side rendering for SEO optimization
+- **Logging Infrastructure:** Replace console.logs with structured logging
+- **Performance Monitoring:** Load testing for both SSR and SPA applications
+- **SEO Optimization:** Enhanced meta tags and structured data for public site
 
 ### **📋 Known Issues & Technical Debt**
 - **Mobile Chat Missing:** Chat component not included in mobile dashboard
 - **Console.log Statements:** Development logs in production code (50+ files)
-- **Limited Test Coverage:** Currently ~5% coverage, needs expansion
+- **Limited Test Coverage:** Currently ~5% coverage, needs expansion for SSR components
 - **No API Versioning:** API endpoints not versioned for backwards compatibility
 
 ### **🎯 Upcoming Features**
-1. **3D Pong Upgrade:** Three.js 3D rendering with dynamic camera angles and particle effects
-2. **Enhanced Analytics:** User behavior tracking and prediction performance metrics
-3. **Advanced Parlay Builder:** Visual interface for complex multi-leg bets
-4. **Social Features:** User follows, prediction sharing, comment threads
-5. **Pong Tournament System:** Brackets, leaderboards, and championship events
-6. **Market Insights:** AI-powered prediction analysis and trends
+1. **Enhanced SEO:** Rich snippets, social media cards, and structured data for public site
+2. **3D Pong Upgrade:** Three.js 3D rendering with dynamic camera angles and particle effects
+3. **Enhanced Analytics:** User behavior tracking and prediction performance metrics
+4. **Advanced Parlay Builder:** Visual interface for complex multi-leg bets
+5. **Social Features:** User follows, prediction sharing, comment threads
+6. **Pong Tournament System:** Brackets, leaderboards, and championship events
+7. **Market Insights:** AI-powered prediction analysis and trends
 
 ### **🤝 Contributing**
 
@@ -396,14 +449,15 @@ We welcome contributions! Please see our [contribution guidelines](./CONTRIBUTIN
 ```bash
 git checkout -b feat/your-feature-name
 # Make changes following the patterns in CLAUDE.md
-npm run lint  # Ensure zero warnings
+npm run lint  # Ensure zero warnings across all apps
 npm test      # Run tests
 git commit -m "feat: add your feature description"
 ```
 
 **Commit Style:** `type(scope): message`
 - Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
-- Example: `feat(predictions): add multi-option support`
+- Scopes: `client`, `server`, `pong`, `theme`, `auth`
+- Example: `feat(client): add dark mode theme toggle`
 
 ---
 
@@ -414,23 +468,26 @@ git commit -m "feat: add your feature description"
 **Disclaimer:** This is a satirical project for educational and entertainment purposes. No real money is involved. No liability if Elon Musk attempts to acquire, manipulate, or otherwise interfere with this platform.
 
 **Privacy & Security:**
-- JWT-based authentication with secure token refresh
+- JWT-based authentication with secure token refresh and full page refresh
 - Password hashing via bcrypt with configurable rounds
 - CORS configured for known origins only
 - Input validation on all API endpoints
 - SQL injection protection via Prisma parameterized queries
+- SSR security with proper sanitization and CSP headers
 
 ---
 
 ## 📚 Documentation & Resources
 
 - **[CLAUDE.md](./CLAUDE.md)** - Comprehensive engineering guide and architecture documentation
+- **[System Architecture](./docs/SYSTEM_ARCHITECTURE.md)** - Visual system diagrams with 15+ Mermaid flowcharts
 - **[Database Schema](./prisma/schema.prisma)** - Complete data model definitions with 44 indexes
-- **[Theme System Guide](./CLAUDE.md#unified-theme-system)** - Component development with 10 themes
-- **[Socket Events Reference](./CLAUDE.md#socket-events)** - Real-time event documentation
+- **[Theme System Guide](./CLAUDE.md#unified-theme-system)** - Component development with dual-app theming
+- **[SSR Architecture](./CLAUDE.md#dual-application-architecture)** - Server-side rendering implementation
+- **[Authentication Flow](./CLAUDE.md#authentication-architecture)** - Security and auth documentation
 
 **External Dependencies:**
-- **[Vite](https://vitejs.dev)** - Frontend build tool and dev server
+- **[Vite](https://vitejs.dev)** - Frontend build tool and dev server (+ SSR support)
 - **[React](https://react.dev)** - UI library with hooks and context
 - **[Prisma](https://www.prisma.io/docs)** - Database ORM and migrations  
 - **[Socket.IO](https://socket.io/docs/v4)** - Real-time WebSocket communication
@@ -441,4 +498,4 @@ git commit -m "feat: add your feature description"
 ---
 
 **Built with ❤️ and questionable life choices by the development team.**  
-*Now with 100% more TypeScript and 0% more Elon approval.*
+*Now with 100% more TypeScript, server-side rendering, and 0% more Elon approval.*

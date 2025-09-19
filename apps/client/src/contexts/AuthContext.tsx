@@ -1,4 +1,13 @@
-import React, { createContext, useState, useEffect, useCallback, useContext } from 'react';
+// Rollback: Remove refreshUserData call from login/logout handlers
+import React, {
+  createContext,
+  useState,
+  useEffect,
+  useCallback,
+  useContext,
+  useOptimistic,
+  startTransition,
+} from 'react';
 import {
   login as loginApi,
   register as registerApi,
@@ -10,7 +19,17 @@ import {
 import type { User } from '../api/auth';
 import type { ReactNode } from 'react';
 import { setAccessToken, setAuthFailureCallback, setTokenRefreshCallback } from '../api/axios';
-import { socket } from '../lib/socket';
+import { useEventBusCore } from './EventBusCoreContext';
+import { useSocket } from './SocketContext';
+import { REDIS_CHANNELS } from '../types/events';
+import type {
+  BalanceUpdatePayload,
+  BetPlacedPayload,
+  BetResolvedPayload,
+  PayoutCompletedPayload,
+  PongWagerPayload,
+  PongPayoutPayload,
+} from '@ems/types';
 
 interface AuthContextType {
   accessToken: string | null;
@@ -22,14 +41,56 @@ interface AuthContextType {
   refreshUser: () => Promise<void>;
   refreshUserBalance: () => Promise<void>;
   clearAuth: () => void; // For use by axios interceptor
+  onUserDataRefresh?: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { subscribe } = useEventBusCore();
+  const socket = useSocket();
   const [accessToken, setToken] = useState<string | null>(null);
-  const [user, setUser] = useState<User | null>(null);
+  const [baseUser, setBaseUser] = useState<User | null>(null);
+  const [user, optimisticUpdateUser] = useOptimistic(
+    baseUser,
+    (
+      current: User | null,
+      action: { type: 'bet' | 'parlay' | 'payout' | 'refresh'; payload: any },
+    ) => {
+      if (!current) return current;
+
+      switch (action.type) {
+        case 'bet':
+          // Optimistically subtract bet amount
+          return {
+            ...current,
+            muskBucks: Math.max(0, current.muskBucks - action.payload.amount),
+          };
+        case 'parlay':
+          // Optimistically subtract parlay amount
+          return {
+            ...current,
+            muskBucks: Math.max(0, current.muskBucks - action.payload.amount),
+          };
+        case 'payout':
+          // Optimistically add payout amount
+          return {
+            ...current,
+            muskBucks: current.muskBucks + action.payload.amount,
+          };
+        case 'refresh':
+          // Set exact balance from server (not optimistic)
+          return {
+            ...current,
+            muskBucks: action.payload.newBalance,
+          };
+        default:
+          return current;
+      }
+    },
+  );
   const [loading, setLoading] = useState(true);
+  const [onUserDataRefresh] = useState<(() => Promise<void>) | undefined>();
 
   // Refresh token and load current user on mount
   useEffect(() => {
@@ -39,11 +100,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setToken(token);
         setAccessToken(token);
         const currentUser = await meApi();
-        setUser(currentUser);
-      } catch {
+        setBaseUser(currentUser);
+      } catch (error) {
         setToken(null);
         setAccessToken('');
-        setUser(null);
+        setBaseUser(null);
+
+        // If we're on a protected route and refresh fails, redirect to public home
+        const currentPath = window.location.pathname;
+        if (
+          !currentPath.includes('/login') &&
+          !currentPath.includes('/register') &&
+          !currentPath.includes('/public')
+        ) {
+          window.location.href = '/public';
+        }
       } finally {
         setLoading(false);
       }
@@ -51,20 +122,26 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   // Login user and load profile
-  const login = useCallback(async (email: string, password: string) => {
-    const token = await loginApi({ email, password });
-    setToken(token);
-    setAccessToken(token);
-    const currentUser = await meApi();
-    setUser(currentUser);
-  }, []);
+  const login = useCallback(
+    async (email: string, password: string) => {
+      const token = await loginApi({ email, password });
+      setToken(token);
+      setAccessToken(token);
+      const currentUser = await meApi();
+      setBaseUser(currentUser);
+      if (onUserDataRefresh) {
+        await onUserDataRefresh();
+      }
+    },
+    [onUserDataRefresh],
+  );
 
   // Register user (does not auto-login)
   const register = useCallback(async (name: string, email: string, password: string) => {
     await registerApi({ name, email, password });
     setToken(null);
     setAccessToken('');
-    setUser(null);
+    setBaseUser(null);
   }, []);
 
   // Logout and clear all user/auth state
@@ -72,13 +149,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     await logoutApi();
     setToken(null);
     setAccessToken('');
-    setUser(null);
+    setBaseUser(null);
   }, []);
 
   // Manually refresh user profile
   const refreshUser = useCallback(async () => {
     const currentUser = await meApi();
-    setUser(currentUser);
+    setBaseUser(currentUser);
   }, []);
 
   // Refresh only user balance without affecting auth state
@@ -86,9 +163,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       if (!user?.id) return;
       const balanceData = await getBalanceApi();
-      // Only update the balance, preserve other user data and avoid token refresh
-      // Convert string to number since server returns muskBucks as string
-      setUser((prevUser) =>
+      // Update base user balance (not optimistic)
+      setBaseUser((prevUser) =>
         prevUser ? { ...prevUser, muskBucks: parseInt(balanceData.muskBucks) } : null,
       );
     } catch (error) {
@@ -101,7 +177,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const clearAuth = useCallback(() => {
     setToken(null);
     setAccessToken('');
-    setUser(null);
+    setBaseUser(null);
   }, []);
 
   // Handle token refresh from axios interceptor
@@ -120,9 +196,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
   }, [clearAuth, handleTokenRefresh]);
 
-  // Listen for balance-affecting events to update user balance in real-time
+  // Handle socket authentication when token changes
   useEffect(() => {
-    if (!user?.id || !socket) return;
+    if (socket) {
+      socket.auth = accessToken ? { token: accessToken } : {};
+      // Reconnect with new auth if socket is already connected
+      if (socket.connected) {
+        socket.disconnect();
+        socket.connect();
+      }
+    }
+  }, [socket, accessToken]);
+
+  // Listen for balance-affecting events to update user balance in real-time using EventBusCore
+  useEffect(() => {
+    if (!user?.id) return;
 
     // Only refresh balance when user navigates back to the app (not during gameplay)
     const handleVisibilityChange = () => {
@@ -134,135 +222,84 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    const handleUserBalanceUpdate = (data: { userId: number; newBalance: number }) => {
-      // Only update if this balance change belongs to the current user
-      if (data.userId === user.id) {
-        setUser((prevUser) => (prevUser ? { ...prevUser, muskBucks: data.newBalance } : null));
-      }
-    };
-
-    const handleBetPlaced = (betData: { user?: { id: number }; amount?: number }) => {
-      // Only refresh if this bet belongs to the current user
-      if (betData.user?.id === user.id) {
-        // Optimistic update - subtract bet amount immediately
-        if (betData.amount && user.muskBucks >= betData.amount) {
-          setUser((prevUser) =>
-            prevUser
-              ? {
-                  ...prevUser,
-                  muskBucks: prevUser.muskBucks - betData.amount!,
-                }
-              : null,
-          );
+    // EventBusCore subscriptions - properly typed with new payload interfaces
+    const unsubscribers = [
+      // Balance updates
+      subscribe(REDIS_CHANNELS.BALANCE_UPDATE, (data: BalanceUpdatePayload) => {
+        if (data.userId === user.id) {
+          startTransition(() => {
+            optimisticUpdateUser({
+              type: 'refresh',
+              payload: { newBalance: data.newBalance },
+            });
+          });
         }
-        // Also refresh from server to ensure accuracy
-        refreshUser();
-      }
-    };
+      }),
 
-    const handleParlayPlaced = (parlayData: { user?: { id: number }; amount?: number }) => {
-      // Only refresh if this parlay belongs to the current user
-      if (parlayData.user?.id === user.id) {
-        // Optimistic update - subtract parlay amount immediately
-        if (parlayData.amount && user.muskBucks >= parlayData.amount) {
-          setUser((prevUser) =>
-            prevUser
-              ? {
-                  ...prevUser,
-                  muskBucks: prevUser.muskBucks - parlayData.amount!,
-                }
-              : null,
-          );
+      // Bet placed events
+      subscribe(REDIS_CHANNELS.BET_PLACED, (data: BetPlacedPayload) => {
+        // Note: BetPlacedPayload doesn't have userId, might need server update
+        // For now, refresh user to get accurate balance
+        refreshUser();
+      }),
+
+      // Parlay placed events
+      subscribe(REDIS_CHANNELS.PARLAY_PLACED, (data: any) => {
+        // Note: Need to check payload structure, might need server update
+        refreshUser();
+      }),
+
+      // Bet resolved events
+      subscribe(REDIS_CHANNELS.BET_RESOLVED, (data: BetResolvedPayload) => {
+        // Note: BetResolvedPayload doesn't have userId, need server updates
+        refreshUser();
+      }),
+
+      // Parlay resolved events
+      subscribe(REDIS_CHANNELS.PARLAY_RESOLVED, (data: PayoutCompletedPayload) => {
+        if (data.userId === user.id && data.amount) {
+          startTransition(() => {
+            optimisticUpdateUser({
+              type: 'payout',
+              payload: { amount: data.amount },
+            });
+          });
+          refreshUser();
         }
-        // Also refresh from server to ensure accuracy
-        refreshUser();
-      }
-    };
+      }),
 
-    const handleBetResolved = (data: { userId: number; payout?: number; amount?: number }) => {
-      // Handle bet resolution payouts
-      if (data.userId === user.id && data.payout) {
-        setUser((prevUser) =>
-          prevUser
-            ? {
-                ...prevUser,
-                muskBucks: prevUser.muskBucks + data.payout!,
-              }
-            : null,
-        );
-        // Refresh from server to ensure accuracy
-        refreshUser();
-      }
-    };
+      // Pong wager events
+      subscribe(REDIS_CHANNELS.PONG_WAGER, (data: PongWagerPayload) => {
+        if (data.userId === user.id) {
+          startTransition(() => {
+            optimisticUpdateUser({
+              type: 'bet',
+              payload: { amount: data.amount },
+            });
+          });
+          refreshUser();
+        }
+      }),
 
-    const handleParlayResolved = (data: { userId: number; payout?: number }) => {
-      // Handle parlay resolution payouts
-      if (data.userId === user.id && data.payout) {
-        setUser((prevUser) =>
-          prevUser
-            ? {
-                ...prevUser,
-                muskBucks: prevUser.muskBucks + data.payout!,
-              }
-            : null,
-        );
-        // Refresh from server to ensure accuracy
-        refreshUser();
-      }
-    };
-
-    const handlePongWager = (data: { userId: number; amount: number }) => {
-      // Handle pong wager deduction (when games start)
-      if (data.userId === user.id) {
-        setUser((prevUser) =>
-          prevUser
-            ? {
-                ...prevUser,
-                muskBucks: prevUser.muskBucks - data.amount,
-              }
-            : null,
-        );
-        // Refresh from server to ensure accuracy
-        refreshUser();
-      }
-    };
-
-    const handlePongPayout = (data: { userId: number; payout: number }) => {
-      // Handle pong game payouts (when games end)
-      if (data.userId === user.id) {
-        setUser((prevUser) =>
-          prevUser
-            ? {
-                ...prevUser,
-                muskBucks: prevUser.muskBucks + data.payout,
-              }
-            : null,
-        );
-        // Refresh from server to ensure accuracy
-        refreshUser();
-      }
-    };
-
-    // Listen for various balance-affecting events
-    socket.on('userBalanceUpdate', handleUserBalanceUpdate);
-    socket.on('betPlaced', handleBetPlaced);
-    socket.on('parlayPlaced', handleParlayPlaced);
-    socket.on('betResolved', handleBetResolved);
-    socket.on('parlayResolved', handleParlayResolved);
-    socket.on('pongWager', handlePongWager);
-    socket.on('pongPayout', handlePongPayout);
+      // Pong payout events
+      subscribe(REDIS_CHANNELS.PONG_PAYOUT, (data: PongPayoutPayload) => {
+        if (data.userId === user.id) {
+          startTransition(() => {
+            optimisticUpdateUser({
+              type: 'payout',
+              payload: { amount: data.payout },
+            });
+          });
+          refreshUser();
+        }
+      }),
+    ];
 
     return () => {
-      socket.off('userBalanceUpdate', handleUserBalanceUpdate);
-      socket.off('betPlaced', handleBetPlaced);
-      socket.off('parlayPlaced', handleParlayPlaced);
-      socket.off('betResolved', handleBetResolved);
-      socket.off('parlayResolved', handleParlayResolved);
-      socket.off('pongWager', handlePongWager);
-      socket.off('pongPayout', handlePongPayout);
+      unsubscribers.forEach((unsub) => unsub());
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [user?.id, user?.muskBucks, refreshUser, refreshUserBalance]);
+  }, [user?.id, subscribe, refreshUser, refreshUserBalance, optimisticUpdateUser]);
 
   return (
     <AuthContext.Provider
@@ -276,6 +313,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         refreshUser,
         refreshUserBalance,
         clearAuth,
+        onUserDataRefresh,
       }}
     >
       {children}

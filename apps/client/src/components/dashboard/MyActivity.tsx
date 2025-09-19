@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react';
+// Rollback: git checkout HEAD -- apps/client/src/components/dashboard/MyActivity.tsx
+import { useCallback, useState } from 'react';
 import { useMyBets, useMyParlays, useMyPredictions } from '../../hooks/useMeStubs';
-import { useSocket } from '../../contexts/SocketContext';
+import { useSocketEvent } from '../../contexts/EventBusCoreContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { REDIS_CHANNELS } from '@ems/types';
 
 interface ActivityItem {
   id: number;
@@ -17,7 +19,6 @@ interface ActivityItem {
 }
 
 export default function MyActivity() {
-  const socket = useSocket();
   const { user } = useAuth();
   const [filter, setFilter] = useState('all');
   const myBets = useMyBets();
@@ -26,34 +27,33 @@ export default function MyActivity() {
 
   const isLoading = myBets.loading || myParlays.loading || myPredictions.loading;
 
-  // Listen for bet and parlay status changes
-  useEffect(() => {
-    if (!socket || !user?.id) return;
-
-    const handleBetStatusChange = (data: any) => {
+  // Handle bet status changes via EventBus
+  const handleBetStatusChange = useCallback(
+    (data: any) => {
       console.log('[MyActivity] Bet status changed:', data);
-      if (data.userId === user.id) {
+      if (data.userId === user?.id) {
         // Refresh bets data
         myBets.refetch?.();
       }
-    };
+    },
+    [user?.id, myBets],
+  );
 
-    const handleParlayStatusChange = (data: any) => {
+  // Handle parlay status changes via EventBus
+  const handleParlayStatusChange = useCallback(
+    (data: any) => {
       console.log('[MyActivity] Parlay status changed:', data);
-      if (data.userId === user.id) {
+      if (data.userId === user?.id) {
         // Refresh parlays data
         myParlays.refetch?.();
       }
-    };
+    },
+    [user?.id, myParlays],
+  );
 
-    socket.on('bet:status_change', handleBetStatusChange);
-    socket.on('parlay:status_change', handleParlayStatusChange);
-
-    return () => {
-      socket.off('bet:status_change', handleBetStatusChange);
-      socket.off('parlay:status_change', handleParlayStatusChange);
-    };
-  }, [socket, user?.id, myBets, myParlays]);
+  // Subscribe to bet and parlay status changes via EventBus
+  useSocketEvent(REDIS_CHANNELS.BET_STATUS_CHANGE, handleBetStatusChange);
+  useSocketEvent(REDIS_CHANNELS.PARLAY_STATUS_CHANGE, handleParlayStatusChange);
 
   const filteredData = (): ActivityItem[] => {
     switch (filter) {

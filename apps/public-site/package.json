@@ -1,0 +1,32 @@
+{
+  "name": "public-site",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx server.ts",
+    "dev:vite": "vite",
+    "build": "vite build --ssr src/entry-server.tsx && vite build",
+    "preview": "vite preview",
+    "tsc": "tsc --noEmit"
+  },
+  "dependencies": {
+    "express": "^4.21.1",
+    "node-fetch": "^3.3.2",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.10.3",
+    "@types/node-fetch": "^2.6.13",
+    "@types/react": "^19.1.2",
+    "@types/react-dom": "^19.1.2",
+    "@vitejs/plugin-react": "^4.4.1",
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.5.4",
+    "tailwindcss": "^3.4.16",
+    "tsx": "^4.19.2",
+    "typescript": "~5.8.3",
+    "vite": "^6.3.5"
+  }
+}

@@ -1,6 +1,7 @@
 // apps/client/src/components/dashboard/activity/ActivityStreamPanel.tsx
+// EMERGENCY FIX: Replaced useActivityStream with useActivity to stop memory leak
 import { useState, useEffect, useRef } from 'react';
-import { useActivityStream } from '../../../hooks/useActivityStream';
+import { useActivity } from '../../../contexts/ActivityContext';
 import ActivityItemComponent from './ActivityItem';
 import ActivityFilters from './ActivityFilters';
 
@@ -9,8 +10,21 @@ interface ActivityStreamPanelProps {
 }
 
 export default function ActivityStreamPanel({ className = '' }: ActivityStreamPanelProps) {
-  const { activities, loading, error, hasMore, filters, updateFilters, loadMore, refresh } =
-    useActivityStream();
+  // EMERGENCY FIX: useActivity provides activities, loading, error, refresh
+  // Missing features (hasMore, filters, updateFilters, loadMore) temporarily disabled
+  const { activities, loading, error, refresh } = useActivity();
+
+  // Temporary placeholders for missing features to prevent breaks
+  const hasMore = false;
+  const filters = {
+    types: [],
+    timeframe: 'all' as const,
+    showPersonal: true,
+    showSocial: true,
+    showPlatform: true,
+  };
+  const updateFilters = () => {};
+  const loadMore = () => {};
 
   const [isExpanded, setIsExpanded] = useState(false);
   const [showFilters, setShowFilters] = useState(false);

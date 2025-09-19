@@ -4,15 +4,17 @@
 // published when the resolution happens synchronously (tests / dev mode).
 // -----------------------------------------------------------------------------
 
-import type { IPayoutRepository } from '../repositories/IPayoutRepository';
+import type { IPayoutRepository } from '../repositories/interfaces/IPayoutRepository';
 import type { PublicPrediction } from '@ems/types';
+import { QUEUE_NAMES, REDIS_CHANNELS } from '@ems/types';
 import { PayoutRepository } from '../repositories/PayoutRepository';
 import { Queue } from 'bullmq';
-import redis from '../lib/redis';
 import IORedis from 'ioredis';
+import { createQueueOptions } from '../lib/bullmqConfig';
 import { leaderboardService } from './leaderboard.service';
 import type { LeaderboardTrigger } from './leaderboard.service';
 import { unifiedActivityService } from './unifiedActivity.service';
+import { eventBus } from '../lib/EventBus';
 
 // Create a separate Redis client for subscriptions to avoid conflicts
 const subscriptionRedis = new IORedis({
@@ -33,7 +35,7 @@ subscriptionRedis.on('connect', () => {
 });
 
 export class PayoutService {
-  private payoutQueue = new Queue('payouts', { connection: redis });
+  private payoutQueue = new Queue(QUEUE_NAMES.PAYOUTS, createQueueOptions('PAYOUTS'));
 
   constructor(private repo: IPayoutRepository = new PayoutRepository()) {}
 
@@ -51,8 +53,8 @@ export class PayoutService {
     if (typeof this.repo.markResolving !== 'function') {
       const resolved = await this.repo.resolvePrediction(predictionId, winningOptionId);
 
-      // Publish real‑time update so front‑end sees result instantly (legacy)
-      await redis.publish('prediction:resolve', JSON.stringify(resolved));
+      // Publish real‑time update so front‑end sees result instantly
+      await eventBus.publish(REDIS_CHANNELS.PREDICTION_RESOLVE, resolved);
 
       // The resolved prediction from the repository includes options
       const resolvedWithOptions = resolved as PublicPrediction & {

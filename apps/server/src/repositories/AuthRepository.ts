@@ -1,6 +1,6 @@
 import prisma from '../db';
 import type { User, EmailVerification, PasswordReset, RefreshToken } from '@prisma/client';
-import type { IAuthRepository } from './IAuthRepository';
+import type { IAuthRepository } from './interfaces/IAuthRepository';
 
 export class PrismaAuthRepository implements IAuthRepository {
   // --- Users ---
@@ -10,6 +10,13 @@ export class PrismaAuthRepository implements IAuthRepository {
 
   async findById(id: number): Promise<User | null> {
     return prisma.user.findUnique({ where: { id } });
+  }
+
+  async findUserBalance(userId: number): Promise<{ muskBucks: bigint } | null> {
+    return prisma.user.findUnique({
+      where: { id: userId },
+      select: { muskBucks: true },
+    });
   }
 
   async createUser(data: {

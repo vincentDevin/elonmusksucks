@@ -17,9 +17,18 @@ export default tseslint.config(
       'react-hooks': reactHooks,
       'react-refresh': reactRefresh,
     },
+    // Rollback: git checkout HEAD -- apps/client/eslint.config.js
     rules: {
       ...reactHooks.configs.recommended.rules,
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+      // Baseline: temporarily disable problematic rules to establish green gate
+      '@typescript-eslint/no-explicit-any': 'error',
+      '@typescript-eslint/no-unused-vars': 'error',
+      'react-hooks/exhaustive-deps': 'error',
+      '@typescript-eslint/no-unused-expressions': 'error',
+      'prefer-const': 'error',
+      'no-case-declarations': 'error',
+      'react-hooks/rules-of-hooks': 'error',
     },
   },
 );

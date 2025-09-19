@@ -1,18 +1,17 @@
 // apps/client/src/components/dashboard/MyStuffPanel.tsx
 import { useState, memo } from 'react';
-import { useEnhancedUserStats } from '../../hooks/useEnhancedUserStats';
-import { useEnhancedLeaderboard } from '../../hooks/useEnhancedLeaderboard';
-import PerformanceMetricsCard from './analytics/PerformanceMetricsCard';
-import QuickStatsGrid from './analytics/QuickStatsGrid';
+import { useUserStats } from '../../hooks/useUserStats';
+import { useLeaderboard } from '../../hooks/useLeaderboard';
+import MetricsCard from './analytics/PerformanceMetricsCard';
+import StatsGrid from './analytics/QuickStatsGrid';
 import SmartInsights from './analytics/SmartInsights';
-import AchievementProgress from './analytics/AchievementProgress';
 
 type ViewMode = 'analytics' | 'activity';
 
 const MyStuffPanel = memo(function MyStuffPanel() {
   const [viewMode, setViewMode] = useState<ViewMode>('analytics');
-  const { stats, loading, error, smartInsights } = useEnhancedUserStats();
-  const { userRank } = useEnhancedLeaderboard('all-time');
+  const { stats, loading, error, smartInsights } = useUserStats();
+  const { userRank } = useLeaderboard('all-time');
 
   if (loading) {
     return (
@@ -81,16 +80,13 @@ const MyStuffPanel = memo(function MyStuffPanel() {
         /* Analytics View */
         <div className="space-y-6">
           {/* Performance Metrics - Full Width */}
-          <PerformanceMetricsCard stats={stats} />
+          <MetricsCard stats={stats} />
 
           {/* Quick Stats Grid - Full Width */}
-          <QuickStatsGrid stats={stats} userRank={userRank} />
+          <StatsGrid stats={stats} userRank={userRank} />
 
           {/* Smart Insights - Full Width */}
-          <SmartInsights insights={smartInsights} />
-
-          {/* Achievement Progress - Full Width */}
-          <AchievementProgress stats={stats} />
+          <SmartInsights insights={smartInsights || []} />
         </div>
       ) : (
         /* Legacy Activity View */

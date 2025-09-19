@@ -10,6 +10,7 @@ import {
   refreshLeaderboard,
 } from '../controllers/leaderboard.controller';
 import { requireAuth } from '../middleware/auth.middleware';
+import { getEloLeaderboard, getLeaderboardByMetric } from '../controllers/pong.controller';
 
 const router = Router();
 
@@ -32,5 +33,15 @@ router.get('/stats', getLeaderboardStats);
 
 // Admin or on-demand refresh endpoint
 router.post('/refresh', refreshLeaderboard);
+
+// ============================================
+// PONG LEADERBOARD ENDPOINTS
+// ============================================
+
+// GET /api/leaderboard/pong/elo - Hybrid Elo rankings
+router.get('/pong/elo', getEloLeaderboard);
+
+// GET /api/leaderboard/pong/:metric - Other Pong rankings
+router.get('/pong/:metric', getLeaderboardByMetric);
 
 export default router;

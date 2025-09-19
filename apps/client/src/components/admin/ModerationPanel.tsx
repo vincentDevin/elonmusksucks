@@ -1,5 +1,6 @@
+// Rollback: Remove useCallback import and unwrap all socket handlers from useCallback
 // apps/client/src/components/admin/ModerationPanel.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSocket } from '../../contexts/SocketContext';
 import * as moderationApi from '../../api/moderation';
 import type { ModerationLogEntry } from '../../api/moderation';
@@ -160,30 +161,31 @@ const ModerationPanel: React.FC = () => {
     return new Date(timestamp).toLocaleString();
   };
 
+  // Stable handler for socket events
+  const handleModerationAction = useCallback(() => {
+    loadRecentActions(); // Reload recent actions
+  }, []);
+
   // Listen for real-time updates
   useEffect(() => {
     if (socket) {
-      const handleModerationAction = () => {
-        loadRecentActions(); // Reload recent actions
-      };
-
-      socket.on('adminModerationUserBan', handleModerationAction);
-      socket.on('adminModerationUserUnban', handleModerationAction);
-      socket.on('adminModerationUserMute', handleModerationAction);
-      socket.on('adminModerationUserKick', handleModerationAction);
-      socket.on('adminModerationMessageDelete', handleModerationAction);
-      socket.on('adminModerationPostDelete', handleModerationAction);
+      socket.on('moderation:userBan', handleModerationAction);
+      socket.on('moderation:userUnban', handleModerationAction);
+      socket.on('moderation:userMute', handleModerationAction);
+      socket.on('moderation:userKick', handleModerationAction);
+      socket.on('moderation:messageDelete', handleModerationAction);
+      socket.on('moderation:postDelete', handleModerationAction);
 
       return () => {
-        socket.off('adminModerationUserBan', handleModerationAction);
-        socket.off('adminModerationUserUnban', handleModerationAction);
-        socket.off('adminModerationUserMute', handleModerationAction);
-        socket.off('adminModerationUserKick', handleModerationAction);
-        socket.off('adminModerationMessageDelete', handleModerationAction);
-        socket.off('adminModerationPostDelete', handleModerationAction);
+        socket.off('moderation:userBan', handleModerationAction);
+        socket.off('moderation:userUnban', handleModerationAction);
+        socket.off('moderation:userMute', handleModerationAction);
+        socket.off('moderation:userKick', handleModerationAction);
+        socket.off('moderation:messageDelete', handleModerationAction);
+        socket.off('moderation:postDelete', handleModerationAction);
       };
     }
-  }, [socket]);
+  }, [socket, handleModerationAction]);
 
   // Load on mount
   useEffect(() => {
