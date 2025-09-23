@@ -2238,13 +2238,22 @@ export interface PongMatchHistoryView {
 export interface PongLeaderboardView {
   userId: number;
   userName: string;
+  avatarUrl?: string;
   eloRating: number;
   tier: string;
   gamesPlayed: number;
   wins: number;
   winRate: number;
+  winStreak?: number;
+  bestStreak?: number;
+  perfectGames?: number;
+  comebacks?: number;
+  totalWagered?: string;       // BigInt → string
   totalWon: string;            // BigInt → string
+  profit?: string;             // BigInt → string
+  biggestWin?: string;         // BigInt → string
   rank: number;
+  riskTaker?: boolean;         // Custom flag for high rollers
 }
 
 // ——— Shame Wall Response DTOs —————————————————————————————————————————————

@@ -52,14 +52,16 @@ function AppContent() {
                     {/* Global Achievement celebrations */}
                     <AchievementCelebrationContainer />
                     {/* Development tools - only in development */}
+                    {/* 
                     {(import.meta.env.DEV || process.env.NODE_ENV === 'development') && (
                       <>
                         <ListenerMonitor />
-                        {/* <EventFlowTest /> - DISABLED to reduce duplicate listeners */}
+                        {// <EventFlowTest /> - DISABLED to reduce duplicate listeners }
                         <EventMetricsDashboard />
                         <LeakDetectionPanel />
                       </>
                     )}
+                    */}
                   </ChatProvider>
                 </ParlayProvider>
               </PredictionProvider>

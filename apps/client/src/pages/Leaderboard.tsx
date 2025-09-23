@@ -5,9 +5,7 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   ArrowPathIcon,
-  ChartBarIcon,
   TrophyIcon,
-  CalendarIcon,
   ExclamationTriangleIcon,
   PuzzlePieceIcon,
 } from '@heroicons/react/24/outline';
@@ -222,7 +220,7 @@ export default function Leaderboard() {
             { key: 'daily', label: 'Daily', description: 'Today only' },
           ],
           value: period,
-          onChange: (value) => setPeriod(value as LeaderboardPeriod),
+          onChange: (value: string) => setPeriod(value as LeaderboardPeriod),
         },
         {
           label: 'Metric',
@@ -233,7 +231,7 @@ export default function Leaderboard() {
             { key: 'roi', label: 'ROI', description: 'Return on investment' },
           ],
           value: metric,
-          onChange: (value) => setMetric(value as LeaderboardMetric),
+          onChange: (value: string) => setMetric(value as LeaderboardMetric),
         },
       ];
     } else if (activeTab === 'pong') {
@@ -249,7 +247,7 @@ export default function Leaderboard() {
             { key: 'perfectGames', label: 'Perfect Games', description: '11-0 victories' },
           ],
           value: pongMetric,
-          onChange: (value) => setPongMetric(value),
+          onChange: (value: string) => setPongMetric(value),
         },
       ];
     }

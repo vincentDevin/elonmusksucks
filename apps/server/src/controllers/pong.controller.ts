@@ -5,6 +5,7 @@ import { PongEloService } from '../services/pongElo.service';
 import { PongRepository } from '../repositories/PongRepository';
 import { PongSocketEmitter } from '../handlers/pongSocketHandlers';
 import { eventBus } from '../lib/EventBus';
+import { UserService } from '../services/user.service';
 import {
   toUserPongStatsView,
   toPongMatchHistoryView,
@@ -20,6 +21,7 @@ import type {
 
 const pongRepository = new PongRepository();
 const pongStatsService = new PongStatsService(pongRepository);
+const userService = new UserService();
 
 /**
  * POST /api/pong/record-match
@@ -177,12 +179,30 @@ export const getEloLeaderboard = async (
     const offset = parseInt(req.query.offset as string) || 0;
 
     const stats = await pongRepository.getEloLeaderboard(limit, offset);
-    const leaderboard = PongStatsService.calculateLeaderboardMetrics(
-      stats.map((s) => (s.user ? { ...s, user: s.user } : s)),
-      offset,
+
+    // Enrich user avatars with signed URLs before calculating metrics
+    const enrichedStats = await Promise.all(
+      stats.map(async (stat) => {
+        if (stat.user) {
+          const enrichedUser = await userService.enrichUserWithAvatar(stat.user);
+          return {
+            ...stat,
+            user: enrichedUser,
+          };
+        }
+        return stat;
+      }),
     );
 
-    const payload = leaderboard.map((entry, index) =>
+    const leaderboard = PongStatsService.calculateLeaderboardMetrics(enrichedStats, offset);
+
+    // Add user data back to leaderboard entries
+    const enrichedLeaderboard = leaderboard.map((entry, index) => ({
+      ...entry,
+      user: enrichedStats[index]?.user,
+    }));
+
+    const payload = enrichedLeaderboard.map((entry, index) =>
       toPongLeaderboardView(entry, offset + index + 1),
     ) satisfies PongLeaderboardView[];
     res.json(payload);
@@ -227,8 +247,29 @@ export const getLeaderboardByMetric = async (
         return;
     }
 
-    const leaderboard = PongStatsService.calculateLeaderboardMetrics(stats, offset);
-    const payload = leaderboard.map((entry, index) =>
+    // Enrich user avatars with signed URLs before calculating metrics
+    const enrichedStats = await Promise.all(
+      stats.map(async (stat) => {
+        if (stat.user) {
+          const enrichedUser = await userService.enrichUserWithAvatar(stat.user);
+          return {
+            ...stat,
+            user: enrichedUser,
+          };
+        }
+        return stat;
+      }),
+    );
+
+    const leaderboard = PongStatsService.calculateLeaderboardMetrics(enrichedStats, offset);
+
+    // Add user data back to leaderboard entries
+    const enrichedLeaderboard = leaderboard.map((entry, index) => ({
+      ...entry,
+      user: enrichedStats[index]?.user,
+    }));
+
+    const payload = enrichedLeaderboard.map((entry, index) =>
       toPongLeaderboardView(entry, offset + index + 1),
     ) satisfies PongLeaderboardView[];
     res.json(payload);

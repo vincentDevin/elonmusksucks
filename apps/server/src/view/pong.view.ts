@@ -105,26 +105,42 @@ export const toPongMatchHistoryView = (match: any): PongMatchHistoryView => {
 export const toPongLeaderboardView = (
   entry: {
     userId: number;
-    user?: { name: string };
+    user?: { name: string; avatarUrl?: string | null; profilePictureKey?: string | null };
     eloRating: number;
     tier: string;
     gamesPlayed?: number;
     wins?: number;
     winRate: number;
+    winStreak?: number;
+    bestStreak?: number;
+    perfectGames?: number;
+    comebacks?: number;
+    totalWagered?: bigint;
     totalWon?: bigint;
+    profit?: bigint;
+    biggestWin?: bigint;
     rank?: number;
   },
   rank: number,
 ): PongLeaderboardView => ({
   userId: entry.userId,
   userName: entry.user?.name || 'Unknown Player',
+  avatarUrl: entry.user?.avatarUrl || undefined,
   eloRating: entry.eloRating,
   tier: entry.tier,
   gamesPlayed: entry.gamesPlayed || 0,
   wins: entry.wins || 0,
   winRate: entry.winRate,
+  winStreak: entry.winStreak,
+  bestStreak: entry.bestStreak,
+  perfectGames: entry.perfectGames,
+  comebacks: entry.comebacks,
+  totalWagered: entry.totalWagered ? entry.totalWagered.toString() : undefined,
   totalWon: entry.totalWon ? entry.totalWon.toString() : '0',
+  profit: entry.profit ? entry.profit.toString() : undefined,
+  biggestWin: entry.biggestWin ? entry.biggestWin.toString() : undefined,
   rank: rank,
+  riskTaker: entry.totalWagered ? Number(entry.totalWagered) > 50000 : false,
 });
 
 /**

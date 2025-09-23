@@ -3,13 +3,16 @@ import prisma from '../db';
 import type { UserFeedPost, PostContentType, PostVisibility, ReactionType } from '@ems/types';
 import { NotFoundError, ForbiddenError, ValidationError } from '../errors';
 import { unifiedActivityService } from './unifiedActivity.service';
+import { UserService } from './user.service';
 
 export class PostService {
   private postRepository: PostRepository;
   private unifiedActivityService = unifiedActivityService;
+  private userService: UserService;
 
   constructor() {
     this.postRepository = new PostRepository(prisma);
+    this.userService = new UserService();
   }
 
   /**
@@ -77,7 +80,7 @@ export class PostService {
     }
 
     // Convert to API format
-    const feedPost = this.toFeedPost(post);
+    const feedPost = await this.toFeedPost(post);
 
     // Real-time events are now handled by postHandlers.ts → eventBus → postRedisEventHandlers.ts
     // This eliminates duplicate emissions and follows the unified event system pattern
@@ -103,7 +106,7 @@ export class PostService {
       throw new ForbiddenError('Cannot edit this post');
     }
 
-    const feedPost = this.toFeedPost(updatedPost);
+    const feedPost = await this.toFeedPost(updatedPost);
 
     // Real-time events are now handled by postHandlers.ts → eventBus → postRedisEventHandlers.ts
 
@@ -133,7 +136,7 @@ export class PostService {
       throw new NotFoundError('Post not found');
     }
 
-    return this.toFeedPost(post, viewerId);
+    return await this.toFeedPost(post, viewerId);
   }
 
   /**
@@ -150,7 +153,7 @@ export class PostService {
     const { posts, nextCursor } = await this.postRepository.getPublicTimeline(options);
 
     return {
-      posts: posts.map((post) => this.toFeedPost(post, viewerId)),
+      posts: await Promise.all(posts.map((post) => this.toFeedPost(post, viewerId))),
       nextCursor,
     };
   }
@@ -170,7 +173,7 @@ export class PostService {
     const { posts, nextCursor } = await this.postRepository.getUserPosts(userId, options, viewerId);
 
     return {
-      posts: posts.map((post) => this.toFeedPost(post, viewerId)),
+      posts: await Promise.all(posts.map((post) => this.toFeedPost(post, viewerId))),
       nextCursor,
     };
   }
@@ -189,7 +192,7 @@ export class PostService {
     const { comments, nextCursor } = await this.postRepository.getPostComments(postId, options);
 
     return {
-      comments: comments.map((comment) => this.toFeedPost(comment, viewerId)),
+      comments: await Promise.all(comments.map((comment) => this.toFeedPost(comment, viewerId))),
       nextCursor,
     };
   }
@@ -199,7 +202,7 @@ export class PostService {
    */
   async getTrendingPosts(viewerId?: number, limit: number = 10): Promise<UserFeedPost[]> {
     const posts = await this.postRepository.getTrendingPosts(limit);
-    return posts.map((post) => this.toFeedPost(post, viewerId));
+    return await Promise.all(posts.map((post) => this.toFeedPost(post, viewerId)));
   }
 
   /**
@@ -310,7 +313,22 @@ export class PostService {
   /**
    * Convert database post to API format
    */
-  private toFeedPost(post: any, viewerId?: number): UserFeedPost {
+  private async toFeedPost(post: any, viewerId?: number): Promise<UserFeedPost> {
+    // Enrich author with signed avatar URL
+    let authorAvatar: string | undefined;
+    if (post.author) {
+      const enrichedAuthor = await this.userService.enrichUserWithAvatar(post.author);
+      authorAvatar = enrichedAuthor.avatarUrl || undefined;
+    }
+
+    // Process children recursively if they exist
+    let children: UserFeedPost[] | undefined;
+    if (post.children) {
+      children = await Promise.all(
+        post.children.map((child: any) => this.toFeedPost(child, viewerId)),
+      );
+    }
+
     return {
       id: post.id,
       authorId: post.authorId,
@@ -331,12 +349,12 @@ export class PostService {
       updatedAt: post.updatedAt.toISOString(),
       editedAt: post.editedAt?.toISOString(),
       authorName: post.author?.name,
-      authorAvatar: post.author?.avatarUrl,
+      authorAvatar,
       reactionCounts: this.calculateReactionCounts(post.reactions || []),
       userReaction: post.reactions?.find((r: any) => r.userId === viewerId)?.type,
       canEdit: viewerId === post.authorId && !post.isDeleted,
       canDelete: viewerId === post.authorId || false, // TODO: check admin status
-      children: post.children?.map((child: any) => this.toFeedPost(child, viewerId)),
+      children,
     };
   }
 
@@ -638,7 +656,9 @@ export class PostService {
     const resultPosts = hasMore ? postHashtags.slice(0, -1) : postHashtags;
     const nextCursor = hasMore ? resultPosts[resultPosts.length - 1]?.id : undefined;
 
-    const posts = resultPosts.map((ph) => this.toFeedPost(ph.post, options.viewerId));
+    const posts = await Promise.all(
+      resultPosts.map((ph) => this.toFeedPost(ph.post, options.viewerId)),
+    );
 
     return { posts, nextCursor };
   }

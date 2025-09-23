@@ -155,34 +155,55 @@ export function transformPongEntry(
     });
   }
 
+  // Build secondary stats array, avoiding duplication with primary stat
+  const allSecondaryStats = [
+    {
+      label: 'Elo Rating',
+      value: entry.eloRating?.toString() || '1200',
+      color: 'text-primary',
+    },
+    {
+      label: 'Wins',
+      value: entry.wins?.toString() || '0',
+      color: 'text-green-400',
+    },
+    {
+      label: 'Win Rate',
+      value: `${entry.winRate?.toFixed(1) || '0.0'}%`,
+      color: 'text-blue-400',
+    },
+    {
+      label: 'Earnings',
+      value: `${(asNum(entry.totalWon) / 1000).toFixed(1)}k`,
+      color: 'text-accent',
+    },
+    {
+      label: 'Win Streak',
+      value: entry.winStreak?.toString() || '0',
+      color: 'text-orange-400',
+    },
+    {
+      label: 'Perfect Games',
+      value: entry.perfectGames?.toString() || '0',
+      color: 'text-purple-400',
+    },
+    {
+      label: 'Volume',
+      value: `${entry.totalWagered ? (asNum(entry.totalWagered) / 1000).toFixed(1) : '0'}k`,
+      color: 'text-cyan-400',
+    },
+  ];
+
+  // Filter out the primary stat from secondary stats to avoid duplication
+  const secondaryStats = allSecondaryStats.filter((stat) => stat.label !== primaryStat.label);
+
   return {
     id: entry.userId,
     userName: entry.userName,
-    avatarUrl: undefined, // PongLeaderboardView doesn't include avatarUrl
+    avatarUrl: entry.avatarUrl,
     variant: 'pong',
     primaryStat,
-    secondaryStats: [
-      {
-        label: 'Elo',
-        value: entry.eloRating?.toString() || '1200',
-        color: 'text-primary',
-      },
-      {
-        label: 'Wins',
-        value: entry.wins?.toString() || '0',
-        color: 'text-green-400',
-      },
-      {
-        label: 'Win Rate',
-        value: `${entry.winRate?.toFixed(1) || '0.0'}%`,
-        color: 'text-blue-400',
-      },
-      {
-        label: 'Earnings',
-        value: `${(asNum(entry.totalWon) / 1000).toFixed(1)}k`,
-        color: 'text-accent',
-      },
-    ],
+    secondaryStats,
     badges,
     rawData: entry,
   };

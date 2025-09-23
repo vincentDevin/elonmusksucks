@@ -7,7 +7,6 @@ import { UserRepository } from '../repositories/UserRepository';
 import type { DbUser, DbUserBadge, DbBadge, DbUserStats, DbUserPost } from '@ems/types';
 // TODO: Branded types available: UserId, PredictionId, ISODateString, TimestampMs
 import type { PublicUserProfile, UserFeedPost, UserStatsDTO } from '@ems/types';
-import { PostService } from './post.service';
 import { unifiedActivityService } from './unifiedActivity.service';
 import { ImageProcessingService, ProcessedImageSizes } from './imageProcessing.service';
 import { DeleteObjectCommand } from '@aws-sdk/client-s3';
@@ -22,13 +21,11 @@ export type UploadedFile = {
 
 export class UserService {
   private repo: IUserRepository;
-  private postService: PostService;
   private s3: S3Client;
   private bucket: string;
 
   constructor(repo: IUserRepository = new UserRepository()) {
     this.repo = repo;
-    this.postService = new PostService();
     this.s3 = new S3Client({
       region: 'auto',
       endpoint: process.env.TIGRIS_S3_ENDPOINT,
@@ -242,13 +239,9 @@ export class UserService {
     const rank = await this.repo.getUserRank(userId);
     const isFollowing = viewerId ? await this.repo.existsFollow(viewerId, userId) : false;
 
-    // Generate signed avatar URL if we have a storage key
+    // Generate signed avatar URL if we have a storage key (use cached version)
     const avatarUrl = user.profilePictureKey
-      ? await getSignedUrl(
-          this.s3,
-          new GetObjectCommand({ Bucket: this.bucket, Key: user.profilePictureKey }),
-          { expiresIn: 60 * 60 },
-        )
+      ? await this.getCachedProfileImageUrl(user.id, user.profilePictureKey, 3600)
       : user.avatarUrl;
 
     return {
@@ -336,12 +329,71 @@ export class UserService {
 
   // --- FEED ---
 
+  /**
+   * Enrich a user object with a signed avatar URL.
+   * This is the centralized method for transforming user data with proper avatar URLs.
+   *
+   * @param user - User object with id, name, avatarUrl, and optionally profilePictureKey
+   * @returns User object with signed avatar URL if profilePictureKey exists
+   */
+  async enrichUserWithAvatar<
+    T extends { id: number; avatarUrl?: string | null; profilePictureKey?: string | null },
+  >(user: T): Promise<T & { avatarUrl: string | null }> {
+    if (!user) return user;
+
+    let avatarUrl: string | null = null;
+
+    if (user.profilePictureKey) {
+      try {
+        avatarUrl = await this.getCachedProfileImageUrl(user.id, user.profilePictureKey, 3600);
+      } catch (error) {
+        console.warn(`Failed to get signed URL for user ${user.id}:`, error);
+        avatarUrl = user.avatarUrl || null;
+      }
+    } else {
+      avatarUrl = user.avatarUrl || null;
+    }
+
+    return {
+      ...user,
+      avatarUrl,
+    };
+  }
+
+  /**
+   * Enrich multiple users with signed avatar URLs.
+   * Batch processing for performance.
+   */
+  async enrichUsersWithAvatars<
+    T extends { id: number; avatarUrl?: string | null; profilePictureKey?: string | null },
+  >(users: T[]): Promise<(T & { avatarUrl: string | null })[]> {
+    return Promise.all(users.map((user) => this.enrichUserWithAvatar(user)));
+  }
+
   async getUserFeed(userId: number, viewerId?: number): Promise<UserFeedPost[]> {
     const user = await this.repo.findById(userId);
     if (!user) throw new Error('User not found');
     if (user.feedPrivate && user.id !== viewerId) throw new Error('Feed is private');
     const posts: DbUserPost[] = await this.repo.getUserFeed(userId); // no { parentId: null }
-    return posts.map(toFeedPostDTO);
+
+    // Enrich posts with author avatar URLs
+    const enrichedPosts = await Promise.all(
+      posts.map(async (post: any) => {
+        let authorAvatar: string | null = null;
+
+        if (post.author) {
+          const enrichedAuthor = await this.enrichUserWithAvatar(post.author);
+          authorAvatar = enrichedAuthor.avatarUrl;
+        }
+
+        return {
+          ...post,
+          authorAvatar,
+        };
+      }),
+    );
+
+    return enrichedPosts.map(toFeedPostDTO);
   }
 
   async createUserPost(
@@ -350,10 +402,10 @@ export class UserService {
     parentId?: number | null,
     _profileOwnerId?: number, // Legacy parameter for backward compatibility
   ): Promise<UserFeedPost> {
-    // Always use the new PostService for consistency
-    const post = await this.postService.createPost(authorId, {
+    // Use repository directly to avoid circular dependency
+    const post = await this.repo.createUserPost({
+      authorId,
       content,
-      visibility: 'PUBLIC', // Default to public for user feed posts
       parentId: parentId || null,
     });
 
@@ -374,7 +426,13 @@ export class UserService {
       );
     }
 
-    return post;
+    // Convert to UserFeedPost format with enriched avatar
+    const enrichedPost = {
+      ...post,
+      authorAvatar: author?.avatarUrl || null,
+    };
+
+    return toFeedPostDTO(enrichedPost);
   }
 
   async getUserPostThread(
@@ -382,9 +440,35 @@ export class UserService {
   ): Promise<(UserFeedPost & { children: UserFeedPost[] }) | null> {
     const thread = await this.repo.getUserPostThread(postId);
     if (!thread) return null;
+
+    // Enrich thread and children with author avatars
+    const enrichThread = async (post: any): Promise<any> => {
+      let authorAvatar: string | null = null;
+
+      if (post.author) {
+        const enrichedAuthor = await this.enrichUserWithAvatar(post.author);
+        authorAvatar = enrichedAuthor.avatarUrl;
+      }
+
+      const enrichedPost = {
+        ...post,
+        authorAvatar,
+      };
+
+      if (post.children && post.children.length > 0) {
+        enrichedPost.children = await Promise.all(
+          post.children.map((child: any) => enrichThread(child)),
+        );
+      }
+
+      return enrichedPost;
+    };
+
+    const enrichedThread = await enrichThread(thread);
+
     return {
-      ...toFeedPostDTO(thread),
-      children: (thread.children ?? []).map(toFeedPostDTO),
+      ...toFeedPostDTO(enrichedThread),
+      children: (enrichedThread.children ?? []).map(toFeedPostDTO),
     };
   }
 
@@ -659,7 +743,12 @@ function calculateReactionCounts(reactions: any[]): Record<any, number> {
 }
 
 function toFeedPostDTO(
-  post: DbUserPost & { children?: DbUserPost[]; authorName?: string; reactions?: any[] },
+  post: DbUserPost & {
+    children?: DbUserPost[];
+    authorName?: string;
+    authorAvatar?: string | null;
+    reactions?: any[];
+  },
 ): UserFeedPost {
   return {
     id: post.id,
@@ -686,6 +775,7 @@ function toFeedPostDTO(
       : undefined,
     children: post.children ? post.children.map(toFeedPostDTO) : undefined,
     authorName: post.authorName,
+    authorAvatar: post.authorAvatar || undefined,
   };
 }
 
