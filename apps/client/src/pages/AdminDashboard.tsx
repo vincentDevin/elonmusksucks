@@ -4,7 +4,7 @@ import { useAdmin } from '../contexts/AdminContext';
 import UserManagement from '../components/admin/UserManagement';
 import PredictionQueue from '../components/admin/PredictionQueue';
 import FinancialDashboard from '../components/admin/FinancialDashboard';
-import AchievementManager from '../components/admin/AchievementManager';
+import AchievementManager from '../components/achievements/AchievementManager';
 import AdvancedAnalyticsDashboard from '../components/admin/AdvancedAnalyticsDashboard';
 import FeedsManager from '../components/admin/FeedsManager';
 import ModerationQueue from '../components/admin/ModerationQueue';

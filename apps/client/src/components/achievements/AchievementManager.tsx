@@ -1,13 +1,26 @@
-// apps/client/src/components/dashboard/AchievementManager.tsx
-import { useState, memo, useMemo } from 'react';
+// apps/client/src/components/achievements/AchievementManager.tsx
+// Consolidated Achievement Manager - User and Admin views
+import { useState, memo, useMemo, useEffect } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
 import { useAchievements } from '../../contexts/AchievementContext';
 import { useAchievementTheme } from '../../theme/hooks/useAchievementTheme';
 import type { AchievementRarity } from '../../theme/utils/achievement-colors';
 import { calculateProgressPercentage } from '../../utils/achievementDataTransform';
 
-import AchievementList from '../achievements/AchievementManager/AchievementList';
+import AchievementList from './AchievementList';
+
+// Admin-specific imports (only loaded when needed)
+import { RuleBuilder } from '../admin/achievements/AchievementRuleBuilder/RuleBuilder';
+import type { JsonRuleAchievementData, RuleValidationResult } from '@ems/types';
+import {
+  getAllAchievements,
+  getAchievementAnalytics,
+  type AchievementWithStats,
+  type AchievementAnalytics,
+} from '../../api/admin';
 
 type SortBy = 'progress' | 'rarity' | 'category' | 'name';
+type ViewMode = 'user' | 'admin';
 
 interface FilterState {
   categories: string[];
@@ -16,6 +29,13 @@ interface FilterState {
 }
 
 const AchievementManager = memo(function AchievementManager() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
+
+  // View mode state - admins can switch between user and admin views
+  const [viewMode, setViewMode] = useState<ViewMode>('user');
+  const showAdminView = isAdmin && viewMode === 'admin';
+
   // Achievement data
   const {
     achievements: progressToNext,
@@ -45,6 +65,41 @@ const AchievementManager = memo(function AchievementManager() {
 
   // User preferences (could be moved to context/localStorage later)
   const [pinnedAchievements, setPinnedAchievements] = useState<string[]>([]);
+
+  // Admin state (only used when in admin mode)
+  const [adminActiveTab, setAdminActiveTab] = useState<'overview' | 'rule-builder'>('overview');
+  const [adminData, setAdminData] = useState<AchievementWithStats[]>([]);
+  const [analytics, setAnalytics] = useState<AchievementAnalytics | null>(null);
+  const [adminLoading, setAdminLoading] = useState(false);
+  const [currentRule, setCurrentRule] = useState<Partial<JsonRuleAchievementData>>({
+    eventKeys: [],
+    progress: { kind: 'count' },
+    unlockWhen: {},
+    counters: [],
+  });
+  const [ruleValidation, setRuleValidation] = useState<RuleValidationResult>({
+    isValid: false,
+    errors: ['Rule is incomplete'],
+    warnings: [],
+    estimatedComplexity: 'low',
+  });
+
+  // Load admin data when switching to admin view
+  useEffect(() => {
+    if (showAdminView) {
+      setAdminLoading(true);
+      Promise.all([getAllAchievements(), getAchievementAnalytics()])
+        .then(([achievements, analyticsData]) => {
+          setAdminData(achievements);
+          setAnalytics(analyticsData);
+          setAdminLoading(false);
+        })
+        .catch((err) => {
+          console.error('Failed to load admin data:', err);
+          setAdminLoading(false);
+        });
+    }
+  }, [showAdminView]);
 
   // Computed achievement categories
   const achievementCategories = useMemo(() => {
@@ -110,7 +165,7 @@ const AchievementManager = memo(function AchievementManager() {
     );
   };
 
-  if (loading) {
+  if (loading || (showAdminView && adminLoading)) {
     return (
       <div className="min-h-[600px] bg-surface border border-muted rounded-2xl p-6">
         <div className="flex items-center justify-center h-full">
@@ -121,15 +176,117 @@ const AchievementManager = memo(function AchievementManager() {
     );
   }
 
+  // Admin View
+  if (showAdminView) {
+    return (
+      <div className="bg-surface border border-muted rounded-2xl p-6 min-h-[600px]">
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-content flex items-center">
+              <span className="mr-3">🏆</span>
+              Achievement Manager (Admin)
+            </h1>
+            <p className="text-tertiary mt-1">Manage and configure platform achievements</p>
+          </div>
+          <button
+            onClick={() => setViewMode('user')}
+            className="px-4 py-2 bg-background border border-muted rounded-lg hover:bg-surface transition-colors text-sm font-medium text-content"
+          >
+            Switch to User View
+          </button>
+        </div>
+
+        <div className="flex gap-2 mb-6 border-b border-muted">
+          <button
+            onClick={() => setAdminActiveTab('overview')}
+            className={`px-4 py-2 font-medium transition-colors ${
+              adminActiveTab === 'overview'
+                ? 'text-primary border-b-2 border-primary'
+                : 'text-tertiary hover:text-content'
+            }`}
+          >
+            Overview
+          </button>
+          <button
+            onClick={() => setAdminActiveTab('rule-builder')}
+            className={`px-4 py-2 font-medium transition-colors ${
+              adminActiveTab === 'rule-builder'
+                ? 'text-primary border-b-2 border-primary'
+                : 'text-tertiary hover:text-content'
+            }`}
+          >
+            Rule Builder
+          </button>
+        </div>
+
+        {adminActiveTab === 'overview' && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="bg-background rounded-lg p-4 border border-muted">
+                <div className="text-2xl font-bold text-content">{adminData.length}</div>
+                <div className="text-sm text-tertiary">Total Achievements</div>
+              </div>
+              <div className="bg-background rounded-lg p-4 border border-muted">
+                <div className="text-2xl font-bold text-content">
+                  {adminData.filter((a) => a.isActive).length}
+                </div>
+                <div className="text-sm text-tertiary">Active</div>
+              </div>
+              <div className="bg-background rounded-lg p-4 border border-muted">
+                <div className="text-2xl font-bold text-content">
+                  {analytics?.totalUnlocks || 0}
+                </div>
+                <div className="text-sm text-tertiary">Total Unlocks</div>
+              </div>
+              <div className="bg-background rounded-lg p-4 border border-muted">
+                <div className="text-2xl font-bold text-content">
+                  {analytics?.averageCompletionRate
+                    ? `${(analytics.averageCompletionRate * 100).toFixed(1)}%`
+                    : '0%'}
+                </div>
+                <div className="text-sm text-tertiary">Avg Completion</div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {adminActiveTab === 'rule-builder' && (
+          <div className="space-y-6">
+            <RuleBuilder
+              rule={currentRule}
+              onChange={setCurrentRule}
+              onValidation={setRuleValidation}
+            />
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // User View (original styling preserved)
   return (
     <div className="bg-surface border border-muted rounded-2xl p-6 min-h-[600px]">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-content flex items-center">
-          <span className="mr-3">🏆</span>
-          Achievement Manager
-        </h1>
-        <p className="text-tertiary mt-1">Track your progress and celebrate your accomplishments</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-content flex items-center">
+              <span className="mr-3">🏆</span>
+              Achievement Manager
+            </h1>
+            <p className="text-tertiary mt-1">
+              Track your progress and celebrate your accomplishments
+            </p>
+          </div>
+          {isAdmin && (
+            <button
+              onClick={() => setViewMode('admin')}
+              className="px-4 py-2 bg-background border border-muted rounded-lg hover:bg-surface transition-colors text-sm font-medium text-content"
+            >
+              Admin View
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Achievement Stats Overview */}

@@ -1,4 +1,4 @@
-// apps/client/src/components/dashboard/AchievementProgressPanel.tsx
+// apps/client/src/components/achievements/AchievementProgressPanel.tsx
 import { memo } from 'react';
 import AchievementManager from './AchievementManager';
 

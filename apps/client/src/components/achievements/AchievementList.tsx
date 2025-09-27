@@ -1,7 +1,7 @@
 // apps/client/src/components/dashboard/AchievementManager/AchievementList.tsx
 import { memo, useState, useMemo } from 'react';
-import { useAchievementTheme } from '../../../theme/hooks/useAchievementTheme';
-import type { AchievementRarity } from '../../../theme/utils/achievement-colors';
+import { useAchievementTheme } from '../../theme/hooks/useAchievementTheme';
+import type { AchievementRarity } from '../../theme/utils/achievement-colors';
 
 interface Achievement {
   id: string;
