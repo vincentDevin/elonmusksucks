@@ -11,7 +11,7 @@ import type { UpdateProfilePayload } from '../api/users';
 // Profile sections
 import { ProfileHeader } from '../components/profile/ProfileHeader';
 import { ProfileEditForm } from '../components/profile/ProfileEditForm';
-import { ProfileStatsPanel } from '../components/profile/ProfileStatsPanel';
+import { ProfileStatsPanel } from '../components/profile/ProfileStats';
 import { CreatePostForm } from '../components/profile/CreatePostForm';
 import { ProfileFeed } from '../components/profile/ProfileFeed';
 
