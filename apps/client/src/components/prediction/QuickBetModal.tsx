@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 // Helper to convert string/number to number
 const asNum = (v: string | number | bigint | undefined | null) => Number(v ?? 0);
 import { usePredictionMarket } from '../../contexts/PredictionContext';
-import BetModal from '../BetModal';
+import BetModal from './BetModal';
 import type { PredictionFull } from '../../api/predictions';
 
 interface QuickBetModalProps {

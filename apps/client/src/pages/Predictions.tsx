@@ -7,10 +7,10 @@
 
 import { useState, useEffect, useCallback } from 'react';
 
-import CreatePredictionForm from '../components/CreatePredictionForm';
-import PredictionCard from '../components/PredictionCard';
-import PredictionFilters from '../components/dashboard/discovery/PredictionFilters';
-import PredictionSectionCard from '../components/dashboard/discovery/PredictionSectionCard';
+import CreatePredictionForm from '../components/prediction/CreatePredictionForm';
+import PredictionCard from '../components/prediction/PredictionCard';
+import PredictionFilters from '../components/prediction/PredictionFilters';
+import PredictionSectionCard from '../components/prediction/PredictionSectionCard';
 
 import { usePredictionDiscovery } from '../hooks/usePredictionDiscovery';
 import { usePredictionMarket } from '../contexts/PredictionContext';

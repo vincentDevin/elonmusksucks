@@ -3,7 +3,7 @@ import { useAchievements } from '../../contexts/AchievementContext';
 import { useAchievementTheme } from '../../theme/hooks/useAchievementTheme';
 import type { AchievementRarity } from '../../theme/utils/achievement-colors';
 import type { ComponentAchievement } from '../../utils/achievementDataTransform';
-import AchievementCard from '../dashboard/AchievementManager/AchievementCard';
+import AchievementCard from '../achievements/AchievementManager/AchievementCard';
 
 interface ProfileAchievementsProps {
   achievements?: ComponentAchievement[];

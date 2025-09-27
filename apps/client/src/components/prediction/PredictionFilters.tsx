@@ -1,7 +1,7 @@
 // apps/client/src/components/dashboard/discovery/PredictionFilters.tsx
 import { useState, useEffect, useRef } from 'react';
-import type { PredictionFilter } from '../../../hooks/usePredictionDiscovery';
-import { usePredictionMarket } from '../../../contexts/PredictionContext';
+import type { PredictionFilter } from '../../hooks/usePredictionDiscovery';
+import { usePredictionMarket } from '../../contexts/PredictionContext';
 
 interface PredictionFiltersProps {
   filters: PredictionFilter;

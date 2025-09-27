@@ -16,7 +16,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   return (
     <div className="flex flex-col min-h-screen bg-background text-content transition-colors duration-300">
       <NavBar />
-      {!inDashboard && <ActivityFeed />}
+      <ActivityFeed />
 
       {/* Main content is below NavBar, but above fixed ChatBar */}
       <div className="relative flex-1">
@@ -25,14 +25,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
           {children}
         </main>
       </div>
-
-      {!inDashboard && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 pointer-events-none">
-          <div className="flex justify-center pointer-events-auto">
-            <ChatBar />
-          </div>
+      <div className="fixed bottom-0 left-0 right-0 z-50 pointer-events-none">
+        <div className="flex justify-center pointer-events-auto">
+          <ChatBar />
         </div>
-      )}
+      </div>
 
       {/* Quick Theme Switcher - Available on all pages */}
       <QuickThemeSwitcher position="bottom-right" hideOnMobile={false} />

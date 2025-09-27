@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import type { PublicPredictionOption, PublicBet } from '@ems/types';
 import { PredictionType } from '@ems/types';
-import { useSocket } from '../contexts/SocketContext';
+import { useSocket } from '../../contexts/SocketContext';
 
 interface FlattenedParlayLeg {
   parlayId: number;

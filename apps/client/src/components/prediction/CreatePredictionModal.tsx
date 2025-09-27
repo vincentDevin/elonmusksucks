@@ -1,6 +1,6 @@
 // apps/client/src/components/dashboard/CreatePredictionModal.tsx
 import { useState, useEffect } from 'react';
-import CreatePredictionForm from '../CreatePredictionForm';
+import CreatePredictionForm from './CreatePredictionForm';
 import { createPrediction } from '../../api/predictions';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../api/axios';

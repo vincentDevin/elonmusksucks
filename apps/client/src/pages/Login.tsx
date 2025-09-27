@@ -12,7 +12,7 @@ export default function Login() {
     if (user) {
       // Use window.location.href for a full page refresh to ensure proper theme and state loading
       if (user.profileComplete) {
-        window.location.href = '/dashboard';
+        window.location.href = '/timeline';
       } else {
         window.location.href = '/setup-profile';
       }
@@ -29,7 +29,7 @@ export default function Login() {
       // Fallback redirect in case useEffect doesn't trigger properly
       setTimeout(() => {
         if (window.location.pathname === '/login') {
-          window.location.href = '/dashboard';
+          window.location.href = '/timeline';
         }
       }, 1000);
     } catch (err) {

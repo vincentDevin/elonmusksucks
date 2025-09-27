@@ -5,7 +5,7 @@ import { useAchievementTheme } from '../../theme/hooks/useAchievementTheme';
 import type { AchievementRarity } from '../../theme/utils/achievement-colors';
 import { calculateProgressPercentage } from '../../utils/achievementDataTransform';
 
-import AchievementList from './AchievementManager/AchievementList';
+import AchievementList from '../achievements/AchievementManager/AchievementList';
 
 type SortBy = 'progress' | 'rarity' | 'category' | 'name';
 

@@ -6,9 +6,9 @@
 // -----------------------------------------------------------------------------
 
 import { useState, useMemo } from 'react';
-import { usePredictionMarket } from '../contexts/PredictionContext';
-import { useAuth } from '../contexts/AuthContext';
-import { formatMuskBucks } from '../utils/formatting';
+import { usePredictionMarket } from '../../contexts/PredictionContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { formatMuskBucks } from '../../utils/formatting';
 import type { PublicPredictionOption, BetWithUser } from '@ems/types';
 
 interface BetFormProps {

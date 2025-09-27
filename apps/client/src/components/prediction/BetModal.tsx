@@ -6,9 +6,9 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { usePredictionMarket } from '../contexts/PredictionContext';
-import { useAuth } from '../contexts/AuthContext';
-import { formatMuskBucks } from '../utils/formatting';
+import { usePredictionMarket } from '../../contexts/PredictionContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { formatMuskBucks } from '../../utils/formatting';
 import type { BetWithUser, PredictionFull } from '@ems/types';
 
 interface BetModalProps {

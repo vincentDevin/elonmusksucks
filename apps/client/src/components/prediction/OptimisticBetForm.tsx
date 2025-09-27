@@ -3,7 +3,7 @@
 // Shows instant UI feedback with automatic rollback on errors
 
 import React, { useState } from 'react';
-import { useOptimisticBetting } from '../hooks/useOptimisticBetting';
+import { useOptimisticBetting } from '../../hooks/useOptimisticBetting';
 
 interface BetFormProps {
   predictionId: number;

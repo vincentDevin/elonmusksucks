@@ -14,7 +14,7 @@ export default function HomeRedirect() {
   useEffect(() => {
     if (accessToken && user) {
       // Redirect authenticated users to Dashboard
-      navigate('/dashboard', { replace: true });
+      navigate('/timeline', { replace: true });
     } else {
       // Redirect non-authenticated users to SSR public site
       window.location.href = 'http://127.0.0.1:5173';

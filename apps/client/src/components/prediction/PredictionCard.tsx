@@ -10,12 +10,12 @@ import type {
   ParlayLegWithUser,
   PredictionType,
 } from '@ems/types';
-import type { PredictionFull } from '../api/predictions';
+import type { PredictionFull } from '../../api/predictions';
 import OddsBar from './OddsBar';
 import BetsList from './BetsList';
 import BetModal from './BetModal';
-import { useParlay } from '../contexts/ParlayContext';
-import { PredictionSourceList } from './prediction/PredictionSourceList';
+import { useParlay } from '../../contexts/ParlayContext';
+import { PredictionSourceList } from './PredictionSourceList';
 
 interface UnifiedPredictionCardProps {
   prediction: PredictionFull;

@@ -13,7 +13,6 @@ import RequireAdmin from '../components/admin/RequireAdmin';
 import MainLayout from '../components/MainLayout';
 
 // Lazy-loaded authenticated routes for code splitting
-const Dashboard = lazy(() => import('../pages/Dashboard'));
 const Timeline = lazy(() => import('../pages/Timeline'));
 const AuthPredictions = lazy(() => import('../pages/Predictions'));
 const AuthLeaderboard = lazy(() => import('../pages/Leaderboard'));
@@ -96,16 +95,6 @@ export default function AppRoutes() {
       {/* Protected authenticated routes */}
       <Route element={<PrivateRoute />}>
         <Route
-          path="/dashboard"
-          element={
-            <MainLayout>
-              <Suspense fallback={<RouteFallback />}>
-                <Dashboard />
-              </Suspense>
-            </MainLayout>
-          }
-        />
-        <Route
           path="/timeline"
           element={
             <MainLayout>
@@ -186,7 +175,7 @@ export default function AppRoutes() {
       {/* Fallback - redirect unknown routes */}
       <Route
         path="*"
-        element={accessToken ? <Navigate to="/dashboard" replace /> : <PublicSiteRedirect />}
+        element={accessToken ? <Navigate to="/timeline" replace /> : <PublicSiteRedirect />}
       />
     </Routes>
   );

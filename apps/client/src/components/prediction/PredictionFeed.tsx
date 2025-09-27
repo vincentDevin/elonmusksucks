@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { usePredictionMarket } from '../../contexts/PredictionContext';
-import PredictionCard from '../PredictionCard';
+import PredictionCard from './PredictionCard';
 import { useInfiniteScroll } from '../../hooks/useInfiniteScroll';
 
 export default function PredictionFeed() {

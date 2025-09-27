@@ -44,9 +44,6 @@ export default function NavBar() {
           {accessToken ? (
             user ? (
               <>
-                <Link to="/dashboard" className={linkClasses('/dashboard')}>
-                  Dashboard
-                </Link>
                 <Link to="/timeline" className={linkClasses('/timeline')}>
                   Timeline
                 </Link>

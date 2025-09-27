@@ -1,7 +1,7 @@
 // apps/client/src/components/dashboard/discovery/PredictionSectionCard.tsx
 import { useState } from 'react';
-import type { PredictionSection, EnhancedPrediction } from '../../../hooks/usePredictionDiscovery';
-import PredictionCard from '../../PredictionCard';
+import type { PredictionSection, EnhancedPrediction } from '../../hooks/usePredictionDiscovery';
+import PredictionCard from './PredictionCard';
 
 interface PredictionSectionCardProps {
   section: PredictionSection;
