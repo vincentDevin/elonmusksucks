@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import NavBar from './NavBar';
-import ChatBar from './ChatBar';
+import { ChatBar } from './ChatWidget';
 import ActivityFeed from './ActivityFeed';
 import { QuickThemeSwitcher } from '../theme';
 

@@ -6,7 +6,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import EventHandlerErrorBoundary from './EventHandlerErrorBoundary';
+import { EventHandlerErrorBoundary } from './ErrorBoundary';
 
 // Import notification/alert-only event handler hooks (Smart Hybrid approach)
 // Note: Chat, Prediction, Achievement, Activity, Parlay use dedicated contexts for state management
