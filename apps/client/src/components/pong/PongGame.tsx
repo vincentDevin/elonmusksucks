@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import { usePongSocket } from '../../hooks/usePongSocket';
 import { usePongInput } from '../../hooks/usePongInput';
 import { PongCanvas } from './PongCanvas';
-import { PongLobby } from './PongLobby';
+import { PongGamesList } from './PongGamesList';
 import { PongSpectator } from './PongSpectator';
+import { PongHeader } from './PongHeader';
+import { PongMatchCreatorModal } from './PongMatchCreatorModal';
 import { PONG_PHYSICS } from '@ems/types';
 
 export function PongGame() {
@@ -28,10 +30,11 @@ export function PongGame() {
     leaveMatch,
   } = usePongSocket();
 
-  // Local state for spectator mode
+  // Local state for spectator mode and match creation modal
   const [spectatingGameId, setSpectatingGameId] = useState<string | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
-  const { inputState, setSendInput, isInputActive } = usePongInput();
+  const { inputState, setSendInput } = usePongInput();
 
   // Connect input system to socket
   useEffect(() => {
@@ -54,8 +57,31 @@ export function PongGame() {
     };
   }, [disconnect]);
 
+  // Auto-refresh lobby when in lobby mode (not in game or spectating)
+  useEffect(() => {
+    // Only refresh when we're in lobby mode (not in a game or spectating)
+    if (currentGame || spectatingGameId || !isConnected || !isAuthenticated) return;
+
+    // Initial lobby join when entering lobby mode
+    joinLobby();
+
+    // Set up periodic refresh every 15 seconds
+    const refreshInterval = setInterval(() => {
+      joinLobby();
+    }, 15000);
+
+    return () => {
+      clearInterval(refreshInterval);
+    };
+  }, [isConnected, isAuthenticated, currentGame, spectatingGameId, joinLobby]);
+
   const handleCreateMatch = (wager: number, type: 'ai' | 'pvp', aiDifficulty?: string) => {
     createMatch(wager, type, aiDifficulty);
+    setShowCreateModal(false); // Close modal after creating match
+  };
+
+  const handleOpenCreateModal = () => {
+    setShowCreateModal(true);
   };
 
   const handleSpectateGame = (gameId: string) => {
@@ -69,13 +95,27 @@ export function PongGame() {
     joinLobby();
   };
 
+  // Determine current mode for header
+  const headerMode = spectatingGameId ? 'spectator' : currentGame ? 'game' : 'lobby';
+
   return (
     <div className="min-h-screen bg-background p-4">
       <div className="max-w-6xl mx-auto">
-        {/* Header */}
+        {/* Unified Header */}
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-content mb-2">🏓 Elon Musk Sucks Pong</h1>
-          <p className="text-secondary">Real-time multiplayer Pong with MuskBucks wagering</p>
+          <PongHeader
+            mode={headerMode}
+            isConnected={isConnected}
+            isAuthenticated={isAuthenticated}
+            connectionError={connectionError}
+            stats={stats}
+            onConnect={connect}
+            onCreateMatch={handleOpenCreateModal}
+            currentGame={currentGame}
+            lastPing={lastPing}
+            onBackToLobby={handleBackToLobby}
+            spectatingGameId={spectatingGameId}
+          />
         </div>
 
         {/* Show spectator if spectating */}
@@ -86,93 +126,6 @@ export function PongGame() {
           </>
         ) : currentGame ? (
           <div className="space-y-6">
-            {/* Game Header */}
-            <div className="flex items-center justify-between p-4 bg-surface border border-muted rounded-lg">
-              <div className="flex items-center space-x-6">
-                <div>
-                  <h2 className="text-xl font-semibold text-content">
-                    {currentGame.players[0]?.name} vs {currentGame.players[1]?.name || 'AI'}
-                  </h2>
-                  <div className="flex items-center space-x-4 mt-1 text-sm text-tertiary">
-                    <span>Game: {currentGame.gameId?.slice(-8)}</span>
-                    <span>You: Player {(currentGame.playerSlot || 0) + 1}</span>
-                  </div>
-                </div>
-                <div className="text-center">
-                  {/* Score Display */}
-                  <div className="flex items-center space-x-2">
-                    <span className="text-2xl font-bold text-accent">{currentGame.scores[0]}</span>
-                    <span className="text-tertiary">-</span>
-                    <span className="text-2xl font-bold text-accent">{currentGame.scores[1]}</span>
-                  </div>
-                  {/* Wager/Pot Display */}
-                  {currentGame.wager !== undefined && (
-                    <div className="mt-1 text-sm text-warning">
-                      💰 Pot:{' '}
-                      {currentGame.pot ||
-                        (currentGame.players[1]?.name === 'AI'
-                          ? currentGame.wager
-                          : currentGame.wager * 2)}{' '}
-                      MB
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex items-center space-x-4">
-                {/* Input indicator */}
-                {isInputActive && (
-                  <div className="flex items-center space-x-2 text-success">
-                    <div className="w-2 h-2 bg-success rounded-full animate-pulse"></div>
-                    <span className="text-sm">Input Active</span>
-                  </div>
-                )}
-                {/* Ping indicator */}
-                {lastPing > 0 && (
-                  <div
-                    className={`text-sm ${
-                      lastPing < 50
-                        ? 'text-success'
-                        : lastPing < 100
-                          ? 'text-warning'
-                          : 'text-error'
-                    }`}
-                  >
-                    {lastPing}ms
-                  </div>
-                )}
-                {/* Status indicator */}
-                <div
-                  className={`px-3 py-1 rounded text-sm font-medium ${
-                    currentGame.status === 'active'
-                      ? 'bg-success/20 text-success'
-                      : currentGame.status === 'countdown'
-                        ? 'bg-warning/20 text-warning'
-                        : currentGame.status === 'ended'
-                          ? 'bg-info/20 text-info'
-                          : currentGame.status === 'waiting_for_opponent'
-                            ? 'bg-secondary/20 text-secondary'
-                            : currentGame.status === 'waiting_for_ready'
-                              ? 'bg-accent/20 text-accent'
-                              : 'bg-muted/20 text-tertiary'
-                  }`}
-                >
-                  {currentGame.status === 'waiting_for_opponent'
-                    ? 'WAITING FOR OPPONENT'
-                    : currentGame.status === 'waiting_for_ready'
-                      ? 'WAITING FOR READY'
-                      : (currentGame.status || 'waiting').toUpperCase()}
-                </div>
-
-                <button
-                  onClick={handleBackToLobby}
-                  className="px-4 py-2 bg-muted text-content rounded-lg hover:bg-muted/80 transition-colors cursor-pointer"
-                >
-                  Back to Lobby
-                </button>
-              </div>
-            </div>
-
             {/* Game Canvas */}
             <div className="flex justify-center">
               <PongCanvas
@@ -224,23 +177,22 @@ export function PongGame() {
           </div>
         ) : (
           /* Lobby */
-          <>
-            {console.log('🏓 Rendering PongLobby')}
-            <PongLobby
+          <div className="space-y-6">
+            <PongGamesList
               lobbies={lobbies}
               activeGames={activeGames}
-              isConnected={isConnected}
-              isAuthenticated={isAuthenticated}
-              connectionError={connectionError}
-              stats={stats}
-              onConnect={connect}
-              onJoinLobby={joinLobby}
-              onCreateMatch={handleCreateMatch}
               onJoinMatch={joinMatch}
               onSpectateGame={handleSpectateGame}
             />
-          </>
+          </div>
         )}
+
+        {/* Match Creation Modal */}
+        <PongMatchCreatorModal
+          isOpen={showCreateModal}
+          onClose={() => setShowCreateModal(false)}
+          onCreateMatch={handleCreateMatch}
+        />
 
         {/* Debug Info (development only) */}
         {process.env.NODE_ENV === 'development' && (

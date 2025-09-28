@@ -10,7 +10,6 @@ interface SpectatorCanvasProps {
 
 export function PongSpectator({ gameId, onBackToLobby }: SpectatorCanvasProps) {
   const {
-    socket,
     isConnected,
     isAuthenticated,
     gameState,
@@ -18,7 +17,6 @@ export function PongSpectator({ gameId, onBackToLobby }: SpectatorCanvasProps) {
     shouldReturnToLobby,
     spectateGame,
     leaveSpectating,
-    getInterpolatedGameState,
   } = usePongSpectator();
 
   const hasInitiatedRef = React.useRef(false);
@@ -209,7 +207,6 @@ export function PongSpectator({ gameId, onBackToLobby }: SpectatorCanvasProps) {
             ping={0}
             onSetReady={undefined} // No ready button for spectators
             isSpectating={true}
-            getInterpolatedGameState={getInterpolatedGameState}
             className="max-w-4xl w-full"
           />
         </div>

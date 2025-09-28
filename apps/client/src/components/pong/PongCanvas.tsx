@@ -98,9 +98,6 @@ export function PongCanvas({
   isSpectating = false,
   gameStateBuffer,
   getInterpolatedGameState,
-  enableAdvancedRenderer = false,
-  targetFPS = 120,
-  showDebugInfo = false,
 }: PongCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>(0);
@@ -144,7 +141,18 @@ export function PongCanvas({
         afterState.timestamp,
       );
 
-      return LinearInterpolation.lerpPoint(beforeState.ball, afterState.ball, t);
+      const interpolatedPosition = LinearInterpolation.lerpPoint(
+        beforeState.ball,
+        afterState.ball,
+        t,
+      );
+      // Return full ball object with velocities for compatibility
+      return {
+        x: interpolatedPosition.x,
+        y: interpolatedPosition.y,
+        vx: afterState.ball.vx, // Use latest velocity
+        vy: afterState.ball.vy,
+      };
     },
     [gameStateBuffer, gameState],
   );
