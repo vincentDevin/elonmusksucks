@@ -3097,6 +3097,11 @@ export type AdminTransactionView = {
   relatedBetId: number | null;
   relatedParlayId: number | null;
   createdAt: string;
+  // Enhanced transaction fields for proper categorization
+  subtype: string | null;
+  description: string | null;
+  relatedPongMatchId: string | null;
+  metadata?: any; // Optional, included when includeMetadata is true
 };
 
 // ——— Pong Payout Worker Types ——————————————————————————————————————————

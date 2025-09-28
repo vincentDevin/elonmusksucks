@@ -73,26 +73,37 @@ const ResolvePredictionModal: React.FC<ResolvePredictionModalProps> = ({
       ]}
     >
       {/* Prediction Details */}
-      <div className="mb-6">
+      <div className="mb-6 p-4 bg-surface rounded-lg border border-muted">
         <h3 className="text-lg font-semibold text-content mb-2">{prediction.title}</h3>
-        <p className="text-content/70 mb-4">{prediction.description}</p>
+        <p className="text-tertiary mb-4 line-clamp-3">{prediction.description}</p>
 
-        <div className="flex flex-wrap gap-4 text-sm text-content/60">
-          <span>
-            Category: <span className="text-content">{prediction.category}</span>
-          </span>
-          <span>
-            Created:{' '}
-            <span className="text-content">
-              {new Date(prediction.createdAt).toLocaleDateString()}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+          <div className="flex items-center gap-2">
+            <span className="text-tertiary">Category:</span>
+            <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-secondary/20 text-secondary rounded-full">
+              {prediction.category}
             </span>
-          </span>
-          <span>
-            Expires:{' '}
-            <span className="text-content">
-              {new Date(prediction.expiresAt).toLocaleDateString()}
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-tertiary">Created:</span>
+            <span className="text-content font-medium">
+              {new Date(prediction.createdAt).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+              })}
             </span>
-          </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-tertiary">Expires:</span>
+            <span className="text-content font-medium">
+              {new Date(prediction.expiresAt).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+              })}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -100,19 +111,31 @@ const ResolvePredictionModal: React.FC<ResolvePredictionModalProps> = ({
       <div className="mb-6">
         <h4 className="text-md font-semibold text-content mb-4">Select the winning option:</h4>
         {!prediction.options || prediction.options.length === 0 ? (
-          <div className="text-error p-4 bg-error bg-opacity-10 border border-error rounded-lg">
-            Error: No options available for this prediction. Cannot resolve.
+          <div className="p-4 bg-error/10 border border-error/30 rounded-lg">
+            <div className="flex items-center gap-2">
+              <span className="text-error text-lg">❌</span>
+              <div>
+                <div className="font-medium text-error mb-1">No Options Available</div>
+                <div className="text-sm text-content">
+                  This prediction doesn't have any options to select from. Please add options before
+                  resolving.
+                </div>
+              </div>
+            </div>
           </div>
         ) : (
           <div className="space-y-3">
-            {prediction.options.map((option) => (
+            {prediction.options.map((option, index) => (
               <label
                 key={option.id}
-                className={`flex items-center p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                  selectedOptionId === option.id
-                    ? 'border-primary bg-primary bg-opacity-10'
-                    : 'border-muted hover:border-primary hover:bg-primary hover:bg-opacity-5'
-                }`}
+                className={`
+                  group flex items-center p-4 rounded-lg border-2 cursor-pointer transition-all
+                  ${
+                    selectedOptionId === option.id
+                      ? 'border-primary bg-primary/10 shadow-sm'
+                      : 'border-muted hover:border-primary/50 hover:bg-surface/80'
+                  }
+                `}
               >
                 <input
                   type="radio"
@@ -124,24 +147,45 @@ const ResolvePredictionModal: React.FC<ResolvePredictionModalProps> = ({
                 />
 
                 <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium text-content">{option.label}</span>
-                    <div className="text-right">
-                      <div className="text-sm text-content/60">Odds: {option.odds.toFixed(2)}x</div>
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs font-semibold text-tertiary bg-muted px-2 py-1 rounded">
+                        Option {index + 1}
+                      </span>
+                      <span className="font-medium text-content group-hover:text-primary transition-colors">
+                        {option.label}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-1">
+                        <span className="text-tertiary">Odds:</span>
+                        <span className="font-medium text-content">{option.odds.toFixed(2)}x</span>
+                      </div>
                       {option.betCount && (
-                        <div className="text-xs text-content/60">{option.betCount} bets</div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-tertiary">Bets:</span>
+                          <span className="font-medium text-content">{option.betCount}</span>
+                        </div>
                       )}
                     </div>
                   </div>
                 </div>
 
                 <div
-                  className={`ml-3 w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                    selectedOptionId === option.id ? 'border-primary bg-primary' : 'border-muted'
-                  }`}
+                  className={`
+                    ml-4 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all
+                    ${
+                      selectedOptionId === option.id
+                        ? 'border-primary bg-primary scale-110'
+                        : 'border-muted group-hover:border-primary'
+                    }
+                  `}
                 >
                   {selectedOptionId === option.id && (
-                    <div className="w-2 h-2 rounded-full bg-white"></div>
+                    <div className="w-2.5 h-2.5 rounded-full bg-white"></div>
                   )}
                 </div>
               </label>
@@ -151,12 +195,17 @@ const ResolvePredictionModal: React.FC<ResolvePredictionModalProps> = ({
       </div>
 
       {/* Warning */}
-      <div className="mb-6 p-4 bg-warning bg-opacity-10 border border-warning rounded-lg">
-        <p className="text-warning font-medium mb-2">⚠️ Warning: This action cannot be undone</p>
-        <p className="text-warning text-sm">
-          Resolving this prediction will immediately settle all bets and distribute payouts. Make
-          sure you have selected the correct winning option.
-        </p>
+      <div className="mb-6 p-4 bg-warning/10 border border-warning/30 rounded-lg">
+        <div className="flex items-start gap-3">
+          <span className="text-warning text-lg flex-shrink-0 mt-0.5">⚠️</span>
+          <div>
+            <p className="text-warning font-semibold mb-2">Warning: This action cannot be undone</p>
+            <p className="text-warning/80 text-sm leading-relaxed">
+              Resolving this prediction will immediately settle all bets and distribute payouts.
+              Make sure you have selected the correct winning option before proceeding.
+            </p>
+          </div>
+        </div>
       </div>
     </BaseModal>
   );

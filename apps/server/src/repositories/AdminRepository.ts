@@ -281,9 +281,43 @@ export class PrismaAdminRepository implements IAdminRepository {
   }
 
   async updateUserBalance(userId: number, amount: number): Promise<User> {
-    return this.prisma.user.update({
-      where: { id: userId },
-      data: { muskBucks: amount },
+    return await this.prisma.$transaction(async (tx) => {
+      // Get current user balance
+      const currentUser = await tx.user.findUnique({ where: { id: userId } });
+      if (!currentUser) {
+        throw new Error('User not found');
+      }
+
+      const currentBalance = currentUser.muskBucks;
+      const newBalance = BigInt(amount);
+      const changeAmount = newBalance - currentBalance;
+
+      // Update user balance
+      const updatedUser = await tx.user.update({
+        where: { id: userId },
+        data: { muskBucks: newBalance },
+      });
+
+      // Create transaction record to track the balance change
+      await tx.transaction.create({
+        data: {
+          userId,
+          type: changeAmount >= 0 ? 'CREDIT' : 'DEBIT',
+          subtype: 'ADMIN_ADJUSTMENT',
+          amount: changeAmount >= 0 ? changeAmount : -changeAmount, // Store absolute value
+          balanceAfter: newBalance,
+          description: `Admin balance adjustment: ${changeAmount >= 0 ? '+' : ''}${changeAmount.toString()} MuskBucks`,
+          metadata: {
+            previousBalance: Number(currentBalance),
+            newBalance: Number(newBalance),
+            changeAmount: Number(changeAmount),
+            adjustmentType: 'manual_admin_adjustment',
+            processedBy: 'admin', // Could be enhanced with actual admin user ID
+          },
+        },
+      });
+
+      return updatedUser;
     });
   }
 
@@ -416,6 +450,9 @@ export class PrismaAdminRepository implements IAdminRepository {
 
       return {
         ...prediction,
+        createdAt: prediction.createdAt.toISOString(),
+        expiresAt: prediction.expiresAt.toISOString(),
+        resolvedAt: prediction.resolvedAt?.toISOString() || null,
         analytics: {
           totalBets: bets.length,
           totalVolume,
@@ -478,6 +515,9 @@ export class PrismaAdminRepository implements IAdminRepository {
 
     return {
       ...prediction,
+      createdAt: prediction.createdAt.toISOString(),
+      expiresAt: prediction.expiresAt.toISOString(),
+      resolvedAt: prediction.resolvedAt?.toISOString() || null,
       analytics: {
         totalBets: bets.length,
         totalVolume,
@@ -510,7 +550,7 @@ export class PrismaAdminRepository implements IAdminRepository {
 
       for (const predictionId of batch) {
         try {
-          let updatedPrediction: Prediction | null = null;
+          let updatedPrediction: Prediction | DetailedPrediction | null = null;
 
           switch (op) {
             case 'approve':
@@ -707,7 +747,6 @@ export class PrismaAdminRepository implements IAdminRepository {
       status,
       transactionType,
       transactionSubtype,
-      includePongTransactions = false,
       includeMetadata = false,
       minAmount,
       maxAmount,
@@ -793,22 +832,9 @@ export class PrismaAdminRepository implements IAdminRepository {
       transactionWhere.subtype = { in: transactionSubtype };
     }
 
-    // Filter pong transactions if requested
-    if (includePongTransactions) {
-      if (!transactionSubtype) {
-        // Include pong subtypes if not already filtered
-        transactionWhere.OR = [
-          ...(transactionWhere.OR || []),
-          { subtype: { in: ['PONG_WAGER', 'PONG_PAYOUT'] } },
-        ];
-      }
-    } else {
-      // Exclude pong transactions by default unless specifically requested
-      transactionWhere.subtype = {
-        ...transactionWhere.subtype,
-        notIn: ['PONG_WAGER', 'PONG_PAYOUT'],
-      };
-    }
+    // Handle pong transaction filtering
+    // If specific pong subtypes are requested, include only those
+    // Otherwise, include all transactions (including pong) by default
 
     // Search across user names and prediction titles
     if (search && search.trim()) {
@@ -881,13 +907,14 @@ export class PrismaAdminRepository implements IAdminRepository {
         ...tx,
         userName: tx.user.name,
         userEmail: tx.user.email,
+        // Always include essential fields for proper categorization
+        subtype: tx.subtype,
+        description: tx.description,
+        relatedPongMatchId: tx.relatedPongMatchId,
+        // Include metadata when requested
         ...(includeMetadata && {
-          subtype: tx.subtype,
-          description: tx.description,
           metadata: tx.metadata,
         }),
-        // For pong transactions, we'll rely on the relatedPongMatchId field
-        // and can optionally fetch pong match data separately if needed
       };
     });
 
@@ -1430,13 +1457,27 @@ export class PrismaAdminRepository implements IAdminRepository {
                 data: { status: 'REFUNDED' },
               });
 
-              // Create refund transaction
+              // Get current user balance and calculate new balance
+              const user = await tx.user.findUnique({ where: { id: bet.userId } });
+              if (!user) throw new Error('User not found');
+
+              const newBalance = user.muskBucks + bet.amount;
+
+              // Create refund transaction with enhanced fields
               await tx.transaction.create({
                 data: {
                   userId: bet.userId,
-                  type: 'CREDIT', // Using CREDIT for refunds
+                  type: 'CREDIT',
+                  subtype: 'BET_REFUND',
                   amount: bet.amount,
-                  balanceAfter: 0, // Would calculate properly
+                  balanceAfter: newBalance,
+                  description: `Admin refund for bet ${betId}`,
+                  metadata: {
+                    betId,
+                    originalAmount: Number(bet.amount),
+                    refundReason: 'admin_refund',
+                    processedBy: 'admin', // Could be enhanced with actual admin user ID
+                  },
                   relatedBetId: betId,
                 },
               });
@@ -1445,7 +1486,7 @@ export class PrismaAdminRepository implements IAdminRepository {
               await tx.user.update({
                 where: { id: bet.userId },
                 data: {
-                  muskBucks: { increment: bet.amount },
+                  muskBucks: newBalance,
                 },
               });
             });

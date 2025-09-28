@@ -1,0 +1,236 @@
+import React, { useState } from 'react';
+import type { BulkPredictionOperation } from '../../../api/admin';
+import type { TabType } from './PredictionTabs';
+
+interface PredictionBulkOperationsProps {
+  selectedPredictions: Set<number>;
+  currentTab: TabType;
+  onBulkOperation: (operation: BulkPredictionOperation['operation']) => Promise<void>;
+  onClearSelection: () => void;
+  className?: string;
+}
+
+const PredictionBulkOperations: React.FC<PredictionBulkOperationsProps> = ({
+  selectedPredictions,
+  currentTab,
+  onBulkOperation,
+  onClearSelection,
+  className = '',
+}) => {
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [selectedOperation, setSelectedOperation] = useState<
+    BulkPredictionOperation['operation'] | ''
+  >('');
+
+  const getAvailableOperations = (): Array<{
+    value: BulkPredictionOperation['operation'];
+    label: string;
+    icon: string;
+    color: string;
+  }> => {
+    const operations: Array<{
+      value: BulkPredictionOperation['operation'];
+      label: string;
+      icon: string;
+      color: string;
+    }> = [];
+
+    if (currentTab === 'pending') {
+      operations.push(
+        {
+          value: 'approve' as const,
+          label: 'Approve All',
+          icon: '✅',
+          color: 'text-success hover:bg-success',
+        },
+        {
+          value: 'reject' as const,
+          label: 'Reject All',
+          icon: '❌',
+          color: 'text-error hover:bg-error',
+        },
+      );
+    }
+
+    if (currentTab === 'approved') {
+      operations.push({
+        value: 'resolve' as const,
+        label: 'Mark for Resolution',
+        icon: '⚡',
+        color: 'text-primary hover:bg-primary',
+      });
+    }
+
+    // Common operations available for all tabs
+    operations.push({
+      value: 'delete' as const,
+      label: 'Delete All',
+      icon: '🗑️',
+      color: 'text-error hover:bg-error',
+    });
+
+    return operations;
+  };
+
+  const handleBulkOperation = async () => {
+    if (!selectedOperation || selectedPredictions.size === 0) return;
+
+    setIsProcessing(true);
+    try {
+      await onBulkOperation(selectedOperation);
+      setSelectedOperation('');
+    } catch (error) {
+      console.error('Bulk operation failed:', error);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const operations = getAvailableOperations();
+
+  if (selectedPredictions.size === 0) {
+    return null;
+  }
+
+  return (
+    <div className={`bg-surface rounded-lg border border-primary/30 p-4 ${className}`}>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center">
+              <span className="text-white text-sm font-bold">{selectedPredictions.size}</span>
+            </div>
+            <span className="text-content font-medium">
+              {selectedPredictions.size} prediction{selectedPredictions.size !== 1 ? 's' : ''}{' '}
+              selected
+            </span>
+          </div>
+        </div>
+
+        <button
+          onClick={onClearSelection}
+          className="text-sm text-tertiary hover:text-content transition-colors"
+        >
+          Clear selection
+        </button>
+      </div>
+
+      {/* Desktop Layout */}
+      <div className="hidden md:flex items-center gap-4">
+        <div className="flex-1">
+          <label className="block text-sm font-medium text-content mb-2">Bulk Action</label>
+          <select
+            value={selectedOperation}
+            onChange={(e) =>
+              setSelectedOperation(e.target.value as BulkPredictionOperation['operation'] | '')
+            }
+            disabled={isProcessing}
+            className="w-full px-3 py-2 bg-surface border border-muted rounded-lg text-content focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+          >
+            <option value="">Select an action...</option>
+            {operations.map((op) => (
+              <option key={op.value} value={op.value}>
+                {op.icon} {op.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex items-end">
+          <button
+            onClick={handleBulkOperation}
+            disabled={!selectedOperation || isProcessing}
+            className="px-6 py-2 bg-primary text-white rounded-lg font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+          >
+            {isProcessing ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                Processing...
+              </>
+            ) : (
+              <>
+                Apply to {selectedPredictions.size} prediction
+                {selectedPredictions.size !== 1 ? 's' : ''}
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Mobile Layout - Action Buttons */}
+      <div className="md:hidden space-y-3">
+        <div className="text-sm font-medium text-content mb-3">Choose an action:</div>
+        <div className="grid grid-cols-1 gap-2">
+          {operations.map((op) => (
+            <button
+              key={op.value}
+              onClick={() => {
+                setSelectedOperation(op.value);
+                handleBulkOperation();
+              }}
+              disabled={isProcessing}
+              className={`
+                flex items-center justify-center gap-2 px-4 py-3 rounded-lg border transition-colors font-medium disabled:opacity-50
+                ${
+                  selectedOperation === op.value
+                    ? `${op.color} bg-opacity-10 border-current`
+                    : 'border-muted text-content hover:border-primary'
+                }
+              `}
+            >
+              {isProcessing && selectedOperation === op.value ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <span>{op.icon}</span>
+                  <span>{op.label}</span>
+                  <span className="text-sm text-tertiary">({selectedPredictions.size})</span>
+                </>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Warning for Destructive Actions */}
+      {(selectedOperation === 'delete' || selectedOperation === 'reject') && (
+        <div className="mt-4 p-3 bg-warning/10 border border-warning/30 rounded-lg">
+          <div className="flex items-start gap-2">
+            <span className="text-warning text-lg">⚠️</span>
+            <div className="text-sm">
+              <div className="font-medium text-warning mb-1">
+                {selectedOperation === 'delete' ? 'Permanent Deletion' : 'Rejection Warning'}
+              </div>
+              <div className="text-content">
+                {selectedOperation === 'delete'
+                  ? 'This action will permanently delete the selected predictions. This cannot be undone.'
+                  : 'Rejected predictions will be removed from the approval queue and marked as rejected.'}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success Message for Resolve */}
+      {selectedOperation === 'resolve' && (
+        <div className="mt-4 p-3 bg-primary/10 border border-primary/30 rounded-lg">
+          <div className="flex items-start gap-2">
+            <span className="text-primary text-lg">ℹ️</span>
+            <div className="text-sm">
+              <div className="font-medium text-primary mb-1">Resolution Queue</div>
+              <div className="text-content">
+                These predictions will be marked for resolution. You'll need to select winning
+                options for each prediction individually.
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default PredictionBulkOperations;

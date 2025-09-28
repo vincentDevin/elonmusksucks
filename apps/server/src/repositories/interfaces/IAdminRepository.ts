@@ -72,7 +72,11 @@ export interface BulkOperationResult {
 // PredictionSearchParams moved to @ems/types - see import above
 
 /** Enhanced prediction with aggregated data */
-export interface DetailedPrediction extends Prediction {
+export interface DetailedPrediction
+  extends Omit<Prediction, 'createdAt' | 'expiresAt' | 'resolvedAt'> {
+  createdAt: string;
+  expiresAt: string;
+  resolvedAt: string | null;
   creator?: {
     id: number;
     name: string;

@@ -85,6 +85,11 @@ export const toAdminTransactionView = (transaction: {
   relatedBetId: number | null;
   relatedParlayId: number | null;
   createdAt: Date;
+  // Enhanced fields for proper categorization
+  subtype?: string | null;
+  description?: string | null;
+  relatedPongMatchId?: string | null;
+  metadata?: any;
 }): AdminTransactionView => ({
   id: transaction.id,
   userId: transaction.userId,
@@ -99,6 +104,11 @@ export const toAdminTransactionView = (transaction: {
   relatedBetId: transaction.relatedBetId,
   relatedParlayId: transaction.relatedParlayId,
   createdAt: transaction.createdAt.toISOString(),
+  // Enhanced fields for proper categorization
+  subtype: transaction.subtype || null,
+  description: transaction.description || null,
+  relatedPongMatchId: transaction.relatedPongMatchId || null,
+  ...(transaction.metadata && { metadata: transaction.metadata }),
 });
 
 /**

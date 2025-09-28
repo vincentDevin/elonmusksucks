@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useAdmin } from '../contexts/AdminContext';
 import UserManagement from '../components/admin/users/UserManagement';
-import PredictionQueue from '../components/admin/predictions/PredictionQueue';
+import PredictionDashboard from '../components/admin/predictions/PredictionDashboard';
 import FinancialDashboard from '../components/admin/financial/FinancialDashboard';
 import AchievementManager from '../components/achievements/AchievementManager';
 import FeedsManager from '../components/admin/feeds/FeedsManager';
@@ -15,7 +15,7 @@ const AdminDashboard: React.FC = () => {
 
   const tabs = [
     { key: 'users', label: 'User Management & Moderation', component: <UserManagement /> },
-    { key: 'predictions', label: 'Prediction Management', component: <PredictionQueue /> },
+    { key: 'predictions', label: 'Prediction Management', component: <PredictionDashboard /> },
     { key: 'bets', label: 'Financial Operations', component: <FinancialDashboard /> },
     { key: 'badges', label: 'Achievement Management', component: <AchievementManager /> },
     { key: 'feeds', label: 'RSS Feeds Management', component: <FeedsManager /> },

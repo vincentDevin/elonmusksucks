@@ -556,6 +556,37 @@ export class PongRepository implements IPongRepository {
       // Payout processing is now handled by the dedicated payout worker
       // The caller should enqueue a payout job after this method completes successfully
 
+      // Link wager transactions to this match for better traceability
+      const humanPlayerId1 = matchData.playerOneId > 0 ? matchData.playerOneId : null;
+      const humanPlayerId2 =
+        matchData.playerTwoId && matchData.playerTwoId > 0 ? matchData.playerTwoId : null;
+
+      if (humanPlayerId1) {
+        await tx.transaction.updateMany({
+          where: {
+            userId: humanPlayerId1,
+            type: 'DEBIT',
+            subtype: 'PONG_WAGER',
+            relatedPongMatchId: null,
+            createdAt: { gte: new Date(Date.now() - 10 * 60 * 1000) }, // Last 10 minutes
+          },
+          data: { relatedPongMatchId: matchData.id },
+        });
+      }
+
+      if (humanPlayerId2) {
+        await tx.transaction.updateMany({
+          where: {
+            userId: humanPlayerId2,
+            type: 'DEBIT',
+            subtype: 'PONG_WAGER',
+            relatedPongMatchId: null,
+            createdAt: { gte: new Date(Date.now() - 10 * 60 * 1000) }, // Last 10 minutes
+          },
+          data: { relatedPongMatchId: matchData.id },
+        });
+      }
+
       return {
         isLossOnly: false,
         winnerId: actualWinnerId,
@@ -745,6 +776,42 @@ export class PongRepository implements IPongRepository {
       }
 
       return { transactionId: transaction.id };
+    });
+  }
+
+  async linkTransactionsToMatch(
+    matchId: string,
+    playerOneId: number,
+    playerTwoId?: number | null,
+  ): Promise<void> {
+    await this.executeInTransaction(async (tx) => {
+      // Link player one wager transaction
+      await tx.transaction.updateMany({
+        where: {
+          userId: playerOneId,
+          type: 'DEBIT',
+          subtype: 'PONG_WAGER',
+          relatedPongMatchId: null,
+        },
+        data: {
+          relatedPongMatchId: matchId,
+        },
+      });
+
+      // Link player two wager transaction if it exists
+      if (playerTwoId && playerTwoId > 0) {
+        await tx.transaction.updateMany({
+          where: {
+            userId: playerTwoId,
+            type: 'DEBIT',
+            subtype: 'PONG_WAGER',
+            relatedPongMatchId: null,
+          },
+          data: {
+            relatedPongMatchId: matchId,
+          },
+        });
+      }
     });
   }
 

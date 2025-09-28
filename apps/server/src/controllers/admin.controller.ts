@@ -262,7 +262,7 @@ export async function getPredictionDetails(
       return;
     }
 
-    res.json(prediction);
+    res.json(serializeBigInt(prediction));
   } catch (err) {
     next(err);
   }

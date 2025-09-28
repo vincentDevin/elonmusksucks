@@ -117,7 +117,9 @@ async function processPVPPayout(
           matchType: 'PVP',
           stakeAmount: Number(stakeAmount),
           payoutAmount: Number(payoutAmount),
+          matchId,
         },
+        relatedPongMatchId: matchId,
         idempotencyKey,
       },
     });
@@ -170,7 +172,9 @@ async function processPVEPayout(
           matchType: 'PVE_AI',
           stakeAmount: Number(stakeAmount),
           payoutAmount: Number(payoutAmount),
+          matchId,
         },
+        relatedPongMatchId: matchId,
         idempotencyKey,
       },
     });
