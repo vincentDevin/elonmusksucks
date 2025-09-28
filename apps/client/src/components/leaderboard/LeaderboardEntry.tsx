@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { UserCircleIcon, TrophyIcon, FireIcon } from '@heroicons/react/24/outline';
 import type { UnifiedLeaderboardEntry as UnifiedEntry } from './types';
@@ -75,9 +75,20 @@ export function LeaderboardEntry({
     }
   };
 
-  // Special handling for shame wall entries (no profile link)
-  const EntryWrapper = entry.variant === 'shame' ? 'div' : Link;
-  const wrapperProps = entry.variant === 'shame' ? {} : { to: `/profile/${entry.id}` };
+  // Content wrapper component
+  const WrapperContent = ({ children }: { children: React.ReactNode }) => {
+    if (entry.variant === 'shame') {
+      return <div className="block p-6">{children}</div>;
+    }
+    return (
+      <Link
+        to={`/profile/${entry.id}`}
+        className="block p-6 group-hover:bg-muted/20 transition-colors"
+      >
+        {children}
+      </Link>
+    );
+  };
 
   return (
     <li
@@ -109,15 +120,12 @@ export function LeaderboardEntry({
           </div>
         )}
 
-      <EntryWrapper
-        {...wrapperProps}
-        className={`block p-4 ${entry.variant === 'shame' ? '' : 'group-hover:bg-muted/20 transition-colors'}`}
-      >
-        <div className="flex items-center space-x-4">
+      <WrapperContent>
+        <div className="flex items-center space-x-6">
           {/* Rank & Avatar Section */}
           <div className="flex items-center space-x-3">
             {/* Rank Display */}
-            <div className="relative w-12 h-12 flex items-center justify-center">
+            <div className="relative w-14 h-14 flex items-center justify-center">
               <div className="flex items-center justify-center">
                 {getRankIcon(rank)}
                 <span className={`${getRankStyle(rank)} transition-transform duration-300`}>
@@ -133,7 +141,7 @@ export function LeaderboardEntry({
                   src={entry.avatarUrl}
                   alt={`${entry.userName}'s avatar`}
                   className={`
-                    w-12 h-12 rounded-full object-cover border-2 transition-all duration-300
+                    w-14 h-14 rounded-full object-cover border-2 transition-all duration-300
                     ${isCurrentUser ? styles.borderColor.replace('border-', 'border-') : 'border-muted'}
                     ${animate ? 'scale-110' : ''}
                   `}
@@ -141,12 +149,12 @@ export function LeaderboardEntry({
               ) : (
                 <div
                   className={`
-                    w-12 h-12 flex items-center justify-center rounded-full border-2 transition-all duration-300
+                    w-14 h-14 flex items-center justify-center rounded-full border-2 transition-all duration-300
                     ${isCurrentUser ? `${styles.highlightBg} ${styles.borderColor}` : 'bg-muted border-muted'}
                     ${animate ? 'scale-110' : ''}
                   `}
                 >
-                  <UserCircleIcon className="w-10 h-10 text-gray-400" />
+                  <UserCircleIcon className="w-12 h-12 text-gray-400" />
                 </div>
               )}
 
@@ -158,28 +166,28 @@ export function LeaderboardEntry({
 
             {/* Name, Badges & Primary Stat */}
             <div className="min-w-0 flex-1">
-              <div className="flex items-center space-x-2 mb-1">
+              <div className="flex items-center space-x-3 mb-2">
                 <span
-                  className={`font-semibold text-lg truncate ${isCurrentUser ? styles.rankColor : 'text-content'}`}
+                  className={`font-bold text-xl truncate ${isCurrentUser ? styles.rankColor : 'text-content'}`}
                 >
                   {entry.userName}
                 </span>
                 {isCurrentUser && (
                   <span
-                    className={`text-xs px-2 py-1 rounded-full ${styles.highlightBg} ${styles.rankColor}`}
+                    className={`text-sm px-3 py-1 rounded-full ${styles.highlightBg} ${styles.rankColor} font-medium`}
                   >
                     You
                   </span>
                 )}
               </div>
 
-              {/* Badges */}
+              {/* Badges - limit to 2 most important */}
               {entry.badges && entry.badges.length > 0 && (
-                <div className="flex flex-wrap gap-1 mb-2">
-                  {entry.badges.map((badge, idx) => (
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {entry.badges.slice(0, 2).map((badge, idx) => (
                     <span
                       key={idx}
-                      className={`text-xs px-2 py-1 rounded-full font-medium ${badge.color}`}
+                      className={`text-sm px-3 py-1 rounded-full font-medium ${badge.color}`}
                     >
                       {badge.icon && <span className="mr-1">{badge.icon}</span>}
                       {badge.text}
@@ -190,25 +198,25 @@ export function LeaderboardEntry({
 
               {/* Primary Stat (Mobile) */}
               <div className="md:hidden">
-                <div className={`text-lg font-bold ${entry.primaryStat.color || 'text-content'}`}>
+                <div className={`text-xl font-bold ${entry.primaryStat.color || 'text-content'}`}>
                   {entry.primaryStat.value}
                 </div>
-                <div className="text-xs text-tertiary">{entry.primaryStat.label}</div>
+                <div className="text-sm text-tertiary">{entry.primaryStat.label}</div>
               </div>
             </div>
           </div>
 
           {/* Stats Grid (Desktop) */}
           <div className="hidden md:flex flex-1 justify-end">
-            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 min-w-0">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 min-w-0">
               {/* Primary Stat */}
               <div className="text-center">
-                <div className="text-xs text-tertiary uppercase font-medium mb-1">
+                <div className="text-sm text-tertiary uppercase font-medium mb-2">
                   {entry.primaryStat.label}
                 </div>
                 <div
                   className={`
-                    font-bold text-sm transition-all duration-300
+                    font-bold text-lg transition-all duration-300
                     ${entry.primaryStat.highlight ? `${styles.rankColor} scale-110` : ''}
                     ${entry.primaryStat.color || 'text-content'}
                   `}
@@ -217,15 +225,15 @@ export function LeaderboardEntry({
                 </div>
               </div>
 
-              {/* Secondary Stats */}
-              {entry.secondaryStats.slice(0, 5).map((stat, idx) => (
+              {/* Secondary Stats - reduced to 3 most important */}
+              {entry.secondaryStats.slice(0, 3).map((stat, idx) => (
                 <div key={idx} className="text-center">
-                  <div className="text-xs text-tertiary uppercase font-medium mb-1 truncate">
+                  <div className="text-sm text-tertiary uppercase font-medium mb-2 truncate">
                     {stat.label}
                   </div>
                   <div
                     className={`
-                      font-bold text-sm transition-all duration-300
+                      font-bold text-base transition-all duration-300
                       ${stat.highlight ? `${styles.rankColor} scale-110` : ''}
                       ${stat.color || 'text-content'}
                     `}
@@ -239,13 +247,13 @@ export function LeaderboardEntry({
         </div>
 
         {/* Mobile Stats Grid */}
-        <div className="md:hidden mt-4 grid grid-cols-2 gap-3">
+        <div className="md:hidden mt-6 grid grid-cols-2 gap-4">
           {entry.secondaryStats.slice(0, 4).map((stat, idx) => (
             <div key={idx} className="text-center">
-              <div className="text-xs text-tertiary uppercase font-medium mb-1">{stat.label}</div>
+              <div className="text-sm text-tertiary uppercase font-medium mb-1">{stat.label}</div>
               <div
                 className={`
-                  font-bold text-sm
+                  font-bold text-base
                   ${stat.color || 'text-content'}
                 `}
               >
@@ -257,15 +265,15 @@ export function LeaderboardEntry({
 
         {/* Special Shame Wall Content */}
         {entry.variant === 'shame' && entry.rawData && 'reason' in entry.rawData && (
-          <div className="mt-4">
+          <div className="mt-6">
             {/* Ban Reason */}
-            <div className="p-3 bg-red-50 rounded-lg border border-red-200 mb-3">
-              <h4 className="text-sm font-medium text-red-800 mb-1">Reason for Ban:</h4>
-              <p className="text-red-700 text-sm">{entry.rawData.reason}</p>
+            <div className="p-4 bg-red-50 rounded-lg border border-red-200 mb-4">
+              <h4 className="text-base font-semibold text-red-800 mb-2">Reason for Ban:</h4>
+              <p className="text-red-700 text-base">{entry.rawData.reason}</p>
             </div>
 
             {/* Ban Details */}
-            <div className="text-sm text-tertiary space-y-1">
+            <div className="text-base text-tertiary space-y-2">
               <div>Banned: {new Date(entry.rawData.startDate).toLocaleDateString()}</div>
               {entry.rawData.endDate && (
                 <div>Until: {new Date(entry.rawData.endDate).toLocaleDateString()}</div>
@@ -273,7 +281,7 @@ export function LeaderboardEntry({
             </div>
           </div>
         )}
-      </EntryWrapper>
+      </WrapperContent>
     </li>
   );
 }

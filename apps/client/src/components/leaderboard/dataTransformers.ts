@@ -19,7 +19,7 @@ export function transformBettingEntry(
   return {
     id: entry.userId,
     userName: entry.userName,
-    avatarUrl: entry.avatarUrl,
+    avatarUrl: entry.avatarUrl ?? undefined,
     variant: 'betting',
     primaryStat: {
       label: 'Balance',
@@ -113,7 +113,7 @@ export function transformPongEntry(
     case 'totalWagered':
       primaryStat = {
         label: 'Volume',
-        value: formatMuskBucks(entry.totalWagered),
+        value: formatMuskBucks(entry.totalWagered ?? 0),
         highlight: asNum(entry.totalWagered) > 50000,
       };
       break;
@@ -145,7 +145,7 @@ export function transformPongEntry(
     };
     badges.push({
       text: entry.tier,
-      color: tierColors[entry.tier] || 'bg-gray-100 text-gray-800',
+      color: tierColors[entry.tier as keyof typeof tierColors] || 'bg-gray-100 text-gray-800',
     });
   }
 
@@ -201,7 +201,7 @@ export function transformPongEntry(
   return {
     id: entry.userId,
     userName: entry.userName,
-    avatarUrl: entry.avatarUrl,
+    avatarUrl: entry.avatarUrl ?? undefined,
     variant: 'pong',
     primaryStat,
     secondaryStats,
@@ -219,7 +219,7 @@ export function transformShameEntry(entry: ShameWallEntry): UnifiedLeaderboardEn
   return {
     id: entry.userId,
     userName: entry.userName,
-    avatarUrl: entry.avatarUrl,
+    avatarUrl: entry.avatarUrl ?? undefined,
     variant: 'shame',
     primaryStat: {
       label: 'Ban Type',
@@ -271,7 +271,7 @@ export function transformShameEntry(entry: ShameWallEntry): UnifiedLeaderboardEn
 /**
  * Transform stats for leaderboard headers
  */
-export function transformBettingHeaderStats(stats: any, userRank?: any): LeaderboardHeaderStats {
+export function transformBettingHeaderStats(stats: any): LeaderboardHeaderStats {
   return {
     primary: {
       value: stats?.totalUsers?.toLocaleString() || '0',

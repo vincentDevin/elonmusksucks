@@ -20,9 +20,8 @@ import { getShameWall, getShameWallStats } from '../api/shameWall';
 import type { ShameWallEntry, ShameWallStats } from '../api/shameWall';
 
 // New unified components
-import { LeaderboardHeader } from '../components/leaderboard/LeaderboardHeader';
 import { LeaderboardEntry } from '../components/leaderboard/LeaderboardEntry';
-import { CompactControlBar } from '../components/leaderboard/CompactControlBar';
+import { CompactLeaderboardHeader } from '../components/leaderboard/CompactLeaderboardHeader';
 import AchievementNotification from '../components/leaderboard/AchievementNotification';
 import {
   transformBettingEntry,
@@ -152,7 +151,7 @@ export default function Leaderboard() {
   const headerStats = useMemo(() => {
     switch (activeTab) {
       case 'betting':
-        return transformBettingHeaderStats(stats, userRank);
+        return transformBettingHeaderStats(stats);
       case 'pong':
         return transformPongHeaderStats(pongLeaderboard);
       case 'shame':
@@ -316,80 +315,47 @@ export default function Leaderboard() {
   }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
+    <div className="p-6 max-w-7xl mx-auto space-y-6">
       {/* Achievement Notifications */}
       <AchievementNotification achievements={achievements} onClear={clearAchievements} />
 
-      {/* Unified Header with Tab Navigation */}
-      <div className="space-y-4">
-        <LeaderboardHeader
-          variant={activeTab as LeaderboardVariant}
-          title={
-            activeTab === 'betting'
-              ? 'Live Leaderboard'
-              : activeTab === 'pong'
-                ? 'Pong Champions'
-                : 'Wall of Shame'
-          }
-          subtitle={
-            activeTab === 'betting'
-              ? 'Real-time betting performance rankings'
-              : activeTab === 'pong'
-                ? 'Elite Pong players and their achievements'
-                : 'Users who have been banned from the platform'
-          }
-          icon={
-            activeTab === 'betting'
-              ? TrophyIcon
-              : activeTab === 'pong'
-                ? PuzzlePieceIcon
-                : ExclamationTriangleIcon
-          }
-          stats={headerStats}
-          isLoading={currentLoading}
-        />
-
-        {/* Tab Navigation */}
-        <div className="flex justify-center space-x-4">
-          {tabs.map((tab) => {
-            const isActive = activeTab === tab.id;
-            let activeStyle = 'bg-primary text-white shadow-xl scale-105';
-            let hoverStyle = 'bg-surface text-content hover:bg-accent hover:scale-105';
-
-            if (tab.id === 'pong') {
-              activeStyle = 'bg-blue-500 text-white shadow-xl scale-105';
-              hoverStyle =
-                'bg-surface text-content hover:bg-blue-500/10 hover:text-blue-500 hover:scale-105';
-            } else if (tab.id === 'shame') {
-              activeStyle = 'bg-red-500 text-white shadow-xl scale-105';
-              hoverStyle =
-                'bg-surface text-content hover:bg-red-50 hover:text-red-600 hover:scale-105';
-            }
-
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center space-x-3 px-6 py-3 rounded-xl font-bold text-lg transition-all duration-200 ${
-                  isActive ? activeStyle : hoverStyle
-                }`}
-              >
-                <tab.icon className="w-6 h-6" />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Unified Control Bar - Combined for all tabs */}
-      <CompactControlBar config={controlBarConfig} />
+      {/* Consolidated Header with Navigation and Controls */}
+      <CompactLeaderboardHeader
+        variant={activeTab as LeaderboardVariant}
+        title={
+          activeTab === 'betting'
+            ? 'Live Leaderboard'
+            : activeTab === 'pong'
+              ? 'Pong Champions'
+              : 'Wall of Shame'
+        }
+        subtitle={
+          activeTab === 'betting'
+            ? 'Real-time betting performance rankings'
+            : activeTab === 'pong'
+              ? 'Elite Pong players and their achievements'
+              : 'Users who have been banned from the platform'
+        }
+        icon={
+          activeTab === 'betting'
+            ? TrophyIcon
+            : activeTab === 'pong'
+              ? PuzzlePieceIcon
+              : ExclamationTriangleIcon
+        }
+        stats={headerStats}
+        isLoading={currentLoading}
+        tabs={tabs}
+        activeTab={activeTab}
+        onTabChange={(tabId: string) => setActiveTab(tabId as TabType)}
+        controlBarConfig={controlBarConfig}
+      />
 
       {/* User Rank for betting leaderboard - integrated into header stats now */}
 
       {/* Unified Entries List */}
       {unifiedEntries.length > 0 ? (
-        <ul className="space-y-4">
+        <ul className="space-y-3">
           {unifiedEntries.map((entry, idx) => {
             const rank = activeTab === 'betting' ? (currentPage - 1) * 25 + idx + 1 : idx + 1;
             const recentChange =
@@ -410,18 +376,18 @@ export default function Leaderboard() {
           })}
         </ul>
       ) : (
-        <div className="text-center py-12">
-          <div className="text-6xl mb-4">
+        <div className="text-center py-16">
+          <div className="text-6xl mb-6">
             {activeTab === 'betting' ? '📊' : activeTab === 'pong' ? '🏓' : '🎉'}
           </div>
-          <h3 className="text-xl font-semibold text-content mb-2">
+          <h3 className="text-2xl font-bold text-content mb-3">
             {activeTab === 'betting'
               ? 'No leaderboard entries yet.'
               : activeTab === 'pong'
                 ? 'No Pong champions yet!'
                 : 'No one is currently banned!'}
           </h3>
-          <p className="text-tertiary">
+          <p className="text-base text-tertiary">
             {activeTab === 'betting'
               ? 'Be the first to place some bets!'
               : activeTab === 'pong'
@@ -433,13 +399,13 @@ export default function Leaderboard() {
 
       {/* Pagination - Only for Betting Leaderboard */}
       {activeTab === 'betting' && pagination.totalPages > 1 && (
-        <div className="flex items-center justify-center space-x-4 py-6">
+        <div className="flex items-center justify-center space-x-4 py-8">
           <button
             onClick={prevPage}
             disabled={!pagination.hasPrevPage || loading}
-            className="flex items-center space-x-2 px-4 py-2 bg-surface rounded-lg hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center space-x-2 px-4 py-3 bg-surface rounded-lg hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-base font-medium"
           >
-            <ChevronLeftIcon className="w-4 h-4" />
+            <ChevronLeftIcon className="w-5 h-5" />
             <span>Previous</span>
           </button>
 
@@ -453,7 +419,7 @@ export default function Leaderboard() {
                   key={page}
                   onClick={() => goToPage(page)}
                   className={`
-                    w-10 h-10 rounded-lg font-medium transition-colors
+                    w-12 h-12 rounded-lg font-semibold transition-colors text-base
                     ${
                       page === currentPage
                         ? 'bg-primary text-surface'
@@ -470,10 +436,10 @@ export default function Leaderboard() {
           <button
             onClick={nextPage}
             disabled={!pagination.hasNextPage || loading}
-            className="flex items-center space-x-2 px-4 py-2 bg-surface rounded-lg hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center space-x-2 px-4 py-3 bg-surface rounded-lg hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-base font-medium"
           >
             <span>Next</span>
-            <ChevronRightIcon className="w-4 h-4" />
+            <ChevronRightIcon className="w-5 h-5" />
           </button>
         </div>
       )}
