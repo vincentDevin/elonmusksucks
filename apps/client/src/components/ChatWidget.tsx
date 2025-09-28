@@ -1,7 +1,7 @@
 // apps/client/src/components/ChatWidget.tsx
 // -----------------------------------------------------------------------------
 // Unified chat component supporting multiple display modes:
-// - widget: Compact chat widget for dashboard
+// - widget: Compact chat widget for main layout
 // - bar: Collapsible floating chat bar with overlay
 // Features real-time messaging, moderation tools, and user presence
 // -----------------------------------------------------------------------------
@@ -103,6 +103,20 @@ export default function ChatWidget({ mode = 'widget', className }: ChatWidgetPro
       el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
     }
   }, [messages]); // runs on every new message / toast
+
+  /* ---------- scroll to bottom when chat expands ---------- */
+  useEffect(() => {
+    if (expanded && mode === 'bar') {
+      // Small delay to allow the expansion animation to complete
+      const timer = setTimeout(() => {
+        const el = scrollBoxRef.current;
+        if (el) {
+          el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+        }
+      }, 250); // Wait for expansion animation
+      return () => clearTimeout(timer);
+    }
+  }, [expanded, mode]);
 
   /* ---------- join / leave toast queue ---------- */
   useEffect(() => {
@@ -313,34 +327,46 @@ export default function ChatWidget({ mode = 'widget', className }: ChatWidgetPro
                 Sign in to join the chat
               </span>
             )}
+            {/* Admin moderate button in header */}
+            {isAdmin && expanded && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowModerationPanel(!showModerationPanel);
+                }}
+                className="ml-2 text-xs px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition flex-shrink-0"
+              >
+                {showModerationPanel ? 'Hide' : 'Moderate'}
+              </button>
+            )}
           </div>
-          {expanded ? (
-            <MinusIcon className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
-          ) : (
-            <PlusIcon className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
-          )}
+          <div className="flex items-center gap-2">
+            {expanded ? (
+              <MinusIcon className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+            ) : (
+              <PlusIcon className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+            )}
+          </div>
         </div>
 
         {/* Chat content */}
         <div
-          className="transition-all duration-200"
+          className="transition-all duration-200 flex flex-col"
           style={{
-            maxHeight: expanded ? 460 : 0,
-            minHeight: expanded ? 320 : 0,
+            height: expanded ? 460 : 0,
             background: 'var(--color-surface)',
             boxShadow: expanded ? '0 -6px 24px 0 rgb(0 0 0 / 0.14)' : undefined,
             borderBottomLeftRadius: 14,
             borderBottomRightRadius: 14,
             width: '100%',
-            overflow: expanded ? 'visible' : 'hidden',
-            paddingBottom: expanded ? 14 : 0,
+            overflow: 'hidden',
           }}
         >
           {expanded && (
-            <div className="relative flex flex-col pb-3">
+            <div className="relative flex flex-col h-full">
               {renderChatContent()}
               {!user && (
-                <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-surface via-transparent p-5 flex flex-col items-center justify-end z-10">
+                <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-surface via-surface/90 to-transparent p-5 flex flex-col items-center justify-end z-10">
                   <div className="text-center text-sm mb-2 text-content">
                     <span>Sign up or log in to join the conversation!</span>
                   </div>
@@ -359,9 +385,24 @@ export default function ChatWidget({ mode = 'widget', className }: ChatWidgetPro
     );
   }
 
-  // Widget mode: compact chat widget for dashboard
+  // Widget mode: compact chat widget for main layout
   return (
     <div className={`relative flex flex-col h-[28rem] bg-transparent ${className || ''}`}>
+      {/* Widget header for admin controls */}
+      {isAdmin && (
+        <div className="flex items-center justify-between px-4 py-2 border-b border-muted bg-surface flex-shrink-0">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-sm">Live Chat</span>
+            <span className="text-xs text-tertiary">({onlineUsers.length} online)</span>
+          </div>
+          <button
+            onClick={() => setShowModerationPanel(!showModerationPanel)}
+            className="text-xs px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition"
+          >
+            {showModerationPanel ? 'Hide' : 'Moderate'}
+          </button>
+        </div>
+      )}
       {renderChatContent()}
     </div>
   );
@@ -369,22 +410,6 @@ export default function ChatWidget({ mode = 'widget', className }: ChatWidgetPro
   function renderChatContent() {
     return (
       <>
-        {/* chat header with user count and admin controls */}
-        <div className="flex items-center justify-between px-4 py-2 border-b border-muted bg-surface">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-sm">Live Chat</span>
-            <span className="text-xs text-tertiary">({onlineUsers.length} online)</span>
-          </div>
-          {isAdmin && (
-            <button
-              onClick={() => setShowModerationPanel(!showModerationPanel)}
-              className="text-xs px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition"
-            >
-              {showModerationPanel ? 'Hide' : 'Moderate'}
-            </button>
-          )}
-        </div>
-
         {/* ephemeral join/leave and moderation toasts */}
         <div className="pointer-events-none absolute inset-x-0 bottom-20 z-20 flex flex-col items-center">
           {recent.map((ev, index) => (
@@ -545,7 +570,7 @@ export default function ChatWidget({ mode = 'widget', className }: ChatWidgetPro
 
         {/* moderation panel (admin only) */}
         {isAdmin && showModerationPanel && (
-          <div className="px-4 py-3 bg-red-50 dark:bg-red-950/30 border-t border-red-200 dark:border-red-800">
+          <div className="px-4 py-3 bg-red-50 dark:bg-red-950/30 border-t border-red-200 dark:border-red-800 flex-shrink-0">
             <h4 className="text-sm font-semibold text-red-800 dark:text-red-300 mb-2">
               Moderation Panel
             </h4>
@@ -604,16 +629,19 @@ export default function ChatWidget({ mode = 'widget', className }: ChatWidgetPro
           </div>
         )}
 
-        <div className="border-t border-muted" />
+        <div className="border-t border-muted flex-shrink-0" />
 
         {/* input (only if logged-in) */}
         {user && (
-          <form onSubmit={onSubmit} className="flex items-center gap-2 px-3 py-2">
+          <form
+            onSubmit={onSubmit}
+            className="flex items-center gap-2 px-3 py-2 flex-shrink-0 bg-surface"
+          >
             <input
               value={input}
               onChange={onChange}
               onBlur={sendStopTyping}
-              className="flex-1 rounded-lg border border-muted bg-background px-3 py-2 focus:outline-none"
+              className="flex-1 rounded-lg border border-muted bg-background px-3 py-2 focus:outline-none focus:border-primary"
               placeholder="Type your message…"
               maxLength={1000}
               autoComplete="off"
@@ -621,7 +649,7 @@ export default function ChatWidget({ mode = 'widget', className }: ChatWidgetPro
             <button
               type="submit"
               disabled={!input.trim()}
-              className="rounded-lg bg-primary px-4 py-2 font-semibold text-surface disabled:opacity-60"
+              className="rounded-lg bg-primary px-4 py-2 font-semibold text-surface disabled:opacity-60 hover:bg-primary/90 transition-colors"
             >
               Send
             </button>
