@@ -706,6 +706,9 @@ export class PrismaAdminRepository implements IAdminRepository {
       betType,
       status,
       transactionType,
+      transactionSubtype,
+      includePongTransactions = false,
+      includeMetadata = false,
       minAmount,
       maxAmount,
       startDate,
@@ -785,6 +788,28 @@ export class PrismaAdminRepository implements IAdminRepository {
       transactionWhere.type = { in: transactionType };
     }
 
+    // New subtype filtering
+    if (transactionSubtype && transactionSubtype.length > 0) {
+      transactionWhere.subtype = { in: transactionSubtype };
+    }
+
+    // Filter pong transactions if requested
+    if (includePongTransactions) {
+      if (!transactionSubtype) {
+        // Include pong subtypes if not already filtered
+        transactionWhere.OR = [
+          ...(transactionWhere.OR || []),
+          { subtype: { in: ['PONG_WAGER', 'PONG_PAYOUT'] } },
+        ];
+      }
+    } else {
+      // Exclude pong transactions by default unless specifically requested
+      transactionWhere.subtype = {
+        ...transactionWhere.subtype,
+        notIn: ['PONG_WAGER', 'PONG_PAYOUT'],
+      };
+    }
+
     // Search across user names and prediction titles
     if (search && search.trim()) {
       const searchTerm = search.trim();
@@ -851,11 +876,20 @@ export class PrismaAdminRepository implements IAdminRepository {
       },
     }));
 
-    const detailedTransactions: DetailedTransaction[] = transactions.map((tx) => ({
-      ...tx,
-      userName: tx.user.name,
-      userEmail: tx.user.email,
-    }));
+    const detailedTransactions: DetailedTransaction[] = transactions.map((tx) => {
+      return {
+        ...tx,
+        userName: tx.user.name,
+        userEmail: tx.user.email,
+        ...(includeMetadata && {
+          subtype: tx.subtype,
+          description: tx.description,
+          metadata: tx.metadata,
+        }),
+        // For pong transactions, we'll rely on the relatedPongMatchId field
+        // and can optionally fetch pong match data separately if needed
+      };
+    });
 
     const totalPages = Math.ceil(Math.max(totalBets, totalTransactions) / limit);
 
@@ -948,6 +982,425 @@ export class PrismaAdminRepository implements IAdminRepository {
     };
 
     return analytics;
+  }
+
+  // NEW: Unified Analytics with enhanced transaction insights
+  async getUnifiedAnalytics(params?: any): Promise<any> {
+    const {
+      startDate,
+      endDate,
+      includeHourlyTrends = false,
+      includeRiskMetrics = false,
+      topUsersLimit = 10,
+    } = params || {};
+
+    const dateFilter = this.buildDateFilter(startDate, endDate);
+    const generatedAt = new Date().toISOString();
+
+    // Get all transactions with enhanced categorization
+    const [transactions, users] = await Promise.all([
+      this.prisma.transaction.findMany({
+        where: dateFilter,
+        include: {
+          user: { select: { id: true, name: true, email: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.user.findMany({
+        where: {
+          transactions: {
+            some: dateFilter,
+          },
+        },
+        select: { id: true, name: true },
+      }),
+    ]);
+
+    // Categorize transactions by subtype
+    const bettingTransactions = transactions.filter(
+      (tx) => tx.subtype?.includes('BET') && !tx.subtype?.includes('PARLAY'),
+    );
+    const parlayTransactions = transactions.filter((tx) => tx.subtype?.includes('PARLAY'));
+    const pongTransactions = transactions.filter((tx) => tx.subtype?.includes('PONG'));
+
+    // Calculate overview metrics
+    const totalVolume = transactions.reduce((sum, tx) => sum + Math.abs(Number(tx.amount)), 0);
+    const totalWagers = transactions
+      .filter((tx) => tx.subtype?.includes('WAGER'))
+      .reduce((sum, tx) => sum + Math.abs(Number(tx.amount)), 0);
+    const totalPayouts = transactions
+      .filter((tx) => tx.subtype?.includes('PAYOUT'))
+      .reduce((sum, tx) => sum + Number(tx.amount), 0);
+    const platformRevenue = totalWagers - totalPayouts;
+
+    // Calculate metrics by transaction type
+    const calculateMetrics = (
+      txs: typeof transactions,
+      wagerSubtype: string,
+      payoutSubtype: string,
+    ) => {
+      const wagers = txs.filter((tx) => tx.subtype === wagerSubtype);
+      const payouts = txs.filter((tx) => tx.subtype === payoutSubtype);
+
+      const totalWagers = wagers.reduce((sum, tx) => sum + Math.abs(Number(tx.amount)), 0);
+      const totalPayouts = payouts.reduce((sum, tx) => sum + Number(tx.amount), 0);
+      const netRevenue = totalWagers - totalPayouts;
+      const avgWagerSize = wagers.length > 0 ? totalWagers / wagers.length : 0;
+      const winRate = wagers.length > 0 ? payouts.length / wagers.length : 0;
+
+      return {
+        totalWagers: totalWagers.toString(),
+        totalPayouts: totalPayouts.toString(),
+        netRevenue: netRevenue.toString(),
+        transactionCount: wagers.length + payouts.length,
+        avgWagerSize: avgWagerSize.toString(),
+        winRate,
+      };
+    };
+
+    const bettingMetrics = calculateMetrics(bettingTransactions, 'BET_WAGER', 'BET_PAYOUT');
+    const parlayMetrics = calculateMetrics(parlayTransactions, 'PARLAY_WAGER', 'PARLAY_PAYOUT');
+    const pongMetrics = calculateMetrics(pongTransactions, 'PONG_WAGER', 'PONG_PAYOUT');
+
+    // Pong-specific breakdown (PVP vs PVE)
+    const pongPvpTxs = pongTransactions.filter(
+      (tx) =>
+        tx.metadata &&
+        typeof tx.metadata === 'object' &&
+        'matchType' in tx.metadata &&
+        (tx.metadata as any).matchType === 'PVP',
+    );
+    const pongPveTxs = pongTransactions.filter(
+      (tx) =>
+        tx.metadata &&
+        typeof tx.metadata === 'object' &&
+        'matchType' in tx.metadata &&
+        (tx.metadata as any).matchType === 'PVE_AI',
+    );
+
+    const pvpVsPveBreakdown = {
+      pvp: {
+        wagers: pongPvpTxs
+          .filter((tx) => tx.subtype === 'PONG_WAGER')
+          .reduce((sum, tx) => sum + Math.abs(Number(tx.amount)), 0)
+          .toString(),
+        payouts: pongPvpTxs
+          .filter((tx) => tx.subtype === 'PONG_PAYOUT')
+          .reduce((sum, tx) => sum + Number(tx.amount), 0)
+          .toString(),
+        matches: Math.floor(pongPvpTxs.filter((tx) => tx.subtype === 'PONG_WAGER').length),
+      },
+      pve: {
+        wagers: pongPveTxs
+          .filter((tx) => tx.subtype === 'PONG_WAGER')
+          .reduce((sum, tx) => sum + Math.abs(Number(tx.amount)), 0)
+          .toString(),
+        payouts: pongPveTxs
+          .filter((tx) => tx.subtype === 'PONG_PAYOUT')
+          .reduce((sum, tx) => sum + Number(tx.amount), 0)
+          .toString(),
+        matches: Math.floor(pongPveTxs.filter((tx) => tx.subtype === 'PONG_WAGER').length),
+      },
+    };
+
+    // Daily trends
+    const dailyTrends = this.calculateDailyTrends(transactions);
+
+    // Hourly trends (if requested)
+    let hourlyTrends: any[] = [];
+    if (includeHourlyTrends) {
+      hourlyTrends = this.calculateHourlyTrends(transactions);
+    }
+
+    // User insights
+    const userInsights = this.calculateUserInsights(transactions, topUsersLimit);
+
+    // Risk metrics (if requested)
+    let riskMetrics: any = {
+      largeTransactions: [],
+      suspitiousPatterns: {
+        rapidTransactions: 0,
+        unusualAmounts: 0,
+        potentialArbitrage: 0,
+      },
+    };
+    if (includeRiskMetrics) {
+      riskMetrics = this.calculateRiskMetrics(transactions);
+    }
+
+    return {
+      overview: {
+        totalVolume: totalVolume.toString(),
+        totalTransactions: transactions.length,
+        totalUsers: users.length,
+        platformRevenue: platformRevenue.toString(),
+        generatedAt,
+      },
+      byTransactionType: {
+        betting: bettingMetrics,
+        parlays: parlayMetrics,
+        pong: {
+          ...pongMetrics,
+          pvpVsPveBreakdown,
+        },
+      },
+      trends: {
+        daily: dailyTrends,
+        hourly: hourlyTrends,
+      },
+      userInsights,
+      riskMetrics,
+    };
+  }
+
+  private buildDateFilter(startDate?: string, endDate?: string) {
+    if (!startDate && !endDate) return {};
+
+    return {
+      createdAt: {
+        ...(startDate && { gte: new Date(startDate) }),
+        ...(endDate && { lte: new Date(endDate) }),
+      },
+    };
+  }
+
+  private calculateDailyTrends(transactions: any[]) {
+    const dailyMap = new Map();
+
+    transactions.forEach((tx) => {
+      const date = tx.createdAt.toISOString().split('T')[0];
+      if (!dailyMap.has(date)) {
+        dailyMap.set(date, {
+          date,
+          betting: { volume: 0, transactions: 0 },
+          parlays: { volume: 0, transactions: 0 },
+          pong: { volume: 0, transactions: 0 },
+        });
+      }
+
+      const day = dailyMap.get(date);
+      const amount = Math.abs(Number(tx.amount));
+
+      if (tx.subtype?.includes('BET') && !tx.subtype?.includes('PARLAY')) {
+        day.betting.volume += amount;
+        day.betting.transactions += 1;
+      } else if (tx.subtype?.includes('PARLAY')) {
+        day.parlays.volume += amount;
+        day.parlays.transactions += 1;
+      } else if (tx.subtype?.includes('PONG')) {
+        day.pong.volume += amount;
+        day.pong.transactions += 1;
+      }
+    });
+
+    return Array.from(dailyMap.values())
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map((day) => ({
+        ...day,
+        betting: {
+          volume: day.betting.volume.toString(),
+          transactions: day.betting.transactions,
+        },
+        parlays: {
+          volume: day.parlays.volume.toString(),
+          transactions: day.parlays.transactions,
+        },
+        pong: {
+          volume: day.pong.volume.toString(),
+          transactions: day.pong.transactions,
+        },
+      }));
+  }
+
+  private calculateHourlyTrends(transactions: any[]) {
+    const hourlyMap = new Map();
+
+    for (let hour = 0; hour < 24; hour++) {
+      hourlyMap.set(hour, { hour, volume: 0, transactionCount: 0 });
+    }
+
+    transactions.forEach((tx) => {
+      const hour = tx.createdAt.getHours();
+      const hourData = hourlyMap.get(hour);
+      hourData.volume += Math.abs(Number(tx.amount));
+      hourData.transactionCount += 1;
+    });
+
+    return Array.from(hourlyMap.values()).map((hour) => ({
+      ...hour,
+      volume: hour.volume.toString(),
+    }));
+  }
+
+  private calculateUserInsights(transactions: any[], limit: number) {
+    const userMap = new Map();
+
+    transactions.forEach((tx) => {
+      const userId = tx.userId;
+      if (!userMap.has(userId)) {
+        userMap.set(userId, {
+          userId,
+          userName: tx.user?.name || 'Unknown',
+          totalSpent: 0,
+          totalWon: 0,
+          betting: 0,
+          parlays: 0,
+          pong: 0,
+        });
+      }
+
+      const user = userMap.get(userId);
+      const amount = Math.abs(Number(tx.amount));
+
+      if (tx.subtype?.includes('WAGER')) {
+        user.totalSpent += amount;
+      } else if (tx.subtype?.includes('PAYOUT')) {
+        user.totalWon += amount;
+      }
+
+      // Categorize spending by activity
+      if (tx.subtype?.includes('BET') && !tx.subtype?.includes('PARLAY')) {
+        user.betting += amount;
+      } else if (tx.subtype?.includes('PARLAY')) {
+        user.parlays += amount;
+      } else if (tx.subtype?.includes('PONG')) {
+        user.pong += amount;
+      }
+    });
+
+    const users = Array.from(userMap.values());
+
+    // Top spenders
+    const topSpenders = users
+      .sort((a, b) => b.totalSpent - a.totalSpent)
+      .slice(0, limit)
+      .map((user) => {
+        const preferredActivity =
+          user.betting >= user.parlays && user.betting >= user.pong
+            ? 'betting'
+            : user.parlays >= user.pong
+              ? 'parlays'
+              : 'pong';
+
+        return {
+          userId: user.userId,
+          userName: user.userName,
+          totalSpent: user.totalSpent.toString(),
+          preferredActivity: preferredActivity as 'betting' | 'parlays' | 'pong',
+          activityBreakdown: {
+            betting: user.betting.toString(),
+            parlays: user.parlays.toString(),
+            pong: user.pong.toString(),
+          },
+        };
+      });
+
+    // Top winners
+    const topWinners = users
+      .map((user) => ({
+        ...user,
+        netProfit: user.totalWon - user.totalSpent,
+      }))
+      .sort((a, b) => b.totalWon - a.totalWon)
+      .slice(0, limit)
+      .map((user) => {
+        const primarySource =
+          user.betting >= user.parlays && user.betting >= user.pong
+            ? 'betting'
+            : user.parlays >= user.pong
+              ? 'parlays'
+              : 'pong';
+
+        return {
+          userId: user.userId,
+          userName: user.userName,
+          totalWon: user.totalWon.toString(),
+          netProfit: user.netProfit.toString(),
+          primarySource: primarySource as 'betting' | 'parlays' | 'pong',
+        };
+      });
+
+    return { topSpenders, topWinners };
+  }
+
+  private calculateRiskMetrics(transactions: any[]) {
+    // Large transactions (>1000 MuskBucks)
+    const largeTransactions = transactions
+      .filter((tx) => Math.abs(Number(tx.amount)) > 1000)
+      .map((tx) => ({
+        transactionId: tx.id.toString(),
+        userId: tx.userId,
+        amount: tx.amount.toString(),
+        type: tx.type,
+        subtype: tx.subtype || 'unknown',
+        riskScore: this.calculateRiskScore(tx),
+        flags: this.generateRiskFlags(tx),
+      }))
+      .sort((a, b) => b.riskScore - a.riskScore)
+      .slice(0, 20);
+
+    // Suspicious patterns
+    const userTransactionCounts = new Map();
+    const unusualAmounts = new Set();
+
+    transactions.forEach((tx) => {
+      const userId = tx.userId;
+      const count = userTransactionCounts.get(userId) || 0;
+      userTransactionCounts.set(userId, count + 1);
+
+      // Flag unusual amounts (multiples of 9999, very round numbers)
+      const amount = Math.abs(Number(tx.amount));
+      if (amount % 9999 === 0 || amount % 10000 === 0) {
+        unusualAmounts.add(tx.id);
+      }
+    });
+
+    const rapidTransactions = Array.from(userTransactionCounts.values()).filter(
+      (count) => count > 50,
+    ).length;
+
+    return {
+      largeTransactions,
+      suspitiousPatterns: {
+        rapidTransactions,
+        unusualAmounts: unusualAmounts.size,
+        potentialArbitrage: 0, // Would implement arbitrage detection
+      },
+    };
+  }
+
+  private calculateRiskScore(transaction: any): number {
+    let score = 0;
+    const amount = Math.abs(Number(transaction.amount));
+
+    // Amount-based risk
+    if (amount > 10000) score += 3;
+    else if (amount > 5000) score += 2;
+    else if (amount > 1000) score += 1;
+
+    // Pattern-based risk
+    if (amount % 9999 === 0) score += 2;
+    if (amount % 10000 === 0) score += 1;
+
+    // Time-based risk (transactions at unusual hours)
+    const hour = transaction.createdAt.getHours();
+    if (hour < 6 || hour > 23) score += 1;
+
+    return Math.min(score, 10); // Cap at 10
+  }
+
+  private generateRiskFlags(transaction: any): string[] {
+    const flags: string[] = [];
+    const amount = Math.abs(Number(transaction.amount));
+
+    if (amount > 10000) flags.push('LARGE_AMOUNT');
+    if (amount % 9999 === 0) flags.push('SUSPICIOUS_PATTERN');
+    if (amount % 10000 === 0) flags.push('ROUND_NUMBER');
+
+    const hour = transaction.createdAt.getHours();
+    if (hour < 6 || hour > 23) flags.push('OFF_HOURS');
+
+    return flags;
   }
 
   async bulkFinancialOperation(operation: BulkFinancialOperation): Promise<BulkFinancialResult> {

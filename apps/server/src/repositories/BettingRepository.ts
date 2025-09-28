@@ -48,9 +48,17 @@ export class BettingRepository implements IBettingRepository {
         data: {
           userId,
           type: 'DEBIT',
+          subtype: 'BET_WAGER',
           amount: BigInt(amount),
           balanceAfter: user.muskBucks,
-          relatedBetId: null,
+          description: `Bet wager on prediction ${predictionId}`,
+          metadata: {
+            predictionId,
+            optionId,
+            oddsAtPlacement,
+            wasAllIn,
+          },
+          relatedBetId: null, // Will be updated after bet creation
           relatedParlayId: null,
           idempotencyKey: idempotencyKey ? `${idempotencyKey}-debit` : undefined,
         },
@@ -165,10 +173,20 @@ export class BettingRepository implements IBettingRepository {
         data: {
           userId,
           type: 'DEBIT',
+          subtype: 'PARLAY_WAGER',
           amount: BigInt(amount),
           balanceAfter: user.muskBucks,
+          description: `Parlay wager with ${legCount} legs`,
+          metadata: {
+            legCount,
+            legs: legs.map((l) => ({
+              predictionId: l.predictionId,
+              optionId: l.optionId,
+              oddsAtPlacement: l.oddsAtPlacement,
+            })),
+          },
           relatedBetId: null,
-          relatedParlayId: null,
+          relatedParlayId: null, // Will be updated after parlay creation
           idempotencyKey: idempotencyKey ? `${idempotencyKey}-debit` : undefined,
         },
       });

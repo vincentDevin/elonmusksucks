@@ -222,6 +222,11 @@ export const getFinancialAnalytics = async (params: any) => {
   return repo.getFinancialAnalytics(params);
 };
 
+// NEW: Unified Analytics endpoint
+export const getUnifiedAnalytics = async (params: any) => {
+  return repo.getUnifiedAnalytics(params);
+};
+
 export const bulkFinancialOperation = async (operation: any) => {
   return repo.bulkFinancialOperation(operation);
 };

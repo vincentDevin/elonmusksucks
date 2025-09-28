@@ -712,8 +712,16 @@ export class PongRepository implements IPongRepository {
         data: {
           userId: playerOneId,
           type: 'DEBIT',
+          subtype: 'PONG_WAGER',
           amount: BigInt(-wagerAmount),
           balanceAfter: playerOneUpdate.muskBucks,
+          description: `Pong match wager${isAI ? ' vs AI' : ' vs player'}`,
+          metadata: {
+            wagerAmount,
+            isAI,
+            playerTwoId,
+            matchType: isAI ? 'PVE_AI' : 'PVP',
+          },
         },
       });
 
@@ -722,8 +730,16 @@ export class PongRepository implements IPongRepository {
           data: {
             userId: playerTwoId,
             type: 'DEBIT',
+            subtype: 'PONG_WAGER',
             amount: BigInt(-wagerAmount),
             balanceAfter: BigInt(0), // Will be updated with actual balance
+            description: 'Pong match wager vs player',
+            metadata: {
+              wagerAmount,
+              isAI: false,
+              playerOneId,
+              matchType: 'PVP',
+            },
           },
         });
       }

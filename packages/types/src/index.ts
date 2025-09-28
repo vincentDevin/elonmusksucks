@@ -418,6 +418,9 @@ export interface FinancialSearchParams {
   betType?: ('single' | 'parlay')[];
   status?: ('pending' | 'won' | 'lost' | 'refunded')[];
   transactionType?: ('DEBIT' | 'CREDIT')[];
+  transactionSubtype?: ('BET_WAGER' | 'BET_PAYOUT' | 'PARLAY_WAGER' | 'PARLAY_PAYOUT' | 'PONG_WAGER' | 'PONG_PAYOUT')[];
+  includePongTransactions?: boolean;
+  includeMetadata?: boolean;
   minAmount?: number;
   maxAmount?: number;
   startDate?: string;
@@ -2664,6 +2667,104 @@ export interface AdminFinancialAnalyticsResponse {
     netLoss: string;              // BigInt → string
   }>;
   generatedAt: string;            // Date → ISO string
+}
+
+// NEW: Unified Analytics Response for cross-transaction insights
+export interface UnifiedAnalyticsResponse {
+  overview: {
+    totalVolume: string;          // Total across all transaction types
+    totalTransactions: number;
+    totalUsers: number;
+    platformRevenue: string;      // Net revenue across all activities
+    generatedAt: string;
+  };
+  byTransactionType: {
+    betting: {
+      totalWagers: string;
+      totalPayouts: string;
+      netRevenue: string;
+      transactionCount: number;
+      avgWagerSize: string;
+      winRate: number;
+    };
+    parlays: {
+      totalWagers: string;
+      totalPayouts: string;
+      netRevenue: string;
+      transactionCount: number;
+      avgWagerSize: string;
+      winRate: number;
+    };
+    pong: {
+      totalWagers: string;
+      totalPayouts: string;
+      netRevenue: string;
+      transactionCount: number;
+      avgWagerSize: string;
+      winRate: number;
+      pvpVsPveBreakdown: {
+        pvp: { wagers: string; payouts: string; matches: number };
+        pve: { wagers: string; payouts: string; matches: number };
+      };
+    };
+  };
+  trends: {
+    daily: Array<{
+      date: string;
+      betting: { volume: string; transactions: number };
+      parlays: { volume: string; transactions: number };
+      pong: { volume: string; transactions: number };
+    }>;
+    hourly: Array<{
+      hour: number;
+      volume: string;
+      transactionCount: number;
+    }>;
+  };
+  userInsights: {
+    topSpenders: Array<{
+      userId: number;
+      userName: string;
+      totalSpent: string;
+      preferredActivity: 'betting' | 'parlays' | 'pong';
+      activityBreakdown: {
+        betting: string;
+        parlays: string;
+        pong: string;
+      };
+    }>;
+    topWinners: Array<{
+      userId: number;
+      userName: string;
+      totalWon: string;
+      netProfit: string;
+      primarySource: 'betting' | 'parlays' | 'pong';
+    }>;
+  };
+  riskMetrics: {
+    largeTransactions: Array<{
+      transactionId: string;
+      userId: number;
+      amount: string;
+      type: string;
+      subtype: string;
+      riskScore: number;
+      flags: string[];
+    }>;
+    suspitiousPatterns: {
+      rapidTransactions: number;
+      unusualAmounts: number;
+      potentialArbitrage: number;
+    };
+  };
+}
+
+export interface UnifiedAnalyticsParams {
+  startDate?: string;
+  endDate?: string;
+  includeHourlyTrends?: boolean;
+  includeRiskMetrics?: boolean;
+  topUsersLimit?: number;
 }
 
 export interface AdminPredictionSearchResponse {

@@ -45,6 +45,7 @@ router.patch(
 // — Enhanced Financial Operations Dashboard —
 router.get('/financial/search', adminController.searchFinancialData);
 router.get('/financial/analytics', adminController.getFinancialAnalytics);
+router.get('/financial/unified-analytics', adminController.getUnifiedAnalytics); // NEW: Unified analytics endpoint
 router.post('/financial/bulk', adminController.bulkFinancialOperation);
 router.get('/financial/export', adminController.exportFinancialData);
 

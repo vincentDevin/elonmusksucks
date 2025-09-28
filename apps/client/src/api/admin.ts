@@ -286,6 +286,16 @@ export interface FinancialSearchParams {
   betType?: ('single' | 'parlay')[];
   status?: ('pending' | 'won' | 'lost' | 'refunded')[];
   transactionType?: ('DEBIT' | 'CREDIT')[];
+  transactionSubtype?: (
+    | 'BET_WAGER'
+    | 'BET_PAYOUT'
+    | 'PARLAY_WAGER'
+    | 'PARLAY_PAYOUT'
+    | 'PONG_WAGER'
+    | 'PONG_PAYOUT'
+  )[];
+  includePongTransactions?: boolean;
+  includeMetadata?: boolean;
   minAmount?: number;
   maxAmount?: number;
   startDate?: string;
@@ -326,6 +336,9 @@ export interface DetailedBet extends PublicBet {
 export interface DetailedTransaction extends PublicTransaction {
   userName?: string;
   userEmail?: string;
+  subtype?: string;
+  description?: string;
+  metadata?: any;
   relatedBet?: {
     id: number;
     predictionTitle: string;
@@ -335,6 +348,15 @@ export interface DetailedTransaction extends PublicTransaction {
     id: number;
     legsCount: number;
     amount: number;
+  };
+  relatedPongMatch?: {
+    id: string;
+    wagerAmount: number;
+    payoutAmount?: number;
+    status: string;
+    playerOneId: number;
+    playerTwoId?: number;
+    winnerId?: number;
   };
 }
 
@@ -381,6 +403,10 @@ export async function searchFinancialData(
   if (params.status) params.status.forEach((s) => queryParams.append('status', s));
   if (params.transactionType)
     params.transactionType.forEach((t) => queryParams.append('transactionType', t));
+  if (params.transactionSubtype)
+    params.transactionSubtype.forEach((s) => queryParams.append('transactionSubtype', s));
+  if (params.includePongTransactions) queryParams.append('includePongTransactions', 'true');
+  if (params.includeMetadata) queryParams.append('includeMetadata', 'true');
   if (params.minAmount) queryParams.append('minAmount', params.minAmount.toString());
   if (params.maxAmount) queryParams.append('maxAmount', params.maxAmount.toString());
   if (params.startDate) queryParams.append('startDate', params.startDate);
@@ -407,6 +433,27 @@ export async function getFinancialAnalytics(params?: {
 
   const res = await api.get<AdminFinancialAnalyticsResponse>(
     `/api/admin/financial/analytics?${queryParams}`,
+  );
+  return res.data;
+}
+
+// NEW: Unified analytics endpoint for cross-transaction insights
+export async function getUnifiedAnalytics(params?: {
+  startDate?: string;
+  endDate?: string;
+  includeHourlyTrends?: boolean;
+  includeRiskMetrics?: boolean;
+  topUsersLimit?: number;
+}): Promise<import('@ems/types').UnifiedAnalyticsResponse> {
+  const queryParams = new URLSearchParams();
+  if (params?.startDate) queryParams.append('startDate', params.startDate);
+  if (params?.endDate) queryParams.append('endDate', params.endDate);
+  if (params?.includeHourlyTrends) queryParams.append('includeHourlyTrends', 'true');
+  if (params?.includeRiskMetrics) queryParams.append('includeRiskMetrics', 'true');
+  if (params?.topUsersLimit) queryParams.append('topUsersLimit', params.topUsersLimit.toString());
+
+  const res = await api.get<import('@ems/types').UnifiedAnalyticsResponse>(
+    `/api/admin/financial/unified-analytics?${queryParams}`,
   );
   return res.data;
 }

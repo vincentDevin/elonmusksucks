@@ -403,7 +403,40 @@ export async function searchFinancialData(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const params = req.query as unknown as any; // Will be typed properly in service
+    // Map query parameters to typed FinancialSearchParams
+    const params = {
+      search: req.query.search as string,
+      userId: req.query.userId ? parseInt(req.query.userId as string) : undefined,
+      predictionId: req.query.predictionId ? parseInt(req.query.predictionId as string) : undefined,
+      betType: req.query.betType
+        ? ((Array.isArray(req.query.betType) ? req.query.betType : [req.query.betType]) as any)
+        : undefined,
+      status: req.query.status
+        ? ((Array.isArray(req.query.status) ? req.query.status : [req.query.status]) as any)
+        : undefined,
+      transactionType: req.query.transactionType
+        ? ((Array.isArray(req.query.transactionType)
+            ? req.query.transactionType
+            : [req.query.transactionType]) as any)
+        : undefined,
+      transactionSubtype: req.query.transactionSubtype
+        ? ((Array.isArray(req.query.transactionSubtype)
+            ? req.query.transactionSubtype
+            : [req.query.transactionSubtype]) as any)
+        : undefined,
+      includePongTransactions: req.query.includePongTransactions === 'true',
+      includeMetadata: req.query.includeMetadata === 'true',
+      minAmount: req.query.minAmount ? parseFloat(req.query.minAmount as string) : undefined,
+      maxAmount: req.query.maxAmount ? parseFloat(req.query.maxAmount as string) : undefined,
+      startDate: req.query.startDate as string,
+      endDate: req.query.endDate as string,
+      suspiciousOnly: req.query.suspiciousOnly === 'true',
+      page: parseInt(req.query.page as string) || 0,
+      limit: parseInt(req.query.limit as string) || 25,
+      sortBy: (req.query.sortBy as any) || 'createdAt',
+      sortOrder: (req.query.sortOrder as any) || 'desc',
+    };
+
     const data = await adminService.searchFinancialData(params);
     const payload = toAdminFinancialDataResponse(data) satisfies AdminFinancialDataResponse;
     res.json(payload);
@@ -424,6 +457,31 @@ export async function getFinancialAnalytics(
       analytics,
     ) satisfies AdminFinancialAnalyticsResponse;
     res.json(payload);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// NEW: Unified Analytics endpoint for cross-transaction insights
+export async function getUnifiedAnalytics(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { startDate, endDate, includeHourlyTrends, includeRiskMetrics, topUsersLimit } =
+      req.query;
+
+    const params = {
+      startDate: startDate as string | undefined,
+      endDate: endDate as string | undefined,
+      includeHourlyTrends: includeHourlyTrends === 'true',
+      includeRiskMetrics: includeRiskMetrics === 'true',
+      topUsersLimit: topUsersLimit ? parseInt(topUsersLimit as string) : 10,
+    };
+
+    const analytics = await adminService.getUnifiedAnalytics(params);
+    res.json(analytics); // Return directly as the repository already formats it correctly
   } catch (err) {
     next(err);
   }

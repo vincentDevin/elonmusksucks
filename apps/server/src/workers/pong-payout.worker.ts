@@ -109,8 +109,15 @@ async function processPVPPayout(
       data: {
         userId: winnerId,
         type: 'CREDIT',
+        subtype: 'PONG_PAYOUT',
         amount: payoutAmount,
         balanceAfter: updatedUser.muskBucks,
+        description: 'Pong match payout (PVP victory)',
+        metadata: {
+          matchType: 'PVP',
+          stakeAmount: Number(stakeAmount),
+          payoutAmount: Number(payoutAmount),
+        },
         idempotencyKey,
       },
     });
@@ -155,8 +162,15 @@ async function processPVEPayout(
       data: {
         userId: winnerId,
         type: 'CREDIT',
+        subtype: 'PONG_PAYOUT',
         amount: payoutAmount,
         balanceAfter: updatedUser.muskBucks,
+        description: 'Pong match payout (PVE_AI victory)',
+        metadata: {
+          matchType: 'PVE_AI',
+          stakeAmount: Number(stakeAmount),
+          payoutAmount: Number(payoutAmount),
+        },
         idempotencyKey,
       },
     });

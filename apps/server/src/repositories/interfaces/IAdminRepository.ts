@@ -515,6 +515,7 @@ export interface IAdminRepository {
   // -- Enhanced Financial Operations Dashboard --
   searchFinancialData(params: FinancialSearchParams): Promise<PaginatedFinancialData>;
   getFinancialAnalytics(params?: FinancialAnalyticsParams): Promise<FinancialAnalytics>;
+  getUnifiedAnalytics(params?: any): Promise<any>; // NEW: Unified analytics across all transaction types
   bulkFinancialOperation(operation: BulkFinancialOperation): Promise<BulkFinancialResult>;
   exportFinancialData(params: FinancialExportParams): Promise<string>;
 
