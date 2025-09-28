@@ -1,7 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import type { LobbyEntry, ActiveGameEntry } from '@ems/types';
 import { PongLobbyHeader } from './PongLobbyHeader';
-import { PongMatchCreator } from './PongMatchCreator';
+import { PongMatchCreatorModal } from './PongMatchCreatorModal';
 import { PongGamesList } from './PongGamesList';
 
 interface PongLobbyProps {
@@ -35,6 +35,7 @@ export function PongLobby({
   onJoinMatch,
   onSpectateGame,
 }: PongLobbyProps) {
+  const [showCreateModal, setShowCreateModal] = useState(false);
   // Auto-refresh lobby every 15 seconds when connected and authenticated
   useEffect(() => {
     if (!isConnected || !isAuthenticated) return;
@@ -75,11 +76,8 @@ export function PongLobby({
         availableMatches={lobbies.length}
         stats={stats}
         onConnect={onConnect}
-        onRefresh={onJoinLobby}
+        onCreateMatch={() => setShowCreateModal(true)}
       />
-
-      {/* Match Creation */}
-      <PongMatchCreator onCreateMatch={handleCreateMatch} />
 
       {/* Unified Games List (Available Matches + Active Games) */}
       <PongGamesList
@@ -87,6 +85,13 @@ export function PongLobby({
         activeGames={activeGames}
         onJoinMatch={onJoinMatch}
         onSpectateGame={onSpectateGame}
+      />
+
+      {/* Match Creation Modal */}
+      <PongMatchCreatorModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onCreateMatch={handleCreateMatch}
       />
     </div>
   );

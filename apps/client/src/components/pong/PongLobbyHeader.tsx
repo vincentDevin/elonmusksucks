@@ -9,7 +9,7 @@ interface PongLobbyHeaderProps {
     availableMatches: number;
   };
   onConnect: () => void;
-  onRefresh: () => void;
+  onCreateMatch?: () => void;
 }
 
 export function PongLobbyHeader({
@@ -19,7 +19,7 @@ export function PongLobbyHeader({
   availableMatches,
   stats,
   onConnect,
-  onRefresh,
+  onCreateMatch,
 }: PongLobbyHeaderProps) {
   // Connection status indicator
   const getStatusIndicator = () => {
@@ -92,24 +92,30 @@ export function PongLobbyHeader({
           </div>
         </div>
 
-        {/* Refresh/Connect Button */}
-        {isConnected && isAuthenticated ? (
-          <button
-            onClick={onRefresh}
-            className="px-3 py-2 bg-accent/10 text-accent rounded-lg hover:bg-accent/20 transition-colors text-sm font-medium cursor-pointer"
-            title="Refresh lobby data"
-          >
-            🔄 Refresh
-          </button>
-        ) : (
-          <button
-            onClick={onConnect}
-            className="px-3 py-2 bg-error/10 text-error rounded-lg hover:bg-error/20 transition-colors text-sm font-medium cursor-pointer"
-            title="Connect to game server"
-          >
-            🚀 Connect
-          </button>
-        )}
+        {/* Action Buttons */}
+        <div className="flex items-center space-x-2">
+          {isConnected && isAuthenticated ? (
+            <>
+              {onCreateMatch && (
+                <button
+                  onClick={onCreateMatch}
+                  className="px-4 py-2 bg-gradient-to-r from-primary to-accent text-white rounded-lg hover:shadow-lg transition-all text-sm font-medium cursor-pointer transform hover:scale-105"
+                  title="Create a new match"
+                >
+                  ➕ Create Match
+                </button>
+              )}
+            </>
+          ) : (
+            <button
+              onClick={onConnect}
+              className="px-3 py-2 bg-error/10 text-error rounded-lg hover:bg-error/20 transition-colors text-sm font-medium cursor-pointer"
+              title="Connect to game server"
+            >
+              🚀 Connect
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
