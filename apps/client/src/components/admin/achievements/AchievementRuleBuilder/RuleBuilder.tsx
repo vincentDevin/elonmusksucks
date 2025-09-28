@@ -199,7 +199,7 @@ export const RuleBuilder: React.FC<RuleBuilderProps> = ({
   };
 
   return (
-    <div className="rule-builder-container space-y-6">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold text-content">Achievement Rule Builder</h2>
@@ -218,7 +218,7 @@ export const RuleBuilder: React.FC<RuleBuilderProps> = ({
       <ValidationFeedback validation={validation} isValidating={isValidating} showDetails={true} />
 
       {/* Event Selection */}
-      <div className="bg-surface rounded-lg p-6 border border-border">
+      <div className="bg-surface rounded-lg border border-muted p-6">
         <h3 className="text-lg font-medium text-content mb-4">Event Keys</h3>
         <p className="text-sm text-tertiary mb-4">
           Select which events will trigger this achievement's progress evaluation.
@@ -231,7 +231,7 @@ export const RuleBuilder: React.FC<RuleBuilderProps> = ({
       </div>
 
       {/* Progress Type */}
-      <div className="bg-surface rounded-lg p-6 border border-border">
+      <div className="bg-surface rounded-lg border border-muted p-6">
         <h3 className="text-lg font-medium text-content mb-4">Progress Type</h3>
         <p className="text-sm text-tertiary mb-4">
           Choose how progress is tracked for this achievement.
@@ -244,7 +244,7 @@ export const RuleBuilder: React.FC<RuleBuilderProps> = ({
       </div>
 
       {/* Progress Conditions */}
-      <div className="bg-surface rounded-lg p-6 border border-border">
+      <div className="bg-surface rounded-lg border border-muted p-6">
         <h3 className="text-lg font-medium text-content mb-4">Progress Conditions</h3>
         <p className="text-sm text-tertiary mb-4">
           Define when progress should increment, reset, or be set to a specific value.
@@ -295,7 +295,7 @@ export const RuleBuilder: React.FC<RuleBuilderProps> = ({
       </div>
 
       {/* Unlock Conditions */}
-      <div className="bg-surface rounded-lg p-6 border border-border">
+      <div className="bg-surface rounded-lg border border-muted p-6">
         <h3 className="text-lg font-medium text-content mb-4">Unlock Conditions</h3>
         <p className="text-sm text-tertiary mb-4">
           Define when the achievement should be awarded to the user.
@@ -308,7 +308,7 @@ export const RuleBuilder: React.FC<RuleBuilderProps> = ({
       </div>
 
       {/* Additional Counters */}
-      <div className="bg-surface rounded-lg p-6 border border-border">
+      <div className="bg-surface rounded-lg border border-muted p-6">
         <h3 className="text-lg font-medium text-content mb-4">Additional Counters</h3>
         <p className="text-sm text-tertiary mb-4">
           Optional: Track additional metrics alongside the main progress.
@@ -322,13 +322,13 @@ export const RuleBuilder: React.FC<RuleBuilderProps> = ({
 
       {/* Rule Simulator */}
       {validation.isValid && (
-        <div className="bg-surface rounded-lg p-6 border border-border">
+        <div className="bg-surface rounded-lg border border-muted p-6">
           <RuleSimulator rule={rule as JsonRuleAchievementData} disabled={disabled} />
         </div>
       )}
 
       {/* Rule Preview */}
-      <div className="bg-surface rounded-lg p-6 border border-border">
+      <div className="bg-surface rounded-lg border border-muted p-6">
         <h3 className="text-lg font-medium text-content mb-4">Rule Preview</h3>
         <RulePreview rule={rule as JsonRuleAchievementData} validation={validation} />
       </div>

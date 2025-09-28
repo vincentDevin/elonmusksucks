@@ -153,14 +153,14 @@ export const UnlockConditionBuilder: React.FC<UnlockConditionBuilderProps> = ({
               className={`cursor-pointer rounded-lg border-2 p-4 transition-all ${
                 conditionType === type.value
                   ? 'border-primary bg-primary/5'
-                  : 'border-border hover:border-primary/50'
+                  : 'border-muted hover:border-primary/50'
               } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
               onClick={() => !disabled && handleConditionTypeChange(type.value)}
             >
               <div className="flex items-center space-x-2">
                 <div
                   className={`h-2 w-2 rounded-full ${
-                    conditionType === type.value ? 'bg-primary' : 'bg-border'
+                    conditionType === type.value ? 'bg-primary' : 'bg-muted'
                   }`}
                 ></div>
                 <h4 className="font-medium text-content">{type.label}</h4>
@@ -182,7 +182,7 @@ export const UnlockConditionBuilder: React.FC<UnlockConditionBuilderProps> = ({
                 value={progressOperator}
                 onChange={(e) => setProgressOperator(e.target.value)}
                 disabled={disabled}
-                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-content focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-3 py-2 border border-muted rounded-lg bg-background text-content focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {OPERATORS.map((op) => (
                   <option key={op.value} value={op.value}>
@@ -199,7 +199,7 @@ export const UnlockConditionBuilder: React.FC<UnlockConditionBuilderProps> = ({
                 onChange={(e) => setProgressValue(e.target.value)}
                 disabled={disabled}
                 min="0"
-                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-content focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-3 py-2 border border-muted rounded-lg bg-background text-content focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
           </div>
@@ -225,7 +225,7 @@ export const UnlockConditionBuilder: React.FC<UnlockConditionBuilderProps> = ({
                 onChange={(e) => setCounterName(e.target.value)}
                 disabled={disabled}
                 placeholder="e.g., totalBets"
-                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-content focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-3 py-2 border border-muted rounded-lg bg-background text-content focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
             <div>
@@ -234,7 +234,7 @@ export const UnlockConditionBuilder: React.FC<UnlockConditionBuilderProps> = ({
                 value={counterOperator}
                 onChange={(e) => setCounterOperator(e.target.value)}
                 disabled={disabled}
-                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-content focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-3 py-2 border border-muted rounded-lg bg-background text-content focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {OPERATORS.map((op) => (
                   <option key={op.value} value={op.value}>
@@ -251,7 +251,7 @@ export const UnlockConditionBuilder: React.FC<UnlockConditionBuilderProps> = ({
                 onChange={(e) => setCounterValue(e.target.value)}
                 disabled={disabled}
                 min="0"
-                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-content focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-3 py-2 border border-muted rounded-lg bg-background text-content focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
           </div>
@@ -275,7 +275,7 @@ export const UnlockConditionBuilder: React.FC<UnlockConditionBuilderProps> = ({
               onChange={(e) => handleComplexConditionChange(e.target.value)}
               disabled={disabled}
               placeholder={`Enter unlock condition in JSON format, e.g.:\n{\n  "and": [\n    { "progress >=": 10 },\n    { "counter >=": { "key": "totalBets", "value": 5 } }\n  ]\n}`}
-              className="w-full h-32 px-3 py-2 border border-border rounded-lg bg-background text-content font-mono text-sm placeholder-tertiary focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed resize-none"
+              className="w-full h-32 px-3 py-2 border border-muted rounded-lg bg-background text-content font-mono text-sm placeholder-tertiary focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed resize-none"
             />
           </div>
 
@@ -329,7 +329,7 @@ export const UnlockConditionBuilder: React.FC<UnlockConditionBuilderProps> = ({
                   type="button"
                   onClick={() => handleComplexConditionChange(example)}
                   disabled={disabled}
-                  className="block w-full text-left text-xs bg-background hover:bg-muted text-content p-2 rounded font-mono disabled:opacity-50 disabled:cursor-not-allowed transition-colors border border-border"
+                  className="block w-full text-left text-xs bg-background hover:bg-muted text-content p-2 rounded font-mono disabled:opacity-50 disabled:cursor-not-allowed transition-colors border border-muted"
                 >
                   {example}
                 </button>

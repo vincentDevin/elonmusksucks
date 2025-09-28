@@ -4,7 +4,7 @@ import { useAdmin } from '../contexts/AdminContext';
 import UserManagement from '../components/admin/users/UserManagement';
 import PredictionDashboard from '../components/admin/predictions/PredictionDashboard';
 import FinancialDashboard from '../components/admin/financial/FinancialDashboard';
-import AchievementManager from '../components/achievements/AchievementManager';
+import AdminAchievementDashboard from '../components/admin/achievements/AdminAchievementDashboard';
 import FeedsManager from '../components/admin/feeds/FeedsManager';
 import ModerationQueue from '../components/admin/content/ModerationQueue';
 import EventSystemMonitor from '../components/admin/system/EventSystemMonitor';
@@ -17,7 +17,7 @@ const AdminDashboard: React.FC = () => {
     { key: 'users', label: 'User Management & Moderation', component: <UserManagement /> },
     { key: 'predictions', label: 'Prediction Management', component: <PredictionDashboard /> },
     { key: 'bets', label: 'Financial Operations', component: <FinancialDashboard /> },
-    { key: 'badges', label: 'Achievement Management', component: <AchievementManager /> },
+    { key: 'badges', label: 'Achievement Management', component: <AdminAchievementDashboard /> },
     { key: 'feeds', label: 'RSS Feeds Management', component: <FeedsManager /> },
     { key: 'moderation', label: 'Content Moderation', component: <ModerationQueue /> },
     { key: 'events', label: 'Event System Monitor', component: <EventSystemMonitor /> },

@@ -130,7 +130,7 @@ export const EventSelector: React.FC<EventSelectorProps> = ({
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             disabled={disabled}
-            className="w-full px-3 py-2 border border-border rounded-lg bg-background text-content placeholder-tertiary focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full px-3 py-2 border border-muted rounded-lg bg-background text-content placeholder-tertiary focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
           />
         </div>
         <div>
@@ -138,7 +138,7 @@ export const EventSelector: React.FC<EventSelectorProps> = ({
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
             disabled={disabled}
-            className="px-3 py-2 border border-border rounded-lg bg-background text-content focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-3 py-2 border border-muted rounded-lg bg-background text-content focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <option value="all">All Categories</option>
             {categories.map((category) => (
@@ -191,7 +191,7 @@ export const EventSelector: React.FC<EventSelectorProps> = ({
             className={`border rounded-lg p-4 cursor-pointer transition-all ${
               selectedEvents.includes(event.key)
                 ? 'border-primary bg-primary/5'
-                : 'border-border hover:border-primary/50'
+                : 'border-muted hover:border-primary/50'
             } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
             onClick={() => handleEventToggle(event.key)}
           >

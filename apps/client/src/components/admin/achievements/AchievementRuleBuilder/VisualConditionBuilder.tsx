@@ -342,14 +342,14 @@ export const VisualConditionBuilder: React.FC<VisualConditionBuilderProps> = ({
       return (
         <div
           key={node.id}
-          className={`${indentClass} flex items-center space-x-2 my-2 p-3 bg-surface rounded-lg border border-border`}
+          className={`${indentClass} flex items-center space-x-2 my-2 p-3 bg-surface rounded-lg border border-muted`}
         >
           {/* Field Selector */}
           <select
             value={node.value}
             onChange={(e) => updateNode(node.id, e.target.value)}
             disabled={disabled}
-            className="px-3 py-2 border border-border rounded bg-background text-content focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50"
+            className="px-3 py-2 border border-muted rounded bg-background text-content focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50"
           >
             {availableFields.map((field) => (
               <option key={field.name} value={field.name}>
@@ -364,7 +364,7 @@ export const VisualConditionBuilder: React.FC<VisualConditionBuilderProps> = ({
               value={operator.value}
               onChange={(e) => updateNode(operator.id, e.target.value)}
               disabled={disabled}
-              className="px-3 py-2 border border-border rounded bg-background text-content focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50"
+              className="px-3 py-2 border border-muted rounded bg-background text-content focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50"
             >
               {OPERATORS.map((op) => (
                 <option key={op.value} value={op.value}>
@@ -382,7 +382,7 @@ export const VisualConditionBuilder: React.FC<VisualConditionBuilderProps> = ({
               onChange={(e) => updateNode(value.id, e.target.value)}
               disabled={disabled}
               placeholder="Value"
-              className="px-3 py-2 border border-border rounded bg-background text-content focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50"
+              className="px-3 py-2 border border-muted rounded bg-background text-content focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50"
             />
           )}
 
@@ -418,7 +418,7 @@ export const VisualConditionBuilder: React.FC<VisualConditionBuilderProps> = ({
           <button
             type="button"
             onClick={() => setShowJsonView(!showJsonView)}
-            className="text-sm text-tertiary hover:text-content px-2 py-1 border border-border rounded"
+            className="text-sm text-tertiary hover:text-content px-2 py-1 border border-muted rounded"
           >
             {showJsonView ? 'Visual View' : 'JSON View'}
           </button>
@@ -427,7 +427,7 @@ export const VisualConditionBuilder: React.FC<VisualConditionBuilderProps> = ({
 
       {showJsonView ? (
         /* JSON View */
-        <div className="bg-background rounded-lg p-4 border border-border">
+        <div className="bg-background rounded-lg p-4 border border-muted">
           <pre className="text-sm font-mono text-content overflow-x-auto">
             {JSON.stringify(treeToCondition(conditionTree), null, 2)}
           </pre>
@@ -460,7 +460,7 @@ export const VisualConditionBuilder: React.FC<VisualConditionBuilderProps> = ({
           )}
 
           {/* Condition Tree */}
-          <div className="min-h-32 bg-muted rounded-lg p-4 border-2 border-dashed border-border">
+          <div className="min-h-32 bg-muted rounded-lg p-4 border-2 border-dashed border-muted">
             {conditionTree.length > 0 ? (
               <div className="space-y-2">
                 {conditionTree.map((node) => renderConditionNode(node))}

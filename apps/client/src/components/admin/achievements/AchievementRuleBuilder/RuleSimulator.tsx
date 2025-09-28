@@ -139,7 +139,7 @@ export const RuleSimulator: React.FC<RuleSimulatorProps> = ({ rule, disabled = f
         <h4 className="font-medium text-content">Scenario Comparison</h4>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {Object.entries(quickResults).map(([scenario, result]) => (
-            <div key={scenario} className="bg-surface border border-border rounded-lg p-4">
+            <div key={scenario} className="bg-surface border border-muted rounded-lg p-4">
               <div className="flex items-center justify-between mb-3">
                 <h5 className="font-medium text-content capitalize">{scenario}</h5>
                 <div className="flex items-center space-x-2">
@@ -178,7 +178,7 @@ export const RuleSimulator: React.FC<RuleSimulatorProps> = ({ rule, disabled = f
                 </div>
 
                 {Object.keys(result.finalCounters).length > 0 && (
-                  <div className="pt-2 border-t border-border">
+                  <div className="pt-2 border-t border-muted">
                     <div className="text-xs text-tertiary mb-1">Counters:</div>
                     {Object.entries(result.finalCounters).map(([counter, value]) => (
                       <div key={counter} className="flex justify-between text-xs">
@@ -212,7 +212,7 @@ export const RuleSimulator: React.FC<RuleSimulatorProps> = ({ rule, disabled = f
           </div>
         </div>
 
-        <div className="bg-surface border border-border rounded-lg p-4">
+        <div className="bg-surface border border-muted rounded-lg p-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
             <div className="text-center">
               <div className="text-2xl font-mono text-primary">
@@ -241,7 +241,7 @@ export const RuleSimulator: React.FC<RuleSimulatorProps> = ({ rule, disabled = f
           </div>
 
           {Object.keys(simulationResult.finalCounters).length > 0 && (
-            <div className="border-t border-border pt-4">
+            <div className="border-t border-muted pt-4">
               <h5 className="font-medium text-content mb-2">Final Counters</h5>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
                 {Object.entries(simulationResult.finalCounters).map(([counter, value]) => (
@@ -256,7 +256,7 @@ export const RuleSimulator: React.FC<RuleSimulatorProps> = ({ rule, disabled = f
         </div>
 
         {/* Simulation Steps */}
-        <div className="bg-surface border border-border rounded-lg p-4">
+        <div className="bg-surface border border-muted rounded-lg p-4">
           <h5 className="font-medium text-content mb-3">Simulation Steps</h5>
           <div className="space-y-2 max-h-64 overflow-y-auto">
             {simulationResult.steps.map((step, index) => (
@@ -265,7 +265,7 @@ export const RuleSimulator: React.FC<RuleSimulatorProps> = ({ rule, disabled = f
                 className={`text-xs border rounded p-2 ${
                   step.unlocked && !simulationResult.steps[index - 1]?.unlocked
                     ? 'border-success bg-success/10'
-                    : 'border-border'
+                    : 'border-muted'
                 }`}
               >
                 <div className="flex items-center justify-between mb-1">
@@ -332,7 +332,7 @@ export const RuleSimulator: React.FC<RuleSimulatorProps> = ({ rule, disabled = f
       {/* Tab Content */}
       {activeTab === 'quick' && (
         <div className="space-y-4">
-          <div className="bg-surface border border-border rounded-lg p-4">
+          <div className="bg-surface border border-muted rounded-lg p-4">
             <p className="text-sm text-tertiary mb-4">
               Run your rule against three different scenarios to see how it performs.
             </p>
@@ -350,7 +350,7 @@ export const RuleSimulator: React.FC<RuleSimulatorProps> = ({ rule, disabled = f
 
       {activeTab === 'custom' && (
         <div className="space-y-4">
-          <div className="bg-surface border border-border rounded-lg p-4 space-y-4">
+          <div className="bg-surface border border-muted rounded-lg p-4 space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-content mb-2">Scenario Type</label>
@@ -358,7 +358,7 @@ export const RuleSimulator: React.FC<RuleSimulatorProps> = ({ rule, disabled = f
                   value={selectedScenario}
                   onChange={(e) => setSelectedScenario(e.target.value as any)}
                   disabled={disabled}
-                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-content focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2 border border-muted rounded-lg bg-background text-content focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <option value="mixed">Mixed (60% success rate)</option>
                   <option value="success">Success (high success rate)</option>
@@ -374,7 +374,7 @@ export const RuleSimulator: React.FC<RuleSimulatorProps> = ({ rule, disabled = f
                   min={1}
                   max={1000}
                   disabled={disabled}
-                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-content focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2 border border-muted rounded-lg bg-background text-content focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
             </div>
@@ -392,7 +392,7 @@ export const RuleSimulator: React.FC<RuleSimulatorProps> = ({ rule, disabled = f
 
       {activeTab === 'events' && (
         <div className="space-y-4">
-          <div className="bg-surface border border-border rounded-lg p-4 space-y-4">
+          <div className="bg-surface border border-muted rounded-lg p-4 space-y-4">
             <p className="text-sm text-tertiary">
               Generate test events that you can use in custom simulations or export for testing.
             </p>
@@ -403,7 +403,7 @@ export const RuleSimulator: React.FC<RuleSimulatorProps> = ({ rule, disabled = f
                   value={selectedScenario}
                   onChange={(e) => setSelectedScenario(e.target.value as any)}
                   disabled={disabled}
-                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-content focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2 border border-muted rounded-lg bg-background text-content focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <option value="mixed">Mixed Events</option>
                   <option value="success">Success Events</option>
@@ -421,7 +421,7 @@ export const RuleSimulator: React.FC<RuleSimulatorProps> = ({ rule, disabled = f
                   min={1}
                   max={1000}
                   disabled={disabled}
-                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-content focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2 border border-muted rounded-lg bg-background text-content focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
             </div>
@@ -435,7 +435,7 @@ export const RuleSimulator: React.FC<RuleSimulatorProps> = ({ rule, disabled = f
           </div>
 
           {customEvents.length > 0 && (
-            <div className="bg-surface border border-border rounded-lg p-4">
+            <div className="bg-surface border border-muted rounded-lg p-4">
               <div className="flex items-center justify-between mb-3">
                 <h5 className="font-medium text-content">
                   Generated Events ({customEvents.length})

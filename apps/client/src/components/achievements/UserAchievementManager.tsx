@@ -1,4 +1,4 @@
-// apps/client/src/components/achievements/AchievementManager.tsx
+// apps/client/src/components/achievements/UserAchievementManager.tsx
 // User-focused Achievement Manager - Clean separation from admin functionality
 import { useState, memo, useMemo } from 'react';
 import { useAchievements } from '../../contexts/AchievementContext';
@@ -16,7 +16,7 @@ interface FilterState {
   searchQuery: string;
 }
 
-const AchievementManager = memo(function AchievementManager() {
+const UserAchievementManager = memo(function UserAchievementManager() {
   // Achievement data
   const {
     achievements: progressToNext,
@@ -121,6 +121,7 @@ const AchievementManager = memo(function AchievementManager() {
       </div>
     );
   }
+
   return (
     <div className="bg-surface border border-muted rounded-2xl p-6 min-h-[600px]">
       {/* Header */}
@@ -524,4 +525,4 @@ const AchievementManager = memo(function AchievementManager() {
   );
 });
 
-export default AchievementManager;
+export default UserAchievementManager;

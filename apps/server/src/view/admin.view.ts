@@ -287,6 +287,7 @@ export const toAdminAchievementView = (achievement: {
   title: string;
   description: string;
   category: string;
+  rarity: string;
   targetValue: number;
   iconUrl: string | null;
   isActive: boolean;
@@ -307,6 +308,7 @@ export const toAdminAchievementView = (achievement: {
   title: achievement.title,
   description: achievement.description,
   category: achievement.category,
+  rarity: achievement.rarity,
   targetValue: achievement.targetValue,
   iconUrl: achievement.iconUrl,
   isActive: achievement.isActive,

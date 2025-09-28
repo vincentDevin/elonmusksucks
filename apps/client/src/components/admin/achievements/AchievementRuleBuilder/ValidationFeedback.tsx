@@ -392,7 +392,7 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({ steps, cur
                       ? 'bg-success text-white'
                       : currentStep === index
                         ? 'bg-primary text-white'
-                        : 'bg-border text-tertiary'
+                        : 'bg-muted text-tertiary'
               }`}
             >
               {step.hasError ? (
@@ -433,7 +433,7 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({ steps, cur
           </div>
           {index < steps.length - 1 && (
             <div
-              className={`h-px flex-1 ${steps[index + 1].completed ? 'bg-success' : 'bg-border'}`}
+              className={`h-px flex-1 ${steps[index + 1].completed ? 'bg-success' : 'bg-muted'}`}
             />
           )}
         </React.Fragment>

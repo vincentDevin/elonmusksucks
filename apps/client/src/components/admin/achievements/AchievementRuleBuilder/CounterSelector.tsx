@@ -215,7 +215,7 @@ export const CounterSelector: React.FC<CounterSelectorProps> = ({
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
             disabled={disabled}
-            className="px-3 py-2 border border-border rounded-lg bg-background text-content focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-3 py-2 border border-muted rounded-lg bg-background text-content focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <option value="all">All Categories</option>
             {categories.map((category) => (
@@ -245,7 +245,7 @@ export const CounterSelector: React.FC<CounterSelectorProps> = ({
                 onChange={(e) => setCustomCounter(e.target.value)}
                 placeholder="counterName"
                 disabled={disabled}
-                className="px-3 py-2 border border-border rounded-lg bg-background text-content text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 py-2 border border-muted rounded-lg bg-background text-content text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
                 onKeyPress={(e) => e.key === 'Enter' && handleAddCustomCounter()}
               />
               <button
@@ -280,7 +280,7 @@ export const CounterSelector: React.FC<CounterSelectorProps> = ({
             className={`border rounded-lg p-4 cursor-pointer transition-all ${
               selectedCounters.includes(counter.name)
                 ? 'border-primary bg-primary/5'
-                : 'border-border hover:border-primary/50'
+                : 'border-muted hover:border-primary/50'
             } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
             onClick={() => handleCounterToggle(counter.name)}
           >

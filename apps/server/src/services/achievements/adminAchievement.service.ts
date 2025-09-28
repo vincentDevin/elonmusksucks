@@ -33,6 +33,7 @@ export interface AchievementWithStats {
   title: string;
   description: string;
   category: string;
+  rarity: string;
   targetValue: number;
   iconUrl: string | null;
   isActive: boolean;
