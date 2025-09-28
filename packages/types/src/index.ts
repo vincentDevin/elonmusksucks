@@ -1998,14 +1998,6 @@ export type OPMLDocument = {
   feeds: OPMLFeed[]; // Root level feeds
 };
 
-export type OPMLImportResult = {
-  imported: number;
-  duplicates: number;
-  errors: Array<{
-    url: string;
-    error: string;
-  }>;
-};
 
 // Worker Job Types
 export type FeedFetchJob = {
@@ -3207,4 +3199,421 @@ export interface RulePerformanceMetrics {
   complexityScore: number;
   performanceScore: number; // 0-100, higher is better
   lastAnalyzed: string;
+}
+
+// ——— Unified Content Management System Types ————————————————————————————————
+
+/**
+ * Unified content types for cross-content management
+ */
+export type UnifiedContentType = 'article' | 'user_post' | 'comment' | 'prediction' | 'feed';
+
+/**
+ * Unified content status for all content types
+ */
+export type UnifiedContentStatus = 'pending' | 'approved' | 'rejected' | 'flagged' | 'deleted' | 'draft';
+
+/**
+ * Content author types
+ */
+export type ContentAuthorType = 'user' | 'feed' | 'system' | 'ai';
+
+/**
+ * Unified content priority levels
+ */
+export type ContentPriority = 'low' | 'normal' | 'high' | 'urgent';
+
+/**
+ * Content visibility levels
+ */
+export type ContentVisibility = 'public' | 'private' | 'friends' | 'followers' | 'unlisted';
+
+/**
+ * Unified content item interface - the core interface for all content types
+ */
+export interface UnifiedContentItem {
+  id: string;                    // Unified ID format: "{type}:{id}"
+  originalId: number;            // Original database ID
+  type: UnifiedContentType;
+  title?: string;                // Optional title (articles, predictions have titles)
+  content: string;               // Main content text
+  excerpt?: string;              // Short excerpt or summary
+
+  // Author information
+  author: {
+    id: number;
+    name: string;
+    type: ContentAuthorType;
+    avatarUrl?: string;
+    reputation?: number;
+  };
+
+  // Status and moderation
+  status: UnifiedContentStatus;
+  priority: ContentPriority;
+  visibility: ContentVisibility;
+  flags: string[];               // Content flags (spam, inappropriate, etc.)
+  moderationNotes?: string;      // Admin moderation notes
+
+  // Metadata
+  metadata: {
+    sourceId?: number;           // Feed ID for articles, parent ID for comments
+    parentId?: number;           // For threaded content (comments, replies)
+    threadId?: number;           // Thread grouping
+    tags?: string[];             // Content tags
+    categories?: string[];       // Content categories
+    language?: string;           // Content language
+    url?: string;                // External URL for articles
+    imageUrls?: string[];        // Associated images
+    videoUrls?: string[];        // Associated videos
+    attachments?: Array<{        // File attachments
+      id: string;
+      name: string;
+      url: string;
+      type: string;
+      size: number;
+    }>;
+  };
+
+  // Engagement metrics
+  engagement: {
+    views: number;
+    reactions: Record<string, number>;  // Like, dislike, love, etc.
+    comments: number;
+    shares: number;
+    bookmarks: number;
+    userReaction?: string;       // Current user's reaction
+    isBookmarked?: boolean;      // Current user bookmark status
+  };
+
+  // Timestamps
+  timestamps: {
+    createdAt: string;
+    updatedAt?: string;
+    publishedAt?: string;
+    deletedAt?: string;
+    moderatedAt?: string;
+  };
+
+  // AI/Quality metrics
+  quality?: {
+    score: number;               // 0-100 quality score
+    readability: number;         // 0-100 readability score
+    sentiment: 'positive' | 'negative' | 'neutral';
+    toxicity: number;            // 0-100 toxicity score
+    aiGenerated: boolean;        // AI detection flag
+    spam: boolean;               // Spam detection flag
+  };
+}
+
+/**
+ * Content filtering options for unified queries
+ */
+export interface UnifiedContentFilters {
+  types?: UnifiedContentType[];
+  statuses?: UnifiedContentStatus[];
+  authorIds?: number[];
+  authorTypes?: ContentAuthorType[];
+  tags?: string[];
+  categories?: string[];
+  flags?: string[];
+  priority?: ContentPriority[];
+  visibility?: ContentVisibility[];
+
+  // Date filtering
+  createdAfter?: string;
+  createdBefore?: string;
+  publishedAfter?: string;
+  publishedBefore?: string;
+
+  // Content filtering
+  search?: string;              // Full-text search
+  hasImages?: boolean;
+  hasVideos?: boolean;
+  hasAttachments?: boolean;
+
+  // Quality filtering
+  minQualityScore?: number;
+  maxToxicityScore?: number;
+  excludeAI?: boolean;
+  excludeSpam?: boolean;
+
+  // Engagement filtering
+  minViews?: number;
+  minReactions?: number;
+  minComments?: number;
+
+  // Pagination
+  limit?: number;
+  offset?: number;
+  cursor?: string;
+  sortBy?: 'createdAt' | 'updatedAt' | 'publishedAt' | 'views' | 'reactions' | 'quality';
+  sortOrder?: 'asc' | 'desc';
+}
+
+/**
+ * Unified content response with pagination
+ */
+export interface UnifiedContentResponse {
+  items: UnifiedContentItem[];
+  pagination: {
+    total: number;
+    hasMore: boolean;
+    nextCursor?: string;
+    currentPage?: number;
+    totalPages?: number;
+  };
+  filters: UnifiedContentFilters;
+  generatedAt: string;
+}
+
+/**
+ * Bulk operations on unified content
+ */
+export type UnifiedContentBulkAction =
+  | 'approve'
+  | 'reject'
+  | 'delete'
+  | 'flag'
+  | 'unflag'
+  | 'feature'
+  | 'unfeature'
+  | 'change_status'
+  | 'add_tags'
+  | 'remove_tags'
+  | 'change_visibility';
+
+export interface UnifiedContentBulkOperation {
+  action: UnifiedContentBulkAction;
+  itemIds: string[];             // Unified content IDs
+  parameters?: {
+    status?: UnifiedContentStatus;
+    tags?: string[];
+    visibility?: ContentVisibility;
+    reason?: string;
+    notes?: string;
+  };
+}
+
+export interface UnifiedContentBulkResult {
+  successCount: number;
+  failureCount: number;
+  totalProcessed: number;
+  errors: Array<{
+    itemId: string;
+    error: string;
+  }>;
+  warnings: Array<{
+    itemId: string;
+    warning: string;
+  }>;
+  processedAt: string;
+}
+
+/**
+ * Content analytics and insights
+ */
+export interface UnifiedContentAnalytics {
+  overview: {
+    totalItems: number;
+    itemsByType: Record<UnifiedContentType, number>;
+    itemsByStatus: Record<UnifiedContentStatus, number>;
+    averageQualityScore: number;
+    totalViews: number;
+    totalReactions: number;
+    totalComments: number;
+  };
+
+  trends: {
+    dailyCreated: Array<{
+      date: string;
+      count: number;
+      byType: Record<UnifiedContentType, number>;
+    }>;
+    weeklyEngagement: Array<{
+      week: string;
+      views: number;
+      reactions: number;
+      comments: number;
+    }>;
+    topTags: Array<{
+      tag: string;
+      count: number;
+      engagement: number;
+    }>;
+  };
+
+  quality: {
+    averageScores: {
+      quality: number;
+      readability: number;
+      toxicity: number;
+    };
+    flaggedContent: number;
+    aiGeneratedContent: number;
+    spamContent: number;
+    lowQualityContent: number;
+  };
+
+  moderation: {
+    pendingReview: number;
+    autoApproved: number;
+    manuallyApproved: number;
+    rejected: number;
+    averageProcessingTime: number; // in minutes
+    moderatorWorkload: Array<{
+      moderatorId: number;
+      moderatorName: string;
+      itemsProcessed: number;
+      averageTime: number;
+    }>;
+  };
+
+  generatedAt: string;
+}
+
+/**
+ * Content moderation action payload
+ */
+export interface UnifiedContentModerationAction {
+  itemId: string;
+  action: 'approve' | 'reject' | 'flag' | 'delete' | 'edit';
+  reason?: string;
+  notes?: string;
+  tags?: string[];
+  newStatus?: UnifiedContentStatus;
+  notifyUser?: boolean;
+  moderatorId: number;
+}
+
+/**
+ * Content creation payload for unified system
+ */
+export interface CreateUnifiedContentPayload {
+  type: UnifiedContentType;
+  title?: string;
+  content: string;
+  excerpt?: string;
+  authorId: number;
+  parentId?: number;             // For comments/replies
+  threadId?: number;
+  tags?: string[];
+  categories?: string[];
+  visibility: ContentVisibility;
+  priority?: ContentPriority;
+  metadata?: {
+    url?: string;
+    imageUrls?: string[];
+    videoUrls?: string[];
+    language?: string;
+  };
+  schedulePublishAt?: string;    // For scheduled publishing
+}
+
+/**
+ * Content update payload for unified system
+ */
+export interface UpdateUnifiedContentPayload {
+  title?: string;
+  content?: string;
+  excerpt?: string;
+  tags?: string[];
+  categories?: string[];
+  visibility?: ContentVisibility;
+  priority?: ContentPriority;
+  status?: UnifiedContentStatus;
+  metadata?: {
+    url?: string;
+    imageUrls?: string[];
+    videoUrls?: string[];
+    language?: string;
+  };
+  moderationNotes?: string;
+}
+
+/**
+ * Real-time content event payloads
+ */
+export interface UnifiedContentEventPayload {
+  eventType: 'created' | 'updated' | 'deleted' | 'status_changed' | 'moderated';
+  contentId: string;
+  contentType: UnifiedContentType;
+  authorId: number;
+  changes?: {
+    field: string;
+    oldValue: any;
+    newValue: any;
+  }[];
+  moderatorId?: number;
+  timestamp: string;
+}
+
+/**
+ * Content search and discovery
+ */
+export interface UnifiedContentSearchQuery {
+  query?: string;               // Full-text search query
+  filters?: UnifiedContentFilters;
+  facets?: string[];            // Fields to get facet counts for
+  highlight?: boolean;          // Enable search highlighting
+  suggestions?: boolean;        // Enable search suggestions
+  semanticSearch?: boolean;     // Enable AI-powered semantic search
+}
+
+export interface UnifiedContentSearchResult {
+  items: (UnifiedContentItem & {
+    score: number;              // Search relevance score
+    highlights?: Record<string, string[]>; // Highlighted text snippets
+  })[];
+  facets: Record<string, Array<{
+    value: string;
+    count: number;
+  }>>;
+  suggestions?: string[];       // Search query suggestions
+  totalResults: number;
+  searchTime: number;           // Search execution time in ms
+  query: UnifiedContentSearchQuery;
+}
+
+/**
+ * OPML Management Types (completing missing backend implementation)
+ */
+export interface OPMLImportPayload {
+  file: File | string;          // File object or XML string
+  validateFeeds?: boolean;      // Whether to validate feed URLs
+  autoEnable?: boolean;         // Whether to auto-enable imported feeds
+  overwriteExisting?: boolean;  // Whether to overwrite existing feeds
+  categoryMapping?: Record<string, string>; // Map OPML categories to system categories
+}
+
+export interface OPMLImportResult {
+  totalFeeds: number;
+  importedFeeds: number;
+  skippedFeeds: number;
+  failedFeeds: number;
+  errors: Array<{
+    feedUrl: string;
+    error: string;
+  }>;
+  importedFeedIds: number[];
+  processedAt: string;
+}
+
+export interface OPMLExportOptions {
+  includeDisabled?: boolean;    // Include disabled feeds
+  categories?: string[];        // Export only specific categories
+  format?: 'opml1' | 'opml2';   // OPML format version
+  includeStats?: boolean;       // Include feed statistics as attributes
+}
+
+export interface OPMLExportResult {
+  xml: string;                  // Generated OPML XML
+  feedCount: number;            // Number of feeds exported
+  categories: string[];         // Categories included
+  generatedAt: string;
+  metadata: {
+    title: string;
+    generator: string;
+    docs: string;
+  };
 }

@@ -164,9 +164,9 @@ export const FeedsManager: React.FC<FeedsManagerProps> = ({ className = '' }) =>
     switch (status) {
       case 'ACTIVE':
         return 'bg-success/10 text-success border border-success/20';
-      case 'PAUSED':
+      case 'INACTIVE':
         return 'bg-warning/10 text-warning border border-warning/20';
-      case 'BLOCKED':
+      case 'ERROR':
         return 'bg-danger/10 text-danger border border-danger/20';
       default:
         return 'bg-muted/10 text-muted border border-muted/20';
@@ -465,7 +465,7 @@ export const FeedsManager: React.FC<FeedsManagerProps> = ({ className = '' }) =>
                   name: formData.get('name') as string,
                   url: formData.get('url') as string,
                   siteUrl: (formData.get('siteUrl') as string) || undefined,
-                  status: formData.get('status') as 'ACTIVE' | 'PAUSED' | 'BLOCKED',
+                  status: formData.get('status') as 'ACTIVE' | 'INACTIVE' | 'ERROR',
                   allowImages: (formData.get('allowImages') as string) === 'on',
                 });
               }}
@@ -510,8 +510,8 @@ export const FeedsManager: React.FC<FeedsManagerProps> = ({ className = '' }) =>
                     className="w-full border border-muted rounded-md px-3 py-2 bg-background text-content focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                   >
                     <option value="ACTIVE">Active</option>
-                    <option value="PAUSED">Paused</option>
-                    <option value="BLOCKED">Blocked</option>
+                    <option value="INACTIVE">Inactive</option>
+                    <option value="ERROR">Error</option>
                   </select>
                 </div>
                 <div>

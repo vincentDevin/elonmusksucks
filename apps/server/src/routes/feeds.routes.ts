@@ -16,6 +16,7 @@ import {
   getArticleCount,
   getArticles,
 } from '../controllers/feeds.controller';
+import { importOPML, exportOPML, validateOPML, getOPMLStats } from '../controllers/opml.controller';
 
 const router = Router();
 
@@ -162,5 +163,18 @@ router.get('/articles', async (req: any, res: any) => {
 
 // POST /api/admin/feeds/:id/refresh - Manual feed refresh trigger
 router.post('/:id/refresh', refreshFeed);
+
+// OPML Management Routes
+// POST /api/admin/feeds/opml/import - Import feeds from OPML file
+router.post('/opml/import', importOPML);
+
+// GET /api/admin/feeds/opml/export - Export feeds to OPML file
+router.get('/opml/export', exportOPML);
+
+// POST /api/admin/feeds/opml/validate - Validate OPML content without importing
+router.post('/opml/validate', validateOPML);
+
+// GET /api/admin/feeds/opml/stats - Get OPML-related statistics
+router.get('/opml/stats', getOPMLStats);
 
 export default router;

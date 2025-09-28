@@ -5,6 +5,7 @@ import { payoutService } from '../services/payout.service';
 import { adminAchievementService } from '../services/achievements/adminAchievement.service';
 import { shameWallService } from '../services/shameWall.service';
 import { RuleSimulationService } from '../services/achievements/ruleSimulation.service';
+import { unifiedContentService } from '../services/unifiedContent.service';
 
 const ruleSimulationService = new RuleSimulationService();
 import { serializeBigInt } from '../utils/bigintSerializer';
@@ -46,6 +47,9 @@ import type {
   AdminAchievementAnalyticsResponse,
   AdminBanHistoryView,
   ResolvePredictionPayload,
+  UnifiedContentType,
+  UnifiedContentStatus,
+  ContentPriority,
 } from '@ems/types';
 import type { Role } from '@prisma/client';
 import type {
@@ -1267,6 +1271,272 @@ export const quickSimulate = async (
     });
   } catch (err) {
     console.error('Quick simulation failed:', err);
+    next(err);
+  }
+};
+
+// ——————————————————————————————————————————————————————————————————————————————
+// Unified Content Management Endpoints
+// ——————————————————————————————————————————————————————————————————————————————
+
+/**
+ * GET /api/admin/unified-content
+ * Get unified content items with filtering and pagination
+ */
+export const getUnifiedContent = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const filters = {
+      types: req.query.types
+        ? Array.isArray(req.query.types)
+          ? (req.query.types as UnifiedContentType[])
+          : [req.query.types as UnifiedContentType]
+        : undefined,
+      statuses: req.query.statuses
+        ? Array.isArray(req.query.statuses)
+          ? (req.query.statuses as UnifiedContentStatus[])
+          : [req.query.statuses as UnifiedContentStatus]
+        : undefined,
+      search: req.query.search as string,
+      authorIds: req.query.authorIds
+        ? Array.isArray(req.query.authorIds)
+          ? req.query.authorIds.map((id) => Number(id))
+          : [Number(req.query.authorIds)]
+        : undefined,
+      createdAfter: req.query.createdAfter as string,
+      createdBefore: req.query.createdBefore as string,
+      publishedAfter: req.query.publishedAfter as string,
+      publishedBefore: req.query.publishedBefore as string,
+      priority: req.query.priority
+        ? Array.isArray(req.query.priority)
+          ? (req.query.priority as ContentPriority[])
+          : [req.query.priority as ContentPriority]
+        : undefined,
+      tags: req.query.tags
+        ? Array.isArray(req.query.tags)
+          ? (req.query.tags as string[])
+          : [req.query.tags as string]
+        : undefined,
+      limit: req.query.limit ? Number(req.query.limit) : 25,
+      offset: req.query.offset ? Number(req.query.offset) : 0,
+      sortBy: req.query.sortBy as
+        | 'createdAt'
+        | 'updatedAt'
+        | 'publishedAt'
+        | 'views'
+        | 'reactions'
+        | 'quality'
+        | undefined,
+      sortOrder: req.query.sortOrder as 'asc' | 'desc' | undefined,
+    };
+
+    const result = await unifiedContentService.getContent(filters);
+    res.json(result);
+  } catch (err) {
+    console.error('Error fetching unified content:', err);
+    next(err);
+  }
+};
+
+/**
+ * GET /api/admin/unified-content/analytics
+ * Get unified content analytics
+ */
+export const getUnifiedContentAnalytics = async (
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const analytics = await unifiedContentService.getAnalytics();
+    res.json(analytics);
+  } catch (err) {
+    console.error('Error fetching unified content analytics:', err);
+    next(err);
+  }
+};
+
+/**
+ * POST /api/admin/unified-content/bulk
+ * Perform bulk moderation operation on content items
+ */
+export const performBulkContentOperation = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const operation = req.body;
+    const result = await unifiedContentService.performBulkOperation(operation);
+    res.json(result);
+  } catch (err) {
+    console.error('Error performing bulk content operation:', err);
+    next(err);
+  }
+};
+
+/**
+ * POST /api/admin/unified-content/:contentId/approve
+ * Approve content item
+ */
+export const approveUnifiedContent = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const { contentId } = req.params;
+    const { reason } = req.body;
+
+    await unifiedContentService.performBulkOperation({
+      action: 'approve',
+      itemIds: [contentId],
+      parameters: { reason },
+    });
+
+    res.json({ success: true, message: 'Content approved successfully' });
+  } catch (err) {
+    console.error('Error approving unified content:', err);
+    next(err);
+  }
+};
+
+/**
+ * POST /api/admin/unified-content/:contentId/reject
+ * Reject content item
+ */
+export const rejectUnifiedContent = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const { contentId } = req.params;
+    const { reason } = req.body;
+
+    await unifiedContentService.performBulkOperation({
+      action: 'reject',
+      itemIds: [contentId],
+      parameters: { reason },
+    });
+
+    res.json({ success: true, message: 'Content rejected successfully' });
+  } catch (err) {
+    console.error('Error rejecting unified content:', err);
+    next(err);
+  }
+};
+
+/**
+ * POST /api/admin/unified-content/:contentId/flag
+ * Flag content item
+ */
+export const flagUnifiedContent = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const { contentId } = req.params;
+    const { reason } = req.body;
+
+    await unifiedContentService.performBulkOperation({
+      action: 'flag',
+      itemIds: [contentId],
+      parameters: { reason },
+    });
+
+    res.json({ success: true, message: 'Content flagged successfully' });
+  } catch (err) {
+    console.error('Error flagging unified content:', err);
+    next(err);
+  }
+};
+
+/**
+ * DELETE /api/admin/unified-content/:contentId
+ * Delete content item
+ */
+export const deleteUnifiedContent = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const { contentId } = req.params;
+    const { reason } = req.body;
+
+    await unifiedContentService.performBulkOperation({
+      action: 'delete',
+      itemIds: [contentId],
+      parameters: { reason },
+    });
+
+    res.json({ success: true, message: 'Content deleted successfully' });
+  } catch (err) {
+    console.error('Error deleting unified content:', err);
+    next(err);
+  }
+};
+
+/**
+ * GET /api/admin/unified-content/export
+ * Export content data
+ */
+export const exportUnifiedContent = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    // Parse filters from query parameters (same as getUnifiedContent)
+    const filters = {
+      types: req.query.types
+        ? Array.isArray(req.query.types)
+          ? (req.query.types as UnifiedContentType[])
+          : [req.query.types as UnifiedContentType]
+        : undefined,
+      statuses: req.query.statuses
+        ? Array.isArray(req.query.statuses)
+          ? (req.query.statuses as UnifiedContentStatus[])
+          : [req.query.statuses as UnifiedContentStatus]
+        : undefined,
+      search: req.query.search as string,
+      createdAfter: req.query.createdAfter as string,
+      createdBefore: req.query.createdBefore as string,
+      // For export, don't limit results
+      limit: 10000,
+      offset: 0,
+    };
+
+    const format = (req.query.format as string) || 'csv';
+    const result = await unifiedContentService.getContent(filters);
+
+    if (format === 'json') {
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', 'attachment; filename=unified-content.json');
+      res.json(result.items);
+    } else {
+      // CSV format
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename=unified-content.csv');
+
+      // Simple CSV generation (could be enhanced with a proper CSV library)
+      const csvHeader = 'ID,Type,Title,Content,Author,Status,Created At,Updated At\n';
+      const csvRows = result.items
+        .map(
+          (item) =>
+            `"${item.id}","${item.type}","${(item.title || '').replace(/"/g, '""')}","${item.content.substring(0, 100).replace(/"/g, '""')}","${item.author.name.replace(/"/g, '""')}","${item.status}","${item.timestamps.createdAt}","${item.timestamps.updatedAt || ''}"`,
+        )
+        .join('\n');
+
+      res.send(csvHeader + csvRows);
+    }
+  } catch (err) {
+    console.error('Error exporting unified content:', err);
     next(err);
   }
 };

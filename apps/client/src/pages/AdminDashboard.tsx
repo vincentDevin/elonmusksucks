@@ -5,8 +5,7 @@ import UserManagement from '../components/admin/users/UserManagement';
 import PredictionDashboard from '../components/admin/predictions/PredictionDashboard';
 import FinancialDashboard from '../components/admin/financial/FinancialDashboard';
 import AdminAchievementDashboard from '../components/admin/achievements/AdminAchievementDashboard';
-import FeedsManager from '../components/admin/feeds/FeedsManager';
-import ModerationQueue from '../components/admin/content/ModerationQueue';
+import ContentDashboard from '../components/admin/content-management/ContentDashboard';
 import EventSystemMonitor from '../components/admin/system/EventSystemMonitor';
 
 const AdminDashboard: React.FC = () => {
@@ -14,12 +13,11 @@ const AdminDashboard: React.FC = () => {
   const { loadUsers, loadPendingPredictions, loadBadges } = useAdmin();
 
   const tabs = [
-    { key: 'users', label: 'User Management & Moderation', component: <UserManagement /> },
-    { key: 'predictions', label: 'Prediction Management', component: <PredictionDashboard /> },
+    { key: 'users', label: 'User Management', component: <UserManagement /> },
+    { key: 'predictions', label: 'Predictions', component: <PredictionDashboard /> },
     { key: 'bets', label: 'Financial Operations', component: <FinancialDashboard /> },
-    { key: 'badges', label: 'Achievement Management', component: <AdminAchievementDashboard /> },
-    { key: 'feeds', label: 'RSS Feeds Management', component: <FeedsManager /> },
-    { key: 'moderation', label: 'Content Moderation', component: <ModerationQueue /> },
+    { key: 'badges', label: 'Achievements', component: <AdminAchievementDashboard /> },
+    { key: 'content', label: 'Content Management', component: <ContentDashboard /> },
     { key: 'events', label: 'Event System Monitor', component: <EventSystemMonitor /> },
   ];
 
