@@ -9,6 +9,7 @@ import {
 } from '@heroicons/react/24/outline';
 import api from '../../api/axios';
 import BaseCard from '../BaseCard';
+import { formatMuskBucks } from '../../utils/formatting';
 
 interface PongStatsCardProps {
   userId: number;
@@ -80,13 +81,6 @@ export default function PongStatsCard({
     fetchStats();
   }, [userId]);
 
-  const formatCurrency = (amount: bigint): string => {
-    const num = Number(amount);
-    if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
-    if (num >= 1000) return `${(num / 1000).toFixed(1)}k`;
-    return num.toString();
-  };
-
   const formatDuration = (seconds: number): string => {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
@@ -131,7 +125,7 @@ export default function PongStatsCard({
             <div className="text-tertiary">Win Rate</div>
           </div>
           <div className="text-center">
-            <div className="font-bold text-success">{formatCurrency(stats.totalWon)}</div>
+            <div className="font-bold text-success">{formatMuskBucks(stats.totalWon)}</div>
             <div className="text-tertiary">Earned</div>
           </div>
           <div className="text-center">
@@ -175,7 +169,7 @@ export default function PongStatsCard({
         </div>
         <div className="text-center p-3 bg-muted/30 rounded-lg">
           <CurrencyDollarIcon className="w-6 h-6 text-success mx-auto mb-1" />
-          <div className="font-bold text-lg text-content">{formatCurrency(stats.totalWon)}</div>
+          <div className="font-bold text-lg text-content">{formatMuskBucks(stats.totalWon)}</div>
           <div className="text-sm text-tertiary">Total Earned</div>
         </div>
       </div>
@@ -211,13 +205,15 @@ export default function PongStatsCard({
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div className="flex justify-between">
               <span className="text-tertiary">Total Wagered</span>
-              <span className="font-medium text-content">{formatCurrency(stats.totalWagered)}</span>
+              <span className="font-medium text-content">
+                {formatMuskBucks(stats.totalWagered)}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-tertiary">Profit/Loss</span>
               <span className={`font-medium ${stats.profit >= 0n ? 'text-success' : 'text-error'}`}>
                 {stats.profit >= 0n ? '+' : ''}
-                {formatCurrency(stats.profit)}
+                {formatMuskBucks(stats.profit)}
               </span>
             </div>
             <div className="flex justify-between">
@@ -230,7 +226,7 @@ export default function PongStatsCard({
             </div>
             <div className="flex justify-between">
               <span className="text-tertiary">Biggest Win</span>
-              <span className="font-medium text-success">{formatCurrency(stats.biggestWin)}</span>
+              <span className="font-medium text-success">{formatMuskBucks(stats.biggestWin)}</span>
             </div>
           </div>
         </div>

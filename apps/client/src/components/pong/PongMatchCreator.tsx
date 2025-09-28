@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { formatMuskBucks } from '../../utils/formatting';
 import EloPredictionCard from './EloPredictionCard';
 
 interface PongMatchCreatorProps {
@@ -209,7 +210,7 @@ export function PongMatchCreator({ onCreateMatch }: PongMatchCreatorProps) {
                       isAiWagerLocked ? 'opacity-60 cursor-not-allowed' : ''
                     }`}
                   >
-                    {amount === 0 ? 'Free' : `${amount}`}
+                    {amount === 0 ? 'Free' : formatMuskBucks(amount)}
                   </button>
                 ))}
               </div>
@@ -296,7 +297,7 @@ export function PongMatchCreator({ onCreateMatch }: PongMatchCreatorProps) {
                       isPvpWagerLocked ? 'opacity-60 cursor-not-allowed' : ''
                     }`}
                   >
-                    {amount === 0 ? 'Free' : `${amount}`}
+                    {amount === 0 ? 'Free' : formatMuskBucks(amount)}
                   </button>
                 ))}
               </div>

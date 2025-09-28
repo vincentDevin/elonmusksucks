@@ -1,6 +1,7 @@
 // apps/client/src/components/UnifiedPredictionCard.tsx
 // Unified prediction card component merging full and compact variants
 import { useState } from 'react';
+import { formatMuskBucks } from '../../utils/formatting';
 
 // Helper to convert string/number to number
 const asNum = (v: string | number | bigint | undefined | null) => Number(v ?? 0);
@@ -174,7 +175,7 @@ export default function UnifiedPredictionCard({
             </span>
             {totalVolume > 0 && (
               <span className="flex items-center gap-1">
-                <span className="text-primary">💰</span>${totalVolume.toLocaleString()} volume
+                <span className="text-primary">💰</span>${formatMuskBucks(totalVolume)} volume
               </span>
             )}
             <span className="flex items-center gap-1">
@@ -286,8 +287,7 @@ export default function UnifiedPredictionCard({
             </span>
             {totalVolume > 0 && (
               <span className="flex items-center gap-1">
-                <span className="text-primary">💰</span>$
-                {isMini ? Math.round(totalVolume / 1000) + 'k' : totalVolume.toLocaleString()}
+                <span className="text-primary">💰</span>${formatMuskBucks(totalVolume)}
               </span>
             )}
             {!prediction.resolved && (

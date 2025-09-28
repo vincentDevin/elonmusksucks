@@ -1,4 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
+import { formatMuskBucks } from '../../utils/formatting';
+
+// Helper to convert string/number to number
+const asNum = (v: string | number | bigint | undefined | null) => Number(v ?? 0);
 import {
   searchFinancialData,
   getFinancialAnalytics,
@@ -141,7 +145,9 @@ export default function FinancialDashboard() {
         params: { reason: 'Admin bulk refund' },
       });
 
-      alert(`Refunded ${result.successCount} bets. Total refunded: $${result.totalRefunded || 0}`);
+      alert(
+        `Refunded ${result.successCount} bets. Total refunded: $${formatMuskBucks(result.totalRefunded || 0)}`,
+      );
       setSelectedBets(new Set());
       loadFinancialData(); // Reload data
     } catch (err) {
@@ -204,11 +210,11 @@ export default function FinancialDashboard() {
   const overviewStats = useMemo(() => {
     if (!financialData) return null;
 
-    const totalBetAmount = financialData.bets.reduce((sum, bet) => sum + bet.amount, 0);
-    const totalPayout = financialData.bets.reduce((sum, bet) => sum + (bet.payout || 0), 0);
+    const totalBetAmount = financialData.bets.reduce((sum, bet) => sum + asNum(bet.amount), 0);
+    const totalPayout = financialData.bets.reduce((sum, bet) => sum + asNum(bet.payout || 0), 0);
     const refundedAmount = financialData.bets
       .filter((bet) => bet.status === 'REFUNDED')
-      .reduce((sum, bet) => sum + bet.amount, 0);
+      .reduce((sum, bet) => sum + asNum(bet.amount), 0);
 
     return {
       totalBets: financialData.bets.length,
@@ -407,22 +413,26 @@ export default function FinancialDashboard() {
               </div>
               <div className="bg-surface p-4 rounded-lg border border-muted">
                 <div className="text-2xl font-bold text-primary">
-                  ${overviewStats.totalBetAmount}
+                  ${formatMuskBucks(overviewStats.totalBetAmount)}
                 </div>
                 <div className="text-sm text-tertiary">Bet Volume</div>
               </div>
               <div className="bg-surface p-4 rounded-lg border border-muted">
-                <div className="text-2xl font-bold text-primary">${overviewStats.totalPayout}</div>
+                <div className="text-2xl font-bold text-primary">
+                  ${formatMuskBucks(overviewStats.totalPayout)}
+                </div>
                 <div className="text-sm text-tertiary">Payouts</div>
               </div>
               <div className="bg-surface p-4 rounded-lg border border-muted">
                 <div className="text-2xl font-bold text-primary">
-                  ${overviewStats.refundedAmount}
+                  ${formatMuskBucks(overviewStats.refundedAmount)}
                 </div>
                 <div className="text-sm text-tertiary">Refunded</div>
               </div>
               <div className="bg-surface p-4 rounded-lg border border-muted">
-                <div className="text-2xl font-bold text-primary">${overviewStats.netRevenue}</div>
+                <div className="text-2xl font-bold text-primary">
+                  ${formatMuskBucks(overviewStats.netRevenue)}
+                </div>
                 <div className="text-sm text-tertiary">Net Revenue</div>
               </div>
             </div>
@@ -434,7 +444,9 @@ export default function FinancialDashboard() {
               <h3 className="text-lg font-semibold text-content mb-4">Analytics Summary</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
-                  <div className="text-xl font-bold text-primary">${analytics.totalVolume}</div>
+                  <div className="text-xl font-bold text-primary">
+                    ${formatMuskBucks(analytics.totalVolume)}
+                  </div>
                   <div className="text-sm text-tertiary">Total Volume</div>
                 </div>
                 <div>
@@ -442,11 +454,15 @@ export default function FinancialDashboard() {
                   <div className="text-sm text-tertiary">Total Bets</div>
                 </div>
                 <div>
-                  <div className="text-xl font-bold text-primary">${analytics.avgBetAmount}</div>
+                  <div className="text-xl font-bold text-primary">
+                    ${formatMuskBucks(analytics.avgBetAmount)}
+                  </div>
                   <div className="text-sm text-tertiary">Avg Bet Size</div>
                 </div>
                 <div>
-                  <div className="text-xl font-bold text-primary">${analytics.netRevenue}</div>
+                  <div className="text-xl font-bold text-primary">
+                    ${formatMuskBucks(analytics.netRevenue)}
+                  </div>
                   <div className="text-sm text-tertiary">Net Revenue</div>
                 </div>
               </div>
@@ -473,9 +489,15 @@ export default function FinancialDashboard() {
                     {analytics.topUsers.map((user, index) => (
                       <tr key={index} className="border-b border-muted">
                         <td className="py-2 text-sm text-content">{user.userName}</td>
-                        <td className="py-2 text-sm text-content">${user.totalWagered}</td>
-                        <td className="py-2 text-sm text-content">${user.totalWon}</td>
-                        <td className="py-2 text-sm text-content">${user.netLoss}</td>
+                        <td className="py-2 text-sm text-content">
+                          ${formatMuskBucks(user.totalWagered)}
+                        </td>
+                        <td className="py-2 text-sm text-content">
+                          ${formatMuskBucks(user.totalWon)}
+                        </td>
+                        <td className="py-2 text-sm text-content">
+                          ${formatMuskBucks(user.netLoss)}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -581,9 +603,11 @@ export default function FinancialDashboard() {
                         </div>
                         <div className="text-tertiary">{bet.prediction?.category}</div>
                       </td>
-                      <td className="px-4 py-3 text-sm font-medium text-content">${bet.amount}</td>
+                      <td className="px-4 py-3 text-sm font-medium text-content">
+                        ${formatMuskBucks(asNum(bet.amount))}
+                      </td>
                       <td className="px-4 py-3 text-sm text-content">
-                        ${bet.potentialPayout || 0}
+                        ${formatMuskBucks(asNum(bet.potentialPayout || 0))}
                       </td>
                       <td className="px-4 py-3">
                         <span
@@ -704,9 +728,12 @@ export default function FinancialDashboard() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-sm font-medium text-content">
-                        {tx.type === 'CREDIT' ? '+' : '-'}${Math.abs(tx.amount)}
+                        {tx.type === 'CREDIT' ? '+' : '-'}$
+                        {formatMuskBucks(Math.abs(asNum(tx.amount)))}
                       </td>
-                      <td className="px-4 py-3 text-sm text-content">${tx.balanceAfter}</td>
+                      <td className="px-4 py-3 text-sm text-content">
+                        ${formatMuskBucks(asNum(tx.balanceAfter))}
+                      </td>
                       <td className="px-4 py-3 text-sm text-tertiary">
                         {tx.relatedBetId
                           ? `Bet #${tx.relatedBetId}`

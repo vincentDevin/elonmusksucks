@@ -32,7 +32,11 @@ import {
   transformPongHeaderStats,
   transformShameHeaderStats,
 } from '../components/leaderboard/dataTransformers';
-import type { LeaderboardVariant, ControlBarConfig } from '../components/leaderboard/types';
+import type {
+  LeaderboardVariant,
+  ControlBarConfig,
+  FilterGroup,
+} from '../components/leaderboard/types';
 
 type TabType = 'betting' | 'pong' | 'shame';
 
@@ -162,9 +166,11 @@ export default function Leaderboard() {
   const controlBarConfig: ControlBarConfig = useMemo(() => {
     const variant = activeTab as LeaderboardVariant;
 
-    const baseConfig = {
+    let filterGroups: FilterGroup[] = [];
+
+    const baseConfig: ControlBarConfig = {
       variant,
-      filterGroups: [],
+      filterGroups,
       actions: [
         {
           label: 'Refresh',
@@ -212,7 +218,7 @@ export default function Leaderboard() {
 
     // Add tab-specific filters
     if (activeTab === 'betting') {
-      baseConfig.filterGroups = [
+      filterGroups = [
         {
           label: 'Period',
           options: [
@@ -235,7 +241,7 @@ export default function Leaderboard() {
         },
       ];
     } else if (activeTab === 'pong') {
-      baseConfig.filterGroups = [
+      filterGroups = [
         {
           label: 'Metric',
           options: [
@@ -252,7 +258,10 @@ export default function Leaderboard() {
       ];
     }
 
-    return baseConfig;
+    return {
+      ...baseConfig,
+      filterGroups,
+    };
   }, [activeTab, period, metric, pongMetric, refresh, loading, pongLoading, shameWallLoading]);
 
   // Handle initial loading states for all tabs

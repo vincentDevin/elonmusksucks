@@ -1,6 +1,7 @@
 // apps/client/src/components/profile/graphs/FinancialBarChart.tsx
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { useEffect, useState } from 'react';
+import { formatMuskBucks } from '../../../utils/formatting';
 
 interface BarChartProps {
   wagered: number;
@@ -49,19 +50,19 @@ export function FinancialBarChart({ wagered, won, profit }: BarChartProps) {
       name: 'Wagered',
       amount: wagered,
       color: colors.wagered,
-      displayAmount: `$${wagered.toLocaleString()}`,
+      displayAmount: `$${formatMuskBucks(wagered)}`,
     },
     {
       name: 'Won',
       amount: won,
       color: colors.won,
-      displayAmount: `$${won.toLocaleString()}`,
+      displayAmount: `$${formatMuskBucks(won)}`,
     },
     {
       name: 'Profit',
       amount: profit,
       color: profit >= 0 ? colors.profitPositive : colors.profitNegative,
-      displayAmount: `${profit >= 0 ? '+' : ''}$${profit.toLocaleString()}`,
+      displayAmount: `${profit >= 0 ? '+' : ''}$${formatMuskBucks(profit)}`,
     },
   ];
 
@@ -112,7 +113,7 @@ export function FinancialBarChart({ wagered, won, profit }: BarChartProps) {
             tick={{ fontSize: 11, fill: colors.muted }}
             axisLine={{ stroke: colors.muted }}
             tickLine={{ stroke: colors.muted }}
-            tickFormatter={(value) => `$${value.toLocaleString()}`}
+            tickFormatter={(value) => `$${formatMuskBucks(value)}`}
           />
           <Tooltip content={<CustomTooltip />} />
           <Bar dataKey="amount" radius={[4, 4, 0, 0]}>

@@ -1,4 +1,5 @@
 // Data transformers to convert different entry types to unified format
+import { formatMuskBucks } from '../../utils/formatting';
 import type { PublicLeaderboardEntry, PongLeaderboardView } from '@ems/types';
 import type { ShameWallEntry } from '../../api/shameWall';
 import type { UnifiedLeaderboardEntry, LeaderboardHeaderStats } from './types';
@@ -22,7 +23,7 @@ export function transformBettingEntry(
     variant: 'betting',
     primaryStat: {
       label: 'Balance',
-      value: `${entry.balance} 🪙`,
+      value: `${formatMuskBucks(entry.balance)} 🪙`,
       highlight: asNum(entry.balance) > 10000,
       color: asNum(entry.balance) > 10000 ? 'text-primary' : undefined,
     },
@@ -41,7 +42,7 @@ export function transformBettingEntry(
       },
       {
         label: period === 'all-time' ? 'Total Profit' : 'Daily Profit',
-        value: `${profit} 🏦`,
+        value: `${formatMuskBucks(profit)} 🏦`,
         highlight: profit > (period === 'all-time' ? 1000 : 100),
         color: profit > 0 ? 'text-green-400' : 'text-red-400',
       },
@@ -105,14 +106,14 @@ export function transformPongEntry(
     case 'totalWon':
       primaryStat = {
         label: 'Earnings',
-        value: `${(asNum(entry.totalWon) / 1000).toFixed(1)}k`,
+        value: formatMuskBucks(entry.totalWon),
         highlight: asNum(entry.totalWon) > 10000,
       };
       break;
     case 'totalWagered':
       primaryStat = {
         label: 'Volume',
-        value: `${(asNum(entry.totalWagered) / 1000).toFixed(1)}k`,
+        value: formatMuskBucks(entry.totalWagered),
         highlight: asNum(entry.totalWagered) > 50000,
       };
       break;
@@ -174,7 +175,7 @@ export function transformPongEntry(
     },
     {
       label: 'Earnings',
-      value: `${(asNum(entry.totalWon) / 1000).toFixed(1)}k`,
+      value: formatMuskBucks(entry.totalWon),
       color: 'text-accent',
     },
     {
@@ -189,7 +190,7 @@ export function transformPongEntry(
     },
     {
       label: 'Volume',
-      value: `${entry.totalWagered ? (asNum(entry.totalWagered) / 1000).toFixed(1) : '0'}k`,
+      value: formatMuskBucks(entry.totalWagered || 0),
       color: 'text-cyan-400',
     },
   ];
@@ -286,7 +287,7 @@ export function transformBettingHeaderStats(stats: any, userRank?: any): Leaderb
         label: 'Total Bets',
       },
       {
-        value: stats?.totalVolume?.toLocaleString() || '0',
+        value: formatMuskBucks(stats?.totalVolume || 0),
         label: 'Total Volume',
       },
       ...(stats?.lastRefresh

@@ -8,6 +8,7 @@ import {
   LockOpenIcon,
 } from '@heroicons/react/24/outline';
 import api from '../../api/axios';
+import { formatMuskBucks } from '../../utils/formatting';
 import { ClientEloCalculator } from '../../utils/eloCalculations';
 
 interface EloPredictionCardProps {
@@ -257,7 +258,7 @@ export default function EloPredictionCard({
         <div>
           <div className="text-tertiary">Wager</div>
           <div className="font-bold text-accent">
-            {isWagerLocked ? lockedWager : wagerAmount}
+            {formatMuskBucks(isWagerLocked ? lockedWager : wagerAmount)}
             {isWagerLocked && ' 🔒'}
           </div>
         </div>

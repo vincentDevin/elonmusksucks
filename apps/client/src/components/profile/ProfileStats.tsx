@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAdmin } from '../../contexts/AdminContext';
+import { formatMuskBucks, getMuskBucksColorClasses } from '../../utils/formatting';
 
 // Helper to convert string/number to number
 const asNum = (v: string | number | bigint | undefined | null) => Number(v ?? 0);
@@ -165,9 +166,9 @@ export function ProfileStats({
                         <td className="px-2 py-1">{s.totalParlays}</td>
                         <td className="px-2 py-1">{s.parlaysWon}</td>
                         <td className="px-2 py-1">{s.parlaysLost}</td>
-                        <td className="px-2 py-1">{s.totalWagered}</td>
-                        <td className="px-2 py-1">{s.totalWon}</td>
-                        <td className="px-2 py-1">{s.profit}</td>
+                        <td className="px-2 py-1">${formatMuskBucks(s.totalWagered)}</td>
+                        <td className="px-2 py-1">${formatMuskBucks(s.totalWon)}</td>
+                        <td className="px-2 py-1">${formatMuskBucks(s.profit)}</td>
                         <td className="px-2 py-1">{(s.roi * 100).toFixed(1)}%</td>
                         <td className="px-2 py-1">
                           <button
@@ -280,7 +281,12 @@ export function ProfileStats({
       {/* Quick Stats Summary - always visible */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 bg-secondary/10 rounded-xl">
         <div className="text-center">
-          <div className="text-lg font-bold text-primary">{asNum(profile.muskBucks)} 🪙</div>
+          <div
+            className={`text-lg font-bold flex items-center justify-center gap-1 px-2 py-1 rounded-full ${getMuskBucksColorClasses(profile.muskBucks)}`}
+          >
+            <span>{formatMuskBucks(profile.muskBucks)}</span>
+            <span>🪙</span>
+          </div>
           <div className="text-xs text-tertiary">MuskBucks</div>
         </div>
         <div className="text-center">
@@ -295,7 +301,7 @@ export function ProfileStats({
           <div
             className={`text-lg font-bold ${asNum(stats.profit) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
           >
-            {asNum(stats.profit) >= 0 ? '+' : ''}${asNum(stats.profit).toLocaleString()}
+            {asNum(stats.profit) >= 0 ? '+' : ''}${formatMuskBucks(stats.profit)}
           </div>
           <div className="text-xs text-tertiary">Profit</div>
         </div>
@@ -354,15 +360,15 @@ export function ProfileStats({
             </div>
             <div className="bg-background/30 p-3 rounded">
               <div className="text-tertiary text-xs">Total Wagered</div>
-              <div className="font-semibold">${asNum(stats.totalWagered).toLocaleString()}</div>
+              <div className="font-semibold">${formatMuskBucks(stats.totalWagered)}</div>
             </div>
             <div className="bg-background/30 p-3 rounded">
               <div className="text-tertiary text-xs">Total Won</div>
-              <div className="font-semibold">${asNum(stats.totalWon).toLocaleString()}</div>
+              <div className="font-semibold">${formatMuskBucks(stats.totalWon)}</div>
             </div>
             <div className="bg-background/30 p-3 rounded">
               <div className="text-tertiary text-xs">Biggest Win</div>
-              <div className="font-semibold">${asNum(stats.biggestWin).toLocaleString()}</div>
+              <div className="font-semibold">${formatMuskBucks(stats.biggestWin)}</div>
             </div>
             <div className="bg-background/30 p-3 rounded">
               <div className="text-tertiary text-xs">Current Streak</div>
