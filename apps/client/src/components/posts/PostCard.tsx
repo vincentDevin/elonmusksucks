@@ -4,6 +4,7 @@ import { formatDistanceToNow } from 'date-fns';
 import type { UserFeedPost } from '@ems/types';
 import { MentionRenderer } from './MentionRenderer';
 import { PostActions } from './PostActions';
+import BaseCard from '../BaseCard';
 
 interface PostCardProps {
   post: UserFeedPost;
@@ -42,7 +43,7 @@ export const PostCard: React.FC<PostCardProps> = ({
 
   return (
     <div className={`${isNested ? 'ml-12 border-l-2 border-muted pl-4' : ''}`}>
-      <div className="bg-surface rounded-lg p-4 hover:bg-surface/80 transition-colors">
+      <BaseCard variant="full" className="hover:bg-surface/80" hoverable={true} as="article">
         {/* Author Header */}
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-start space-x-3">
@@ -190,7 +191,7 @@ export const PostCard: React.FC<PostCardProps> = ({
             ))}
           </div>
         )}
-      </div>
+      </BaseCard>
     </div>
   );
 };

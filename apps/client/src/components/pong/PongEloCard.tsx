@@ -5,6 +5,7 @@ import {
   ArrowTrendingDownIcon,
 } from '@heroicons/react/24/outline';
 import api from '../../api/axios';
+import BaseCard from '../BaseCard';
 
 interface PongEloCardProps {
   userId: number;
@@ -91,14 +92,12 @@ export default function PongEloCard({
   const pointsToNextTier = nextTierName && tierData ? tierData.max + 1 - eloRating : 0;
 
   return (
-    <div className={`bg-surface rounded-xl shadow-sm border border-accent/20 p-6 ${className}`}>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center space-x-3">
-          <TrophyIcon className="w-6 h-6 text-primary" />
-          <span className="font-semibold text-content">Elo Rating</span>
-        </div>
-        {lastEloChange !== 0 && (
+    <BaseCard
+      variant="full"
+      className={className}
+      title="🏆 Elo Rating"
+      headerContent={
+        lastEloChange !== 0 && (
           <div
             className={`flex items-center space-x-1 px-2 py-1 rounded-full text-sm font-medium ${
               lastEloChange > 0 ? 'bg-success/10 text-success' : 'bg-error/10 text-error'
@@ -114,9 +113,9 @@ export default function PongEloCard({
               {lastEloChange}
             </span>
           </div>
-        )}
-      </div>
-
+        )
+      }
+    >
       {/* Main Elo Display */}
       <div className="text-center mb-4">
         <div className="text-4xl font-bold text-primary mb-2">{eloRating.toLocaleString()}</div>
@@ -183,6 +182,6 @@ export default function PongEloCard({
           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mx-auto"></div>
         </div>
       )}
-    </div>
+    </BaseCard>
   );
 }
