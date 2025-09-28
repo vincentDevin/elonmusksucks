@@ -2,8 +2,8 @@
 // apps/client/src/components/admin/ModerationQueue.tsx
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { ArticleModerationData } from '@ems/types';
-import { useSocket } from '../../contexts/SocketContext';
-import * as feedsAPI from '../../api/feeds';
+import { useSocket } from '../../../contexts/SocketContext';
+import * as feedsAPI from '../../../api/feeds';
 
 interface ModerationQueueProps {
   className?: string;

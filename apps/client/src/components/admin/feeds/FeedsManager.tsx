@@ -7,8 +7,8 @@ import type {
   UpdateFeedRequest,
   FeedStatsResponse,
 } from '@ems/types';
-import { useSocket } from '../../contexts/SocketContext';
-import * as feedsAPI from '../../api/feeds';
+import { useSocket } from '../../../contexts/SocketContext';
+import * as feedsAPI from '../../../api/feeds';
 
 interface FeedsManagerProps {
   className?: string;

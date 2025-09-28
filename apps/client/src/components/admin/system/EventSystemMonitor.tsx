@@ -3,7 +3,7 @@
 // Real-time metrics display with health indicators and detailed breakdowns
 
 import { useState, useEffect } from 'react';
-import { useEventSystemMetrics } from '../../hooks/useEventSystemMetrics';
+import { useEventSystemMetrics } from '../../../hooks/useEventSystemMetrics';
 
 export default function EventSystemMonitor() {
   const { metrics, getTopEvents, getSlowestEvents, getEventFrequency, resetMetrics, isHealthy } =

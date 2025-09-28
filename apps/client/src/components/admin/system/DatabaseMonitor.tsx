@@ -10,7 +10,7 @@ import {
   CheckCircleIcon,
   XCircleIcon,
 } from '@heroicons/react/24/outline';
-import api from '../../api/axios';
+import api from '../../../api/axios';
 
 interface QueryMetric {
   model?: string;

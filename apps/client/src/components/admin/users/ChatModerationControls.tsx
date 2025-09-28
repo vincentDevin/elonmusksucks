@@ -1,7 +1,7 @@
 // apps/client/src/components/admin/ChatModerationControls.tsx
 import React from 'react';
-import { useSocket } from '../../contexts/SocketContext';
-import { useAuth } from '../../contexts/AuthContext';
+import { useSocket } from '../../../contexts/SocketContext';
+import { useAuth } from '../../../contexts/AuthContext';
 
 interface ChatModerationControlsProps {
   messageId?: number;

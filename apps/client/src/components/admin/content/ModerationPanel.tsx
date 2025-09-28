@@ -1,9 +1,9 @@
 // Rollback: Remove useCallback import and unwrap all socket handlers from useCallback
 // apps/client/src/components/admin/ModerationPanel.tsx
 import React, { useState, useEffect, useCallback } from 'react';
-import { useSocket } from '../../contexts/SocketContext';
-import * as moderationApi from '../../api/moderation';
-import type { ModerationLogEntry } from '../../api/moderation';
+import { useSocket } from '../../../contexts/SocketContext';
+import * as moderationApi from '../../../api/moderation';
+import type { ModerationLogEntry } from '../../../api/moderation';
 
 interface QuickActionForm {
   userId: number;

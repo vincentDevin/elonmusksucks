@@ -1,8 +1,8 @@
 // apps/client/src/components/admin/BannedUsersWall.tsx
 import React, { useState, useEffect } from 'react';
-import { useSocket } from '../../contexts/SocketContext';
-import * as moderationApi from '../../api/moderation';
-import type { UserBan } from '../../api/moderation';
+import { useSocket } from '../../../contexts/SocketContext';
+import * as moderationApi from '../../../api/moderation';
+import type { UserBan } from '../../../api/moderation';
 
 const BannedUsersWall: React.FC = () => {
   const [bans, setBans] = useState<UserBan[]>([]);

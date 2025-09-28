@@ -5,13 +5,13 @@ import {
   bulkUpdatePredictions,
   getPredictionDetails,
   resolvePrediction,
-} from '../../api/admin';
+} from '../../../api/admin';
 import type {
   PredictionSearchParams,
   DetailedPrediction,
   PaginatedPredictions,
   BulkPredictionOperation,
-} from '../../api/admin';
+} from '../../../api/admin';
 import ResolvePredictionModal from './ResolvePredictionModal';
 
 interface PredictionQueueProps {

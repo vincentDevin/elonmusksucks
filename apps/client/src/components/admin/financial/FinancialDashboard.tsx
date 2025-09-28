@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { formatMuskBucks } from '../../utils/formatting';
+import { formatMuskBucks } from '../../../utils/formatting';
 
 // Helper to convert string/number to number
 const asNum = (v: string | number | bigint | undefined | null) => Number(v ?? 0);
@@ -12,7 +12,7 @@ import {
   type PaginatedFinancialData,
   type DetailedBet,
   type DetailedTransaction,
-} from '../../api/admin';
+} from '../../../api/admin';
 import type { AdminFinancialAnalyticsResponse } from '@ems/types';
 
 interface FilterState {

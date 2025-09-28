@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useAdmin } from '../contexts/AdminContext';
-import UserManagement from '../components/admin/UserManagement';
-import PredictionQueue from '../components/admin/PredictionQueue';
-import FinancialDashboard from '../components/admin/FinancialDashboard';
+import UserManagement from '../components/admin/users/UserManagement';
+import PredictionQueue from '../components/admin/predictions/PredictionQueue';
+import FinancialDashboard from '../components/admin/financial/FinancialDashboard';
 import AchievementManager from '../components/achievements/AchievementManager';
-import FeedsManager from '../components/admin/FeedsManager';
-import ModerationQueue from '../components/admin/ModerationQueue';
-import EventSystemMonitor from '../components/admin/EventSystemMonitor';
+import FeedsManager from '../components/admin/feeds/FeedsManager';
+import ModerationQueue from '../components/admin/content/ModerationQueue';
+import EventSystemMonitor from '../components/admin/system/EventSystemMonitor';
 
 const AdminDashboard: React.FC = () => {
   const { user } = useAuth();
