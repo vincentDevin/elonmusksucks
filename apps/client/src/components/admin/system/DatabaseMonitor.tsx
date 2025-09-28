@@ -175,7 +175,7 @@ export default function DatabaseMonitor() {
             <ChartBarIcon className="w-4 h-4 text-tertiary" />
           </div>
           <p className="text-2xl font-bold mt-1 text-primary">
-            {metrics.database.totalQueries.toLocaleString()}
+            {(metrics.database.totalQueries || 0).toLocaleString()}
           </p>
           <p className="text-xs text-tertiary mt-1">Last 1000 tracked</p>
         </div>
@@ -185,23 +185,23 @@ export default function DatabaseMonitor() {
             <ChartBarIcon className="w-4 h-4 text-tertiary" />
           </div>
           <p
-            className={`text-2xl font-bold mt-1 ${getDurationColor(metrics.database.averageDuration)}`}
+            className={`text-2xl font-bold mt-1 ${getDurationColor(metrics.database.averageDuration || 0)}`}
           >
-            {metrics.database.averageDuration.toFixed(1)}ms
+            {(metrics.database.averageDuration || 0).toFixed(1)}ms
           </p>
           <p className="text-xs text-tertiary mt-1">Target: &lt;100ms</p>
         </div>
         <div className="bg-muted rounded-lg p-4">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-tertiary">Slow Queries</span>
-            {metrics.database.slowQueries > 0 && (
+            {(metrics.database.slowQueries || 0) > 0 && (
               <ExclamationTriangleIcon className="w-4 h-4 text-yellow-500" />
             )}
           </div>
           <p
-            className={`text-2xl font-bold mt-1 ${metrics.database.slowQueries > 0 ? 'text-yellow-600' : 'text-green-600'}`}
+            className={`text-2xl font-bold mt-1 ${(metrics.database.slowQueries || 0) > 0 ? 'text-yellow-600' : 'text-green-600'}`}
           >
-            {metrics.database.slowQueries}
+            {metrics.database.slowQueries || 0}
           </p>
           <p className="text-xs text-tertiary mt-1">&gt;100ms queries</p>
         </div>
@@ -232,8 +232,8 @@ export default function DatabaseMonitor() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {metrics.database.recentQueries.length > 0 ? (
-                  metrics.database.recentQueries.map((query, idx) => (
+                {(metrics.database.recentQueries || []).length > 0 ? (
+                  (metrics.database.recentQueries || []).map((query, idx) => (
                     <tr key={idx} className="hover:bg-accent/20 transition-colors">
                       <td className="px-4 py-2 text-sm">{query.model || 'N/A'}</td>
                       <td className="px-4 py-2 text-sm">{query.action || 'N/A'}</td>

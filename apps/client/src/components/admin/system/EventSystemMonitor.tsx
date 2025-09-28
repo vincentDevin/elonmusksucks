@@ -6,8 +6,16 @@ import { useState, useEffect } from 'react';
 import { useEventSystemMetrics } from '../../../hooks/useEventSystemMetrics';
 
 export default function EventSystemMonitor() {
-  const { metrics, getTopEvents, getSlowestEvents, getEventFrequency, resetMetrics, isHealthy } =
-    useEventSystemMetrics();
+  const {
+    metrics,
+    getTopEvents,
+    getSlowestEvents,
+    getEventFrequency,
+    resetMetrics,
+    fetchBackendMetrics,
+    backendMetricsError,
+    isHealthy,
+  } = useEventSystemMetrics();
 
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [selectedEvent, setSelectedEvent] = useState<string | null>(null);
@@ -46,10 +54,43 @@ export default function EventSystemMonitor() {
   };
 
   const getHealthColor = () => {
-    if (metrics.performance.errorRate > 10) return 'text-red-500';
-    if (metrics.performance.errorRate > 5) return 'text-yellow-500';
+    const errorRate = metrics.backendMetrics?.errorRate ?? metrics.performance.errorRate;
+    if (errorRate > 10) return 'text-red-500';
+    if (errorRate > 5) return 'text-yellow-500';
     return 'text-green-500';
   };
+
+  const getDisplayMetrics = () => {
+    // Prefer backend metrics when available, fallback to frontend metrics
+    if (metrics.backendMetrics) {
+      return {
+        totalEvents: metrics.backendMetrics.totalEvents,
+        errorRate: metrics.backendMetrics.errorRate,
+        avgProcessingTime: metrics.backendMetrics.avgProcessingTime,
+        redisConnected: metrics.backendMetrics.redisConnected,
+        socketConnections: metrics.backendMetrics.socketConnections,
+        activeRooms: metrics.backendMetrics.activeRooms.length,
+        redisMemoryUsage: metrics.backendMetrics.redisMemoryUsage,
+        redisConnectedClients: metrics.backendMetrics.redisConnectedClients,
+        eventBusPoolStats: metrics.backendMetrics.eventBusPoolStats,
+      };
+    }
+
+    // Fallback to frontend metrics
+    return {
+      totalEvents: Object.values(metrics.eventMetrics).reduce((sum, e) => sum + e.count, 0),
+      errorRate: metrics.performance.errorRate,
+      avgProcessingTime: metrics.performance.avgEventProcessingTime,
+      redisConnected: true, // Assume connected if no backend data
+      socketConnections: 0,
+      activeRooms: 0,
+      redisMemoryUsage: undefined,
+      redisConnectedClients: undefined,
+      eventBusPoolStats: { active: 0, idle: 0, total: 1 },
+    };
+  };
+
+  const displayMetrics = getDisplayMetrics();
 
   const topEvents = getTopEvents(10);
   const slowestEvents = getSlowestEvents(5);
@@ -62,7 +103,11 @@ export default function EventSystemMonitor() {
           <h2 className="text-2xl font-bold text-content">Event System Monitor</h2>
           <p className="text-tertiary text-sm">
             Real-time performance metrics for the event bus system
+            {metrics.backendMetrics ? ' (Backend Data)' : ' (Frontend Only)'}
           </p>
+          {backendMetricsError && (
+            <p className="text-red-500 text-xs mt-1">Backend Error: {backendMetricsError}</p>
+          )}
         </div>
         <div className="flex items-center gap-4">
           <div className={`flex items-center gap-2 ${getHealthColor()}`}>
@@ -80,6 +125,12 @@ export default function EventSystemMonitor() {
             {autoRefresh ? 'Auto-refresh ON' : 'Auto-refresh OFF'}
           </button>
           <button
+            onClick={fetchBackendMetrics}
+            className="px-3 py-1 rounded text-sm font-medium bg-blue-500 text-white hover:bg-blue-600 transition"
+          >
+            Refresh Now
+          </button>
+          <button
             onClick={resetMetrics}
             className="px-3 py-1 rounded text-sm font-medium bg-red-500 text-white hover:bg-red-600 transition"
           >
@@ -89,20 +140,27 @@ export default function EventSystemMonitor() {
       </div>
 
       {/* System Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <div className="bg-background rounded-lg p-4 border border-border">
-          <div className="text-2xl font-bold text-content">{metrics.totalListeners}</div>
-          <div className="text-sm text-tertiary">Total Listeners</div>
+          <div className="text-2xl font-bold text-content">
+            {displayMetrics.totalEvents.toLocaleString()}
+          </div>
+          <div className="text-sm text-tertiary">Total Events</div>
         </div>
 
         <div className="bg-background rounded-lg p-4 border border-border">
-          <div className="text-2xl font-bold text-content">{metrics.activeEvents.length}</div>
-          <div className="text-sm text-tertiary">Active Event Types</div>
+          <div className="text-2xl font-bold text-content">{metrics.totalListeners}</div>
+          <div className="text-sm text-tertiary">Frontend Listeners</div>
+        </div>
+
+        <div className="bg-background rounded-lg p-4 border border-border">
+          <div className="text-2xl font-bold text-content">{displayMetrics.socketConnections}</div>
+          <div className="text-sm text-tertiary">Socket Connections</div>
         </div>
 
         <div className="bg-background rounded-lg p-4 border border-border">
           <div className={`text-2xl font-bold ${getHealthColor()}`}>
-            {metrics.performance.errorRate.toFixed(1)}%
+            {displayMetrics.errorRate.toFixed(1)}%
           </div>
           <div className="text-sm text-tertiary">Error Rate</div>
         </div>
@@ -113,6 +171,55 @@ export default function EventSystemMonitor() {
         </div>
       </div>
 
+      {/* Backend System Metrics */}
+      {metrics.backendMetrics && (
+        <div className="bg-background rounded-lg p-4 border border-border">
+          <h3 className="font-semibold text-content mb-3">Backend System Status</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium text-tertiary">Redis Status</h4>
+              <div className="flex items-center gap-2">
+                <div
+                  className={`w-2 h-2 rounded-full ${displayMetrics.redisConnected ? 'bg-green-500' : 'bg-red-500'}`}
+                />
+                <span className="text-sm">
+                  {displayMetrics.redisConnected ? 'Connected' : 'Disconnected'}
+                </span>
+              </div>
+              {displayMetrics.redisMemoryUsage && (
+                <div className="text-xs text-tertiary">
+                  Memory: {displayMetrics.redisMemoryUsage}
+                </div>
+              )}
+              {displayMetrics.redisConnectedClients && (
+                <div className="text-xs text-tertiary">
+                  Clients: {displayMetrics.redisConnectedClients}
+                </div>
+              )}
+            </div>
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium text-tertiary">Event Bus Pool</h4>
+              <div className="text-xs text-tertiary">
+                Active: {displayMetrics.eventBusPoolStats.active} /{' '}
+                {displayMetrics.eventBusPoolStats.total}
+              </div>
+              <div className="text-xs text-tertiary">
+                Idle: {displayMetrics.eventBusPoolStats.idle}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium text-tertiary">Socket.IO</h4>
+              <div className="text-xs text-tertiary">
+                Connections: {displayMetrics.socketConnections}
+              </div>
+              <div className="text-xs text-tertiary">
+                Active Rooms: {displayMetrics.activeRooms}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Performance Metrics */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="bg-background rounded-lg p-4 border border-border">
@@ -121,7 +228,7 @@ export default function EventSystemMonitor() {
             <div className="flex justify-between">
               <span className="text-tertiary">Average Processing:</span>
               <span className="font-medium text-content">
-                {formatTime(metrics.performance.avgEventProcessingTime)}
+                {formatTime(displayMetrics.avgProcessingTime)}
               </span>
             </div>
             <div className="flex justify-between">

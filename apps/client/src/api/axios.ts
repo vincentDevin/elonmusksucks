@@ -213,4 +213,12 @@ api.interceptors.response.use(
   },
 );
 
+// Event System Metrics API functions
+export const eventSystemMetricsApi = {
+  getMetrics: () => api.get('/api/monitoring/metrics/events'),
+  resetMetrics: () => api.post('/api/monitoring/metrics/events/reset'),
+  startMonitoring: () => api.post('/api/monitoring/monitoring/start'),
+  stopMonitoring: () => api.post('/api/monitoring/monitoring/stop'),
+};
+
 export default api;

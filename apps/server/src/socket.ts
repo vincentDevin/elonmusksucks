@@ -27,6 +27,7 @@ import { registerPostRedisHandlers } from './handlers/postRedisEventHandlers';
 import { socketCleanupManager } from './lib/SocketCleanupManager';
 import { setupAchievementRedisHandlers } from './handlers/achievementEventHandler';
 import { registerRoomHandlers } from './handlers/roomHandlers';
+import { eventSystemMetricsService } from './services/eventSystemMetrics.service';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -139,6 +140,18 @@ export async function initSocket(httpServer: HTTPServer) {
   const { unifiedActivityService } = await import('./services/unifiedActivity.service');
   unifiedActivityService.setSocketIO(io);
 
+  // ── Event System Metrics Integration ──────────────────────────────────────
+  // Set Socket.IO instance for connection metrics
+  eventSystemMetricsService.setSocketIO(io);
+
+  // Start event monitoring for admin oversight
+  try {
+    await eventSystemMetricsService.startMonitoring();
+    console.log('[EventSystemMetrics] Monitoring started successfully');
+  } catch (error) {
+    console.error('[EventSystemMetrics] Failed to start monitoring:', error);
+  }
+
   // ── Achievement Redis subscriber ──────────────────────────────────────────
   const achievementSub = setupAchievementRedisHandlers();
   redisClients.push(achievementSub);
@@ -215,6 +228,14 @@ export async function initSocket(httpServer: HTTPServer) {
         await socketCleanupManager.cleanupAll();
       } catch (error) {
         console.error('[socket] Error during socket cleanup:', error);
+      }
+
+      // Stop Event System monitoring
+      console.log('[socket] Stopping Event System monitoring...');
+      try {
+        await eventSystemMetricsService.stopMonitoring();
+      } catch (error) {
+        console.error('[socket] Error stopping Event System monitoring:', error);
       }
 
       // Close Socket.IO server

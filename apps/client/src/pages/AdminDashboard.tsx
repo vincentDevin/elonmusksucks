@@ -6,7 +6,7 @@ import PredictionDashboard from '../components/admin/predictions/PredictionDashb
 import FinancialDashboard from '../components/admin/financial/FinancialDashboard';
 import AdminAchievementDashboard from '../components/admin/achievements/AdminAchievementDashboard';
 import ContentDashboard from '../components/admin/content-management/ContentDashboard';
-import EventSystemMonitor from '../components/admin/system/EventSystemMonitor';
+import SystemDashboard from '../components/admin/system/SystemDashboard';
 
 const AdminDashboard: React.FC = () => {
   const { user } = useAuth();
@@ -18,7 +18,7 @@ const AdminDashboard: React.FC = () => {
     { key: 'bets', label: 'Financial Operations', component: <FinancialDashboard /> },
     { key: 'badges', label: 'Achievements', component: <AdminAchievementDashboard /> },
     { key: 'content', label: 'Content Management', component: <ContentDashboard /> },
-    { key: 'events', label: 'Event System Monitor', component: <EventSystemMonitor /> },
+    { key: 'system', label: 'System Monitoring', component: <SystemDashboard /> },
   ];
 
   const [activeTab, setActiveTab] = useState<string>(tabs[0].key);

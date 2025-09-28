@@ -4,6 +4,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useEventBusCore } from '../contexts/EventBusCoreContext';
+import { eventSystemMetricsApi } from '../api/axios';
+import { REDIS_CHANNELS } from '../types/events';
 
 interface EventMetrics {
   eventType: string;
@@ -36,6 +38,23 @@ interface SystemMetrics {
   };
   uptime: number;
   lastUpdated: number;
+  // Backend metrics
+  backendMetrics?: {
+    totalEvents: number;
+    totalErrors: number;
+    avgProcessingTime: number;
+    errorRate: number;
+    redisConnected: boolean;
+    redisMemoryUsage?: string;
+    redisConnectedClients?: number;
+    socketConnections: number;
+    activeRooms: string[];
+    eventBusPoolStats: {
+      active: number;
+      idle: number;
+      total: number;
+    };
+  };
 }
 
 export function useEventSystemMetrics() {
@@ -56,11 +75,32 @@ export function useEventSystemMetrics() {
 
   const metricsRef = useRef<SystemMetrics>(metrics);
   const startTime = useRef(Date.now());
+  const [backendMetricsError, setBackendMetricsError] = useState<string | null>(null);
 
   // Update metrics reference when state changes
   useEffect(() => {
     metricsRef.current = metrics;
   }, [metrics]);
+
+  // Fetch backend metrics
+  const fetchBackendMetrics = useCallback(async () => {
+    try {
+      const response = await eventSystemMetricsApi.getMetrics();
+      const backendData = response.data;
+
+      setMetrics((prev) => ({
+        ...prev,
+        backendMetrics: backendData.system,
+        lastUpdated: Date.now(),
+      }));
+      setBackendMetricsError(null);
+    } catch (error) {
+      console.warn('[useEventSystemMetrics] Failed to fetch backend metrics:', error);
+      setBackendMetricsError(
+        error instanceof Error ? error.message : 'Failed to fetch backend metrics',
+      );
+    }
+  }, []);
 
   // Track event processing
   const trackEvent = useCallback((eventType: string, processingTime: number, hasError = false) => {
@@ -184,31 +224,33 @@ export function useEventSystemMetrics() {
     const interval = setInterval(() => {
       updateListenerCount();
       updateMemoryUsage();
+      fetchBackendMetrics(); // Fetch backend metrics every 2 seconds
     }, 2000); // Update every 2 seconds
 
+    // Initial fetch
+    fetchBackendMetrics();
+
     return () => clearInterval(interval);
-  }, [updateListenerCount, updateMemoryUsage]);
+  }, [updateListenerCount, updateMemoryUsage, fetchBackendMetrics]);
 
   // Subscribe to all events for monitoring (low-impact listeners)
   useEffect(() => {
     const monitoringSubscriptions: (() => void)[] = [];
 
-    // Common events to monitor
+    // Common events to monitor - using proper REDIS_CHANNELS constants
     const eventsToMonitor = [
-      'bet:placed',
-      'bet:won',
-      'bet:lost',
-      'prediction:created',
-      'prediction:resolved',
-      'parlay:placed',
-      'chat:message',
-      'pong:game:started',
-      'pong:game:ended',
-      'user:stats:update',
-      'balance:update',
-      'achievement:unlocked',
-      'leaderboard:update',
-    ];
+      REDIS_CHANNELS.BET_PLACED,
+      REDIS_CHANNELS.BET_WON,
+      REDIS_CHANNELS.BET_LOST,
+      REDIS_CHANNELS.PREDICTION_CREATED,
+      REDIS_CHANNELS.PREDICTION_RESOLVE,
+      REDIS_CHANNELS.PARLAY_PLACED,
+      REDIS_CHANNELS.CHAT_MESSAGE,
+      REDIS_CHANNELS.USER_STATS_UPDATE,
+      REDIS_CHANNELS.BALANCE_UPDATE,
+      REDIS_CHANNELS.ACHIEVEMENT_UNLOCKED,
+      REDIS_CHANNELS.LEADERBOARD_ALL_TIME,
+    ] as const;
 
     eventsToMonitor.forEach((eventType) => {
       try {
@@ -263,7 +305,16 @@ export function useEventSystemMetrics() {
     [metrics.eventMetrics],
   );
 
-  const resetMetrics = useCallback(() => {
+  const resetMetrics = useCallback(async () => {
+    try {
+      // Reset backend metrics
+      await eventSystemMetricsApi.resetMetrics();
+      console.log('[useEventSystemMetrics] Backend metrics reset successfully');
+    } catch (error) {
+      console.warn('[useEventSystemMetrics] Failed to reset backend metrics:', error);
+    }
+
+    // Reset frontend metrics
     setMetrics({
       totalListeners: 0,
       activeEvents: [],
@@ -287,6 +338,8 @@ export function useEventSystemMetrics() {
     getSlowestEvents,
     getEventFrequency,
     resetMetrics,
+    fetchBackendMetrics,
+    backendMetricsError,
     isHealthy: metrics.performance.errorRate < 5, // Less than 5% error rate
   };
 }
