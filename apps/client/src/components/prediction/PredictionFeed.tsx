@@ -1,117 +1,106 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { usePredictionMarket } from '../../contexts/PredictionContext';
 import PredictionCard from './PredictionCard';
-import { useInfiniteScroll } from '../../hooks/useInfiniteScroll';
+import GenericFeed from '../GenericFeed';
+import type { FeedResponse, FeedTab, FeedFilter } from '../GenericFeed';
 
 export default function PredictionFeed() {
-  const { predictions, loading, error } = usePredictionMarket();
-  const [sortBy, setSortBy] = useState('newest');
-  const [filterByCategory, setFilterByCategory] = useState('all');
-  const observerRef = useRef(null);
+  const { predictions } = usePredictionMarket();
 
-  const sortedAndFilteredPredictions = useMemo(() => {
-    let filtered = predictions.filter((p) => {
-      const now = Date.now();
-      const expires = new Date(p.expiresAt).getTime();
-      return p.status === 'APPROVED' && now <= expires;
-    });
+  // Create tabs for different sort options
+  const tabs: FeedTab[] = [
+    { id: 'newest', label: 'Newest', icon: '🆕', count: predictions.length },
+    { id: 'endingSoon', label: 'Ending Soon', icon: '⏰', count: predictions.length },
+  ];
 
-    if (filterByCategory !== 'all') {
-      filtered = filtered.filter((p) => p.category === filterByCategory);
-    }
+  // Create filters for categories
+  const categories = useMemo(() => [...new Set(predictions.map((p) => p.category))], [predictions]);
+  const filters: FeedFilter[] = categories.map((category) => ({
+    id: category,
+    label: category,
+    value: category,
+    active: false,
+  }));
 
-    if (sortBy === 'newest') {
-      return filtered.sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      );
-    } else if (sortBy === 'endingSoon') {
-      return filtered.sort(
-        (a, b) => new Date(a.expiresAt).getTime() - new Date(b.expiresAt).getTime(),
-      );
-    }
+  // Fetch function that works with the context data
+  const fetchPredictions = useCallback(
+    async ({
+      cursor,
+      limit = 10,
+      tab = 'newest',
+      filters: activeFilters = {},
+    }: {
+      cursor?: string;
+      limit?: number;
+      tab?: string;
+      filters?: Record<string, any>;
+    }): Promise<FeedResponse<any>> => {
+      // Filter predictions
+      let filtered = predictions.filter((p) => {
+        const now = Date.now();
+        const expires = new Date(p.expiresAt).getTime();
+        return p.status === 'APPROVED' && now <= expires;
+      });
 
-    return filtered;
-  }, [predictions, sortBy, filterByCategory]);
-
-  const { items, hasMore, loadMore } = useInfiniteScroll(sortedAndFilteredPredictions, 10);
-
-  useEffect(() => {
-    const currentObserverRef = observerRef.current;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasMore) {
-          loadMore();
-        }
-      },
-      { threshold: 1.0 },
-    );
-
-    if (currentObserverRef) {
-      observer.observe(currentObserverRef);
-    }
-
-    return () => {
-      if (currentObserverRef) {
-        observer.unobserve(currentObserverRef);
+      // Apply category filters
+      const activeCategories = Object.keys(activeFilters);
+      if (activeCategories.length > 0) {
+        filtered = filtered.filter((p) => activeCategories.includes(p.category));
       }
-    };
-  }, [hasMore, loadMore]);
 
-  if (loading && predictions.length === 0) return <p>Loading…</p>;
-  if (error) return <p className="text-red-500">Error: {String(error)}</p>;
+      // Apply sorting based on tab
+      if (tab === 'newest') {
+        filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      } else if (tab === 'endingSoon') {
+        filtered.sort((a, b) => new Date(a.expiresAt).getTime() - new Date(b.expiresAt).getTime());
+      }
+
+      // Simulate pagination with cursor
+      const startIndex = cursor ? parseInt(cursor) : 0;
+      const endIndex = startIndex + limit;
+      const items = filtered.slice(startIndex, endIndex);
+      const hasMore = endIndex < filtered.length;
+
+      return {
+        items,
+        pagination: {
+          hasMore,
+          cursor: hasMore ? endIndex.toString() : undefined,
+        },
+      };
+    },
+    [predictions],
+  );
 
   return (
     <section className="bg-surface border border-muted rounded-2xl p-4 shadow-lg">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-bold text-content">Prediction Feed</h2>
-        <div className="flex gap-2">
-          <select
-            onChange={(e) => setSortBy(e.target.value)}
-            className="bg-background border border-muted rounded-md px-2 py-1 text-sm"
-          >
-            <option value="newest">Newest</option>
-            <option value="endingSoon">Ending Soon</option>
-          </select>
-          <select
-            onChange={(e) => setFilterByCategory(e.target.value)}
-            className="bg-background border border-muted rounded-md px-2 py-1 text-sm"
-          >
-            <option value="all">All Categories</option>
-            {[...new Set(predictions.map((p) => p.category))].map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
+      <h2 className="text-xl font-bold text-content mb-4">📊 Prediction Feed</h2>
 
-      {items.length === 0 ? (
-        <div className="text-center py-8 text-tertiary">
-          <div className="text-4xl mb-2">📊</div>
-          <p>No open predictions available</p>
-        </div>
-      ) : (
-        <div className="space-y-4 pr-2">
-          {items.map((p) => (
-            <PredictionCard
-              key={p.id}
-              prediction={p}
-              variant="compact"
-              showParlayActions={true}
-              showBetsList={false}
-              hideInlineParlaySelector={true}
-            />
-          ))}
-          {hasMore && (
-            <div ref={observerRef} className="text-center">
-              <button onClick={loadMore} className="text-primary hover:underline">
-                Loading more...
-              </button>
-            </div>
-          )}
-        </div>
-      )}
+      <GenericFeed
+        fetchItems={fetchPredictions}
+        renderItem={(prediction) => (
+          <PredictionCard
+            key={prediction.id}
+            prediction={prediction}
+            variant="compact"
+            showParlayActions={true}
+            showBetsList={false}
+            hideInlineParlaySelector={true}
+          />
+        )}
+        tabs={tabs}
+        initialTab="newest"
+        filters={filters}
+        variant="list"
+        spacing="normal"
+        enableInfiniteScroll={true}
+        emptyComponent={
+          <div className="text-center py-8 text-tertiary">
+            <div className="text-4xl mb-2">📊</div>
+            <p>No open predictions available</p>
+          </div>
+        }
+      />
     </section>
   );
 }

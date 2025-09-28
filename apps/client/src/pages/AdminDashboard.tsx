@@ -5,7 +5,6 @@ import UserManagement from '../components/admin/UserManagement';
 import PredictionQueue from '../components/admin/PredictionQueue';
 import FinancialDashboard from '../components/admin/FinancialDashboard';
 import AchievementManager from '../components/achievements/AchievementManager';
-import AdvancedAnalyticsDashboard from '../components/admin/AdvancedAnalyticsDashboard';
 import FeedsManager from '../components/admin/FeedsManager';
 import ModerationQueue from '../components/admin/ModerationQueue';
 import EventSystemMonitor from '../components/admin/EventSystemMonitor';
@@ -21,7 +20,6 @@ const AdminDashboard: React.FC = () => {
     { key: 'badges', label: 'Achievement Management', component: <AchievementManager /> },
     { key: 'feeds', label: 'RSS Feeds Management', component: <FeedsManager /> },
     { key: 'moderation', label: 'Content Moderation', component: <ModerationQueue /> },
-    { key: 'analytics', label: 'Advanced Analytics', component: <AdvancedAnalyticsDashboard /> },
     { key: 'events', label: 'Event System Monitor', component: <EventSystemMonitor /> },
   ];
 
