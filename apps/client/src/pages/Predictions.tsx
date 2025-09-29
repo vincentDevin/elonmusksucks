@@ -243,14 +243,14 @@ export default function Predictions() {
     switch (viewMode) {
       case 'sections':
         return (
-          <div className="space-y-6">
+          <div className="space-y-8">
             {predictionSections.map((section) => (
               <PredictionSectionCard
                 key={section.id}
                 section={section}
                 onFavoriteToggle={toggleFavorite}
                 onMarkViewed={markAsViewed}
-                className="bg-surface border border-border shadow-sm hover:shadow-md transition-shadow"
+                className="bg-surface border border-border shadow-sm hover:shadow-md transition-shadow rounded-xl overflow-hidden"
               />
             ))}
           </div>
@@ -258,7 +258,7 @@ export default function Predictions() {
 
       case 'list':
         return (
-          <div className="space-y-4">
+          <div className="space-y-6">
             {enhancedPredictions.map((prediction) => (
               <div
                 key={prediction.id}
@@ -300,7 +300,7 @@ export default function Predictions() {
 
       case 'grid':
         return (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
             {enhancedPredictions.map((prediction) => (
               <div
                 key={prediction.id}
@@ -399,7 +399,7 @@ export default function Predictions() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="bg-surface border-b border-border sticky top-0 z-20">
-        <div className="container mx-auto px-4 py-4">
+        <div className="px-6 py-4 max-w-[1800px] mx-auto">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <h1 className="text-2xl font-bold text-content flex items-center gap-2">
@@ -500,8 +500,8 @@ export default function Predictions() {
       {/* Create Form */}
       {creating && (
         <div className="bg-surface/50 border-b border-border">
-          <div className="container mx-auto px-4 py-6">
-            <div className="max-w-2xl mx-auto">
+          <div className="px-6 py-6 max-w-[1400px] mx-auto">
+            <div className="max-w-4xl mx-auto">
               <CreatePredictionForm
                 onCreated={async (input) => {
                   // Convert string date to Date object for local API
@@ -521,22 +521,28 @@ export default function Predictions() {
       )}
 
       {/* Main Content */}
-      <div className="container mx-auto px-4 py-6">
-        <div className={`${isMobile ? 'space-y-4' : 'grid grid-cols-1 lg:grid-cols-4 gap-6'}`}>
-          {/* Filters Sidebar */}
-          <div className={isMobile ? 'w-full' : 'lg:col-span-1'}>
-            <EnhancedPredictionFilters
-              filters={filters}
-              availableCategories={availableCategories}
-              onFiltersChange={updateFilters}
-              onClearFilters={clearFilters}
-              totalResults={enhancedPredictions.length}
-              isMobile={isMobile}
-            />
+      <div className="px-6 py-6 max-w-[1800px] mx-auto">
+        <div
+          className={`${isMobile ? 'space-y-4' : 'grid grid-cols-1 xl:grid-cols-5 2xl:grid-cols-6 gap-8'}`}
+        >
+          {/* Enhanced Filters Sidebar */}
+          <div className={`${isMobile ? 'w-full' : 'xl:col-span-1 2xl:col-span-1'}`}>
+            <div className="sticky top-24 space-y-4">
+              <EnhancedPredictionFilters
+                filters={filters}
+                availableCategories={availableCategories}
+                onFiltersChange={updateFilters}
+                onClearFilters={clearFilters}
+                totalResults={enhancedPredictions.length}
+                isMobile={isMobile}
+              />
+            </div>
           </div>
 
-          {/* Predictions List */}
-          <div className={`${isMobile ? 'w-full' : 'lg:col-span-3'}`}>{renderPredictions()}</div>
+          {/* Predictions List - More space on wide screens */}
+          <div className={`${isMobile ? 'w-full' : 'xl:col-span-4 2xl:col-span-5'}`}>
+            {renderPredictions()}
+          </div>
         </div>
       </div>
 

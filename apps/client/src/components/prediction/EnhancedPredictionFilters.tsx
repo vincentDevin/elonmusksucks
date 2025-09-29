@@ -34,7 +34,7 @@ export default function EnhancedPredictionFilters({
   className = '',
   isMobile = false,
 }: EnhancedPredictionFiltersProps) {
-  const [isExpanded, setIsExpanded] = useState(!isMobile);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [showMobileSheet, setShowMobileSheet] = useState(false);
   const [activeTab, setActiveTab] = useState<'quick' | 'categories' | 'advanced'>('quick');
   const [tempFilters, setTempFilters] = useState(filters);
@@ -364,7 +364,7 @@ export default function EnhancedPredictionFilters({
   return (
     <div className={`bg-surface rounded-xl border border-border ${className}`}>
       {/* Search Bar */}
-      <div className="p-4 border-b border-border">
+      <div className="p-3 border-b border-border">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-tertiary" />
           <input
@@ -411,12 +411,12 @@ export default function EnhancedPredictionFilters({
         </div>
 
         {/* Quick Filters */}
-        <div className="flex gap-2 mt-3 overflow-x-auto pb-2">
+        <div className="flex gap-1.5 mt-2 overflow-x-auto pb-1">
           {quickFilters.map((filter) => (
             <button
               key={filter.id}
               onClick={() => onFiltersChange(filter.filter)}
-              className="px-3 py-1.5 bg-muted hover:bg-primary/20 text-content text-sm rounded-full whitespace-nowrap transition-colors flex items-center gap-1"
+              className="px-2.5 py-1 bg-muted hover:bg-primary/20 text-content text-xs rounded-full whitespace-nowrap transition-colors flex items-center gap-1"
             >
               <span>{filter.icon}</span>
               <span>{filter.label}</span>
@@ -426,14 +426,14 @@ export default function EnhancedPredictionFilters({
       </div>
 
       {/* Expandable Advanced Filters */}
-      <div className="p-4">
+      <div className="p-3">
         <button
           onClick={() => setIsExpanded(!isExpanded)}
           className="flex items-center justify-between w-full text-left"
         >
           <div className="flex items-center gap-2">
             <Filter className="w-4 h-4 text-tertiary" />
-            <span className="font-medium text-content">Advanced Filters</span>
+            <span className="font-medium text-content text-sm">Advanced Filters</span>
             {activeFilterCount > 0 && (
               <span className="px-2 py-0.5 bg-primary text-surface text-xs rounded-full">
                 {activeFilterCount}
@@ -448,11 +448,11 @@ export default function EnhancedPredictionFilters({
         </button>
 
         {isExpanded && (
-          <div className="mt-4 space-y-4">
+          <div className="mt-3 space-y-3">
             {/* Categories */}
             <div>
-              <h4 className="text-sm font-medium text-tertiary mb-2">Categories</h4>
-              <div className="flex flex-wrap gap-2">
+              <h4 className="text-xs font-medium text-tertiary mb-2">Categories</h4>
+              <div className="grid grid-cols-1 gap-1.5">
                 {availableCategories.map((category) => (
                   <button
                     key={category}
@@ -463,29 +463,30 @@ export default function EnhancedPredictionFilters({
                       onFiltersChange({ categories: newCats });
                     }}
                     className={`
-                      px-3 py-1 rounded-full text-sm border transition-colors
+                      w-full px-2.5 py-1.5 rounded-lg text-xs border transition-colors text-left flex items-center justify-between
                       ${
                         filters.categories.includes(category)
                           ? 'bg-primary text-surface border-primary'
-                          : 'bg-surface text-content border-border hover:border-primary/50'
+                          : 'bg-surface text-content border-border hover:border-primary/50 hover:bg-muted'
                       }
                     `}
                   >
-                    {category}
+                    <span>{category}</span>
+                    {filters.categories.includes(category) && <Check className="w-4 h-4" />}
                   </button>
                 ))}
               </div>
             </div>
 
             {/* Other Filters Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-2">
               {/* Time Remaining */}
               <div>
-                <label className="text-sm font-medium text-tertiary mb-1 block">Time</label>
+                <label className="text-xs font-medium text-tertiary mb-1 block">Time</label>
                 <select
                   value={filters.timeRemaining}
                   onChange={(e) => onFiltersChange({ timeRemaining: e.target.value as any })}
-                  className="w-full p-2 bg-muted border border-border rounded-lg text-content text-sm"
+                  className="w-full p-1.5 bg-muted border border-border rounded-lg text-content text-xs"
                 >
                   <option value="all">All Time</option>
                   <option value="1h">1 Hour</option>
@@ -496,11 +497,11 @@ export default function EnhancedPredictionFilters({
 
               {/* Status */}
               <div>
-                <label className="text-sm font-medium text-tertiary mb-1 block">Status</label>
+                <label className="text-xs font-medium text-tertiary mb-1 block">Status</label>
                 <select
                   value={filters.status}
                   onChange={(e) => onFiltersChange({ status: e.target.value as any })}
-                  className="w-full p-2 bg-muted border border-border rounded-lg text-content text-sm"
+                  className="w-full p-1.5 bg-muted border border-border rounded-lg text-content text-xs"
                 >
                   <option value="all">All</option>
                   <option value="open">Open</option>
@@ -511,11 +512,11 @@ export default function EnhancedPredictionFilters({
 
               {/* Activity */}
               <div>
-                <label className="text-sm font-medium text-tertiary mb-1 block">Activity</label>
+                <label className="text-xs font-medium text-tertiary mb-1 block">Activity</label>
                 <select
                   value={filters.activity}
                   onChange={(e) => onFiltersChange({ activity: e.target.value as any })}
-                  className="w-full p-2 bg-muted border border-border rounded-lg text-content text-sm"
+                  className="w-full p-1.5 bg-muted border border-border rounded-lg text-content text-xs"
                 >
                   <option value="all">All</option>
                   <option value="high">High</option>
@@ -530,7 +531,7 @@ export default function EnhancedPredictionFilters({
               <div className="flex justify-end">
                 <button
                   onClick={onClearFilters}
-                  className="text-sm text-tertiary hover:text-error transition-colors"
+                  className="text-xs text-tertiary hover:text-error transition-colors"
                 >
                   Clear All Filters
                 </button>
@@ -542,8 +543,8 @@ export default function EnhancedPredictionFilters({
 
       {/* Results Count */}
       {totalResults !== undefined && (
-        <div className="px-4 py-2 border-t border-border bg-muted/30">
-          <p className="text-sm text-tertiary">
+        <div className="px-3 py-2 border-t border-border bg-muted/30">
+          <p className="text-xs text-tertiary">
             Found <span className="font-medium text-content">{totalResults}</span> predictions
           </p>
         </div>
