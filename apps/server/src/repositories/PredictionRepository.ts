@@ -416,4 +416,149 @@ export class PredictionRepository implements IPredictionRepository {
       orderBy: { capturedAt: 'desc' },
     });
   }
+
+  async findPredictionsByIds(ids: number[]): Promise<
+    Array<
+      DbPrediction & {
+        options: DbPredictionOption[];
+        bets: Array<
+          DbBet & {
+            user: Pick<DbUser, 'id' | 'name' | 'avatarUrl' | 'profilePictureKey'>;
+          }
+        >;
+        parlayLegs: ParlayLegWithUser[];
+      }
+    >
+  > {
+    const preds = await prisma.prediction.findMany({
+      where: { id: { in: ids } },
+      include: {
+        options: {
+          include: {
+            parlayLegs: {
+              include: {
+                parlay: {
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        name: true,
+                        avatarUrl: true,
+                        profilePictureKey: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        bets: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                avatarUrl: true,
+                profilePictureKey: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return preds.map((pred) => {
+      const { options, bets, ...rest } = pred;
+
+      // --- flatten parlay legs ---
+      const parlayLegs: ParlayLegWithUser[] = [];
+      options.forEach((opt) =>
+        opt.parlayLegs.forEach((leg) => {
+          parlayLegs.push({
+            parlayId: leg.parlay.id,
+            user: {
+              id: leg.parlay.user.id,
+              name: leg.parlay.user.name,
+              avatarUrl: leg.parlay.user.avatarUrl,
+              ...(leg.parlay.user.profilePictureKey && {
+                profilePictureKey: leg.parlay.user.profilePictureKey,
+              }),
+            },
+            stake: leg.parlay.amount.toString(),
+            optionId: opt.id,
+            createdAt: leg.createdAt,
+          });
+        }),
+      );
+
+      return { ...rest, options, bets, parlayLegs } as any;
+    });
+  }
+
+  async incrementViewCount(predictionId: number): Promise<void> {
+    await prisma.prediction.update({
+      where: { id: predictionId },
+      data: {
+        viewCount: {
+          increment: 1,
+        },
+      },
+    });
+  }
+
+  async hasUserViewedPrediction(predictionId: number, userId: number): Promise<boolean> {
+    const viewLog = await prisma.userActivityLog.findFirst({
+      where: {
+        userId,
+        activityType: 'prediction_viewed',
+        metadata: {
+          path: ['predictionId'],
+          equals: predictionId,
+        },
+      },
+    });
+    return !!viewLog;
+  }
+
+  async getUserViewCount(predictionId: number): Promise<number> {
+    const viewCount = await prisma.userActivityLog.count({
+      where: {
+        activityType: 'prediction_viewed',
+        metadata: {
+          path: ['predictionId'],
+          equals: predictionId,
+        },
+      },
+    });
+    return viewCount;
+  }
+
+  async getUserActivityLog(
+    userId: number,
+    activityTypes: string[],
+    limit: number = 100,
+  ): Promise<
+    Array<{
+      activityType: string;
+      metadata: any;
+      occurredAt: Date;
+    }>
+  > {
+    return prisma.userActivityLog.findMany({
+      where: {
+        userId,
+        activityType: {
+          in: activityTypes,
+        },
+      },
+      orderBy: { occurredAt: 'desc' },
+      take: limit,
+      select: {
+        activityType: true,
+        metadata: true,
+        occurredAt: true,
+      },
+    });
+  }
 }

@@ -72,6 +72,7 @@ import type {
   ArticleStatus as PrismaArticleStatus,
   Tweet as PrismaTweet,
   PredictionSourceLink as PrismaPredictionSourceLink,
+  PredictionComment as PrismaPredictionComment,
   BanType as PrismaBanType,
   ModerationAction as PrismaModerationAction,
 } from '@prisma/client';
@@ -671,6 +672,22 @@ export interface BetWithUser extends PublicBet {
   /** optional contextual info */
   optionLabel?: string;
   predictionTitle?: string;
+  /** Enhanced with activity metrics for real-time events */
+  activityMetrics?: {
+    activityLevel: 'high' | 'medium' | 'low';
+    totalBets: number;
+    totalParlayLegs: number;
+    bettingVelocity: number;
+    lastActivityAt: Date | null;
+    popularityScore: number;
+  };
+  difficulty?: 'easy' | 'medium' | 'hard' | 'expert';
+  viewStats?: {
+    totalViews: number;
+    uniqueViewers: number;
+    viewsLast24h: number;
+    viewsLast7d: number;
+  };
 }
 
 // ——— User Betting Response DTOs ————————————————————————————————————————————
@@ -723,6 +740,22 @@ export type ParlayLegWithUser = {
   predictionId?: number;
   optionLabel?: string;
   predictionTitle?: string;
+  /** Enhanced with activity metrics for real-time events */
+  activityMetrics?: {
+    activityLevel: 'high' | 'medium' | 'low';
+    totalBets: number;
+    totalParlayLegs: number;
+    bettingVelocity: number;
+    lastActivityAt: Date | null;
+    popularityScore: number;
+  };
+  difficulty?: 'easy' | 'medium' | 'hard' | 'expert';
+  viewStats?: {
+    totalViews: number;
+    uniqueViewers: number;
+    viewsLast24h: number;
+    viewsLast7d: number;
+  };
 };
 
 export type DbParlay     = PrismaParlay;
@@ -1149,6 +1182,288 @@ export interface PredictionFull extends PublicPrediction {
   sourceLinks?: PublicPredictionSourceLink[];
 }
 
+// ——— Enhanced Prediction Event Types ——————————————————————————————————————————————
+export interface EnhancedPredictionCreatePayload extends PublicPrediction {
+  options: PublicPredictionOption[];
+  bets: BetWithUser[];
+  parlayLegs: ParlayLegWithUser[];
+  /** Enhanced with activity metrics for real-time events */
+  activityMetrics: {
+    activityLevel: 'high' | 'medium' | 'low';
+    totalBets: number;
+    totalParlayLegs: number;
+    bettingVelocity: number;
+    lastActivityAt: Date | null;
+    popularityScore: number;
+  };
+  difficulty: 'easy' | 'medium' | 'hard' | 'expert';
+  viewStats: {
+    totalViews: number;
+    uniqueViewers: number;
+    viewsLast24h: number;
+    viewsLast7d: number;
+  };
+}
+
+export interface EnhancedOddsUpdatePayload {
+  predictionId: number;
+  timestamp: string;
+  significantChanges: number;
+  hotMarket: boolean;
+  /** Enhanced with activity metrics for real-time events */
+  activityMetrics: {
+    activityLevel: 'high' | 'medium' | 'low';
+    totalBets: number;
+    totalParlayLegs: number;
+    bettingVelocity: number;
+    lastActivityAt: Date | null;
+    popularityScore: number;
+  };
+  difficulty: 'easy' | 'medium' | 'hard' | 'expert';
+  viewStats: {
+    totalViews: number;
+    uniqueViewers: number;
+    viewsLast24h: number;
+    viewsLast7d: number;
+  };
+  options: Array<{
+    id: number;
+    label: string;
+    odds: number;
+    previousOdds: number;
+    change: number;
+    changePercent: number;
+  }>;
+}
+
+// ——— Prediction Comment Types ——————————————————————————————————————————————
+export type DbPredictionComment = PrismaPredictionComment;
+
+export interface PublicPredictionComment {
+  id: number;
+  predictionId: number;
+  userId: number;
+  content: string;
+  parentId: number | null;
+  isEdited: boolean;
+  editedAt: string | null;
+  likesCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PredictionCommentWithUser extends PublicPredictionComment {
+  user: {
+    id: number;
+    name: string;
+    avatarUrl: string | null;
+  };
+  replies?: PredictionCommentWithUser[];
+  replyCount?: number;
+}
+
+export interface CreatePredictionCommentPayload {
+  predictionId: number;
+  content: string;
+  parentId?: number;
+}
+
+export interface UpdatePredictionCommentPayload {
+  content: string;
+}
+
+export interface PredictionCommentEvent {
+  type: 'comment_created' | 'comment_updated' | 'comment_deleted' | 'comment_liked';
+  comment: PredictionCommentWithUser;
+  predictionId: number;
+  timestamp: string;
+}
+
+// ——— Dashboard Analytics Types ——————————————————————————————————————————————
+export interface PlatformHealthMetrics {
+  activeUsers: {
+    last24h: number;
+    last7d: number;
+    last30d: number;
+    growth: number;
+  };
+  predictions: {
+    total: number;
+    active: number;
+    resolved: number;
+    createdLast24h: number;
+    resolutionRate: number;
+  };
+  betting: {
+    totalVolume: string;
+    volumeLast24h: string;
+    uniqueBettors: number;
+    averageBetSize: string;
+    winRate: number;
+  };
+  engagement: {
+    commentsLast24h: number;
+    likesLast24h: number;
+    pongMatchesLast24h: number;
+    timelineViews: number;
+  };
+  performance: {
+    averageResponseTime: number;
+    errorRate: number;
+    systemLoad: number;
+    databaseConnections: number;
+  };
+}
+
+export interface TrendAnalysis {
+  userRegistrations: Array<{
+    date: string;
+    count: number;
+    cumulativeCount: number;
+  }>;
+  bettingVolume: Array<{
+    date: string;
+    volume: string;
+    averageBetSize: string;
+    uniqueBettors: number;
+  }>;
+  predictionCreation: Array<{
+    date: string;
+    count: number;
+    categories: Record<string, number>;
+  }>;
+  engagement: Array<{
+    date: string;
+    comments: number;
+    likes: number;
+    views: number;
+    pongMatches: number;
+  }>;
+}
+
+export interface CrossFeatureAnalytics {
+  userSegments: {
+    heavyBettors: number;
+    socialUsers: number;
+    gamers: number;
+    creators: number;
+    lurkers: number;
+  };
+  featureCorrelation: {
+    bettingToComments: number;
+    pongToOverallActivity: number;
+    predictionCreationToEngagement: number;
+  };
+  retentionMetrics: {
+    day1: number;
+    day7: number;
+    day30: number;
+  };
+  cohortAnalysis: Array<{
+    cohort: string;
+    week0: number;
+    week1: number;
+    week2: number;
+    week3: number;
+    week4: number;
+  }>;
+}
+
+export interface ContentAnalytics {
+  categories: Array<{
+    name: string;
+    predictionCount: number;
+    totalBets: number;
+    averageActivity: number;
+    popularityScore: number;
+  }>;
+  topPerformers: {
+    mostViewedPredictions: Array<{
+      id: number;
+      title: string;
+      views: number;
+      comments: number;
+      bets: number;
+    }>;
+    topCommentedPredictions: Array<{
+      id: number;
+      title: string;
+      comments: number;
+      likes: number;
+    }>;
+    mostActiveUsers: Array<{
+      id: number;
+      name: string;
+      activityScore: number;
+      predictions: number;
+      bets: number;
+      comments: number;
+    }>;
+  };
+}
+
+export interface ComprehensiveDashboard {
+  healthMetrics: PlatformHealthMetrics;
+  trends: TrendAnalysis;
+  crossFeature: CrossFeatureAnalytics;
+  content: ContentAnalytics;
+  generatedAt: string;
+  timeRange: {
+    days: number;
+    startDate: string;
+    endDate: string;
+  };
+}
+
+export interface RealtimeMetrics {
+  activeUsers24h: number;
+  newPredictions24h: number;
+  bettingVolume24h: string;
+  engagement24h: {
+    commentsLast24h: number;
+    likesLast24h: number;
+    pongMatchesLast24h: number;
+    timelineViews: number;
+  };
+  performance: {
+    averageResponseTime: number;
+    errorRate: number;
+    systemLoad: number;
+    databaseConnections: number;
+  };
+  timestamp: string;
+}
+
+export interface AnalyticsSummary {
+  period: 'week' | 'month' | 'quarter';
+  days: number;
+  overview: {
+    totalUsers: number;
+    userGrowth: number;
+    totalPredictions: number;
+    activePredictions: number;
+    totalBettingVolume: string;
+    averageBetSize: string;
+  };
+  engagement: {
+    dailyComments: number;
+    dailyPongMatches: number;
+    totalEngagement: number;
+  };
+  trends: {
+    userRegistrations: Array<{
+      date: string;
+      count: number;
+      cumulativeCount: number;
+    }>;
+    topCategories: Array<{
+      name: string;
+      count: number;
+    }>;
+  };
+  generatedAt: string;
+}
+
 // ——— Admin DTOs ——————————————————————————————————————————————
 export interface AdminBet extends PublicBet {
   userName:   string;
@@ -1474,6 +1789,12 @@ export const REDIS_CHANNELS = {
   STREAK_BROKEN: 'streak:broken',
   STREAK_RESET: 'streak:reset',
   STREAK_MILESTONE_REACHED: 'streak:milestone:reached',
+
+  // Comment channels
+  PREDICTION_COMMENT_CREATE: 'prediction:comment:create',
+  PREDICTION_COMMENT_UPDATE: 'prediction:comment:update',
+  PREDICTION_COMMENT_DELETE: 'prediction:comment:delete',
+  PREDICTION_COMMENT_LIKE: 'prediction:comment:like',
 
   // Other channels
   PAYOUT_COMPLETED: 'payout:completed',

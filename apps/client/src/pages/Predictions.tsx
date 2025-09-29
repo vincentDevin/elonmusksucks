@@ -14,6 +14,7 @@ import { FloatingParlayIndicator } from '../components/prediction/ParlaySelectio
 import CreatePredictionForm from '../components/prediction/CreatePredictionForm';
 import PredictionCard from '../components/prediction/PredictionCard';
 import PredictionSectionCard from '../components/prediction/PredictionSectionCard';
+import PredictionAnalyticsInsights from '../components/prediction/PredictionAnalyticsInsights';
 
 // Hooks and contexts
 import { usePredictionDiscovery } from '../hooks/usePredictionDiscovery';
@@ -535,6 +536,14 @@ export default function Predictions() {
                 onClearFilters={clearFilters}
                 totalResults={enhancedPredictions.length}
                 isMobile={isMobile}
+              />
+
+              {/* Analytics Insights */}
+              <PredictionAnalyticsInsights
+                compact={isMobile}
+                onCategorySelect={(category) => {
+                  updateFilters({ categories: [category] });
+                }}
               />
             </div>
           </div>

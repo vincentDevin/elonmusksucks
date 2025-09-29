@@ -187,6 +187,44 @@ export function registerRedisEventHandlers(io: Server, eventSub: any) {
         io.emit(REDIS_CHANNELS.CHAT_LEAVE, payload);
         break;
 
+      // Comment events
+      case REDIS_CHANNELS.PREDICTION_COMMENT_CREATE:
+        const createCommentPayload = payload as any;
+        if (createCommentPayload.predictionId) {
+          io.to(`prediction:${createCommentPayload.predictionId}`).emit(
+            'prediction:comment:created',
+            payload,
+          );
+        }
+        break;
+      case REDIS_CHANNELS.PREDICTION_COMMENT_UPDATE:
+        const updateCommentPayload = payload as any;
+        if (updateCommentPayload.predictionId) {
+          io.to(`prediction:${updateCommentPayload.predictionId}`).emit(
+            'prediction:comment:updated',
+            payload,
+          );
+        }
+        break;
+      case REDIS_CHANNELS.PREDICTION_COMMENT_DELETE:
+        const deleteCommentPayload = payload as any;
+        if (deleteCommentPayload.predictionId) {
+          io.to(`prediction:${deleteCommentPayload.predictionId}`).emit(
+            'prediction:comment:deleted',
+            payload,
+          );
+        }
+        break;
+      case REDIS_CHANNELS.PREDICTION_COMMENT_LIKE:
+        const likeCommentPayload = payload as any;
+        if (likeCommentPayload.predictionId) {
+          io.to(`prediction:${likeCommentPayload.predictionId}`).emit(
+            'prediction:comment:liked',
+            payload,
+          );
+        }
+        break;
+
       default:
         console.warn('[socket] Unhandled Redis channel', channel);
     }

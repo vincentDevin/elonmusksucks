@@ -126,7 +126,14 @@ export class BettingService {
             ? await this.userService.getCachedProfileImageUrl(user.id, user.profilePictureKey, 3600)
             : user.avatarUrl;
 
-          // Compose bet event payload
+          // Get activity metrics for the prediction
+          const { PredictionService } = require('./predictions.service');
+          const predictionService = new PredictionService();
+          const activityMetrics = await predictionService.getActivityMetrics(opt.prediction.id);
+          const difficulty = await predictionService.calculateDifficulty(opt.prediction.id);
+          const viewStats = await predictionService.getPredictionViewStats(opt.prediction.id);
+
+          // Compose enhanced bet event payload
           const betWithUser: BetWithUser = {
             ...bet,
             amount: bet.amount.toString(),
@@ -139,6 +146,10 @@ export class BettingService {
             },
             optionLabel: opt.label,
             predictionTitle: opt.prediction.title,
+            // Enhanced with activity metrics
+            activityMetrics,
+            difficulty,
+            viewStats,
           };
 
           // Execute all post-transaction operations in parallel for performance
@@ -294,17 +305,33 @@ export class BettingService {
         ? await this.userService.getCachedProfileImageUrl(user.id, user.profilePictureKey, 3600)
         : user.avatarUrl;
 
-      // Prepare leg events payload
-      const legsPayload: ParlayLegWithUser[] = validLegs.map((o) => ({
-        parlayId: parlay.id,
-        user: { id: user.id, name: user.name, avatarUrl },
-        stake: amount.toString(),
-        optionId: o.id,
-        createdAt: parlay.createdAt,
-        predictionId: o.prediction.id,
-        optionLabel: o.label,
-        predictionTitle: o.prediction.title,
-      }));
+      // Get activity metrics for each prediction in the parlay
+      const { PredictionService } = require('./predictions.service');
+      const predictionService = new PredictionService();
+
+      // Prepare enhanced leg events payload with activity metrics
+      const legsPayload: ParlayLegWithUser[] = await Promise.all(
+        validLegs.map(async (o) => {
+          const activityMetrics = await predictionService.getActivityMetrics(o.prediction.id);
+          const difficulty = await predictionService.calculateDifficulty(o.prediction.id);
+          const viewStats = await predictionService.getPredictionViewStats(o.prediction.id);
+
+          return {
+            parlayId: parlay.id,
+            user: { id: user.id, name: user.name, avatarUrl },
+            stake: amount.toString(),
+            optionId: o.id,
+            createdAt: parlay.createdAt,
+            predictionId: o.prediction.id,
+            optionLabel: o.label,
+            predictionTitle: o.prediction.title,
+            // Enhanced with activity metrics
+            activityMetrics,
+            difficulty,
+            viewStats,
+          };
+        }),
+      );
 
       // Get affected predictions for odds recalculation
       const affectedPredictions = Array.from(new Set(validLegs.map((leg) => leg.prediction.id)));
@@ -402,12 +429,23 @@ export class BettingService {
       return change > 0.1; // 10%+ change is significant
     });
 
-    // 🔥 Broadcast enhanced odds update with excitement data
+    // Get current activity metrics for the prediction
+    const { PredictionService } = require('./predictions.service');
+    const predictionService = new PredictionService();
+    const activityMetrics = await predictionService.getActivityMetrics(predictionId);
+    const difficulty = await predictionService.calculateDifficulty(predictionId);
+    const viewStats = await predictionService.getPredictionViewStats(predictionId);
+
+    // 🔥 Broadcast enhanced odds update with excitement data and activity metrics
     await this.eventBus.publish('odds:update:enhanced', {
       predictionId,
       timestamp: new Date().toISOString(),
       significantChanges: significantChanges.length,
       hotMarket: significantChanges.length >= 2, // Multiple options changed significantly
+      // Enhanced with activity metrics
+      activityMetrics,
+      difficulty,
+      viewStats,
       options: afterOdds.map((option, index) => {
         const before = beforeOdds[index];
         return {

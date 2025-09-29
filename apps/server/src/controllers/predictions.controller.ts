@@ -212,3 +212,424 @@ export const createSourceLink = async (
     publisher || null,
   );
 };
+
+/**
+ * GET /api/predictions/:id/activity-level
+ * Get activity level for a single prediction
+ */
+export const getActivityLevel = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const predictionId = parseInt(req.params.id);
+
+    if (isNaN(predictionId)) {
+      res.status(400).json({ error: 'Invalid prediction ID' });
+      return;
+    }
+
+    const activityLevel = await predictionService.calculateActivityLevel(predictionId);
+    res.json({ predictionId, activityLevel });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * POST /api/predictions/activity-levels
+ * Get activity levels for multiple predictions
+ * Body: { predictionIds: number[] }
+ */
+export const getBulkActivityLevels = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const { predictionIds } = req.body;
+
+    if (!Array.isArray(predictionIds) || predictionIds.some((id) => typeof id !== 'number')) {
+      res.status(400).json({ error: 'predictionIds must be an array of numbers' });
+      return;
+    }
+
+    if (predictionIds.length > 100) {
+      res.status(400).json({ error: 'Maximum 100 predictions per request' });
+      return;
+    }
+
+    const activityLevels = await predictionService.calculateBulkActivityLevels(predictionIds);
+    res.json({ activityLevels });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * GET /api/predictions/:id/activity-metrics
+ * Get comprehensive activity metrics for a prediction
+ */
+export const getActivityMetrics = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const predictionId = parseInt(req.params.id);
+
+    if (isNaN(predictionId)) {
+      res.status(400).json({ error: 'Invalid prediction ID' });
+      return;
+    }
+
+    const metrics = await predictionService.getActivityMetrics(predictionId);
+    res.json({ predictionId, ...metrics });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * GET /api/predictions/:id/difficulty
+ * Get difficulty level for a single prediction
+ */
+export const getDifficulty = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const predictionId = parseInt(req.params.id);
+
+    if (isNaN(predictionId)) {
+      res.status(400).json({ error: 'Invalid prediction ID' });
+      return;
+    }
+
+    const difficulty = await predictionService.calculateDifficulty(predictionId);
+    res.json({ predictionId, difficulty });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * POST /api/predictions/difficulties
+ * Get difficulty levels for multiple predictions
+ * Body: { predictionIds: number[] }
+ */
+export const getBulkDifficulties = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const { predictionIds } = req.body;
+
+    if (!Array.isArray(predictionIds) || predictionIds.some((id) => typeof id !== 'number')) {
+      res.status(400).json({ error: 'predictionIds must be an array of numbers' });
+      return;
+    }
+
+    if (predictionIds.length > 100) {
+      res.status(400).json({ error: 'Maximum 100 predictions per request' });
+      return;
+    }
+
+    const difficulties = await predictionService.calculateBulkDifficulties(predictionIds);
+    res.json({ difficulties });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * POST /api/predictions/filter
+ * Get filtered and sorted predictions with analytics support
+ * Body: PredictionFilter object with optional pagination
+ */
+export const getFilteredPredictions = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const filters = req.body;
+
+    // Validate pagination parameters
+    if (
+      filters.limit &&
+      (typeof filters.limit !== 'number' || filters.limit < 1 || filters.limit > 100)
+    ) {
+      res.status(400).json({ error: 'limit must be a number between 1 and 100' });
+      return;
+    }
+
+    if (filters.offset && (typeof filters.offset !== 'number' || filters.offset < 0)) {
+      res.status(400).json({ error: 'offset must be a non-negative number' });
+      return;
+    }
+
+    // Validate filter arrays
+    if (filters.categories && !Array.isArray(filters.categories)) {
+      res.status(400).json({ error: 'categories must be an array' });
+      return;
+    }
+
+    if (filters.difficulties && !Array.isArray(filters.difficulties)) {
+      res.status(400).json({ error: 'difficulties must be an array' });
+      return;
+    }
+
+    const result = await predictionService.getFilteredPredictions(filters);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * GET /api/predictions/:id/view-stats
+ * Get view analytics for a single prediction
+ */
+export const getViewStats = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const predictionId = parseInt(req.params.id);
+
+    if (isNaN(predictionId)) {
+      res.status(400).json({ error: 'Invalid prediction ID' });
+      return;
+    }
+
+    const stats = await predictionService.getPredictionViewStats(predictionId);
+    res.json({ predictionId, ...stats });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * POST /api/predictions/view-stats
+ * Get view analytics for multiple predictions
+ * Body: { predictionIds: number[] }
+ */
+export const getBulkViewStats = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const { predictionIds } = req.body;
+
+    if (!Array.isArray(predictionIds) || predictionIds.some((id) => typeof id !== 'number')) {
+      res.status(400).json({ error: 'predictionIds must be an array of numbers' });
+      return;
+    }
+
+    if (predictionIds.length > 100) {
+      res.status(400).json({ error: 'Maximum 100 predictions per request' });
+      return;
+    }
+
+    const stats = await predictionService.getBulkViewStats(predictionIds);
+    res.json({ viewStats: stats });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * POST /api/predictions/:id/track-view
+ * Track a user viewing a prediction (manual endpoint for testing/debugging)
+ */
+export const trackView = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const predictionId = parseInt(req.params.id);
+    const { userId } = req.body;
+
+    if (isNaN(predictionId)) {
+      res.status(400).json({ error: 'Invalid prediction ID' });
+      return;
+    }
+
+    if (!userId || typeof userId !== 'number') {
+      res.status(400).json({ error: 'userId is required and must be a number' });
+      return;
+    }
+
+    await predictionService.trackPredictionView(predictionId, userId);
+    res.json({ success: true, message: 'View tracked successfully' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * GET /api/predictions/analytics
+ * Get general prediction analytics (status counts, resolution times)
+ */
+export const getPredictionAnalytics = async (
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const analytics = await predictionService.getPredictionAnalytics();
+    res.json(analytics);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * GET /api/predictions/:id/analytics
+ * Get detailed analytics for a specific prediction
+ */
+export const getDetailedAnalytics = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const predictionId = parseInt(req.params.id);
+
+    if (isNaN(predictionId)) {
+      res.status(400).json({ error: 'Invalid prediction ID' });
+      return;
+    }
+
+    const analytics = await predictionService.getDetailedPredictionAnalytics(predictionId);
+    res.json({ predictionId, ...analytics });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * GET /api/predictions/analytics/categories
+ * Get analytics breakdown by category
+ */
+export const getCategoryAnalytics = async (
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const analytics = await predictionService.getCategoryAnalytics();
+    res.json({ categories: analytics });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * GET /api/predictions/analytics/performance
+ * Get performance metrics including distributions and trends
+ */
+export const getPerformanceMetrics = async (
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const metrics = await predictionService.getPerformanceMetrics();
+    res.json(metrics);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * GET /api/predictions/hot-markets
+ * Detect currently hot prediction markets based on activity and engagement
+ */
+export const getHotMarkets = async (
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const hotMarkets = await predictionService.detectHotMarkets();
+    res.json({ hotMarkets });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * GET /api/predictions/market-trends
+ * Get trending, emerging, and cooling markets analysis
+ */
+export const getMarketTrends = async (
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const trends = await predictionService.getMarketTrends();
+    res.json(trends);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * POST /api/predictions/recommendations
+ * Get personalized prediction recommendations for a user
+ * Body: { userId: number, options?: RecommendationOptions }
+ */
+export const getPersonalizedRecommendations = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const { userId, options = {} } = req.body;
+
+    if (!userId || typeof userId !== 'number') {
+      res.status(400).json({ error: 'userId is required and must be a number' });
+      return;
+    }
+
+    const recommendations = await predictionService.getPersonalizedRecommendations(userId, options);
+    res.json({ userId, recommendations });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * GET /api/predictions/:id/similar
+ * Get predictions similar to the specified prediction
+ */
+export const getSimilarPredictions = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const predictionId = parseInt(req.params.id);
+    const limit = parseInt(req.query.limit as string) || 5;
+
+    if (isNaN(predictionId)) {
+      res.status(400).json({ error: 'Invalid prediction ID' });
+      return;
+    }
+
+    if (limit < 1 || limit > 20) {
+      res.status(400).json({ error: 'limit must be between 1 and 20' });
+      return;
+    }
+
+    const similarPredictions = await predictionService.getSimilarPredictions(predictionId, limit);
+    res.json({ predictionId, similarPredictions });
+  } catch (err) {
+    next(err);
+  }
+};

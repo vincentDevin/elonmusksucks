@@ -4,6 +4,23 @@ import {
   getPredictionById,
   createPrediction,
   getSourceLinks,
+  getActivityLevel,
+  getBulkActivityLevels,
+  getActivityMetrics,
+  getDifficulty,
+  getBulkDifficulties,
+  getFilteredPredictions,
+  getViewStats,
+  getBulkViewStats,
+  trackView,
+  getPredictionAnalytics,
+  getDetailedAnalytics,
+  getCategoryAnalytics,
+  getPerformanceMetrics,
+  getHotMarkets,
+  getMarketTrends,
+  getPersonalizedRecommendations,
+  getSimilarPredictions,
 } from '../controllers/predictions.controller';
 import { requireAuth } from '../middleware/auth.middleware';
 import type { AuthRequest } from '../middleware/auth.middleware';
@@ -90,5 +107,56 @@ router.post('/source-links', requireAuth, async (req: AuthRequest, res: any) => 
 
 // GET /api/predictions/:id/source-links - Get source links for a prediction
 router.get('/:id/source-links', getSourceLinks);
+
+// GET /api/predictions/:id/activity-level - Get activity level for a single prediction
+router.get('/:id/activity-level', getActivityLevel);
+
+// POST /api/predictions/activity-levels - Get activity levels for multiple predictions
+router.post('/activity-levels', getBulkActivityLevels);
+
+// GET /api/predictions/:id/activity-metrics - Get comprehensive activity metrics for a prediction
+router.get('/:id/activity-metrics', getActivityMetrics);
+
+// GET /api/predictions/:id/difficulty - Get difficulty level for a single prediction
+router.get('/:id/difficulty', getDifficulty);
+
+// POST /api/predictions/difficulties - Get difficulty levels for multiple predictions
+router.post('/difficulties', getBulkDifficulties);
+
+// POST /api/predictions/filter - Get filtered and sorted predictions with analytics support
+router.post('/filter', getFilteredPredictions);
+
+// GET /api/predictions/:id/view-stats - Get view analytics for a single prediction
+router.get('/:id/view-stats', getViewStats);
+
+// POST /api/predictions/view-stats - Get view analytics for multiple predictions
+router.post('/view-stats', getBulkViewStats);
+
+// POST /api/predictions/:id/track-view - Track a user viewing a prediction (manual endpoint)
+router.post('/:id/track-view', trackView);
+
+// GET /api/predictions/analytics - Get general prediction analytics
+router.get('/analytics', getPredictionAnalytics);
+
+// GET /api/predictions/analytics/categories - Get analytics breakdown by category
+router.get('/analytics/categories', getCategoryAnalytics);
+
+// GET /api/predictions/analytics/performance - Get performance metrics and trends
+router.get('/analytics/performance', getPerformanceMetrics);
+
+// GET /api/predictions/:id/analytics - Get detailed analytics for a specific prediction
+router.get('/:id/analytics', getDetailedAnalytics);
+
+// GET /api/predictions/hot-markets - Detect currently hot prediction markets
+router.get('/hot-markets', getHotMarkets);
+
+// GET /api/predictions/market-trends - Get trending, emerging, and cooling markets
+router.get('/market-trends', getMarketTrends);
+
+// POST /api/predictions/recommendations - Get personalized recommendations for a user
+router.post('/recommendations', getPersonalizedRecommendations);
+
+// GET /api/predictions/:id/similar - Get similar predictions based on content and user behavior
+router.get('/:id/similar', getSimilarPredictions);
 
 export default router;

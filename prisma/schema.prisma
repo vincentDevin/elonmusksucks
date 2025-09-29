@@ -150,6 +150,8 @@ model User {
   moderationReceived ModerationLog[] @relation("ModeratedUser")
   articleReactions   ArticleReaction[]
   articleComments    ArticleComment[]
+  predictionComments PredictionComment[]
+  predictionCommentLikes PredictionCommentLike[]
   // Pong relations
   pongMatchesAsP1    PongMatch[]     @relation("PlayerOne")
   pongMatchesAsP2    PongMatch[]     @relation("PlayerTwo")
@@ -218,6 +220,7 @@ model Prediction {
   creator         User                   @relation(fields: [creatorId], references: [id])
   activities      UserActivity[]
   sourceLinks     PredictionSourceLink[]
+  comments        PredictionComment[]
 
   @@index([expiresAt, resolved])
   @@index([creatorId, createdAt(sort: Desc)])
@@ -755,6 +758,42 @@ model ArticleComment {
   updatedAt DateTime @updatedAt
 
   @@index([articleId, createdAt])
+  @@index([userId])
+}
+
+model PredictionComment {
+  id           Int        @id @default(autoincrement())
+  prediction   Prediction @relation(fields: [predictionId], references: [id], onDelete: Cascade)
+  predictionId Int
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       Int
+  content      String     @db.Text
+  parentId     Int?       // For nested replies
+  parent       PredictionComment? @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies      PredictionComment[] @relation("CommentReplies")
+  isEdited     Boolean    @default(false)
+  editedAt     DateTime?
+  likesCount   Int        @default(0)
+  likes        PredictionCommentLike[]
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([predictionId, createdAt])
+  @@index([userId])
+  @@index([parentId])
+  @@index([predictionId, parentId, createdAt])
+}
+
+model PredictionCommentLike {
+  id        Int               @id @default(autoincrement())
+  comment   PredictionComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  commentId Int
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int
+  createdAt DateTime          @default(now())
+
+  @@unique([commentId, userId])
+  @@index([commentId])
   @@index([userId])
 }
 
