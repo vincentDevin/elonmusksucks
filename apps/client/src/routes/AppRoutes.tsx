@@ -115,6 +115,16 @@ export default function AppRoutes() {
           }
         />
         <Route
+          path="/predictions/:id"
+          element={
+            <MainLayout>
+              <Suspense fallback={<RouteFallback />}>
+                <AuthPredictions />
+              </Suspense>
+            </MainLayout>
+          }
+        />
+        <Route
           path="/leaderboard"
           element={
             <MainLayout>

@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useMemo, useCallback } from 'react';
 import { usePredictionMarket } from '../../contexts/PredictionContext';
 import PredictionCard from './PredictionCard';
 import GenericFeed from '../GenericFeed';

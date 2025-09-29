@@ -33,9 +33,7 @@ export default function BetModal({
   isOpen,
   onClose,
   mode = 'modal',
-  compact = false,
   onBetPlaced,
-  addOptimisticBet,
   enableOptimistic = false,
 }: BetModalProps) {
   const { placeBet, predictions } = usePredictionMarket();
@@ -63,7 +61,7 @@ export default function BetModal({
     if (mode !== 'quick') return [];
 
     const active = predictions.filter(
-      (pred) => !pred.resolved && new Date(pred.expiresAt) > new Date(),
+      (pred) => !pred.resolvedAt && new Date(pred.expiresAt) > new Date(),
     );
 
     const filtered = active.filter(
@@ -143,7 +141,13 @@ export default function BetModal({
 
     // Market impact calculation
     const asNum = (v: string | number | bigint | undefined | null) => Number(v ?? 0);
-    const totalBets = prediction.bets.reduce<number>((sum, bet) => sum + asNum(bet.amount), 0);
+    const totalBets =
+      activePrediction && 'bets' in activePrediction && Array.isArray(activePrediction.bets)
+        ? (activePrediction.bets as any[]).reduce<number>(
+            (sum: number, bet: any) => sum + asNum(bet.amount),
+            0,
+          )
+        : 0;
     const marketImpact = amount > Math.max(100, totalBets * 0.1);
 
     // 🚀 ALL-IN bonus detection
@@ -166,7 +170,13 @@ export default function BetModal({
       allInMultiplier,
       excitementLevel,
     };
-  }, [amount, optionId, balance, prediction.options, prediction.bets]);
+  }, [
+    amount,
+    optionId,
+    balance,
+    activePrediction?.options,
+    activePrediction && 'bets' in activePrediction ? activePrediction.bets : [],
+  ]);
 
   // 🎊 Bet submission with celebration
   const submit = async () => {
@@ -185,7 +195,7 @@ export default function BetModal({
           setShowCelebration(false);
           onClose();
         },
-        betCalculations.isYolo ? 2000 : 1500,
+        betCalculations?.isYolo ? 2000 : 1500,
       );
 
       // Optimistic UI update
@@ -193,7 +203,7 @@ export default function BetModal({
         const optimistic: BetWithUser = {
           id: Date.now(),
           userId: user.id,
-          predictionId: prediction.id,
+          predictionId: activePrediction?.id || 0,
           amount: amount.toString(),
           oddsAtPlacement: 0,
           potentialPayout: '0',
@@ -222,7 +232,8 @@ export default function BetModal({
   // Early return for closed state
   if (!isOpen && mode !== 'inline') return null;
 
-  // 🎨 Dynamic styling based on mode and excitement level
+  // 🎨 Dynamic styling based on mode and excitement level (currently unused)
+  /*
   const getRiskColors = () => {
     if (!betCalculations) return 'bg-gradient-to-br from-green-600 to-green-700 text-white';
     switch (betCalculations.excitementLevel) {
@@ -238,6 +249,7 @@ export default function BetModal({
         return 'bg-gradient-to-br from-green-600 to-green-700 text-white';
     }
   };
+  */
 
   // Quick mode: prediction selection interface
   if (mode === 'quick' && !selectedPrediction) {
@@ -268,7 +280,7 @@ export default function BetModal({
             {availablePredictions.map((pred) => (
               <div
                 key={pred.id}
-                onClick={() => setSelectedPrediction(pred)}
+                onClick={() => setSelectedPrediction(pred as any)}
                 className="p-4 bg-background border border-muted rounded-lg hover:bg-surface cursor-pointer transition-colors"
               >
                 <h4 className="font-semibold text-content mb-1">{pred.title}</h4>
@@ -276,7 +288,7 @@ export default function BetModal({
                 <div className="flex gap-2">
                   {pred.options.map((opt) => (
                     <span key={opt.id} className="text-xs bg-muted px-2 py-1 rounded">
-                      {opt.text} ({opt.odds.toFixed(2)}x)
+                      {opt.label} ({(opt.odds || 0).toFixed(2)}x)
                     </span>
                   ))}
                 </div>
@@ -316,7 +328,9 @@ export default function BetModal({
         <div className="flex justify-between items-start mb-4">
           <div className="flex-1 pr-4">
             <h3 className="font-bold text-lg text-content line-clamp-2">
-              {activePrediction.title}
+              {activePrediction && 'title' in activePrediction
+                ? String(activePrediction.title)
+                : 'Select Prediction'}
             </h3>
             <div className="text-sm text-tertiary mt-1">Balance: {formatMuskBucks(balance)} 🪙</div>
           </div>
@@ -327,8 +341,104 @@ export default function BetModal({
           )}
         </div>
 
-        {/* Rest of betting form components would go here... */}
-        <div className="text-center text-tertiary">[Betting form implementation continues...]</div>
+        {/* Option Selection */}
+        <div className="space-y-3">
+          <label className="block text-sm font-medium text-content">Choose Option</label>
+          <div className="grid gap-2">
+            {activePrediction.options.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => setOptionId(option.id)}
+                className={`p-3 rounded-lg border text-left transition-colors ${
+                  optionId === option.id
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-muted bg-background hover:bg-surface text-content'
+                }`}
+              >
+                <div className="flex justify-between items-center">
+                  <span className="font-medium">{option.label}</span>
+                  <span className="text-sm font-bold">{(option.odds || 0).toFixed(2)}x</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Amount Input */}
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-content">Bet Amount</label>
+          <input
+            type="number"
+            min="1"
+            max={balance}
+            value={amount || ''}
+            onChange={(e) => setAmount(Number(e.target.value) || 0)}
+            placeholder="Enter amount..."
+            className="w-full px-3 py-2 border border-muted rounded-lg bg-background text-content placeholder-tertiary focus:outline-none focus:border-primary"
+          />
+          <div className="flex justify-between text-xs text-tertiary">
+            <span>Min: 1 🪙</span>
+            <span>Max: {formatMuskBucks(balance)} 🪙</span>
+          </div>
+        </div>
+
+        {/* Bet Calculations */}
+        {betCalculations && amount > 0 && (
+          <div className="bg-background border border-muted rounded-lg p-4 space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-tertiary">Potential Payout:</span>
+              <span className="font-bold text-content">
+                {formatMuskBucks(betCalculations.payout)} 🪙
+              </span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-tertiary">Profit:</span>
+              <span
+                className={`font-bold ${betCalculations.profit > 0 ? 'text-success' : 'text-content'}`}
+              >
+                +{formatMuskBucks(betCalculations.profit)} 🪙
+              </span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-tertiary">Risk Level:</span>
+              <span className="font-bold">
+                {betCalculations.riskEmoji} {betCalculations.riskLevel}
+              </span>
+            </div>
+            {betCalculations.isAllIn && (
+              <div className="text-center text-sm font-bold text-primary">
+                🚀 ALL-IN BONUS: {betCalculations.allInMultiplier}x multiplier!
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Error Display */}
+        {err && (
+          <div className="bg-error/10 border border-error/20 rounded-lg p-3 text-error text-sm">
+            {err}
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        <div className="flex gap-3 pt-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 px-4 py-2 border border-muted rounded-lg text-content hover:bg-surface transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={submit}
+            disabled={!amount || amount > balance || placing}
+            className="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {placing ? 'Placing...' : `Place Bet`}
+          </button>
+        </div>
       </>
     );
   };
@@ -376,8 +486,7 @@ export function BetForm(props: {
         isOpen={open}
         onClose={() => setOpen(false)}
         mode="inline"
-        onBetPlaced={props.onPlaced}
-        addOptimisticBet={props.addOptimisticBet}
+        onBetPlaced={props.addOptimisticBet}
       />
     </>
   );
@@ -397,8 +506,10 @@ export function OptimisticBetForm(props: {
     options: [
       {
         id: props.optionId,
-        text: props.optionName,
+        label: props.optionName,
         odds: props.currentOdds,
+        predictionId: props.predictionId,
+        createdAt: new Date(),
       },
     ],
   };

@@ -6,7 +6,7 @@
 
 import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import type { CreatePredictionPayload } from '../api/predictions';
+import type { CreatePredictionPayload } from '@ems/types';
 import { PredictionType } from '@ems/types';
 
 interface CreatePredictionFormProps {
@@ -109,7 +109,7 @@ export default function CreatePredictionForm({
       title,
       description,
       category,
-      expiresAt: new Date(expiresAt),
+      expiresAt: new Date(expiresAt).toISOString(),
       type,
       threshold: isOU ? Number(threshold) : undefined,
       options: isMultiple ? options.map((label) => ({ label })) : undefined,

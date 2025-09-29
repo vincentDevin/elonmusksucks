@@ -17,6 +17,8 @@ export interface Leg {
   optionId: number;
   predictionId: number;
   label: string;
+  predictionTitle: string;
+  odds: number;
 }
 interface State {
   legs: Leg[];

@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { usePredictionMarket } from '../contexts/PredictionContext';
 import { useAuth } from '../contexts/AuthContext';
-import type { PredictionFull } from '../api/predictions';
+import type { PredictionFull } from '@ems/types';
 
 export interface PredictionFilter {
   categories: string[];
@@ -11,6 +11,7 @@ export interface PredictionFilter {
   activity: 'all' | 'high' | 'medium' | 'low';
   status: 'all' | 'open' | 'pending' | 'expired' | 'resolved';
   search: string;
+  sortBy: 'relevance' | 'newest' | 'oldest' | 'odds' | 'volume' | 'activity';
 }
 
 export interface PredictionRecommendation {
@@ -62,6 +63,7 @@ export function usePredictionDiscovery() {
     activity: 'all',
     status: 'open',
     search: '',
+    sortBy: 'relevance',
   });
 
   const [favorites, setFavorites] = useState<Set<number>>(new Set());
@@ -486,6 +488,7 @@ export function usePredictionDiscovery() {
       activity: 'all',
       status: 'open',
       search: '',
+      sortBy: 'relevance',
     });
   }, []);
 

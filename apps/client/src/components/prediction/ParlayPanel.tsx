@@ -5,7 +5,6 @@ import { useParlay } from '../../contexts/ParlayContext';
 import { usePredictionMarket } from '../../contexts/PredictionContext';
 import { useSocket } from '../../contexts/SocketContext';
 import { useAuth } from '../../contexts/AuthContext';
-import type { PublicPredictionOption } from '@ems/types';
 import { formatMuskBucks } from '../../utils/formatting';
 
 export default function ParlayPanel() {
@@ -24,7 +23,7 @@ export default function ParlayPanel() {
   /* ---------- Helpers ---------- */
   const findPrediction = (predId: number) => predictions.find((p) => p.id === predId);
 
-  const findOption = (predId: number, optId: number): PublicPredictionOption | undefined =>
+  const findOption = (predId: number, optId: number) =>
     findPrediction(predId)?.options.find((o: any) => o.id === optId);
 
   /** Return current odds for the given leg (falls back to 1). */
@@ -232,6 +231,8 @@ export default function ParlayPanel() {
                               optionId: newOptionId,
                               predictionId: leg.predictionId,
                               label: newOption.label,
+                              predictionTitle: leg.predictionTitle,
+                              odds: newOption.odds,
                             },
                           });
                         }

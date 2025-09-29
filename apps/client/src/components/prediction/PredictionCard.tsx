@@ -2,6 +2,13 @@
 // Unified prediction card component merging full and compact variants
 import { useState } from 'react';
 import { formatMuskBucks } from '../../utils/formatting';
+import {
+  PlusIcon as Plus,
+  CheckIcon as Check,
+  ArrowTrendingUpIcon as TrendingUp,
+  ChevronDownIcon as ChevronDown,
+  ChevronUpIcon as ChevronUp,
+} from '@heroicons/react/24/outline';
 
 // Helper to convert string/number to number
 const asNum = (v: string | number | bigint | undefined | null) => Number(v ?? 0);
@@ -10,8 +17,8 @@ import type {
   BetWithUser,
   ParlayLegWithUser,
   PredictionType,
+  PredictionFull,
 } from '@ems/types';
-import type { PredictionFull } from '../../api/predictions';
 import OddsBar from './OddsBar';
 import BetsList from './BetsList';
 import BetModal from './BetModal';
@@ -41,7 +48,7 @@ export default function UnifiedPredictionCard({
   hideInlineParlaySelector = false,
   onCardView,
 }: UnifiedPredictionCardProps) {
-  const { dispatch: parlayDispatch } = useParlay();
+  const { dispatch: parlayDispatch, state: parlayState } = useParlay();
   const [showBetModal, setShowBetModal] = useState(false);
   const [addingToParlay, setAddingToParlay] = useState<number | null>(null);
   const [showParlaySelector, setShowParlaySelector] = useState(false);
@@ -50,6 +57,10 @@ export default function UnifiedPredictionCard({
   const isCompact = variant === 'compact';
   const isMini = variant === 'mini';
   const isFullSize = variant === 'full';
+
+  // Check if prediction is already in parlay
+  const isInParlay = parlayState.legs.some((leg) => leg.predictionId === prediction.id);
+  const parlayOption = parlayState.legs.find((leg) => leg.predictionId === prediction.id);
 
   // Time calculations
   const now = Date.now();
@@ -98,6 +109,8 @@ export default function UnifiedPredictionCard({
         predictionId: prediction.id,
         optionId,
         label: selectedOption.label,
+        predictionTitle: prediction.title,
+        odds: selectedOption.odds,
       },
     });
 
@@ -326,40 +339,71 @@ export default function UnifiedPredictionCard({
             }
           />
 
-          {/* Parlay Option Selector */}
+          {/* Enhanced Parlay Option Selector */}
           {showParlayActions &&
             showParlaySelector &&
             !hideInlineParlaySelector &&
             !prediction.resolved &&
             now <= expires && (
-              <div className="mt-3 p-3 bg-secondary/20 rounded-lg border border-secondary">
-                <div className="text-sm font-medium text-content mb-2">
-                  Choose option for parlay:
+              <div className="mt-3 p-3 bg-gradient-to-r from-secondary/10 to-primary/10 rounded-lg border border-secondary/30">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="text-sm font-medium text-content flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-secondary" />
+                    {isInParlay ? 'Update parlay selection:' : 'Add to parlay:'}
+                  </div>
+                  {isInParlay && (
+                    <span className="text-xs bg-success/20 text-success px-2 py-0.5 rounded-full">
+                      Already in parlay
+                    </span>
+                  )}
                 </div>
                 <div className="space-y-2">
-                  {prediction.options.map((option: any) => (
-                    <button
-                      key={option.id}
-                      onClick={(e) => {
-                        e.stopPropagation(); // Prevent event bubbling to card view handler
-                        handleAddToParlay(option.id);
-                      }}
-                      disabled={addingToParlay !== null}
-                      className={`w-full p-2 rounded-lg text-sm transition-all duration-200 text-left ${
-                        addingToParlay === option.id
-                          ? 'bg-success text-surface scale-105'
-                          : 'bg-surface border border-muted hover:border-primary hover:scale-102'
-                      }`}
-                    >
-                      <div className="flex justify-between items-center">
-                        <span className="font-medium">{option.label}</span>
-                        <span className="text-primary font-bold">{option.odds.toFixed(2)}×</span>
-                      </div>
-                      {addingToParlay === option.id && (
-                        <div className="text-xs mt-1 opacity-90">✅ Added to parlay!</div>
-                      )}
-                    </button>
-                  ))}
+                  {prediction.options.map((option: any) => {
+                    const isSelected = parlayOption?.optionId === option.id;
+                    const isAdding = addingToParlay === option.id;
+
+                    return (
+                      <button
+                        key={option.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAddToParlay(option.id);
+                        }}
+                        disabled={addingToParlay !== null || isSelected}
+                        className={`
+                          w-full p-3 rounded-lg text-sm transition-all duration-200 text-left
+                          flex items-center justify-between group
+                          ${
+                            isAdding
+                              ? 'bg-success text-surface scale-105 shadow-lg'
+                              : isSelected
+                                ? 'bg-success/20 text-success border-2 border-success cursor-not-allowed'
+                                : 'bg-surface border border-muted hover:border-primary hover:scale-102 hover:shadow-md'
+                          }
+                        `}
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{option.label}</span>
+                            {isSelected && <Check className="w-4 h-4 text-success" />}
+                          </div>
+                          {(isAdding || isSelected) && (
+                            <div className="text-xs mt-1 opacity-90">
+                              {isAdding ? '✨ Adding to parlay...' : '✓ Currently selected'}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-primary font-bold text-lg">
+                            {option.odds.toFixed(2)}×
+                          </span>
+                          {!isSelected && !isAdding && (
+                            <Plus className="w-4 h-4 text-tertiary group-hover:text-primary transition-colors" />
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -381,40 +425,57 @@ export default function UnifiedPredictionCard({
                 </span>
               </button>
 
-              {/* Parlay Button */}
+              {/* Enhanced Parlay Button */}
               {showParlayActions && (
                 <button
                   onClick={(e) => {
-                    e.stopPropagation(); // Prevent event bubbling to card view handler
+                    e.stopPropagation();
                     if (hideInlineParlaySelector) {
                       handleAddDefaultToParlay();
                     } else {
                       toggleParlaySelector();
                     }
                   }}
-                  disabled={addingToParlay !== null}
-                  className={`px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
-                    showParlaySelector && !hideInlineParlaySelector
-                      ? 'bg-secondary text-content border-2 border-secondary'
-                      : addingToParlay !== null
-                        ? 'bg-success text-surface scale-105'
-                        : 'bg-warning hover:bg-warning/90 text-surface hover:scale-105'
-                  }`}
+                  disabled={addingToParlay !== null || isInParlay}
+                  className={`
+                    px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200
+                    flex items-center gap-1.5
+                    ${
+                      isInParlay
+                        ? 'bg-success/20 text-success border border-success cursor-not-allowed'
+                        : showParlaySelector && !hideInlineParlaySelector
+                          ? 'bg-secondary text-surface border-2 border-secondary'
+                          : addingToParlay !== null
+                            ? 'bg-success text-surface scale-105'
+                            : 'bg-secondary hover:bg-secondary-hover text-surface hover:scale-105'
+                    }
+                  `}
                 >
-                  {addingToParlay !== null ? (
-                    <span className="flex items-center space-x-1">
-                      <span>✅</span>
-                    </span>
+                  {isInParlay ? (
+                    <>
+                      <Check className="w-4 h-4" />
+                      <span>In Parlay</span>
+                    </>
+                  ) : addingToParlay !== null ? (
+                    <>
+                      <Check className="w-4 h-4" />
+                      <span>Added!</span>
+                    </>
                   ) : hideInlineParlaySelector ? (
-                    <span className="flex items-center space-x-1">
-                      <span>📈</span>
-                      <span>+</span>
-                    </span>
+                    <>
+                      <Plus className="w-4 h-4" />
+                      <span>Parlay</span>
+                    </>
                   ) : (
-                    <span className="flex items-center space-x-1">
-                      <span>📈</span>
-                      <span>{showParlaySelector ? '^' : 'v'}</span>
-                    </span>
+                    <>
+                      <TrendingUp className="w-4 h-4" />
+                      <span>Parlay</span>
+                      {showParlaySelector ? (
+                        <ChevronUp className="w-3 h-3" />
+                      ) : (
+                        <ChevronDown className="w-3 h-3" />
+                      )}
+                    </>
                   )}
                 </button>
               )}
@@ -445,7 +506,7 @@ export default function UnifiedPredictionCard({
         prediction={prediction}
         isOpen={showBetModal}
         onClose={() => setShowBetModal(false)}
-        mode="full"
+        mode="modal"
         onBetPlaced={addOptimisticBet}
       />
     </>
