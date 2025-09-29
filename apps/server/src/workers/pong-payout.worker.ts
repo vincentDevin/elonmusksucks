@@ -39,9 +39,9 @@ const pongPayoutWorker = new Worker<PongPayoutData>(
       const stakeAmountBigInt = BigInt(stakeAmount); // Convert number to bigint
 
       if (mode === 'PVP') {
-        result = await processPVPPayout(winnerId, stakeAmountBigInt, idempotencyKey);
+        result = await processPVPPayout(matchId, winnerId, stakeAmountBigInt, idempotencyKey);
       } else if (mode === 'PVE_AI') {
-        result = await processPVEPayout(winnerId, stakeAmountBigInt, idempotencyKey);
+        result = await processPVEPayout(matchId, winnerId, stakeAmountBigInt, idempotencyKey);
       } else {
         throw new Error(`Invalid match mode: ${mode}`);
       }
@@ -88,6 +88,7 @@ async function checkExistingPayout(idempotencyKey: string): Promise<PongPayoutRe
  * Note: Winner already paid their stake, so they get back their stake + opponent's stake
  */
 async function processPVPPayout(
+  matchId: string,
   winnerId: number,
   stakeAmount: bigint,
   idempotencyKey: string,
@@ -136,6 +137,7 @@ async function processPVPPayout(
  * Process PVE_AI payout (house pays 2x player stake)
  */
 async function processPVEPayout(
+  matchId: string,
   winnerId: number,
   stakeAmount: bigint,
   idempotencyKey: string,
