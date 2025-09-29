@@ -18,6 +18,7 @@ import {
 import type { PongLeaderboardView } from '@ems/types';
 import { getShameWall, getShameWallStats } from '../api/shameWall';
 import type { ShameWallEntry, ShameWallStats } from '../api/shameWall';
+import PageContainer from '../components/PageContainer';
 
 // New unified components
 import { LeaderboardEntry } from '../components/leaderboard/LeaderboardEntry';
@@ -279,7 +280,7 @@ export default function Leaderboard() {
 
   if (isInitialLoading) {
     return (
-      <div className="p-6 max-w-6xl mx-auto">
+      <PageContainer>
         <div className="text-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-tertiary">
@@ -292,13 +293,13 @@ export default function Leaderboard() {
             …
           </p>
         </div>
-      </div>
+      </PageContainer>
     );
   }
 
   if (hasError) {
     return (
-      <div className="p-6 max-w-6xl mx-auto">
+      <PageContainer>
         <div className="text-center py-12">
           <p className="text-red-500 mb-4">
             Error: {hasError instanceof Error ? hasError.message : hasError}
@@ -310,159 +311,161 @@ export default function Leaderboard() {
             Try Again
           </button>
         </div>
-      </div>
+      </PageContainer>
     );
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
-      {/* Achievement Notifications */}
-      <AchievementNotification achievements={achievements} onClear={clearAchievements} />
+    <PageContainer>
+      <div className="space-y-6">
+        {/* Achievement Notifications */}
+        <AchievementNotification achievements={achievements} onClear={clearAchievements} />
 
-      {/* Consolidated Header with Navigation and Controls */}
-      <CompactLeaderboardHeader
-        variant={activeTab as LeaderboardVariant}
-        title={
-          activeTab === 'betting'
-            ? 'Live Leaderboard'
-            : activeTab === 'pong'
-              ? 'Pong Champions'
-              : 'Wall of Shame'
-        }
-        subtitle={
-          activeTab === 'betting'
-            ? 'Real-time betting performance rankings'
-            : activeTab === 'pong'
-              ? 'Elite Pong players and their achievements'
-              : 'Users who have been banned from the platform'
-        }
-        icon={
-          activeTab === 'betting'
-            ? TrophyIcon
-            : activeTab === 'pong'
-              ? PuzzlePieceIcon
-              : ExclamationTriangleIcon
-        }
-        stats={headerStats}
-        isLoading={currentLoading}
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabChange={(tabId: string) => setActiveTab(tabId as TabType)}
-        controlBarConfig={controlBarConfig}
-      />
-
-      {/* User Rank for betting leaderboard - integrated into header stats now */}
-
-      {/* Unified Entries List */}
-      {unifiedEntries.length > 0 ? (
-        <ul className="space-y-3">
-          {unifiedEntries.map((entry, idx) => {
-            const rank = activeTab === 'betting' ? (currentPage - 1) * 25 + idx + 1 : idx + 1;
-            const recentChange =
-              activeTab === 'betting'
-                ? recentChanges.find((change) => change.userId === entry.id)
-                : undefined;
-            const isCurrentUser = user?.id === entry.id;
-
-            return (
-              <LeaderboardEntry
-                key={`${activeTab}-${entry.id}`}
-                entry={entry}
-                rank={rank}
-                isCurrentUser={isCurrentUser}
-                showAnimation={!!recentChange}
-              />
-            );
-          })}
-        </ul>
-      ) : (
-        <div className="text-center py-16">
-          <div className="text-6xl mb-6">
-            {activeTab === 'betting' ? '📊' : activeTab === 'pong' ? '🏓' : '🎉'}
-          </div>
-          <h3 className="text-2xl font-bold text-content mb-3">
-            {activeTab === 'betting'
-              ? 'No leaderboard entries yet.'
+        {/* Consolidated Header with Navigation and Controls */}
+        <CompactLeaderboardHeader
+          variant={activeTab as LeaderboardVariant}
+          title={
+            activeTab === 'betting'
+              ? 'Live Leaderboard'
               : activeTab === 'pong'
-                ? 'No Pong champions yet!'
-                : 'No one is currently banned!'}
-          </h3>
-          <p className="text-base text-tertiary">
-            {activeTab === 'betting'
-              ? 'Be the first to place some bets!'
+                ? 'Pong Champions'
+                : 'Wall of Shame'
+          }
+          subtitle={
+            activeTab === 'betting'
+              ? 'Real-time betting performance rankings'
               : activeTab === 'pong'
-                ? 'Be the first to dominate the Pong leaderboard.'
-                : 'Everyone is behaving themselves... for now.'}
-          </p>
-        </div>
-      )}
+                ? 'Elite Pong players and their achievements'
+                : 'Users who have been banned from the platform'
+          }
+          icon={
+            activeTab === 'betting'
+              ? TrophyIcon
+              : activeTab === 'pong'
+                ? PuzzlePieceIcon
+                : ExclamationTriangleIcon
+          }
+          stats={headerStats}
+          isLoading={currentLoading}
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabChange={(tabId: string) => setActiveTab(tabId as TabType)}
+          controlBarConfig={controlBarConfig}
+        />
 
-      {/* Pagination - Only for Betting Leaderboard */}
-      {activeTab === 'betting' && pagination.totalPages > 1 && (
-        <div className="flex items-center justify-center space-x-4 py-8">
-          <button
-            onClick={prevPage}
-            disabled={!pagination.hasPrevPage || loading}
-            className="flex items-center space-x-2 px-4 py-3 bg-surface rounded-lg hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-base font-medium"
-          >
-            <ChevronLeftIcon className="w-5 h-5" />
-            <span>Previous</span>
-          </button>
+        {/* User Rank for betting leaderboard - integrated into header stats now */}
 
-          <div className="flex items-center space-x-2">
-            {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
-              const page = Math.max(1, currentPage - 2) + i;
-              if (page > pagination.totalPages) return null;
+        {/* Unified Entries List */}
+        {unifiedEntries.length > 0 ? (
+          <ul className="space-y-3">
+            {unifiedEntries.map((entry, idx) => {
+              const rank = activeTab === 'betting' ? (currentPage - 1) * 25 + idx + 1 : idx + 1;
+              const recentChange =
+                activeTab === 'betting'
+                  ? recentChanges.find((change) => change.userId === entry.id)
+                  : undefined;
+              const isCurrentUser = user?.id === entry.id;
 
               return (
-                <button
-                  key={page}
-                  onClick={() => goToPage(page)}
-                  className={`
-                    w-12 h-12 rounded-lg font-semibold transition-colors text-base
-                    ${
-                      page === currentPage
-                        ? 'bg-primary text-surface'
-                        : 'bg-surface hover:bg-accent text-content'
-                    }
-                  `}
-                >
-                  {page}
-                </button>
+                <LeaderboardEntry
+                  key={`${activeTab}-${entry.id}`}
+                  entry={entry}
+                  rank={rank}
+                  isCurrentUser={isCurrentUser}
+                  showAnimation={!!recentChange}
+                />
               );
             })}
+          </ul>
+        ) : (
+          <div className="text-center py-16">
+            <div className="text-6xl mb-6">
+              {activeTab === 'betting' ? '📊' : activeTab === 'pong' ? '🏓' : '🎉'}
+            </div>
+            <h3 className="text-2xl font-bold text-content mb-3">
+              {activeTab === 'betting'
+                ? 'No leaderboard entries yet.'
+                : activeTab === 'pong'
+                  ? 'No Pong champions yet!'
+                  : 'No one is currently banned!'}
+            </h3>
+            <p className="text-base text-tertiary">
+              {activeTab === 'betting'
+                ? 'Be the first to place some bets!'
+                : activeTab === 'pong'
+                  ? 'Be the first to dominate the Pong leaderboard.'
+                  : 'Everyone is behaving themselves... for now.'}
+            </p>
           </div>
+        )}
 
-          <button
-            onClick={nextPage}
-            disabled={!pagination.hasNextPage || loading}
-            className="flex items-center space-x-2 px-4 py-3 bg-surface rounded-lg hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-base font-medium"
-          >
-            <span>Next</span>
-            <ChevronRightIcon className="w-5 h-5" />
-          </button>
-        </div>
-      )}
+        {/* Pagination - Only for Betting Leaderboard */}
+        {activeTab === 'betting' && pagination.totalPages > 1 && (
+          <div className="flex items-center justify-center space-x-4 py-8">
+            <button
+              onClick={prevPage}
+              disabled={!pagination.hasPrevPage || loading}
+              className="flex items-center space-x-2 px-4 py-3 bg-surface rounded-lg hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-base font-medium"
+            >
+              <ChevronLeftIcon className="w-5 h-5" />
+              <span>Previous</span>
+            </button>
 
-      {/* Loading overlay */}
-      {currentLoading && unifiedEntries.length > 0 && (
-        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-40">
-          <div className="bg-surface rounded-lg p-4 shadow-lg">
-            <div className="flex items-center space-x-3">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-              <span>
-                Updating{' '}
-                {activeTab === 'betting'
-                  ? 'leaderboard'
-                  : activeTab === 'pong'
-                    ? 'Pong leaderboard'
-                    : 'shame wall'}
-                ...
-              </span>
+            <div className="flex items-center space-x-2">
+              {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                const page = Math.max(1, currentPage - 2) + i;
+                if (page > pagination.totalPages) return null;
+
+                return (
+                  <button
+                    key={page}
+                    onClick={() => goToPage(page)}
+                    className={`
+                      w-12 h-12 rounded-lg font-semibold transition-colors text-base
+                      ${
+                        page === currentPage
+                          ? 'bg-primary text-surface'
+                          : 'bg-surface hover:bg-accent text-content'
+                      }
+                    `}
+                  >
+                    {page}
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              onClick={nextPage}
+              disabled={!pagination.hasNextPage || loading}
+              className="flex items-center space-x-2 px-4 py-3 bg-surface rounded-lg hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-base font-medium"
+            >
+              <span>Next</span>
+              <ChevronRightIcon className="w-5 h-5" />
+            </button>
+          </div>
+        )}
+
+        {/* Loading overlay */}
+        {currentLoading && unifiedEntries.length > 0 && (
+          <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-40">
+            <div className="bg-surface rounded-lg p-4 shadow-lg">
+              <div className="flex items-center space-x-3">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                <span>
+                  Updating{' '}
+                  {activeTab === 'betting'
+                    ? 'leaderboard'
+                    : activeTab === 'pong'
+                      ? 'Pong leaderboard'
+                      : 'shame wall'}
+                  ...
+                </span>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </PageContainer>
   );
 }

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import PageContainer from '../components/PageContainer';
 
 export default function Register() {
   const { register, user } = useAuth();
@@ -51,7 +52,7 @@ export default function Register() {
 
   if (verificationSent) {
     return (
-      <div className="container mx-auto my-8 px-4 bg-background text-content min-h-screen transition-colors duration-300">
+      <PageContainer>
         <div className="bg-surface shadow rounded-lg p-6 max-w-md mx-auto text-content transition-colors duration-300">
           <h2 className="text-2xl font-bold mb-4">Verify Your Email</h2>
           <p>
@@ -66,12 +67,12 @@ export default function Register() {
             </Link>
           </div>
         </div>
-      </div>
+      </PageContainer>
     );
   }
 
   return (
-    <div className="container mx-auto my-8 px-4 bg-background text-content min-h-screen transition-colors duration-300">
+    <PageContainer>
       <div className="bg-surface shadow rounded-lg p-6 max-w-md mx-auto text-content transition-colors duration-300">
         <h2 className="text-2xl font-bold mb-4">Register</h2>
         {error && <p className="text-red-500">{error}</p>}
@@ -149,6 +150,6 @@ export default function Register() {
           </button>
         </form>
       </div>
-    </div>
+    </PageContainer>
   );
 }

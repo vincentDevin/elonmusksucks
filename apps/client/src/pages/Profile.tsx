@@ -7,6 +7,7 @@ import { followUser, unfollowUser } from '../api/users';
 import { useAuth } from '../contexts/AuthContext';
 import { useUserProfile } from '../hooks/useUserProfile';
 import type { UpdateProfilePayload } from '../api/users';
+import PageContainer from '../components/PageContainer';
 
 // Profile sections
 import { ProfileHeader } from '../components/profile/ProfileHeader';
@@ -142,52 +143,54 @@ export default function Profile() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <ProfileHeader
-        profile={profile}
-        isOwn={isOwn}
-        editing={editing}
-        setEditing={setEditing}
-        following={following}
-        toggleFollow={toggleFollow}
-        followersCount={profile.followersCount}
-        followingCount={profile.followingCount}
-      />
-
-      {editing ? (
-        <ProfileEditForm
-          userId={profile.id}
-          formData={formData}
-          setFormData={setFormData}
-          handleSave={handleSave}
-          saving={saving}
+    <PageContainer>
+      <div className="max-w-4xl mx-auto space-y-6">
+        <ProfileHeader
+          profile={profile}
+          isOwn={isOwn}
+          editing={editing}
+          setEditing={setEditing}
+          following={following}
+          toggleFollow={toggleFollow}
+          followersCount={profile.followersCount}
+          followingCount={profile.followingCount}
         />
-      ) : (
-        <>
-          <ProfileStatsPanel
-            profile={{
-              id: profile.id,
-              name: profile.name,
-              muskBucks: profile.muskBucks,
-              rank: profile.rank,
-              achievements: profile.achievements,
-              badges: profile.badges,
-            }}
-            stats={statsData}
-            isOwn={isOwn}
+
+        {editing ? (
+          <ProfileEditForm
+            userId={profile.id}
+            formData={formData}
+            setFormData={setFormData}
+            handleSave={handleSave}
+            saving={saving}
           />
+        ) : (
+          <>
+            <ProfileStatsPanel
+              profile={{
+                id: profile.id,
+                name: profile.name,
+                muskBucks: profile.muskBucks,
+                rank: profile.rank,
+                achievements: profile.achievements,
+                badges: profile.badges,
+              }}
+              stats={statsData}
+              isOwn={isOwn}
+            />
 
-          {isOwn ? (
-            <CreatePostForm onSubmit={handlePost} disabled={loading} />
-          ) : (
-            <p className="text-gray-500">
-              Only {profile.name} can post on their own wall. You can reply to posts below.
-            </p>
-          )}
+            {isOwn ? (
+              <CreatePostForm onSubmit={handlePost} disabled={loading} />
+            ) : (
+              <p className="text-gray-500">
+                Only {profile.name} can post on their own wall. You can reply to posts below.
+              </p>
+            )}
 
-          <ProfileFeed feed={feed} loading={loading} onSubmit={handlePost} />
-        </>
-      )}
-    </div>
+            <ProfileFeed feed={feed} loading={loading} onSubmit={handlePost} />
+          </>
+        )}
+      </div>
+    </PageContainer>
   );
 }

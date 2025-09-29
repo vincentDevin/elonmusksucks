@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import PageContainer from '../components/PageContainer';
 
 export default function Login() {
   const { login, user } = useAuth();
@@ -38,7 +39,7 @@ export default function Login() {
   };
 
   return (
-    <div className="container mx-auto my-8 px-4 bg-background text-content min-h-screen transition-colors duration-300">
+    <PageContainer>
       <div className="bg-surface shadow rounded-lg p-6 max-w-md mx-auto text-content transition-colors duration-300">
         <h2 className="text-2xl font-bold mb-4">Login</h2>
         {error && <p className="text-red-500">{error}</p>}
@@ -76,6 +77,6 @@ export default function Login() {
           </Link>
         </p>
       </div>
-    </div>
+    </PageContainer>
   );
 }

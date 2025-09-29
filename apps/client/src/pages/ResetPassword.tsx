@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { performPasswordReset } from '../api/auth';
+import PageContainer from '../components/PageContainer';
 
 function useQuery() {
   return new URLSearchParams(useLocation().search);
@@ -66,61 +67,65 @@ export default function ResetPassword() {
   }
 
   return (
-    <div className="max-w-md mx-auto p-6 bg-surface rounded-lg shadow">
-      <h2 className="text-2xl font-semibold mb-4">Reset Password</h2>
-      {formError && <p className="text-red-500 mb-2">{formError}</p>}
-      {error && <p className="text-red-500 mb-2">{error}</p>}
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <label className="block">
-          <span className="text-sm font-medium">New Password</span>
-          <input
-            type="password"
-            required
-            minLength={8}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className={`mt-1 w-full px-3 py-2 rounded focus:outline-none focus:ring ${
-              password === ''
-                ? 'border border-gray-300'
-                : isPasswordValid
-                  ? 'border border-green-500'
-                  : 'border border-red-500'
+    <PageContainer>
+      <div className="max-w-md mx-auto p-6 bg-surface rounded-lg shadow">
+        <h2 className="text-2xl font-semibold mb-4">Reset Password</h2>
+        {formError && <p className="text-red-500 mb-2">{formError}</p>}
+        {error && <p className="text-red-500 mb-2">{error}</p>}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <label className="block">
+            <span className="text-sm font-medium">New Password</span>
+            <input
+              type="password"
+              required
+              minLength={8}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className={`mt-1 w-full px-3 py-2 rounded focus:outline-none focus:ring ${
+                password === ''
+                  ? 'border border-gray-300'
+                  : isPasswordValid
+                    ? 'border border-green-500'
+                    : 'border border-red-500'
+              }`}
+            />
+            {!isPasswordValid && (
+              <p className="text-red-500 text-xs mt-1">Password must be at least 8 characters.</p>
+            )}
+          </label>
+          <label className="block">
+            <span className="text-sm font-medium">Confirm Password</span>
+            <input
+              type="password"
+              required
+              minLength={8}
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              className={`mt-1 w-full px-3 py-2 rounded focus:outline-none focus:ring ${
+                confirm === ''
+                  ? 'border border-gray-300'
+                  : isConfirmValid
+                    ? 'border border-green-500'
+                    : 'border border-red-500'
+              }`}
+            />
+            {!isConfirmValid && (
+              <p className="text-red-500 text-xs mt-1">Passwords do not match.</p>
+            )}
+          </label>
+          <button
+            type="submit"
+            disabled={!isFormValid || status === 'submitting'}
+            className={`w-full px-4 py-2 rounded text-white ${
+              isFormValid
+                ? 'bg-blue-600 hover:bg-blue-700 disabled:opacity-50'
+                : 'bg-gray-400 cursor-not-allowed'
             }`}
-          />
-          {!isPasswordValid && (
-            <p className="text-red-500 text-xs mt-1">Password must be at least 8 characters.</p>
-          )}
-        </label>
-        <label className="block">
-          <span className="text-sm font-medium">Confirm Password</span>
-          <input
-            type="password"
-            required
-            minLength={8}
-            value={confirm}
-            onChange={(e) => setConfirm(e.target.value)}
-            className={`mt-1 w-full px-3 py-2 rounded focus:outline-none focus:ring ${
-              confirm === ''
-                ? 'border border-gray-300'
-                : isConfirmValid
-                  ? 'border border-green-500'
-                  : 'border border-red-500'
-            }`}
-          />
-          {!isConfirmValid && <p className="text-red-500 text-xs mt-1">Passwords do not match.</p>}
-        </label>
-        <button
-          type="submit"
-          disabled={!isFormValid || status === 'submitting'}
-          className={`w-full px-4 py-2 rounded text-white ${
-            isFormValid
-              ? 'bg-blue-600 hover:bg-blue-700 disabled:opacity-50'
-              : 'bg-gray-400 cursor-not-allowed'
-          }`}
-        >
-          Reset Password
-        </button>
-      </form>
-    </div>
+          >
+            Reset Password
+          </button>
+        </form>
+      </div>
+    </PageContainer>
   );
 }

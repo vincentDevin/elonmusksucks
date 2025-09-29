@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { requestPasswordReset } from '../api/auth';
+import PageContainer from '../components/PageContainer';
 
 export default function ForgotPassword() {
   const { user } = useAuth();
@@ -41,51 +42,55 @@ export default function ForgotPassword() {
 
   if (status === 'sent') {
     return (
-      <div className="max-w-md mx-auto p-6 bg-surface rounded-lg shadow">
-        <h2 className="text-2xl font-semibold mb-4">Check Your Inbox</h2>
-        <p>
-          If an account exists for <strong>{email}</strong>, you’ll receive a link to reset your
-          password. Please allow a few minutes.
-        </p>
-      </div>
+      <PageContainer>
+        <div className="max-w-md mx-auto p-6 bg-surface rounded-lg shadow">
+          <h2 className="text-2xl font-semibold mb-4">Check Your Inbox</h2>
+          <p>
+            If an account exists for <strong>{email}</strong>, you'll receive a link to reset your
+            password. Please allow a few minutes.
+          </p>
+        </div>
+      </PageContainer>
     );
   }
 
   return (
-    <div className="max-w-md mx-auto p-6 bg-surface rounded-lg shadow">
-      <h2 className="text-2xl font-semibold mb-4">Forgot Password</h2>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <label className="block">
-          <span className="text-sm font-medium">Email address</span>
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className={`mt-1 w-full px-3 py-2 rounded focus:outline-none focus:ring ${
-              email === ''
-                ? 'border border-gray-300'
-                : isEmailValid
-                  ? 'border border-green-500'
-                  : 'border border-red-500'
+    <PageContainer>
+      <div className="max-w-md mx-auto p-6 bg-surface rounded-lg shadow">
+        <h2 className="text-2xl font-semibold mb-4">Forgot Password</h2>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <label className="block">
+            <span className="text-sm font-medium">Email address</span>
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className={`mt-1 w-full px-3 py-2 rounded focus:outline-none focus:ring ${
+                email === ''
+                  ? 'border border-gray-300'
+                  : isEmailValid
+                    ? 'border border-green-500'
+                    : 'border border-red-500'
+              }`}
+            />
+            {!isEmailValid && <p className="text-red-500 text-xs mt-1">Invalid email format.</p>}
+          </label>
+          {status === 'error' && (
+            <p className="text-red-500 text-sm">{error || 'Unable to send reset link.'}</p>
+          )}
+          {formError && <p className="text-red-500 text-sm">{formError}</p>}
+          <button
+            type="submit"
+            disabled={!isFormValid}
+            className={`w-full px-4 py-2 rounded text-white ${
+              isFormValid ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed'
             }`}
-          />
-          {!isEmailValid && <p className="text-red-500 text-xs mt-1">Invalid email format.</p>}
-        </label>
-        {status === 'error' && (
-          <p className="text-red-500 text-sm">{error || 'Unable to send reset link.'}</p>
-        )}
-        {formError && <p className="text-red-500 text-sm">{formError}</p>}
-        <button
-          type="submit"
-          disabled={!isFormValid}
-          className={`w-full px-4 py-2 rounded text-white ${
-            isFormValid ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed'
-          }`}
-        >
-          Send Reset Link
-        </button>
-      </form>
-    </div>
+          >
+            Send Reset Link
+          </button>
+        </form>
+      </div>
+    </PageContainer>
   );
 }

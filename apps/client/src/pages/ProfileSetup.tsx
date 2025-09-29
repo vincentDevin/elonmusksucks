@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { getUserProfile, updateUserProfile } from '../api/users';
 import type { UpdateProfilePayload } from '../api/users';
 import { ProfileImageUpload } from '../components/profile/ProfileImageUpload';
+import PageContainer from '../components/PageContainer';
 
 export default function ProfileSetup() {
   const { user: currentUser, refreshUser } = useAuth();
@@ -89,58 +90,60 @@ export default function ProfileSetup() {
   if (!currentUser) return <p>Please log in to continue.</p>;
 
   return (
-    <div className="max-w-lg mx-auto p-6 bg-surface rounded-lg shadow space-y-6">
-      <h2 className="text-2xl font-bold">Complete Your Profile</h2>
-      {error && <p className="text-red-500 text-sm">{error}</p>}
-      <form onSubmit={handleSubmit} className="space-y-5">
-        <div>
-          <label className="block text-sm font-medium mb-2">Profile Picture</label>
-          <ProfileImageUpload
-            userId={currentUser.id}
-            currentAvatarUrl={formData.avatarUrl}
-            onUploadSuccess={handleUploadSuccess}
-            onUploadError={handleUploadError}
-          />
-        </div>
+    <PageContainer>
+      <div className="max-w-lg mx-auto p-6 bg-surface rounded-lg shadow space-y-6">
+        <h2 className="text-2xl font-bold">Complete Your Profile</h2>
+        {error && <p className="text-red-500 text-sm">{error}</p>}
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div>
+            <label className="block text-sm font-medium mb-2">Profile Picture</label>
+            <ProfileImageUpload
+              userId={currentUser.id}
+              currentAvatarUrl={formData.avatarUrl}
+              onUploadSuccess={handleUploadSuccess}
+              onUploadError={handleUploadError}
+            />
+          </div>
 
-        <label className="block">
-          <span className="text-sm font-medium">Bio</span>
-          <textarea
-            name="bio"
-            value={formData.bio ?? ''}
-            onChange={handleChange}
-            className="mt-1 w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring focus:ring-blue-200"
-            rows={4}
-          />
-        </label>
+          <label className="block">
+            <span className="text-sm font-medium">Bio</span>
+            <textarea
+              name="bio"
+              value={formData.bio ?? ''}
+              onChange={handleChange}
+              className="mt-1 w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring focus:ring-blue-200"
+              rows={4}
+            />
+          </label>
 
-        <label className="block">
-          <span className="text-sm font-medium">Location</span>
-          <input
-            name="location"
-            value={formData.location ?? ''}
-            onChange={handleChange}
-            className="mt-1 w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring focus:ring-blue-200"
-          />
-        </label>
+          <label className="block">
+            <span className="text-sm font-medium">Location</span>
+            <input
+              name="location"
+              value={formData.location ?? ''}
+              onChange={handleChange}
+              className="mt-1 w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring focus:ring-blue-200"
+            />
+          </label>
 
-        <label className="block">
-          <span className="text-sm font-medium">Timezone</span>
-          <input
-            name="timezone"
-            value={formData.timezone ?? ''}
-            onChange={handleChange}
-            className="mt-1 w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring focus:ring-blue-200"
-          />
-        </label>
+          <label className="block">
+            <span className="text-sm font-medium">Timezone</span>
+            <input
+              name="timezone"
+              value={formData.timezone ?? ''}
+              onChange={handleChange}
+              className="mt-1 w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring focus:ring-blue-200"
+            />
+          </label>
 
-        <button
-          type="submit"
-          className="w-full py-3 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-        >
-          Save Profile
-        </button>
-      </form>
-    </div>
+          <button
+            type="submit"
+            className="w-full py-3 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+          >
+            Save Profile
+          </button>
+        </form>
+      </div>
+    </PageContainer>
   );
 }
