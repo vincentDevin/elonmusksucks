@@ -96,7 +96,7 @@ interface ReactionDetailsProps {
 }
 
 export function ReactionDetails({
-  postId,
+  postId: _postId,
   onClose,
   reactions = [],
   loading = false,

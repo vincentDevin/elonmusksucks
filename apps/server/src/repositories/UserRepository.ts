@@ -380,6 +380,106 @@ export class UserRepository implements IUserRepository {
       avatarUrl: user.avatarUrl || undefined,
     }));
   }
+
+  // ===============================================
+  // Social Features Methods
+  // ===============================================
+
+  async getUserFollowers(userId: number, params: { limit: number; cursor?: string }) {
+    const pageLimit = Math.min(params.limit || 20, 100);
+    const where: any = { followingId: userId };
+
+    if (params.cursor) {
+      const cursorDate = new Date(params.cursor);
+      if (!isNaN(cursorDate.getTime())) {
+        where.createdAt = { lt: cursorDate };
+      }
+    }
+
+    const follows = await prisma.follow.findMany({
+      where,
+      include: {
+        follower: {
+          select: {
+            id: true,
+            name: true,
+            avatarUrl: true,
+            profilePictureKey: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: pageLimit + 1,
+    });
+
+    const hasMore = follows.length > pageLimit;
+    const items = follows.slice(0, pageLimit);
+
+    const nextCursor =
+      hasMore && items.length > 0 ? items[items.length - 1].createdAt.toISOString() : undefined;
+
+    return {
+      followers: items.map((follow) => ({
+        id: follow.follower.id,
+        name: follow.follower.name,
+        avatarUrl: follow.follower.avatarUrl || undefined,
+        followedAt: follow.createdAt.toISOString(),
+      })),
+      pagination: {
+        cursor: nextCursor,
+        hasMore,
+        total: undefined,
+      },
+    };
+  }
+
+  async getUserFollowing(userId: number, params: { limit: number; cursor?: string }) {
+    const pageLimit = Math.min(params.limit || 20, 100);
+    const where: any = { followerId: userId };
+
+    if (params.cursor) {
+      const cursorDate = new Date(params.cursor);
+      if (!isNaN(cursorDate.getTime())) {
+        where.createdAt = { lt: cursorDate };
+      }
+    }
+
+    const follows = await prisma.follow.findMany({
+      where,
+      include: {
+        following: {
+          select: {
+            id: true,
+            name: true,
+            avatarUrl: true,
+            profilePictureKey: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: pageLimit + 1,
+    });
+
+    const hasMore = follows.length > pageLimit;
+    const items = follows.slice(0, pageLimit);
+
+    const nextCursor =
+      hasMore && items.length > 0 ? items[items.length - 1].createdAt.toISOString() : undefined;
+
+    return {
+      following: items.map((follow) => ({
+        id: follow.following.id,
+        name: follow.following.name,
+        avatarUrl: follow.following.avatarUrl || undefined,
+        followedAt: follow.createdAt.toISOString(),
+      })),
+      pagination: {
+        cursor: nextCursor,
+        hasMore,
+        total: undefined,
+      },
+    };
+  }
 }
 
 function mapUserPost(post: any): DbUserPost {

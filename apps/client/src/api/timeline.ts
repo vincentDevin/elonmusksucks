@@ -142,6 +142,121 @@ export const timelineApi = {
     );
     return response.data;
   },
+
+  /**
+   * Search timeline content
+   */
+  search: async (params: {
+    query: string;
+    filters?: any;
+    limit?: number;
+    cursor?: string;
+  }): Promise<TimelineResponse> => {
+    const searchParams = new URLSearchParams();
+    searchParams.set('q', params.query);
+    searchParams.set('limit', String(params.limit || 30));
+
+    if (params.cursor) searchParams.set('cursor', params.cursor);
+    if (params.filters) searchParams.set('filters', JSON.stringify(params.filters));
+
+    const response = await api.get(`/api/timeline/search?${searchParams.toString()}`);
+    return response.data;
+  },
+
+  /**
+   * Get search suggestions
+   */
+  getSearchSuggestions: async (
+    query: string,
+  ): Promise<{
+    suggestions: Array<{
+      type: 'article' | 'tag' | 'author' | 'feed';
+      value: string;
+      count?: number;
+    }>;
+  }> => {
+    const response = await api.get(
+      `/api/timeline/search/suggestions?q=${encodeURIComponent(query)}`,
+    );
+    return response.data;
+  },
+
+  /**
+   * Get trending content
+   */
+  getTrending: async (params?: {
+    timeRange?: 'hour' | 'day' | 'week' | 'month';
+    limit?: number;
+    type?: 'articles' | 'posts' | 'all';
+  }): Promise<{
+    articles: any[];
+    posts: any[];
+    tags: any[];
+    authors: any[];
+  }> => {
+    const searchParams = new URLSearchParams();
+    searchParams.set('timeRange', params?.timeRange || 'day');
+    searchParams.set('limit', String(params?.limit || 10));
+    searchParams.set('type', params?.type || 'all');
+
+    const response = await api.get(`/api/timeline/trending?${searchParams.toString()}`);
+    return response.data;
+  },
+
+  /**
+   * Toggle article bookmark
+   */
+  toggleBookmark: async (
+    articleId: number,
+    collectionId?: number,
+  ): Promise<{
+    action: 'added' | 'removed';
+    bookmarkId?: number;
+  }> => {
+    const response = await api.post(`/api/timeline/articles/${articleId}/bookmark`, {
+      collectionId,
+    });
+    return response.data;
+  },
+
+  /**
+   * Get user bookmarks
+   */
+  getBookmarks: async (params?: {
+    limit?: number;
+    cursor?: string;
+    collectionId?: number;
+  }): Promise<{
+    bookmarks: any[];
+    pagination: { cursor?: string; hasMore: boolean; total?: number };
+  }> => {
+    const searchParams = new URLSearchParams();
+    searchParams.set('limit', String(params?.limit || 20));
+
+    if (params?.cursor) searchParams.set('cursor', params.cursor);
+    if (params?.collectionId) searchParams.set('collectionId', String(params.collectionId));
+
+    const response = await api.get(`/api/timeline/bookmarks?${searchParams.toString()}`);
+    return response.data;
+  },
+
+  /**
+   * Share article
+   */
+  shareArticle: async (
+    articleId: number,
+    data: {
+      platform: string;
+      message?: string;
+      targetUsers?: number[];
+    },
+  ): Promise<{
+    shareId: number;
+    shareUrl?: string;
+  }> => {
+    const response = await api.post(`/api/timeline/articles/${articleId}/share`, data);
+    return response.data;
+  },
 };
 
 // ===============================================

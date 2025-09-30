@@ -8,6 +8,15 @@ import {
   getArticleReactions,
   createArticleComment,
   getArticleComments,
+  searchTimeline,
+  getSearchSuggestions,
+  getTrendingContent,
+  toggleArticleBookmark,
+  getUserBookmarks,
+  getBookmarkCollections,
+  createBookmarkCollection,
+  shareArticle,
+  getArticleShareStats,
 } from '../controllers/timeline.controller';
 import { requireAuth } from '../middleware/auth.middleware';
 
@@ -41,5 +50,47 @@ router.post('/articles/:id/comments', requireAuth, createArticleComment);
 
 // GET /api/timeline/articles/:id/comments - Get article comments
 router.get('/articles/:id/comments', getArticleComments);
+
+// ===============================================
+// Search and Discovery API
+// ===============================================
+
+// GET /api/timeline/search - Search timeline content
+// Query params: q (query string), filters (JSON), limit, cursor
+router.get('/search', searchTimeline);
+
+// GET /api/timeline/search/suggestions - Get search suggestions
+// Query params: q (partial query string)
+router.get('/search/suggestions', getSearchSuggestions);
+
+// GET /api/timeline/trending - Get trending content
+// Query params: timeRange (hour|day|week|month), limit, type (articles|posts|all)
+router.get('/trending', getTrendingContent);
+
+// ===============================================
+// Bookmark System API
+// ===============================================
+
+// POST /api/timeline/articles/:id/bookmark - Bookmark article
+router.post('/articles/:id/bookmark', requireAuth, toggleArticleBookmark);
+
+// GET /api/timeline/bookmarks - Get user's bookmarks
+router.get('/bookmarks', requireAuth, getUserBookmarks);
+
+// GET /api/timeline/bookmark-collections - Get bookmark collections
+router.get('/bookmark-collections', requireAuth, getBookmarkCollections);
+
+// POST /api/timeline/bookmark-collections - Create bookmark collection
+router.post('/bookmark-collections', requireAuth, createBookmarkCollection);
+
+// ===============================================
+// Social Sharing API (Articles)
+// ===============================================
+
+// POST /api/timeline/articles/:id/share - Share article
+router.post('/articles/:id/share', requireAuth, shareArticle);
+
+// GET /api/timeline/articles/:id/share-stats - Get article share statistics
+router.get('/articles/:id/share-stats', getArticleShareStats);
 
 export default router;

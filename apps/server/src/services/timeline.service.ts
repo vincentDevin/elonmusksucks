@@ -1,12 +1,13 @@
 import { PrismaClient } from '@prisma/client';
 import { TimelineRepository } from '../repositories/TimelineRepository';
+import type { ITimelineRepository } from '../repositories/interfaces/ITimelineRepository';
 import { UserService } from './user.service';
 
 const prisma = new PrismaClient();
 const userService = new UserService();
 
 export class TimelineService {
-  private repository: TimelineRepository;
+  private repository: ITimelineRepository;
 
   constructor() {
     this.repository = new TimelineRepository(prisma);
@@ -84,5 +85,112 @@ export class TimelineService {
       ...result,
       comments: enrichedComments,
     };
+  }
+
+  // ===============================================
+  // Search and Discovery Methods
+  // ===============================================
+
+  async searchTimeline(params: { query: string; filters?: any; limit: number; cursor?: string }) {
+    // Basic text search implementation
+    const searchResults = await this.repository.searchContent({
+      query: params.query,
+      filters: params.filters || {},
+      limit: params.limit,
+      cursor: params.cursor,
+    });
+
+    return {
+      items: searchResults.items || [],
+      pagination: {
+        cursor: searchResults.nextCursor,
+        hasMore: searchResults.hasMore || false,
+        total: searchResults.total,
+      },
+    };
+  }
+
+  async getSearchSuggestions(query: string) {
+    // Return search suggestions based on query
+    const suggestions = await this.repository.getSearchSuggestions(query);
+
+    return suggestions.map((suggestion) => ({
+      type: suggestion.type,
+      value: suggestion.value,
+      count: suggestion.count || 0,
+    }));
+  }
+
+  async getTrendingContent(params: {
+    timeRange: 'hour' | 'day' | 'week' | 'month';
+    limit: number;
+    type: 'articles' | 'posts' | 'all';
+  }) {
+    const trendingData = await this.repository.getTrendingContent({
+      timeRange: params.timeRange,
+      limit: params.limit,
+      contentType: params.type,
+    });
+
+    return {
+      articles: trendingData.articles || [],
+      posts: trendingData.posts || [],
+      tags: trendingData.tags || [],
+      authors: trendingData.authors || [],
+    };
+  }
+
+  // ===============================================
+  // Bookmark System Methods
+  // ===============================================
+
+  async toggleArticleBookmark(articleId: number, userId: number, collectionId?: number) {
+    return this.repository.toggleArticleBookmark(articleId, userId, collectionId);
+  }
+
+  async getUserBookmarks(
+    userId: number,
+    params: {
+      limit: number;
+      cursor?: string;
+      collectionId?: number;
+    },
+  ) {
+    return this.repository.getUserBookmarks(userId, params);
+  }
+
+  async getBookmarkCollections(userId: number) {
+    return this.repository.getBookmarkCollections(userId);
+  }
+
+  async createBookmarkCollection(
+    userId: number,
+    data: {
+      name: string;
+      description?: string | null;
+      isPrivate: boolean;
+    },
+  ) {
+    return this.repository.createBookmarkCollection(userId, data);
+  }
+
+  // ===============================================
+  // Social Sharing Methods
+  // ===============================================
+
+  async shareArticle(
+    articleId: number,
+    userId: number,
+    data: {
+      platform: string;
+      message?: string | null;
+      targetUsers: number[];
+    },
+  ) {
+    return this.repository.shareArticle(articleId, userId, data);
+  }
+
+  async getArticleShareStats(articleId: number) {
+    return this.repository.getArticleShareStats(articleId);
   }
 }

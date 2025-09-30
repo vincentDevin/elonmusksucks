@@ -30,17 +30,11 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({
   className = '',
 }) => {
   const [reactionCounts, setReactionCounts] = useState({
-    reactions: item.engagement.reactions,
-    comments: item.engagement.comments,
+    reactions: item.engagement?.reactions || 0,
+    comments: item.engagement?.comments || 0,
   });
   const [isLiking, setIsLiking] = useState(false);
   const [userLiked, setUserLiked] = useState(false); // Note: User reaction state managed locally
-
-  const handleUseAsSource = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    onUseAsSource?.(item);
-  };
 
   const handleViewDetails = () => {
     onViewDetails?.(item);
@@ -81,8 +75,8 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({
 
   return (
     <BaseArticleCard
-      title={item.content.title}
-      subtitle={`${item.content.author} • ${formatTimeAgo(item.timestamp)}${item.content.source ? ` • ${item.content.source}` : ''}`}
+      title={item.content?.title}
+      subtitle={`${item.content?.author} • ${formatTimeAgo(item.timestamp)}${item.content?.source ? ` • ${item.content?.source}` : ''}`}
       className={className}
       onClick={handleViewDetails}
       primaryAction={
@@ -100,11 +94,11 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({
       }}
     >
       {/* Lead Image */}
-      {item.content.imageUrl && (
+      {item.content?.imageUrl && (
         <div className="aspect-video w-full overflow-hidden rounded-lg mb-4 -mx-1">
           <img
-            src={item.content.imageUrl}
-            alt={item.content.title}
+            src={item.content?.imageUrl}
+            alt={item.content?.title}
             className="w-full h-full object-cover hover:scale-105 transition-transform duration-200 cursor-pointer"
             onClick={handleViewDetails}
           />
@@ -112,23 +106,23 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({
       )}
 
       {/* Excerpt */}
-      {item.content.excerpt && (
+      {item.content?.excerpt && (
         <p className="text-content/80 text-sm leading-relaxed mb-3 line-clamp-3">
-          {item.content.excerpt}
+          {item.content?.excerpt}
         </p>
       )}
 
       {/* Tags */}
-      {item.tags.length > 0 && (
+      {item.tags?.length > 0 && (
         <div className="flex flex-wrap gap-1 mb-3">
-          {item.tags.slice(0, 4).map((tag) => (
+          {item.tags?.slice(0, 4).map((tag) => (
             <span key={tag} className="px-2 py-1 bg-muted/20 text-content/70 text-xs rounded-full">
               {tag}
             </span>
           ))}
-          {item.tags.length > 4 && (
+          {item.tags?.length > 4 && (
             <span className="px-2 py-1 bg-muted/20 text-content/70 text-xs rounded-full">
-              +{item.tags.length - 4}
+              +{item.tags?.length - 4}
             </span>
           )}
         </div>

@@ -160,6 +160,10 @@ model User {
   pongMatchesAsJoiner PongMatch[]    @relation("PongJoiner")
   pongMatchesAsAI    PongMatch[]     @relation("PongAI")
   pongStats          PongStats?
+  // Bookmark and Social relations
+  bookmarkCollections BookmarkCollection[]
+  articleBookmarks   ArticleBookmark[]
+  articleShares      ArticleShare[]
 }
 
 model ChatRoom {
@@ -724,6 +728,9 @@ model Article {
   sourceLinks          PredictionSourceLink[]
   articleReactions     ArticleReaction[]
   articleComments      ArticleComment[]
+  // Bookmark and Social relations
+  bookmarks            ArticleBookmark[]
+  shares               ArticleShare[]
 
   @@index([status, publishedAt(sort: Desc)])
   @@index([hash])
@@ -1043,6 +1050,57 @@ model Hashtag {
   usageCount Int          @default(0)
   posts     PostHashtag[]
   createdAt DateTime      @default(now())
-  
+
   @@index([usageCount])
+}
+
+// ===============================================
+// Bookmark and Social Features Models
+// ===============================================
+
+model BookmarkCollection {
+  id          Int               @id @default(autoincrement())
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      Int
+  name        String
+  description String?
+  isPrivate   Boolean           @default(false)
+  bookmarks   ArticleBookmark[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([userId])
+}
+
+model ArticleBookmark {
+  id           Int                @id @default(autoincrement())
+  article      Article            @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  articleId    Int
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       Int
+  collection   BookmarkCollection? @relation(fields: [collectionId], references: [id], onDelete: SetNull)
+  collectionId Int?
+  createdAt    DateTime           @default(now())
+
+  @@unique([articleId, userId, collectionId])
+  @@index([userId])
+  @@index([articleId])
+  @@index([collectionId])
+}
+
+model ArticleShare {
+  id          Int      @id @default(autoincrement())
+  article     Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  articleId   Int
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      Int
+  platform    String   // 'internal', 'twitter', 'facebook', 'linkedin', 'email', 'copy_link'
+  message     String?
+  targetUsers Int[]    @default([])
+  createdAt   DateTime @default(now())
+
+  @@index([articleId])
+  @@index([userId])
+  @@index([platform])
+  @@index([createdAt])
 }

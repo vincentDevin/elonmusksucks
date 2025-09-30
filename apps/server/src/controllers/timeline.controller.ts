@@ -84,7 +84,7 @@ export async function getTimelineTweets(req: Request, res: Response) {
         comments: tweet.replyCount,
       },
       tags: [],
-      sourceLinks: tweet.sourceLinks.map((link) => ({
+      sourceLinks: tweet.sourceLinks.map((link: any) => ({
         id: link.id,
         predictionId: link.predictionId,
         articleId: null,
@@ -324,3 +324,235 @@ export const getArticleComments = async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Failed to fetch comments' });
   }
 };
+
+// ===============================================
+// Search and Discovery Controllers
+// ===============================================
+
+export async function searchTimeline(req: Request, res: Response) {
+  try {
+    const { q, filters, limit = '30', cursor } = req.query;
+
+    if (!q || typeof q !== 'string') {
+      return res.status(400).json({ error: 'Search query is required' });
+    }
+
+    const pageLimit = Math.min(parseInt(limit as string) || 30, 100);
+
+    // Parse filters if provided
+    let parsedFilters;
+    try {
+      parsedFilters = filters ? JSON.parse(filters as string) : {};
+    } catch (error) {
+      return res.status(400).json({ error: 'Invalid filters format' });
+    }
+
+    const searchParams = {
+      query: q,
+      filters: parsedFilters,
+      limit: pageLimit,
+      cursor: cursor as string | undefined,
+    };
+
+    const results = await timelineService.searchTimeline(searchParams);
+    res.json(results);
+  } catch (error) {
+    console.error('[timeline] Error searching timeline:', error);
+    res.status(500).json({ error: 'Failed to search timeline' });
+  }
+}
+
+export async function getSearchSuggestions(req: Request, res: Response) {
+  try {
+    const { q } = req.query;
+
+    if (!q || typeof q !== 'string') {
+      return res.status(400).json({ error: 'Query parameter is required' });
+    }
+
+    if (q.length < 2) {
+      return res.json({ suggestions: [] });
+    }
+
+    const suggestions = await timelineService.getSearchSuggestions(q);
+    res.json({ suggestions });
+  } catch (error) {
+    console.error('[timeline] Error fetching search suggestions:', error);
+    res.status(500).json({ error: 'Failed to fetch suggestions' });
+  }
+}
+
+export async function getTrendingContent(req: Request, res: Response) {
+  try {
+    const { timeRange = 'day', limit = '10', type = 'all' } = req.query;
+
+    const pageLimit = Math.min(parseInt(limit as string) || 10, 50);
+
+    const validTimeRanges = ['hour', 'day', 'week', 'month'];
+    const validTypes = ['articles', 'posts', 'all'];
+
+    if (!validTimeRanges.includes(timeRange as string)) {
+      return res.status(400).json({ error: 'Invalid timeRange parameter' });
+    }
+
+    if (!validTypes.includes(type as string)) {
+      return res.status(400).json({ error: 'Invalid type parameter' });
+    }
+
+    const trendingParams = {
+      timeRange: timeRange as 'hour' | 'day' | 'week' | 'month',
+      limit: pageLimit,
+      type: type as 'articles' | 'posts' | 'all',
+    };
+
+    const trending = await timelineService.getTrendingContent(trendingParams);
+    res.json(trending);
+  } catch (error) {
+    console.error('[timeline] Error fetching trending content:', error);
+    res.status(500).json({ error: 'Failed to fetch trending content' });
+  }
+}
+
+// ===============================================
+// Bookmark System Controllers
+// ===============================================
+
+export async function toggleArticleBookmark(req: AuthRequest, res: Response) {
+  try {
+    const articleId = parseInt(req.params.id);
+    const { collectionId } = req.body;
+    const userId = req.user!.id;
+
+    if (isNaN(articleId)) {
+      res.status(400).json({ error: 'Invalid article ID' });
+      return;
+    }
+
+    const result = await timelineService.toggleArticleBookmark(articleId, userId, collectionId);
+    res.json(result);
+  } catch (error: any) {
+    console.error('[timeline] Error toggling article bookmark:', error);
+
+    if (error.message === 'Article not found') {
+      res.status(404).json({ error: 'Article not found' });
+      return;
+    }
+
+    res.status(500).json({ error: 'Failed to toggle bookmark' });
+  }
+}
+
+export async function getUserBookmarks(req: AuthRequest, res: Response) {
+  try {
+    const { limit = '20', cursor, collectionId } = req.query;
+    const pageLimit = Math.min(parseInt(limit as string) || 20, 100);
+    const userId = req.user!.id;
+
+    const bookmarks = await timelineService.getUserBookmarks(userId, {
+      limit: pageLimit,
+      cursor: cursor as string,
+      collectionId: collectionId ? parseInt(collectionId as string) : undefined,
+    });
+
+    res.json(bookmarks);
+  } catch (error) {
+    console.error('[timeline] Error fetching user bookmarks:', error);
+    res.status(500).json({ error: 'Failed to fetch bookmarks' });
+  }
+}
+
+export async function getBookmarkCollections(req: AuthRequest, res: Response) {
+  try {
+    const userId = req.user!.id;
+    const collections = await timelineService.getBookmarkCollections(userId);
+    res.json({ collections });
+  } catch (error) {
+    console.error('[timeline] Error fetching bookmark collections:', error);
+    res.status(500).json({ error: 'Failed to fetch bookmark collections' });
+  }
+}
+
+export async function createBookmarkCollection(req: AuthRequest, res: Response) {
+  try {
+    const { name, description, isPrivate = false } = req.body;
+    const userId = req.user!.id;
+
+    if (!name || name.trim().length === 0) {
+      res.status(400).json({ error: 'Collection name is required' });
+      return;
+    }
+
+    if (name.length > 100) {
+      res.status(400).json({ error: 'Collection name too long (max 100 characters)' });
+      return;
+    }
+
+    const collection = await timelineService.createBookmarkCollection(userId, {
+      name: name.trim(),
+      description: description?.trim() || null,
+      isPrivate: Boolean(isPrivate),
+    });
+
+    res.status(201).json(collection);
+  } catch (error) {
+    console.error('[timeline] Error creating bookmark collection:', error);
+    res.status(500).json({ error: 'Failed to create bookmark collection' });
+  }
+}
+
+// ===============================================
+// Social Sharing Controllers
+// ===============================================
+
+export async function shareArticle(req: AuthRequest, res: Response) {
+  try {
+    const articleId = parseInt(req.params.id);
+    const { platform, message, targetUsers } = req.body;
+    const userId = req.user!.id;
+
+    if (isNaN(articleId)) {
+      res.status(400).json({ error: 'Invalid article ID' });
+      return;
+    }
+
+    const validPlatforms = ['internal', 'twitter', 'facebook', 'linkedin', 'email', 'copy_link'];
+    if (platform && !validPlatforms.includes(platform)) {
+      res.status(400).json({ error: 'Invalid platform' });
+      return;
+    }
+
+    const shareResult = await timelineService.shareArticle(articleId, userId, {
+      platform: platform || 'internal',
+      message: message?.trim() || null,
+      targetUsers: targetUsers || [],
+    });
+
+    res.json(shareResult);
+  } catch (error: any) {
+    console.error('[timeline] Error sharing article:', error);
+
+    if (error.message === 'Article not found') {
+      res.status(404).json({ error: 'Article not found' });
+      return;
+    }
+
+    res.status(500).json({ error: 'Failed to share article' });
+  }
+}
+
+export async function getArticleShareStats(req: Request, res: Response) {
+  try {
+    const articleId = parseInt(req.params.id);
+
+    if (isNaN(articleId)) {
+      res.status(400).json({ error: 'Invalid article ID' });
+      return;
+    }
+
+    const stats = await timelineService.getArticleShareStats(articleId);
+    res.json(stats);
+  } catch (error) {
+    console.error('[timeline] Error fetching article share stats:', error);
+    res.status(500).json({ error: 'Failed to fetch share stats' });
+  }
+}

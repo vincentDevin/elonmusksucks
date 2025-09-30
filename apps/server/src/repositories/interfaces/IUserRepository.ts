@@ -100,4 +100,21 @@ export interface IUserRepository {
 
   // User search for mentions
   searchUsersByName(query: string): Promise<{ id: number; name: string; avatarUrl?: string }[]>;
+
+  // Social features
+  getUserFollowers(
+    userId: number,
+    params: { limit: number; cursor?: string },
+  ): Promise<{
+    followers: Array<{ id: number; name: string; avatarUrl?: string; followedAt: string }>;
+    pagination: { cursor?: string; hasMore: boolean; total?: number };
+  }>;
+
+  getUserFollowing(
+    userId: number,
+    params: { limit: number; cursor?: string },
+  ): Promise<{
+    following: Array<{ id: number; name: string; avatarUrl?: string; followedAt: string }>;
+    pagination: { cursor?: string; hasMore: boolean; total?: number };
+  }>;
 }

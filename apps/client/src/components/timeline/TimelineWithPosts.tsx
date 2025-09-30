@@ -10,6 +10,8 @@ import { CommunityPosts } from '../posts/CommunityPosts';
 interface TimelineWithPostsProps {
   className?: string;
   initialTab?: 'articles' | 'posts';
+  searchQuery?: string;
+  filters?: any;
 }
 
 /**
@@ -19,6 +21,8 @@ interface TimelineWithPostsProps {
 export const TimelineWithPosts: React.FC<TimelineWithPostsProps> = ({
   className = '',
   initialTab = 'articles',
+  searchQuery = '',
+  filters,
 }) => {
   const [activeTab, setActiveTab] = useState<'articles' | 'posts'>(initialTab);
   const [articles, setArticles] = useState<TimelineItem[]>([]);
@@ -33,30 +37,39 @@ export const TimelineWithPosts: React.FC<TimelineWithPostsProps> = ({
 
   // Socket connection for real-time updates (only for articles)
   useTimelineSocket({
-    onNewArticle: (article) => {
+    activeTab: activeTab === 'posts' ? 'tweets' : activeTab,
+    onNewArticles: (article: any) => {
       if (activeTab === 'articles') {
         setArticles((prev) => [article, ...prev]);
       }
     },
-    onNewTweet: () => {}, // No longer needed
+    onNewTweets: () => {}, // No longer needed
   });
 
-  // Load articles when tab changes to articles
+  // Load articles when tab changes to articles or when search/filters change
   useEffect(() => {
     if (activeTab === 'articles') {
       loadArticles(true);
     }
-  }, [activeTab]);
+  }, [activeTab, searchQuery, filters]);
 
   const loadArticles = async (reset = false) => {
     try {
       setLoading(true);
       setError(null);
 
-      const data: TimelineResponse = await timelineApi.getArticles({
-        cursor: reset ? undefined : cursor,
-        limit: 20,
-      });
+      // Use search API if search query is provided, otherwise use getArticles
+      const data: TimelineResponse = searchQuery
+        ? await timelineApi.search({
+            query: searchQuery,
+            cursor: reset ? undefined : cursor,
+            limit: 20,
+            filters: filters,
+          })
+        : await timelineApi.getArticles({
+            cursor: reset ? undefined : cursor,
+            limit: 20,
+          });
 
       if (reset) {
         setArticles(data.items);
@@ -65,8 +78,8 @@ export const TimelineWithPosts: React.FC<TimelineWithPostsProps> = ({
         setArticles((prev) => [...prev, ...data.items]);
       }
 
-      setCursor(data.nextCursor);
-      setHasMore(!!data.nextCursor);
+      setCursor(data.pagination?.cursor);
+      setHasMore(!!data.pagination?.hasMore);
     } catch (err: any) {
       setError(err.message || 'Failed to load articles');
       console.error('Error loading articles:', err);
@@ -197,6 +210,7 @@ export const TimelineWithPosts: React.FC<TimelineWithPostsProps> = ({
       {showArticleDrawer && selectedItem && (
         <ArticleDrawer
           item={selectedItem}
+          isOpen={showArticleDrawer}
           onClose={handleCloseDrawer}
           onUseAsSource={handleUseAsSource}
         />
@@ -204,7 +218,11 @@ export const TimelineWithPosts: React.FC<TimelineWithPostsProps> = ({
 
       {/* Use as Source Modal */}
       {showUseAsSourceModal && sourceItem && (
-        <UseAsSourceModal item={sourceItem} onClose={handleCloseModal} />
+        <UseAsSourceModal
+          item={sourceItem}
+          isOpen={showUseAsSourceModal}
+          onClose={handleCloseModal}
+        />
       )}
     </div>
   );

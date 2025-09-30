@@ -42,7 +42,7 @@ export const ArticleDrawer: React.FC<ArticleDrawerProps> = ({
       loadArticleDetails();
       loadComments(true); // Reset comments when opening
     }
-  }, [isOpen, item]);
+  }, [isOpen, item]); // Keep watching original item to avoid infinite loop
 
   const loadArticleDetails = async () => {
     if (!item) return;
@@ -168,7 +168,7 @@ export const ArticleDrawer: React.FC<ArticleDrawerProps> = ({
               {/* Article Header */}
               <div className="mb-6">
                 <h1 className="text-2xl font-bold text-content leading-tight mb-4">
-                  {item.content.title}
+                  {item?.content?.title || 'Untitled'}
                 </h1>
 
                 {/* Meta Information */}
@@ -187,7 +187,7 @@ export const ArticleDrawer: React.FC<ArticleDrawerProps> = ({
                         d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
                       />
                     </svg>
-                    {item.content.author}
+                    {item?.content.author || 'Unknown'}
                   </span>
                   <span className="flex items-center">
                     <svg
@@ -205,7 +205,7 @@ export const ArticleDrawer: React.FC<ArticleDrawerProps> = ({
                     </svg>
                     {formatDate(article?.publishedAt || null)}
                   </span>
-                  {item.content.source && (
+                  {item?.content.source && (
                     <span className="flex items-center">
                       <svg
                         className="w-4 h-4 mr-1"
@@ -220,13 +220,13 @@ export const ArticleDrawer: React.FC<ArticleDrawerProps> = ({
                           d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
                         />
                       </svg>
-                      {item.content.source}
+                      {item?.content.source}
                     </span>
                   )}
                 </div>
 
                 {/* Tags */}
-                {item.tags && item.tags.length > 0 && (
+                {item?.tags && item.tags.length > 0 && (
                   <div className="flex flex-wrap gap-2 mb-4">
                     {item.tags.map((tag) => (
                       <span
@@ -241,25 +241,25 @@ export const ArticleDrawer: React.FC<ArticleDrawerProps> = ({
               </div>
 
               {/* Lead Image */}
-              {item.content.imageUrl && (
+              {item?.content.imageUrl && (
                 <div className="mb-6">
                   <img
-                    src={item.content.imageUrl}
-                    alt={item.content.title}
+                    src={item?.content.imageUrl}
+                    alt={item?.content.title}
                     className="w-full rounded-lg shadow-sm"
                   />
                 </div>
               )}
 
               {/* Article Excerpt/Content */}
-              {item.content.excerpt && (
+              {item?.content.excerpt && (
                 <div className="mb-6">
-                  <p className="text-content/80 leading-relaxed text-lg">{item.content.excerpt}</p>
+                  <p className="text-content/80 leading-relaxed text-lg">{item?.content.excerpt}</p>
                 </div>
               )}
 
               {/* Related Predictions */}
-              {item.sourceLinks && item.sourceLinks.length > 0 && (
+              {item?.sourceLinks && item.sourceLinks.length > 0 && (
                 <div className="mb-6 p-4 bg-muted/20 rounded-lg">
                   <h3 className="text-sm font-semibold text-content mb-3">Related Predictions</h3>
                   <div className="space-y-2">
@@ -405,7 +405,7 @@ export const ArticleDrawer: React.FC<ArticleDrawerProps> = ({
                     📊 Use as Prediction Source
                   </button>
                   <a
-                    href={item.content.url}
+                    href={item?.content.url || '#'}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex-1 bg-muted text-content px-4 py-2 rounded-lg hover:bg-muted/80 transition-colors font-medium text-center"

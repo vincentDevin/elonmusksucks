@@ -1,7 +1,7 @@
 // apps/client/src/components/timeline/UseAsSourceModal.tsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { TimelineItem, PredictionFull } from '@ems/types';
+import type { TimelineItem, PredictionView } from '@ems/types';
 import { getPredictions } from '../../api/predictions';
 import { useAuth } from '../../contexts/AuthContext';
 import BaseModal from '../BaseModal';
@@ -22,7 +22,7 @@ export const UseAsSourceModal: React.FC<UseAsSourceModalProps> = ({ item, isOpen
   const navigate = useNavigate();
   const { user } = useAuth();
   const [selectedOption, setSelectedOption] = useState<'new' | 'existing' | null>(null);
-  const [predictions, setPredictions] = useState<PredictionFull[]>([]);
+  const [predictions, setPredictions] = useState<PredictionView[]>([]);
   const [selectedPrediction, setSelectedPrediction] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingPredictions, setLoadingPredictions] = useState(false);
@@ -49,7 +49,7 @@ export const UseAsSourceModal: React.FC<UseAsSourceModalProps> = ({ item, isOpen
       setLoadingPredictions(true);
       const data = await getPredictions();
       // Filter to show only active, unresolved predictions
-      const activePredictions = data.filter((p) => !p.resolved && p.approved);
+      const activePredictions = data.filter((p) => !p.resolvedAt && p.status === 'ACTIVE');
       setPredictions(activePredictions);
     } catch (err) {
       console.error('Failed to load predictions:', err);

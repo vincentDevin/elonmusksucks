@@ -165,13 +165,10 @@ export const PostCard: React.FC<PostCardProps> = ({
             onReport={() => {
               // Handle report
             }}
-            onEdit={(content) => {
-              // Handle edit
-              handlePostUpdate({
-                ...post,
-                content,
-                editedAt: new Date().toISOString(),
-              });
+            onEdit={(postId) => {
+              // Handle edit - this should open an edit modal or inline editor
+              console.log('Edit post:', postId);
+              // TODO: Implement edit functionality
             }}
             onDelete={handlePostDelete}
           />

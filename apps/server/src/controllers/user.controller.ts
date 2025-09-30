@@ -546,3 +546,63 @@ export async function searchUsersHandler(
     next(err);
   }
 }
+
+/**
+ * Get user's followers list
+ * GET /api/users/:userId/followers
+ */
+export async function getUserFollowersHandler(
+  req: ReqWithUser,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const userId = Number(req.params.userId);
+    const { limit = '20', cursor } = req.query;
+    const pageLimit = Math.min(parseInt(limit as string) || 20, 100);
+
+    if (isNaN(userId)) {
+      res.status(400).json({ error: 'Invalid user ID' });
+      return;
+    }
+
+    const followers = await userService.getUserFollowers(userId, {
+      limit: pageLimit,
+      cursor: cursor as string,
+    });
+
+    res.json(followers);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Get users that this user is following
+ * GET /api/users/:userId/following
+ */
+export async function getUserFollowingHandler(
+  req: ReqWithUser,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const userId = Number(req.params.userId);
+    const { limit = '20', cursor } = req.query;
+    const pageLimit = Math.min(parseInt(limit as string) || 20, 100);
+
+    if (isNaN(userId)) {
+      res.status(400).json({ error: 'Invalid user ID' });
+      return;
+    }
+
+    const following = await userService.getUserFollowing(userId, {
+      limit: pageLimit,
+      cursor: cursor as string,
+    });
+
+    res.json(following);
+  } catch (err) {
+    next(err);
+  }
+}

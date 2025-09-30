@@ -719,6 +719,30 @@ export class UserService {
       };
     }
   }
+
+  // ===============================================
+  // Social Features Methods
+  // ===============================================
+
+  async getUserFollowers(
+    userId: number,
+    params: {
+      limit: number;
+      cursor?: string;
+    },
+  ) {
+    return this.repo.getUserFollowers(userId, params);
+  }
+
+  async getUserFollowing(
+    userId: number,
+    params: {
+      limit: number;
+      cursor?: string;
+    },
+  ) {
+    return this.repo.getUserFollowing(userId, params);
+  }
 }
 
 // --- Helpers: always map DB types to DTOs used on frontend ---

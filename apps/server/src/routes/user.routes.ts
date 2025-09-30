@@ -18,6 +18,8 @@ import {
   getRecentAchievementsHandler,
   getAllAchievementsHandler,
   searchUsersHandler,
+  getUserFollowersHandler,
+  getUserFollowingHandler,
 } from '../controllers/user.controller';
 import { getUserPosts as getUserPostsHandler } from '../controllers/post.controller';
 import { requireAuth } from '../middleware/auth.middleware';
@@ -60,6 +62,10 @@ router.get('/:userId/activity', requireAuth, getUserActivityHandler);
 // Follow/unfollow
 router.post('/:userId/follow', requireAuth, followUserHandler);
 router.delete('/:userId/follow', requireAuth, unfollowUserHandler);
+
+// Get followers/following lists
+router.get('/:userId/followers', getUserFollowersHandler);
+router.get('/:userId/following', getUserFollowingHandler);
 
 // User stats
 router.get('/:userId/stats', requireAuth, getUserStatsHandler);

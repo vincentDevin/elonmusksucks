@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import api from '../../api/axios';
 import type { UserFeedPost } from '@ems/types';
@@ -48,11 +48,11 @@ const HashtagFeed: React.FC = () => {
     };
   };
 
-  const handlePostUpdate = useCallback((updatedPost: UserFeedPost) => {
+  const handlePostUpdate = useCallback((_updatedPost: UserFeedPost) => {
     // This will be handled by GenericFeed's internal state
   }, []);
 
-  const handlePostDelete = useCallback((postId: number) => {
+  const handlePostDelete = useCallback((_postId: number) => {
     // This will be handled by GenericFeed's internal state
   }, []);
 
