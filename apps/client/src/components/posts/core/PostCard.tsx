@@ -1,15 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
-import type { UserFeedPost } from '@ems/types';
-import { MentionRenderer } from './MentionRenderer';
+import type { UserFeedPost, ReactionType } from '@ems/types';
+import { MentionRenderer } from '../creation/MentionRenderer';
 import { PostActions } from './PostActions';
-import BaseCard from '../BaseCard';
+import { PostReactions } from './PostReactions';
+import BaseCard from '../../BaseCard';
+import { useReactions } from '../../../contexts/ReactionContext';
 
 interface PostCardProps {
   post: UserFeedPost;
   onUpdate?: (post: UserFeedPost) => void;
   onDelete?: (postId: number) => void;
+  onExpand?: (post: UserFeedPost) => void;
   showComments?: boolean;
   isNested?: boolean;
 }
@@ -18,11 +21,21 @@ export const PostCard: React.FC<PostCardProps> = ({
   post,
   onUpdate,
   onDelete,
+  onExpand,
   showComments = false,
   isNested = false,
 }) => {
+  const { getReactionState, toggleReaction, initializeReactions } = useReactions();
   const [showReplies, setShowReplies] = useState(showComments);
   const [isDeleted, setIsDeleted] = useState(post.isDeleted);
+
+  // Initialize reactions on mount
+  useEffect(() => {
+    initializeReactions('post', post.id, post.reactionCounts, post.userReaction);
+  }, [post.id, post.reactionCounts, post.userReaction, initializeReactions]);
+
+  // Get current reaction state from context
+  const { reactionCounts, userReaction, isReacting } = getReactionState('post', post.id);
 
   const handlePostUpdate = (updatedPost: UserFeedPost) => {
     onUpdate?.(updatedPost);
@@ -31,6 +44,10 @@ export const PostCard: React.FC<PostCardProps> = ({
   const handlePostDelete = () => {
     setIsDeleted(true);
     onDelete?.(post.id);
+  };
+
+  const handleReaction = async (type: ReactionType) => {
+    await toggleReaction('post', post.id, type);
   };
 
   if (isDeleted) {
@@ -43,19 +60,25 @@ export const PostCard: React.FC<PostCardProps> = ({
 
   return (
     <div className={`${isNested ? 'ml-12 border-l-2 border-muted pl-4' : ''}`}>
-      <BaseCard variant="full" className="hover:bg-surface/80" hoverable={true} as="article">
+      <BaseCard
+        variant="full"
+        className="hover:bg-surface/80"
+        hoverable={true}
+        as="article"
+        onClick={onExpand ? () => onExpand(post) : undefined}
+      >
         {/* Author Header */}
-        <div className="flex items-start justify-between mb-3">
+        <div className="flex items-start justify-between mb-4">
           <div className="flex items-start space-x-3">
             <Link to={`/profile/${post.authorId}`} className="flex-shrink-0">
               {post.authorAvatar ? (
                 <img
                   src={post.authorAvatar}
                   alt={post.authorName || 'User'}
-                  className="w-12 h-12 rounded-full object-cover ring-2 ring-primary/20 hover:ring-primary/40 transition-all"
+                  className="w-11 h-11 rounded-full object-cover hover:ring-2 hover:ring-primary/30 transition-all"
                 />
               ) : (
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white font-semibold text-lg ring-2 ring-primary/20 hover:ring-primary/40 transition-all">
+                <div className="w-11 h-11 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white font-semibold hover:ring-2 hover:ring-primary/30 transition-all">
                   {post.authorName?.[0]?.toUpperCase() || '?'}
                 </div>
               )}
@@ -64,12 +87,12 @@ export const PostCard: React.FC<PostCardProps> = ({
               <div className="flex items-center space-x-2 mb-1">
                 <Link
                   to={`/profile/${post.authorId}`}
-                  className="font-semibold text-content hover:text-primary transition-colors text-base"
+                  className="font-semibold text-content hover:text-primary transition-colors"
                 >
                   {post.authorName || 'Unknown User'}
                 </Link>
                 {post.visibility !== 'PUBLIC' && (
-                  <span className="px-2 py-0.5 bg-muted/50 rounded-full text-xs font-medium">
+                  <span className="px-2 py-0.5 bg-muted/50 rounded-full text-xs font-medium text-tertiary">
                     {post.visibility.toLowerCase()}
                   </span>
                 )}
@@ -88,8 +111,8 @@ export const PostCard: React.FC<PostCardProps> = ({
         </div>
 
         {/* Post Content */}
-        <div className="mb-3">
-          <MentionRenderer content={post.content} className="text-content" />
+        <div className="mb-4">
+          <MentionRenderer content={post.content} className="text-content leading-relaxed" />
 
           {/* Media URLs */}
           {post.mediaUrls && post.mediaUrls.length > 0 && (
@@ -138,25 +161,43 @@ export const PostCard: React.FC<PostCardProps> = ({
 
         {/* Stats and Actions */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4 text-sm text-tertiary">
+          <div className="flex items-center space-x-5 text-sm">
+            {/* Reactions */}
+            <PostReactions
+              counts={reactionCounts}
+              userReaction={userReaction}
+              postId={post.id}
+              onReactionSelect={handleReaction}
+            />
+
+            {/* Comments */}
             <button
               onClick={() => setShowReplies(!showReplies)}
-              className="flex items-center space-x-1 hover:text-primary transition-colors"
+              className="flex items-center space-x-1.5 hover:text-primary transition-colors text-tertiary hover:bg-muted/30 px-2 py-1 rounded-lg"
             >
-              <span>💬</span>
-              <span>{post.commentsCount || 0}</span>
-              {post.commentsCount > 0 && (showReplies ? <span>▲</span> : <span>▼</span>)}
+              <span className="text-base">💬</span>
+              <span className="font-medium">{post.commentsCount || 0}</span>
+              {post.commentsCount > 0 && <span className="text-xs">{showReplies ? '▲' : '▼'}</span>}
             </button>
-            <div className="flex items-center space-x-1">
-              <span>👁</span>
-              <span>{post.viewsCount || 0}</span>
+
+            {/* Views */}
+            <div className="flex items-center space-x-1.5 text-tertiary">
+              <span className="text-base">👁</span>
+              <span className="font-medium">{Number(post.viewsCount) || 0}</span>
             </div>
+
+            {/* Shares */}
+            {post.sharesCount > 0 && (
+              <div className="flex items-center space-x-1.5 text-tertiary">
+                <span className="text-base">🔄</span>
+                <span className="font-medium">{post.sharesCount}</span>
+              </div>
+            )}
           </div>
 
           <PostActions
             post={post}
             onShare={() => {
-              // Update share count
               handlePostUpdate({
                 ...post,
                 sharesCount: (post.sharesCount || 0) + 1,
@@ -166,9 +207,7 @@ export const PostCard: React.FC<PostCardProps> = ({
               // Handle report
             }}
             onEdit={(postId) => {
-              // Handle edit - this should open an edit modal or inline editor
               console.log('Edit post:', postId);
-              // TODO: Implement edit functionality
             }}
             onDelete={handlePostDelete}
           />

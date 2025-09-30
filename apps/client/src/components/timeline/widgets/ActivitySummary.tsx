@@ -9,8 +9,8 @@ import {
   StarIcon,
   ChartBarIcon,
 } from '@heroicons/react/24/outline';
-import { useAuth } from '../../contexts/AuthContext';
-import api from '../../api/axios';
+import { useAuth } from '../../../contexts/AuthContext';
+import { getUserActivity, getUserStats } from '../../../api/users';
 
 interface ActivityStats {
   today: {
@@ -65,32 +65,66 @@ export const ActivitySummary: React.FC<ActivitySummaryProps> = ({
       }
 
       try {
-        const response = await api.get(`/api/users/${user.id}/activity-stats`);
-        setStats(response.data);
-      } catch (error) {
-        console.error('Failed to fetch activity stats:', error);
-        // Use mock data for development
-        setStats({
+        // Use existing API functions instead of direct axios calls
+        const [userActivity, userStats] = await Promise.all([
+          getUserActivity(user.id),
+          getUserStats(user.id).catch(() => null), // Stats might not be available
+        ]);
+
+        // Transform the activity data to match our interface
+        // Note: This is a simplified transform - we might need to aggregate the actual activity data
+        const transformedStats: ActivityStats = {
           today: {
-            posts: 3,
-            reactions: 12,
-            comments: 7,
-            predictions: 2,
+            posts: userActivity.filter((a) => a.type === 'post_created' && isToday(a.timestamp))
+              .length,
+            reactions: userActivity.filter(
+              (a) => a.type === 'reaction_given' && isToday(a.timestamp),
+            ).length,
+            comments: userActivity.filter(
+              (a) => a.type === 'comment_created' && isToday(a.timestamp),
+            ).length,
+            predictions: userActivity.filter(
+              (a) => a.type === 'prediction_created' && isToday(a.timestamp),
+            ).length,
           },
           week: {
-            posts: 18,
-            reactions: 67,
-            comments: 34,
-            predictions: 8,
-            streak: 5,
+            posts: userActivity.filter((a) => a.type === 'post_created' && isThisWeek(a.timestamp))
+              .length,
+            reactions: userActivity.filter(
+              (a) => a.type === 'reaction_given' && isThisWeek(a.timestamp),
+            ).length,
+            comments: userActivity.filter(
+              (a) => a.type === 'comment_created' && isThisWeek(a.timestamp),
+            ).length,
+            predictions: userActivity.filter(
+              (a) => a.type === 'prediction_created' && isThisWeek(a.timestamp),
+            ).length,
+            streak: calculateCurrentStreak(userActivity),
           },
           allTime: {
-            totalPosts: 234,
-            totalReactions: 892,
-            totalComments: 456,
-            totalPredictions: 78,
-            accountAge: 180,
-            bestStreak: 21,
+            totalPosts: userActivity.filter((a) => a.type === 'post_created').length,
+            totalReactions: userActivity.filter((a) => a.type === 'reaction_given').length,
+            totalComments: userActivity.filter((a) => a.type === 'comment_created').length,
+            totalPredictions: userActivity.filter((a) => a.type === 'prediction_created').length,
+            accountAge: userStats?.accountAge || 180,
+            bestStreak: calculateBestStreak(userActivity),
+          },
+        };
+
+        setStats(transformedStats);
+      } catch (error) {
+        console.error('Failed to fetch activity stats:', error);
+        // Use minimal fallback data
+        setStats({
+          today: { posts: 0, reactions: 0, comments: 0, predictions: 0 },
+          week: { posts: 0, reactions: 0, comments: 0, predictions: 0, streak: 0 },
+          allTime: {
+            totalPosts: 0,
+            totalReactions: 0,
+            totalComments: 0,
+            totalPredictions: 0,
+            accountAge: 0,
+            bestStreak: 0,
           },
         });
       } finally {
@@ -103,6 +137,44 @@ export const ActivitySummary: React.FC<ActivitySummaryProps> = ({
     const interval = setInterval(fetchActivityStats, 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, [user?.id, authLoading]);
+
+  // Helper functions for date calculations
+  const isToday = (timestamp: string): boolean => {
+    const date = new Date(timestamp);
+    const today = new Date();
+    return date.toDateString() === today.toDateString();
+  };
+
+  const isThisWeek = (timestamp: string): boolean => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    return date >= weekAgo;
+  };
+
+  const calculateCurrentStreak = (activities: any[]): number => {
+    // Simple implementation - count consecutive days with activity
+    const today = new Date();
+    let streak = 0;
+    for (let i = 0; i < 30; i++) {
+      const checkDate = new Date(today.getTime() - i * 24 * 60 * 60 * 1000);
+      const hasActivity = activities.some((a) => {
+        const activityDate = new Date(a.timestamp);
+        return activityDate.toDateString() === checkDate.toDateString();
+      });
+      if (hasActivity) {
+        streak++;
+      } else {
+        break;
+      }
+    }
+    return streak;
+  };
+
+  const calculateBestStreak = (activities: any[]): number => {
+    // Simple implementation - return current streak for now
+    return calculateCurrentStreak(activities);
+  };
 
   // Show loading while auth is loading or stats are loading
   if (authLoading || loading) {

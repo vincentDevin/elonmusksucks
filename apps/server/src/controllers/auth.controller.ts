@@ -25,6 +25,7 @@ import {
   resetPassword,
   getUserBalance,
 } from '../services/auth.service';
+import { UserService } from '../services/user.service';
 import { sendEmail } from '../services/email.service';
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '../utils/jwtHelpers';
 
@@ -124,7 +125,11 @@ export const me: RequestHandler = async (req, res, next) => {
       return sendError(res, 404, 'User not found');
     }
 
-    const payload = toAuthUserView(user) satisfies AuthUserView;
+    // Create UserService instance to enrich user with fresh avatar URL
+    const userService = new UserService();
+    const enrichedUser = await userService.enrichUserWithAvatar(user);
+
+    const payload = toAuthUserView(enrichedUser) satisfies AuthUserView;
     return res.json(payload);
   } catch (err) {
     next(err);

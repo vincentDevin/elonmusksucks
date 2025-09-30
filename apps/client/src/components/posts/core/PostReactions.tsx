@@ -6,6 +6,7 @@ interface PostReactionsProps {
   userReaction?: ReactionType;
   postId: number;
   onShowDetails?: (postId: number) => void;
+  onReactionSelect?: (type: ReactionType) => void;
   className?: string;
 }
 
@@ -32,50 +33,111 @@ export function PostReactions({
   userReaction,
   postId,
   onShowDetails,
+  onReactionSelect,
   className = '',
 }: PostReactionsProps) {
+  const [showReactionPicker, setShowReactionPicker] = useState(false);
   const totalReactions = Object.values(counts).reduce((sum, count) => sum + count, 0);
 
-  if (totalReactions === 0) {
-    return null;
-  }
+  // Always show the component so users can add reactions even when count is 0
 
   // Get reactions with counts > 0, sorted by count (descending)
   const reactionsWithCounts = (Object.entries(counts) as [ReactionType, number][])
     .filter(([, count]) => count > 0)
     .sort(([, a], [, b]) => b - a);
 
-  const handleClick = () => {
-    if (onShowDetails) {
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent triggering parent card onClick
+
+    // If we have onReactionSelect, show picker; otherwise show details
+    if (onReactionSelect) {
+      setShowReactionPicker(!showReactionPicker);
+    } else if (onShowDetails) {
       onShowDetails(postId);
     }
   };
 
+  const handleReactionSelect = (type: ReactionType) => {
+    if (onReactionSelect) {
+      onReactionSelect(type);
+    }
+    setShowReactionPicker(false);
+  };
+
   return (
-    <div className={`flex items-center ${className}`}>
-      {/* Reaction Emojis and Counts */}
+    <div className={`relative flex items-center ${className}`}>
+      {/* Reaction Emojis and Counts OR React Button */}
       <button
         onClick={handleClick}
         className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-muted transition-colors cursor-pointer"
-        title={`${totalReactions} reaction${totalReactions === 1 ? '' : 's'}`}
-        aria-label={`View ${totalReactions} reactions`}
+        title={
+          totalReactions > 0
+            ? `${totalReactions} reaction${totalReactions === 1 ? '' : 's'}`
+            : 'Add reaction'
+        }
+        aria-label={totalReactions > 0 ? `View ${totalReactions} reactions` : 'Add reaction'}
       >
-        {/* Show top 3 reaction types */}
-        <div className="flex -space-x-1">
-          {reactionsWithCounts.slice(0, 3).map(([type]) => (
-            <span
-              key={type}
-              className="inline-block w-5 h-5 rounded-full bg-surface border border-muted text-xs leading-5 text-center"
-              title={REACTION_LABELS[type]}
-            >
-              {REACTION_EMOJIS[type]}
-            </span>
-          ))}
-        </div>
+        {totalReactions > 0 ? (
+          <>
+            {/* Show top 3 reaction types */}
+            <div className="flex -space-x-1">
+              {reactionsWithCounts.slice(0, 3).map(([type]) => (
+                <span
+                  key={type}
+                  className="inline-block w-6 h-6 rounded-full bg-surface border border-muted text-sm leading-6 text-center"
+                  title={REACTION_LABELS[type]}
+                >
+                  {REACTION_EMOJIS[type]}
+                </span>
+              ))}
+            </div>
 
-        {/* Total count */}
-        <span className="text-sm text-tertiary ml-1">{totalReactions}</span>
+            {/* Total count */}
+            <span className="text-sm text-tertiary ml-1">{totalReactions}</span>
+          </>
+        ) : (
+          <>
+            {/* React button when no reactions */}
+            <span className="text-base">😊</span>
+            <span className="text-sm text-tertiary">React</span>
+          </>
+        )}
       </button>
+
+      {/* Reaction Picker */}
+      {showReactionPicker && onReactionSelect && (
+        <>
+          {/* Backdrop */}
+          <div className="fixed inset-0 z-10" onClick={() => setShowReactionPicker(false)} />
+
+          {/* Picker Panel */}
+          <div className="absolute top-full left-0 mt-2 z-50 bg-surface border border-muted rounded-lg shadow-xl p-1 min-w-max">
+            <div className="flex gap-1">
+              {(Object.entries(REACTION_EMOJIS) as [ReactionType, string][]).map(
+                ([type, emoji]) => (
+                  <button
+                    key={type}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleReactionSelect(type);
+                    }}
+                    className={`
+                      flex flex-col items-center p-1.5 rounded-md min-w-[36px] transition-all
+                      hover:bg-muted hover:scale-105
+                      ${userReaction === type ? 'bg-primary/10 ring-1 ring-primary' : ''}
+                    `}
+                    title={REACTION_LABELS[type]}
+                    aria-label={`React with ${REACTION_LABELS[type]}`}
+                  >
+                    <span className="text-base">{emoji}</span>
+                    <span className="text-xs text-tertiary mt-0.5">{type.slice(0, 3)}</span>
+                  </button>
+                ),
+              )}
+            </div>
+          </div>
+        </>
+      )}
 
       {/* User's reaction indicator */}
       {userReaction && (

@@ -1,20 +1,30 @@
 import { useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { TimelineProvider } from '../contexts/TimelineContext';
-import { TimelineWithPosts } from '../components/timeline/TimelineWithPosts';
-import { TrendingHashtags } from '../components/posts/TrendingHashtags';
-import { TimelineSearch } from '../components/timeline/TimelineSearch';
-import { TimelineFilters, type TimelineFilter } from '../components/timeline/TimelineFilters';
-import { TrendingContent } from '../components/timeline/TrendingContent';
-import { ActivitySummary } from '../components/timeline/ActivitySummary';
-import { NotificationWidget } from '../components/timeline/NotificationWidget';
-import { BookmarkSystem } from '../components/timeline/BookmarkSystem';
+import {
+  TimelineWithPosts,
+  TimelineSearch,
+  TimelineFilters,
+  type TimelineFilter,
+  ContentModal,
+} from '../components/timeline/core';
+import { TrendingHashtags } from '../components/posts/feeds';
+import {
+  TrendingContent,
+  ActivitySummary,
+  NotificationWidget,
+  BookmarkSystem,
+} from '../components/timeline/widgets';
+import { convertArticleToFeedItem, type UnifiedFeedItem } from '../utils/feedAdapter';
 import { useAuth } from '../contexts/AuthContext';
 import { timelineApi } from '../api/timeline';
+import type { TimelineItem } from '@ems/types';
 
 export default function Timeline() {
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedContent, setSelectedContent] = useState<UnifiedFeedItem | null>(null);
+  const [showUnifiedModal, setShowUnifiedModal] = useState(false);
   const [filters, setFilters] = useState<TimelineFilter>({
     dateRange: { start: null, end: null, preset: 'all' },
     contentType: ['all'],
@@ -51,9 +61,47 @@ export default function Timeline() {
 
   // Handle search suggestion clicks
   const handleSuggestionClick = useCallback(async (suggestion: any) => {
-    // For now, just perform a regular search for all suggestion types
-    // until we properly implement article ID mapping from suggestions
-    setSearchQuery(suggestion.title);
+    if (suggestion.type === 'article' && suggestion.id) {
+      try {
+        // Extract article ID from suggestion (assuming format 'article-123' or just '123')
+        const articleId = parseInt(suggestion.id.toString().replace('article-', ''));
+
+        if (!isNaN(articleId)) {
+          // Fetch full article details using existing API
+          const articleData = await timelineApi.getArticleDetails(articleId);
+
+          // Convert to TimelineItem format for ArticleDrawer
+          const timelineItem: TimelineItem = {
+            id: `article-${articleId}`,
+            type: 'article',
+            timestamp: articleData.publishedAt || new Date().toISOString(),
+            content: {
+              title: articleData.title,
+              excerpt: articleData.excerpt || undefined,
+              author: articleData.feed?.name || 'Unknown Source',
+              imageUrl: articleData.leadImageUrl || undefined,
+              url: articleData.url,
+            },
+            engagement: {
+              reactions: articleData.reactions || 0,
+              comments: articleData.comments || 0,
+            },
+            tags: articleData.tags || [],
+          };
+
+          // Convert to UnifiedFeedItem and open ContentModal
+          const unifiedItem = convertArticleToFeedItem(timelineItem);
+          setSelectedContent(unifiedItem);
+          setShowUnifiedModal(true);
+          return;
+        }
+      } catch (error) {
+        console.error('Failed to load article from suggestion:', error);
+      }
+    }
+
+    // Fallback: just perform a search for all other types or if article loading fails
+    setSearchQuery(suggestion.title || suggestion.value || suggestion);
   }, []);
 
   // Handle filter changes
@@ -201,6 +249,18 @@ export default function Timeline() {
           </div>
         </div>
       </TimelineProvider>
+
+      {/* Unified Content Modal for search suggestions */}
+      {showUnifiedModal && selectedContent && (
+        <ContentModal
+          content={selectedContent}
+          isOpen={showUnifiedModal}
+          onClose={() => {
+            setShowUnifiedModal(false);
+            setSelectedContent(null);
+          }}
+        />
+      )}
     </div>
   );
 }

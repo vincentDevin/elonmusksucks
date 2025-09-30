@@ -10,6 +10,7 @@ import { ParlayProvider } from './contexts/ParlayContext';
 import { ChatProvider } from './contexts/ChatContext';
 import { ActivityProvider } from './contexts/ActivityContext';
 import { AchievementProvider } from './contexts/AchievementContext';
+import { ReactionProvider } from './contexts/ReactionContext';
 import AppRoutes from './routes/AppRoutes';
 import { useAuth } from './contexts/AuthContext';
 import PongEloNotification from './components/pong/PongEloNotification';
@@ -39,20 +40,21 @@ function AppContent() {
           {/* domain state that depends on socket/auth */}
           <ActivityProvider>
             <AchievementProvider>
-              <PredictionProvider>
-                <ParlayProvider>
-                  <ChatProvider>
-                    {/* Hydration marker to enable safe event processing */}
-                    <HydrationMarker />
-                    {/* Central event handlers for all 73+ Redis channels */}
-                    <EventHandlers />
-                    <AppRoutes />
-                    {/* Global Pong Elo notifications */}
-                    <PongEloNotification />
-                    {/* Global Achievement celebrations */}
-                    <AchievementCelebrationContainer />
-                    {/* Development tools - only in development */}
-                    {/* 
+              <ReactionProvider>
+                <PredictionProvider>
+                  <ParlayProvider>
+                    <ChatProvider>
+                      {/* Hydration marker to enable safe event processing */}
+                      <HydrationMarker />
+                      {/* Central event handlers for all 73+ Redis channels */}
+                      <EventHandlers />
+                      <AppRoutes />
+                      {/* Global Pong Elo notifications */}
+                      <PongEloNotification />
+                      {/* Global Achievement celebrations */}
+                      <AchievementCelebrationContainer />
+                      {/* Development tools - only in development */}
+                      {/* 
                     {(import.meta.env.DEV || process.env.NODE_ENV === 'development') && (
                       <>
                         <ListenerMonitor />
@@ -62,9 +64,10 @@ function AppContent() {
                       </>
                     )}
                     */}
-                  </ChatProvider>
-                </ParlayProvider>
-              </PredictionProvider>
+                    </ChatProvider>
+                  </ParlayProvider>
+                </PredictionProvider>
+              </ReactionProvider>
             </AchievementProvider>
           </ActivityProvider>
         </UnifiedThemeProvider>

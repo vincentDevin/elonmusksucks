@@ -9,8 +9,8 @@ import {
   DocumentTextIcon,
   ChatBubbleLeftRightIcon,
 } from '@heroicons/react/24/outline';
-import { useDebounce } from '../../hooks/useDebounce';
-import { timelineApi } from '../../api/timeline';
+import { useDebounce } from '../../../hooks/useDebounce';
+import { timelineApi } from '../../../api/timeline';
 
 interface SearchSuggestion {
   id: string;

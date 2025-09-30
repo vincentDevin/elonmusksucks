@@ -365,17 +365,55 @@ export class PostRepository implements IPostRepository {
       limit?: number;
     } = {},
   ): Promise<{ comments: UserPost[]; nextCursor?: number }> {
-    const limit = options.limit ?? 20;
+    const limit = options.limit ?? 50; // Increase limit since we're getting entire thread
 
-    const comments = await this.prisma.userPost.findMany({
+    // Use raw SQL to get all comments in the thread using recursive CTE
+    const comments = await this.prisma.$queryRaw<
+      (UserPost & {
+        author: {
+          id: number;
+          name: string;
+          avatarUrl: string | null;
+          profilePictureKey: string | null;
+        };
+        reactions: any[];
+        _count: { children: number; reactions: number };
+      })[]
+    >`
+      WITH RECURSIVE comment_tree AS (
+        -- Base case: Direct comments on the post
+        SELECT
+          up.*,
+          0 as depth_level
+        FROM "UserPost" up
+        WHERE up."parentId" = ${postId}
+          AND up."isDeleted" = false
+
+        UNION ALL
+
+        -- Recursive case: Replies to comments
+        SELECT
+          up.*,
+          ct.depth_level + 1
+        FROM "UserPost" up
+        INNER JOIN comment_tree ct ON up."parentId" = ct.id
+        WHERE up."isDeleted" = false
+          AND ct.depth_level < 10  -- Prevent infinite recursion
+      )
+      SELECT
+        ct.*
+      FROM comment_tree ct
+      ORDER BY ct."createdAt" DESC
+      LIMIT ${limit + 1}
+    `;
+
+    // Now fetch the related data for each comment
+    const commentIds = comments.map((c) => c.id);
+
+    const commentsWithIncludes = await this.prisma.userPost.findMany({
       where: {
-        parentId: postId,
-        isDeleted: false,
+        id: { in: commentIds },
       },
-      orderBy: { createdAt: 'desc' },
-      take: limit + 1,
-      cursor: options.cursor ? { id: options.cursor } : undefined,
-      skip: options.cursor ? 1 : 0,
       include: {
         author: {
           select: {
@@ -393,10 +431,11 @@ export class PostRepository implements IPostRepository {
           },
         },
       },
+      orderBy: { createdAt: 'desc' },
     });
 
-    const hasMore = comments.length > limit;
-    const resultComments = hasMore ? comments.slice(0, -1) : comments;
+    const hasMore = commentsWithIncludes.length > limit;
+    const resultComments = hasMore ? commentsWithIncludes.slice(0, -1) : commentsWithIncludes;
     const nextCursor = hasMore ? resultComments[resultComments.length - 1]?.id : undefined;
 
     return { comments: resultComments, nextCursor };

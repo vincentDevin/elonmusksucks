@@ -155,7 +155,12 @@ export default function GenericFeed<T extends FeedItem>({
         if (reset) {
           setItems(response.items);
         } else {
-          setItems((prev) => [...prev, ...response.items]);
+          // Deduplicate items to prevent duplicate keys
+          setItems((prev) => {
+            const existingIds = new Set(prev.map((item) => item.id));
+            const newItems = response.items.filter((item) => !existingIds.has(item.id));
+            return [...prev, ...newItems];
+          });
         }
 
         setHasMore(response.pagination.hasMore);

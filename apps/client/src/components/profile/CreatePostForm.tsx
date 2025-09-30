@@ -1,7 +1,6 @@
 import React, { useState, useRef } from 'react';
 import type { PostVisibility, PostContentType } from '@ems/types';
-import { PrivacySelector, VisibilityIndicator } from '../posts/PrivacySelector';
-import { MentionAutocomplete } from '../posts/MentionAutocomplete';
+import { PrivacySelector, VisibilityIndicator, MentionAutocomplete } from '../posts/creation';
 
 type CreatePostFormProps = {
   onSubmit: (

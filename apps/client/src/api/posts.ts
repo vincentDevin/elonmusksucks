@@ -128,3 +128,46 @@ export async function sharePost(
   );
   return response.data;
 }
+
+/**
+ * Toggle reaction on a post or comment
+ */
+export async function togglePostReaction(
+  postId: number,
+  type: string,
+): Promise<{
+  action: 'added' | 'removed';
+  type: string;
+  counts: Record<string, number>;
+}> {
+  const response = await api.post<{
+    action: 'added' | 'removed';
+    type: string;
+    counts: Record<string, number>;
+  }>(`/api/posts/${postId}/reactions`, { type });
+  return response.data;
+}
+
+/**
+ * Get reactions for a post or comment
+ */
+export async function getPostReactions(postId: number): Promise<{
+  reactions: Record<string, Array<{ id: number; user: any; createdAt: string }>>;
+  total: number;
+}> {
+  const response = await api.get<{
+    reactions: Record<string, Array<{ id: number; user: any; createdAt: string }>>;
+    total: number;
+  }>(`/api/posts/${postId}/reactions`);
+  return response.data;
+}
+
+/**
+ * Create a reply to a comment (same as createComment but with different parentId)
+ */
+export async function createReply(parentCommentId: number, content: string): Promise<UserFeedPost> {
+  const response = await api.post<UserFeedPost>(`/api/posts/${parentCommentId}/comments`, {
+    content,
+  });
+  return response.data;
+}

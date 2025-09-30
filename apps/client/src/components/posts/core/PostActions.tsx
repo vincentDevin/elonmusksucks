@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { sharePost } from '../../api/posts';
-import { useAuth } from '../../contexts/AuthContext';
+import { sharePost } from '../../../api/posts';
+import { useAuth } from '../../../contexts/AuthContext';
 import type { UserFeedPost } from '@ems/types';
 
 interface PostActionsProps {

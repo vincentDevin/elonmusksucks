@@ -2,9 +2,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { TimelineItem, PredictionView } from '@ems/types';
-import { getPredictions } from '../../api/predictions';
-import { useAuth } from '../../contexts/AuthContext';
-import BaseModal from '../BaseModal';
+import { getPredictions } from '../../../api/predictions';
+import { useAuth } from '../../../contexts/AuthContext';
+import BaseModal from '../../BaseModal';
 
 interface UseAsSourceModalProps {
   item: TimelineItem | null;

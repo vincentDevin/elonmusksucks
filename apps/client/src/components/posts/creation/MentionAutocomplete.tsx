@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { searchUsers } from '../../api/users';
+import { searchUsers } from '../../../api/users';
 
 interface User {
   id: number;

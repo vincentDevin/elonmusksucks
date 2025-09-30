@@ -1,11 +1,11 @@
 import React, { useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import api from '../../api/axios';
+import api from '../../../api/axios';
 import type { UserFeedPost } from '@ems/types';
-import { PostCard } from './PostCard';
+import { PostCard } from '../core';
 import { TrendingHashtags } from './TrendingHashtags';
-import GenericFeed from '../GenericFeed';
-import type { FeedResponse } from '../GenericFeed';
+import GenericFeed from '../../GenericFeed';
+import type { FeedResponse } from '../../GenericFeed';
 
 interface HashtagFeedResponse {
   posts: UserFeedPost[];

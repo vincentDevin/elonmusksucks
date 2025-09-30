@@ -1,9 +1,10 @@
 // apps/client/src/components/timeline/ArticleCard.tsx
 // Migrated to use BaseCard for consistent styling and behavior
-import React, { useState } from 'react';
-import type { TimelineItem } from '@ems/types';
-import { timelineApi } from '../../api/timeline';
-import { ArticleCard as BaseArticleCard } from '../BaseCard';
+import React, { useState, useEffect } from 'react';
+import type { TimelineItem, ReactionType } from '@ems/types';
+import { ArticleCard as BaseArticleCard } from '../../BaseCard';
+import { PostReactions } from '../../posts/core/PostReactions';
+import { useReactions } from '../../../contexts/ReactionContext';
 
 interface ArticleCardProps {
   item: TimelineItem;
@@ -29,36 +30,25 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({
   onViewDetails,
   className = '',
 }) => {
-  const [reactionCounts, setReactionCounts] = useState({
-    reactions: item.engagement?.reactions || 0,
-    comments: item.engagement?.comments || 0,
-  });
-  const [isLiking, setIsLiking] = useState(false);
-  const [userLiked, setUserLiked] = useState(false); // Note: User reaction state managed locally
+  const { getReactionState, toggleReaction, initializeReactions } = useReactions();
+  const [commentsCount, setCommentsCount] = useState(item.engagement?.comments || 0);
+
+  // Initialize reactions on mount
+  useEffect(() => {
+    const articleId = parseInt(item.id.replace('article-', ''));
+    initializeReactions('article', articleId);
+  }, [item.id, initializeReactions]);
+
+  // Get current reaction state from context
+  const articleId = parseInt(item.id.replace('article-', ''));
+  const { reactionCounts, userReaction, isReacting } = getReactionState('article', articleId);
 
   const handleViewDetails = () => {
     onViewDetails?.(item);
   };
 
-  const handleLike = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (isLiking) return;
-
-    try {
-      setIsLiking(true);
-      const articleId = parseInt(item.id.replace('article-', ''));
-      const result = await timelineApi.toggleReaction(articleId, 'like');
-
-      setReactionCounts(result.counts);
-      setUserLiked(result.action === 'added');
-    } catch (error) {
-      console.error('Failed to toggle like:', error);
-      // Could show a toast notification here
-    } finally {
-      setIsLiking(false);
-    }
+  const handleReaction = async (type: ReactionType) => {
+    await toggleReaction('article', articleId, type);
   };
 
   const formatTimeAgo = (timestamp: string) => {
@@ -129,26 +119,25 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({
       )}
 
       {/* Engagement */}
-      <div className="flex items-center space-x-4 text-sm mb-3">
-        <button
-          onClick={handleLike}
-          disabled={isLiking}
-          className={`flex items-center space-x-1 transition-colors ${
-            userLiked ? 'text-primary hover:text-primary/80' : 'text-content/60 hover:text-primary'
-          } ${isLiking ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-        >
-          <span className={`transition-transform ${isLiking ? 'scale-110' : ''}`}>
-            {userLiked ? '❤️' : '🤍'}
-          </span>
-          <span>{reactionCounts.reactions}</span>
-        </button>
-        <button
-          onClick={handleViewDetails}
-          className="flex items-center space-x-1 text-content/60 hover:text-primary transition-colors cursor-pointer"
-        >
-          <span>💬</span>
-          <span>{reactionCounts.comments}</span>
-        </button>
+      <div className="flex items-center justify-between text-sm">
+        <div className="flex items-center space-x-4">
+          {/* Reactions - Always show PostReactions component */}
+          <PostReactions
+            counts={reactionCounts}
+            userReaction={userReaction}
+            postId={parseInt(item.id.replace('article-', ''))}
+            onReactionSelect={handleReaction}
+          />
+
+          {/* Comments */}
+          <button
+            onClick={handleViewDetails}
+            className="flex items-center space-x-1.5 text-tertiary hover:text-primary transition-colors hover:bg-muted/30 px-2 py-1 rounded-lg cursor-pointer"
+          >
+            <span className="text-base">💬</span>
+            <span className="font-medium">{commentsCount}</span>
+          </button>
+        </div>
       </div>
 
       {/* Related prediction links section */}

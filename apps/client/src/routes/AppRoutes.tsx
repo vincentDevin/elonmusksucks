@@ -20,7 +20,7 @@ const Profile = lazy(() => import('../pages/Profile'));
 const AdminDashboard = lazy(() => import('../pages/AdminDashboard'));
 const Pong = lazy(() => import('../pages/Pong'));
 
-import HashtagFeed from '../components/posts/HashtagFeed';
+import { HashtagFeed } from '../components/posts/feeds';
 
 // Redirect to public site component
 const PublicSiteRedirect = () => {

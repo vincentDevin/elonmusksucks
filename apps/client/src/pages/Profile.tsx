@@ -28,7 +28,6 @@ export default function Profile() {
     formData,
     setFormData,
     refresh: reloadProfile,
-    feed,
     stats,
     saveProfile, // from hook
     postToFeed,
@@ -187,7 +186,7 @@ export default function Profile() {
               </p>
             )}
 
-            <ProfileFeed feed={feed} loading={loading} onSubmit={handlePost} />
+            <ProfileFeed userId={numericId} includeReplies={true} />
           </>
         )}
       </div>

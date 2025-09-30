@@ -188,8 +188,8 @@ export const toggleArticleReaction = async (req: AuthRequest, res: Response) => 
       return;
     }
 
-    // Validate reaction type
-    const validTypes = ['like', 'dislike', 'love', 'laugh', 'angry'] as const;
+    // Validate reaction type - use same types as posts
+    const validTypes = ['LIKE', 'LOVE', 'LAUGH', 'WOW', 'SAD', 'ANGRY'] as const;
     if (!validTypes.includes(type as (typeof validTypes)[number])) {
       res.status(400).json({ error: 'Invalid reaction type' });
       return;
