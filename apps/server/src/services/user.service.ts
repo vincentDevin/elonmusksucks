@@ -4,9 +4,9 @@ import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { IUserRepository } from '../repositories/interfaces/IUserRepository';
 import { UserRepository } from '../repositories/UserRepository';
-import type { DbUser, DbUserBadge, DbBadge, DbUserStats, DbUserPost } from '@ems/types';
+import type { DbUser, DbUserBadge, DbBadge, DbUserStats, DbUserFeedContent } from '@ems/types';
 // TODO: Branded types available: UserId, PredictionId, ISODateString, TimestampMs
-import type { PublicUserProfile, UserFeedPost, UserStatsDTO } from '@ems/types';
+import type { UserProfileView, UserStatsView } from '@ems/types';
 import { unifiedActivityService } from './unifiedActivity.service';
 import { ImageProcessingService, ProcessedImageSizes } from './imageProcessing.service';
 import { DeleteObjectCommand } from '@aws-sdk/client-s3';
@@ -225,7 +225,7 @@ export class UserService {
   }
 
   // --- PROFILE (with signed URL fallback) ---
-  async getUserProfile(userId: number, viewerId?: number): Promise<PublicUserProfile> {
+  async getUserProfile(userId: number, viewerId?: number): Promise<UserProfileView> {
     const user = await this.repo.findById(userId);
     if (!user) throw new Error('User not found');
 
@@ -276,27 +276,16 @@ export class UserService {
         awardedAt: typeof ub.awardedAt === 'string' ? ub.awardedAt : ub.awardedAt.toISOString(),
       })),
       achievements: userAchievements.map((ua: any) => ({
-        id: ua.achievement.id,
-        name: ua.achievement.name,
+        id: ua.achievement.id.toString(),
         title: ua.achievement.title || ua.achievement.name,
         description: ua.achievement.description,
-        category: ua.achievement.category || 'general',
-        rarity: ua.achievement.rarity || 'common',
-        iconUrl: ua.achievement.iconUrl || null,
-        completedAt: ua.completedAt
-          ? typeof ua.completedAt === 'string'
-            ? ua.completedAt
-            : ua.completedAt.toISOString()
-          : null,
-        awardedAt: ua.completedAt
-          ? typeof ua.completedAt === 'string'
-            ? ua.completedAt
-            : ua.completedAt.toISOString()
-          : null,
+        isUnlocked: ua.completedAt !== null,
       })),
       followersCount,
       followingCount,
       isFollowing,
+      createdAt: typeof user.createdAt === 'string' ? user.createdAt : user.createdAt.toISOString(),
+      updatedAt: typeof user.createdAt === 'string' ? user.createdAt : user.createdAt.toISOString(),
     };
   }
   async followUser(followerId: number, followingId: number): Promise<void> {
@@ -322,7 +311,7 @@ export class UserService {
         | 'profileComplete'
       >
     >,
-  ): Promise<PublicUserProfile> {
+  ): Promise<UserProfileView> {
     await this.repo.updateProfile(userId, data);
     return this.getUserProfile(userId, userId);
   }
@@ -370,11 +359,11 @@ export class UserService {
     return Promise.all(users.map((user) => this.enrichUserWithAvatar(user)));
   }
 
-  async getUserFeed(userId: number, viewerId?: number): Promise<UserFeedPost[]> {
+  async getUserFeed(userId: number, viewerId?: number): Promise<DbUserFeedContent[]> {
     const user = await this.repo.findById(userId);
     if (!user) throw new Error('User not found');
     if (user.feedPrivate && user.id !== viewerId) throw new Error('Feed is private');
-    const posts: DbUserPost[] = await this.repo.getUserFeed(userId); // no { parentId: null }
+    const posts: DbUserFeedContent[] = await this.repo.getUserFeed(userId); // no { parentId: null }
 
     // Enrich posts with author avatar URLs
     const enrichedPosts = await Promise.all(
@@ -393,7 +382,7 @@ export class UserService {
       }),
     );
 
-    return enrichedPosts.map(toFeedPostDTO);
+    return enrichedPosts;
   }
 
   async createUserPost(
@@ -401,7 +390,7 @@ export class UserService {
     content: string,
     parentId?: number | null,
     _profileOwnerId?: number, // Legacy parameter for backward compatibility
-  ): Promise<UserFeedPost> {
+  ): Promise<DbUserFeedContent> {
     // Use repository directly to avoid circular dependency
     const post = await this.repo.createUserPost({
       authorId,
@@ -426,18 +415,13 @@ export class UserService {
       );
     }
 
-    // Convert to UserFeedPost format with enriched avatar
-    const enrichedPost = {
-      ...post,
-      authorAvatar: author?.avatarUrl || null,
-    };
-
-    return toFeedPostDTO(enrichedPost);
+    // Repository already returns DbUserFeedContent with author included
+    return post;
   }
 
   async getUserPostThread(
     postId: number,
-  ): Promise<(UserFeedPost & { children: UserFeedPost[] }) | null> {
+  ): Promise<(DbUserFeedContent & { children: DbUserFeedContent[] }) | null> {
     const thread = await this.repo.getUserPostThread(postId);
     if (!thread) return null;
 
@@ -466,17 +450,14 @@ export class UserService {
 
     const enrichedThread = await enrichThread(thread);
 
-    return {
-      ...toFeedPostDTO(enrichedThread),
-      children: (enrichedThread.children ?? []).map(toFeedPostDTO),
-    };
+    return enrichedThread;
   }
 
   // --- ACTIVITY (Legacy methods removed - use unifiedActivityService instead) ---
 
   // --- STATS ---
 
-  async getUserStats(userId: number): Promise<UserStatsDTO | null> {
+  async getUserStats(userId: number): Promise<UserStatsView | null> {
     const stats = await this.repo.getUserStats(userId);
     if (!stats) return null;
     return {
@@ -744,66 +725,3 @@ export class UserService {
     return this.repo.getUserFollowing(userId, params);
   }
 }
-
-// --- Helpers: always map DB types to DTOs used on frontend ---
-
-function calculateReactionCounts(reactions: any[]): Record<any, number> {
-  const counts: Record<any, number> = {
-    LIKE: 0,
-    LOVE: 0,
-    LAUGH: 0,
-    WOW: 0,
-    SAD: 0,
-    ANGRY: 0,
-  };
-
-  reactions.forEach((reaction: any) => {
-    if (reaction.type && reaction.type in counts) {
-      counts[reaction.type]++;
-    }
-  });
-
-  return counts;
-}
-
-function toFeedPostDTO(
-  post: DbUserPost & {
-    children?: DbUserPost[];
-    authorName?: string;
-    authorAvatar?: string | null;
-    reactions?: any[];
-  },
-): UserFeedPost {
-  return {
-    id: post.id,
-    authorId: post.authorId,
-    content: post.content,
-    contentType: post.contentType,
-    visibility: post.visibility,
-    parentId: post.parentId,
-    threadDepth: post.threadDepth,
-    likesCount: post.likesCount,
-    commentsCount: post.commentsCount,
-    sharesCount: post.sharesCount,
-    viewsCount: post.viewsCount.toString(),
-    reactionCounts: calculateReactionCounts(post.reactions || []),
-    userReaction: undefined, // TODO: Pass viewerId to calculate user reaction
-    isDeleted: post.isDeleted,
-    isFlagged: post.isFlagged,
-    createdAt: post.createdAt instanceof Date ? post.createdAt.toISOString() : post.createdAt,
-    updatedAt: post.updatedAt instanceof Date ? post.updatedAt.toISOString() : post.updatedAt,
-    editedAt: post.editedAt
-      ? post.editedAt instanceof Date
-        ? post.editedAt.toISOString()
-        : post.editedAt
-      : undefined,
-    children: post.children ? post.children.map(toFeedPostDTO) : undefined,
-    authorName: post.authorName,
-    authorAvatar: post.authorAvatar || undefined,
-  };
-}
-
-// Legacy ticker publishing removed - now handled by unified activity system
-// const TICKER_CHANNEL = 'activity:newsflash';
-// const TICKER_LIST = 'activity:ticker';
-// const TICKER_MAX = 100;

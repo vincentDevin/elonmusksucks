@@ -1,21 +1,18 @@
 // Shame Wall Service
 // Manages banned users and shame achievements
 
-import { PrismaClient, BanType } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import { adminAchievementService } from './achievements/adminAchievement.service';
 import { UserRepository } from '../repositories/UserRepository';
 import { ModerationRepository } from '../repositories/ModerationRepository';
 import { AchievementRepository } from '../repositories/AchievementRepository';
 import type { IAchievementRepository } from '../repositories/interfaces/IAchievementRepository';
-import type { BanRequest } from '@ems/types';
+import type { BanUserRequest, BanType } from '@ems/types';
 
 const prisma = new PrismaClient();
 const userRepository = new UserRepository();
 const moderationRepository = new ModerationRepository(prisma);
 const achievementRepository = new AchievementRepository(prisma);
-
-// TEMP: Re-export for backwards compatibility during migration
-export type { BanRequest } from '@ems/types';
 
 export interface ShameWallEntry {
   userId: number;
@@ -38,7 +35,7 @@ export interface BanHistory {
   id: number;
   userId: number;
   userName: string;
-  banType: BanType;
+  banType: BanType; // Using @ems/types BanType (lowercase values)
   reason: string;
   startDate: string;
   endDate?: string;
@@ -53,7 +50,7 @@ class ShameWallService {
   /**
    * Issue a ban and award appropriate shame achievements
    */
-  async issueBan(request: BanRequest): Promise<BanHistory> {
+  async issueBan(request: BanUserRequest): Promise<BanHistory> {
     const { userId, reason, durationDays, moderatorId } = request;
 
     const user = await userRepository.findUserBasicById(userId);
@@ -69,7 +66,7 @@ class ShameWallService {
     }
 
     const isPermanent = !durationDays;
-    const banType = isPermanent ? BanType.PERMANENT : BanType.TEMPORARY;
+    const banType: BanType = isPermanent ? 'permanent' : 'temporary';
     const expiresAt = isPermanent
       ? null
       : new Date(Date.now() + durationDays! * 24 * 60 * 60 * 1000);
@@ -223,6 +220,7 @@ class ShameWallService {
     const history = await moderationRepository.getBanHistoryWithModerator(limit);
     return history.map((ban) => ({
       ...ban,
+      banType: ban.banType.toLowerCase() as BanType, // Convert Prisma's uppercase to lowercase
       endDate: ban.endDate || undefined,
       shameAchievementsAwarded: [], // Would need to track this separately
     }));

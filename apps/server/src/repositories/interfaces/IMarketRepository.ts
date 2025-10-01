@@ -6,7 +6,7 @@ export interface IMarketRepository {
     Array<{
       id: number;
       title: string;
-      category: string;
+      category: string | null;
       betCount: number;
       expiresAt: Date;
     }>

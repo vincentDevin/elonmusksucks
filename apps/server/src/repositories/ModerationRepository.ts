@@ -1,5 +1,5 @@
 // apps/server/src/repositories/ModerationRepository.ts
-import { PrismaClient, BanType } from '@prisma/client';
+import { PrismaClient, BanType as PrismaBanType } from '@prisma/client';
 import type {
   IModerationRepository,
   CreateBanData,
@@ -7,15 +7,21 @@ import type {
   BanWithUser,
   ModerationLogWithUsers,
 } from './interfaces/IModerationRepository';
-import type { UserBan, ModerationLog, User, Message, UserPost } from '@prisma/client';
+import type { UserBan, ModerationLog, User, Message, Content } from '@prisma/client';
 
 export class ModerationRepository implements IModerationRepository {
   constructor(private prisma: PrismaClient) {}
 
   async createBan(data: CreateBanData): Promise<UserBan> {
+    // Convert lowercase banType to uppercase for Prisma enum
+    const prismaBanType = data.banType.toUpperCase() as PrismaBanType;
+
     return this.prisma.userBan.create({
       data: {
-        ...data,
+        userId: data.userId,
+        banType: prismaBanType,
+        reason: data.reason,
+        expiresAt: data.expiresAt,
         isActive: data.isActive !== undefined ? data.isActive : true,
       },
     });
@@ -125,8 +131,9 @@ export class ModerationRepository implements IModerationRepository {
 
   async deletePost(postId: number): Promise<boolean> {
     try {
-      await this.prisma.userPost.delete({
+      await this.prisma.content.update({
         where: { id: postId },
+        data: { isDeleted: true },
       });
       return true;
     } catch {
@@ -134,8 +141,8 @@ export class ModerationRepository implements IModerationRepository {
     }
   }
 
-  async getPost(postId: number): Promise<UserPost | null> {
-    return this.prisma.userPost.findUnique({
+  async getPost(postId: number): Promise<Content | null> {
+    return this.prisma.content.findUnique({
       where: { id: postId },
     });
   }
@@ -204,7 +211,7 @@ export class ModerationRepository implements IModerationRepository {
       id: number;
       userId: number;
       userName: string;
-      banType: BanType;
+      banType: PrismaBanType;
       reason: string;
       startDate: string;
       endDate: string | null;

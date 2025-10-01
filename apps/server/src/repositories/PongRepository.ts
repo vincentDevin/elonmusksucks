@@ -21,26 +21,33 @@ export class PongRepository implements IPongRepository {
   }
 
   async createStats(data: Partial<PongStatsData>): Promise<PongStatsData> {
+    const { id, eloHistory, createdAt, updatedAt, ...createData } = data;
     const stats = await prisma.pongStats.create({
       data: {
         userId: data.userId!,
         eloRating: data.eloRating || 1200,
         peakElo: data.peakElo || 1200,
         tier: data.tier || 'SILVER',
-        ...data,
+        ...createData,
+        eloHistory: eloHistory ? (eloHistory as any) : undefined,
       },
     });
     return this.mapPongStats(stats);
   }
 
   async updateStats(userId: number, data: Partial<PongStatsData>): Promise<void> {
+    const { id, eloHistory, createdAt, updatedAt, userId: _userId, ...updateData } = data;
     await prisma.pongStats.update({
       where: { userId },
-      data,
+      data: {
+        ...updateData,
+        eloHistory: eloHistory ? (eloHistory as any) : undefined,
+      },
     });
   }
 
   async upsertStats(userId: number, data: Partial<PongStatsData>): Promise<PongStatsData> {
+    const { id, eloHistory, createdAt, updatedAt, userId: _userId, ...cleanData } = data;
     const stats = await prisma.pongStats.upsert({
       where: { userId },
       create: {
@@ -48,9 +55,13 @@ export class PongRepository implements IPongRepository {
         eloRating: data.eloRating || 1200,
         peakElo: data.peakElo || 1200,
         tier: data.tier || 'SILVER',
-        ...data,
+        ...cleanData,
+        eloHistory: eloHistory ? (eloHistory as any) : undefined,
       },
-      update: data,
+      update: {
+        ...cleanData,
+        eloHistory: eloHistory ? (eloHistory as any) : undefined,
+      },
     });
     return this.mapPongStats(stats);
   }

@@ -5,7 +5,10 @@
 // -----------------------------------------------------------------------------
 
 // TEMP: Re-export shared prediction payload types for backwards compatibility during migration
-export type { CreatePredictionPayload, ResolvePredictionPayload } from '@ems/types';
+export type {
+  CreatePredictionRequest as CreatePredictionPayload,
+  ResolvePredictionRequest as ResolvePredictionPayload,
+} from '@ems/types';
 
 import type {
   DbPrediction,
@@ -86,7 +89,7 @@ export class PredictionService {
   async createPrediction(params: {
     title: string;
     description: string;
-    category: string;
+    categoryId: number; // Changed from category string to categoryId number
     expiresAt: Date;
     creatorId: number;
     options: Array<{ label: string }>;
@@ -109,7 +112,7 @@ export class PredictionService {
       id: pred.id,
       title: pred.title,
       description: pred.description,
-      category: pred.category,
+      categoryId: pred.categoryId,
       expiresAt: pred.expiresAt,
       type: pred.type,
       threshold: pred.threshold ?? null,
@@ -152,7 +155,7 @@ export class PredictionService {
         {
           id: pred.id,
           title: pred.title,
-          category: pred.category,
+          category: pred.category?.name || 'Uncategorized',
         },
       );
 
@@ -169,7 +172,7 @@ export class PredictionService {
           payload: {
             predictionId: pred.id,
             title: pred.title,
-            category: pred.category,
+            category: pred.category?.name || null,
             description: pred.description,
             type: pred.type,
             threshold: pred.threshold,
@@ -251,7 +254,7 @@ export class PredictionService {
         payload: {
           predictionId,
           title: prediction.title,
-          category: prediction.category,
+          category: prediction.category?.name || null,
           isResolved: prediction.resolved,
           userHasBet,
           viewedAt: new Date().toISOString(),
@@ -265,7 +268,7 @@ export class PredictionService {
         metadata: {
           predictionId,
           title: prediction.title?.substring(0, 100),
-          category: prediction.category,
+          category: prediction.category?.name || null,
           isResolved: prediction.resolved,
           userHasBet,
           timestamp: new Date().toISOString(),
@@ -314,7 +317,7 @@ export class PredictionService {
           predictionId,
           betId,
           title: prediction.title,
-          category: prediction.category,
+          category: prediction.category?.name || null,
           achievedAt: new Date().toISOString(),
         },
       });
@@ -369,7 +372,7 @@ export class PredictionService {
           payload: {
             predictionId,
             title: prediction.title,
-            category: prediction.category,
+            category: prediction.category?.name || null,
             createdAt: prediction.createdAt?.toISOString(),
             resolvedAt: new Date().toISOString(),
             timeDifferenceMinutes: timeDifference,
@@ -412,7 +415,7 @@ export class PredictionService {
           payload: {
             predictionId,
             title: prediction.title,
-            category: prediction.category,
+            category: prediction.category?.name || null,
             viewCount,
             betCount,
             viralMetrics: {
@@ -548,8 +551,28 @@ export class PredictionService {
       title: link.title,
       publisher: link.publisher,
       capturedAt: link.capturedAt.toISOString(),
-      type: link.articleId ? 'article' : 'tweet',
-      source: link.article || link.tweet || null,
+      type: link.articleId ? ('article' as const) : ('tweet' as const),
+      source: link.article
+        ? {
+            id: link.article.id,
+            title: link.article.title,
+            url: link.article.url,
+            leadImageUrl: link.article.leadImageUrl,
+            feed: link.article.feed
+              ? {
+                  name: link.article.feed.name,
+                  siteUrl: link.article.feed.siteUrl,
+                }
+              : undefined,
+          }
+        : link.tweetId
+          ? {
+              id: link.tweetId,
+              text: link.title || undefined,
+              url: link.url,
+              permalink: link.url,
+            }
+          : null,
     }));
   }
 
@@ -770,9 +793,10 @@ export class PredictionService {
 
       // Category filter
       if (filters.categories && filters.categories.length > 0) {
-        filteredPredictions = filteredPredictions.filter((pred) =>
-          filters.categories!.includes(pred.category),
-        );
+        filteredPredictions = filteredPredictions.filter((pred) => {
+          const categoryName = pred.category?.name;
+          return categoryName ? filters.categories!.includes(categoryName) : false;
+        });
       }
 
       // Status filter
@@ -823,7 +847,7 @@ export class PredictionService {
           (pred) =>
             pred.title.toLowerCase().includes(searchTerm) ||
             (pred.description && pred.description.toLowerCase().includes(searchTerm)) ||
-            pred.category.toLowerCase().includes(searchTerm),
+            (pred.category?.name && pred.category.name.toLowerCase().includes(searchTerm)),
         );
       }
 
@@ -1143,12 +1167,13 @@ export class PredictionService {
   > {
     try {
       const allPredictions = await this.repo.listAllPredictions();
-      const categoryMap = new Map<string, any>();
+      const categoryMap = new Map<string | null, any>();
 
       for (const prediction of allPredictions) {
-        if (!categoryMap.has(prediction.category)) {
-          categoryMap.set(prediction.category, {
-            category: prediction.category,
+        const categoryKey = prediction.category?.name || null;
+        if (!categoryMap.has(categoryKey)) {
+          categoryMap.set(categoryKey, {
+            category: categoryKey,
             totalPredictions: 0,
             activePredictions: 0,
             totalVolume: 0,
@@ -1157,7 +1182,7 @@ export class PredictionService {
           });
         }
 
-        const stats = categoryMap.get(prediction.category);
+        const stats = categoryMap.get(categoryKey);
         stats.totalPredictions++;
 
         if (!prediction.resolved) {
@@ -1212,7 +1237,7 @@ export class PredictionService {
     topPerformingPredictions: Array<{
       id: number;
       title: string;
-      category: string;
+      category: string | null;
       engagementScore: number;
       viewCount: number;
       betCount: number;
@@ -1257,7 +1282,7 @@ export class PredictionService {
         return {
           id: prediction.id,
           title: prediction.title,
-          category: prediction.category,
+          category: prediction.category?.name || null,
           engagementScore: Math.round(engagementScore),
           viewCount,
           betCount: totalEngagement,
@@ -1427,7 +1452,7 @@ export class PredictionService {
             hotMarkets.push({
               id: prediction.id,
               title: prediction.title,
-              category: prediction.category,
+              category: prediction.category?.name || null,
               hotScore,
               indicators,
               metrics: {
@@ -1533,7 +1558,7 @@ export class PredictionService {
             trending.push({
               id: prediction.id,
               title: prediction.title,
-              category: prediction.category,
+              category: prediction.category?.name || null,
               trendScore,
               change24h: {
                 bets: betChange,
@@ -1559,7 +1584,10 @@ export class PredictionService {
             potentialIndicators.push('Gaining visibility');
             emergingScore += 15;
           }
-          if (prediction.category === 'Technology' || prediction.category === 'Politics') {
+          if (
+            (prediction.category?.name || null) === 'Technology' ||
+            (prediction.category?.name || null) === 'Politics'
+          ) {
             potentialIndicators.push('Hot category');
             emergingScore += 10;
           }
@@ -1572,7 +1600,7 @@ export class PredictionService {
             emerging.push({
               id: prediction.id,
               title: prediction.title,
-              category: prediction.category,
+              category: prediction.category?.name || null,
               emergingScore,
               potentialIndicators,
             });
@@ -1608,7 +1636,7 @@ export class PredictionService {
             cooling.push({
               id: prediction.id,
               title: prediction.title,
-              category: prediction.category,
+              category: prediction.category?.name || null,
               coolingScore,
               reasonsForCooling,
             });
@@ -1640,7 +1668,7 @@ export class PredictionService {
     Array<{
       id: number;
       title: string;
-      category: string;
+      category: string | null;
       difficulty: 'easy' | 'medium' | 'hard' | 'expert';
       recommendationScore: number;
       reasons: string[];
@@ -1695,7 +1723,10 @@ export class PredictionService {
       let candidatePredictions = activePredictions.filter((prediction) => {
         if (excludeViewed && viewedPredictionIds.has(prediction.id)) return false;
         if (excludeBetOn && betPredictionIds.has(prediction.id)) return false;
-        if (options.categories && !options.categories.includes(prediction.category)) return false;
+        if (options.categories) {
+          const categoryName = prediction.category?.name;
+          if (!categoryName || !options.categories.includes(categoryName)) return false;
+        }
         return true;
       });
 
@@ -1711,7 +1742,7 @@ export class PredictionService {
         return {
           id: prediction.id,
           title: prediction.title,
-          category: prediction.category,
+          category: prediction.category?.name || null,
           difficulty,
           ...score,
         };
@@ -1806,14 +1837,15 @@ export class PredictionService {
     let confidence = 0;
 
     // Category preference scoring (0-40 points)
-    const categoryScore = userProfile.categoryPreferences.get(prediction.category) || 0;
+    const categoryScore =
+      userProfile.categoryPreferences.get(prediction.category?.name || null) || 0;
     if (categoryScore > 0) {
       score += Math.min(40, categoryScore * 10);
       confidence += 20;
       if (categoryScore >= 3) {
-        reasons.push(`You often engage with ${prediction.category} predictions`);
+        reasons.push(`You often engage with ${prediction.category?.name || null} predictions`);
       } else {
-        reasons.push(`You've shown interest in ${prediction.category}`);
+        reasons.push(`You've shown interest in ${prediction.category?.name || null}`);
       }
     }
 
@@ -1941,7 +1973,7 @@ export class PredictionService {
     Array<{
       id: number;
       title: string;
-      category: string;
+      category: string | null;
       similarityScore: number;
       similarityReasons: string[];
     }>
@@ -1960,7 +1992,7 @@ export class PredictionService {
           return {
             id: prediction.id,
             title: prediction.title,
-            category: prediction.category,
+            category: prediction.category?.name || null,
             ...similarity,
           };
         })
@@ -1980,9 +2012,9 @@ export class PredictionService {
     const reasons: string[] = [];
 
     // Category match (high weight)
-    if (target.category === candidate.category) {
+    if ((target.category?.name || null) === (candidate.category?.name || null)) {
       score += 40;
-      reasons.push(`Same category: ${target.category}`);
+      reasons.push(`Same category: ${target.category?.name || null}`);
     }
 
     // Difficulty similarity

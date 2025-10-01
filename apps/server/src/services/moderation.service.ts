@@ -2,8 +2,9 @@
 import { PrismaClient } from '@prisma/client';
 import { ModerationRepository } from '../repositories/ModerationRepository';
 import type { IModerationRepository } from '../repositories/interfaces/IModerationRepository';
-import type { BanType, ModerationAction } from '@prisma/client';
+import type { ModerationAction } from '@prisma/client';
 import { REDIS_CHANNELS } from '@ems/types';
+import type { BanType } from '@ems/types';
 import { eventBus } from '../lib/EventBus';
 
 const prisma = new PrismaClient();
@@ -88,7 +89,7 @@ export const moderationService = {
 
     // Calculate expiration for temporary bans
     const expiresAt =
-      banType === 'TEMPORARY' && duration ? new Date(Date.now() + duration * 60 * 1000) : undefined;
+      banType === 'temporary' && duration ? new Date(Date.now() + duration * 60 * 1000) : undefined;
 
     // Create ban
     const ban = await moderationRepo.createBan({
@@ -154,7 +155,7 @@ export const moderationService = {
     // Create temporary ban
     const ban = await moderationRepo.createBan({
       userId,
-      banType: 'TEMPORARY',
+      banType: 'temporary' as BanType,
       reason: `MUTE: ${reason}`,
       expiresAt: new Date(Date.now() + duration * 60 * 1000),
     });
@@ -251,7 +252,7 @@ export const moderationService = {
       moderatorId,
       REDIS_CHANNELS.MODERATION_POST_DELETE,
       post.authorId,
-      { postId, reason, content: post.content },
+      { postId, reason, content: post.body },
       ipAddress,
       userAgent,
     );

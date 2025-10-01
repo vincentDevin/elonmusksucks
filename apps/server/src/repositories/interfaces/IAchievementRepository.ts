@@ -1,28 +1,57 @@
+import type {
+  PrismaAchievement,
+  PrismaUserAchievement,
+  PrismaUser,
+  DbAchievementQueryParams,
+  DbUserAchievementQueryParams,
+  DetailedAchievement,
+  DetailedUserAchievement,
+  CreateAchievementData,
+  UpdateAchievementData,
+  CreateUserAchievementData,
+  UpdateUserAchievementData,
+  BulkCreateUserAchievementData,
+  DbAchievementRule,
+  DbAchievementRuleMetrics,
+  ShameAchievement,
+} from '@ems/types';
+
 export interface IAchievementRepository {
-  findMany(params?: any): Promise<any[]>;
-  findById(id: number): Promise<any | null>;
-  findBySlug(slug: string): Promise<any | null>;
-  findByName(name: string): Promise<any | null>;
-  create(data: any): Promise<any>;
-  update(id: number, data: any): Promise<any>;
+  // Achievement CRUD
+  findMany(params?: DbAchievementQueryParams): Promise<PrismaAchievement[]>;
+  findById(id: number): Promise<DetailedAchievement | null>;
+  findBySlug(slug: string): Promise<PrismaAchievement | null>;
+  findByName(name: string): Promise<PrismaAchievement | null>;
+  create(data: CreateAchievementData): Promise<PrismaAchievement>;
+  update(id: number, data: UpdateAchievementData): Promise<PrismaAchievement>;
   delete(id: number): Promise<void>;
-  findUserAchievements(userId: number): Promise<any[]>;
-  findUserAchievementsByAchievementId(achievementId: number, params?: any): Promise<any[]>;
-  createUserAchievement(data: any): Promise<any>;
-  updateUserAchievement(params: any): Promise<any>;
+
+  // User Achievement CRUD
+  findUserAchievements(userId: number): Promise<DetailedUserAchievement[]>;
+  findUserAchievementsByAchievementId(
+    achievementId: number,
+    params?: DbUserAchievementQueryParams,
+  ): Promise<DetailedUserAchievement[]>;
+  createUserAchievement(data: CreateUserAchievementData): Promise<PrismaUserAchievement>;
+  updateUserAchievement(params: UpdateUserAchievementData): Promise<PrismaUserAchievement>;
+
+  // Bulk Operations
   findAllUserIds(): Promise<{ id: number }[]>;
-  createManyUserAchievements(
-    data: { userId: number; achievementId: number; progress: number }[],
-  ): Promise<void>;
+  createManyUserAchievements(data: BulkCreateUserAchievementData[]): Promise<void>;
   deleteUserAchievementsByAchievementId(achievementId: number): Promise<void>;
-  findUserById(userId: number): Promise<any | null>;
+
+  // User Queries
+  findUserById(userId: number): Promise<PrismaUser | null>;
   findUserAchievementByUserAndAchievementId(
     userId: number,
     achievementId: number,
-  ): Promise<any | null>;
-  findAllAchievements(): Promise<any[]>;
-  findAllUserAchievementsWithDetails(): Promise<any[]>;
-  findRecentUserAchievements(userId: number, limit: number): Promise<any[]>;
+  ): Promise<DetailedUserAchievement | null>;
+
+  // Achievement Lists
+  findAllAchievements(): Promise<PrismaAchievement[]>;
+  findAllUserAchievementsWithDetails(): Promise<DetailedUserAchievement[]>;
+  findRecentUserAchievements(userId: number, limit: number): Promise<DetailedUserAchievement[]>;
+
   // Idempotency methods
   recordEventIdempotency(
     idempotencyKey: string,
@@ -30,25 +59,21 @@ export interface IAchievementRepository {
     eventKey: string,
   ): Promise<boolean>;
   hasProcessedEvent(idempotencyKey: string): Promise<boolean>;
-  findActiveRulesIndexedByEventKey(): Promise<Map<string, any[]>>;
+
+  // Rule Management
+  findActiveRulesIndexedByEventKey(): Promise<Map<string, DbAchievementRule[]>>;
   backfillAchievementRules(): Promise<number>;
-  getShameAchievements(userId: number): Promise<
-    Array<{
-      slug: string;
-      title: string;
-      description: string;
-      completedAt: Date;
-    }>
-  >;
-  findShameAchievementByName(name: string): Promise<any | null>;
+
+  // Shame Achievements
+  getShameAchievements(userId: number): Promise<ShameAchievement[]>;
+  findShameAchievementByName(name: string): Promise<PrismaAchievement | null>;
+
   // Rule complexity tracking methods
   updateRuleComplexityMetrics(
     achievementId: number,
     complexityScore: number,
     performanceScore: number,
   ): Promise<void>;
-  findAchievementsNeedingValidation(): Promise<any[]>;
-  validateAndUpdateRuleMetrics(
-    achievementId: number,
-  ): Promise<{ complexityScore: number; performanceScore: number }>;
+  findAchievementsNeedingValidation(): Promise<PrismaAchievement[]>;
+  validateAndUpdateRuleMetrics(achievementId: number): Promise<DbAchievementRuleMetrics>;
 }

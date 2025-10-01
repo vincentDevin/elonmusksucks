@@ -1,35 +1,36 @@
 import { ReactionRepository } from '../repositories/ReactionRepository';
 import type { IReactionRepository } from '../repositories/interfaces/IReactionRepository';
-import { PostRepository } from '../repositories/PostRepository';
+import { ContentRepository } from '../repositories/ContentRepository';
+import type { IContentRepository } from '../repositories/interfaces/IContentRepository';
 import prisma from '../db';
-import type { PostReaction, ReactionType } from '@ems/types';
+import type { PrismaReaction, PrismaReactionType } from '@ems/types';
 import { NotFoundError, ValidationError } from '../errors';
 
 export class ReactionService {
   private reactionRepository: IReactionRepository;
-  private postRepository: PostRepository;
+  private contentRepository: IContentRepository;
 
   constructor() {
     this.reactionRepository = new ReactionRepository(prisma);
-    this.postRepository = new PostRepository(prisma);
+    this.contentRepository = new ContentRepository();
   }
 
   /**
-   * Add or update a reaction to a post
+   * Add or update a reaction to a post/content
    */
   async addReaction(
-    postId: number,
+    contentId: number,
     userId: number,
-    type: ReactionType,
+    type: PrismaReactionType,
   ): Promise<{
-    reaction: PostReaction;
-    counts: Record<ReactionType, number>;
-    action: 'added' | 'changed';
+    reaction: PrismaReaction | undefined;
+    counts: Record<PrismaReactionType, number>;
+    action: 'added' | 'changed' | 'removed';
   }> {
-    // Validate post exists and user can see it
-    const post = await this.postRepository.getPost(postId, userId);
-    if (!post) {
-      throw new NotFoundError('Post not found');
+    // Validate content exists
+    const content = await this.contentRepository.getContentById(contentId);
+    if (!content) {
+      throw new NotFoundError('Content not found');
     }
 
     // Validate reaction type
@@ -37,80 +38,65 @@ export class ReactionService {
       throw new ValidationError('Invalid reaction type');
     }
 
-    // Check for existing reaction
-    const existingReaction = await this.reactionRepository.getUserReaction(postId, userId);
-
-    let action: 'added' | 'changed';
-    if (existingReaction) {
-      if (existingReaction.type === type) {
-        throw new ValidationError('You have already reacted with this type');
-      }
-      // Remove old reaction first
-      await this.reactionRepository.removeReaction(postId, userId, existingReaction.type);
-      action = 'changed';
-    } else {
-      action = 'added';
-    }
-
-    // Add new reaction
-    const reaction = await this.reactionRepository.addReaction(postId, userId, type);
+    // Use toggle method which handles add/change/remove
+    const result = await this.reactionRepository.toggleContentReaction(contentId, userId, type);
 
     // Get updated counts
-    const counts = await this.reactionRepository.getReactionCounts(postId);
+    const counts = await this.reactionRepository.getContentReactionCounts(contentId);
 
-    // Real-time events are now handled by postHandlers.ts → eventBus → postRedisEventHandlers.ts
+    // Real-time events are now handled by handlers → eventBus → redisEventHandlers
 
     return {
-      reaction: this.toReactionDTO(reaction),
+      reaction: result.reaction,
       counts,
-      action,
+      action: result.action,
     };
   }
 
   /**
-   * Remove a reaction from a post
+   * Remove a reaction from a post/content (by toggling with same type)
    */
   async removeReaction(
-    postId: number,
+    contentId: number,
     userId: number,
-    type: ReactionType,
+    type: PrismaReactionType,
   ): Promise<{
     success: boolean;
-    counts: Record<ReactionType, number>;
+    counts: Record<PrismaReactionType, number>;
   }> {
-    // Validate post exists
-    const post = await this.postRepository.getPost(postId, userId);
-    if (!post) {
-      throw new NotFoundError('Post not found');
+    // Validate content exists
+    const content = await this.contentRepository.getContentById(contentId);
+    if (!content) {
+      throw new NotFoundError('Content not found');
     }
 
-    // Remove reaction
-    const success = await this.reactionRepository.removeReaction(postId, userId, type);
+    // Toggle will remove if same type exists
+    const result = await this.reactionRepository.toggleContentReaction(contentId, userId, type);
 
     // Get updated counts
-    const counts = await this.reactionRepository.getReactionCounts(postId);
+    const counts = await this.reactionRepository.getContentReactionCounts(contentId);
 
-    // Real-time events are now handled by postHandlers.ts → eventBus → postRedisEventHandlers.ts
+    // Real-time events are now handled by handlers → eventBus → redisEventHandlers
 
-    return { success, counts };
+    return { success: result.action === 'removed', counts };
   }
 
   /**
    * Toggle a reaction (smart add/remove/change)
    */
   async toggleReaction(
-    postId: number,
+    contentId: number,
     userId: number,
-    type: ReactionType,
+    type: PrismaReactionType,
   ): Promise<{
     action: 'added' | 'removed' | 'changed';
-    reaction?: PostReaction;
-    counts: Record<ReactionType, number>;
+    reaction?: PrismaReaction;
+    counts: Record<PrismaReactionType, number>;
   }> {
-    // Validate post exists and user can see it
-    const post = await this.postRepository.getPost(postId, userId);
-    if (!post) {
-      throw new NotFoundError('Post not found');
+    // Validate content exists
+    const content = await this.contentRepository.getContentById(contentId);
+    if (!content) {
+      throw new NotFoundError('Content not found');
     }
 
     // Validate reaction type
@@ -119,61 +105,61 @@ export class ReactionService {
     }
 
     // Toggle reaction
-    const result = await this.reactionRepository.toggleReaction(postId, userId, type);
+    const result = await this.reactionRepository.toggleContentReaction(contentId, userId, type);
 
     // Get updated counts
-    const counts = await this.reactionRepository.getReactionCounts(postId);
+    const counts = await this.reactionRepository.getContentReactionCounts(contentId);
 
-    // Real-time events are now handled by postHandlers.ts → eventBus → postRedisEventHandlers.ts
+    // Real-time events are now handled by handlers → eventBus → redisEventHandlers
 
     return {
       action: result.action,
-      reaction: result.reaction ? this.toReactionDTO(result.reaction) : undefined,
+      reaction: result.reaction,
       counts,
     };
   }
 
   /**
-   * Get all reactions for a post
+   * Get all reactions for content
    */
   async getPostReactions(
-    postId: number,
+    contentId: number,
     userId?: number,
     options: {
       cursor?: number;
       limit?: number;
-      type?: ReactionType;
+      type?: PrismaReactionType;
     } = {},
   ): Promise<{
-    reactions: PostReaction[];
-    counts: Record<ReactionType, number>;
-    userReaction?: ReactionType;
+    reactions: PrismaReaction[];
+    counts: Record<PrismaReactionType, number>;
+    userReaction?: PrismaReactionType;
     nextCursor?: number;
   }> {
-    // Validate post exists and user can see it
-    const post = await this.postRepository.getPost(postId, userId);
-    if (!post) {
-      throw new NotFoundError('Post not found');
+    // Validate content exists
+    const content = await this.contentRepository.getContentById(contentId);
+    if (!content) {
+      throw new NotFoundError('Content not found');
     }
 
     // Get paginated reactions
-    const { reactions, nextCursor } = await this.reactionRepository.getPostReactionsPaginated(
-      postId,
+    const { reactions, nextCursor } = await this.reactionRepository.getContentReactionsPaginated(
+      contentId,
       options,
     );
 
     // Get reaction counts
-    const counts = await this.reactionRepository.getReactionCounts(postId);
+    const counts = await this.reactionRepository.getContentReactionCounts(contentId);
 
     // Get user's reaction if authenticated
-    let userReaction: ReactionType | undefined;
+    let userReaction: PrismaReactionType | undefined;
     if (userId) {
-      const reaction = await this.reactionRepository.getUserReaction(postId, userId);
+      const reaction = await this.reactionRepository.getUserContentReaction(contentId, userId);
       userReaction = reaction?.type;
     }
 
     return {
-      reactions: reactions.map((r: any) => this.toReactionDTO(r)),
+      reactions,
       counts,
       userReaction,
       nextCursor,
@@ -181,40 +167,25 @@ export class ReactionService {
   }
 
   /**
-   * Get reaction summary for a post (counts only)
+   * Get reaction summary for content (counts only)
    */
-  async getReactionCounts(postId: number): Promise<Record<ReactionType, number>> {
-    return await this.reactionRepository.getReactionCounts(postId);
+  async getReactionCounts(contentId: number): Promise<Record<PrismaReactionType, number>> {
+    return await this.reactionRepository.getContentReactionCounts(contentId);
   }
 
   /**
-   * Get user's reaction to a post
+   * Get user's reaction to content
    */
-  async getUserReaction(postId: number, userId: number): Promise<ReactionType | null> {
-    const reaction = await this.reactionRepository.getUserReaction(postId, userId);
+  async getUserReaction(contentId: number, userId: number): Promise<PrismaReactionType | null> {
+    const reaction = await this.reactionRepository.getUserContentReaction(contentId, userId);
     return reaction?.type ?? null;
   }
 
   /**
    * Validate reaction type
    */
-  private isValidReactionType(type: string): type is ReactionType {
+  private isValidReactionType(type: string): type is PrismaReactionType {
     const validTypes = ['LIKE', 'LOVE', 'LAUGH', 'WOW', 'SAD', 'ANGRY'];
     return validTypes.includes(type);
-  }
-
-  /**
-   * Convert database reaction to API format
-   */
-  private toReactionDTO(reaction: any): PostReaction {
-    return {
-      id: reaction.id,
-      postId: reaction.postId,
-      userId: reaction.userId,
-      type: reaction.type,
-      createdAt: reaction.createdAt.toISOString(),
-      userName: reaction.user?.name || null,
-      userAvatar: reaction.user?.avatarUrl || null,
-    };
   }
 }

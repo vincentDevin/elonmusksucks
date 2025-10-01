@@ -4,10 +4,10 @@ import jwt from 'jsonwebtoken';
 
 // TEMP: Re-export shared auth payload types for backwards compatibility during migration
 export type {
-  RegisterPayload,
-  LoginPayload,
-  PasswordResetRequestPayload,
-  PasswordResetPayload,
+  RegisterRequest as RegisterPayload,
+  LoginRequest as LoginPayload,
+  PasswordResetRequestRequest as PasswordResetRequestPayload,
+  PasswordResetRequest as PasswordResetPayload,
 } from '@ems/types';
 
 import type { User } from '@prisma/client';

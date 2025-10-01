@@ -1,71 +1,160 @@
 import { PrismaClient } from '@prisma/client';
 import type { ITimelineRepository } from './interfaces/ITimelineRepository';
+import type {
+  DbArticleFeedParams,
+  DbArticleWithTags,
+  DbArticleWithStats,
+  DbSearchFilters,
+  DbSearchResult,
+  DbSearchSuggestion,
+  DbTrendingContentParams,
+  DbTrendingContent,
+  DbToggleBookmarkResult,
+  DbUserBookmarksParams,
+  DbUserBookmarksResult,
+  DbBookmarkCollectionWithCount,
+  DbCreateBookmarkCollectionData,
+  DbShareArticleData,
+  DbShareArticleResult,
+  DbArticleShareStats,
+} from '@ems/types';
+import type { Prisma } from '@prisma/client';
 
+// Type for ArticleTag with included tag relation
+type ArticleTagWithTag = {
+  id: number;
+  tagId: number;
+  tag: {
+    id: number;
+    name: string;
+    slug: string;
+  };
+};
+
+/**
+ * Timeline Repository Implementation
+ *
+ * Handles article feed management, article details, search/discovery,
+ * bookmarking system, and social sharing features.
+ * All methods use proper types from @ems/types with no `any` types.
+ */
 export class TimelineRepository implements ITimelineRepository {
   constructor(private prisma: PrismaClient) {}
 
-  async getApprovedArticles(params: { cursor?: Date; limit: number }) {
-    const where: any = { status: 'APPROVED' };
+  /**
+   * Get approved articles for the timeline feed
+   * @param params - Cursor-based pagination params with optional tag filtering
+   * @returns Array of articles with tags and feed information
+   */
+  async getApprovedArticles(params: DbArticleFeedParams): Promise<DbArticleWithTags[]> {
+    const where: Prisma.ArticleWhereInput = { status: 'APPROVED' };
 
     if (params.cursor) {
       where.publishedAt = { lt: params.cursor };
     }
 
-    return this.prisma.article.findMany({
+    // Filter by normalized tags
+    if (params.tagIds && params.tagIds.length > 0) {
+      where.tags = {
+        some: {
+          tagId: {
+            in: params.tagIds,
+          },
+        },
+      };
+    }
+
+    const articles = await this.prisma.article.findMany({
       where,
       include: {
         feed: {
           select: {
             id: true,
             name: true,
+            url: true,
             siteUrl: true,
+            status: true,
+            allowImages: true,
+            lastFetchedAt: true,
+            lastSuccessAt: true,
+            lastErrorAt: true,
+            lastErrorMsg: true,
+            fetchCount: true,
+            errorCount: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+        tags: {
+          include: {
+            tag: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+              },
+            },
           },
         },
       },
       orderBy: { publishedAt: 'desc' },
       take: params.limit + 1,
     });
-  }
 
-  async getTimelineTweets(params: { cursor?: string; limit: number }) {
-    const where: {
-      status: string;
-      id?: { lt: string };
-    } = {
-      status: 'VISIBLE',
-    };
-
-    if (params.cursor) {
-      where.id = { lt: params.cursor };
-    }
-
-    return this.prisma.tweet.findMany({
-      where,
-      include: {
-        sourceLinks: {
-          select: {
-            id: true,
-            predictionId: true,
-            title: true,
-          },
-          take: 5,
+    return articles.map((article) => ({
+      id: article.id,
+      feedId: article.feedId,
+      guid: article.guid,
+      url: article.url,
+      canonicalUrl: article.canonicalUrl,
+      title: article.title,
+      excerpt: article.excerpt,
+      leadImageUrl: article.leadImageUrl,
+      publishedAt: article.publishedAt,
+      fetchedAt: article.fetchedAt,
+      hash: article.hash,
+      status: article.status,
+      modNotes: article.modNotes,
+      createdAt: article.createdAt,
+      updatedAt: article.updatedAt,
+      feed: article.feed,
+      tags: article.tags.map((at: ArticleTagWithTag) => ({
+        id: at.id,
+        tagId: at.tagId,
+        tag: {
+          id: at.tag.id,
+          name: at.tag.name,
+          slug: at.tag.slug,
         },
-      },
-      orderBy: { postedAt: 'desc' },
-      take: params.limit + 1,
-    });
+      })),
+    }));
   }
 
-  async getArticleDetails(articleId: number): Promise<any> {
-    return this.prisma.article.findUnique({
+  /**
+   * Get article details with tags
+   * @param articleId - ID of the article
+   * @returns Article with tags or null if not found
+   */
+  async getArticleDetails(articleId: number): Promise<DbArticleWithTags | null> {
+    const article = await this.prisma.article.findUnique({
       where: { id: articleId },
       include: {
         feed: {
           select: {
             id: true,
             name: true,
+            url: true,
             siteUrl: true,
             status: true,
+            allowImages: true,
+            lastFetchedAt: true,
+            lastSuccessAt: true,
+            lastErrorAt: true,
+            lastErrorMsg: true,
+            fetchCount: true,
+            errorCount: true,
+            createdAt: true,
+            updatedAt: true,
           },
         },
         sourceLinks: {
@@ -77,229 +166,149 @@ export class TimelineRepository implements ITimelineRepository {
         },
       },
     });
-  }
 
-  async toggleArticleReaction(
-    articleId: number,
-    userId: number,
-    type: string,
-  ): Promise<{
-    action: 'added' | 'removed';
-    counts: { reactions: number; comments: number };
-  }> {
-    // Check if article exists and is approved
-    const article = await this.prisma.article.findUnique({
-      where: { id: articleId },
-      select: { id: true, status: true },
-    });
-
-    if (!article) {
-      throw new Error('Article not found');
-    }
-
-    if (article.status !== 'APPROVED') {
-      throw new Error('Article not available for reactions');
-    }
-
-    // Check if user already reacted with this type
-    const existingReaction = await this.prisma.articleReaction.findUnique({
-      where: {
-        articleId_userId_type: {
-          articleId,
-          userId,
-          type,
-        },
-      },
-    });
-
-    let action: 'added' | 'removed';
-
-    if (existingReaction) {
-      // Remove existing reaction
-      await this.prisma.$transaction(async (tx: any) => {
-        await tx.articleReaction.delete({
-          where: { id: existingReaction.id },
-        });
-
-        // Decrement reaction count
-        await tx.article.update({
-          where: { id: articleId },
-          data: { reactions: { decrement: 1 } },
-        });
-      });
-      action = 'removed';
-    } else {
-      // Add new reaction
-      await this.prisma.$transaction(async (tx: any) => {
-        await tx.articleReaction.create({
-          data: { articleId, userId, type },
-        });
-
-        // Increment reaction count
-        await tx.article.update({
-          where: { id: articleId },
-          data: { reactions: { increment: 1 } },
-        });
-      });
-      action = 'added';
-    }
-
-    // Get updated reaction counts
-    const updatedCounts = await this.prisma.article.findUnique({
-      where: { id: articleId },
-      select: { reactions: true, comments: true },
-    });
+    if (!article) return null;
 
     return {
-      action,
-      counts: {
-        reactions: updatedCounts?.reactions || 0,
-        comments: updatedCounts?.comments || 0,
-      },
+      id: article.id,
+      feedId: article.feedId,
+      guid: article.guid,
+      url: article.url,
+      canonicalUrl: article.canonicalUrl,
+      title: article.title,
+      excerpt: article.excerpt,
+      leadImageUrl: article.leadImageUrl,
+      publishedAt: article.publishedAt,
+      fetchedAt: article.fetchedAt,
+      hash: article.hash,
+      status: article.status,
+      modNotes: article.modNotes,
+      createdAt: article.createdAt,
+      updatedAt: article.updatedAt,
+      feed: article.feed,
     };
   }
 
-  async getArticleReactions(articleId: number): Promise<any[]> {
-    return this.prisma.articleReaction.findMany({
-      where: { articleId },
+  /**
+   * Get article with full statistics (reactions, comments, tags)
+   * @param articleId - ID of the article
+   * @returns Article with comprehensive stats
+   * @throws Error if article not found
+   */
+  async getArticleWithStats(articleId: number): Promise<DbArticleWithStats> {
+    const article = await this.prisma.article.findUnique({
+      where: { id: articleId },
       include: {
-        user: {
+        feed: {
           select: {
             id: true,
             name: true,
-            avatarUrl: true,
-            profilePictureKey: true,
+            url: true,
+            siteUrl: true,
+            status: true,
+            allowImages: true,
+            lastFetchedAt: true,
+            lastSuccessAt: true,
+            lastErrorAt: true,
+            lastErrorMsg: true,
+            fetchCount: true,
+            errorCount: true,
+            createdAt: true,
+            updatedAt: true,
           },
         },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-  }
-
-  async createArticleComment(articleId: number, userId: number, content: string): Promise<any> {
-    // Check if article exists and is approved
-    const article = await this.prisma.article.findUnique({
-      where: { id: articleId },
-      select: { id: true, status: true },
-    });
-
-    if (!article) {
-      throw new Error('Article not found');
-    }
-
-    if (article.status !== 'APPROVED') {
-      throw new Error('Article not available for comments');
-    }
-
-    // Create comment and increment counter
-    const newComment = await this.prisma.$transaction(async (tx: any) => {
-      const comment = await tx.articleComment.create({
-        data: {
-          articleId,
-          userId,
-          content: content.trim(),
-        },
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              avatarUrl: true,
-              profilePictureKey: true,
+        tags: {
+          include: {
+            tag: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+              },
             },
           },
         },
-      });
-
-      // Increment comment count
-      await tx.article.update({
-        where: { id: articleId },
-        data: { comments: { increment: 1 } },
-      });
-
-      return comment;
+      },
     });
 
-    return newComment;
-  }
-
-  async getArticleComments(
-    articleId: number,
-    limit: number,
-    cursor?: string,
-  ): Promise<{
-    comments: any[];
-    pagination: { cursor?: string; hasMore: boolean; total?: number };
-  }> {
-    const pageLimit = Math.min(limit || 20, 100);
-    const where: any = { articleId };
-
-    if (cursor) {
-      const cursorDate = new Date(cursor);
-      if (!isNaN(cursorDate.getTime())) {
-        where.createdAt = { lt: cursorDate };
-      }
+    if (!article) {
+      throw new Error('Article not found');
     }
 
-    const comments = await this.prisma.articleComment.findMany({
-      where,
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            avatarUrl: true,
-            profilePictureKey: true,
-          },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: pageLimit + 1,
+    // Get reaction counts (grouped by type)
+    const reactions = await this.prisma.reaction.groupBy({
+      by: ['type'],
+      where: { articleId },
+      _count: { type: true },
     });
 
-    const hasMore = comments.length > pageLimit;
-    const items = comments.slice(0, pageLimit);
+    const reactionCounts: Record<string, number> = {};
+    reactions.forEach((r) => {
+      reactionCounts[r.type] = r._count.type;
+    });
 
-    const formattedComments = items.map((comment: any) => ({
-      id: comment.id,
-      content: comment.content,
-      user: comment.user,
-      createdAt: comment.createdAt.toISOString(),
-      updatedAt: comment.updatedAt.toISOString(),
-    }));
-
-    const nextCursor =
-      hasMore && items.length > 0 ? items[items.length - 1].createdAt.toISOString() : undefined;
+    // Get comment count
+    const commentCount = await this.prisma.content.count({
+      where: {
+        articleId,
+        type: 'COMMENT',
+        isDeleted: false,
+      },
+    });
 
     return {
-      comments: formattedComments,
-      pagination: {
-        cursor: nextCursor,
-        hasMore,
-        total: undefined,
+      article: {
+        id: article.id,
+        feedId: article.feedId,
+        guid: article.guid,
+        url: article.url,
+        canonicalUrl: article.canonicalUrl,
+        title: article.title,
+        excerpt: article.excerpt,
+        leadImageUrl: article.leadImageUrl,
+        publishedAt: article.publishedAt,
+        fetchedAt: article.fetchedAt,
+        hash: article.hash,
+        status: article.status,
+        modNotes: article.modNotes,
+        createdAt: article.createdAt,
+        updatedAt: article.updatedAt,
+        feed: article.feed,
+        tags: article.tags.map((at: ArticleTagWithTag) => ({
+          id: at.id,
+          tagId: at.tagId,
+          tag: {
+            id: at.tag.id,
+            name: at.tag.name,
+            slug: at.tag.slug,
+          },
+        })),
       },
+      tags: article.tags.map((at: ArticleTagWithTag) => ({
+        id: at.tag.id,
+        name: at.tag.name,
+        slug: at.tag.slug,
+      })),
+      reactionCounts,
+      commentCount,
     };
   }
 
-  // ===============================================
-  // Search and Discovery Methods
-  // ===============================================
-
+  /**
+   * Search content with filters and cursor-based pagination
+   * @param params - Search query, filters, limit, and cursor
+   * @returns Paginated search results
+   */
   async searchContent(params: {
     query: string;
-    filters: any;
+    filters: DbSearchFilters;
     limit: number;
     cursor?: string;
-  }): Promise<{
-    items: any[];
-    nextCursor?: string;
-    hasMore: boolean;
-    total?: number;
-  }> {
+  }): Promise<DbSearchResult> {
     const pageLimit = Math.min(params.limit || 30, 100);
 
-    // Search in articles
-    const articleWhere: any = {
+    // Build search where clause
+    const articleWhere: Prisma.ArticleWhereInput = {
       status: 'APPROVED',
       OR: [
         { title: { contains: params.query, mode: 'insensitive' } },
@@ -316,19 +325,28 @@ export class TimelineRepository implements ITimelineRepository {
     }
 
     // Apply filters
-    if (params.filters.dateRange) {
-      if (params.filters.dateRange.start) {
-        articleWhere.publishedAt = {
-          ...articleWhere.publishedAt,
-          gte: new Date(params.filters.dateRange.start),
-        };
+    if (params.filters.startDate || params.filters.endDate) {
+      articleWhere.publishedAt = {
+        ...(typeof articleWhere.publishedAt === 'object' ? articleWhere.publishedAt : {}),
+      };
+      if (params.filters.startDate) {
+        (articleWhere.publishedAt as Prisma.DateTimeFilter).gte = params.filters.startDate;
       }
-      if (params.filters.dateRange.end) {
-        articleWhere.publishedAt = {
-          ...articleWhere.publishedAt,
-          lte: new Date(params.filters.dateRange.end),
-        };
+      if (params.filters.endDate) {
+        (articleWhere.publishedAt as Prisma.DateTimeFilter).lte = params.filters.endDate;
       }
+    }
+
+    if (params.filters.tagIds && params.filters.tagIds.length > 0) {
+      articleWhere.tags = {
+        some: {
+          tagId: { in: params.filters.tagIds },
+        },
+      };
+    }
+
+    if (params.filters.feedIds && params.filters.feedIds.length > 0) {
+      articleWhere.feedId = { in: params.filters.feedIds };
     }
 
     const articles = await this.prisma.article.findMany({
@@ -338,7 +356,29 @@ export class TimelineRepository implements ITimelineRepository {
           select: {
             id: true,
             name: true,
+            url: true,
             siteUrl: true,
+            status: true,
+            allowImages: true,
+            lastFetchedAt: true,
+            lastSuccessAt: true,
+            lastErrorAt: true,
+            lastErrorMsg: true,
+            fetchCount: true,
+            errorCount: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+        tags: {
+          include: {
+            tag: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+              },
+            },
           },
         },
       },
@@ -356,25 +396,46 @@ export class TimelineRepository implements ITimelineRepository {
         : undefined;
 
     return {
-      items,
+      items: items.map((article) => ({
+        id: article.id,
+        feedId: article.feedId,
+        guid: article.guid,
+        url: article.url,
+        canonicalUrl: article.canonicalUrl,
+        title: article.title,
+        excerpt: article.excerpt,
+        leadImageUrl: article.leadImageUrl,
+        publishedAt: article.publishedAt,
+        fetchedAt: article.fetchedAt,
+        hash: article.hash,
+        status: article.status,
+        modNotes: article.modNotes,
+        createdAt: article.createdAt,
+        updatedAt: article.updatedAt,
+        feed: article.feed,
+        tags: article.tags.map((at: ArticleTagWithTag) => ({
+          id: at.id,
+          tagId: at.tagId,
+          tag: {
+            id: at.tag.id,
+            name: at.tag.name,
+            slug: at.tag.slug,
+          },
+        })),
+      })),
       nextCursor,
       hasMore,
       total: undefined,
     };
   }
 
-  async getSearchSuggestions(query: string): Promise<
-    Array<{
-      type: 'article' | 'tag' | 'author' | 'feed';
-      value: string;
-      count?: number;
-    }>
-  > {
-    const suggestions: Array<{
-      type: 'article' | 'tag' | 'author' | 'feed';
-      value: string;
-      count?: number;
-    }> = [];
+  /**
+   * Get search suggestions based on query
+   * @param query - Search query string
+   * @returns Array of suggestions (articles, tags, authors, feeds)
+   */
+  async getSearchSuggestions(query: string): Promise<DbSearchSuggestion[]> {
+    const suggestions: DbSearchSuggestion[] = [];
 
     // Article title suggestions
     const articles = await this.prisma.article.findMany({
@@ -403,7 +464,7 @@ export class TimelineRepository implements ITimelineRepository {
       take: 3,
     });
 
-    feeds.forEach((feed: any) => {
+    feeds.forEach((feed) => {
       suggestions.push({
         type: 'feed',
         value: feed.name,
@@ -413,16 +474,12 @@ export class TimelineRepository implements ITimelineRepository {
     return suggestions.slice(0, 8); // Limit total suggestions
   }
 
-  async getTrendingContent(params: {
-    timeRange: 'hour' | 'day' | 'week' | 'month';
-    limit: number;
-    contentType: 'articles' | 'posts' | 'all';
-  }): Promise<{
-    articles: any[];
-    posts: any[];
-    tags: any[];
-    authors: any[];
-  }> {
+  /**
+   * Get trending content based on time range and content type
+   * @param params - Time range, limit, and content type filters
+   * @returns Trending articles, posts, tags, and authors
+   */
+  async getTrendingContent(params: DbTrendingContentParams): Promise<DbTrendingContent> {
     const now = new Date();
     const timeRanges = {
       hour: new Date(now.getTime() - 60 * 60 * 1000),
@@ -434,15 +491,49 @@ export class TimelineRepository implements ITimelineRepository {
     const since = timeRanges[params.timeRange];
     const limit = Math.min(params.limit || 10, 50);
 
-    const result = {
-      articles: [] as any[],
-      posts: [] as any[],
-      tags: [] as any[],
-      authors: [] as any[],
+    const result: DbTrendingContent = {
+      articles: [],
+      posts: [],
+      tags: [],
+      authors: [],
     };
 
     // Get trending articles
     if (params.contentType === 'articles' || params.contentType === 'all') {
+      type ArticleWithFeedAndTags = Prisma.ArticleGetPayload<{
+        include: {
+          feed: {
+            select: {
+              id: true;
+              name: true;
+              url: true;
+              siteUrl: true;
+              status: true;
+              allowImages: true;
+              lastFetchedAt: true;
+              lastSuccessAt: true;
+              lastErrorAt: true;
+              lastErrorMsg: true;
+              fetchCount: true;
+              errorCount: true;
+              createdAt: true;
+              updatedAt: true;
+            };
+          };
+          tags: {
+            include: {
+              tag: {
+                select: {
+                  id: true;
+                  name: true;
+                  slug: true;
+                };
+              };
+            };
+          };
+        };
+      }>;
+
       const trendingArticles = await this.prisma.article.findMany({
         where: {
           status: 'APPROVED',
@@ -453,15 +544,63 @@ export class TimelineRepository implements ITimelineRepository {
             select: {
               id: true,
               name: true,
+              url: true,
               siteUrl: true,
+              status: true,
+              allowImages: true,
+              lastFetchedAt: true,
+              lastSuccessAt: true,
+              lastErrorAt: true,
+              lastErrorMsg: true,
+              fetchCount: true,
+              errorCount: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          },
+          tags: {
+            include: {
+              tag: {
+                select: {
+                  id: true,
+                  name: true,
+                  slug: true,
+                },
+              },
             },
           },
         },
-        orderBy: [{ reactions: 'desc' }, { comments: 'desc' }, { publishedAt: 'desc' }],
+        orderBy: [{ reactionsCount: 'desc' }, { commentsCount: 'desc' }, { publishedAt: 'desc' }],
         take: limit,
       });
 
-      result.articles = trendingArticles;
+      result.articles = trendingArticles.map((article: ArticleWithFeedAndTags) => ({
+        id: article.id,
+        feedId: article.feedId,
+        guid: article.guid,
+        url: article.url,
+        canonicalUrl: article.canonicalUrl,
+        title: article.title,
+        excerpt: article.excerpt,
+        leadImageUrl: article.leadImageUrl,
+        publishedAt: article.publishedAt,
+        fetchedAt: article.fetchedAt,
+        hash: article.hash,
+        status: article.status,
+        modNotes: article.modNotes,
+        createdAt: article.createdAt,
+        updatedAt: article.updatedAt,
+        feed: article.feed,
+        tags: article.tags.map((at: ArticleTagWithTag) => ({
+          id: at.id,
+          tagId: at.tagId,
+          tag: {
+            id: at.tag.id,
+            name: at.tag.name,
+            slug: at.tag.slug,
+          },
+        })),
+      }));
     }
 
     // Get trending feeds (as authors)
@@ -498,23 +637,28 @@ export class TimelineRepository implements ITimelineRepository {
       take: Math.min(limit, 10),
     });
 
-    result.authors = trendingFeeds;
+    result.authors = trendingFeeds.map((feed) => ({
+      id: feed.id,
+      name: feed.name,
+      articlesCount: feed._count.articles,
+    }));
 
     return result;
   }
 
-  // ===============================================
-  // Bookmark System Methods
-  // ===============================================
-
+  /**
+   * Toggle article bookmark (add or remove)
+   * @param articleId - ID of the article
+   * @param userId - ID of the user
+   * @param collectionId - Optional collection ID
+   * @returns Action taken (added or removed) and optional bookmark ID
+   * @throws Error if article not found or not approved
+   */
   async toggleArticleBookmark(
     articleId: number,
     userId: number,
     collectionId?: number,
-  ): Promise<{
-    action: 'added' | 'removed';
-    bookmarkId?: number;
-  }> {
+  ): Promise<DbToggleBookmarkResult> {
     // Check if article exists and is approved
     const article = await this.prisma.article.findUnique({
       where: { id: articleId },
@@ -557,19 +701,18 @@ export class TimelineRepository implements ITimelineRepository {
     }
   }
 
+  /**
+   * Get user's bookmarked articles
+   * @param userId - ID of the user
+   * @param params - Pagination and filter params
+   * @returns Bookmarks with pagination info
+   */
   async getUserBookmarks(
     userId: number,
-    params: {
-      limit: number;
-      cursor?: string;
-      collectionId?: number;
-    },
-  ): Promise<{
-    bookmarks: any[];
-    pagination: { cursor?: string; hasMore: boolean; total?: number };
-  }> {
+    params: DbUserBookmarksParams,
+  ): Promise<DbUserBookmarksResult> {
     const pageLimit = Math.min(params.limit || 20, 100);
-    const where: any = { userId };
+    const where: Prisma.ArticleBookmarkWhereInput = { userId };
 
     if (params.collectionId) {
       where.collectionId = params.collectionId;
@@ -591,7 +734,29 @@ export class TimelineRepository implements ITimelineRepository {
               select: {
                 id: true,
                 name: true,
+                url: true,
                 siteUrl: true,
+                status: true,
+                allowImages: true,
+                lastFetchedAt: true,
+                lastSuccessAt: true,
+                lastErrorAt: true,
+                lastErrorMsg: true,
+                fetchCount: true,
+                errorCount: true,
+                createdAt: true,
+                updatedAt: true,
+              },
+            },
+            tags: {
+              include: {
+                tag: {
+                  select: {
+                    id: true,
+                    name: true,
+                    slug: true,
+                  },
+                },
               },
             },
           },
@@ -614,7 +779,40 @@ export class TimelineRepository implements ITimelineRepository {
       hasMore && items.length > 0 ? items[items.length - 1].createdAt.toISOString() : undefined;
 
     return {
-      bookmarks: items,
+      bookmarks: items.map((bookmark) => ({
+        id: bookmark.id,
+        articleId: bookmark.articleId,
+        userId: bookmark.userId,
+        collectionId: bookmark.collectionId,
+        createdAt: bookmark.createdAt,
+        article: {
+          id: bookmark.article.id,
+          feedId: bookmark.article.feedId,
+          guid: bookmark.article.guid,
+          url: bookmark.article.url,
+          canonicalUrl: bookmark.article.canonicalUrl,
+          title: bookmark.article.title,
+          excerpt: bookmark.article.excerpt,
+          leadImageUrl: bookmark.article.leadImageUrl,
+          publishedAt: bookmark.article.publishedAt,
+          fetchedAt: bookmark.article.fetchedAt,
+          hash: bookmark.article.hash,
+          status: bookmark.article.status,
+          modNotes: bookmark.article.modNotes,
+          createdAt: bookmark.article.createdAt,
+          updatedAt: bookmark.article.updatedAt,
+          feed: bookmark.article.feed,
+          tags: bookmark.article.tags.map((at: ArticleTagWithTag) => ({
+            id: at.id,
+            tagId: at.tagId,
+            tag: {
+              id: at.tag.id,
+              name: at.tag.name,
+              slug: at.tag.slug,
+            },
+          })),
+        },
+      })),
       pagination: {
         cursor: nextCursor,
         hasMore,
@@ -623,8 +821,13 @@ export class TimelineRepository implements ITimelineRepository {
     };
   }
 
-  async getBookmarkCollections(userId: number): Promise<any[]> {
-    return this.prisma.bookmarkCollection.findMany({
+  /**
+   * Get user's bookmark collections
+   * @param userId - ID of the user
+   * @returns Array of collections with bookmark counts
+   */
+  async getBookmarkCollections(userId: number): Promise<DbBookmarkCollectionWithCount[]> {
+    const collections = await this.prisma.bookmarkCollection.findMany({
       where: { userId },
       include: {
         _count: {
@@ -635,42 +838,74 @@ export class TimelineRepository implements ITimelineRepository {
       },
       orderBy: { createdAt: 'desc' },
     });
+
+    return collections.map((collection) => ({
+      id: collection.id,
+      userId: collection.userId,
+      name: collection.name,
+      description: collection.description,
+      isPrivate: collection.isPrivate,
+      createdAt: collection.createdAt,
+      updatedAt: collection.updatedAt,
+      _count: {
+        bookmarks: collection._count.bookmarks,
+      },
+    }));
   }
 
+  /**
+   * Create a new bookmark collection
+   * @param userId - ID of the user
+   * @param data - Collection name, description, and privacy setting
+   * @returns Created collection with bookmark count (0)
+   */
   async createBookmarkCollection(
     userId: number,
-    data: {
-      name: string;
-      description?: string | null;
-      isPrivate: boolean;
-    },
-  ): Promise<any> {
-    return this.prisma.bookmarkCollection.create({
+    data: DbCreateBookmarkCollectionData,
+  ): Promise<DbBookmarkCollectionWithCount> {
+    const collection = await this.prisma.bookmarkCollection.create({
       data: {
         userId,
         name: data.name,
-        description: data.description,
+        description: data.description ?? null,
         isPrivate: data.isPrivate,
       },
+      include: {
+        _count: {
+          select: {
+            bookmarks: true,
+          },
+        },
+      },
     });
+
+    return {
+      id: collection.id,
+      userId: collection.userId,
+      name: collection.name,
+      description: collection.description,
+      isPrivate: collection.isPrivate,
+      createdAt: collection.createdAt,
+      updatedAt: collection.updatedAt,
+      _count: {
+        bookmarks: collection._count.bookmarks,
+      },
+    };
   }
 
-  // ===============================================
-  // Social Sharing Methods
-  // ===============================================
-
+  /**
+   * Share an article on a platform
+   * @param articleId - ID of the article
+   * @param userId - ID of the user sharing
+   * @param data - Platform, message, and target users
+   * @returns Share ID and optional share URL
+   * @throws Error if article not found or not approved
+   */
   async shareArticle(
     articleId: number,
     userId: number,
-    data: {
-      platform: string;
-      message?: string | null;
-      targetUsers: number[];
-    },
-  ): Promise<{
-    shareId: number;
-    shareUrl?: string;
-  }> {
+    data: DbShareArticleData,
+  ): Promise<DbShareArticleResult> {
     // Check if article exists and is approved
     const article = await this.prisma.article.findUnique({
       where: { id: articleId },
@@ -691,7 +926,7 @@ export class TimelineRepository implements ITimelineRepository {
         articleId,
         userId,
         platform: data.platform,
-        message: data.message,
+        message: data.message ?? null,
         targetUsers: data.targetUsers,
       },
     });
@@ -708,11 +943,12 @@ export class TimelineRepository implements ITimelineRepository {
     };
   }
 
-  async getArticleShareStats(articleId: number): Promise<{
-    totalShares: number;
-    platforms: Record<string, number>;
-    recentShares: any[];
-  }> {
+  /**
+   * Get article sharing statistics
+   * @param articleId - ID of the article
+   * @returns Total shares, platform breakdown, and recent shares
+   */
+  async getArticleShareStats(articleId: number): Promise<DbArticleShareStats> {
     const shares = await this.prisma.articleShare.findMany({
       where: { articleId },
       include: {
@@ -731,7 +967,7 @@ export class TimelineRepository implements ITimelineRepository {
 
     // Group by platform
     const platforms = shares.reduce(
-      (acc: any, share: any) => {
+      (acc, share) => {
         acc[share.platform] = (acc[share.platform] || 0) + 1;
         return acc;
       },
@@ -741,7 +977,19 @@ export class TimelineRepository implements ITimelineRepository {
     return {
       totalShares: shares.length,
       platforms,
-      recentShares: shares.slice(0, 5),
+      recentShares: shares.slice(0, 5).map((share) => ({
+        id: share.id,
+        articleId: share.articleId,
+        userId: share.userId,
+        platform: share.platform,
+        message: share.message,
+        createdAt: share.createdAt,
+        user: {
+          id: share.user.id,
+          name: share.user.name,
+          avatarUrl: share.user.avatarUrl,
+        },
+      })),
     };
   }
 }

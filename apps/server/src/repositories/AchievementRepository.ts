@@ -1,99 +1,376 @@
 import { PrismaClient, Prisma } from '@prisma/client';
-import type { JsonRuleAchievementData } from '@ems/types';
+import type {
+  PrismaAchievement,
+  PrismaUser,
+  DbAchievementQueryParams,
+  DbUserAchievementQueryParams,
+  DetailedAchievement,
+  DetailedUserAchievement,
+  CreateAchievementData,
+  UpdateAchievementData,
+  CreateUserAchievementData,
+  UpdateUserAchievementData,
+  BulkCreateUserAchievementData,
+  DbAchievementRule,
+  DbAchievementRuleMetrics,
+  ShameAchievement,
+} from '@ems/types';
 import { RuleComplexityTracker } from '../services/achievements/ruleComplexityTracker.service';
 import type { IAchievementRepository } from './interfaces/IAchievementRepository';
+
+// Helper type for rule data structure
+interface JsonRuleAchievementData {
+  eventKeys: string[];
+  progress: {
+    kind: string;
+    incrementIf?: Record<string, unknown>;
+  };
+  unlockWhen: Record<string, unknown>;
+  counters?: string[];
+}
 
 export class AchievementRepository implements IAchievementRepository {
   private complexityTracker = new RuleComplexityTracker();
 
   constructor(private prisma: PrismaClient) {}
 
-  async findMany(params?: any) {
-    return this.prisma.achievement.findMany(params);
+  async findMany(params?: DbAchievementQueryParams): Promise<PrismaAchievement[]> {
+    const where: Prisma.AchievementWhereInput = {};
+
+    if (params) {
+      if (params.category) where.category = params.category;
+      if (params.rarity) where.rarity = params.rarity;
+      if (params.isActive !== undefined) where.isActive = params.isActive;
+      if (params.autoAward !== undefined) where.autoAward = params.autoAward;
+      if (params.manualOnly !== undefined) where.manualOnly = params.manualOnly;
+      if (params.isShame !== undefined) where.isShame = params.isShame;
+    }
+
+    return this.prisma.achievement.findMany({
+      where,
+      take: params?.limit,
+      skip: params?.offset,
+      orderBy: { sortOrder: 'asc' },
+    });
   }
 
-  async findById(id: number) {
+  async findById(id: number): Promise<DetailedAchievement | null> {
     if (typeof id !== 'number' || isNaN(id)) {
       throw new Error(`Invalid achievement ID: ${id} (type: ${typeof id})`);
     }
 
-    return this.prisma.achievement.findUnique({
+    const achievement = await this.prisma.achievement.findUnique({
       where: { id },
+      include: {
+        _count: {
+          select: {
+            userProgress: true,
+          },
+        },
+      },
     });
+
+    if (!achievement) return null;
+
+    // Transform to DetailedAchievement
+    return {
+      ...achievement,
+      totalEarned: achievement._count.userProgress,
+    };
   }
 
-  async findBySlug(slug: string) {
+  async findBySlug(slug: string): Promise<PrismaAchievement | null> {
     return this.prisma.achievement.findUnique({
       where: { slug },
     });
   }
 
-  async create(data: any) {
+  async findByName(name: string): Promise<PrismaAchievement | null> {
+    return this.prisma.achievement.findUnique({
+      where: { name },
+    });
+  }
+
+  async create(data: CreateAchievementData): Promise<PrismaAchievement> {
     return this.prisma.achievement.create({
       data: {
         name: data.name,
+        slug: data.slug,
         title: data.title,
         description: data.description,
         category: data.category,
+        rarity: data.rarity ?? 'common',
         targetValue: data.targetValue,
         iconUrl: data.iconUrl ?? null,
         isActive: data.isActive ?? true,
+        autoAward: data.autoAward ?? true,
+        manualOnly: data.manualOnly ?? false,
+        isShame: data.isShame ?? false,
         sortOrder: data.sortOrder ?? 999,
-        slug: data.slug,
-        autoAward: data.autoAward,
-        manualOnly: data.manualOnly,
-        ruleData: data.ruleData,
+        ruleData: data.ruleData ?? Prisma.JsonNull,
       },
     });
   }
 
-  async update(id: number, data: any) {
+  async update(id: number, data: UpdateAchievementData): Promise<PrismaAchievement> {
+    const updateData: Prisma.AchievementUpdateInput = {};
+
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.slug !== undefined) updateData.slug = data.slug;
+    if (data.title !== undefined) updateData.title = data.title;
+    if (data.description !== undefined) updateData.description = data.description;
+    if (data.category !== undefined) updateData.category = data.category;
+    if (data.rarity !== undefined) updateData.rarity = data.rarity;
+    if (data.targetValue !== undefined) updateData.targetValue = data.targetValue;
+    if (data.iconUrl !== undefined) updateData.iconUrl = data.iconUrl;
+    if (data.isActive !== undefined) updateData.isActive = data.isActive;
+    if (data.autoAward !== undefined) updateData.autoAward = data.autoAward;
+    if (data.manualOnly !== undefined) updateData.manualOnly = data.manualOnly;
+    if (data.isShame !== undefined) updateData.isShame = data.isShame;
+    if (data.sortOrder !== undefined) updateData.sortOrder = data.sortOrder;
+    if (data.ruleData !== undefined) updateData.ruleData = data.ruleData ?? Prisma.JsonNull;
+    if (data.ruleComplexity !== undefined) updateData.ruleComplexity = data.ruleComplexity;
+    if (data.rulePerformanceScore !== undefined)
+      updateData.rulePerformanceScore = data.rulePerformanceScore;
+    if (data.lastRuleValidation !== undefined)
+      updateData.lastRuleValidation = data.lastRuleValidation;
+
     return this.prisma.achievement.update({
       where: { id },
-      data,
+      data: updateData,
     });
   }
 
-  async delete(id: number) {
+  async delete(id: number): Promise<void> {
     await this.prisma.achievement.delete({
       where: { id },
     });
   }
 
-  async findUserAchievements(userId: number) {
-    return this.prisma.userAchievement.findMany({
+  async findUserAchievements(userId: number): Promise<DetailedUserAchievement[]> {
+    const userAchievements = await this.prisma.userAchievement.findMany({
       where: { userId },
       include: {
         achievement: true,
       },
       orderBy: [{ achievement: { category: 'asc' } }, { achievement: { sortOrder: 'asc' } }],
     });
+
+    return userAchievements.map((ua) => ({
+      ...ua,
+      achievement: ua.achievement,
+      percentComplete:
+        ua.achievement.targetValue > 0
+          ? Math.min(100, (ua.progress / ua.achievement.targetValue) * 100)
+          : 0,
+    }));
   }
 
-  async findUserAchievementsByAchievementId(achievementId: number, params?: any) {
-    const baseWhere = { achievementId };
-    const finalWhere = params?.where ? { ...baseWhere, ...params.where } : baseWhere;
+  async findUserAchievementsByAchievementId(
+    achievementId: number,
+    params?: DbUserAchievementQueryParams,
+  ): Promise<DetailedUserAchievement[]> {
+    const where: Prisma.UserAchievementWhereInput = { achievementId };
 
-    // Remove the 'where: undefined' which was overriding our where clause
-    const queryParams = params ? { ...params } : {};
-    delete queryParams.where; // Ensure we don't override the where clause
+    if (params) {
+      if (params.userId) where.userId = params.userId;
+      if (params.completed !== undefined) {
+        where.completedAt = params.completed ? { not: null } : null;
+      }
+      if (params.minProgress !== undefined) {
+        where.progress = { gte: params.minProgress };
+      }
+    }
 
-    const results = await this.prisma.userAchievement.findMany({
-      where: finalWhere,
-      ...queryParams,
+    const userAchievements = await this.prisma.userAchievement.findMany({
+      where,
+      include: {
+        achievement: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+      take: params?.limit,
+      skip: params?.offset,
+      orderBy: { progress: 'desc' },
     });
 
-    return results;
+    return userAchievements.map((ua) => ({
+      ...ua,
+      achievement: ua.achievement,
+      user: ua.user,
+      percentComplete:
+        ua.achievement.targetValue > 0
+          ? Math.min(100, (ua.progress / ua.achievement.targetValue) * 100)
+          : 0,
+    }));
   }
 
-  async createUserAchievement(data: any) {
+  async createUserAchievement(
+    data: CreateUserAchievementData,
+  ): Promise<import('@prisma/client').UserAchievement> {
     return this.prisma.userAchievement.create({
-      data,
+      data: {
+        userId: data.userId,
+        achievementId: data.achievementId,
+        progress: data.progress ?? 0,
+        completedAt: data.completedAt,
+      },
     });
   }
 
-  async updateUserAchievement(params: any) {
-    return this.prisma.userAchievement.upsert(params);
+  async updateUserAchievement(
+    params: UpdateUserAchievementData,
+  ): Promise<import('@prisma/client').UserAchievement> {
+    return this.prisma.userAchievement.upsert({
+      where: {
+        userId_achievementId: {
+          userId: params.userId,
+          achievementId: params.achievementId,
+        },
+      },
+      update: {
+        progress: params.progress,
+        completedAt: params.completedAt,
+      },
+      create: {
+        userId: params.userId,
+        achievementId: params.achievementId,
+        progress: params.progress ?? 0,
+        completedAt: params.completedAt,
+      },
+    });
+  }
+
+  async findAllUserIds(): Promise<{ id: number }[]> {
+    return this.prisma.user.findMany({ select: { id: true } });
+  }
+
+  async createManyUserAchievements(data: BulkCreateUserAchievementData[]): Promise<void> {
+    await this.prisma.userAchievement.createMany({
+      data,
+      skipDuplicates: true,
+    });
+  }
+
+  async deleteUserAchievementsByAchievementId(achievementId: number): Promise<void> {
+    await this.prisma.userAchievement.deleteMany({
+      where: { achievementId },
+    });
+  }
+
+  async findUserById(userId: number): Promise<PrismaUser | null> {
+    return this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+  }
+
+  async findUserAchievementByUserAndAchievementId(
+    userId: number,
+    achievementId: number,
+  ): Promise<DetailedUserAchievement | null> {
+    const userAchievement = await this.prisma.userAchievement.findUnique({
+      where: {
+        userId_achievementId: {
+          userId,
+          achievementId,
+        },
+      },
+      include: {
+        achievement: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    if (!userAchievement) return null;
+
+    return {
+      ...userAchievement,
+      achievement: userAchievement.achievement,
+      user: userAchievement.user,
+      percentComplete:
+        userAchievement.achievement.targetValue > 0
+          ? Math.min(
+              100,
+              (userAchievement.progress / userAchievement.achievement.targetValue) * 100,
+            )
+          : 0,
+    };
+  }
+
+  async findAllAchievements(): Promise<PrismaAchievement[]> {
+    return this.prisma.achievement.findMany();
+  }
+
+  async findAllUserAchievementsWithDetails(): Promise<DetailedUserAchievement[]> {
+    const userAchievements = await this.prisma.userAchievement.findMany({
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        achievement: true,
+      },
+    });
+
+    return userAchievements.map((ua) => ({
+      ...ua,
+      achievement: ua.achievement,
+      user: ua.user,
+      percentComplete:
+        ua.achievement.targetValue > 0
+          ? Math.min(100, (ua.progress / ua.achievement.targetValue) * 100)
+          : 0,
+    }));
+  }
+
+  async findRecentUserAchievements(
+    userId: number,
+    limit: number,
+  ): Promise<DetailedUserAchievement[]> {
+    const userAchievements = await this.prisma.userAchievement.findMany({
+      where: {
+        userId,
+        completedAt: { not: null },
+      },
+      include: {
+        achievement: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: {
+        completedAt: 'desc',
+      },
+      take: limit,
+    });
+
+    return userAchievements.map((ua) => ({
+      ...ua,
+      achievement: ua.achievement,
+      user: ua.user,
+      percentComplete:
+        ua.achievement.targetValue > 0
+          ? Math.min(100, (ua.progress / ua.achievement.targetValue) * 100)
+          : 0,
+    }));
   }
 
   async recordEventIdempotency(
@@ -123,7 +400,7 @@ export class AchievementRepository implements IAchievementRepository {
     return !!existing;
   }
 
-  async findActiveRulesIndexedByEventKey(): Promise<Map<string, any[]>> {
+  async findActiveRulesIndexedByEventKey(): Promise<Map<string, DbAchievementRule[]>> {
     try {
       // Fetch all active achievements that have rule data and auto-award enabled
       const achievements = await this.prisma.achievement.findMany({
@@ -142,17 +419,19 @@ export class AchievementRepository implements IAchievementRepository {
           category: true,
           targetValue: true,
           ruleData: true,
+          ruleComplexity: true,
+          rulePerformanceScore: true,
         },
       });
 
       // Index rules by event keys
-      const rulesIndex = new Map<string, any[]>();
+      const rulesIndex = new Map<string, DbAchievementRule[]>();
 
       for (const achievement of achievements) {
         if (!achievement.ruleData) continue;
 
         try {
-          const rule = achievement.ruleData as any;
+          const rule = achievement.ruleData as unknown as JsonRuleAchievementData;
 
           // Validate rule structure
           if (!rule.eventKeys || !Array.isArray(rule.eventKeys)) {
@@ -163,13 +442,14 @@ export class AchievementRepository implements IAchievementRepository {
           }
 
           // Create enriched rule object
-          const enrichedRule = {
+          const enrichedRule: DbAchievementRule = {
+            id: achievement.id,
             achievementId: achievement.id,
-            achievementName: achievement.name,
-            achievementSlug: achievement.slug,
-            category: achievement.category,
-            targetValue: achievement.targetValue,
-            rule,
+            eventKey: rule.eventKeys[0], // Primary event key
+            ruleData: rule,
+            isActive: true,
+            complexity: achievement.ruleComplexity,
+            performanceScore: achievement.rulePerformanceScore,
           };
 
           // Index by each event key this rule listens to
@@ -195,7 +475,7 @@ export class AchievementRepository implements IAchievementRepository {
   /**
    * Helper method to generate default rules for legacy achievements based on category
    */
-  private generateDefaultRule(achievement: any): any | null {
+  private generateDefaultRule(achievement: PrismaAchievement): JsonRuleAchievementData | null {
     const { category, targetValue } = achievement;
 
     // Generate basic rules based on category
@@ -262,7 +542,7 @@ export class AchievementRepository implements IAchievementRepository {
         if (defaultRule) {
           await this.prisma.achievement.update({
             where: { id: achievement.id },
-            data: { ruleData: defaultRule },
+            data: { ruleData: defaultRule as any },
           });
           backfilledCount++;
         }
@@ -275,85 +555,7 @@ export class AchievementRepository implements IAchievementRepository {
     }
   }
 
-  async findByName(name: string) {
-    return this.prisma.achievement.findUnique({
-      where: { name },
-    });
-  }
-
-  async findAllUserIds() {
-    return this.prisma.user.findMany({ select: { id: true } });
-  }
-
-  async createManyUserAchievements(
-    data: { userId: number; achievementId: number; progress: number }[],
-  ) {
-    await this.prisma.userAchievement.createMany({
-      data,
-      skipDuplicates: true,
-    });
-  }
-
-  async deleteUserAchievementsByAchievementId(achievementId: number) {
-    await this.prisma.userAchievement.deleteMany({
-      where: { achievementId },
-    });
-  }
-
-  async findUserById(userId: number) {
-    return this.prisma.user.findUnique({
-      where: { id: userId },
-    });
-  }
-
-  async findUserAchievementByUserAndAchievementId(userId: number, achievementId: number) {
-    return this.prisma.userAchievement.findUnique({
-      where: {
-        userId_achievementId: {
-          userId,
-          achievementId,
-        },
-      },
-    });
-  }
-
-  async findAllAchievements() {
-    return this.prisma.achievement.findMany();
-  }
-
-  async findAllUserAchievementsWithDetails() {
-    return this.prisma.userAchievement.findMany({
-      include: {
-        user: true,
-        achievement: true,
-      },
-    });
-  }
-
-  async findRecentUserAchievements(userId: number, limit: number) {
-    return this.prisma.userAchievement.findMany({
-      where: {
-        userId,
-        completedAt: { not: null },
-      },
-      include: {
-        achievement: true,
-      },
-      orderBy: {
-        completedAt: 'desc',
-      },
-      take: limit,
-    });
-  }
-
-  async getShameAchievements(userId: number): Promise<
-    Array<{
-      slug: string;
-      title: string;
-      description: string;
-      completedAt: Date;
-    }>
-  > {
+  async getShameAchievements(userId: number): Promise<ShameAchievement[]> {
     const userAchievements = await this.prisma.userAchievement.findMany({
       where: {
         userId,
@@ -384,7 +586,7 @@ export class AchievementRepository implements IAchievementRepository {
     }));
   }
 
-  async findShameAchievementByName(name: string): Promise<any | null> {
+  async findShameAchievementByName(name: string): Promise<PrismaAchievement | null> {
     return this.prisma.achievement.findFirst({
       where: {
         name,
@@ -415,7 +617,7 @@ export class AchievementRepository implements IAchievementRepository {
   /**
    * Find achievements that need rule validation (never validated or validation is stale)
    */
-  async findAchievementsNeedingValidation(): Promise<any[]> {
+  async findAchievementsNeedingValidation(): Promise<PrismaAchievement[]> {
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
@@ -425,24 +627,13 @@ export class AchievementRepository implements IAchievementRepository {
         ruleData: { not: Prisma.JsonNull },
         OR: [{ lastRuleValidation: null }, { lastRuleValidation: { lt: sevenDaysAgo } }],
       },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        ruleData: true,
-        ruleComplexity: true,
-        rulePerformanceScore: true,
-        lastRuleValidation: true,
-      },
     });
   }
 
   /**
    * Validate and update rule metrics for a specific achievement
    */
-  async validateAndUpdateRuleMetrics(
-    achievementId: number,
-  ): Promise<{ complexityScore: number; performanceScore: number }> {
+  async validateAndUpdateRuleMetrics(achievementId: number): Promise<DbAchievementRuleMetrics> {
     const achievement = await this.prisma.achievement.findUnique({
       where: { id: achievementId },
       select: { ruleData: true },

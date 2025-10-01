@@ -431,13 +431,13 @@ export class BettingRepository implements IBettingRepository {
         prediction: {
           id: number;
           title: string;
-          category: string;
+          category: string | null;
           resolved: boolean;
         };
         option: {
           id: number;
           label: string;
-        };
+        } | null;
       }
     >
   > {
@@ -487,6 +487,12 @@ export class BettingRepository implements IBettingRepository {
     // Map the results to match the expected interface
     return bets.map((bet) => ({
       ...bet,
+      prediction: {
+        id: bet.prediction.id,
+        title: bet.prediction.title,
+        category: bet.prediction.category?.name ?? null,
+        resolved: bet.prediction.resolved,
+      },
       option: bet.optionOption
         ? {
             id: bet.optionOption.id,
@@ -498,13 +504,13 @@ export class BettingRepository implements IBettingRepository {
         prediction: {
           id: number;
           title: string;
-          category: string;
+          category: string | null;
           resolved: boolean;
         };
         option: {
           id: number;
           label: string;
-        };
+        } | null;
       }
     >;
   }

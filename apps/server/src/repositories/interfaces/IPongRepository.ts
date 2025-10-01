@@ -1,13 +1,18 @@
 // apps/server/src/repositories/IPongRepository.ts
 
-import type { PongDifficulty, PongMatchStatus } from '@prisma/client';
+import type {
+  PrismaPongDifficulty,
+  PrismaPongMatchStatus,
+  DbPongEloHistoryEntry,
+  DbPrismaTransaction,
+} from '@ems/types';
 
 export interface PongStatsData {
   id?: number;
   userId: number;
   eloRating: number;
   peakElo: number;
-  eloHistory?: any[];
+  eloHistory?: DbPongEloHistoryEntry[];
   tier: string;
   lastEloChange: number;
   totalEloGained: number;
@@ -31,7 +36,7 @@ export interface PongStatsData {
   comebacks: number;
   aiWins: number;
   aiLosses: number;
-  hardestAiBeaten?: PongDifficulty;
+  hardestAiBeaten?: PrismaPongDifficulty;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -42,10 +47,10 @@ export interface PongMatchData {
   playerTwoId?: number;
   winnerId?: number;
   wagerAmount: bigint;
-  aiDifficulty?: PongDifficulty;
+  aiDifficulty?: PrismaPongDifficulty;
   playerOneScore: number;
   playerTwoScore: number;
-  status: PongMatchStatus;
+  status: PrismaPongMatchStatus;
   startedAt?: Date;
   completedAt?: Date;
   gameDuration?: number;
@@ -143,5 +148,5 @@ export interface IPongRepository {
   ): Promise<{ isLossOnly: boolean; winnerId?: number; loserId?: number }>;
 
   // Utility operations
-  executeInTransaction<T>(callback: (tx: any) => Promise<T>): Promise<T>;
+  executeInTransaction<T>(callback: (tx: DbPrismaTransaction) => Promise<T>): Promise<T>;
 }

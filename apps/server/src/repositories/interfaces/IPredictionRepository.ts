@@ -1,72 +1,36 @@
 // apps/server/src/repositories/IPredictionRepository.ts
 import type {
-  DbPrediction,
-  DbPredictionOption,
-  DbBet,
-  DbUser,
+  PrismaPredictionOption,
+  PrismaPredictionSourceLink,
   ParlayLegWithUser,
+  PredictionType,
+  BetWithUser,
+  DbPredictionActivity,
+  PredictionWithRelations,
+  PredictionWithCategory,
 } from '@ems/types';
-import type { PredictionType } from '@ems/types';
-
-// Using the global ParlayLegWithUser type from @ems/types
 
 export interface IPredictionRepository {
   /** Create a prediction along with its options */
   createPrediction(data: {
     title: string;
     description: string;
-    category: string;
+    categoryId: number;
     expiresAt: Date;
     creatorId: number;
     options: Array<{ label: string }>;
     type: PredictionType;
     threshold?: number;
-  }): Promise<
-    DbPrediction & {
-      options: DbPredictionOption[];
-      bets: Array<
-        DbBet & { user: Pick<DbUser, 'id' | 'name' | 'avatarUrl' | 'profilePictureKey'> }
-      >;
-    }
-  >;
+  }): Promise<PredictionWithCategory & { bets: BetWithUser[] }>;
 
   /** List all predictions, including options, bets, and parlay legs */
-  listAllPredictions(): Promise<
-    Array<
-      DbPrediction & {
-        options: DbPredictionOption[];
-        bets: Array<
-          DbBet & { user: Pick<DbUser, 'id' | 'name' | 'avatarUrl' | 'profilePictureKey'> }
-        >;
-        parlayLegs: ParlayLegWithUser[];
-      }
-    >
-  >;
+  listAllPredictions(): Promise<PredictionWithRelations[]>;
 
   /** Find a single prediction by ID, including options, bets, and parlay legs */
-  findPredictionById(id: number): Promise<
-    | (DbPrediction & {
-        options: DbPredictionOption[];
-        bets: Array<
-          DbBet & { user: Pick<DbUser, 'id' | 'name' | 'avatarUrl' | 'profilePictureKey'> }
-        >;
-        parlayLegs: ParlayLegWithUser[];
-      })
-    | null
-  >;
+  findPredictionById(id: number): Promise<PredictionWithRelations | null>;
 
   /** Find multiple predictions by IDs, including options, bets, and parlay legs */
-  findPredictionsByIds(ids: number[]): Promise<
-    Array<
-      DbPrediction & {
-        options: DbPredictionOption[];
-        bets: Array<
-          DbBet & { user: Pick<DbUser, 'id' | 'name' | 'avatarUrl' | 'profilePictureKey'> }
-        >;
-        parlayLegs: ParlayLegWithUser[];
-      }
-    >
-  >;
+  findPredictionsByIds(ids: number[]): Promise<PredictionWithRelations[]>;
 
   /** Find basic prediction data by ID (minimal fields for validation) */
   findPredictionBasicById(id: number): Promise<{
@@ -76,7 +40,11 @@ export interface IPredictionRepository {
   } | null>;
 
   /** Find existing source link for a prediction */
-  findExistingSourceLink(predictionId: number, articleId?: number, tweetId?: string): Promise<any>;
+  findExistingSourceLink(
+    predictionId: number,
+    articleId?: number,
+    tweetId?: string,
+  ): Promise<PrismaPredictionSourceLink | null>;
 
   /** Create a new source link for a prediction */
   createSourceLink(
@@ -86,7 +54,7 @@ export interface IPredictionRepository {
     url: string,
     title: string | null,
     publisher: string | null,
-  ): Promise<any>;
+  ): Promise<PrismaPredictionSourceLink>;
 
   /** Get source links for a prediction */
   getSourceLinks(predictionId: number): Promise<
@@ -109,12 +77,6 @@ export interface IPredictionRepository {
           siteUrl: string | null;
         };
       } | null;
-      tweet: {
-        id: string;
-        text: string;
-        permalink: string;
-        authorHandle: string;
-      } | null;
     }>
   >;
 
@@ -132,11 +94,5 @@ export interface IPredictionRepository {
     userId: number,
     activityTypes: string[],
     limit?: number,
-  ): Promise<
-    Array<{
-      activityType: string;
-      metadata: any;
-      occurredAt: Date;
-    }>
-  >;
+  ): Promise<DbPredictionActivity[]>;
 }

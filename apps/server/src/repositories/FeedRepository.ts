@@ -103,10 +103,32 @@ export class FeedRepository {
     });
   }
 
-  async updateArticleTags(id: number, tags: string[]) {
-    return this.prisma.article.update({
+  async updateArticleTags(id: number, tagIds: number[]) {
+    // First, delete existing tags for this article
+    await this.prisma.articleTag.deleteMany({
+      where: { articleId: id },
+    });
+
+    // Then create new tag associations
+    if (tagIds.length > 0) {
+      await this.prisma.articleTag.createMany({
+        data: tagIds.map((tagId) => ({
+          articleId: id,
+          tagId,
+        })),
+      });
+    }
+
+    // Return the updated article with its tags
+    return this.prisma.article.findUnique({
       where: { id },
-      data: { tags },
+      include: {
+        tags: {
+          include: {
+            tag: true,
+          },
+        },
+      },
     });
   }
 

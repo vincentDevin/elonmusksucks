@@ -1,17 +1,25 @@
 // apps/server/src/repositories/IUserRepository.ts
 
-import type { DbUser, DbUserBadge, DbBadge, DbUserStats, DbUserPost } from '@ems/types';
+import type {
+  PrismaUser,
+  PrismaUserBadge,
+  PrismaBadge,
+  DbUserStats,
+  DetailedUserAchievement,
+  DbUserFeedContent,
+  PrismaContent,
+} from '@ems/types';
 import type { Prisma } from '@prisma/client';
 
 export interface IUserRepository {
-  findById(id: number): Promise<DbUser | null>;
+  findById(id: number): Promise<PrismaUser | null>;
   findUserBasicById(id: number): Promise<{ id: number; name: string } | null>;
   getUserStats(userId: number): Promise<DbUserStats | null>;
 
   getFollowersCount(userId: number): Promise<number>;
   getFollowingCount(userId: number): Promise<number>;
-  findUserBadges(userId: number): Promise<Array<DbUserBadge & { badge: DbBadge }>>;
-  findUserAchievements(userId: number): Promise<any[]>;
+  findUserBadges(userId: number): Promise<Array<PrismaUserBadge & { badge: PrismaBadge }>>;
+  findUserAchievements(userId: number): Promise<DetailedUserAchievement[]>;
   existsFollow(followerId: number, followingId: number): Promise<boolean>;
   createFollow(followerId: number, followingId: number): Promise<void>;
   deleteFollow(followerId: number, followingId: number): Promise<void>;
@@ -20,7 +28,7 @@ export interface IUserRepository {
     userId: number,
     data: Partial<
       Pick<
-        DbUser,
+        PrismaUser,
         | 'bio'
         | 'avatarUrl'
         | 'location'
@@ -35,15 +43,15 @@ export interface IUserRepository {
   ): Promise<void>;
 
   /** now takes an optional filter for parentId */
-  getUserFeed(userId: number, options?: { parentId: number | null }): Promise<DbUserPost[]>;
+  getUserFeed(userId: number, options?: { parentId: number | null }): Promise<DbUserFeedContent[]>;
 
   createUserPost(data: {
     authorId: number;
     content: string;
     parentId: number | null;
-  }): Promise<DbUserPost>;
+  }): Promise<DbUserFeedContent>;
 
-  getUserPostThread(postId: number): Promise<(DbUserPost & { children: DbUserPost[] }) | null>;
+  getUserPostThread(postId: number): Promise<DbUserFeedContent | null>;
 
   /** stats stored in the database */
   getUserStats(userId: number): Promise<DbUserStats | null>;

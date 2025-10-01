@@ -1,123 +1,100 @@
-import { PrismaClient, PostReaction, ReactionType } from '@prisma/client';
+// apps/server/src/repositories/ReactionRepository.ts
+import { PrismaClient, Reaction, ReactionType } from '@prisma/client';
 import type { IReactionRepository } from './interfaces/IReactionRepository';
 
 export class ReactionRepository implements IReactionRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma: PrismaClient = new PrismaClient()) {}
 
-  /**
-   * Add a reaction to a post
-   */
-  async addReaction(postId: number, userId: number, type: ReactionType): Promise<PostReaction> {
-    // Use upsert to handle cases where user changes reaction type
-    const reaction = await this.prisma.postReaction.upsert({
-      where: {
-        postId_userId_type: {
-          postId,
+  // ============================================
+  // CONTENT REACTIONS (posts, comments)
+  // ============================================
+
+  async toggleContentReaction(
+    contentId: number,
+    userId: number,
+    type: ReactionType,
+  ): Promise<{
+    action: 'added' | 'removed' | 'changed';
+    reaction?: Reaction;
+    previousType?: ReactionType;
+  }> {
+    // Check if user already has a reaction
+    const existingReaction = await this.getUserContentReaction(contentId, userId);
+
+    if (!existingReaction) {
+      // Add new reaction
+      const reaction = await this.prisma.reaction.create({
+        data: {
           userId,
+          contentId,
           type,
         },
-      },
-      create: {
-        postId,
-        userId,
-        type,
-      },
-      update: {
-        type,
-        createdAt: new Date(), // Update timestamp when changing reaction
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            avatarUrl: true,
-          },
-        },
-      },
-    });
+      });
 
-    // Update the post's likes count
-    await this.updatePostReactionCount(postId);
+      // Increment content reaction count
+      await this.prisma.content.update({
+        where: { id: contentId },
+        data: { reactionsCount: { increment: 1 } },
+      });
 
-    return reaction;
-  }
+      return { action: 'added', reaction };
+    } else if (existingReaction.type === type) {
+      // Remove same reaction type
+      await this.prisma.reaction.delete({
+        where: { id: existingReaction.id },
+      });
 
-  /**
-   * Remove a reaction from a post
-   */
-  async removeReaction(postId: number, userId: number, type: ReactionType): Promise<boolean> {
-    const deleted = await this.prisma.postReaction.deleteMany({
-      where: {
-        postId,
-        userId,
-        type,
-      },
-    });
+      // Decrement content reaction count
+      await this.prisma.content.update({
+        where: { id: contentId },
+        data: { reactionsCount: { decrement: 1 } },
+      });
 
-    if (deleted.count > 0) {
-      await this.updatePostReactionCount(postId);
-      return true;
+      return { action: 'removed', previousType: type };
+    } else {
+      // Change reaction type (no count change)
+      const reaction = await this.prisma.reaction.update({
+        where: { id: existingReaction.id },
+        data: { type },
+      });
+
+      return { action: 'changed', reaction, previousType: existingReaction.type };
     }
-
-    return false;
   }
 
-  /**
-   * Get user's reaction to a post (any type)
-   */
-  async getUserReaction(postId: number, userId: number): Promise<PostReaction | null> {
-    return await this.prisma.postReaction.findFirst({
+  async getUserContentReaction(contentId: number, userId: number): Promise<Reaction | null> {
+    return this.prisma.reaction.findFirst({
       where: {
-        postId,
+        contentId,
         userId,
       },
+    });
+  }
+
+  async getContentReactions(contentId: number): Promise<Reaction[]> {
+    return this.prisma.reaction.findMany({
+      where: { contentId },
       include: {
         user: {
           select: {
             id: true,
             name: true,
             avatarUrl: true,
+            profilePictureKey: true,
           },
         },
       },
+      orderBy: { createdAt: 'desc' },
     });
   }
 
-  /**
-   * Get all reactions for a post
-   */
-  async getPostReactions(postId: number): Promise<PostReaction[]> {
-    return await this.prisma.postReaction.findMany({
-      where: { postId },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            avatarUrl: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
-  }
-
-  /**
-   * Get reaction counts by type for a post
-   */
-  async getReactionCounts(postId: number): Promise<Record<ReactionType, number>> {
-    const reactions = await this.prisma.postReaction.groupBy({
+  async getContentReactionCounts(contentId: number): Promise<Record<ReactionType, number>> {
+    const reactions = await this.prisma.reaction.groupBy({
       by: ['type'],
-      where: { postId },
-      _count: {
-        type: true,
-      },
+      where: { contentId },
+      _count: { type: true },
     });
 
-    // Initialize all reaction types with 0
     const counts: Record<ReactionType, number> = {
       LIKE: 0,
       LOVE: 0,
@@ -127,7 +104,6 @@ export class ReactionRepository implements IReactionRepository {
       ANGRY: 0,
     };
 
-    // Fill in actual counts
     reactions.forEach((reaction) => {
       counts[reaction.type] = reaction._count.type;
     });
@@ -135,36 +111,19 @@ export class ReactionRepository implements IReactionRepository {
     return counts;
   }
 
-  /**
-   * Update the post's total likes count (denormalized for performance)
-   */
-  async updatePostReactionCount(postId: number): Promise<void> {
-    const totalReactions = await this.prisma.postReaction.count({
-      where: { postId },
-    });
-
-    await this.prisma.userPost.update({
-      where: { id: postId },
-      data: { likesCount: totalReactions },
-    });
-  }
-
-  /**
-   * Get reactions with pagination for large posts
-   */
-  async getPostReactionsPaginated(
-    postId: number,
+  async getContentReactionsPaginated(
+    contentId: number,
     options: {
       cursor?: number;
       limit?: number;
       type?: ReactionType;
-    } = {},
-  ): Promise<{ reactions: PostReaction[]; nextCursor?: number }> {
+    },
+  ): Promise<{ reactions: Reaction[]; nextCursor?: number }> {
     const limit = options.limit ?? 50;
 
-    const reactions = await this.prisma.postReaction.findMany({
+    const reactions = await this.prisma.reaction.findMany({
       where: {
-        postId,
+        contentId,
         ...(options.type && { type: options.type }),
       },
       orderBy: { createdAt: 'desc' },
@@ -177,6 +136,7 @@ export class ReactionRepository implements IReactionRepository {
             id: true,
             name: true,
             avatarUrl: true,
+            profilePictureKey: true,
           },
         },
       },
@@ -189,34 +149,348 @@ export class ReactionRepository implements IReactionRepository {
     return { reactions: resultReactions, nextCursor };
   }
 
-  /**
-   * Toggle reaction (add if not exists, remove if exists, or change type)
-   */
-  async toggleReaction(
-    postId: number,
+  // ============================================
+  // ARTICLE REACTIONS
+  // ============================================
+
+  async toggleArticleReaction(
+    articleId: number,
     userId: number,
     type: ReactionType,
   ): Promise<{
     action: 'added' | 'removed' | 'changed';
-    reaction?: PostReaction;
+    reaction?: Reaction;
     previousType?: ReactionType;
   }> {
     // Check if user already has a reaction
-    const existingReaction = await this.getUserReaction(postId, userId);
+    const existingReaction = await this.getUserArticleReaction(articleId, userId);
 
     if (!existingReaction) {
       // Add new reaction
-      const reaction = await this.addReaction(postId, userId, type);
+      const reaction = await this.prisma.reaction.create({
+        data: {
+          userId,
+          articleId,
+          type,
+        },
+      });
+
+      // Increment article reaction count
+      await this.prisma.article.update({
+        where: { id: articleId },
+        data: { reactionsCount: { increment: 1 } },
+      });
+
       return { action: 'added', reaction };
     } else if (existingReaction.type === type) {
       // Remove same reaction type
-      await this.removeReaction(postId, userId, type);
+      await this.prisma.reaction.delete({
+        where: { id: existingReaction.id },
+      });
+
+      // Decrement article reaction count
+      await this.prisma.article.update({
+        where: { id: articleId },
+        data: { reactionsCount: { decrement: 1 } },
+      });
+
       return { action: 'removed', previousType: type };
     } else {
-      // Change reaction type - remove old, add new
-      await this.removeReaction(postId, userId, existingReaction.type);
-      const reaction = await this.addReaction(postId, userId, type);
+      // Change reaction type (no count change)
+      const reaction = await this.prisma.reaction.update({
+        where: { id: existingReaction.id },
+        data: { type },
+      });
+
       return { action: 'changed', reaction, previousType: existingReaction.type };
     }
+  }
+
+  async getUserArticleReaction(articleId: number, userId: number): Promise<Reaction | null> {
+    return this.prisma.reaction.findFirst({
+      where: {
+        articleId,
+        userId,
+      },
+    });
+  }
+
+  async getArticleReactions(articleId: number): Promise<Reaction[]> {
+    return this.prisma.reaction.findMany({
+      where: { articleId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            avatarUrl: true,
+            profilePictureKey: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async getArticleReactionCounts(articleId: number): Promise<Record<ReactionType, number>> {
+    const reactions = await this.prisma.reaction.groupBy({
+      by: ['type'],
+      where: { articleId },
+      _count: { type: true },
+    });
+
+    const counts: Record<ReactionType, number> = {
+      LIKE: 0,
+      LOVE: 0,
+      LAUGH: 0,
+      WOW: 0,
+      SAD: 0,
+      ANGRY: 0,
+    };
+
+    reactions.forEach((reaction) => {
+      counts[reaction.type] = reaction._count.type;
+    });
+
+    return counts;
+  }
+
+  // ============================================
+  // PREDICTION REACTIONS
+  // ============================================
+
+  async togglePredictionReaction(
+    predictionId: number,
+    userId: number,
+    type: ReactionType,
+  ): Promise<{
+    action: 'added' | 'removed' | 'changed';
+    reaction?: Reaction;
+    previousType?: ReactionType;
+  }> {
+    // Check if user already has a reaction
+    const existingReaction = await this.getUserPredictionReaction(predictionId, userId);
+
+    if (!existingReaction) {
+      // Add new reaction
+      const reaction = await this.prisma.reaction.create({
+        data: {
+          userId,
+          predictionId,
+          type,
+        },
+      });
+
+      // Note: Prediction doesn't have reactionsCount in schema yet
+      // This would need to be added if we want denormalized counts
+
+      return { action: 'added', reaction };
+    } else if (existingReaction.type === type) {
+      // Remove same reaction type
+      await this.prisma.reaction.delete({
+        where: { id: existingReaction.id },
+      });
+
+      return { action: 'removed', previousType: type };
+    } else {
+      // Change reaction type
+      const reaction = await this.prisma.reaction.update({
+        where: { id: existingReaction.id },
+        data: { type },
+      });
+
+      return { action: 'changed', reaction, previousType: existingReaction.type };
+    }
+  }
+
+  async getUserPredictionReaction(predictionId: number, userId: number): Promise<Reaction | null> {
+    return this.prisma.reaction.findFirst({
+      where: {
+        predictionId,
+        userId,
+      },
+    });
+  }
+
+  async getPredictionReactions(predictionId: number): Promise<Reaction[]> {
+    return this.prisma.reaction.findMany({
+      where: { predictionId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            avatarUrl: true,
+            profilePictureKey: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async getPredictionReactionCounts(predictionId: number): Promise<Record<ReactionType, number>> {
+    const reactions = await this.prisma.reaction.groupBy({
+      by: ['type'],
+      where: { predictionId },
+      _count: { type: true },
+    });
+
+    const counts: Record<ReactionType, number> = {
+      LIKE: 0,
+      LOVE: 0,
+      LAUGH: 0,
+      WOW: 0,
+      SAD: 0,
+      ANGRY: 0,
+    };
+
+    reactions.forEach((reaction) => {
+      counts[reaction.type] = reaction._count.type;
+    });
+
+    return counts;
+  }
+
+  // ============================================
+  // BATCH OPERATIONS
+  // ============================================
+
+  async getUserReactionsForContent(
+    userId: number,
+    contentIds: number[],
+  ): Promise<Map<number, Reaction>> {
+    const reactions = await this.prisma.reaction.findMany({
+      where: {
+        userId,
+        contentId: {
+          in: contentIds,
+        },
+      },
+    });
+
+    const map = new Map<number, Reaction>();
+    reactions.forEach((reaction) => {
+      if (reaction.contentId) {
+        map.set(reaction.contentId, reaction);
+      }
+    });
+
+    return map;
+  }
+
+  async getUserReactionsForArticles(
+    userId: number,
+    articleIds: number[],
+  ): Promise<Map<number, Reaction>> {
+    const reactions = await this.prisma.reaction.findMany({
+      where: {
+        userId,
+        articleId: {
+          in: articleIds,
+        },
+      },
+    });
+
+    const map = new Map<number, Reaction>();
+    reactions.forEach((reaction) => {
+      if (reaction.articleId) {
+        map.set(reaction.articleId, reaction);
+      }
+    });
+
+    return map;
+  }
+
+  async getUserReactionsForPredictions(
+    userId: number,
+    predictionIds: number[],
+  ): Promise<Map<number, Reaction>> {
+    const reactions = await this.prisma.reaction.findMany({
+      where: {
+        userId,
+        predictionId: {
+          in: predictionIds,
+        },
+      },
+    });
+
+    const map = new Map<number, Reaction>();
+    reactions.forEach((reaction) => {
+      if (reaction.predictionId) {
+        map.set(reaction.predictionId, reaction);
+      }
+    });
+
+    return map;
+  }
+
+  // ============================================
+  // STATISTICS
+  // ============================================
+
+  async getUserReactionStats(userId: number): Promise<{
+    totalReactions: number;
+    reactionsByType: Record<ReactionType, number>;
+  }> {
+    const reactions = await this.prisma.reaction.groupBy({
+      by: ['type'],
+      where: { userId },
+      _count: { type: true },
+    });
+
+    const reactionsByType: Record<ReactionType, number> = {
+      LIKE: 0,
+      LOVE: 0,
+      LAUGH: 0,
+      WOW: 0,
+      SAD: 0,
+      ANGRY: 0,
+    };
+
+    let totalReactions = 0;
+
+    reactions.forEach((reaction) => {
+      reactionsByType[reaction.type] = reaction._count.type;
+      totalReactions += reaction._count.type;
+    });
+
+    return {
+      totalReactions,
+      reactionsByType,
+    };
+  }
+
+  async getMostReactedContent(limit?: number): Promise<any[]> {
+    // Get most reacted content (across all types)
+    const contentReactions = await this.prisma.content.findMany({
+      where: {
+        reactionsCount: {
+          gt: 0,
+        },
+        isDeleted: false,
+      },
+      orderBy: {
+        reactionsCount: 'desc',
+      },
+      take: limit || 10,
+      include: {
+        author: {
+          select: {
+            id: true,
+            name: true,
+            avatarUrl: true,
+            profilePictureKey: true,
+          },
+        },
+        _count: {
+          select: {
+            reactions: true,
+          },
+        },
+      },
+    });
+
+    return contentReactions;
   }
 }

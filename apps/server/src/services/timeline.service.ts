@@ -1,40 +1,45 @@
 import { PrismaClient } from '@prisma/client';
 import { TimelineRepository } from '../repositories/TimelineRepository';
 import type { ITimelineRepository } from '../repositories/interfaces/ITimelineRepository';
+import { ReactionRepository } from '../repositories/ReactionRepository';
+import type { IReactionRepository } from '../repositories/interfaces/IReactionRepository';
+import { ContentRepository } from '../repositories/ContentRepository';
+import type { IContentRepository } from '../repositories/interfaces/IContentRepository';
 import { UserService } from './user.service';
+import type { PrismaReactionType } from '@ems/types';
 
 const prisma = new PrismaClient();
 const userService = new UserService();
 
 export class TimelineService {
   private repository: ITimelineRepository;
+  private reactionRepository: IReactionRepository;
+  private contentRepository: IContentRepository;
 
   constructor() {
     this.repository = new TimelineRepository(prisma);
+    this.reactionRepository = new ReactionRepository(prisma);
+    this.contentRepository = new ContentRepository();
   }
 
   async getArticles(params: { cursor?: Date; limit: number }) {
     return this.repository.getApprovedArticles(params);
   }
 
-  async getTimelineTweets(params: { cursor?: string; limit: number }) {
-    return this.repository.getTimelineTweets(params);
-  }
-
   async getArticleDetails(articleId: number): Promise<any> {
     return this.repository.getArticleDetails(articleId);
   }
 
-  async toggleArticleReaction(articleId: number, userId: number, type: string) {
-    return this.repository.toggleArticleReaction(articleId, userId, type);
+  async toggleArticleReaction(articleId: number, userId: number, type: PrismaReactionType) {
+    return this.reactionRepository.toggleArticleReaction(articleId, userId, type);
   }
 
   async getArticleReactions(articleId: number) {
-    const reactions = await this.repository.getArticleReactions(articleId);
+    const reactions = await this.reactionRepository.getArticleReactions(articleId);
 
     // Enrich user data with signed avatar URLs
     const enrichedReactions = await Promise.all(
-      reactions.map(async (reaction) => {
+      reactions.map(async (reaction: any) => {
         if (reaction.user) {
           const enrichedUser = await userService.enrichUserWithAvatar(reaction.user);
           return {
@@ -50,28 +55,29 @@ export class TimelineService {
   }
 
   async createArticleComment(articleId: number, userId: number, content: string) {
-    const comment = await this.repository.createArticleComment(articleId, userId, content);
-
-    // Enrich user data with signed avatar URL
-    if (comment.user) {
-      const enrichedUser = await userService.enrichUserWithAvatar(comment.user);
-      return {
-        ...comment,
-        user: enrichedUser,
-      };
-    }
+    // Create comment using Content model with articleId
+    const comment = await this.contentRepository.createContent({
+      authorId: userId,
+      type: 'COMMENT',
+      body: content,
+      articleId,
+    });
 
     return comment;
   }
 
   async getArticleComments(articleId: number, limit: number, cursor?: string) {
-    const result = await this.repository.getArticleComments(articleId, limit, cursor);
+    // Get comments for article using Content repository
+    const result = await this.contentRepository.getArticleComments(articleId, {
+      limit,
+      cursor: cursor ? parseInt(cursor) : undefined,
+    });
 
     // Enrich user data with signed avatar URLs
     const enrichedComments = await Promise.all(
-      result.comments.map(async (comment) => {
-        if (comment.user) {
-          const enrichedUser = await userService.enrichUserWithAvatar(comment.user);
+      result.comments.map(async (comment: any) => {
+        if (comment.author) {
+          const enrichedUser = await userService.enrichUserWithAvatar(comment.author);
           return {
             ...comment,
             user: enrichedUser,
@@ -82,8 +88,8 @@ export class TimelineService {
     );
 
     return {
-      ...result,
       comments: enrichedComments,
+      nextCursor: result.nextCursor?.toString(),
     };
   }
 

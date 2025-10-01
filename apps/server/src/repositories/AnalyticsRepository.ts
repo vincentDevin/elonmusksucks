@@ -133,7 +133,12 @@ export class AnalyticsRepository implements IAnalyticsRepository {
   }> {
     const [totalComments, totalPredictions, mostActiveUsers, pongMatchesLast24h] =
       await Promise.all([
-        this.prisma.predictionComment.count(),
+        this.prisma.content.count({
+          where: {
+            type: 'COMMENT',
+            isDeleted: false,
+          },
+        }),
         this.prisma.prediction.count(),
         this.prisma.userActivityLog.count({
           where: { occurredAt: { gte: last24h } },
@@ -236,7 +241,11 @@ export class AnalyticsRepository implements IAnalyticsRepository {
     }>
   > {
     const [comments, pongMatches] = await Promise.all([
-      this.prisma.predictionComment.findMany({
+      this.prisma.content.findMany({
+        where: {
+          type: 'COMMENT',
+          isDeleted: false,
+        },
         select: { createdAt: true },
         orderBy: { createdAt: 'asc' },
       }),

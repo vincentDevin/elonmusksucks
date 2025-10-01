@@ -41,7 +41,10 @@ export class PayoutRepository implements IPayoutRepository {
             winningOptionId,
             resolvedAt: new Date(),
           },
-          include: { options: true },
+          include: {
+            options: true,
+            category: true,
+          },
         });
 
         // --- STEP 2: process single bets ---
@@ -97,7 +100,7 @@ export class PayoutRepository implements IPayoutRepository {
                   metadata: {
                     predictionId,
                     predictionTitle: updatedPrediction.title,
-                    predictionCategory: updatedPrediction.category,
+                    predictionCategory: updatedPrediction.category?.name ?? null,
                     betId: b.id,
                     winningOptionId,
                     originalAmount: Number(b.amount),
@@ -237,7 +240,7 @@ export class PayoutRepository implements IPayoutRepository {
                 amount: Number(b.amount),
                 payout: Number(payoutAmount),
                 won: isWinner,
-                category: updatedPrediction.category,
+                category: updatedPrediction.category?.name ?? null,
                 odds: Number(b.oddsAtPlacement),
                 wasAllIn: b.wasAllIn,
               },
@@ -258,7 +261,15 @@ export class PayoutRepository implements IPayoutRepository {
           const legs = await tx.parlayLeg.findMany({
             where: { parlayId },
             include: {
-              option: { include: { prediction: true } },
+              option: {
+                include: {
+                  prediction: {
+                    include: {
+                      category: true,
+                    },
+                  },
+                },
+              },
               parlay: { include: { user: true } },
             },
           });
@@ -329,7 +340,7 @@ export class PayoutRepository implements IPayoutRepository {
                   predictions: legs.map((leg) => ({
                     id: leg.option.prediction.id,
                     title: leg.option.prediction.title,
-                    category: leg.option.prediction.category,
+                    category: leg.option.prediction.category?.name ?? null,
                     won: leg.optionId === leg.option.prediction.winningOptionId,
                   })),
                 },

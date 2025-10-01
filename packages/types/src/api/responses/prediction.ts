@@ -1,0 +1,153 @@
+/**
+ * Prediction Response DTOs
+ *
+ * Response types for prediction endpoints
+ */
+
+import type { PublicPrediction, PublicPredictionOption } from '../../database/prediction';
+import type { BetWithUser } from '../../prisma';
+
+// ============================================================================
+// API-Specific Types
+// ============================================================================
+
+export interface ParlayLegWithUser {
+  parlayId: number;
+  user: {
+    id: number;
+    name: string;
+    avatarUrl: string | null;
+    profilePictureKey?: string | null;
+  };
+  stake: string;
+  optionId: number;
+  createdAt: Date;
+  /** parent prediction id for context */
+  predictionId?: number;
+  optionLabel?: string;
+  predictionTitle?: string;
+  /** Enhanced with activity metrics for real-time events */
+  activityMetrics?: {
+    activityLevel: 'high' | 'medium' | 'low';
+    totalBets: number;
+    totalParlayLegs: number;
+    bettingVelocity: number;
+    lastActivityAt: Date | null;
+    popularityScore: number;
+  };
+  difficulty?: 'easy' | 'medium' | 'hard' | 'expert';
+  viewStats?: {
+    totalViews: number;
+    uniqueViewers: number;
+    viewsLast24h: number;
+    viewsLast7d: number;
+  };
+}
+
+// ============================================================================
+// Prediction View
+// ============================================================================
+
+export interface PredictionView {
+  id: number;
+  title: string;
+  description: string;
+  categoryId: number;
+  categoryName?: string;
+  status: string; // 'PENDING' | 'APPROVED' | 'RESOLVED'
+  type: string;
+  threshold?: number | null;
+  createdAt: string; // Date → ISO string
+  expiresAt: string; // Date → ISO string
+  resolvedAt: string | null; // Date → ISO string
+  creatorUserId: number;
+  winningOptionId: number | null;
+  options: Array<{
+    id: number;
+    label: string;
+    odds: number;
+    predictionId: number;
+  }>;
+  bets: Array<{
+    id: number;
+    userId: number;
+    userName: string;
+    amount: string; // BigInt → string
+    potentialPayout: string | null; // BigInt → string
+    payout: string | null; // BigInt → string
+    status: string;
+    createdAt: string; // Date → ISO string
+  }>;
+  sourceLinks?: Array<{
+    id: number;
+    url: string;
+    title: string;
+    description: string | null;
+  }>;
+}
+
+// ============================================================================
+// Prediction Full (with all related data)
+// ============================================================================
+
+export interface PredictionFull extends PublicPrediction {
+  options: PublicPredictionOption[];
+  bets: BetWithUser[];
+  parlayLegs?: ParlayLegWithUser[];
+  sourceLinks?: any[];
+}
+
+// ============================================================================
+// Enhanced Prediction Event Types (for real-time)
+// ============================================================================
+
+export interface EnhancedPredictionCreatePayload extends PublicPrediction {
+  options: PublicPredictionOption[];
+  bets: BetWithUser[];
+  parlayLegs: ParlayLegWithUser[];
+  activityMetrics: {
+    activityLevel: 'high' | 'medium' | 'low';
+    totalBets: number;
+    totalParlayLegs: number;
+    bettingVelocity: number;
+    lastActivityAt: Date | null;
+    popularityScore: number;
+  };
+  difficulty: 'easy' | 'medium' | 'hard' | 'expert';
+  viewStats: {
+    totalViews: number;
+    uniqueViewers: number;
+    viewsLast24h: number;
+    viewsLast7d: number;
+  };
+}
+
+export interface EnhancedOddsUpdatePayload {
+  predictionId: number;
+  timestamp: string;
+  significantChanges: number;
+  hotMarket: boolean;
+  activityMetrics: {
+    activityLevel: 'high' | 'medium' | 'low';
+    totalBets: number;
+    totalParlayLegs: number;
+    bettingVelocity: number;
+    lastActivityAt: Date | null;
+    popularityScore: number;
+  };
+  difficulty: 'easy' | 'medium' | 'hard' | 'expert';
+  viewStats: {
+    totalViews: number;
+    uniqueViewers: number;
+    viewsLast24h: number;
+    viewsLast7d: number;
+  };
+  options: Array<{
+    id: number;
+    label: string;
+    odds: number;
+    previousOdds: number;
+    change: number;
+    changePercent: number;
+  }>;
+}
