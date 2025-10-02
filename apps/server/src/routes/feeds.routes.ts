@@ -57,27 +57,28 @@ router.post('/retag', async (req: any, res: any) => {
     for (const articleId of ids) {
       const article = await findArticleById(articleId);
       if (article) {
-        const currentTags = new Set(article.tags);
+        // Extract tag IDs from article.tags (which are objects like { id, articleId, tagId })
+        const currentTagIds = new Set(article.tags.map((t: any) => t.tagId || t.id || t));
         let hasChanges = false;
 
-        // Remove tags
-        for (const tag of remove) {
-          if (currentTags.has(tag)) {
-            currentTags.delete(tag);
+        // Remove tags (expecting tag IDs)
+        for (const tagId of remove) {
+          if (currentTagIds.has(tagId)) {
+            currentTagIds.delete(tagId);
             hasChanges = true;
           }
         }
 
-        // Add tags
-        for (const tag of add) {
-          if (!currentTags.has(tag)) {
-            currentTags.add(tag);
+        // Add tags (expecting tag IDs)
+        for (const tagId of add) {
+          if (!currentTagIds.has(tagId)) {
+            currentTagIds.add(tagId);
             hasChanges = true;
           }
         }
 
         if (hasChanges) {
-          await updateArticleTags(articleId, Array.from(currentTags));
+          await updateArticleTags(articleId, Array.from(currentTagIds));
           tagged++;
         }
         processed++;

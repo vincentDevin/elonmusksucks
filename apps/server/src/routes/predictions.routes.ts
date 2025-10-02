@@ -159,4 +159,18 @@ router.post('/recommendations', getPersonalizedRecommendations);
 // GET /api/predictions/:id/similar - Get similar predictions based on content and user behavior
 router.get('/:id/similar', getSimilarPredictions);
 
+// ===============================================
+// Prediction Comments (unified Content system)
+// ===============================================
+// Note: Comments are now handled by the unified Content system
+// These routes use post.controller handlers which work with ContentRepository
+
+import { getPostComments, createComment } from '../controllers/post.controller';
+
+// GET /api/predictions/:id/comments - Get comments for a prediction
+router.get('/:id/comments', getPostComments);
+
+// POST /api/predictions/:id/comments - Create a comment on a prediction
+router.post('/:id/comments', requireAuth, createComment);
+
 export default router;

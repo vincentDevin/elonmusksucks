@@ -363,7 +363,7 @@ export const BookmarkSystem: React.FC<BookmarkSystemProps> = ({
             <div className="flex space-x-2 mt-2">
               <button
                 onClick={handleCreateCollection}
-                className="flex-1 px-3 py-1.5 bg-primary text-white text-sm rounded hover:bg-primary/90"
+                className="flex-1 px-3 py-1.5 bg-primary text-primary-foreground text-sm rounded hover:bg-primary/90"
               >
                 Create
               </button>
@@ -425,7 +425,7 @@ export const BookmarkSystem: React.FC<BookmarkSystemProps> = ({
           <h2 className="text-xl font-bold text-content">Bookmarks Manager</h2>
           <button
             onClick={() => setShowCreateCollection(true)}
-            className="px-3 py-1.5 text-sm bg-primary text-white rounded-lg hover:bg-primary/90
+            className="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90
                        flex items-center space-x-1"
           >
             <FolderPlusIcon className="w-4 h-4" />
@@ -439,7 +439,7 @@ export const BookmarkSystem: React.FC<BookmarkSystemProps> = ({
             onClick={() => setSelectedCollection(null)}
             className={`px-3 py-1.5 text-xs rounded-lg whitespace-nowrap transition-colors ${
               !selectedCollection
-                ? 'bg-primary text-white'
+                ? 'bg-primary text-primary-foreground'
                 : 'bg-muted text-tertiary hover:bg-hover'
             }`}
           >
@@ -452,7 +452,7 @@ export const BookmarkSystem: React.FC<BookmarkSystemProps> = ({
               className={`px-3 py-1.5 text-xs rounded-lg whitespace-nowrap transition-colors
                           flex items-center space-x-1 ${
                             selectedCollection === collection.id
-                              ? 'bg-primary text-white'
+                              ? 'bg-primary text-primary-foreground'
                               : 'bg-muted text-tertiary hover:bg-hover'
                           }`}
             >

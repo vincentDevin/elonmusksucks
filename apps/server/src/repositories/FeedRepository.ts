@@ -1,9 +1,10 @@
 import { PrismaClient, FeedStatus, ArticleStatus } from '@prisma/client';
+import type { IFeedRepository } from './interfaces/IFeedRepository';
 
 // TEMP: Re-export shared types for backwards compatibility during migration
 export type { PageQuery, CursorPage, SortOrder, DateRange } from '@ems/types';
 
-export class FeedRepository {
+export class FeedRepository implements IFeedRepository {
   constructor(private prisma: PrismaClient) {}
 
   async findMany() {
@@ -151,6 +152,89 @@ export class FeedRepository {
       orderBy,
       take,
       skip,
+    });
+  }
+
+  /**
+   * Create article with tags (for feed worker)
+   */
+  async createArticleWithTags(data: {
+    feedId: number;
+    guid: string | null;
+    url: string;
+    canonicalUrl?: string;
+    title: string;
+    excerpt?: string;
+    leadImageUrl?: string;
+    publishedAt: Date;
+    hash: string;
+    status: 'PENDING' | 'APPROVED' | 'REJECTED';
+    tags: {
+      create: Array<{
+        tag: {
+          connectOrCreate: {
+            where: { name: string };
+            create: { name: string; slug: string };
+          };
+        };
+      }>;
+    };
+  }) {
+    return this.prisma.article.create({
+      data,
+    });
+  }
+
+  /**
+   * Find article by hash for deduplication
+   */
+  async findArticleByHash(hash: string) {
+    return this.prisma.article.findUnique({
+      where: { hash },
+    });
+  }
+
+  /**
+   * Update article with enrichment data
+   */
+  async updateArticleEnrichment(
+    articleId: number,
+    data: {
+      leadImageUrl?: string;
+      excerpt?: string;
+      canonicalUrl?: string;
+      tags?: {
+        create: Array<{
+          tag: {
+            connectOrCreate: {
+              where: { name: string };
+              create: { name: string; slug: string };
+            };
+          };
+        }>;
+      };
+    },
+  ) {
+    return this.prisma.article.update({
+      where: { id: articleId },
+      data,
+    });
+  }
+
+  /**
+   * Get article with tags and feed (for enrichment worker)
+   */
+  async findArticleWithTagsAndFeed(articleId: number) {
+    return this.prisma.article.findUnique({
+      where: { id: articleId },
+      include: {
+        feed: true,
+        tags: {
+          include: {
+            tag: true,
+          },
+        },
+      },
     });
   }
 }

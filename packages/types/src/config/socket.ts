@@ -5,6 +5,33 @@
  */
 
 // ============================================================================
+// ACK Configuration
+// ============================================================================
+
+/**
+ * ACK Timeout Configuration
+ */
+export interface ACKTimeoutConfig {
+  timeoutMs: number;
+  maxRetries: number;
+  backoffMultiplier: number;
+  maxBackoffMs: number;
+}
+
+/**
+ * ACK Retry Policy
+ */
+export interface ACKRetryPolicy {
+  enabled: boolean;
+  maxAttempts: number;
+  attempt?: number;
+  backoffStrategy: 'linear' | 'exponential';
+  initialDelayMs: number;
+  maxDelayMs: number;
+  nextRetryDelayMs?: number;
+}
+
+// ============================================================================
 // Socket.IO Server Configuration
 // ============================================================================
 

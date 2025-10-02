@@ -2,8 +2,8 @@
  * API Requests Barrel Export
  */
 
-export * from './auth';
-export * from './prediction';
-export * from './user';
-export * from './content';
-export * from './admin';
+export * from './auth.js';
+export * from './prediction.js';
+export * from './user.js';
+export * from './content.js';
+export * from './admin.js';

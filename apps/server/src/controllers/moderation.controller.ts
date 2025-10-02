@@ -1,7 +1,7 @@
 // apps/server/src/controllers/moderation.controller.ts
 import { Request, Response, NextFunction } from 'express';
 import { moderationService } from '../services/moderation.service';
-import type { BanType } from '@prisma/client';
+import type { BanType } from '@ems/types';
 
 interface AuthenticatedRequest extends Request {
   user?: {

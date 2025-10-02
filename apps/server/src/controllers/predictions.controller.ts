@@ -65,7 +65,7 @@ export const createPrediction = async (
   next: NextFunction,
 ): Promise<void> => {
   try {
-    const { title, description, category, expiresAt, options, type, threshold } =
+    const { title, description, categoryId, expiresAt, options, type, threshold } =
       req.body as CreatePredictionPayload;
 
     const creatorId = (req as any).user?.id;
@@ -145,7 +145,7 @@ export const createPrediction = async (
     const pred = await predictionService.createPrediction({
       title,
       description,
-      category,
+      categoryId,
       expiresAt: new Date(expiresAt),
       creatorId,
       options: finalOptions,

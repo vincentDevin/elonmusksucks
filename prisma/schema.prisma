@@ -40,6 +40,10 @@ enum TransactionType {
 enum BanType {
   TEMPORARY
   PERMANENT
+  SHADOW           // User can post but content is hidden
+  CHAT_ONLY        // Can't chat but can use other features
+  BETTING_RESTRICTED // Can't place bets
+  FULL             // Complete platform ban
 }
 
 enum ModerationAction {
@@ -686,12 +690,15 @@ model UserStats {
   winRate      Float  @default(0) // (betsWon + parlaysWon) / (totalBets + totalParlays)
 
   // streak tracking
-  currentStreak Int @default(0)
-  longestStreak Int @default(0)
+  currentStreak     Int @default(0)
+  longestStreak     Int @default(0)
+  longestLoseStreak Int @default(0)
 
   // extras
   mostCommonBet String?
   biggestWin    BigInt  @default(0)
+  biggestLoss   BigInt  @default(0)
+  averageOdds   Float   @default(0) // Average odds of all bets placed
 
   updatedAt DateTime @default(now()) @updatedAt
 

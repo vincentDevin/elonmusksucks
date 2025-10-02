@@ -40,8 +40,10 @@ export function betaCohortMiddleware(config: BetaCohortConfig = defaultBetaCohor
       config.enabled && userId ? isUserInBetaCohort(userId, config.percentage) : false;
 
     (req as any).betaCohort = {
-      inBetaCohort,
-      cohortPercentage: config.percentage,
+      isInCohort: inBetaCohort,
+      percentage: config.percentage,
+      userId: userId || 0,
+      features: config.features,
     } as BetaCohortInfo;
 
     if (inBetaCohort) {

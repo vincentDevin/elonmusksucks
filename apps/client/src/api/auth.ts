@@ -56,6 +56,8 @@ export interface User {
   profileComplete: boolean;
   avatarUrl: string | null;
   theme: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 /**

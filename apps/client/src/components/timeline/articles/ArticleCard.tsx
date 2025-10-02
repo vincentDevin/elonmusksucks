@@ -31,7 +31,7 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({
   className = '',
 }) => {
   const { getReactionState, toggleReaction, initializeReactions } = useReactions();
-  const [commentsCount, setCommentsCount] = useState(item.engagement?.comments || 0);
+  const [commentsCount] = useState(item.engagement?.comments || 0);
 
   // Initialize reactions on mount
   useEffect(() => {
@@ -41,7 +41,7 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({
 
   // Get current reaction state from context
   const articleId = parseInt(item.id.replace('article-', ''));
-  const { reactionCounts, userReaction, isReacting } = getReactionState('article', articleId);
+  const { reactionCounts, userReaction } = getReactionState('article', articleId);
 
   const handleViewDetails = () => {
     onViewDetails?.(item);
@@ -147,12 +147,24 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({
           <div className="space-y-1">
             {item.sourceLinks.slice(0, 2).map((link) => (
               <div key={link.id} className="text-xs">
-                <a
-                  href={`/predictions/${link.predictionId}`}
-                  className="text-primary hover:text-primary/80"
-                >
-                  {link.title}
-                </a>
+                {(link as any).predictionId && (
+                  <a
+                    href={`/predictions/${(link as any).predictionId}`}
+                    className="text-primary hover:text-primary/80"
+                  >
+                    {(link as any).title || 'Prediction'}
+                  </a>
+                )}
+                {!(link as any).predictionId && (
+                  <a
+                    href={link.url}
+                    className="text-primary hover:text-primary/80"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Source Link
+                  </a>
+                )}
               </div>
             ))}
           </div>

@@ -79,11 +79,11 @@ export const toDatabaseMetricsResponse = (data: {
 export const toClearMetricsResponse = (data: {
   success: boolean;
   message: string;
-  timestamp: Date;
+  clearedAt: Date;
 }): ClearMetricsResponse => ({
   success: data.success,
   message: data.message,
-  timestamp: data.timestamp.toISOString(),
+  clearedAt: data.clearedAt.toISOString(),
 });
 
 /**

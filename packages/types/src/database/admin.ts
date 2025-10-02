@@ -566,3 +566,16 @@ export interface RealtimeMetrics {
     severity: number;
   }>;
 }
+
+// ============================================================================
+// Database Performance Monitoring Types
+// ============================================================================
+
+export interface SlowQueryRecord {
+  traceId: string;
+  model: string;
+  action: string;
+  duration: number;
+  timestamp: string;
+  params?: string;
+}

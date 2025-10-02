@@ -1,4 +1,6 @@
 import { ContentRepository } from '../repositories/ContentRepository';
+import { UserRepository } from '../repositories/UserRepository';
+import { UserService } from './user.service';
 import type { IContentRepository } from '../repositories/interfaces/IContentRepository';
 import type {
   DbUserFeedContent,
@@ -9,12 +11,16 @@ import type {
 import { NotFoundError, ForbiddenError, ValidationError } from '../errors';
 import { unifiedActivityService } from './unifiedActivity.service';
 
+const userService = new UserService();
+
 export class PostService {
   private contentRepository: IContentRepository;
+  private userRepository: UserRepository;
   private unifiedActivityService = unifiedActivityService;
 
   constructor() {
     this.contentRepository = new ContentRepository();
+    this.userRepository = new UserRepository();
   }
 
   /**
@@ -162,18 +168,38 @@ export class PostService {
     } = {},
     viewerId?: number,
   ): Promise<{ posts: DbUserFeedContent[]; nextCursor?: number }> {
-    const result = await this.contentRepository.getUserPosts(
-      userId,
-      {
-        limit: options.limit || 20,
-        cursor: options.cursor,
-        includeReplies: options.includeReplies ?? false,
-      },
+    const result = await this.contentRepository.getUserPosts(userId, {
+      limit: options.limit || 20,
+      cursor: options.cursor,
+      includeReplies: options.includeReplies ?? false,
       viewerId,
+    });
+
+    // Convert to feed content and enrich avatars
+    const posts = await Promise.all(
+      result.content.map(async (post) => {
+        const feedContent = this.toFeedContent(post, viewerId);
+
+        // Enrich author avatar URL
+        if (feedContent.author && feedContent.author.id) {
+          try {
+            const enrichedAuthor = await userService.enrichUserWithAvatar(feedContent.author);
+            return {
+              ...feedContent,
+              author: enrichedAuthor,
+              authorAvatar: enrichedAuthor.avatarUrl,
+            };
+          } catch (error) {
+            console.error(`[post] Error enriching post author ${feedContent.author.id}:`, error);
+          }
+        }
+
+        return feedContent;
+      }),
     );
 
     return {
-      posts: result.content.map((post) => this.toFeedContent(post, viewerId)),
+      posts,
       nextCursor: result.nextCursor,
     };
   }
@@ -183,7 +209,7 @@ export class PostService {
    */
   async getPostComments(
     postId: number,
-    _viewerId?: number,
+    viewerId?: number,
     options: {
       cursor?: number;
       limit?: number;
@@ -192,10 +218,34 @@ export class PostService {
     const result = await this.contentRepository.getReplies(postId, {
       limit: options.limit || 20,
       cursor: options.cursor,
+      viewerId,
     });
 
+    // Enrich comments with signed avatar URLs
+    const enrichedComments = await Promise.all(
+      result.replies.map(async (reply) => {
+        const feedContent = this.toFeedContent(reply);
+
+        // Enrich author avatar URL
+        if (feedContent.author && feedContent.author.id) {
+          try {
+            const enrichedAuthor = await userService.enrichUserWithAvatar(feedContent.author);
+            return {
+              ...feedContent,
+              author: enrichedAuthor,
+              authorAvatar: enrichedAuthor.avatarUrl,
+            };
+          } catch (error) {
+            console.error(`[post] Error enriching comment author ${feedContent.author.id}:`, error);
+          }
+        }
+
+        return feedContent;
+      }),
+    );
+
     return {
-      comments: result.replies.map((reply) => this.toFeedContent(reply)),
+      comments: enrichedComments,
       nextCursor: result.nextCursor,
     };
   }
@@ -216,26 +266,17 @@ export class PostService {
     }
 
     // Check if user already reported this content
-    const existingReport = await prisma.contentReport.findFirst({
-      where: {
-        contentId: postId,
-        reporterId,
-      },
-    });
-
-    if (existingReport) {
+    const hasReported = await this.contentRepository.hasUserReportedContent(postId, reporterId);
+    if (hasReported) {
       throw new ValidationError('You have already reported this post');
     }
 
     // Create the report
-    const report = await prisma.contentReport.create({
-      data: {
-        contentId: postId,
-        reporterId,
-        reason: reason as ReportReason,
-        details: details?.trim() || null,
-        status: 'PENDING',
-      },
+    const report = await this.contentRepository.createContentReport({
+      contentId: postId,
+      reporterId,
+      reason: reason as ReportReason,
+      details,
     });
 
     return {
@@ -264,7 +305,21 @@ export class PostService {
         avatarUrl: null,
       },
       parent: content.parent || null,
-    };
+      // Additional fields for UI compatibility
+      authorName: content.author?.name,
+      authorAvatar: content.author?.avatarUrl,
+      commentsCount: content._count?.children || content.repliesCount || 0,
+      visibility: content.visibility,
+      mediaUrls: content.mediaUrls,
+      linkPreview: content.linkPreview,
+      viewsCount: content.viewsCount?.toString() || '0',
+      sharesCount: content.sharesCount || 0,
+      editedAt: content.editedAt,
+      updatedAt: content.updatedAt,
+      reactionCounts: content.reactionCounts || { LIKE: 0, LOVE: 0, LAUGH: 0, ANGRY: 0, SAD: 0 },
+      userReaction: content.userReaction || null,
+      children: content.children || [],
+    } as any;
   }
 
   /**
@@ -303,29 +358,23 @@ export class PostService {
   private async processMentions(contentId: number, mentions: string[]): Promise<void> {
     for (const username of mentions) {
       try {
-        const user = await prisma.user.findFirst({
-          where: { name: username },
-        });
+        const user = await this.userRepository.findByUsername(username);
 
         if (user) {
           // Get content details
-          const content = await prisma.content.findUnique({
-            where: { id: contentId },
-            select: { body: true, authorId: true },
-          });
+          const content = await this.contentRepository.getContentById(contentId);
 
           if (content) {
             const startIndex = content.body.indexOf(`@${username}`);
             if (startIndex !== -1) {
               // Create mention record using ContentMention
-              await prisma.contentMention.create({
-                data: {
-                  contentId,
+              await this.contentRepository.addMentions(contentId, [
+                {
                   userId: user.id,
                   startIndex,
                   endIndex: startIndex + username.length + 1,
                 },
-              });
+              ]);
 
               // Create mention notification
               await this.createMentionNotification(contentId, user.id, username);
@@ -348,16 +397,9 @@ export class PostService {
   ): Promise<void> {
     try {
       // Get content and author details
-      const content = await prisma.content.findUnique({
-        where: { id: contentId },
-        include: {
-          author: {
-            select: { id: true, name: true, avatarUrl: true },
-          },
-        },
-      });
+      const content = await this.contentRepository.getContentWithDetails(contentId);
 
-      if (!content || !content.author) return;
+      if (!content) return;
 
       // Create unified activity for the mention
       const contentPreview =
@@ -390,25 +432,10 @@ export class PostService {
    * Process hashtags (create/update records)
    */
   private async processHashtags(contentId: number, hashtags: string[]): Promise<void> {
-    for (const tag of hashtags) {
-      try {
-        // Find or create hashtag
-        const hashtag = await prisma.hashtag.upsert({
-          where: { tag },
-          create: { tag, usageCount: 1 },
-          update: { usageCount: { increment: 1 } },
-        });
-
-        // Link hashtag to content using ContentHashtag
-        await prisma.contentHashtag.create({
-          data: {
-            contentId,
-            hashtagId: hashtag.id,
-          },
-        });
-      } catch (error) {
-        console.error(`Failed to process hashtag #${tag}:`, error);
-      }
+    try {
+      await this.contentRepository.addHashtags(contentId, hashtags);
+    } catch (error) {
+      console.error(`Failed to process hashtags:`, error);
     }
   }
 
@@ -423,44 +450,7 @@ export class PostService {
       trendingScore?: number;
     }>
   > {
-    // Get hashtags with most usage in the last 7 days
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-
-    const trending = await prisma.hashtag.findMany({
-      where: {
-        contents: {
-          some: {
-            content: {
-              createdAt: { gte: sevenDaysAgo },
-            },
-          },
-        },
-      },
-      include: {
-        _count: {
-          select: {
-            contents: {
-              where: {
-                content: {
-                  createdAt: { gte: sevenDaysAgo },
-                },
-              },
-            },
-          },
-        },
-      },
-      orderBy: {
-        usageCount: 'desc',
-      },
-      take: limit,
-    });
-
-    return trending.map((hashtag) => ({
-      id: hashtag.id,
-      tag: hashtag.tag,
-      usageCount: hashtag.usageCount,
-      trendingScore: hashtag._count.contents, // Recent usage count
-    }));
+    return this.contentRepository.getTrendingHashtags(limit);
   }
 
   /**
@@ -474,55 +464,14 @@ export class PostService {
       viewerId?: number;
     } = {},
   ): Promise<{ posts: DbUserFeedContent[]; nextCursor?: number }> {
-    const limit = options.limit ?? 20;
-
-    // First find the hashtag
-    const hashtag = await prisma.hashtag.findUnique({
-      where: { tag },
+    const result = await this.contentRepository.getContentByHashtag(tag, {
+      cursor: options.cursor,
+      limit: options.limit || 20,
     });
 
-    if (!hashtag) {
-      return { posts: [] };
-    }
-
-    // Get content with this hashtag
-    const contentHashtags = await prisma.contentHashtag.findMany({
-      where: {
-        hashtagId: hashtag.id,
-        content: {
-          type: 'POST',
-          visibility: 'PUBLIC', // Only show public posts in hashtag feeds
-        },
-      },
-      include: {
-        content: {
-          include: {
-            author: {
-              select: {
-                id: true,
-                name: true,
-                avatarUrl: true,
-              },
-            },
-          },
-        },
-      },
-      orderBy: {
-        content: {
-          createdAt: 'desc',
-        },
-      },
-      take: limit + 1,
-      cursor: options.cursor ? { id: options.cursor } : undefined,
-      skip: options.cursor ? 1 : 0,
-    });
-
-    const hasMore = contentHashtags.length > limit;
-    const resultPosts = hasMore ? contentHashtags.slice(0, -1) : contentHashtags;
-    const nextCursor = hasMore ? resultPosts[resultPosts.length - 1]?.id : undefined;
-
-    const posts = resultPosts.map((ch) => this.toFeedContent(ch.content, options.viewerId));
-
-    return { posts, nextCursor };
+    return {
+      posts: result.content.map((content) => this.toFeedContent(content, options.viewerId)),
+      nextCursor: result.nextCursor,
+    };
   }
 }

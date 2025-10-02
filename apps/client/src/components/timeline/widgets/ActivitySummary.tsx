@@ -66,10 +66,7 @@ export const ActivitySummary: React.FC<ActivitySummaryProps> = ({
 
       try {
         // Use existing API functions instead of direct axios calls
-        const [userActivity, userStats] = await Promise.all([
-          getUserActivity(user.id),
-          getUserStats(user.id).catch(() => null), // Stats might not be available
-        ]);
+        const userActivity = await getUserActivity(user.id);
 
         // Transform the activity data to match our interface
         // Note: This is a simplified transform - we might need to aggregate the actual activity data
@@ -106,7 +103,11 @@ export const ActivitySummary: React.FC<ActivitySummaryProps> = ({
             totalReactions: userActivity.filter((a) => a.type === 'reaction_given').length,
             totalComments: userActivity.filter((a) => a.type === 'comment_created').length,
             totalPredictions: userActivity.filter((a) => a.type === 'prediction_created').length,
-            accountAge: userStats?.accountAge || 180,
+            accountAge: user?.createdAt
+              ? Math.floor(
+                  (Date.now() - new Date(user.createdAt).getTime()) / (1000 * 60 * 60 * 24),
+                )
+              : 0,
             bestStreak: calculateBestStreak(userActivity),
           },
         };
@@ -271,7 +272,7 @@ export const ActivitySummary: React.FC<ActivitySummaryProps> = ({
               onClick={() => setTimeframe(period)}
               className={`flex-1 px-2 py-1 text-xs rounded transition-colors ${
                 timeframe === period
-                  ? 'bg-primary text-white'
+                  ? 'bg-primary text-primary-foreground'
                   : 'bg-muted text-tertiary hover:bg-hover'
               }`}
             >

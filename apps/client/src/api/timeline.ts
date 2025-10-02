@@ -22,7 +22,28 @@ import type {
 
 export const timelineApi = {
   /**
-   * Get articles timeline with pagination
+   * Get unified timeline (articles + posts) with pagination
+   * Backend merges both content types automatically
+   */
+  getTimeline: async (params?: {
+    cursor?: string;
+    limit?: number;
+    search?: string;
+  }): Promise<TimelineResponse> => {
+    const searchParams = new URLSearchParams();
+
+    searchParams.set('limit', String(params?.limit || 30));
+
+    // Optional parameters
+    if (params?.cursor) searchParams.set('cursor', params.cursor);
+    if (params?.search) searchParams.set('search', params.search);
+
+    const response = await api.get(`/api/timeline?${searchParams.toString()}`);
+    return response.data;
+  },
+
+  /**
+   * @deprecated Use getTimeline() instead - backend returns unified feed
    */
   getArticles: async (params?: {
     cursor?: string;
@@ -32,33 +53,23 @@ export const timelineApi = {
     sort?: 'newest' | 'oldest';
     search?: string;
   }): Promise<TimelineResponse> => {
-    const searchParams = new URLSearchParams();
-
-    // Default parameters
-    searchParams.set('status', params?.status || 'APPROVED');
-    searchParams.set('limit', String(params?.limit || 30));
-    searchParams.set('sort', params?.sort || 'newest');
-
-    // Optional parameters
-    if (params?.cursor) searchParams.set('cursor', params.cursor);
-    if (params?.tag) searchParams.set('tag', params.tag);
-    if (params?.search) searchParams.set('search', params.search);
-
-    const response = await api.get(`/api/timeline/articles?${searchParams.toString()}`);
-    return response.data;
+    // Just call getTimeline - backend doesn't support filtering by type
+    return timelineApi.getTimeline({
+      cursor: params?.cursor,
+      limit: params?.limit,
+      search: params?.search,
+    });
   },
 
   /**
-   * Get tweets timeline with pagination
+   * @deprecated Use getTimeline() instead - backend returns unified feed
    */
-  getTweets: async (params?: { cursor?: string; limit?: number }): Promise<TimelineResponse> => {
-    const searchParams = new URLSearchParams();
-
-    searchParams.set('limit', String(params?.limit || 50));
-    if (params?.cursor) searchParams.set('cursor', params.cursor);
-
-    const response = await api.get(`/api/timeline/tweets?${searchParams.toString()}`);
-    return response.data;
+  getPosts: async (params?: { cursor?: string; limit?: number }): Promise<TimelineResponse> => {
+    // Just call getTimeline - backend doesn't support filtering by type
+    return timelineApi.getTimeline({
+      cursor: params?.cursor,
+      limit: params?.limit,
+    });
   },
 
   /**

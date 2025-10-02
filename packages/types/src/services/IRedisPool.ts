@@ -5,6 +5,68 @@
  * Prevents direct Redis client usage in service layer.
  */
 
+import type IORedis from 'ioredis';
+
+/**
+ * Redis Pool Configuration
+ */
+export interface RedisPoolConfig {
+  /**
+   * Maximum number of connections in the pool
+   */
+  maxConnections: number;
+
+  /**
+   * Minimum number of connections to maintain
+   */
+  minConnections: number;
+
+  /**
+   * Timeout in milliseconds for acquiring a connection
+   */
+  acquireTimeoutMs: number;
+
+  /**
+   * Timeout in milliseconds for idle connections
+   */
+  idleTimeoutMs: number;
+}
+
+/**
+ * Redis Pool Health Statistics
+ */
+export interface RedisPoolHealth {
+  /**
+   * Total number of connections
+   */
+  totalConnections: number;
+
+  /**
+   * Number of active connections
+   */
+  activeConnections: number;
+
+  /**
+   * Number of idle connections
+   */
+  idleConnections: number;
+
+  /**
+   * Number of failed connection acquisitions
+   */
+  failedAcquisitions: number;
+
+  /**
+   * Average acquisition time in milliseconds
+   */
+  avgAcquisitionTime: number;
+
+  /**
+   * Timestamp of last health check
+   */
+  lastHealthCheck: number;
+}
+
 /**
  * Redis Pool Interface
  *
@@ -253,6 +315,42 @@ export interface IRedisPool {
    * @returns Promise that resolves when all connections are closed
    */
   close(): Promise<void>;
+
+  /**
+   * Get a connection from the pool (for advanced operations)
+   *
+   * @returns Promise resolving to a Redis connection
+   */
+  getConnection(): Promise<IORedis>;
+
+  /**
+   * Release a connection back to the pool
+   *
+   * @param connection - Redis connection to release
+   * @returns Promise that resolves when connection is released
+   */
+  releaseConnection(connection: IORedis): Promise<void>;
+
+  /**
+   * Destroy the pool and all connections
+   *
+   * @returns Promise that resolves when pool is destroyed
+   */
+  destroy(): Promise<void>;
+
+  /**
+   * Get pool statistics
+   *
+   * @returns Current pool stats
+   */
+  getStats(): { active: number; idle: number; total: number };
+
+  /**
+   * Get detailed health statistics
+   *
+   * @returns Detailed health stats or null if unavailable
+   */
+  getHealthStats?(): RedisPoolHealth | null;
 }
 
 /**

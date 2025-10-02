@@ -1,10 +1,4 @@
-import type {
-  JsonRuleAchievementData,
-  RuleValidationResult,
-  EventKeyOption,
-  RulePerformanceMetrics,
-  IEventBus,
-} from '@ems/types';
+import type { JsonRuleAchievementData, RuleValidationResult, EventKeyOption } from '@ems/types';
 
 /**
  * RuleValidationService
@@ -21,7 +15,7 @@ export class RuleValidationService {
   private cacheExpiry: number = 0;
   private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-  constructor(private eventBus: IEventBus) {}
+  constructor() {}
 
   /**
    * Validate a complete achievement rule
@@ -949,6 +943,4 @@ export class RuleValidationService {
 }
 
 // Export singleton instance for dependency injection
-export const ruleValidationService = new RuleValidationService({
-  publish: async () => {}, // Placeholder - will be injected with real eventBus
-} as any);
+export const ruleValidationService = new RuleValidationService();

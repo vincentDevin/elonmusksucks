@@ -72,8 +72,11 @@ export interface DbUserStats {
   // Streak tracking
   currentStreak: number;
   longestStreak: number;
+  longestLoseStreak: number;
   // Extras
   mostCommonBet: string | null;
   biggestWin: bigint;
+  biggestLoss: bigint;
+  averageOdds: number;
   updatedAt: Date;
 }

@@ -7,7 +7,7 @@ import type { IBackpressureQueue, BackpressureQueueConfig, QueuedOperation } fro
 
 export class BackpressureQueue implements IBackpressureQueue {
   private config: BackpressureQueueConfig;
-  private queue: QueuedOperation[] = [];
+  private queue: QueuedOperation<any>[] = [];
   private running: Set<string> = new Set();
   private operationCounter = 0;
 
@@ -54,7 +54,7 @@ export class BackpressureQueue implements IBackpressureQueue {
     });
   }
 
-  private insertByPriority(operation: QueuedOperation): void {
+  private insertByPriority(operation: QueuedOperation<any>): void {
     // Find insertion point - higher priority first, then by timestamp (FIFO)
     let insertIndex = this.queue.length;
     for (let i = 0; i < this.queue.length; i++) {
@@ -92,7 +92,7 @@ export class BackpressureQueue implements IBackpressureQueue {
       const result = await operation.operation();
       operation.resolve(result);
     } catch (error) {
-      operation.reject(error);
+      operation.reject(error instanceof Error ? error : new Error(String(error)));
     } finally {
       this.running.delete(operation.id);
 

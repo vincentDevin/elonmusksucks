@@ -1,10 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import type {
-  JsonRuleAchievementData,
-  RuleSimulationResult,
-  EventKeyOption,
-  IEventBus,
-} from '@ems/types';
+import type { JsonRuleAchievementData, RuleSimulationResult, IEventBus } from '@ems/types';
 
 interface TestScenario {
   name: string;
@@ -20,13 +15,6 @@ interface TestScenario {
   };
 }
 
-interface UnlockEstimate {
-  estimatedUnlockRate: number; // Percentage 0-100
-  sampleSize: number;
-  confidence: number; // 0-100
-  avgTimeToUnlock?: number; // hours
-}
-
 /**
  * AchievementSimulationService
  *
@@ -37,10 +25,7 @@ interface UnlockEstimate {
  * - Performance estimates
  */
 export class AchievementSimulationService {
-  constructor(
-    private prisma: PrismaClient,
-    private eventBus: IEventBus,
-  ) {}
+  constructor(private prisma: PrismaClient) {}
 
   /**
    * Simulate rule progress for a specific user
@@ -193,7 +178,7 @@ export class AchievementSimulationService {
       const bets = await this.prisma.bet.findMany({
         where: { userId },
         include: {
-          option: {
+          optionOption: {
             include: { prediction: true },
           },
         },
@@ -212,8 +197,8 @@ export class AchievementSimulationService {
               predictionId: bet.predictionId,
               amount: Number(bet.amount),
               odds: bet.oddsAtPlacement,
-              category: bet.option?.prediction?.category || 'unknown',
-              optionLabel: bet.option?.label || 'unknown',
+              category: bet.optionOption?.prediction?.categoryId || 'unknown',
+              optionLabel: bet.optionOption?.label || 'unknown',
             },
             timestamp: bet.createdAt.toISOString(),
           });
@@ -235,7 +220,7 @@ export class AchievementSimulationService {
                 profit: bet.payout ? Number(bet.payout) - Number(bet.amount) : -Number(bet.amount),
                 odds: bet.oddsAtPlacement,
               },
-              timestamp: bet.updatedAt.toISOString(),
+              timestamp: bet.createdAt.toISOString(),
             });
           }
         }
@@ -279,7 +264,7 @@ export class AchievementSimulationService {
               payout: Number(parlay.potentialPayout),
               profit: Number(parlay.potentialPayout) - Number(parlay.amount),
             },
-            timestamp: parlay.updatedAt.toISOString(),
+            timestamp: parlay.createdAt.toISOString(),
           });
         }
       }
@@ -454,7 +439,7 @@ export class AchievementSimulationService {
 
     // Initialize counters
     if (rule.counters) {
-      rule.counters.forEach((counter) => counters.set(counter, 0));
+      rule.counters.forEach((counter: string) => counters.set(counter, 0));
     }
 
     for (let i = 0; i < events.length; i++) {
@@ -463,8 +448,6 @@ export class AchievementSimulationService {
 
       // Check if this event should affect progress
       if (rule.eventKeys.includes(event.eventKey)) {
-        const oldProgress = currentProgress;
-
         // Process based on progress kind
         switch (rule.progress.kind) {
           case 'count':
@@ -508,7 +491,7 @@ export class AchievementSimulationService {
         }
 
         // Update counters
-        rule.counters?.forEach((counter) => {
+        rule.counters?.forEach((counter: string) => {
           const counterValue = this.extractCounterValue(event.payload, counter);
           if (counterValue !== null) {
             counters.set(counter, (counters.get(counter) || 0) + counterValue);
@@ -626,7 +609,7 @@ export class AchievementSimulationService {
    * Get nested value from object using dot notation
    */
   private getNestedValue(obj: Record<string, unknown>, path: string): unknown {
-    return path.split('.').reduce((current, key) => {
+    return path.split('.').reduce<unknown>((current, key) => {
       if (current && typeof current === 'object' && key in current) {
         return (current as Record<string, unknown>)[key];
       }
@@ -643,7 +626,7 @@ export class AchievementSimulationService {
   ): number | null {
     // This is a simplified implementation
     // In practice, you'd parse the setIf condition to extract the field reference
-    for (const [key, value] of Object.entries(setIf)) {
+    for (const [, value] of Object.entries(setIf)) {
       if (typeof value === 'string' && value.startsWith('$.')) {
         const fieldName = value.substring(2);
         const fieldValue = payload[fieldName];
@@ -826,7 +809,7 @@ export class AchievementSimulationService {
     }
   }
 
-  private createErrorResult(message: string): RuleSimulationResult {
+  private createErrorResult(_message: string): RuleSimulationResult {
     return {
       simulatedEvents: [],
       progressHistory: [],
@@ -918,7 +901,4 @@ export class AchievementSimulationService {
 }
 
 // Export singleton instance
-export const achievementSimulationService = new AchievementSimulationService(
-  new PrismaClient(),
-  { publish: async () => {} } as any, // Placeholder
-);
+export const achievementSimulationService = new AchievementSimulationService(new PrismaClient());

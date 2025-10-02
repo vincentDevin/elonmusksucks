@@ -13,7 +13,7 @@ const processedStats = new Set<IdempotencyKey>();
  * Returns true if processed, false if duplicate
  */
 export function processPongStats(matchId: string, userId: number, _stats: any): boolean {
-  const idempotencyKey = `${matchId}|${userId}`;
+  const idempotencyKey: IdempotencyKey = `${matchId}|${userId}` as IdempotencyKey;
 
   if (processedStats.has(idempotencyKey)) {
     console.log(`[pong-stats] Duplicate stats submission ignored: ${idempotencyKey}`);
@@ -25,12 +25,18 @@ export function processPongStats(matchId: string, userId: number, _stats: any): 
   return true;
 }
 
-// PongDifficulty now handled via 'any' type in shared interfaces
-import { PongMatchResult, PongStatsUpdate, EloChangeComponents, PongPayoutData } from '@ems/types';
+// Import all required types from @ems/types
+import {
+  PongMatchResult,
+  EloChangeComponents,
+  PongStatsUpdate,
+  PongPayoutJobData,
+  PongStatsData,
+} from '@ems/types';
+import { PongDifficulty } from '@prisma/client';
 import { PongEloService } from './pongElo.service';
 import { PureEloService } from './pureElo.service';
 import { SYSTEM_AI_USER_ID } from '@ems/types';
-import type { PongStatsData } from '../repositories/interfaces/IPongRepository';
 import { pongPayoutQueueService } from './pongPayoutQueue.service';
 import { eventBus } from '../lib/EventBus';
 import { streakManager } from './StreakManager.service';
@@ -426,11 +432,20 @@ export class PongStatsService {
 
     // 10. Enqueue payout if there's a human winner and wager amount > 0
     if (winnerId && winnerId > 0 && wagerAmount > 0) {
-      const payoutData: PongPayoutData = {
+      const payoutData: PongPayoutJobData = {
         matchId,
         winnerId,
-        mode: isAIMatch ? 'PVE_AI' : 'PVP',
-        stakeAmount: wagerAmount, // Keep as number for JSON serialization
+        loserId: loserId || null,
+        wager: wagerAmount,
+        payout: payoutAmount.toString(),
+        houseRake: '0', // Calculate in worker
+        vsAI: isAIMatch,
+        aiDifficulty: isAIMatch ? this.getAIDifficultyFromId(aiPlayerId) : undefined,
+        winnerScore: winnerScore || 5,
+        loserScore: loserScore || 0,
+        duration,
+        eloChange: calculations?.winnerEloChange?.totalChange || 0,
+        newElo: calculations?.winnerEloChange?.newRating || 0,
       };
 
       try {
@@ -908,7 +923,7 @@ export class PongStatsService {
           ? difficultyRank[newHardestAiBeaten as keyof typeof difficultyRank]
           : 0;
         if (difficultyRank[aiDifficulty as keyof typeof difficultyRank] > currentRank) {
-          newHardestAiBeaten = aiDifficulty;
+          newHardestAiBeaten = aiDifficulty.toUpperCase() as PongDifficulty;
         }
       } else {
         newAiLosses++;

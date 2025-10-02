@@ -11,7 +11,12 @@ export class SocketCleanupManager implements ISocketCleanupManager {
   /**
    * Register an event handler for cleanup tracking
    */
-  registerHandler(socketId: string, event: string, handler: Function, cleanup?: Function): void {
+  registerHandler(
+    socketId: string,
+    event: string,
+    handler: Function,
+    cleanup?: () => void | Promise<void>,
+  ): void {
     if (!this.socketListeners.has(socketId)) {
       this.socketListeners.set(socketId, []);
     }

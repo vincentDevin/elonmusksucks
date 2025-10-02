@@ -77,7 +77,59 @@ export interface MatchPlayerInfo {
 // ============================================================================
 
 /**
- * ELO Calculation Input
+ * ELO Change Components - Hybrid calculation result
+ *
+ * Used by PongEloService for calculating ELO changes based on
+ * both skill and economic components
+ */
+export interface EloChangeComponents {
+  skillChange: number;
+  economyChange: number;
+  economyComponent: number;
+  totalChange: number;
+  newRating: number;
+  newTier: string;
+}
+
+/**
+ * Hybrid ELO Calculation Input
+ *
+ * Used by PongEloService for calculating ELO with wager consideration
+ */
+export interface HybridEloCalculationInput {
+  playerElo: number;
+  opponentElo: number;
+  playerWon: boolean;
+  wagerAmount: bigint;
+  amountWon: bigint;
+  isAiOpponent?: boolean;
+  isPerfectGame?: boolean;
+}
+
+/**
+ * Pure ELO Calculation Input
+ *
+ * Used by PureEloService for standard ELO calculations
+ */
+export interface PureEloInput {
+  playerElo: number;
+  opponentElo: number;
+  won: boolean;
+  mode: 'PVP' | 'PVE_AI';
+}
+
+/**
+ * Pure ELO Calculation Result
+ */
+export interface PureEloResult {
+  delta: number;
+  newRating: number;
+  opponentDelta: number;
+  opponentNewRating: number;
+}
+
+/**
+ * Legacy ELO Calculation Input (deprecated, use HybridEloCalculationInput or PureEloInput)
  */
 export interface EloCalculationInput {
   winnerElo: number;
@@ -88,7 +140,7 @@ export interface EloCalculationInput {
 }
 
 /**
- * ELO Calculation Result
+ * Legacy ELO Calculation Result (deprecated)
  */
 export interface EloCalculationResult {
   winnerEloChange: number;
@@ -186,7 +238,7 @@ export interface EloTierInfo {
 // ============================================================================
 
 /**
- * Pong Stats Update Input
+ * Pong Stats Update Input - For calculating stats changes
  */
 export interface PongStatsUpdateInput {
   userId: number;
@@ -194,6 +246,25 @@ export interface PongStatsUpdateInput {
   eloChange: number;
   newElo: number;
   isWin: boolean;
+}
+
+/**
+ * Pong Stats Update - Raw input for stats calculation
+ *
+ * Used by pongStats.service.ts for calculating player statistics updates
+ */
+export interface PongStatsUpdate {
+  userId: number;
+  won: boolean;
+  wagerAmount: bigint;
+  amountWon: bigint;
+  opponentId?: number;
+  opponentElo?: number;
+  aiDifficulty?: string;
+  isPerfectGame?: boolean;
+  isComeback?: boolean;
+  gameDuration?: number;
+  avgPing?: number;
 }
 
 /**

@@ -191,7 +191,7 @@ export class AchievementEngine {
       // Get current user achievement progress
       const userAchievements = await this.achievementRepo.findUserAchievementsByAchievementId(
         rule.achievementId,
-        { where: { userId: event.userId } },
+        { userId: event.userId },
       );
 
       let currentProgress = 0;
@@ -263,8 +263,7 @@ export class AchievementEngine {
               description: achievement.description,
               category: achievement.category,
               targetValue: achievement.targetValue,
-              iconName: achievement.iconName,
-              badgeColor: achievement.badgeColor,
+              iconUrl: achievement.iconUrl,
             },
             progress: evaluation.newProgress,
             progressMax: achievement.targetValue || evaluation.newProgress,
@@ -313,17 +312,11 @@ export class AchievementEngine {
     achievementId: number,
     newProgress: number,
   ): Promise<void> {
-    // Always use upsert to handle race conditions
+    // Repository handles upsert internally
     await this.achievementRepo.updateUserAchievement({
-      where: {
-        userId_achievementId: { userId, achievementId },
-      },
-      update: { progress: newProgress },
-      create: {
-        userId,
-        achievementId,
-        progress: newProgress,
-      },
+      userId,
+      achievementId,
+      progress: newProgress,
     });
   }
 
@@ -337,21 +330,12 @@ export class AchievementEngine {
   ): Promise<void> {
     const completedAt = new Date();
 
-    // Always use upsert to handle race conditions
+    // Repository handles upsert internally
     await this.achievementRepo.updateUserAchievement({
-      where: {
-        userId_achievementId: { userId, achievementId },
-      },
-      update: {
-        progress: finalProgress,
-        completedAt,
-      },
-      create: {
-        userId,
-        achievementId,
-        progress: finalProgress,
-        completedAt,
-      },
+      userId,
+      achievementId,
+      progress: finalProgress,
+      completedAt,
     });
   }
 

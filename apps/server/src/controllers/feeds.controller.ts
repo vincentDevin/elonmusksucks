@@ -211,9 +211,9 @@ export const findArticleById = async (articleId: number) => {
   }
 };
 
-export const updateArticleTags = async (articleId: number, tags: string[]) => {
+export const updateArticleTags = async (articleId: number, tagIds: number[]) => {
   try {
-    const result = await feedService.updateArticleTags(articleId, tags);
+    const result = await feedService.updateArticleTags(articleId, tagIds);
     return result;
   } catch (error) {
     console.error('Error updating article tags:', error);

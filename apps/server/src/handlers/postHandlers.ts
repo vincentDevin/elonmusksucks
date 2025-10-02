@@ -23,7 +23,7 @@ export function registerPostHandlers(socket: AuthenticatedSocket): void {
   socket.on('post:edit', handlePostEdit);
   socket.on('post:delete', handlePostDelete);
   socket.on('post:react', handlePostReact);
-  socket.on('post:share', handlePostShare);
+  // socket.on('post:share', handlePostShare); // TODO: Implement sharePost in PostService
   socket.on('comment:create', handleCommentCreate);
   socket.on('comment:delete', handleCommentDelete);
 }
@@ -50,8 +50,21 @@ async function handlePostCreate(
       return;
     }
 
+    // Filter payload to only include supported visibility values
+    const servicePayload = {
+      content: payload.content,
+      mediaUrls: payload.mediaUrls,
+      linkPreview: payload.linkPreview,
+      parentId: payload.parentId,
+      // Only include visibility if it's one of the supported values
+      ...(payload.visibility &&
+        ['PUBLIC', 'PRIVATE', 'FOLLOWERS'].includes(payload.visibility) && {
+          visibility: payload.visibility as 'PUBLIC' | 'PRIVATE' | 'FOLLOWERS',
+        }),
+    };
+
     // Create post via service
-    const newPost = await postService.createPost(userId, payload);
+    const newPost = await postService.createPost(userId, servicePayload);
 
     // Publish to Redis for cross-server broadcasting
     await eventBus.publish(REDIS_CHANNELS.POST_CREATED, {
@@ -160,7 +173,9 @@ async function handlePostReact(
 
 /**
  * Handle real-time post sharing
+ * TODO: Implement sharePost method in PostService
  */
+/*
 async function handlePostShare(
   this: AuthenticatedSocket,
   payload: { postId: number },
@@ -183,6 +198,7 @@ async function handlePostShare(
     callback?.({ error: error.message || 'Failed to share post' });
   }
 }
+*/
 
 /**
  * Handle real-time comment creation

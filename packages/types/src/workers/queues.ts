@@ -28,6 +28,11 @@ export const QUEUE_NAMES = {
   LEADERBOARD_REFRESH: 'leaderboard-refresh',
 
   /**
+   * Leaderboard event processing queue
+   */
+  LEADERBOARD_EVENTS: 'leaderboard-events',
+
+  /**
    * Feed fetching queue
    */
   FEED_FETCH: 'feed-fetch',
@@ -146,6 +151,15 @@ export const QueueOptions: Record<QueueName, BaseQueueOptions> = {
     removeOnComplete: 10,
     removeOnFail: false,
     priority: 5, // Medium priority
+  },
+
+  [QUEUE_NAMES.LEADERBOARD_EVENTS]: {
+    attempts: 3,
+    backoff: { type: 'fixed', delay: 2000 },
+    timeout: 30000,
+    removeOnComplete: 100,
+    removeOnFail: false,
+    priority: 6, // Medium priority
   },
 
   [QUEUE_NAMES.FEED_FETCH]: {

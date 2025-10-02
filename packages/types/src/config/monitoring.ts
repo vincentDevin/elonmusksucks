@@ -380,3 +380,50 @@ export interface ProfilingConfig {
   outputPath?: string;
   uploadEndpoint?: string;
 }
+
+// ============================================================================
+// Socket Handler Metrics
+// ============================================================================
+
+/**
+ * Socket Handler Metrics
+ */
+export interface SocketHandlerMetrics {
+  handlerName: string;
+  count: number;
+  totalDuration?: number;
+  avgDuration: number;
+  p95Duration: number;
+  p99Duration: number;
+  errors?: number;
+  errorCount?: number;
+  errorRate?: number;
+  lastExecution?: string;
+}
+
+/**
+ * BullMQ Metrics
+ */
+export interface BullMQMetrics {
+  queueName: string;
+  processed: number;
+  failed: number;
+  depth: number;
+  oldestJobAge?: number;
+  ageMs?: number;
+  avgProcessingTime?: number;
+  successRate?: number;
+  lastUpdated: number;
+}
+
+/**
+ * Alert Threshold
+ */
+export interface AlertThreshold {
+  type?: string;
+  metric: string;
+  threshold: number;
+  currentValue?: number;
+  severity: AlertSeverity;
+  message: string;
+}

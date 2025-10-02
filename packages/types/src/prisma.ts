@@ -109,6 +109,23 @@ export type {
   PrismaPongMatchStatus,
 };
 
+// Export enums with cleaner names for convenience
+// Note: BanType and ModerationAction are NOT aliased here because they conflict
+// with domain layer types in domain/moderation.ts
+export type {
+  PrismaRole as Role,
+  PrismaBetOption as BetOption,
+  PrismaBetStatus as BetStatus,
+  PrismaTransactionType as TransactionType,
+  PrismaArticleStatus as ArticleStatus,
+  // PrismaBanType as BanType, // Conflicts with domain/moderation.ts
+  // PrismaModerationAction as ModerationAction, // Conflicts with domain/moderation.ts
+  PrismaReactionType as ReactionType,
+  PrismaContentType as ContentType,
+  PrismaPongDifficulty as PongDifficulty,
+  PrismaPongMatchStatus as PongMatchStatus,
+};
+
 // ============================================================================
 // Prisma Helper Types (using Prisma.ModelGetPayload pattern)
 // ============================================================================

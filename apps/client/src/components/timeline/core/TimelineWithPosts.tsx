@@ -53,18 +53,6 @@ export const TimelineWithPosts: React.FC<TimelineWithPostsProps> = ({
     setSourceItem(null);
   };
 
-  // Format time ago helper
-  const formatTimeAgo = (timestamp: string) => {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-
-    if (diffHours < 1) return 'Just now';
-    if (diffHours < 24) return `${diffHours}h ago`;
-    return `${Math.floor(diffHours / 24)}d ago`;
-  };
-
   // Render function for unified feed items using proper components
   const renderFeedItem = (item: UnifiedFeedItem) => {
     if (item.type === 'article') {

@@ -346,3 +346,130 @@ export const SampleAchievements: AchievementDefinition[] = [
     ],
   },
 ];
+
+// ============================================================================
+// Achievement Event Types
+// ============================================================================
+
+import type { RedisChannel } from '../api/socket/events';
+
+/**
+ * Achievement event that triggers rule evaluation
+ * Uses RedisChannel for event key to stay consistent with pub/sub system
+ */
+export interface AchievementEvent {
+  key: RedisChannel;
+  userId: number;
+  occurredAt: string; // ISO 8601
+  idempotencyKey: string;
+  payload: Record<string, unknown>;
+}
+
+// ============================================================================
+// Achievement Rule Types (JSON-based)
+// ============================================================================
+
+export interface JsonRuleAchievementData {
+  eventKeys: string[];
+  progress: {
+    kind: 'count' | 'streak' | 'threshold' | 'binary';
+    incrementIf?: Record<string, unknown>;
+    setIf?: Record<string, unknown>;
+    resetIf?: Record<string, unknown>;
+  };
+  unlockWhen: Record<string, unknown>;
+  counters?: string[];
+}
+
+export interface AchievementTemplate {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  rarity: 'common' | 'uncommon' | 'rare' | 'legendary' | 'secret' | 'shame';
+  ruleTemplate: JsonRuleAchievementData;
+  variables: Record<string, string>; // Template variables like {{streakLength}}
+  usage: number; // How many times this template has been used
+}
+
+// ============================================================================
+// Rule Validation Types
+// ============================================================================
+
+export interface RuleValidationResult {
+  isValid: boolean;
+  errors: string[];
+  warnings: string[];
+  estimatedComplexity: 'low' | 'medium' | 'high';
+  complexityScore: number;
+  optimizationSuggestions: string[];
+  estimatedPerformanceImpact: 'minimal' | 'moderate' | 'high';
+}
+
+export interface EventKeyOption {
+  key: string;
+  description: string;
+  category: 'betting' | 'chat' | 'prediction' | 'leaderboard' | 'pong' | 'user' | 'admin';
+  payloadSchema: Record<string, string>; // field name -> type
+  volume: 'low' | 'medium' | 'high' | 'critical';
+  examples: Record<string, unknown>[]; // Sample payloads
+}
+
+// ============================================================================
+// Rule Simulation Types
+// ============================================================================
+
+export interface RuleSimulationResult {
+  userId?: number;
+  userName?: string;
+  simulatedEvents: Array<{
+    eventKey: string;
+    payload: Record<string, unknown>;
+    timestamp: string;
+  }>;
+  progressHistory: Array<{
+    step: number;
+    progress: number;
+    unlocked: boolean;
+    timestamp: string;
+    triggerEvent?: string;
+  }>;
+  finalProgress: number;
+  unlocked: boolean;
+  unlockTimestamp?: string;
+  estimatedUnlockRate: number; // Percentage of users expected to unlock
+}
+
+export interface UnlockEstimate {
+  achievementId: number;
+  achievementTitle: string;
+  estimatedUnlockRate: number;
+  estimatedTimeToUnlock: number; // in hours
+  sampleSize: number;
+}
+
+// ============================================================================
+// Rule Performance Metrics
+// ============================================================================
+
+export interface RulePerformanceMetrics {
+  achievementId: number;
+  achievementTitle: string;
+  totalUsers: number;
+  completedUsers: number;
+  completionRate: number;
+  averageTimeToComplete: number; // in hours
+  processingLatency: {
+    p50: number;
+    p95: number;
+    p99: number;
+  };
+  eventVolume: {
+    daily: number;
+    weekly: number;
+    monthly: number;
+  };
+  complexityScore: number;
+  performanceScore: number; // 0-100, higher is better
+  lastAnalyzed: string;
+}

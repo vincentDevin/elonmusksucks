@@ -5,11 +5,14 @@
  */
 
 // Service Interfaces
-export * from './IEventBus';
-export * from './IRedisPool';
-export * from './IRateLimiter';
+export * from './IEventBus.js';
+export * from './IRedisPool.js';
+export * from './IRateLimiter.js';
+export * from './IBackpressureQueue.js';
+export * from './IEventCoalescer.js';
+export * from './ISocketCleanupManager.js';
 
 // Service-Specific Types
-export * from './prediction';
-export * from './user-stats';
-export * from './pong';
+export * from './prediction.js';
+export * from './user-stats.js';
+export * from './pong.js';

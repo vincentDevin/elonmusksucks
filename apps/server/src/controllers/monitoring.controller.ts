@@ -75,7 +75,7 @@ export async function clearDatabaseMetrics(
     const payload = toClearMetricsResponse({
       success: true,
       message: 'Query metrics cleared',
-      timestamp: new Date(),
+      clearedAt: new Date(),
     }) satisfies ClearMetricsResponse;
     res.json(payload);
   } catch (err) {

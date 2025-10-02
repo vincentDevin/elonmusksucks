@@ -7,6 +7,7 @@ import {
   TimelineFilters,
   type TimelineFilter,
   ContentModal,
+  CreatePost,
 } from '../components/timeline/core';
 import { TrendingHashtags } from '../components/posts/feeds';
 import {
@@ -36,6 +37,7 @@ export default function Timeline() {
     hasReactions: null,
   });
   const [showFilters, setShowFilters] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // Handle search
   const handleSearch = useCallback(async (query: string) => {
@@ -83,10 +85,10 @@ export default function Timeline() {
               url: articleData.url,
             },
             engagement: {
-              reactions: articleData.reactions || 0,
-              comments: articleData.comments || 0,
+              reactions: articleData.reactionsCount || 0,
+              comments: articleData.commentsCount || 0,
             },
-            tags: articleData.tags || [],
+            tags: articleData.tags?.map((t) => t.name || String(t)) || [],
           };
 
           // Convert to UnifiedFeedItem and open ContentModal
@@ -123,6 +125,11 @@ export default function Timeline() {
       hasMedia: null,
       hasReactions: null,
     });
+  }, []);
+
+  // Handle post created - refresh timeline feed
+  const handlePostCreated = useCallback(() => {
+    setRefreshKey((prev) => prev + 1);
   }, []);
 
   return (
@@ -191,10 +198,15 @@ export default function Timeline() {
             {/* Main Content Layout */}
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
               {/* Main Timeline Content - Takes up 3 columns on large screens */}
-              <div className="lg:col-span-3">
+              <div className="lg:col-span-3 space-y-6">
+                {/* Create Post Component - Only shown for authenticated users */}
+                {user && <CreatePost onPostCreated={handlePostCreated} />}
+
+                {/* Timeline Feed */}
                 <div className="bg-surface shadow rounded-lg transition-colors duration-300">
                   <div className="p-6">
                     <TimelineWithPosts
+                      key={refreshKey}
                       initialTab="posts"
                       searchQuery={searchQuery}
                       filters={filters}
@@ -225,19 +237,19 @@ export default function Timeline() {
                     <div className="space-y-2">
                       <Link
                         to="/predictions"
-                        className="block w-full px-4 py-2 text-sm bg-primary text-white rounded hover:bg-primary/90 transition-colors text-center"
+                        className="block w-full px-4 py-2 text-sm bg-primary text-primary-foreground rounded hover:bg-primary-hover transition-colors text-center"
                       >
                         Make Prediction
                       </Link>
                       <Link
                         to="/leaderboard"
-                        className="block w-full px-4 py-2 text-sm bg-surface border border-border text-content rounded hover:bg-hover transition-colors text-center"
+                        className="block w-full px-4 py-2 text-sm bg-surface border border-border text-content rounded hover:bg-primary/10 transition-colors text-center"
                       >
                         View Leaderboard
                       </Link>
                       <Link
                         to="/pong"
-                        className="block w-full px-4 py-2 text-sm bg-surface border border-border text-content rounded hover:bg-hover transition-colors text-center"
+                        className="block w-full px-4 py-2 text-sm bg-surface border border-border text-content rounded hover:bg-primary/10 transition-colors text-center"
                       >
                         Play Pong
                       </Link>

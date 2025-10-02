@@ -84,7 +84,7 @@ export const bulkUpdatePredictions = async (
         await eventBus.publish(REDIS_CHANNELS.PREDICTION_APPROVED, {
           id: prediction.id,
           title: prediction.title,
-          category: prediction.category,
+          categoryId: prediction.categoryId,
           timestamp: new Date().toISOString(),
         });
 
@@ -98,7 +98,7 @@ export const bulkUpdatePredictions = async (
             payload: {
               predictionId: prediction.id,
               title: prediction.title,
-              category: prediction.category,
+              categoryId: prediction.categoryId,
               bulkOperation: true,
             },
           });
@@ -126,7 +126,7 @@ export const bulkUpdatePredictions = async (
             payload: {
               predictionId: prediction.id,
               title: prediction.title,
-              category: prediction.category,
+              categoryId: prediction.categoryId,
               winningOptionId: prediction.resolutionData?.winningOptionId,
               bulkOperation: true,
             },
@@ -156,7 +156,7 @@ export const setPredictionStatus = async (
       id: updated.id,
       title: updated.title,
       description: updated.description,
-      category: updated.category,
+      categoryId: updated.categoryId,
       type: updated.type,
       approved: true,
       timestamp: new Date().toISOString(),
@@ -172,7 +172,7 @@ export const setPredictionStatus = async (
         payload: {
           predictionId: updated.id,
           title: updated.title,
-          category: updated.category,
+          categoryId: updated.categoryId,
           description: updated.description,
           type: updated.type,
         },
@@ -301,17 +301,20 @@ export const revokeBadge = async (userId: number, badgeId: number) => {
   return repo.removeBadgeFromUser(userId, badgeId);
 };
 
-// -- Leaderboard & Stats --
-export const refreshLeaderboard = async () => {
-  return repo.recalculateLeaderboard();
-};
-
 /**
  * Fetches raw stats, then maps Date→ISO and returns the DTO.
  */
 export const getUserStats = async (userId: number): Promise<UserStatsDTO | null> => {
   const raw = await repo.findUserStats(userId);
   if (!raw) return null;
+
+  // Calculate derived fields
+  const totalWinnings = raw.totalWon || BigInt(0);
+  const totalWagered = raw.totalWagered || BigInt(0);
+  const netProfit = raw.profit || BigInt(0);
+  const totalLosses = totalWagered - totalWinnings; // wagered - winnings = losses
+  const averageBetSize = raw.totalBets > 0 ? totalWagered / BigInt(raw.totalBets) : BigInt(0);
+  const winRate = raw.totalBets > 0 ? (raw.betsWon / raw.totalBets) * 100 : 0;
 
   return {
     totalBets: raw.totalBets,
@@ -323,15 +326,19 @@ export const getUserStats = async (userId: number): Promise<UserStatsDTO | null>
     totalParlayLegs: raw.totalParlayLegs,
     parlayLegsWon: raw.parlayLegsWon,
     parlayLegsLost: raw.parlayLegsLost,
-    totalWagered: raw.totalWagered.toString(),
-    totalWon: raw.totalWon.toString(),
-    profit: raw.profit.toString(),
-    roi: raw.roi,
+    totalWagered: totalWagered.toString(),
+    totalWinnings: totalWinnings.toString(),
+    totalLosses: totalLosses.toString(),
+    netProfit: netProfit.toString(),
     currentStreak: raw.currentStreak,
-    longestStreak: raw.longestStreak,
-    mostCommonBet: raw.mostCommonBet,
-    biggestWin: raw.biggestWin.toString(),
-    updatedAt: raw.updatedAt.toISOString(),
+    longestWinStreak: raw.longestStreak || 0,
+    longestLoseStreak: raw.longestLoseStreak || 0,
+    averageBetSize: averageBetSize.toString(),
+    averageOdds: raw.averageOdds || 0,
+    biggestWin: raw.biggestWin?.toString() || '0',
+    biggestLoss: raw.biggestLoss?.toString() || '0',
+    winRate: winRate,
+    roi: raw.roi,
   };
 };
 
@@ -362,11 +369,6 @@ export const exportAnalyticsData = async (params: {
   filters?: Record<string, any>;
 }) => {
   return repo.exportAnalyticsData(params);
-};
-
-// -- Miscellaneous --
-export const generateAITweet = async () => {
-  return repo.triggerAITweet();
 };
 
 // -- Real-time Metrics Broadcasting --

@@ -1,116 +1,149 @@
 import type { Request, Response } from 'express';
 import { TimelineService } from '../services/timeline.service';
+import { UserService } from '../services/user.service';
 import type {
   TimelineItem,
   TimelineResponse,
-  TimelineArticlesResponse,
   ArticleReactionResponse,
   ArticleCommentResponse,
 } from '@ems/types';
 import { validateArticleId } from '../utils/timeline';
 import type { AuthRequest } from '../middleware/auth.middleware';
-import {
-  toTimelineArticlesResponse,
-  toArticleReactionResponse,
-  toArticleCommentResponse,
-} from '../view/timeline.view';
 
 const timelineService = new TimelineService();
+const userService = new UserService();
 
-export async function getArticles(req: Request, res: Response) {
+/**
+ * Get unified timeline (posts + articles)
+ * GET /api/timeline
+ */
+export async function getTimeline(req: Request, res: Response) {
   try {
-    const { limit = '30', cursor } = req.query;
+    const { limit = '30' } = req.query;
     const pageLimit = Math.min(parseInt(limit as string) || 30, 100);
+    const viewerId = (req as any).user?.id; // Optional: include user reactions if authenticated
 
-    const cursorDate = cursor ? new Date(cursor as string) : undefined;
-    if (cursor && isNaN(cursorDate!.getTime())) {
-      // Keep same behavior - ignore invalid cursor
-      cursorDate ? undefined : undefined;
-    }
-
-    const articles = await timelineService.getArticles({
-      cursor: cursorDate && !isNaN(cursorDate.getTime()) ? cursorDate : undefined,
+    // Get both articles and posts, then merge and sort
+    const articlesPromise = timelineService.getArticles({
       limit: pageLimit,
     });
 
-    const hasMore = articles.length > pageLimit;
-    const items = articles.slice(0, pageLimit);
-
-    const nextCursor =
-      hasMore && items.length > 0
-        ? items[items.length - 1].publishedAt?.toISOString() ||
-          items[items.length - 1].createdAt.toISOString()
-        : undefined;
-
-    const payload = toTimelineArticlesResponse(
-      items,
-      hasMore,
-      nextCursor,
-    ) satisfies TimelineArticlesResponse;
-    res.json(payload);
-  } catch (error) {
-    console.error('[timeline] Error fetching articles:', error);
-    res.status(500).json({ error: 'Failed to fetch articles' });
-  }
-}
-
-export async function getTimelineTweets(req: Request, res: Response) {
-  try {
-    const { cursor, limit = '50' } = req.query as Record<string, string>;
-
-    const pageLimit = Math.min(parseInt(limit) || 50, 100);
-
-    const tweets = await timelineService.getTimelineTweets({
-      cursor: cursor || undefined,
+    const postsPromise = timelineService.getPublicPosts({
       limit: pageLimit,
+      viewerId,
     });
 
-    const hasMore = tweets.length > pageLimit;
-    const items = tweets.slice(0, pageLimit);
+    const [articles, posts] = await Promise.all([articlesPromise, postsPromise]);
 
-    const timelineItems: TimelineItem[] = items.map((tweet) => ({
-      id: `tweet-${tweet.id}`,
-      type: 'tweet' as const,
-      timestamp: tweet.postedAt.toISOString(),
+    // Enrich post authors with signed avatar URLs
+    const enrichedPosts = await Promise.all(
+      posts.map(async (post: any) => {
+        if (post.author) {
+          try {
+            const enrichedAuthor = await userService.enrichUserWithAvatar(post.author);
+            return { ...post, author: enrichedAuthor };
+          } catch (error) {
+            console.error(`[timeline] Error enriching post author ${post.authorId}:`, error);
+            return post;
+          }
+        }
+        return post;
+      }),
+    );
+
+    // Convert articles to TimelineItem format
+    const articleItems: TimelineItem[] = articles.map((article: any) => ({
+      id: `article-${article.id}`,
+      type: 'article' as const,
+      timestamp: article.publishedAt?.toISOString() || article.createdAt.toISOString(),
       content: {
-        title: `@${tweet.authorHandle}`,
-        excerpt: tweet.text,
-        url: tweet.permalink,
-        author: `@${tweet.authorHandle}`,
-        source: 'X (Twitter)',
+        title: article.title,
+        excerpt: article.excerpt || undefined,
+        url: article.url,
+        imageUrl: article.leadImageUrl || null,
+        author: article.feed?.name,
+        source: article.feed?.siteUrl || undefined,
       },
       engagement: {
-        reactions: tweet.likeCount,
-        comments: tweet.replyCount,
+        reactions: 0, // TODO: Get from article reactions
+        comments: 0, // TODO: Get from article comments
       },
-      tags: [],
-      sourceLinks: tweet.sourceLinks.map((link: any) => ({
-        id: link.id,
-        predictionId: link.predictionId,
-        articleId: null,
-        tweetId: tweet.id,
-        url: tweet.permalink,
-        title: link.title,
-        publisher: 'X (Twitter)',
-        capturedAt: new Date().toISOString(),
-      })),
+      tags: Array.isArray(article.tags)
+        ? article.tags.map((t: any) => t.tag?.name || t.name || t).filter(Boolean)
+        : [],
     }));
 
-    const nextCursor = hasMore && items.length > 0 ? items[items.length - 1].id : undefined;
+    // Convert posts to TimelineItem format with embedded post data
+    const postItems: TimelineItem[] = enrichedPosts.map((post: any) => ({
+      id: `post-${post.id}`,
+      type: 'article' as const, // Using 'article' type for posts too (timeline only has article/tweet)
+      timestamp: post.createdAt.toISOString(),
+      content: {
+        title: post.author?.name || 'User Post',
+        excerpt: post.body.substring(0, 200),
+        url: `/posts/${post.id}`, // Internal post URL
+        imageUrl: post.mediaUrls?.[0] || null,
+        author: post.author?.name,
+        source: 'Community Post',
+      },
+      engagement: {
+        reactions: post._count?.reactions || 0,
+        comments: post._count?.children || 0,
+      },
+      tags: [],
+      // Add full post data for frontend to use
+      postData: {
+        id: post.id,
+        authorId: post.authorId,
+        content: post.body, // For type compatibility
+        body: post.body, // For PostCard component
+        contentType: post.contentType,
+        visibility: post.visibility,
+        mediaUrls: post.mediaUrls,
+        linkPreview: post.linkPreview,
+        parentId: post.parentId,
+        threadDepth: post.threadDepth,
+        likesCount: post._count?.reactions || 0,
+        commentsCount: post._count?.children || 0,
+        sharesCount: post.sharesCount || 0,
+        viewsCount: post.viewCount?.toString() || '0',
+        reactionCounts: post.reactionCounts,
+        userReaction: post.userReaction,
+        isDeleted: post.isDeleted,
+        isFlagged: post.isFlagged,
+        createdAt: post.createdAt.toISOString(),
+        updatedAt: post.updatedAt.toISOString(),
+        editedAt: post.editedAt?.toISOString(),
+        children: undefined,
+        authorName: post.author?.name,
+        authorAvatar: post.author?.avatarUrl,
+        canEdit: false,
+        canDelete: false,
+      },
+    }));
 
-    const response: TimelineResponse = {
-      items: timelineItems,
+    // Merge and sort by timestamp
+    const allItems = [...articleItems, ...postItems].sort(
+      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+    );
+
+    // Apply pagination
+    const items = allItems.slice(0, pageLimit);
+    const hasMore = allItems.length > pageLimit;
+    const nextCursor = hasMore ? items[items.length - 1].timestamp : undefined;
+
+    const payload: TimelineResponse = {
+      items,
       pagination: {
         cursor: nextCursor,
         hasMore,
         total: undefined,
       },
     };
-
-    res.json(response);
+    res.json(payload);
   } catch (error) {
-    console.error('[timeline] Error fetching tweets:', error);
-    res.status(500).json({ error: 'Failed to fetch tweets' });
+    console.error('[timeline] Error fetching timeline:', error);
+    res.status(500).json({ error: 'Failed to fetch timeline' });
   }
 }
 
@@ -197,11 +230,12 @@ export const toggleArticleReaction = async (req: AuthRequest, res: Response) => 
 
     const result = await timelineService.toggleArticleReaction(articleId, userId, type);
 
-    const payload = toArticleReactionResponse({
+    const payload: ArticleReactionResponse = {
       action: result.action,
-      type: type as string,
-      totalReactions: (result.counts as any)?.[type] || 0,
-    }) satisfies ArticleReactionResponse;
+      type: type,
+      totalReactions: 0, // TODO: Get actual count from result
+      reactionCounts: {}, // TODO: Get actual counts from result
+    };
     res.json(payload);
   } catch (error: any) {
     console.error('[timeline] Error toggling article reaction:', error);
@@ -280,14 +314,29 @@ export const createArticleComment = async (req: AuthRequest, res: Response) => {
 
     const newComment = await timelineService.createArticleComment(articleId, userId, content);
 
-    const payload = toArticleCommentResponse({
+    // Enrich author with avatar if available
+    let enrichedAuthor;
+    if ('author' in newComment && newComment.author) {
+      try {
+        enrichedAuthor = await userService.enrichUserWithAvatar(newComment.author);
+      } catch (error) {
+        console.error('[timeline] Error enriching comment author:', error);
+        enrichedAuthor = newComment.author;
+      }
+    }
+
+    const payload: ArticleCommentResponse = {
       id: newComment.id,
-      content: newComment.content,
-      authorId: newComment.user.id,
-      authorName: newComment.user.name,
+      content: newComment.body,
+      body: newComment.body,
+      authorId: newComment.authorId,
+      authorName: enrichedAuthor?.name || 'Unknown',
       articleId,
-      createdAt: newComment.createdAt,
-    }) satisfies ArticleCommentResponse;
+      createdAt: newComment.createdAt.toISOString(),
+      author: enrichedAuthor,
+      user: enrichedAuthor,
+    };
+
     res.status(201).json(payload);
   } catch (error: any) {
     console.error('[timeline] Error creating article comment:', error);
@@ -311,14 +360,27 @@ export const getArticleComments = async (req: Request, res: Response) => {
     const articleId = parseInt(req.params.id);
     const { limit = '20', cursor } = req.query;
     const pageLimit = Math.min(parseInt(limit as string) || 20, 100);
+    const viewerId = (req as any).user?.id; // Optional: include user reactions if authenticated
 
     if (isNaN(articleId)) {
       res.status(400).json({ error: 'Invalid article ID' });
       return;
     }
 
-    const result = await timelineService.getArticleComments(articleId, pageLimit, cursor as string);
-    res.json(result);
+    const result = await timelineService.getArticleComments(
+      articleId,
+      pageLimit,
+      cursor as string,
+      viewerId,
+    );
+
+    // Convert BigInt values to strings before JSON serialization
+    const jsonString = JSON.stringify(result, (_key, value) =>
+      typeof value === 'bigint' ? value.toString() : value,
+    );
+
+    res.setHeader('Content-Type', 'application/json');
+    res.send(jsonString);
   } catch (error) {
     console.error('[timeline] Error fetching article comments:', error);
     res.status(500).json({ error: 'Failed to fetch comments' });

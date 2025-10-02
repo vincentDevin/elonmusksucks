@@ -19,6 +19,8 @@ interface ParsedContent {
  */
 export const MentionRenderer: React.FC<MentionRendererProps> = ({ content, className = '' }) => {
   const parseContent = (text: string): ParsedContent[] => {
+    if (!text) return [];
+
     const parts: ParsedContent[] = [];
 
     // Combined regex for mentions, hashtags, and links

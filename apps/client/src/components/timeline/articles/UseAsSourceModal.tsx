@@ -284,7 +284,7 @@ export const UseAsSourceModal: React.FC<UseAsSourceModalProps> = ({ item, isOpen
                       {prediction.title}
                     </h4>
                     <p className="text-xs text-content/60 mt-1">
-                      {prediction.category} • Expires{' '}
+                      Category ID: {prediction.categoryId} • Expires{' '}
                       {new Date(prediction.expiresAt).toLocaleDateString()}
                     </p>
                   </button>

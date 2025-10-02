@@ -6,7 +6,12 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        primary: 'var(--color-primary)',
+        primary: {
+          DEFAULT: 'var(--color-primary)',
+          foreground: 'var(--color-primary-foreground, #ffffff)',
+          hover: 'var(--color-primary-hover, var(--color-primary))',
+        },
+        border: 'var(--color-border, #e2e8f0)',
         muted: 'var(--color-muted)',
         tertiary: 'var(--color-tertiary)',
         surface: 'var(--color-surface)',
@@ -14,6 +19,10 @@ module.exports = {
         secondary: 'var(--color-secondary)',
         content: 'var(--color-content)',
         background: 'var(--color-background)',
+        error: 'var(--color-error)',
+        warning: 'var(--color-warning)',
+        success: 'var(--color-success)',
+        info: 'var(--color-info)',
       },
       keyframes: {
         marquee: {

@@ -14,6 +14,9 @@ export interface RegisterRequest {
   password?: string;
 }
 
+// Alias for backwards compatibility
+export type RegisterPayload = RegisterRequest;
+
 // ============================================================================
 // Login
 // ============================================================================
@@ -23,6 +26,9 @@ export interface LoginRequest {
   password?: string;
 }
 
+// Alias for backwards compatibility
+export type LoginPayload = LoginRequest;
+
 // ============================================================================
 // Password Reset
 // ============================================================================
@@ -31,7 +37,13 @@ export interface PasswordResetRequestRequest {
   email?: string;
 }
 
+// Alias for backwards compatibility
+export type PasswordResetRequestPayload = PasswordResetRequestRequest;
+
 export interface PasswordResetRequest {
   token?: string;
   newPassword?: string;
 }
+
+// Alias for backwards compatibility
+export type PasswordResetPayload = PasswordResetRequest;

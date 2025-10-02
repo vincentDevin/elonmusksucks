@@ -4,5 +4,5 @@
  * Exports all worker/queue types
  */
 
-export * from './queues';
-export * from './jobs';
+export * from './queues.js';
+export * from './jobs.js';

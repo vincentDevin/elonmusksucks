@@ -105,21 +105,7 @@ router.patch('/users/:id/badges', adminController.assignBadge);
 router.delete('/users/:id/badges/:badgeId', adminController.revokeBadge);
 
 // — Leaderboard & Stats —
-router.post('/leaderboard/refresh', adminController.refreshLeaderboard);
 router.get('/stats/:userId', adminController.getUserStats);
-
-// — Miscellaneous —
-router.post('/aitweet', adminController.triggerAITweet);
-
-// — Unified Content Management —
-router.get('/unified-content', adminController.getUnifiedContent);
-router.get('/unified-content/analytics', adminController.getUnifiedContentAnalytics);
-router.post('/unified-content/bulk', adminController.performBulkContentOperation);
-router.post('/unified-content/:contentId/approve', adminController.approveUnifiedContent);
-router.post('/unified-content/:contentId/reject', adminController.rejectUnifiedContent);
-router.post('/unified-content/:contentId/flag', adminController.flagUnifiedContent);
-router.delete('/unified-content/:contentId', adminController.deleteUnifiedContent);
-router.get('/unified-content/export', adminController.exportUnifiedContent);
 
 // — RSS Feeds Management —
 // Mount the feeds routes under /feeds (so they become /api/admin/feeds/*)

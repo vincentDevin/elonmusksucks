@@ -189,11 +189,50 @@ export class UserService {
     expiresInSeconds = 3600,
   ): Promise<string> {
     const redisKey = CACHE_KEYS.PROFILE_IMAGE_URL(userId);
+
     // Try Redis first
     const cached = await redisClient.get(redisKey);
-    if (cached) return cached;
+    if (cached) {
+      // Validate the cached URL isn't expired by checking the X-Amz-Date parameter
+      try {
+        const url = new URL(cached);
+        const amzDate = url.searchParams.get('X-Amz-Date');
+        const expires = url.searchParams.get('X-Amz-Expires');
 
-    // Not cached: generate signed URL
+        if (amzDate && expires) {
+          // Parse the date: format is YYYYMMDDTHHmmssZ
+          const year = parseInt(amzDate.substring(0, 4));
+          const month = parseInt(amzDate.substring(4, 6)) - 1;
+          const day = parseInt(amzDate.substring(6, 8));
+          const hour = parseInt(amzDate.substring(9, 11));
+          const minute = parseInt(amzDate.substring(11, 13));
+          const second = parseInt(amzDate.substring(13, 15));
+
+          const signedDate = new Date(Date.UTC(year, month, day, hour, minute, second));
+          const expiryDate = new Date(signedDate.getTime() + parseInt(expires) * 1000);
+
+          // If URL is expired or will expire in the next 5 minutes, regenerate
+          if (expiryDate.getTime() > Date.now() + 5 * 60 * 1000) {
+            console.log(
+              `[user] Using cached avatar for user ${userId}, expires at ${expiryDate.toISOString()}`,
+            );
+            return cached;
+          }
+
+          // Delete expired cache
+          console.log(
+            `[user] Cached avatar expired for user ${userId}, regenerating (was signed ${amzDate}, expired ${expiryDate.toISOString()})`,
+          );
+          await redisClient.del(redisKey);
+        }
+      } catch (error) {
+        console.warn(`Failed to validate cached URL for user ${userId}:`, error);
+        // If validation fails, delete the cache and regenerate
+        await redisClient.del(redisKey);
+      }
+    }
+
+    // Not cached or expired: generate signed URL
     const url = await this.getSignedAvatarUrl(profilePictureKey, expiresInSeconds);
 
     // Store in Redis with intelligent TTL based on signature expiry

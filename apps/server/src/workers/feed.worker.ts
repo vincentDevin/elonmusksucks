@@ -11,8 +11,10 @@ const FEED_CONCURRENCY = parseInt(process.env.WORKER_FEED_CONCURRENCY || '3');
 import type { Job } from 'bullmq';
 import Parser from 'rss-parser';
 import { createHash } from 'crypto';
+import { FeedRepository } from '../repositories/FeedRepository';
 
 const prisma = new PrismaClient();
+const feedRepo = new FeedRepository(prisma);
 
 // Note: Job data interfaces now imported from @ems/types
 
@@ -224,32 +226,41 @@ async function processFeedFetch(job: Job<FeedFetchJobData>): Promise<{
         // Generate content hash for deduplication
         const contentHash = generateArticleHash(articleData);
 
-        // Check if article already exists
-        const existingArticle = await prisma.article.findFirst({
-          where: {
-            OR: [{ url: articleData.url }, { hash: contentHash }],
-          },
-        });
+        // Check if article already exists using repository
+        const existingArticle = await feedRepo.findArticleByHash(contentHash);
 
         if (existingArticle) {
           duplicatesSkipped++;
           continue;
         }
 
-        // Create new article
-        const article = await prisma.article.create({
-          data: {
-            feedId,
-            guid: articleData.guid,
-            url: articleData.url,
-            canonicalUrl: articleData.canonicalUrl || articleData.url,
-            title: articleData.title,
-            excerpt: articleData.excerpt,
-            leadImageUrl: articleData.leadImageUrl,
-            publishedAt: articleData.publishedAt,
-            hash: contentHash,
-            status: 'PENDING', // Requires moderation
-            tags: generateBasicTags(articleData.title, articleData.excerpt),
+        // Create new article using repository
+        const article = await feedRepo.createArticleWithTags({
+          feedId,
+          guid: articleData.guid ?? null,
+          url: articleData.url,
+          canonicalUrl: articleData.canonicalUrl || articleData.url,
+          title: articleData.title,
+          excerpt: articleData.excerpt,
+          leadImageUrl: articleData.leadImageUrl,
+          publishedAt: articleData.publishedAt || new Date(),
+          hash: contentHash,
+          status: 'PENDING', // Requires moderation
+          tags: {
+            create: generateBasicTags(articleData.title, articleData.excerpt).map((tagName) => ({
+              tag: {
+                connectOrCreate: {
+                  where: { name: tagName },
+                  create: {
+                    name: tagName,
+                    slug: tagName
+                      .toLowerCase()
+                      .replace(/[^a-z0-9]+/g, '-')
+                      .replace(/^-|-$/g, ''),
+                  },
+                },
+              },
+            })),
           },
         });
 

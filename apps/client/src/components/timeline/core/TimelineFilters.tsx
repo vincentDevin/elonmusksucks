@@ -204,8 +204,8 @@ export const TimelineFilters: React.FC<TimelineFiltersProps> = ({
           transition-all duration-200 flex items-center space-x-2
           ${
             active
-              ? 'bg-primary text-white border-primary'
-              : 'bg-surface border-border text-content hover:bg-hover hover:border-primary/50'
+              ? 'bg-primary text-primary-foreground border-primary'
+              : 'bg-surface border-border text-content hover:bg-primary/10 hover:border-primary/50'
           }
         `}
       >
@@ -238,14 +238,16 @@ export const TimelineFilters: React.FC<TimelineFiltersProps> = ({
         <button
           onClick={() => setIsExpanded(!isExpanded)}
           className="w-full px-4 py-2 flex items-center justify-between
-                     text-sm font-medium text-content hover:bg-hover
+                     text-sm font-medium text-content hover:bg-primary/10
                      transition-colors rounded-lg"
         >
           <div className="flex items-center space-x-2">
             <FunnelIcon className="w-4 h-4" />
             <span>Filters</span>
             {hasActiveFilters && (
-              <span className="px-2 py-0.5 bg-primary text-white text-xs rounded-full">Active</span>
+              <span className="px-2 py-0.5 bg-primary text-primary-foreground text-xs rounded-full">
+                Active
+              </span>
             )}
           </div>
           <ChevronDownIcon
@@ -271,8 +273,8 @@ export const TimelineFilters: React.FC<TimelineFiltersProps> = ({
                     px-3 py-1.5 text-xs rounded-lg border transition-colors
                     ${
                       filters.dateRange.preset === preset.value
-                        ? 'bg-primary text-white border-primary'
-                        : 'bg-background border-border text-content hover:bg-hover'
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'bg-background border-border text-content hover:bg-primary/10'
                     }
                   `}
                 >
@@ -350,7 +352,7 @@ export const TimelineFilters: React.FC<TimelineFiltersProps> = ({
                     <button
                       key={level.value}
                       onClick={() => handleEngagementChange(level.value)}
-                      className="w-full px-4 py-2 text-left text-sm hover:bg-hover
+                      className="w-full px-4 py-2 text-left text-sm hover:bg-primary/10
                                  transition-colors flex items-center justify-between"
                     >
                       <div className="flex items-center space-x-2">
@@ -379,7 +381,7 @@ export const TimelineFilters: React.FC<TimelineFiltersProps> = ({
                     <button
                       key={option.value}
                       onClick={() => handleSortChange(option.value)}
-                      className="w-full px-4 py-2 text-left text-sm hover:bg-hover
+                      className="w-full px-4 py-2 text-left text-sm hover:bg-primary/10
                                  transition-colors flex items-center justify-between"
                     >
                       <span>{option.label}</span>
@@ -406,8 +408,8 @@ export const TimelineFilters: React.FC<TimelineFiltersProps> = ({
                 px-3 py-1.5 text-xs rounded-lg border transition-colors
                 ${
                   filters.hasMedia === true
-                    ? 'bg-primary text-white border-primary'
-                    : 'bg-background border-border text-content hover:bg-hover'
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-background border-border text-content hover:bg-primary/10'
                 }
               `}
             >
@@ -424,8 +426,8 @@ export const TimelineFilters: React.FC<TimelineFiltersProps> = ({
                 px-3 py-1.5 text-xs rounded-lg border transition-colors
                 ${
                   filters.hasReactions === true
-                    ? 'bg-primary text-white border-primary'
-                    : 'bg-background border-border text-content hover:bg-hover'
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-background border-border text-content hover:bg-primary/10'
                 }
               `}
             >

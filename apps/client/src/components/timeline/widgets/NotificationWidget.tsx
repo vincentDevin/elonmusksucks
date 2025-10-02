@@ -268,7 +268,7 @@ export const NotificationWidget: React.FC<NotificationWidgetProps> = ({
       <div className={`relative ${className}`}>
         <button
           onClick={() => setShowPanel(!showPanel)}
-          className="relative p-2 rounded-lg transition-colors text-tertiary hover:text-primary hover:bg-hover"
+          className="relative p-2 rounded-lg transition-colors text-tertiary hover:text-primary hover:bg-primary/10"
         >
           {unreadCount > 0 ? (
             <BellIconSolid className="w-6 h-6 text-primary" />
@@ -277,7 +277,7 @@ export const NotificationWidget: React.FC<NotificationWidgetProps> = ({
           )}
           {unreadCount > 0 && (
             <span
-              className="absolute -top-1 -right-1 bg-error text-white text-xs font-bold
+              className="absolute -top-1 -right-1 bg-error text-primary-foreground text-xs font-bold
                            rounded-full h-5 w-5 flex items-center justify-center"
             >
               {unreadCount > 99 ? '99+' : unreadCount}
@@ -334,7 +334,7 @@ export const NotificationWidget: React.FC<NotificationWidgetProps> = ({
                   <button
                     key={notification.id}
                     onClick={() => handleNotificationClick(notification)}
-                    className={`w-full p-3 text-left hover:bg-hover transition-colors border-b border-border last:border-b-0
+                    className={`w-full p-3 text-left hover:bg-primary/10 transition-colors border-b border-border last:border-b-0
                                ${!notification.isRead ? 'bg-primary/5' : ''}`}
                   >
                     <div className="flex items-start space-x-3">
@@ -386,7 +386,7 @@ export const NotificationWidget: React.FC<NotificationWidgetProps> = ({
             <span>Notifications</span>
           </h3>
           {unreadCount > 0 && (
-            <span className="bg-error text-white text-xs font-bold px-2 py-1 rounded-full">
+            <span className="bg-error text-primary-foreground text-xs font-bold px-2 py-1 rounded-full">
               {unreadCount}
             </span>
           )}
@@ -402,7 +402,7 @@ export const NotificationWidget: React.FC<NotificationWidgetProps> = ({
                 <button
                   key={notification.id}
                   onClick={() => handleNotificationClick(notification)}
-                  className={`w-full text-left p-2 rounded hover:bg-hover transition-colors
+                  className={`w-full text-left p-2 rounded hover:bg-primary/10 transition-colors
                            ${!notification.isRead ? 'bg-primary/5' : ''}`}
                 >
                   <div className="flex items-start space-x-2">
@@ -438,13 +438,13 @@ export const NotificationWidget: React.FC<NotificationWidgetProps> = ({
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-xl font-bold text-content">Notifications</h2>
           <div className="flex items-center space-x-2">
-            <button className="p-2 hover:bg-hover rounded-lg transition-colors">
+            <button className="p-2 hover:bg-primary/10 rounded-lg transition-colors">
               <Cog6ToothIcon className="w-5 h-5 text-tertiary" />
             </button>
             {unreadCount > 0 && (
               <button
                 onClick={markAllAsRead}
-                className="px-3 py-1.5 text-sm bg-primary text-white rounded-lg hover:bg-primary/90"
+                className="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
               >
                 Mark all read
               </button>
@@ -459,7 +459,9 @@ export const NotificationWidget: React.FC<NotificationWidgetProps> = ({
               key={f}
               onClick={() => setFilter(f)}
               className={`px-3 py-1.5 text-xs rounded transition-colors ${
-                filter === f ? 'bg-primary text-white' : 'bg-muted text-tertiary hover:bg-hover'
+                filter === f
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-tertiary hover:bg-primary/10'
               }`}
             >
               {f.charAt(0).toUpperCase() + f.slice(1)}
@@ -520,7 +522,7 @@ export const NotificationWidget: React.FC<NotificationWidgetProps> = ({
                     {!notification.isRead && (
                       <button
                         onClick={() => markAsRead(notification.id)}
-                        className="p-1 hover:bg-hover rounded transition-colors"
+                        className="p-1 hover:bg-primary/10 rounded transition-colors"
                         title="Mark as read"
                       >
                         <EyeIcon className="w-4 h-4 text-tertiary" />
@@ -528,7 +530,7 @@ export const NotificationWidget: React.FC<NotificationWidgetProps> = ({
                     )}
                     <button
                       onClick={() => deleteNotification(notification.id)}
-                      className="p-1 hover:bg-hover rounded transition-colors"
+                      className="p-1 hover:bg-primary/10 rounded transition-colors"
                       title="Delete"
                     >
                       <TrashIcon className="w-4 h-4 text-tertiary hover:text-error" />

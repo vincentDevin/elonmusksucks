@@ -44,6 +44,50 @@ export interface UserProfileView {
   updatedAt: string; // Date → ISO string
 }
 
+// Alias for backwards compatibility
+export type PublicUserProfile = UserProfileView;
+
+// ============================================================================
+// User Feed (using unified content system)
+// ============================================================================
+
+// Re-export from database layer for controller convenience
+export type { DbUserFeedContent as UserFeedPost } from '../../database/content';
+
+// ============================================================================
+// Unified Activity Event
+// ============================================================================
+
+export interface UnifiedActivityEvent {
+  id: string | number;
+  type: string;
+  userId: number;
+  userName?: string;
+  userAvatar?: string;
+  title: string;
+  description: string;
+  timestamp: string | Date;
+  priority: 'high' | 'medium' | 'low';
+  icon?: string;
+  color?: string;
+  isPersonal: boolean;
+  isHighValue?: boolean;
+
+  // Betting-related fields
+  amount?: number;
+  odds?: number;
+  predictionId?: number;
+  predictionTitle?: string;
+  category?: string;
+  optionLabel?: string;
+  isWin?: boolean;
+  streak?: number;
+
+  // Additional metadata
+  meta?: Record<string, any>;
+  details?: Record<string, any>;
+}
+
 // ============================================================================
 // User Stats View
 // ============================================================================
@@ -135,6 +179,9 @@ export interface EnhancedUserStats {
   monthlyProfitLoss: Array<{ date: string; value: number }>;
   categoryStats: CategoryStats[];
 }
+
+// Alias for backwards compatibility
+export type UserEnhancedStatsView = EnhancedUserStats;
 
 // ============================================================================
 // User Achievement Progress View

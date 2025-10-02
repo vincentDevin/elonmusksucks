@@ -1,8 +1,7 @@
 // apps/server/src/routes/timeline.routes.ts
 import { Router } from 'express';
 import {
-  getArticles,
-  getTimelineTweets,
+  getTimeline,
   getArticleDetails,
   toggleArticleReaction,
   getArticleReactions,
@@ -22,11 +21,9 @@ import { requireAuth } from '../middleware/auth.middleware';
 
 const router = Router();
 
-// GET /api/timeline/articles - Basic article listing
-router.get('/articles', getArticles);
-// GET /api/timeline/tweets
-// Query params: cursor (tweet snowflake ID), limit (max 100)
-router.get('/tweets', getTimelineTweets);
+// GET /api/timeline - Unified timeline (posts + articles)
+// Query params: limit, cursor, type (all/articles/posts)
+router.get('/', getTimeline);
 
 // GET /api/articles/:id
 router.get('/articles/:id', getArticleDetails);

@@ -7,6 +7,7 @@ import { PostActions } from './PostActions';
 import { PostReactions } from './PostReactions';
 import BaseCard from '../../BaseCard';
 import { useReactions } from '../../../contexts/ReactionContext';
+import { CommentSection } from '../../timeline/core/CommentSection';
 
 interface PostCardProps {
   post: UserFeedPost;
@@ -91,7 +92,7 @@ export const PostCard: React.FC<PostCardProps> = ({
                 >
                   {post.authorName || 'Unknown User'}
                 </Link>
-                {post.visibility !== 'PUBLIC' && (
+                {post.visibility && post.visibility !== 'PUBLIC' && (
                   <span className="px-2 py-0.5 bg-muted/50 rounded-full text-xs font-medium text-tertiary">
                     {post.visibility.toLowerCase()}
                   </span>
@@ -112,7 +113,7 @@ export const PostCard: React.FC<PostCardProps> = ({
 
         {/* Post Content */}
         <div className="mb-4">
-          <MentionRenderer content={post.content} className="text-content leading-relaxed" />
+          <MentionRenderer content={post.body || ''} className="text-content leading-relaxed" />
 
           {/* Media URLs */}
           {post.mediaUrls && post.mediaUrls.length > 0 && (
@@ -213,18 +214,23 @@ export const PostCard: React.FC<PostCardProps> = ({
           />
         </div>
 
-        {/* Nested Comments/Replies */}
-        {showReplies && post.children && post.children.length > 0 && (
-          <div className="mt-4 space-y-2">
-            {post.children.map((child) => (
-              <PostCard
-                key={child.id}
-                post={child}
-                onUpdate={onUpdate}
-                onDelete={onDelete}
-                isNested={true}
-              />
-            ))}
+        {/* Comments Section */}
+        {showComments && showReplies && (
+          <div className="mt-4 pt-4">
+            <CommentSection
+              contentType="post"
+              contentId={post.id}
+              comments={[]} // Always fetch fresh comments to get updated avatar URLs
+              commentsCount={post.commentsCount || 0}
+              onCommentsUpdate={(updatedComments) => {
+                // Update post with new comment count
+                handlePostUpdate({
+                  ...post,
+                  commentsCount: updatedComments.length,
+                  children: updatedComments,
+                });
+              }}
+            />
           </div>
         )}
       </BaseCard>

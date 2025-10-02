@@ -77,7 +77,7 @@ export class PayoutService {
           {
             id: resolved.id,
             title: resolved.title,
-            category: resolved.category,
+            category: `category_${resolved.categoryId}`, // TODO: Fetch category name from categoryId
             winningOption: winningOption.label,
           },
           resolver,
@@ -104,7 +104,7 @@ export class PayoutService {
     const trigger: LeaderboardTrigger = {
       event: 'prediction:completed',
       priority: 'batched',
-      affectedMetrics: ['profit', 'winRate', 'streak'],
+      affectedMetrics: ['profit', 'win_rate', 'streak'],
       metadata: { predictionId, winningOptionId },
     };
 
@@ -123,10 +123,10 @@ export class PayoutService {
       const trigger: LeaderboardTrigger = {
         event: 'prediction:completed',
         priority: 'immediate', // Immediate for sync path
-        affectedMetrics: ['profit', 'winRate', 'streak'],
+        affectedMetrics: ['profit', 'win_rate', 'streak'],
         metadata: {
           predictionId,
-          category: resolvedPrediction.category,
+          categoryId: resolvedPrediction.categoryId,
         },
       };
 
@@ -166,7 +166,7 @@ const initializePayoutSubscription = async () => {
                 event: 'bet:resolved',
                 priority: 'batched',
                 userId,
-                affectedMetrics: ['profit', 'winRate'],
+                affectedMetrics: ['profit', 'win_rate'],
                 metadata: { predictionId },
               };
 

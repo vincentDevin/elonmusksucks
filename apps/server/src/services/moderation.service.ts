@@ -4,7 +4,7 @@ import { ModerationRepository } from '../repositories/ModerationRepository';
 import type { IModerationRepository } from '../repositories/interfaces/IModerationRepository';
 import type { ModerationAction } from '@prisma/client';
 import { REDIS_CHANNELS } from '@ems/types';
-import type { BanType } from '@ems/types';
+import type { BanType, RedisChannel } from '@ems/types';
 import { eventBus } from '../lib/EventBus';
 
 const prisma = new PrismaClient();
@@ -33,7 +33,10 @@ interface ModerationEventData {
 }
 
 // Publish moderation events to Redis
-async function publishModerationEvent(channel: string, data: ModerationEventData): Promise<void> {
+async function publishModerationEvent(
+  channel: RedisChannel,
+  data: ModerationEventData,
+): Promise<void> {
   try {
     await eventBus.publish(channel, data);
   } catch (error) {
@@ -45,7 +48,7 @@ async function publishModerationEvent(channel: string, data: ModerationEventData
 async function logAndPublishAction(
   action: ModerationAction,
   moderatorId: number,
-  channel: string,
+  channel: RedisChannel,
   targetUserId?: number,
   details?: any,
   ipAddress?: string,

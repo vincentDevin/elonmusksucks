@@ -27,6 +27,10 @@ const payoutWorker = new Worker<PayoutJobData>(
     const { predictionId, winningOptionId } = job.data;
     console.log(`[worker] Processing payout for prediction ${predictionId}`);
 
+    if (!winningOptionId) {
+      throw new Error(`No winning option ID provided for prediction ${predictionId}`);
+    }
+
     try {
       // 1. Run the full payout logic and get back the updated prediction
       const updated: PublicPrediction = await payoutRepo.resolvePrediction(
@@ -41,11 +45,11 @@ const payoutWorker = new Worker<PayoutJobData>(
       const trigger: LeaderboardTrigger = {
         event: 'prediction:completed',
         priority: 'immediate',
-        affectedMetrics: ['profit', 'winRate', 'streak'],
+        affectedMetrics: ['profit', 'win_rate', 'streak'],
         metadata: {
           predictionId,
           winningOptionId,
-          category: updated.category,
+          category: updated.categoryId,
         },
       };
 

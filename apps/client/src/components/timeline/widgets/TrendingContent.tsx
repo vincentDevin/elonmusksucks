@@ -237,7 +237,7 @@ export const TrendingContent: React.FC<TrendingContentProps> = ({
           </div>
           <button
             onClick={handleRefresh}
-            className={`p-1 hover:bg-hover rounded transition-colors ${
+            className={`p-1 hover:bg-primary/10 rounded transition-colors ${
               isRefreshing ? 'animate-spin' : ''
             }`}
           >
@@ -260,7 +260,7 @@ export const TrendingContent: React.FC<TrendingContentProps> = ({
               <button
                 key={item.id}
                 onClick={() => onItemClick?.(item)}
-                className="w-full text-left hover:bg-hover p-2 -mx-2 rounded transition-colors"
+                className="w-full text-left hover:bg-primary/10 p-2 -mx-2 rounded transition-colors"
               >
                 <div className="flex items-start space-x-2">
                   <span className="text-tertiary font-medium text-sm">{index + 1}</span>
@@ -303,8 +303,8 @@ export const TrendingContent: React.FC<TrendingContentProps> = ({
                     onClick={() => handleTimeRangeChange(range)}
                     className={`px-3 py-1 text-xs rounded-lg transition-colors ${
                       selectedTimeRange === range
-                        ? 'bg-primary text-white'
-                        : 'bg-background text-tertiary hover:bg-hover'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-background text-tertiary hover:bg-primary/10'
                     }`}
                   >
                     {range.charAt(0).toUpperCase() + range.slice(1)}
@@ -315,7 +315,7 @@ export const TrendingContent: React.FC<TrendingContentProps> = ({
           </div>
           <button
             onClick={handleRefresh}
-            className={`p-2 hover:bg-hover rounded-lg transition-colors ${
+            className={`p-2 hover:bg-primary/10 rounded-lg transition-colors ${
               isRefreshing ? 'animate-spin' : ''
             }`}
           >
@@ -358,7 +358,7 @@ export const TrendingContent: React.FC<TrendingContentProps> = ({
               <button
                 key={item.id}
                 onClick={() => onItemClick?.(item)}
-                className="w-full text-left group hover:bg-hover p-3 -m-3 rounded-lg transition-colors"
+                className="w-full text-left group hover:bg-primary/10 p-3 -m-3 rounded-lg transition-colors"
               >
                 <div className="flex items-start space-x-3">
                   {/* Rank Badge */}

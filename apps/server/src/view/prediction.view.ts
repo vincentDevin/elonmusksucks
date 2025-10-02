@@ -8,7 +8,7 @@ export const toPredictionView = (prediction: {
   id: number;
   title: string;
   description: string;
-  category: string;
+  categoryId: number | null; // UPDATED: Use categoryId instead of category string
   type: any; // PredictionType enum
   threshold: number | null;
   createdAt: Date;
@@ -52,7 +52,7 @@ export const toPredictionView = (prediction: {
   id: prediction.id,
   title: prediction.title,
   description: prediction.description,
-  category: prediction.category,
+  categoryId: prediction.categoryId, // UPDATED: Use categoryId instead of category string
   status: prediction.resolved ? 'RESOLVED' : prediction.approved ? 'APPROVED' : 'PENDING',
   type: prediction.type,
   threshold: prediction.threshold,

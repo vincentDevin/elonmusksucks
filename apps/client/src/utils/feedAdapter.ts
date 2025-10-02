@@ -12,18 +12,24 @@ export interface UnifiedFeedItem extends FeedItem {
 }
 
 /**
- * Convert TimelineItem (article) to UnifiedFeedItem
+ * Convert TimelineItem to UnifiedFeedItem
+ * Detects whether it's an article or post based on ID prefix
+ * Uses postData field when available for proper post rendering
  */
 export function convertArticleToFeedItem(item: TimelineItem): UnifiedFeedItem {
-  // Ensure unique ID by always prefixing with type
-  const uniqueId = item.id.toString().startsWith('article-') ? item.id : `article-${item.id}`;
+  // Determine type from ID prefix
+  const isPost = item.id.toString().startsWith('post-');
+  const type = isPost ? 'post' : 'article';
+
+  // If it's a post and we have postData, use that as originalData
+  const originalData = isPost && item.postData ? (item.postData as UserFeedPost) : item;
 
   return {
-    id: uniqueId,
-    type: 'article',
+    id: item.id,
+    type: type,
     createdAt: item.timestamp,
     updatedAt: item.timestamp,
-    originalData: item,
+    originalData: originalData,
   };
 }
 
@@ -75,6 +81,7 @@ function calculateNextCursor(
 /**
  * Fetch unified feed of articles and community posts
  * This is the main function that GenericFeed will call
+ * Backend already merges articles + posts at /api/timeline
  */
 export async function fetchUnifiedFeed(params: {
   cursor?: string;
@@ -85,66 +92,23 @@ export async function fetchUnifiedFeed(params: {
 }): Promise<FeedResponse<UnifiedFeedItem>> {
   try {
     const limit = params.limit || 20;
-    const halfLimit = Math.ceil(limit / 2);
 
-    // Fetch articles and posts in parallel
-    const [articlesResponse, postsResponse] = await Promise.all([
-      timelineApi
-        .getArticles({
-          cursor: params.cursor, // Articles API expects timestamp string
-          limit: halfLimit,
-          search: params.filters?.search,
-        })
-        .catch((error) => {
-          console.error('Failed to fetch articles:', error);
-          return { items: [], pagination: { hasMore: false } };
-        }),
-
-      getTimeline({
-        // Posts API expects numeric cursor, but we need to handle timestamp cursor
-        // For now, don't pass cursor to posts API to avoid confusion
-        cursor: undefined,
-        limit: halfLimit,
-        sortBy: 'recent',
-      }).catch((error) => {
-        console.error('Failed to fetch posts:', error);
-        return { posts: [], nextCursor: undefined };
-      }),
-    ]);
-
-    // Convert both types to unified format
-    const articleItems = articlesResponse.items.map(convertArticleToFeedItem);
-    const postItems = postsResponse.posts.map(convertPostToFeedItem);
-
-    // Merge and sort chronologically (newest first)
-    let allItems = [...articleItems, ...postItems].sort((a, b) => {
-      const dateA = new Date(a.createdAt).getTime();
-      const dateB = new Date(b.createdAt).getTime();
-      return dateB - dateA; // Newest first
+    // Use the unified timeline endpoint which already merges articles and posts
+    const response = await timelineApi.getTimeline({
+      cursor: params.cursor,
+      limit: limit,
+      search: params.filters?.search,
     });
 
-    // Filter items by cursor timestamp if provided (for pagination)
-    if (params.cursor) {
-      const cursorTime = new Date(params.cursor).getTime();
-      allItems = allItems.filter((item) => {
-        const itemTime = new Date(item.createdAt).getTime();
-        return itemTime < cursorTime; // Only items older than cursor
-      });
-    }
-
-    // Take only the requested limit
-    const limitedItems = allItems.slice(0, limit);
+    // Convert TimelineItems to UnifiedFeedItems
+    const items = response.items.map(convertArticleToFeedItem);
 
     return {
-      items: limitedItems,
+      items,
       pagination: {
-        hasMore: articlesResponse.pagination?.hasMore || !!postsResponse.nextCursor,
-        cursor: calculateNextCursor(
-          limitedItems,
-          articlesResponse.pagination,
-          postsResponse.nextCursor,
-        ),
-        total: limitedItems.length,
+        hasMore: response.pagination?.hasMore || false,
+        cursor: response.pagination?.cursor,
+        total: items.length,
       },
     };
   } catch (error) {
@@ -219,6 +183,7 @@ export async function fetchUserPostsFeed(params: {
 
 /**
  * Search function for unified feed
+ * Searches both articles and posts via the timeline search endpoint
  */
 export async function searchUnifiedFeed(params: {
   query: string;
@@ -227,22 +192,22 @@ export async function searchUnifiedFeed(params: {
   filters?: Record<string, any>;
 }): Promise<FeedResponse<UnifiedFeedItem>> {
   try {
-    // For now, only search articles since posts don't have search API
-    const articlesResponse = await timelineApi.search({
+    const response = await timelineApi.search({
       query: params.query,
       cursor: params.cursor,
       limit: params.limit || 20,
       filters: params.filters,
     });
 
-    const articleItems = articlesResponse.items.map(convertArticleToFeedItem);
+    // Convert timeline items to unified feed items
+    const items = response.items.map(convertArticleToFeedItem);
 
     return {
-      items: articleItems,
+      items,
       pagination: {
-        hasMore: articlesResponse.pagination?.hasMore || false,
-        cursor: articlesResponse.pagination?.cursor,
-        total: articleItems.length,
+        hasMore: response.pagination?.hasMore || false,
+        cursor: response.pagination?.cursor,
+        total: items.length,
       },
     };
   } catch (error) {

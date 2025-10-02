@@ -4,8 +4,8 @@
  * Exports all domain/business logic types
  */
 
-export * from './achievements';
-export * from './analytics';
-export * from './activity';
-export * from './moderation';
-export * from './leaderboard';
+export * from './achievements.js';
+export * from './analytics.js';
+export * from './activity.js';
+export * from './moderation.js';
+export * from './leaderboard.js';

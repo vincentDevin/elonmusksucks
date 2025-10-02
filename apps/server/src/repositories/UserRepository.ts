@@ -9,7 +9,6 @@ import type {
   DbUserStats,
   DetailedUserAchievement,
   DbUserFeedContent,
-  PrismaContent,
 } from '@ems/types';
 
 export type { IUserRepository };
@@ -26,6 +25,15 @@ export class UserRepository implements IUserRepository {
    */
   async findById(id: number): Promise<PrismaUser | null> {
     return prisma.user.findUnique({ where: { id } }) as Promise<PrismaUser | null>;
+  }
+
+  /**
+   * Find user by username (exact match, case-sensitive)
+   */
+  async findByUsername(username: string): Promise<PrismaUser | null> {
+    return prisma.user.findFirst({
+      where: { name: username },
+    }) as Promise<PrismaUser | null>;
   }
 
   /**
@@ -331,6 +339,9 @@ export class UserRepository implements IUserRepository {
     }
     if (data.biggestWin && typeof data.biggestWin === 'string') {
       (prismaData as Record<string, unknown>).biggestWin = BigInt(data.biggestWin);
+    }
+    if (data.biggestLoss && typeof data.biggestLoss === 'string') {
+      (prismaData as Record<string, unknown>).biggestLoss = BigInt(data.biggestLoss);
     }
     await prisma.userStats.update({ where: { userId }, data: prismaData });
   }

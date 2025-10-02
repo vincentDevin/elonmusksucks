@@ -8,6 +8,7 @@ import type {
   DbLinkPreview,
   DbContentWithDetails,
   DbUserMention,
+  ReportReason,
 } from '@ems/types';
 import { IContentRepository } from './interfaces/IContentRepository';
 
@@ -172,6 +173,7 @@ export class ContentRepository implements IContentRepository {
     cursor?: number;
     limit?: number;
     sortBy?: 'recent' | 'trending';
+    viewerId?: number;
   }): Promise<{ content: PrismaContent[]; nextCursor?: number }> {
     const limit = options.limit || 20;
 
@@ -201,6 +203,7 @@ export class ContentRepository implements IContentRepository {
             profilePictureKey: true,
           },
         },
+        reactions: true, // Include all reactions
         _count: {
           select: {
             children: true,
@@ -214,7 +217,37 @@ export class ContentRepository implements IContentRepository {
     const items = hasMore ? content.slice(0, limit) : content;
     const nextCursor = hasMore ? items[items.length - 1].id : undefined;
 
-    return { content: items as PrismaContent[], nextCursor };
+    // Aggregate reaction counts and user reaction for each post
+    const enrichedPosts = items.map((post: any) => {
+      const reactionCounts: Record<string, number> = {
+        LIKE: 0,
+        LOVE: 0,
+        LAUGH: 0,
+        WOW: 0,
+        SAD: 0,
+        ANGRY: 0,
+      };
+      let userReaction = null;
+
+      if (post.reactions) {
+        post.reactions.forEach((reaction: any) => {
+          if (reaction.type in reactionCounts) {
+            reactionCounts[reaction.type]++;
+          }
+          if (options.viewerId && reaction.userId === options.viewerId) {
+            userReaction = reaction.type;
+          }
+        });
+      }
+
+      return {
+        ...post,
+        reactionCounts,
+        userReaction,
+      };
+    });
+
+    return { content: enrichedPosts as PrismaContent[], nextCursor };
   }
 
   /**
@@ -227,6 +260,7 @@ export class ContentRepository implements IContentRepository {
       cursor?: number;
       limit?: number;
       includeReplies?: boolean;
+      viewerId?: number;
     },
   ): Promise<{ content: PrismaContent[]; nextCursor?: number }> {
     const limit = options.limit || 20;
@@ -252,6 +286,7 @@ export class ContentRepository implements IContentRepository {
             profilePictureKey: true,
           },
         },
+        reactions: true, // Include all reactions
         _count: {
           select: {
             children: true,
@@ -265,7 +300,37 @@ export class ContentRepository implements IContentRepository {
     const items = hasMore ? content.slice(0, limit) : content;
     const nextCursor = hasMore ? items[items.length - 1].id : undefined;
 
-    return { content: items as PrismaContent[], nextCursor };
+    // Aggregate reaction counts and user reaction for each post
+    const enrichedPosts = items.map((post: any) => {
+      const reactionCounts: Record<string, number> = {
+        LIKE: 0,
+        LOVE: 0,
+        LAUGH: 0,
+        WOW: 0,
+        SAD: 0,
+        ANGRY: 0,
+      };
+      let userReaction = null;
+
+      if (post.reactions) {
+        post.reactions.forEach((reaction: any) => {
+          if (reaction.type in reactionCounts) {
+            reactionCounts[reaction.type]++;
+          }
+          if (options.viewerId && reaction.userId === options.viewerId) {
+            userReaction = reaction.type;
+          }
+        });
+      }
+
+      return {
+        ...post,
+        reactionCounts,
+        userReaction,
+      };
+    });
+
+    return { content: enrichedPosts as PrismaContent[], nextCursor };
   }
 
   /**
@@ -278,6 +343,7 @@ export class ContentRepository implements IContentRepository {
       cursor?: number;
       limit?: number;
       includeReplies?: boolean;
+      viewerId?: number;
     },
   ): Promise<{ comments: PrismaContent[]; nextCursor?: number }> {
     const limit = options.limit || 20;
@@ -303,6 +369,7 @@ export class ContentRepository implements IContentRepository {
             profilePictureKey: true,
           },
         },
+        reactions: true, // Include all reactions
         _count: {
           select: {
             children: true,
@@ -316,7 +383,37 @@ export class ContentRepository implements IContentRepository {
     const items = hasMore ? comments.slice(0, limit) : comments;
     const nextCursor = hasMore ? items[items.length - 1].id : undefined;
 
-    return { comments: items as PrismaContent[], nextCursor };
+    // Aggregate reaction counts and user reaction for each comment
+    const enrichedComments = items.map((comment: any) => {
+      const reactionCounts: Record<string, number> = {
+        LIKE: 0,
+        LOVE: 0,
+        LAUGH: 0,
+        WOW: 0,
+        SAD: 0,
+        ANGRY: 0,
+      };
+      let userReaction = null;
+
+      if (comment.reactions) {
+        comment.reactions.forEach((reaction: any) => {
+          if (reaction.type in reactionCounts) {
+            reactionCounts[reaction.type]++;
+          }
+          if (options.viewerId && reaction.userId === options.viewerId) {
+            userReaction = reaction.type;
+          }
+        });
+      }
+
+      return {
+        ...comment,
+        reactionCounts,
+        userReaction,
+      };
+    });
+
+    return { comments: enrichedComments as PrismaContent[], nextCursor };
   }
 
   /**
@@ -379,6 +476,7 @@ export class ContentRepository implements IContentRepository {
     options: {
       cursor?: number;
       limit?: number;
+      viewerId?: number;
     },
   ): Promise<{ replies: PrismaContent[]; nextCursor?: number }> {
     const limit = options.limit || 20;
@@ -402,6 +500,7 @@ export class ContentRepository implements IContentRepository {
             profilePictureKey: true,
           },
         },
+        reactions: true, // Include all reactions
         _count: {
           select: {
             children: true,
@@ -415,7 +514,37 @@ export class ContentRepository implements IContentRepository {
     const items = hasMore ? replies.slice(0, limit) : replies;
     const nextCursor = hasMore ? items[items.length - 1].id : undefined;
 
-    return { replies: items as PrismaContent[], nextCursor };
+    // Aggregate reaction counts and user reaction for each reply
+    const enrichedReplies = items.map((reply: any) => {
+      const reactionCounts: Record<string, number> = {
+        LIKE: 0,
+        LOVE: 0,
+        LAUGH: 0,
+        WOW: 0,
+        SAD: 0,
+        ANGRY: 0,
+      };
+      let userReaction = null;
+
+      if (reply.reactions) {
+        reply.reactions.forEach((reaction: any) => {
+          if (reaction.type in reactionCounts) {
+            reactionCounts[reaction.type]++;
+          }
+          if (options.viewerId && reaction.userId === options.viewerId) {
+            userReaction = reaction.type;
+          }
+        });
+      }
+
+      return {
+        ...reply,
+        reactionCounts,
+        userReaction,
+      };
+    });
+
+    return { replies: enrichedReplies as PrismaContent[], nextCursor };
   }
 
   /**
@@ -891,5 +1020,100 @@ export class ContentRepository implements IContentRepository {
     });
 
     return content as PrismaContent[];
+  }
+
+  // ============================================
+  // HASHTAGS
+  // ============================================
+
+  /**
+   * Get trending hashtags based on recent usage
+   */
+  async getTrendingHashtags(limit: number = 10): Promise<
+    Array<{
+      id: number;
+      tag: string;
+      usageCount: number;
+      trendingScore: number;
+    }>
+  > {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+    const trending = await this.prisma.hashtag.findMany({
+      where: {
+        contents: {
+          some: {
+            content: {
+              createdAt: { gte: sevenDaysAgo },
+              isDeleted: false,
+            },
+          },
+        },
+      },
+      include: {
+        _count: {
+          select: {
+            contents: {
+              where: {
+                content: {
+                  createdAt: { gte: sevenDaysAgo },
+                  isDeleted: false,
+                },
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        usageCount: 'desc',
+      },
+      take: limit,
+    });
+
+    return trending.map((hashtag) => ({
+      id: hashtag.id,
+      tag: hashtag.tag,
+      usageCount: hashtag.usageCount,
+      trendingScore: hashtag._count.contents,
+    }));
+  }
+
+  // ============================================
+  // REPORTS
+  // ============================================
+
+  /**
+   * Check if user has already reported specific content
+   */
+  async hasUserReportedContent(contentId: number, reporterId: number): Promise<boolean> {
+    const report = await this.prisma.contentReport.findFirst({
+      where: {
+        contentId,
+        reporterId,
+      },
+    });
+    return !!report;
+  }
+
+  /**
+   * Create a content report
+   */
+  async createContentReport(data: {
+    contentId: number;
+    reporterId: number;
+    reason: ReportReason;
+    details?: string;
+  }): Promise<{ id: number }> {
+    const report = await this.prisma.contentReport.create({
+      data: {
+        contentId: data.contentId,
+        reporterId: data.reporterId,
+        reason: data.reason,
+        details: data.details?.trim() || null,
+        status: 'PENDING',
+      },
+    });
+
+    return { id: report.id };
   }
 }

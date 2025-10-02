@@ -1,13 +1,13 @@
 import { Queue } from 'bullmq';
-import { PongPayoutData, QUEUE_NAMES } from '@ems/types';
+import { PongPayoutJobData, QUEUE_NAMES } from '@ems/types';
 import { createQueueOptions } from '../lib/bullmqConfig';
 
 export class PongPayoutQueueService {
   private static instance: PongPayoutQueueService;
-  private queue: Queue<PongPayoutData>;
+  private queue: Queue<PongPayoutJobData>;
 
   constructor() {
-    this.queue = new Queue<PongPayoutData>(
+    this.queue = new Queue<PongPayoutJobData>(
       QUEUE_NAMES.PONG_PAYOUTS,
       createQueueOptions('PONG_PAYOUTS'),
     );
@@ -23,7 +23,7 @@ export class PongPayoutQueueService {
   /**
    * Enqueue a Pong payout job with idempotency
    */
-  async enqueuePayout(data: PongPayoutData): Promise<void> {
+  async enqueuePayout(data: PongPayoutJobData): Promise<void> {
     const jobId = `payout_v1:${data.matchId}`;
 
     await this.queue.add('pong-payout', data, {

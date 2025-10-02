@@ -1,7 +1,21 @@
 // apps/server/src/handlers/moderationHandlers.ts
 import type { AuthenticatedSocket } from '../middleware/socketAuthMiddleware';
 import { moderationService } from '../services/moderation.service';
-import type { BanType } from '@prisma/client';
+import type { BanType as PrismaBanType } from '@prisma/client';
+import type { BanType } from '@ems/types';
+
+// Convert Prisma BanType (UPPERCASE) to domain BanType (lowercase)
+function convertBanType(prismaBanType: PrismaBanType): BanType {
+  const mapping: Record<PrismaBanType, BanType> = {
+    TEMPORARY: 'temporary',
+    PERMANENT: 'permanent',
+    SHADOW: 'shadow',
+    CHAT_ONLY: 'chat_only',
+    BETTING_RESTRICTED: 'betting_restricted',
+    FULL: 'full',
+  };
+  return mapping[prismaBanType];
+}
 
 export function registerModerationHandlers(socket: AuthenticatedSocket): void {
   // Ensure user is admin
@@ -15,7 +29,7 @@ export function registerModerationHandlers(socket: AuthenticatedSocket): void {
     async (
       data: {
         userId: number;
-        banType: BanType;
+        banType: PrismaBanType;
         reason: string;
         duration?: number;
       },
@@ -25,7 +39,7 @@ export function registerModerationHandlers(socket: AuthenticatedSocket): void {
         const ban = await moderationService.banUser({
           userId: data.userId,
           moderatorId: socket.user!.id,
-          banType: data.banType,
+          banType: convertBanType(data.banType),
           reason: data.reason,
           duration: data.duration,
           ipAddress: socket.handshake.address,

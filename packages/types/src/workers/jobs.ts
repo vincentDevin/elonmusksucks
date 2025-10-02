@@ -18,6 +18,7 @@ export interface PayoutJobData {
   userId: number;
   predictionId: number;
   optionId: number;
+  winningOptionId?: number; // For prediction resolution context
   wager: string; // BigInt as string
   payout: string; // BigInt as string
   odds: number;
@@ -73,6 +74,28 @@ export interface LeaderboardRefreshJobData {
 }
 
 /**
+ * Alias for backward compatibility
+ */
+export type RefreshJobData = LeaderboardRefreshJobData;
+
+/**
+ * Incremental leaderboard update from events
+ */
+export interface IncrementalUpdateData {
+  userId: number;
+  metrics: string[];
+  trigger: string;
+}
+
+/**
+ * Batch user update for leaderboard
+ */
+export interface BatchUserUpdateData {
+  userIds: number[];
+  metrics?: string[];
+}
+
+/**
  * User Rank Update Job Data
  */
 export interface UserRankUpdateJobData {
@@ -102,6 +125,15 @@ export interface FeedFetchJobData {
 export interface BatchFeedFetchJobData {
   feedIds: number[];
   forceRefresh?: boolean;
+}
+
+/**
+ * Feed Health Check Job Data
+ */
+export interface FeedHealthCheckData {
+  feedId: number;
+  checkType: 'connectivity' | 'content' | 'performance';
+  threshold?: number;
 }
 
 /**

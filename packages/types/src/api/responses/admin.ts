@@ -441,6 +441,37 @@ export interface HealthCheckResponse {
   timestamp: string; // Date → ISO string
 }
 
+export interface ClearMetricsResponse {
+  success: boolean;
+  message: string;
+  clearedAt: string; // Date → ISO string
+}
+
+// ============================================================================
+// Feed Management Response DTOs
+// ============================================================================
+
+export interface FeedView {
+  id: number;
+  name: string;
+  url: string;
+  siteUrl: string | null;
+  status: import('../../shared/enums').FeedStatus;
+  allowImages: boolean;
+  lastFetchedAt: string | null; // Date → ISO string
+  lastSuccessAt: string | null; // Date → ISO string
+  lastErrorAt: string | null; // Date → ISO string
+  lastErrorMsg: string | null;
+  fetchCount: number;
+  errorCount: number;
+  createdAt: string; // Date → ISO string
+  updatedAt: string; // Date → ISO string
+}
+
+export interface FeedsListResponse {
+  feeds: FeedView[];
+}
+
 // ============================================================================
 // Generic API Response
 // ============================================================================

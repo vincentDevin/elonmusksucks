@@ -81,17 +81,24 @@ export class EventCoalescer implements IEventCoalescer {
     // For stats updates, combine into single batched event
     if (batch[0].channel === 'user:stats_update' && batch.length > 1) {
       const latestEvent = batch[batch.length - 1];
-      const batchedPayload = {
-        ...latestEvent.payload,
-        batchCount: batch.length,
-        batchedAt: new Date().toISOString(),
-      };
+      const batchedPayload =
+        typeof latestEvent.payload === 'object' && latestEvent.payload !== null
+          ? {
+              ...(latestEvent.payload as object),
+              batchCount: batch.length,
+              batchedAt: new Date().toISOString(),
+            }
+          : {
+              value: latestEvent.payload,
+              batchCount: batch.length,
+              batchedAt: new Date().toISOString(),
+            };
 
-      await this.eventBus.publish(batch[0].channel, batchedPayload);
+      await this.eventBus.publish(batch[0].channel as any, batchedPayload);
     } else {
       // For other events or single events, emit individually
       for (const event of batch) {
-        await this.eventBus.publish(event.channel, event.payload);
+        await this.eventBus.publish(event.channel as any, event.payload);
       }
     }
   }

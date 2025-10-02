@@ -9,14 +9,7 @@ import type {
   IBettingRepository,
   OptionWithPrediction,
 } from '../repositories/interfaces/IBettingRepository';
-import type {
-  DbBet,
-  DbParlay,
-  BetWithUser,
-  ParlayLegWithUser,
-  IEventBus,
-  IEventCoalescer,
-} from '@ems/types';
+import type { DbBet, DbParlay, ParlayLegWithUser, IEventBus, IEventCoalescer } from '@ems/types';
 import { BettingRepository } from '../repositories/BettingRepository';
 import { eventBus } from '../lib/EventBus';
 import { EventCoalescer } from '../lib/EventCoalescer';
@@ -134,15 +127,13 @@ export class BettingService {
           const viewStats = await predictionService.getPredictionViewStats(opt.prediction.id);
 
           // Compose enhanced bet event payload
-          const betWithUser: BetWithUser = {
+          const betWithUser: any = {
             ...bet,
-            amount: bet.amount.toString(),
-            potentialPayout: bet.potentialPayout?.toString() || null,
-            payout: bet.payout?.toString() || null,
             user: {
               id: user.id,
               name: user.name,
               avatarUrl,
+              profilePictureKey: user.profilePictureKey,
             },
             optionLabel: opt.label,
             predictionTitle: opt.prediction.title,

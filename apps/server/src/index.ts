@@ -12,7 +12,7 @@ import http from 'http';
 import { initSocket } from './socket';
 import authRoutes from './routes/auth.routes';
 import predictionRoutes from './routes/predictions.routes';
-import predictionCommentRoutes from './routes/predictionComment.routes';
+// import predictionCommentRoutes from './routes/predictionComment.routes'; // Deprecated - comments now in unified Content system
 import userRoutes from './routes/user.routes';
 import payoutRoutes from './routes/payout.routes';
 import adminRoutes from './routes/admin.routes';
@@ -60,7 +60,7 @@ app.get('/health', (_req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/predictions', predictionRoutes);
-app.use('/api', predictionCommentRoutes);
+// app.use('/api', predictionCommentRoutes); // Deprecated - comments now in unified Content system (predictions.controller handles this)
 app.use('/api/users', userRoutes);
 app.use('/api/payout', payoutRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);

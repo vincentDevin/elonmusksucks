@@ -7,6 +7,7 @@ import type {
   DbLinkPreview,
   DbContentWithDetails,
   DbUserMention,
+  ReportReason,
 } from '@ems/types';
 
 /**
@@ -50,6 +51,7 @@ export interface IContentRepository {
     cursor?: number;
     limit?: number;
     sortBy?: 'recent' | 'trending';
+    viewerId?: number;
   }): Promise<{ content: PrismaContent[]; nextCursor?: number }>;
 
   /** Get user's posts (type=POST, created by userId) */
@@ -59,8 +61,8 @@ export interface IContentRepository {
       cursor?: number;
       limit?: number;
       includeReplies?: boolean;
+      viewerId?: number;
     },
-    viewerId?: number,
   ): Promise<{ content: PrismaContent[]; nextCursor?: number }>;
 
   /** Get comments for a specific article */
@@ -70,6 +72,7 @@ export interface IContentRepository {
       cursor?: number;
       limit?: number;
       includeReplies?: boolean;
+      viewerId?: number;
     },
   ): Promise<{ comments: PrismaContent[]; nextCursor?: number }>;
 
@@ -80,6 +83,7 @@ export interface IContentRepository {
       cursor?: number;
       limit?: number;
       includeReplies?: boolean;
+      viewerId?: number;
     },
   ): Promise<{ comments: PrismaContent[]; nextCursor?: number }>;
 
@@ -89,6 +93,7 @@ export interface IContentRepository {
     options: {
       cursor?: number;
       limit?: number;
+      viewerId?: number;
     },
   ): Promise<{ replies: PrismaContent[]; nextCursor?: number }>;
 
@@ -173,6 +178,31 @@ export interface IContentRepository {
     userId: number,
     options: { cursor?: number; limit?: number; unreadOnly?: boolean },
   ): Promise<{ mentions: DbUserMention[]; nextCursor?: number }>;
+
+  /** Get trending hashtags */
+  getTrendingHashtags(limit?: number): Promise<
+    Array<{
+      id: number;
+      tag: string;
+      usageCount: number;
+      trendingScore: number;
+    }>
+  >;
+
+  // ============================================
+  // REPORTS
+  // ============================================
+
+  /** Check if user has already reported content */
+  hasUserReportedContent(contentId: number, reporterId: number): Promise<boolean>;
+
+  /** Create a content report */
+  createContentReport(data: {
+    contentId: number;
+    reporterId: number;
+    reason: ReportReason;
+    details?: string;
+  }): Promise<{ id: number }>;
 
   // ============================================
   // STATS & ANALYTICS

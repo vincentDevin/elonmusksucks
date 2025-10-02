@@ -10,6 +10,9 @@
  */
 @theme {
   --color-primary: #3b82f6; /* Blue 500 - fallback */
+  --color-primary-foreground: #ffffff; /* White text on primary */
+  --color-primary-hover: #2563eb; /* Blue 600 - hover state */
+  --color-border: #e2e8f0; /* Slate 200 - borders */
   --color-muted: #e2e8f0; /* Slate 200 - fallback */
   --color-tertiary: #64748b; /* Slate 500 - fallback */
   --color-surface: #ffffff; /* White - fallback */
@@ -28,6 +31,9 @@
 /* Legacy dark mode support (will be replaced by theme system) */
 .dark {
   --color-primary: #10b981;
+  --color-primary-foreground: #ffffff; /* White text on primary */
+  --color-primary-hover: #059669; /* Darker green for hover */
+  --color-border: #374151; /* Gray 700 - dark borders */
   --color-muted: #374151;
   --color-tertiary: #9ca3af;
   --color-surface: #1f2937;

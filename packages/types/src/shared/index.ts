@@ -2,7 +2,8 @@
  * Shared Utilities Barrel Export
  */
 
-export * from './constants';
-export * from './pagination';
-export * from './branded-types';
-export * from './enums';
+export * from './constants.js';
+export * from './pagination.js';
+export * from './branded-types.js';
+export * from './enums.js';
+export * from './errors.js';

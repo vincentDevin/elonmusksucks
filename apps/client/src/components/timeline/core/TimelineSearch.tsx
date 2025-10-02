@@ -297,7 +297,7 @@ export const TimelineSearch: React.FC<TimelineSearchProps> = ({
                 <div>
                   <div
                     className="px-4 py-2 flex justify-between items-center
-                                  border-b border-border bg-muted"
+                                  border-b border-border bg-primary/10"
                   >
                     <span className="text-xs font-medium text-tertiary uppercase">
                       Recent Searches
@@ -314,8 +314,8 @@ export const TimelineSearch: React.FC<TimelineSearchProps> = ({
                       key={index}
                       onClick={() => handleRecentSearch(search)}
                       className={`w-full px-4 py-3 flex items-center space-x-3
-                                 hover:bg-hover transition-colors text-left
-                                 ${selectedIndex === index ? 'bg-hover' : ''}`}
+                                 hover:bg-primary/10 transition-colors text-left
+                                 ${selectedIndex === index ? 'bg-primary/10' : ''}`}
                     >
                       <ClockIcon className="w-4 h-4 text-tertiary flex-shrink-0" />
                       <span className="text-sm text-content truncate">{search}</span>
@@ -328,7 +328,7 @@ export const TimelineSearch: React.FC<TimelineSearchProps> = ({
               {suggestions.length > 0 && (
                 <div>
                   {query && (
-                    <div className="px-4 py-2 border-b border-border bg-muted">
+                    <div className="px-4 py-2 border-b border-border bg-primary/10">
                       <span className="text-xs font-medium text-tertiary uppercase">
                         Suggestions
                       </span>
@@ -343,8 +343,8 @@ export const TimelineSearch: React.FC<TimelineSearchProps> = ({
                         key={suggestion.id}
                         onClick={() => handleSuggestionClick(suggestion)}
                         className={`w-full px-4 py-3 flex items-center space-x-3
-                                   hover:bg-hover transition-colors text-left
-                                   ${selectedIndex === actualIndex ? 'bg-hover' : ''}`}
+                                   hover:bg-primary/10 transition-colors text-left
+                                   ${selectedIndex === actualIndex ? 'bg-primary/10' : ''}`}
                       >
                         <div
                           className={`flex-shrink-0 ${

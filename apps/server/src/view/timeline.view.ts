@@ -1,5 +1,5 @@
 import type {
-  TimelineArticlesResponse,
+  TimelineResponse,
   ArticleReactionResponse,
   ArticleCommentResponse,
   TimelineItem,
@@ -27,7 +27,7 @@ export const toTimelineArticlesResponse = (
   }>,
   hasMore: boolean,
   nextCursor?: string,
-): TimelineArticlesResponse => {
+): TimelineResponse => {
   const timelineItems: TimelineItem[] = articles.map((article) => ({
     id: `article-${article.id}`,
     type: 'article' as const,
@@ -62,13 +62,15 @@ export const toTimelineArticlesResponse = (
  * Maps article reaction response from service
  */
 export const toArticleReactionResponse = (reaction: {
-  action: 'added' | 'removed';
+  action: 'added' | 'removed' | 'changed';
   type: string;
   totalReactions: number;
+  reactionCounts?: Record<string, number>;
 }): ArticleReactionResponse => ({
   action: reaction.action,
-  type: reaction.type,
+  type: reaction.type as any, // Type is validated at controller level
   totalReactions: reaction.totalReactions,
+  reactionCounts: reaction.reactionCounts || {},
 });
 
 /**

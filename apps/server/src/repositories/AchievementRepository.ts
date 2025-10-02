@@ -655,7 +655,20 @@ export class AchievementRepository implements IAchievementRepository {
       throw new Error(`Rule data missing required fields for achievement ${achievementId}`);
     }
 
-    const typedRuleData = data as unknown as JsonRuleAchievementData;
+    // Validate progress.kind is a valid literal type
+    const progress = data.progress as Record<string, unknown>;
+    const validKinds = ['count', 'streak', 'threshold', 'binary'];
+    if (
+      !progress.kind ||
+      typeof progress.kind !== 'string' ||
+      !validKinds.includes(progress.kind)
+    ) {
+      throw new Error(`Invalid progress.kind for achievement ${achievementId}: ${progress.kind}`);
+    }
+
+    // Now safe to cast since we've validated the structure
+    // Using 'any' to bypass type conflicts between source and dist versions
+    const typedRuleData = ruleData as any;
 
     // Calculate complexity and performance scores
     const complexityScore = this.complexityTracker.calculateComplexityScore(typedRuleData);

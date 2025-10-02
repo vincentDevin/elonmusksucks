@@ -81,8 +81,8 @@ export class FeedService {
     return this.repository.findArticleById(articleId);
   }
 
-  async updateArticleTags(articleId: number, tags: string[]) {
-    return this.repository.updateArticleTags(articleId, tags);
+  async updateArticleTags(articleId: number, tagIds: number[]) {
+    return this.repository.updateArticleTags(articleId, tagIds);
   }
 
   async getArticleCountWithFilters(where: any) {

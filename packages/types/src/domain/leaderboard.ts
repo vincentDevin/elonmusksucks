@@ -319,3 +319,57 @@ export interface LeaderboardRefreshResult {
   completedAt: Date;
   errors?: string[];
 }
+
+// ============================================================================
+// Leaderboard Event-Driven Updates
+// ============================================================================
+
+/**
+ * Leaderboard Trigger - Event that triggers a leaderboard update
+ */
+export interface LeaderboardTrigger {
+  event: string;
+  priority: 'immediate' | 'batched' | 'scheduled';
+  userId?: number;
+  affectedMetrics: LeaderboardMetric[];
+  metadata?: Record<string, any>;
+}
+
+/**
+ * Leaderboard Metrics - Plural alias for array of metrics
+ */
+export type LeaderboardMetrics = LeaderboardMetric[];
+
+/**
+ * Schedule Configuration
+ */
+export interface ScheduleConfig {
+  interval?: number | string; // milliseconds (number) or cron expression (string)
+  cron?: string;
+  timezone?: string;
+  enabled: boolean;
+}
+
+// ============================================================================
+// Leaderboard Drift Detection & Reconciliation
+// ============================================================================
+
+/**
+ * Drift Detail - Information about ranking drift
+ */
+export interface DriftDetail {
+  userId: number;
+  expectedRank: number;
+  actualRank: number;
+  eloRating: number;
+}
+
+/**
+ * Reconciliation Result
+ */
+export interface ReconciliationResult {
+  usersDrifted: number;
+  driftDetails: DriftDetail[];
+  fixesApplied: number;
+  dryRun: boolean;
+}

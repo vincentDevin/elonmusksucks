@@ -20,6 +20,9 @@ export interface CreatePredictionRequest {
   threshold?: number;
 }
 
+// Alias for backwards compatibility
+export type CreatePredictionPayload = CreatePredictionRequest;
+
 // ============================================================================
 // Resolve Prediction
 // ============================================================================

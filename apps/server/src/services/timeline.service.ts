@@ -26,6 +26,16 @@ export class TimelineService {
     return this.repository.getApprovedArticles(params);
   }
 
+  async getPublicPosts(params: {
+    cursor?: number;
+    limit: number;
+    sortBy?: 'recent' | 'trending';
+    viewerId?: number;
+  }) {
+    const result = await this.contentRepository.getPublicTimeline(params);
+    return result.content;
+  }
+
   async getArticleDetails(articleId: number): Promise<any> {
     return this.repository.getArticleDetails(articleId);
   }
@@ -63,34 +73,58 @@ export class TimelineService {
       articleId,
     });
 
-    return comment;
+    // Fetch the full comment with author details
+    const fullComment = await this.contentRepository.getContentWithDetails(comment.id);
+
+    return fullComment || comment;
   }
 
-  async getArticleComments(articleId: number, limit: number, cursor?: string) {
-    // Get comments for article using Content repository
-    const result = await this.contentRepository.getArticleComments(articleId, {
-      limit,
-      cursor: cursor ? parseInt(cursor) : undefined,
-    });
+  async getArticleComments(articleId: number, limit: number, cursor?: string, viewerId?: number) {
+    try {
+      // Get comments for article using Content repository
+      const result = await this.contentRepository.getArticleComments(articleId, {
+        limit,
+        cursor: cursor ? parseInt(cursor) : undefined,
+        viewerId,
+      });
 
-    // Enrich user data with signed avatar URLs
-    const enrichedComments = await Promise.all(
-      result.comments.map(async (comment: any) => {
-        if (comment.author) {
-          const enrichedUser = await userService.enrichUserWithAvatar(comment.author);
-          return {
-            ...comment,
-            user: enrichedUser,
-          };
-        }
-        return comment;
-      }),
-    );
+      // Enrich user data with signed avatar URLs
+      const enrichedComments = await Promise.all(
+        result.comments.map(async (comment: any) => {
+          try {
+            if (comment.author) {
+              const enrichedUser = await userService.enrichUserWithAvatar(comment.author);
+              console.log(
+                `[timeline] Enriched comment ${comment.id} author avatarUrl:`,
+                enrichedUser.avatarUrl,
+              );
+              return {
+                ...comment,
+                user: enrichedUser,
+                author: enrichedUser, // Keep both for compatibility
+              };
+            }
+            return comment;
+          } catch (error) {
+            console.error(`[timeline] Error enriching comment ${comment.id}:`, error);
+            // Return comment with basic author data if enrichment fails
+            return {
+              ...comment,
+              user: comment.author || { id: comment.authorId, name: 'Unknown', avatarUrl: null },
+              author: comment.author || { id: comment.authorId, name: 'Unknown', avatarUrl: null },
+            };
+          }
+        }),
+      );
 
-    return {
-      comments: enrichedComments,
-      nextCursor: result.nextCursor?.toString(),
-    };
+      return {
+        comments: enrichedComments,
+        nextCursor: result.nextCursor?.toString(),
+      };
+    } catch (error) {
+      console.error('[timeline] Error in getArticleComments:', error);
+      throw error;
+    }
   }
 
   // ===============================================

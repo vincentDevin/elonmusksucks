@@ -2,11 +2,11 @@
  * API Responses Barrel Export
  */
 
-export * from './auth';
-export * from './user';
-export * from './prediction';
-export * from './betting';
-export * from './leaderboard';
-export * from './timeline';
-export * from './pong';
-export * from './admin';
+export * from './auth.js';
+export * from './user.js';
+export * from './prediction.js';
+export * from './betting.js';
+export * from './leaderboard.js';
+export * from './timeline.js';
+export * from './pong.js';
+export * from './admin.js';

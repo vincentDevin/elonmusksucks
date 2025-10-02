@@ -4,7 +4,10 @@ import { PostReactions } from '../../posts/core/PostReactions';
 import { CommentSection } from './CommentSection';
 import { useReactions } from '../../../contexts/ReactionContext';
 import type { UnifiedFeedItem } from '../../../utils/feedAdapter';
-import type { TimelineItem, UserFeedPost, ReactionType } from '@ems/types';
+import type { TimelineItem, ReactionType } from '@ems/types';
+
+// Type for the full post data structure
+type FullPostData = NonNullable<TimelineItem['postData']>;
 
 interface ContentModalProps {
   isOpen: boolean;
@@ -29,7 +32,7 @@ export const ContentModal: React.FC<ContentModalProps> = ({ isOpen, onClose, con
   React.useEffect(() => {
     if (isOpen) {
       if (contentType === 'post' && contentData) {
-        const postData = contentData as UserFeedPost;
+        const postData = contentData as unknown as FullPostData;
         initializeReactions('post', contentId, postData.reactionCounts, postData.userReaction);
       } else if (contentType === 'article') {
         initializeReactions('article', contentId);
@@ -42,7 +45,7 @@ export const ContentModal: React.FC<ContentModalProps> = ({ isOpen, onClose, con
 
   // Type-safe content data
   const articleData = contentType === 'article' ? (contentData as TimelineItem) : null;
-  const postData = contentType === 'post' ? (contentData as UserFeedPost) : null;
+  const postData = contentType === 'post' ? (contentData as unknown as FullPostData) : null;
 
   // Modal title based on content type
   const modalTitle =
@@ -120,7 +123,7 @@ export const ContentModal: React.FC<ContentModalProps> = ({ isOpen, onClose, con
               Array.isArray(postData.mediaUrls) &&
               postData.mediaUrls.length > 0 && (
                 <div className="mt-3 space-y-3">
-                  {postData.mediaUrls.map((url, index) => {
+                  {postData.mediaUrls.map((url: string, index: number) => {
                     const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
                     const isVideo = /\.(mp4|webm|mov)$/i.test(url);
 
@@ -262,7 +265,7 @@ export const ContentModal: React.FC<ContentModalProps> = ({ isOpen, onClose, con
             <CommentSection
               contentType="post"
               contentId={contentId}
-              comments={postData.children || []}
+              comments={[]} // Always fetch fresh comments to get updated avatar URLs
               commentsCount={postData.commentsCount || 0}
               onCommentsUpdate={(updatedComments) => {
                 // Update post data with new comments

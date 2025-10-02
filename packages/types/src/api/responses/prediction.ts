@@ -52,8 +52,8 @@ export interface PredictionView {
   id: number;
   title: string;
   description: string;
-  categoryId: number;
-  categoryName?: string;
+  categoryId: number | null; // Nullable as per Prisma schema
+  categoryName?: string; // Optional category name if we want to include it
   status: string; // 'PENDING' | 'APPROVED' | 'RESOLVED'
   type: string;
   threshold?: number | null;

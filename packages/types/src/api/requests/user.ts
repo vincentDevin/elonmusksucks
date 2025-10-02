@@ -18,6 +18,9 @@ export interface UpdateProfileRequest {
   profileImageUrl?: string;
 }
 
+// Alias for backwards compatibility
+export type UpdateProfilePayload = UpdateProfileRequest;
+
 // ============================================================================
 // User Posts (legacy - will migrate to Content)
 // ============================================================================
@@ -38,3 +41,6 @@ export interface CreateUserPostRequest {
   mediaUrls?: string[];
   linkPreview?: LinkPreview;
 }
+
+// Alias for backwards compatibility
+export type CreateUserPostPayload = CreateUserPostRequest;

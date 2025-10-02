@@ -115,7 +115,7 @@ export interface PublicArticleShare {
 // ============================================================================
 
 export interface TimelineItem {
-  id: string; // composite: 'article-123' or 'tweet-456'
+  id: string; // composite: 'article-123' or 'post-456' or 'tweet-789'
   type: 'article' | 'tweet';
   timestamp: string;
   content: {
@@ -135,7 +135,37 @@ export interface TimelineItem {
     id: number;
     url: string;
     type: string;
+    title?: string;
+    predictionId?: number;
   }>;
+  // When ID starts with 'post-', this contains the full UserFeedPost data
+  postData?: {
+    id: number;
+    authorId: number;
+    content: string;
+    contentType: string;
+    visibility: string;
+    mediaUrls?: string[];
+    linkPreview?: any;
+    parentId: number | null;
+    threadDepth: number;
+    likesCount: number;
+    commentsCount: number;
+    sharesCount: number;
+    viewsCount: string;
+    reactionCounts?: any;
+    userReaction?: any;
+    isDeleted: boolean;
+    isFlagged: boolean;
+    createdAt: string;
+    updatedAt: string;
+    editedAt?: string;
+    children?: any;
+    authorName?: string;
+    authorAvatar?: string;
+    canEdit?: boolean;
+    canDelete?: boolean;
+  };
 }
 
 // ============================================================================

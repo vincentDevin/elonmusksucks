@@ -41,7 +41,7 @@ export const ProfileFeed: React.FC<ProfileFeedProps> = ({
     return (
       <PostCard
         post={post}
-        showComments={false}
+        showComments={true}
         onExpand={() => handleViewDetails(item)}
         onUpdate={(updatedPost) => {
           // Handle post updates (reactions, etc.)

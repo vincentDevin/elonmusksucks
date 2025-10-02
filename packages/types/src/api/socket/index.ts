@@ -2,6 +2,6 @@
  * Socket.IO Types Barrel Export
  */
 
-export * from './events';
-export * from './payloads';
-export * from './acks';
+export * from './events.js';
+export * from './payloads.js';
+export * from './acks.js';

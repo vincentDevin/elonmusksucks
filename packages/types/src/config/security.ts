@@ -14,8 +14,10 @@
 export interface CSRFConfig {
   enabled: boolean;
   cookieName: string;
-  headerName: string;
-  tokenLength: number;
+  tokenHeader?: string;
+  headerName?: string;
+  tokenLength?: number;
+  exemptPaths?: string[];
   ignoreMethods?: string[]; // e.g., ['GET', 'HEAD', 'OPTIONS']
   cookie?: {
     httpOnly: boolean;
@@ -80,6 +82,26 @@ export interface JWTPayload {
   [key: string]: unknown; // Additional claims
 }
 
+/**
+ * JWT Key Configuration for key rotation
+ */
+export interface JWTKeyConfig {
+  keyId: string;
+  secret: string;
+  algorithm: JWTAlgorithm;
+  createdAt: Date;
+  expiresAt?: Date;
+}
+
+/**
+ * JWT Rotation Configuration
+ */
+export interface JWTRotationConfig {
+  currentKeyId: string;
+  keys: Record<string, JWTKeyConfig>;
+  overlapPeriodMs: number;
+}
+
 // ============================================================================
 // Rate Limiting Configuration
 // ============================================================================
@@ -88,9 +110,10 @@ export interface JWTPayload {
  * Rate Limit Config
  */
 export interface RateLimitConfig {
-  enabled: boolean;
+  enabled?: boolean;
   windowMs: number;
-  max: number;
+  max?: number;
+  maxRequests?: number; // Socket.IO usage
   message?: string;
   statusCode?: number;
   skipSuccessfulRequests?: boolean;
@@ -101,9 +124,9 @@ export interface RateLimitConfig {
 }
 
 /**
- * Rate Limit Key Generator Type
+ * Rate Limit Key Generator Type (for HTTP middleware)
  */
-export type RateLimitKeyGenerator = (req: unknown) => string;
+export type RateLimitKeyGenerator = (req: unknown, eventName?: string) => string;
 
 /**
  * Rate Limit Handler Type

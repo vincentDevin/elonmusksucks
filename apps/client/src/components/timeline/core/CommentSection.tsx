@@ -35,10 +35,6 @@ const Comment: React.FC<{
     }
   }, [comment.id, contentType, comment.reactionCounts, comment.userReaction, initializeReactions]);
 
-  const handleReaction = (type: ReactionType) => {
-    toggleReaction(contentType, comment.id, type);
-  };
-
   const handleReplySubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!replyText.trim() || !onReply) return;
@@ -57,10 +53,10 @@ const Comment: React.FC<{
       <div className="flex space-x-3">
         {/* Avatar */}
         <div className="flex-shrink-0">
-          {comment.authorAvatar || comment.user?.avatarUrl ? (
+          {comment.authorAvatar || comment.author?.avatarUrl || comment.user?.avatarUrl ? (
             <img
-              src={comment.authorAvatar || comment.user?.avatarUrl}
-              alt={comment.authorName || comment.user?.name}
+              src={comment.authorAvatar || comment.author?.avatarUrl || comment.user?.avatarUrl}
+              alt={comment.authorName || comment.author?.name || comment.user?.name}
               className={`${depth > 0 ? 'w-7 h-7' : 'w-8 h-8'} rounded-full object-cover`}
             />
           ) : (
@@ -68,7 +64,9 @@ const Comment: React.FC<{
               className={`${depth > 0 ? 'w-7 h-7' : 'w-8 h-8'} bg-primary/10 rounded-full flex items-center justify-center`}
             >
               <span className="text-primary text-xs font-medium">
-                {(comment.authorName || comment.user?.name || 'U').charAt(0).toUpperCase()}
+                {(comment.authorName || comment.author?.name || comment.user?.name || 'U')
+                  .charAt(0)
+                  .toUpperCase()}
               </span>
             </div>
           )}
@@ -78,7 +76,7 @@ const Comment: React.FC<{
         <div className="flex-1 min-w-0">
           <div className="flex items-center space-x-2 mb-1">
             <span className={`font-medium text-content ${depth > 0 ? 'text-xs' : 'text-sm'}`}>
-              {comment.authorName || comment.user?.name || 'Unknown User'}
+              {comment.authorName || comment.author?.name || comment.user?.name || 'Unknown User'}
             </span>
             <span className="text-xs text-tertiary/70">
               {new Date(comment.createdAt).toLocaleDateString('en-US', {
@@ -91,7 +89,7 @@ const Comment: React.FC<{
           </div>
 
           <p className={`text-content leading-relaxed mb-2 ${depth > 0 ? 'text-xs' : 'text-sm'}`}>
-            {comment.content}
+            {comment.body || comment.content}
           </p>
 
           {/* Actions Row - Reactions and Buttons */}
@@ -236,8 +234,8 @@ export const CommentSection: React.FC<CommentSectionProps> = ({
           // Transform article comments to match the expected structure
           const transformedComments = response.comments.map((comment) => ({
             ...comment,
-            authorName: comment.user?.name,
-            authorAvatar: comment.user?.avatarUrl,
+            authorName: comment.author?.name || comment.user?.name,
+            authorAvatar: comment.author?.avatarUrl || comment.user?.avatarUrl,
             parentId: contentId, // Article comments are always top-level
             reactionCounts: { LIKE: 0, LOVE: 0, LAUGH: 0, ANGRY: 0, SAD: 0 }, // Will be populated by ReactionContext
             userReaction: null, // Will be populated by ReactionContext
@@ -276,8 +274,8 @@ export const CommentSection: React.FC<CommentSectionProps> = ({
         // Transform article comment to match expected structure
         const transformedComment = {
           ...comment,
-          authorName: comment.user?.name || user?.name, // Fallback to current user
-          authorAvatar: comment.user?.avatarUrl || user?.avatarUrl || user?.profilePictureKey, // Try multiple fallbacks
+          authorName: comment.author?.name || comment.user?.name || user?.name,
+          authorAvatar: comment.author?.avatarUrl || comment.user?.avatarUrl || user?.avatarUrl,
           parentId: contentId, // Article comments are always top-level
           reactionCounts: { LIKE: 0, LOVE: 0, LAUGH: 0, ANGRY: 0, SAD: 0 }, // Will be populated by ReactionContext
           userReaction: null, // Will be populated by ReactionContext
@@ -300,7 +298,7 @@ export const CommentSection: React.FC<CommentSectionProps> = ({
     if (!user || contentType !== 'post') return; // Only handle post replies for now
 
     try {
-      const reply = await createComment(parentId, content);
+      await createComment(parentId, content);
       // Refresh comments to get updated tree
       const response = await getPostComments(contentId);
       setLoadedComments(response.comments);

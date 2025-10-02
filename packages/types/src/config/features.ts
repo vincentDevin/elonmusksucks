@@ -319,3 +319,23 @@ export const CommonFeatureFlags = {
 } as const;
 
 export type CommonFeatureFlag = (typeof CommonFeatureFlags)[keyof typeof CommonFeatureFlags];
+
+// ============================================================================
+// Feature Flag Configuration
+// ============================================================================
+
+/**
+ * Feature Flag Configuration (for lib/flags.ts usage)
+ */
+export interface FeatureFlagConfig {
+  pong_beta?: boolean;
+  enhanced_chat?: boolean;
+  advanced_analytics?: boolean;
+  experimental_ui?: boolean;
+  [key: string]: boolean | undefined;
+}
+
+/**
+ * Feature Flag Key (string union type for indexing)
+ */
+export type FeatureFlagKey = keyof FeatureFlagConfig;

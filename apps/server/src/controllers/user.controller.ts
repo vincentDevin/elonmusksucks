@@ -10,7 +10,6 @@ import { adminAchievementService } from '../services/achievements/adminAchieveme
 import type {
   PublicUserProfile,
   UserFeedPost,
-  UserStatsDTO,
   UserStatsView,
   UserProfileView,
   UpdateProfilePayload,
@@ -22,7 +21,6 @@ import type {
   UnifiedActivityEvent,
 } from '@ems/types';
 import {
-  toUserStatsView,
   toUserProfileView,
   toUserEnhancedStatsView,
   toUserAchievementProgressView,
@@ -325,14 +323,14 @@ export async function getUserStatsHandler(
       return;
     }
 
-    const stats: UserStatsDTO | null = await userService.getUserStats(userId);
+    const stats: UserStatsView | null = await userService.getUserStats(userId);
     if (!stats) {
       res.status(404).json({ error: 'Stats not found' });
       return;
     }
 
-    const payload = toUserStatsView(stats) satisfies UserStatsView;
-    res.json(payload);
+    // Service already returns UserStatsView, no need to transform
+    res.json(stats);
   } catch (err) {
     next(err);
   }

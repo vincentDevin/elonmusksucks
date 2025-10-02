@@ -25,13 +25,18 @@ import { UserService } from '../services/user.service';
 import { unifiedActivityService } from './unifiedActivity.service';
 import { eventBus } from '../lib/EventBus';
 import { serializeBigInt } from '../utils/bigintSerializer';
+import { ContentRepository } from '../repositories/ContentRepository';
+import type { IContentRepository } from '../repositories/interfaces/IContentRepository';
 
 // Using the global ParlayLegWithUser type from @ems/types
 
 export class PredictionService {
   private userService = new UserService();
+  private contentRepository: IContentRepository;
 
-  constructor(private repo: IPredictionRepository = new PredictionRepository()) {}
+  constructor(private repo: IPredictionRepository = new PredictionRepository()) {
+    this.contentRepository = new ContentRepository();
+  }
 
   async findPredictionBasicById(id: number) {
     return (this.repo as any).findPredictionBasicById(id);
@@ -2101,6 +2106,96 @@ export class PredictionService {
       .split(/\s+/)
       .filter((word) => word.length >= 3 && !commonWords.has(word))
       .slice(0, 10); // Top 10 keywords
+  }
+
+  // ===============================================
+  // Prediction Comment Methods (using Content model)
+  // ===============================================
+
+  /**
+   * Create a comment on a prediction
+   */
+  async createPredictionComment(predictionId: number, userId: number, content: string) {
+    // Validate content
+    if (!content.trim()) {
+      throw new Error('Comment content cannot be empty');
+    }
+    if (content.length > 2000) {
+      throw new Error('Comment content cannot exceed 2000 characters');
+    }
+
+    // Create comment using Content model with predictionId
+    const comment = await this.contentRepository.createContent({
+      authorId: userId,
+      type: 'COMMENT',
+      body: content,
+      predictionId,
+    });
+
+    return comment;
+  }
+
+  /**
+   * Get comments for a prediction with pagination
+   */
+  async getPredictionComments(predictionId: number, limit: number, cursor?: string) {
+    // Get comments for prediction using Content repository
+    const result = await this.contentRepository.getPredictionComments(predictionId, {
+      limit,
+      cursor: cursor ? parseInt(cursor) : undefined,
+    });
+
+    // Enrich user data with signed avatar URLs
+    const enrichedComments = await Promise.all(
+      result.comments.map(async (comment: any) => {
+        if (comment.author) {
+          const enrichedUser = await this.userService.enrichUserWithAvatar(comment.author);
+          return {
+            ...comment,
+            user: enrichedUser,
+          };
+        }
+        return comment;
+      }),
+    );
+
+    return {
+      comments: enrichedComments,
+      nextCursor: result.nextCursor?.toString(),
+    };
+  }
+
+  /**
+   * Update a comment (ownership validated)
+   */
+  async updatePredictionComment(commentId: number, userId: number, content: string) {
+    // Validate content
+    if (!content.trim()) {
+      throw new Error('Comment content cannot be empty');
+    }
+    if (content.length > 2000) {
+      throw new Error('Comment content cannot exceed 2000 characters');
+    }
+
+    // Update via ContentRepository (it handles ownership validation)
+    const updatedComment = await this.contentRepository.updateContent(commentId, userId, content);
+
+    return updatedComment;
+  }
+
+  /**
+   * Delete a comment (soft delete, ownership validated)
+   */
+  async deletePredictionComment(commentId: number, userId: number) {
+    // Delete via ContentRepository (it handles ownership validation and soft delete)
+    await this.contentRepository.deleteContent(commentId, userId);
+  }
+
+  /**
+   * Get comment count for a prediction
+   */
+  async getPredictionCommentCount(predictionId: number): Promise<number> {
+    return this.contentRepository.getPredictionCommentCount(predictionId);
   }
 }
 

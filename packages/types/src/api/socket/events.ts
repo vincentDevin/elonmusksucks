@@ -157,6 +157,11 @@ export const REDIS_CHANNELS = {
   PREDICTION_COMMENT_DELETE: 'prediction:comment:delete',
   PREDICTION_COMMENT_LIKE: 'prediction:comment:like',
 
+  // Redis health monitoring channels
+  REDIS_HEALTH_METRICS: 'redis:health:metrics',
+  REDIS_HEALTH_ERROR: 'redis:health:error',
+  REDIS_HEALTH_ALERT: 'redis:health:alert',
+
   // Other channels
   PAYOUT_COMPLETED: 'payout:completed',
   EVENT_SEQUENCE_COMPLETED: 'event:sequence:completed',

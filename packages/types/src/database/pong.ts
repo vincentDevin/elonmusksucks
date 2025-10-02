@@ -144,6 +144,132 @@ export interface DbPongPlayerStats {
 }
 
 // ============================================================================
+// Repository Layer Types
+// ============================================================================
+
+import type { PongDifficulty, PongMatchStatus } from '../prisma';
+
+export interface PongStatsData {
+  id?: number;
+  userId: number;
+  eloRating: number;
+  peakElo: number;
+  eloHistory?: DbPongEloHistoryEntry[];
+  tier: string;
+  lastEloChange: number;
+  totalEloGained: number;
+  totalEloLost: number;
+  highestWagerWin: bigint;
+  riskTaker: boolean;
+  totalMatches: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  winStreak: number;
+  bestWinStreak: number;
+  totalWagered: bigint;
+  totalWon: bigint;
+  totalLost: bigint;
+  biggestWin: bigint;
+  biggestLoss: bigint;
+  avgPing: number;
+  avgGameDuration: number;
+  perfectGames: number;
+  comebacks: number;
+  aiWins: number;
+  aiLosses: number;
+  hardestAiBeaten?: PongDifficulty | null;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export interface PongMatchData {
+  id: string;
+  playerOneId: number;
+  playerTwoId?: number | null;
+  winnerId?: number | null;
+  wagerAmount: bigint;
+  aiDifficulty?: PongDifficulty | null;
+  playerOneScore: number;
+  playerTwoScore: number;
+  status: PongMatchStatus;
+  startedAt?: Date | null;
+  completedAt?: Date | null;
+  gameDuration?: number | null;
+  playerOnePing: number;
+  playerTwoPing: number;
+  player1EloStart?: number | null;
+  player2EloStart?: number | null;
+  player1EloEnd?: number | null;
+  player2EloEnd?: number | null;
+  eloChange?: number | null;
+  skillComponent?: number | null;
+  economyComponent?: number | null;
+  // Canonical fields
+  mode?: string | null;
+  rated?: boolean | null;
+  hostUserId?: number | null;
+  joinerUserId?: number | null;
+  aiUserId?: number | null;
+  hostDisplayName?: string | null;
+  joinerDisplayName?: string | null;
+  aiDisplayName?: string | null;
+}
+
+export interface PongMatchUpdateData {
+  playerTwoId?: number;
+  winnerId?: number;
+  aiDifficulty?: PongDifficulty;
+  playerOneScore?: number;
+  playerTwoScore?: number;
+  status?: PongMatchStatus;
+  startedAt?: Date;
+  completedAt?: Date;
+  gameDuration?: number;
+  playerOnePing?: number;
+  playerTwoPing?: number;
+  player1EloStart?: number;
+  player2EloStart?: number;
+  player1EloEnd?: number;
+  player2EloEnd?: number;
+  eloChange?: number;
+  skillComponent?: number;
+  economyComponent?: number;
+  mode?: string;
+  rated?: boolean;
+  joinerUserId?: number;
+  aiUserId?: number;
+  hostDisplayName?: string;
+  joinerDisplayName?: string;
+  aiDisplayName?: string;
+}
+
+export interface PongStatsWithUser extends PongStatsData {
+  user: {
+    id: number;
+    name: string;
+    avatarUrl: string | null;
+  };
+}
+
+export interface PongMatchWithPlayers extends PongMatchData {
+  playerOne: {
+    id: number;
+    name: string;
+    avatarUrl: string | null;
+  };
+  playerTwo?: {
+    id: number;
+    name: string;
+    avatarUrl: string | null;
+  };
+  winner?: {
+    id: number;
+    name: string;
+  };
+}
+
+// ============================================================================
 // Prisma Transaction Type
 // ============================================================================
 

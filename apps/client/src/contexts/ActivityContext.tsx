@@ -138,13 +138,18 @@ let globalHasRequestedInitialData = false;
 let globalActivities: Activity[] = getStoredActivities();
 let globalHasInitialized = getStoredHasInitialized();
 
+// Activity feed configuration - FILO queue with max 25 items
+const MAX_ACTIVITIES = 25;
+
 export function ActivityProvider({ children }: { children: React.ReactNode }) {
   const { isConnected } = useEventBusCore();
   const { shouldRefresh, updateLastFetch } = useVisibilityGuard(5 * 60 * 1000); // 5 minutes
+
+  // Show cached data immediately if available, only show loading if no cache
   const [activities, setActivities] = useState<Activity[]>(globalActivities);
-  const [loading, setLoading] = useState(!globalHasInitialized);
+  const [loading, setLoading] = useState(globalActivities.length === 0);
   const [error, setError] = useState<string | null>(null);
-  const [hasInitialized, setHasInitialized] = useState(globalHasInitialized);
+  const [hasInitialized, setHasInitialized] = useState(globalActivities.length > 0);
 
   // Handle unified activity feed response
   const handleActivityFeedResponse = useCallback((data: any[]) => {
@@ -185,10 +190,10 @@ export function ActivityProvider({ children }: { children: React.ReactNode }) {
       const existingIds = new Set(unifiedActivities.map((a) => a.id));
       const uniqueCachedActivities = globalActivities.filter((a) => !existingIds.has(a.id));
 
-      // Combine and sort by timestamp (newest first), then limit to 100
+      // Combine and sort by timestamp (newest first), then limit to MAX_ACTIVITIES (FILO queue)
       finalActivities = [...unifiedActivities, ...uniqueCachedActivities]
         .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-        .slice(0, 100);
+        .slice(0, MAX_ACTIVITIES);
     }
 
     // Update both local and global state
@@ -238,9 +243,9 @@ export function ActivityProvider({ children }: { children: React.ReactNode }) {
     };
 
     setActivities((prev) => {
-      // Add new activity and remove duplicates, keeping only latest 100
+      // Add new activity and remove duplicates, keeping only latest MAX_ACTIVITIES (FILO queue)
       const newActivities = [unifiedActivity, ...prev.filter((a) => a.id !== unifiedActivity.id)];
-      const trimmedActivities = newActivities.slice(0, 100);
+      const trimmedActivities = newActivities.slice(0, MAX_ACTIVITIES);
 
       // Update global cache and storage
       globalActivities = trimmedActivities;
@@ -252,11 +257,13 @@ export function ActivityProvider({ children }: { children: React.ReactNode }) {
 
   // Load initial data from Redis cache on connection
   const loadInitialData = useCallback(async () => {
-    if (globalHasRequestedInitialData) return; // Prevent duplicate requests
+    // Only prevent duplicate requests if we already have data
+    if (globalHasRequestedInitialData && globalActivities.length > 0) return;
     globalHasRequestedInitialData = true;
 
     // Skip refresh if tab was hidden and data isn't stale
     if (!shouldRefresh()) {
+      setLoading(false);
       return;
     }
 
@@ -265,7 +272,7 @@ export function ActivityProvider({ children }: { children: React.ReactNode }) {
 
     try {
       console.log('[ActivityContext] Loading initial activities from Redis cache...');
-      const response = await getRecentActivities(100);
+      const response = await getRecentActivities(MAX_ACTIVITIES);
 
       if (response.success && response.activities.length > 0) {
         console.log(
@@ -355,23 +362,33 @@ export function ActivityProvider({ children }: { children: React.ReactNode }) {
         setHasInitialized(true);
         updateLastFetch();
       } else {
-        console.log('[ctivityContext] No initial activities found, waiting for real-time events');
+        console.log('[ActivityContext] No initial activities found, waiting for real-time events');
         globalHasInitialized = true;
         setHasInitialized(true);
         updateLastFetch();
       }
     } catch (error) {
       console.error('[ActivityContext] Error loading initial activities:', error);
-      setError('Failed to load initial activities');
+
+      // Reset request flag so it can retry
+      globalHasRequestedInitialData = false;
 
       // Fall back to cached data if available
       const cached = getStoredActivities();
       if (cached.length > 0) {
-        console.log('[ActivityContext] Falling back to browser cache');
+        console.log(
+          '[ActivityContext] Falling back to browser cache:',
+          cached.length,
+          'activities',
+        );
         setActivities(cached);
         globalActivities = cached;
         globalHasInitialized = true;
         setHasInitialized(true);
+        setError(null); // Clear error since we have cached data
+      } else {
+        console.log('[ActivityContext] No cache available, showing error');
+        setError('Failed to load activity feed');
       }
     } finally {
       setLoading(false);
@@ -380,19 +397,38 @@ export function ActivityProvider({ children }: { children: React.ReactNode }) {
 
   // Handle connection state changes via EventBus
   useEffect(() => {
+    console.log(
+      '[ActivityContext] Connection state:',
+      isConnected,
+      'Has initialized:',
+      globalHasInitialized,
+      'Cached activities:',
+      globalActivities.length,
+    );
+
     if (isConnected) {
       setError(null);
-      // Load initial data from server if not already done
-      if (!globalHasInitialized) {
+      // Load initial data from server if not already done OR if we have no data
+      if (!globalHasInitialized || globalActivities.length === 0) {
+        console.log('[ActivityContext] Loading initial data...');
         loadInitialData();
       } else {
         // Use existing global data
+        console.log('[ActivityContext] Using cached data:', globalActivities.length, 'activities');
         setActivities(globalActivities);
         setHasInitialized(true);
         setLoading(false);
       }
     } else {
-      setError('Connection lost');
+      // Only show error if we have no cached data to fall back to
+      if (globalActivities.length === 0) {
+        setError('Connection lost');
+      } else {
+        console.log('[ActivityContext] Offline but using cached data');
+        setActivities(globalActivities);
+        setHasInitialized(true);
+        setLoading(false);
+      }
     }
   }, [isConnected, loadInitialData]);
 

@@ -38,10 +38,23 @@ export interface ArticleReactionResponse {
 export interface ArticleCommentResponse {
   id: number;
   content: string;
+  body: string; // For PostCard compatibility
   authorId: number;
   authorName: string;
   articleId: number;
   createdAt: string; // Date → ISO string
+  author?: {
+    id: number;
+    name: string;
+    avatarUrl: string | null;
+    profilePictureKey?: string | null;
+  };
+  user?: {
+    id: number;
+    name: string;
+    avatarUrl: string | null;
+    profilePictureKey?: string | null;
+  };
 }
 
 // ============================================================================

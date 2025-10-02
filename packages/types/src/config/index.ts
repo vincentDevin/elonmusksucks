@@ -4,7 +4,8 @@
  * Exports all configuration types
  */
 
-export * from './security';
-export * from './features';
-export * from './socket';
-export * from './monitoring';
+export * from './security.js';
+export * from './features.js';
+export * from './socket.js';
+export * from './monitoring.js';
+export * from './middleware.js';

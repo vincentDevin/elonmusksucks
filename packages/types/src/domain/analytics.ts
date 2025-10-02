@@ -389,3 +389,47 @@ export interface RiskFactor {
   description: string;
   mitigation?: string;
 }
+
+// ============================================================================
+// User Stats DTO
+// ============================================================================
+
+/**
+ * User Statistics DTO
+ *
+ * Raw user statistics data transfer object
+ */
+export interface UserStatsDTO {
+  totalBets: number;
+  betsWon: number;
+  betsLost: number;
+  totalParlays: number;
+  parlaysWon: number;
+  parlaysLost: number;
+  totalParlayLegs: number;
+  parlayLegsWon: number;
+  parlayLegsLost: number;
+  totalWagered: string; // BigInt as string
+  totalWinnings: string; // BigInt as string
+  totalLosses: string; // BigInt as string
+  netProfit: string; // BigInt as string
+  currentStreak: number;
+  longestWinStreak: number;
+  longestLoseStreak: number;
+  averageBetSize: string; // BigInt as string
+  averageOdds: number;
+  biggestWin: string; // BigInt as string
+  biggestLoss: string; // BigInt as string
+  winRate: number;
+  roi: number;
+}
+
+/**
+ * Trend Data Point
+ *
+ * Simple time-series data point for charts and graphs
+ */
+export interface TrendData {
+  date: string;
+  value: number;
+}
