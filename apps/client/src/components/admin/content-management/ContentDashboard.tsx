@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { REDIS_CHANNELS } from '@ems/types';
 import { useSocket } from '../../../contexts/SocketContext';
 import { useAuth } from '../../../contexts/AuthContext';
 import type { UnifiedContentItem, UnifiedContentFilters, UnifiedContentResponse } from '@ems/types';
@@ -97,16 +98,16 @@ const ContentDashboard: React.FC<ContentDashboardProps> = ({ className = '' }) =
     };
 
     // Subscribe to real-time events
-    socket.on('content:updated', handleContentUpdate);
-    socket.on('content:moderated', handleModerationUpdate);
-    socket.on('feeds:updated', handleContentUpdate);
-    socket.on('articles:bulk-moderated', handleContentUpdate);
+    socket.on(REDIS_CHANNELS.CONTENT_UPDATED, handleContentUpdate);
+    socket.on(REDIS_CHANNELS.CONTENT_MODERATED, handleModerationUpdate);
+    socket.on(REDIS_CHANNELS.FEEDS_UPDATED, handleContentUpdate);
+    socket.on(REDIS_CHANNELS.ARTICLES_BULK_MODERATED, handleContentUpdate);
 
     return () => {
-      socket.off('content:updated', handleContentUpdate);
-      socket.off('content:moderated', handleModerationUpdate);
-      socket.off('feeds:updated', handleContentUpdate);
-      socket.off('articles:bulk-moderated', handleContentUpdate);
+      socket.off(REDIS_CHANNELS.CONTENT_UPDATED, handleContentUpdate);
+      socket.off(REDIS_CHANNELS.CONTENT_MODERATED, handleModerationUpdate);
+      socket.off(REDIS_CHANNELS.FEEDS_UPDATED, handleContentUpdate);
+      socket.off(REDIS_CHANNELS.ARTICLES_BULK_MODERATED, handleContentUpdate);
     };
   }, [socket, loadContent]);
 

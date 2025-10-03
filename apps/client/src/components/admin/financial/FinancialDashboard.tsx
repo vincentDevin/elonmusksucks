@@ -10,7 +10,7 @@ import {
   type PaginatedFinancialData,
   type DetailedBet,
 } from '../../../api/admin';
-import type { AdminFinancialAnalyticsResponse } from '@ems/types';
+import { REDIS_CHANNELS, SOCKET_EVENTS, type AdminFinancialAnalyticsResponse } from '@ems/types';
 
 // Sub-components
 import FinancialStatsOverview from './FinancialStatsOverview';
@@ -192,22 +192,22 @@ const FinancialDashboard: React.FC<FinancialDashboardProps> = ({ className = '' 
     };
 
     // Register event listeners
-    socket.on('betPlaced', handleFinancialUpdate);
-    socket.on('parlayPlaced', handleFinancialUpdate);
-    socket.on('bet:status_change', handleFinancialUpdate);
-    socket.on('parlay:status_change', handleFinancialUpdate);
-    socket.on('pong:stats:update', handleFinancialUpdate);
-    socket.on('admin:metrics:update', handleFinancialUpdate);
-    socket.on('user:stats_update', handleFinancialUpdate);
+    socket.on(SOCKET_EVENTS.BET_PLACED, handleFinancialUpdate);
+    socket.on(SOCKET_EVENTS.PARLAY_PLACED, handleFinancialUpdate);
+    socket.on(REDIS_CHANNELS.BET_STATUS_CHANGE, handleFinancialUpdate);
+    socket.on(REDIS_CHANNELS.PARLAY_STATUS_CHANGE, handleFinancialUpdate);
+    socket.on(SOCKET_EVENTS.PONG_STATS_UPDATE, handleFinancialUpdate);
+    socket.on(REDIS_CHANNELS.ADMIN_METRICS_UPDATE, handleFinancialUpdate);
+    socket.on(REDIS_CHANNELS.USER_STATS_UPDATE, handleFinancialUpdate);
 
     return () => {
-      socket.off('betPlaced');
-      socket.off('parlayPlaced');
-      socket.off('bet:status_change');
-      socket.off('parlay:status_change');
-      socket.off('pong:stats:update');
-      socket.off('admin:metrics:update');
-      socket.off('user:stats_update');
+      socket.off(SOCKET_EVENTS.BET_PLACED);
+      socket.off(SOCKET_EVENTS.PARLAY_PLACED);
+      socket.off(REDIS_CHANNELS.BET_STATUS_CHANGE);
+      socket.off(REDIS_CHANNELS.PARLAY_STATUS_CHANGE);
+      socket.off(SOCKET_EVENTS.PONG_STATS_UPDATE);
+      socket.off(REDIS_CHANNELS.ADMIN_METRICS_UPDATE);
+      socket.off(REDIS_CHANNELS.USER_STATS_UPDATE);
     };
   }, [socket, realtimeEnabled]);
 

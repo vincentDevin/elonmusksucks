@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { searchUsers, type UserSearchParams } from '../../../api/admin';
-import type { PublicBadge } from '@ems/types';
 import { listBadges } from '../../../api/admin';
+import { SOCKET_EVENTS, type PublicBadge } from '@ems/types';
 import { useSocket } from '../../../contexts/SocketContext';
 import UserListToolbar from './UserListToolbar';
 import CompactUserList, { type CompactUser } from './CompactUserList';
@@ -159,16 +159,16 @@ const UserManagement: React.FC<UserManagementProps> = ({ className = '' }) => {
         performSearch(currentSearchParams, false);
       };
 
-      socket.on('adminModerationUserBan', handleUserUpdate);
-      socket.on('adminModerationUserUnban', handleUserUpdate);
-      socket.on('adminModerationUserMute', handleUserUpdate);
-      socket.on('adminModerationUserKick', handleUserUpdate);
+      socket.on(SOCKET_EVENTS.ADMIN_MODERATION_USER_BAN, handleUserUpdate);
+      socket.on(SOCKET_EVENTS.ADMIN_MODERATION_USER_UNBAN, handleUserUpdate);
+      socket.on(SOCKET_EVENTS.ADMIN_MODERATION_USER_MUTE, handleUserUpdate);
+      socket.on(SOCKET_EVENTS.ADMIN_MODERATION_USER_KICK, handleUserUpdate);
 
       return () => {
-        socket.off('adminModerationUserBan', handleUserUpdate);
-        socket.off('adminModerationUserUnban', handleUserUpdate);
-        socket.off('adminModerationUserMute', handleUserUpdate);
-        socket.off('adminModerationUserKick', handleUserUpdate);
+        socket.off(SOCKET_EVENTS.ADMIN_MODERATION_USER_BAN, handleUserUpdate);
+        socket.off(SOCKET_EVENTS.ADMIN_MODERATION_USER_UNBAN, handleUserUpdate);
+        socket.off(SOCKET_EVENTS.ADMIN_MODERATION_USER_MUTE, handleUserUpdate);
+        socket.off(SOCKET_EVENTS.ADMIN_MODERATION_USER_KICK, handleUserUpdate);
       };
     }
   }, [socket, currentSearchParams]);

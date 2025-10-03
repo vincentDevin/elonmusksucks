@@ -27,7 +27,14 @@ const ROOM_PATTERNS = {
   PONG_USER: /^pong:user:(\d+)$/,
 
   // Admin-only rooms - only accessible by admin users
-  ADMIN: ['admin', 'admin:metrics', 'admin:moderation', 'admin:feeds', 'admin:events'],
+  ADMIN: [
+    'admin',
+    'admin:metrics',
+    'admin:moderation',
+    'admin:feeds',
+    'admin:events',
+    'admin:predictions',
+  ],
 
   // Game-specific rooms (require additional validation)
   PONG_GAME: /^pong:game:([a-zA-Z0-9]+)$/,

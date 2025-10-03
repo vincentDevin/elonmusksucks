@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { REDIS_CHANNELS } from '@ems/types';
 import {
   searchPredictions,
   bulkUpdatePredictions,
@@ -179,23 +180,23 @@ const PredictionDashboard: React.FC<PredictionDashboardProps> = ({ className = '
     };
 
     // Register event listeners for prediction-related events
-    socket.on('prediction:created', handlePredictionUpdate);
-    socket.on('prediction:approved', handlePredictionUpdate);
-    socket.on('prediction:rejected', handlePredictionUpdate);
-    socket.on('prediction:resolved', handlePredictionUpdate);
-    socket.on('prediction:status_change', handlePredictionUpdate);
-    socket.on('bet:placed', handlePredictionUpdate); // May affect prediction analytics
-    socket.on('parlay:placed', handlePredictionUpdate); // May affect prediction analytics
+    socket.on(REDIS_CHANNELS.PREDICTION_CREATED, handlePredictionUpdate);
+    socket.on(REDIS_CHANNELS.PREDICTION_APPROVED, handlePredictionUpdate);
+    socket.on(REDIS_CHANNELS.PREDICTION_REJECTED, handlePredictionUpdate);
+    socket.on(REDIS_CHANNELS.PREDICTION_RESOLVED, handlePredictionUpdate);
+    socket.on(REDIS_CHANNELS.PREDICTION_STATUS_CHANGE, handlePredictionUpdate);
+    socket.on(REDIS_CHANNELS.BET_PLACED, handlePredictionUpdate); // May affect prediction analytics
+    socket.on(REDIS_CHANNELS.PARLAY_PLACED, handlePredictionUpdate); // May affect prediction analytics
 
     // Cleanup function
     return () => {
-      socket.off('prediction:created', handlePredictionUpdate);
-      socket.off('prediction:approved', handlePredictionUpdate);
-      socket.off('prediction:rejected', handlePredictionUpdate);
-      socket.off('prediction:resolved', handlePredictionUpdate);
-      socket.off('prediction:status_change', handlePredictionUpdate);
-      socket.off('bet:placed', handlePredictionUpdate);
-      socket.off('parlay:placed', handlePredictionUpdate);
+      socket.off(REDIS_CHANNELS.PREDICTION_CREATED, handlePredictionUpdate);
+      socket.off(REDIS_CHANNELS.PREDICTION_APPROVED, handlePredictionUpdate);
+      socket.off(REDIS_CHANNELS.PREDICTION_REJECTED, handlePredictionUpdate);
+      socket.off(REDIS_CHANNELS.PREDICTION_RESOLVED, handlePredictionUpdate);
+      socket.off(REDIS_CHANNELS.PREDICTION_STATUS_CHANGE, handlePredictionUpdate);
+      socket.off(REDIS_CHANNELS.BET_PLACED, handlePredictionUpdate);
+      socket.off(REDIS_CHANNELS.PARLAY_PLACED, handlePredictionUpdate);
     };
   }, [socket, realtimeEnabled, paginationInfo.currentPage, fetchPredictions]);
 

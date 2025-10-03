@@ -13,6 +13,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useChat } from '../contexts/ChatContext';
 import { useSocket } from '../contexts/SocketContext';
 import api from '../api/axios';
+import { SOCKET_EVENTS } from '@ems/types';
 
 const FALLBACK_AVATAR =
   'https://ui-avatars.com/api/?name=Unknown&background=64748b&color=fff&size=48';
@@ -185,22 +186,28 @@ export default function ChatWidget({ mode = 'widget', className }: ChatWidgetPro
     };
 
     // Listen for moderation events
-    socket.on('moderationUserBan', (data) => handleModerationEvent({ ...data, type: 'userBan' }));
-    socket.on('moderationUserUnban', (data) =>
+    socket.on(SOCKET_EVENTS.MODERATION_USER_BAN, (data) =>
+      handleModerationEvent({ ...data, type: 'userBan' }),
+    );
+    socket.on(SOCKET_EVENTS.MODERATION_USER_UNBAN, (data) =>
       handleModerationEvent({ ...data, type: 'userUnban' }),
     );
-    socket.on('moderationUserMute', (data) => handleModerationEvent({ ...data, type: 'userMute' }));
-    socket.on('moderationUserKick', (data) => handleModerationEvent({ ...data, type: 'userKick' }));
-    socket.on('moderationMessageDelete', (data) =>
+    socket.on(SOCKET_EVENTS.MODERATION_USER_MUTE, (data) =>
+      handleModerationEvent({ ...data, type: 'userMute' }),
+    );
+    socket.on(SOCKET_EVENTS.MODERATION_USER_KICK, (data) =>
+      handleModerationEvent({ ...data, type: 'userKick' }),
+    );
+    socket.on(SOCKET_EVENTS.MODERATION_MESSAGE_DELETE, (data) =>
       handleModerationEvent({ ...data, type: 'messageDeleted' }),
     );
 
     return () => {
-      socket.off('moderationUserBan');
-      socket.off('moderationUserUnban');
-      socket.off('moderationUserMute');
-      socket.off('moderationUserKick');
-      socket.off('moderationMessageDelete');
+      socket.off(SOCKET_EVENTS.MODERATION_USER_BAN);
+      socket.off(SOCKET_EVENTS.MODERATION_USER_UNBAN);
+      socket.off(SOCKET_EVENTS.MODERATION_USER_MUTE);
+      socket.off(SOCKET_EVENTS.MODERATION_USER_KICK);
+      socket.off(SOCKET_EVENTS.MODERATION_MESSAGE_DELETE);
     };
   }, [socket, pushModerationEvent]);
 

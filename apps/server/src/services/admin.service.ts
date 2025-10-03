@@ -108,6 +108,14 @@ export const bulkUpdatePredictions = async (
             achievementError,
           );
         }
+      } else if (operation.operation === 'reject') {
+        await eventBus.publish(REDIS_CHANNELS.PREDICTION_REJECTED, {
+          id: prediction.id,
+          title: prediction.title,
+          categoryId: prediction.categoryId,
+          reason: operation.params?.reason ?? null,
+          timestamp: new Date().toISOString(),
+        });
       } else if (operation.operation === 'resolve') {
         await eventBus.publish(REDIS_CHANNELS.PREDICTION_RESOLVE, {
           id: prediction.id,

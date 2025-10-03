@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSocket } from '../contexts/SocketContext';
 import { useAuth } from '../contexts/AuthContext';
 import { debounce } from '../lib/debouncer';
-import type { PublicLeaderboardEntry } from '@ems/types';
+import { REDIS_CHANNELS, SOCKET_EVENTS, type PublicLeaderboardEntry } from '@ems/types';
 import {
   getTopAllTimePaginated,
   getTopDailyPaginated,
@@ -352,14 +352,14 @@ export function useLeaderboard(
       debouncedUpdate();
     };
 
-    socket.on('leaderboardAllTime', handleAllTime);
-    socket.on('leaderboardDaily', handleDaily);
-    socket.on('leaderboard:rankChange', handleRankChange);
+    socket.on(SOCKET_EVENTS.LEADERBOARD_ALL_TIME, handleAllTime);
+    socket.on(SOCKET_EVENTS.LEADERBOARD_DAILY, handleDaily);
+    socket.on(REDIS_CHANNELS.LEADERBOARD_RANK_CHANGE, handleRankChange);
 
     return () => {
-      socket.off('leaderboardAllTime', handleAllTime);
-      socket.off('leaderboardDaily', handleDaily);
-      socket.off('leaderboard:rankChange', handleRankChange);
+      socket.off(SOCKET_EVENTS.LEADERBOARD_ALL_TIME, handleAllTime);
+      socket.off(SOCKET_EVENTS.LEADERBOARD_DAILY, handleDaily);
+      socket.off(REDIS_CHANNELS.LEADERBOARD_RANK_CHANGE, handleRankChange);
 
       // Cancel any pending debounced updates
       debouncedUpdate.cancel();

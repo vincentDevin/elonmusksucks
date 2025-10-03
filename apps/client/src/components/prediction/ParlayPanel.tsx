@@ -1,6 +1,7 @@
 // apps/client/src/components/dashboard/ParlayPanel.tsx
 // Rollback: git checkout HEAD -- apps/client/src/components/dashboard/ParlayPanel.tsx
 import { useState, useMemo, useEffect, useCallback } from 'react';
+import { SOCKET_EVENTS } from '@ems/types';
 import { useParlay } from '../../contexts/ParlayContext';
 import { usePredictionMarket } from '../../contexts/PredictionContext';
 import { useSocket } from '../../contexts/SocketContext';
@@ -126,14 +127,14 @@ export default function ParlayPanel() {
   useEffect(() => {
     if (!socket) return;
 
-    socket.on('betPlaced', handleBetPlaced);
-    socket.on('predictionCreated', handlePredictionUpdate);
-    socket.on('predictionResolved', handlePredictionUpdate);
+    socket.on(SOCKET_EVENTS.BET_PLACED, handleBetPlaced);
+    socket.on(SOCKET_EVENTS.PREDICTION_CREATED, handlePredictionUpdate);
+    socket.on(SOCKET_EVENTS.PREDICTION_RESOLVED, handlePredictionUpdate);
 
     return () => {
-      socket.off('betPlaced', handleBetPlaced);
-      socket.off('predictionCreated', handlePredictionUpdate);
-      socket.off('predictionResolved', handlePredictionUpdate);
+      socket.off(SOCKET_EVENTS.BET_PLACED, handleBetPlaced);
+      socket.off(SOCKET_EVENTS.PREDICTION_CREATED, handlePredictionUpdate);
+      socket.off(SOCKET_EVENTS.PREDICTION_RESOLVED, handlePredictionUpdate);
     };
   }, [socket, handleBetPlaced, handlePredictionUpdate]);
 

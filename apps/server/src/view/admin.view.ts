@@ -144,6 +144,7 @@ export const toAdminFinancialDataResponse = (financialData: {
   currentPage: number;
   hasNextPage: boolean;
   hasPreviousPage: boolean;
+  pageSize?: number;
 }): AdminFinancialDataResponse => {
   // Calculate summary data from the transactions and bets
   const totalVolume = financialData.bets.reduce((sum, bet) => {
@@ -158,9 +159,22 @@ export const toAdminFinancialDataResponse = (financialData: {
 
   const netRevenue = totalVolume - totalPayouts;
 
+  const pageSize =
+    financialData.pageSize ??
+    (financialData.totalPages > 0
+      ? Math.ceil(Math.max(financialData.totalBets, financialData.totalTransactions) /
+          financialData.totalPages)
+      : undefined);
+
   return {
     transactions: financialData.transactions.map(toAdminTransactionView),
     bets: financialData.bets.map(toAdminBetView),
+    totalTransactions: financialData.totalTransactions,
+    totalBets: financialData.totalBets,
+    totalPages: financialData.totalPages,
+    currentPage: financialData.currentPage,
+    hasNextPage: financialData.hasNextPage,
+    hasPreviousPage: financialData.hasPreviousPage,
     summary: {
       totalTransactions: financialData.totalTransactions,
       totalBets: financialData.totalBets,
@@ -168,12 +182,14 @@ export const toAdminFinancialDataResponse = (financialData: {
       totalPayouts: totalPayouts.toString(),
       netRevenue: netRevenue.toString(),
     },
-    pagination: {
-      page: financialData.currentPage,
-      limit: Math.ceil(financialData.totalBets / financialData.totalPages) || 25,
-      totalPages: financialData.totalPages,
-      hasMore: financialData.hasNextPage,
-    },
+    pagination: pageSize
+      ? {
+          page: financialData.currentPage,
+          limit: pageSize,
+          totalPages: financialData.totalPages,
+          hasMore: financialData.hasNextPage,
+        }
+      : undefined,
   };
 };
 

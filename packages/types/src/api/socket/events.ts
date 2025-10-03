@@ -12,9 +12,12 @@ export const REDIS_CHANNELS = {
   // Prediction channels
   PREDICTION_CREATE: 'prediction:create',
   PREDICTION_CREATED: 'prediction:created',
+  PREDICTION_REJECTED: 'prediction:rejected',
   PREDICTION_RESOLVE: 'prediction:resolve',
+  PREDICTION_RESOLVED: 'prediction:resolved',
   PREDICTION_RESOLVED_FAST: 'prediction:resolved:fast',
   PREDICTION_APPROVED: 'prediction:approved',
+  PREDICTION_STATUS_CHANGE: 'prediction:status_change',
   PREDICTION_VIEWED: 'prediction:viewed',
   PREDICTION_VIRAL: 'prediction:viral',
   PREDICTION_FIRST_CORRECT_BET: 'prediction:first:correct:bet',
@@ -130,14 +133,21 @@ export const REDIS_CHANNELS = {
   FEED_SOURCE_CREATED: 'feed:source:created',
   FEED_SOURCE_UPDATED: 'feed:source:updated',
   FEED_SOURCE_DELETED: 'feed:source:deleted',
+  TIMELINE_ARTICLE_NEW: 'timeline:article:new',
   TIMELINE_ARTICLES_NEW: 'timeline:articles:new',
   TIMELINE_ARTICLES_APPROVED: 'timeline:articles:approved',
+  TIMELINE_MODERATION_BULK: 'timeline:moderation:bulk',
+  TIMELINE_FEED_REFRESH: 'timeline:feed:refresh',
 
   // Admin channels
   ADMIN_METRICS_UPDATE: 'admin:metrics:update',
   ADMIN_MODERATION_BULK: 'admin:moderation:bulk',
   ADMIN_RETAGGING_BULK: 'admin:retagging:bulk',
   ADMIN_FEED_REFRESH: 'admin:feed:refresh',
+  CONTENT_UPDATED: 'content:updated',
+  CONTENT_MODERATED: 'content:moderated',
+  FEEDS_UPDATED: 'feeds:updated',
+  ARTICLES_BULK_MODERATED: 'articles:bulk-moderated',
   MODERATION_USER_BAN: 'moderation:userBan',
   MODERATION_USER_UNBAN: 'moderation:userUnban',
   MODERATION_USER_MUTE: 'moderation:userMute',
@@ -185,6 +195,48 @@ export const SOCKET_ROOMS = {
 } as const;
 
 export type SocketRoom = (typeof SOCKET_ROOMS)[keyof typeof SOCKET_ROOMS];
+
+// ============================================================================
+// Socket.IO Event Names (non-Redis fan-out slugs)
+// ============================================================================
+
+export const SOCKET_EVENTS = {
+  // Prediction lifecycle fan-out to public sockets
+  PREDICTION_CREATED: 'predictionCreated',
+  PREDICTION_RESOLVED: 'predictionResolved',
+
+  // Betting events consumed by widgets/dashboards
+  BET_PLACED: 'betPlaced',
+  PARLAY_PLACED: 'parlayPlaced',
+  ODDS_UPDATE_ENHANCED: 'oddsUpdatedEnhanced',
+
+  // Leaderboard events for legacy listeners
+  LEADERBOARD_ALL_TIME: 'leaderboardAllTime',
+  LEADERBOARD_DAILY: 'leaderboardDaily',
+
+  // Moderation broadcasts (public + admin scoped)
+  MODERATION_USER_BAN: 'moderationUserBan',
+  MODERATION_USER_UNBAN: 'moderationUserUnban',
+  MODERATION_USER_MUTE: 'moderationUserMute',
+  MODERATION_USER_KICK: 'moderationUserKick',
+  MODERATION_MESSAGE_DELETE: 'moderationMessageDelete',
+  ADMIN_MODERATION_USER_BAN: 'adminModerationUserBan',
+  ADMIN_MODERATION_USER_UNBAN: 'adminModerationUserUnban',
+  ADMIN_MODERATION_USER_MUTE: 'adminModerationUserMute',
+  ADMIN_MODERATION_USER_KICK: 'adminModerationUserKick',
+  ADMIN_MODERATION_MESSAGE_DELETE: 'adminModerationMessageDelete',
+
+  // Activity stream events
+  USER_ACTIVITY: 'userActivity',
+  ADMIN_USER_ACTIVITY: 'adminUserActivity',
+
+  // Pong realtime updates
+  PONG_ELO_UPDATE: 'pong:elo:update',
+  PONG_TIER_CHANGE: 'pong:tier:change',
+  PONG_STATS_UPDATE: 'pong:stats:update',
+} as const;
+
+export type SocketEvent = (typeof SOCKET_EVENTS)[keyof typeof SOCKET_EVENTS];
 
 // ============================================================================
 // Achievement Socket Events (enum for backward compatibility)

@@ -1,5 +1,6 @@
 // apps/client/src/components/admin/BannedUsersWall.tsx
 import React, { useState, useEffect } from 'react';
+import { SOCKET_EVENTS } from '@ems/types';
 import { useSocket } from '../../../contexts/SocketContext';
 import * as moderationApi from '../../../api/moderation';
 import type { UserBan } from '../../../api/moderation';
@@ -103,12 +104,12 @@ const BannedUsersWall: React.FC = () => {
         setBans((prev) => prev.filter((ban) => ban.userId !== data.targetUserId));
       };
 
-      socket.on('adminModerationUserBan', handleUserBan);
-      socket.on('adminModerationUserUnban', handleUserUnban);
+      socket.on(SOCKET_EVENTS.ADMIN_MODERATION_USER_BAN, handleUserBan);
+      socket.on(SOCKET_EVENTS.ADMIN_MODERATION_USER_UNBAN, handleUserUnban);
 
       return () => {
-        socket.off('adminModerationUserBan', handleUserBan);
-        socket.off('adminModerationUserUnban', handleUserUnban);
+        socket.off(SOCKET_EVENTS.ADMIN_MODERATION_USER_BAN, handleUserBan);
+        socket.off(SOCKET_EVENTS.ADMIN_MODERATION_USER_UNBAN, handleUserUnban);
       };
     }
   }, [socket]);
