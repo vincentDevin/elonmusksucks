@@ -4,8 +4,11 @@
 // -----------------------------------------------------------------------------
 
 import { Server } from 'socket.io';
-import { SOCKET_ROOMS, REDIS_CHANNELS } from '@ems/types';
+import { SOCKET_ROOMS, REDIS_CHANNELS, SOCKET_EVENTS } from '@ems/types';
 import type { RedisChannel } from '@ems/types';
+
+const ADMIN_ROOM = 'admin';
+const ADMIN_PREDICTIONS_ROOM = 'admin:predictions';
 
 // All channels now available in REDIS_CHANNELS
 
@@ -21,31 +24,57 @@ export function registerRedisEventHandlers(io: Server, eventSub: any) {
 
     switch (channel) {
       case REDIS_CHANNELS.PREDICTION_CREATE:
-        io.to(SOCKET_ROOMS.PREDICTIONS).emit('predictionCreated', payload);
+      case REDIS_CHANNELS.PREDICTION_CREATED:
+        io.to(SOCKET_ROOMS.PREDICTIONS).emit(SOCKET_EVENTS.PREDICTION_CREATED, payload);
+        io.to(ADMIN_PREDICTIONS_ROOM).emit(REDIS_CHANNELS.PREDICTION_CREATED, payload);
+        io.to(ADMIN_ROOM).emit(REDIS_CHANNELS.PREDICTION_CREATED, payload);
+        io.to(ADMIN_PREDICTIONS_ROOM).emit(REDIS_CHANNELS.PREDICTION_STATUS_CHANGE, payload);
+        io.to(ADMIN_ROOM).emit(REDIS_CHANNELS.PREDICTION_STATUS_CHANGE, payload);
         break;
       case REDIS_CHANNELS.PREDICTION_RESOLVE:
-        io.to(SOCKET_ROOMS.PREDICTIONS).emit('predictionResolved', payload);
+      case REDIS_CHANNELS.PREDICTION_RESOLVED_FAST:
+        io.to(SOCKET_ROOMS.PREDICTIONS).emit(SOCKET_EVENTS.PREDICTION_RESOLVED, payload);
+        io.to(ADMIN_PREDICTIONS_ROOM).emit(REDIS_CHANNELS.PREDICTION_RESOLVED, payload);
+        io.to(ADMIN_ROOM).emit(REDIS_CHANNELS.PREDICTION_RESOLVED, payload);
+        io.to(ADMIN_PREDICTIONS_ROOM).emit(REDIS_CHANNELS.PREDICTION_STATUS_CHANGE, payload);
+        io.to(ADMIN_ROOM).emit(REDIS_CHANNELS.PREDICTION_STATUS_CHANGE, payload);
+        break;
+      case REDIS_CHANNELS.PREDICTION_APPROVED:
+        io.to(ADMIN_PREDICTIONS_ROOM).emit(REDIS_CHANNELS.PREDICTION_APPROVED, payload);
+        io.to(ADMIN_ROOM).emit(REDIS_CHANNELS.PREDICTION_APPROVED, payload);
+        io.to(ADMIN_PREDICTIONS_ROOM).emit(REDIS_CHANNELS.PREDICTION_STATUS_CHANGE, payload);
+        io.to(ADMIN_ROOM).emit(REDIS_CHANNELS.PREDICTION_STATUS_CHANGE, payload);
+        break;
+      case REDIS_CHANNELS.PREDICTION_REJECTED:
+        io.to(ADMIN_PREDICTIONS_ROOM).emit(REDIS_CHANNELS.PREDICTION_REJECTED, payload);
+        io.to(ADMIN_ROOM).emit(REDIS_CHANNELS.PREDICTION_REJECTED, payload);
+        io.to(ADMIN_PREDICTIONS_ROOM).emit(REDIS_CHANNELS.PREDICTION_STATUS_CHANGE, payload);
+        io.to(ADMIN_ROOM).emit(REDIS_CHANNELS.PREDICTION_STATUS_CHANGE, payload);
         break;
       case REDIS_CHANNELS.BET_PLACE:
-        io.to(SOCKET_ROOMS.BETTING).emit('betPlaced', payload);
+        io.to(SOCKET_ROOMS.BETTING).emit(SOCKET_EVENTS.BET_PLACED, payload);
+        io.to(ADMIN_PREDICTIONS_ROOM).emit(REDIS_CHANNELS.BET_PLACED, payload);
+        io.to(ADMIN_ROOM).emit(REDIS_CHANNELS.BET_PLACED, payload);
         break;
       case REDIS_CHANNELS.PARLAY_PLACE:
-        io.to(SOCKET_ROOMS.BETTING).emit('parlayPlaced', payload);
+        io.to(SOCKET_ROOMS.BETTING).emit(SOCKET_EVENTS.PARLAY_PLACED, payload);
+        io.to(ADMIN_PREDICTIONS_ROOM).emit(REDIS_CHANNELS.PARLAY_PLACED, payload);
+        io.to(ADMIN_ROOM).emit(REDIS_CHANNELS.PARLAY_PLACED, payload);
         break;
       case REDIS_CHANNELS.ODDS_UPDATE_ENHANCED:
-        io.to(SOCKET_ROOMS.PREDICTIONS).emit('oddsUpdatedEnhanced', payload);
+        io.to(SOCKET_ROOMS.PREDICTIONS).emit(SOCKET_EVENTS.ODDS_UPDATE_ENHANCED, payload);
         break;
       case REDIS_CHANNELS.LEADERBOARD_ALL_TIME:
-        io.to(SOCKET_ROOMS.LEADERBOARD).emit('leaderboardAllTime', payload);
+        io.to(SOCKET_ROOMS.LEADERBOARD).emit(SOCKET_EVENTS.LEADERBOARD_ALL_TIME, payload);
         break;
       case REDIS_CHANNELS.LEADERBOARD_DAILY:
-        io.to(SOCKET_ROOMS.LEADERBOARD).emit('leaderboardDaily', payload);
+        io.to(SOCKET_ROOMS.LEADERBOARD).emit(SOCKET_EVENTS.LEADERBOARD_DAILY, payload);
         break;
       case REDIS_CHANNELS.LEADERBOARD_RANK_CHANGE:
-        io.to(SOCKET_ROOMS.LEADERBOARD).emit('leaderboard:rankChange', payload);
+        io.to(SOCKET_ROOMS.LEADERBOARD).emit(REDIS_CHANNELS.LEADERBOARD_RANK_CHANGE, payload);
         break;
       case REDIS_CHANNELS.LEADERBOARD_MILESTONE:
-        io.to(SOCKET_ROOMS.LEADERBOARD).emit('leaderboard:milestone', payload);
+        io.to(SOCKET_ROOMS.LEADERBOARD).emit(REDIS_CHANNELS.LEADERBOARD_MILESTONE, payload);
         break;
 
       // Stats and achievements events
@@ -53,35 +82,35 @@ export function registerRedisEventHandlers(io: Server, eventSub: any) {
         // Emit to specific user room if userId is in payload
         const statsPayload = payload as any;
         if (statsPayload.userId) {
-          io.to(`user:${statsPayload.userId}`).emit('stats:update', payload);
+          io.to(`user:${statsPayload.userId}`).emit(REDIS_CHANNELS.STATS_UPDATE, payload);
         } else {
-          io.emit('stats:update', payload);
+          io.emit(REDIS_CHANNELS.STATS_UPDATE, payload);
         }
         break;
       case REDIS_CHANNELS.STATS_REFRESH:
         const refreshPayload = payload as any;
         if (refreshPayload.userId) {
-          io.to(`user:${refreshPayload.userId}`).emit('stats:refresh', payload);
+          io.to(`user:${refreshPayload.userId}`).emit(REDIS_CHANNELS.STATS_REFRESH, payload);
         }
         break;
       case REDIS_CHANNELS.RANKING_CHANGE:
         const rankingPayload = payload as any;
         if (rankingPayload.userId) {
-          io.to(`user:${rankingPayload.userId}`).emit('ranking:change', payload);
+          io.to(`user:${rankingPayload.userId}`).emit(REDIS_CHANNELS.RANKING_CHANGE, payload);
         }
-        io.emit('ranking:change', payload); // Also broadcast globally for leaderboard updates
+        io.emit(REDIS_CHANNELS.RANKING_CHANGE, payload); // Also broadcast globally for leaderboard updates
         break;
       case REDIS_CHANNELS.ACHIEVEMENT_UNLOCKED:
         const achievementPayload = payload as any;
         if (achievementPayload.userId) {
-          io.to(`user:${achievementPayload.userId}`).emit('achievement:unlocked', payload);
+          io.to(`user:${achievementPayload.userId}`).emit(REDIS_CHANNELS.ACHIEVEMENT_UNLOCKED, payload);
         }
-        io.emit('achievement:unlocked', payload); // Also broadcast globally for activity feed
+        io.emit(REDIS_CHANNELS.ACHIEVEMENT_UNLOCKED, payload); // Also broadcast globally for activity feed
         break;
       case REDIS_CHANNELS.USER_STATS_UPDATE:
         const userStatsPayload = payload as any;
         if (userStatsPayload.userId) {
-          io.to(`user:${userStatsPayload.userId}`).emit('user:stats_update', payload);
+          io.to(`user:${userStatsPayload.userId}`).emit(REDIS_CHANNELS.USER_STATS_UPDATE, payload);
         }
         break;
 
@@ -89,72 +118,93 @@ export function registerRedisEventHandlers(io: Server, eventSub: any) {
       case REDIS_CHANNELS.BET_STATUS_CHANGE:
         const betStatusPayload = payload as any;
         if (betStatusPayload.userId) {
-          io.to(`user:${betStatusPayload.userId}`).emit('bet:status_change', payload);
+          io.to(`user:${betStatusPayload.userId}`).emit(REDIS_CHANNELS.BET_STATUS_CHANGE, payload);
         }
         break;
       case REDIS_CHANNELS.PARLAY_STATUS_CHANGE:
         const parlayStatusPayload = payload as any;
         if (parlayStatusPayload.userId) {
-          io.to(`user:${parlayStatusPayload.userId}`).emit('parlay:status_change', payload);
+          io.to(`user:${parlayStatusPayload.userId}`).emit(REDIS_CHANNELS.PARLAY_STATUS_CHANGE, payload);
         }
         break;
 
       // Admin metrics event for real-time dashboard updates
       case REDIS_CHANNELS.ADMIN_METRICS_UPDATE:
         // Broadcast to admin room only
-        io.to('admin').emit('admin:metrics:update', payload);
+        io.to(ADMIN_ROOM).emit(REDIS_CHANNELS.ADMIN_METRICS_UPDATE, payload);
         break;
 
       // NOTE: 'activity:newsflash' removed - handled by unified activity system
       case REDIS_CHANNELS.MODERATION_USER_BAN:
-        io.emit('moderationUserBan', payload);
+        io.emit(SOCKET_EVENTS.MODERATION_USER_BAN, payload);
         // Emit to admin room specifically
-        io.to('admin').emit('adminModerationUserBan', payload);
+        io.to(ADMIN_ROOM).emit(SOCKET_EVENTS.ADMIN_MODERATION_USER_BAN, payload);
         break;
       case REDIS_CHANNELS.MODERATION_USER_MUTE:
-        io.emit('moderationUserMute', payload);
-        io.to('admin').emit('adminModerationUserMute', payload);
+        io.emit(SOCKET_EVENTS.MODERATION_USER_MUTE, payload);
+        io.to(ADMIN_ROOM).emit(SOCKET_EVENTS.ADMIN_MODERATION_USER_MUTE, payload);
+        break;
+      case REDIS_CHANNELS.MODERATION_USER_UNBAN:
+        io.emit(SOCKET_EVENTS.MODERATION_USER_UNBAN, payload);
+        io.to(ADMIN_ROOM).emit(SOCKET_EVENTS.ADMIN_MODERATION_USER_UNBAN, payload);
+        break;
+      case REDIS_CHANNELS.MODERATION_USER_KICK:
+        io.emit(SOCKET_EVENTS.MODERATION_USER_KICK, payload);
+        io.to(ADMIN_ROOM).emit(SOCKET_EVENTS.ADMIN_MODERATION_USER_KICK, payload);
         break;
       case REDIS_CHANNELS.MODERATION_MESSAGE_DELETE:
-        io.emit('moderationMessageDelete', payload);
-        io.to('admin').emit('adminModerationMessageDelete', payload);
+        io.emit(SOCKET_EVENTS.MODERATION_MESSAGE_DELETE, payload);
+        io.to(ADMIN_ROOM).emit(SOCKET_EVENTS.ADMIN_MODERATION_MESSAGE_DELETE, payload);
         break;
       case REDIS_CHANNELS.USER_ACTIVITY_LOG:
-        io.emit('userActivity', payload);
-        io.to('admin').emit('adminUserActivity', payload);
+        io.emit(SOCKET_EVENTS.USER_ACTIVITY, payload);
+        io.to(ADMIN_ROOM).emit(SOCKET_EVENTS.ADMIN_USER_ACTIVITY, payload);
         break;
 
       // Timeline events
       case REDIS_CHANNELS.FEED_ARTICLE_NEW:
         // Notify admins of new articles for moderation
-        io.to('admin').emit('timeline:article:new', payload);
+        io.to(ADMIN_ROOM).emit(REDIS_CHANNELS.TIMELINE_ARTICLE_NEW, payload);
+        io.to(ADMIN_ROOM).emit(REDIS_CHANNELS.CONTENT_UPDATED, payload);
+        io.to(ADMIN_ROOM).emit(REDIS_CHANNELS.FEEDS_UPDATED, payload);
         break;
       case REDIS_CHANNELS.ADMIN_MODERATION_BULK:
         // Real-time admin updates for bulk moderation
-        io.to('admin').emit('timeline:moderation:bulk', payload);
+        io.to(ADMIN_ROOM).emit(REDIS_CHANNELS.TIMELINE_MODERATION_BULK, payload);
+        io.to(ADMIN_ROOM).emit(REDIS_CHANNELS.CONTENT_MODERATED, payload);
+        io.to(ADMIN_ROOM).emit(REDIS_CHANNELS.ARTICLES_BULK_MODERATED, payload);
         break;
       case REDIS_CHANNELS.ADMIN_FEED_REFRESH:
         // Notify admin room of feed refresh requests
-        io.to('admin').emit('timeline:feed:refresh', payload);
+        io.to(ADMIN_ROOM).emit(REDIS_CHANNELS.TIMELINE_FEED_REFRESH, payload);
+        io.to(ADMIN_ROOM).emit(REDIS_CHANNELS.FEEDS_UPDATED, payload);
+        io.to(ADMIN_ROOM).emit(REDIS_CHANNELS.CONTENT_UPDATED, payload);
         break;
       case REDIS_CHANNELS.TIMELINE_ARTICLES_NEW:
         // Notify public timeline of newly approved articles
-        io.emit('timeline:articles:approved', payload);
+        io.emit(REDIS_CHANNELS.TIMELINE_ARTICLES_APPROVED, payload);
+        io.to(ADMIN_ROOM).emit(REDIS_CHANNELS.CONTENT_UPDATED, payload);
+        break;
+      case REDIS_CHANNELS.FEED_SOURCE_CREATED:
+      case REDIS_CHANNELS.FEED_SOURCE_UPDATED:
+      case REDIS_CHANNELS.FEED_SOURCE_DELETED:
+        io.to(ADMIN_ROOM).emit(REDIS_CHANNELS.FEEDS_UPDATED, payload);
+        io.to(ADMIN_ROOM).emit(REDIS_CHANNELS.CONTENT_UPDATED, payload);
         break;
 
       // Pong events
       case REDIS_CHANNELS.PONG_ELO_UPDATE:
         // Emit to everyone (for leaderboards/spectators)
-        io.emit('pong:elo:update', payload);
+        io.emit(SOCKET_EVENTS.PONG_ELO_UPDATE, payload);
         break;
       case REDIS_CHANNELS.PONG_TIER_CHANGE:
         // Emit to everyone (for leaderboards/spectators)
-        io.emit('pong:tier:change', payload);
+        io.emit(SOCKET_EVENTS.PONG_TIER_CHANGE, payload);
         break;
       case REDIS_CHANNELS.PONG_STATS_UPDATE:
         const pongStatsPayload = payload as any;
         if (pongStatsPayload.userId) {
-          io.to(`user:${pongStatsPayload.userId}`).emit('pong:stats:update', payload);
+          io.to(`user:${pongStatsPayload.userId}`).emit(SOCKET_EVENTS.PONG_STATS_UPDATE, payload);
         }
         break;
 
@@ -192,7 +242,7 @@ export function registerRedisEventHandlers(io: Server, eventSub: any) {
         const createCommentPayload = payload as any;
         if (createCommentPayload.predictionId) {
           io.to(`prediction:${createCommentPayload.predictionId}`).emit(
-            'prediction:comment:created',
+            REDIS_CHANNELS.PREDICTION_COMMENT_CREATE,
             payload,
           );
         }
@@ -201,7 +251,7 @@ export function registerRedisEventHandlers(io: Server, eventSub: any) {
         const updateCommentPayload = payload as any;
         if (updateCommentPayload.predictionId) {
           io.to(`prediction:${updateCommentPayload.predictionId}`).emit(
-            'prediction:comment:updated',
+            REDIS_CHANNELS.PREDICTION_COMMENT_UPDATE,
             payload,
           );
         }
@@ -210,7 +260,7 @@ export function registerRedisEventHandlers(io: Server, eventSub: any) {
         const deleteCommentPayload = payload as any;
         if (deleteCommentPayload.predictionId) {
           io.to(`prediction:${deleteCommentPayload.predictionId}`).emit(
-            'prediction:comment:deleted',
+            REDIS_CHANNELS.PREDICTION_COMMENT_DELETE,
             payload,
           );
         }
@@ -219,7 +269,7 @@ export function registerRedisEventHandlers(io: Server, eventSub: any) {
         const likeCommentPayload = payload as any;
         if (likeCommentPayload.predictionId) {
           io.to(`prediction:${likeCommentPayload.predictionId}`).emit(
-            'prediction:comment:liked',
+            REDIS_CHANNELS.PREDICTION_COMMENT_LIKE,
             payload,
           );
         }

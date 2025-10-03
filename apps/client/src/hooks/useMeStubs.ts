@@ -1,5 +1,6 @@
 // apps/client/src/hooks/useMeStubs.ts
 import { useState, useEffect, useCallback } from 'react';
+import { SOCKET_EVENTS } from '@ems/types';
 import { useAuth } from '../contexts/AuthContext';
 import { useSocket } from '../contexts/SocketContext';
 import api from '../api/axios';
@@ -83,10 +84,10 @@ export function useMyBets() {
       }
     };
 
-    socket.on('betPlaced', handleBetPlaced);
+    socket.on(SOCKET_EVENTS.BET_PLACED, handleBetPlaced);
 
     return () => {
-      socket.off('betPlaced', handleBetPlaced);
+      socket.off(SOCKET_EVENTS.BET_PLACED, handleBetPlaced);
     };
   }, [user?.id, socket, fetchBets]);
 
@@ -135,10 +136,10 @@ export function useMyParlays() {
       }
     };
 
-    socket.on('parlayPlaced', handleParlayPlaced);
+    socket.on(SOCKET_EVENTS.PARLAY_PLACED, handleParlayPlaced);
 
     return () => {
-      socket.off('parlayPlaced', handleParlayPlaced);
+      socket.off(SOCKET_EVENTS.PARLAY_PLACED, handleParlayPlaced);
     };
   }, [user?.id, socket, fetchParlays]);
 
@@ -187,10 +188,10 @@ export function useMyPredictions() {
       }
     };
 
-    socket.on('predictionCreated', handlePredictionCreated);
+    socket.on(SOCKET_EVENTS.PREDICTION_CREATED, handlePredictionCreated);
 
     return () => {
-      socket.off('predictionCreated', handlePredictionCreated);
+      socket.off(SOCKET_EVENTS.PREDICTION_CREATED, handlePredictionCreated);
     };
   }, [user?.id, socket, fetchPredictions]);
 

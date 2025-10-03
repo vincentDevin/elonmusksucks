@@ -30,6 +30,12 @@ const USER_INFO_HASH_KEY = 'global:chat:userInfo';
 // Per‑process typing debounce maps
 const typingUsers = new Set<number>();
 const typingTimeout = new Map<number, NodeJS.Timeout>();
+const TYPING_STATE_KEY = 'global:chat:typingUsers';
+const TYPING_TTL_MS = 4000;
+const TYPING_SWEEP_INTERVAL_MS = 2000;
+let typingSweepInitialized = false;
+const PRESENCE_HEARTBEAT_INTERVAL_MS = CACHE_TTL.USER_ONLINE_STATUS * 1000;
+let presenceHeartbeatInitialized = false;
 
 export type ChatMessageDTO = {
   id: number;
@@ -48,6 +54,9 @@ const userService = new UserService();
 export async function registerChatHandlers(socket: Socket) {
   const authSock = socket as AuthenticatedSocket;
   socket.join(GLOBAL_CHAT_ROOM);
+
+  ensureTypingSweep();
+  ensurePresenceHeartbeat();
 
   // Track listeners for memory leak prevention
   let listenerCount = 0;
@@ -69,15 +78,8 @@ export async function registerChatHandlers(socket: Socket) {
           role: authSock.user.role ?? 'USER',
         }),
       );
-
-      // Set TTL on presence data to prevent stale entries
-      await Promise.all([
-        redisClient.expire(ONLINE_USERS_SET_KEY, CACHE_TTL.CHAT_PRESENCE),
-        redisClient.expire(USER_INFO_HASH_KEY, CACHE_TTL.CHAT_PRESENCE),
-        redisClient.expire(CONNECTIONS + uid, CACHE_TTL.CHAT_PRESENCE),
-      ]);
     }
-    await publishOnlineUsers();
+    await publishOnlineUsers(uid);
 
     await eventBus.publish(REDIS_CHANNELS.CHAT_JOIN, {
       id: authSock.user.id,
@@ -190,6 +192,11 @@ export async function registerChatHandlers(socket: Socket) {
 
       // clear typing state
       typingUsers.delete(authSock.user.id);
+      if (typingTimeout.has(authSock.user.id)) {
+        clearTimeout(typingTimeout.get(authSock.user.id));
+        typingTimeout.delete(authSock.user.id);
+      }
+      await clearUserTyping(authSock.user.id);
       await eventBus.publish(REDIS_CHANNELS.CHAT_STOP_TYPING, { id: authSock.user.id });
     } catch (err) {
       console.error('[chat] send error:', err);
@@ -206,6 +213,8 @@ export async function registerChatHandlers(socket: Socket) {
   const typingHandler = async () => {
     if (!authSock.user) return;
     const uid = authSock.user.id;
+
+    await markUserTyping(uid);
 
     if (!typingUsers.has(uid)) {
       typingUsers.add(uid);
@@ -229,26 +238,29 @@ export async function registerChatHandlers(socket: Socket) {
 
     if (typingTimeout.has(uid)) clearTimeout(typingTimeout.get(uid));
 
-    const t = setTimeout(async () => {
-      typingUsers.delete(uid);
-      await eventBus.publish(REDIS_CHANNELS.CHAT_STOP_TYPING, { id: uid });
-      typingTimeout.delete(uid);
+    const t = setTimeout(() => {
+      void (async () => {
+        typingUsers.delete(uid);
+        typingTimeout.delete(uid);
+        await clearUserTyping(uid);
+        await eventBus.publish(REDIS_CHANNELS.CHAT_STOP_TYPING, { id: uid });
 
-      // Publish JSON rule achievement event for typing stop
-      try {
-        await eventBus.publish('chat:typing:stop', {
-          key: 'chat:typing:stop',
-          userId: uid,
-          occurredAt: new Date().toISOString(),
-          idempotencyKey: `chat:typing:stop:${uid}:${Date.now()}`,
-          payload: {
-            roomId: GLOBAL_ROOM_ID,
-          },
-        });
-      } catch (achievementError) {
-        console.error('[chat] Error publishing typing stop achievement event:', achievementError);
-      }
-    }, 4000);
+        // Publish JSON rule achievement event for typing stop
+        try {
+          await eventBus.publish('chat:typing:stop', {
+            key: 'chat:typing:stop',
+            userId: uid,
+            occurredAt: new Date().toISOString(),
+            idempotencyKey: `chat:typing:stop:${uid}:${Date.now()}`,
+            payload: {
+              roomId: GLOBAL_ROOM_ID,
+            },
+          });
+        } catch (achievementError) {
+          console.error('[chat] Error publishing typing stop achievement event:', achievementError);
+        }
+      })();
+    }, TYPING_TTL_MS);
 
     typingTimeout.set(uid, t);
   };
@@ -261,6 +273,7 @@ export async function registerChatHandlers(socket: Socket) {
     const uid = authSock.user.id;
     if (typingUsers.has(uid)) {
       typingUsers.delete(uid);
+      await clearUserTyping(uid);
       await eventBus.publish(REDIS_CHANNELS.CHAT_STOP_TYPING, { id: uid });
       if (typingTimeout.has(uid)) {
         clearTimeout(typingTimeout.get(uid));
@@ -315,6 +328,7 @@ export async function registerChatHandlers(socket: Socket) {
       clearTimeout(typingTimeout.get(authSock.user.id));
       typingTimeout.delete(authSock.user.id);
     }
+    await clearUserTyping(authSock.user.id);
     await eventBus.publish(REDIS_CHANNELS.CHAT_STOP_TYPING, { id: authSock.user.id });
   });
 
@@ -325,7 +339,7 @@ export async function registerChatHandlers(socket: Socket) {
 }
 
 // Helper: broadcast current online list via Redis
-async function publishOnlineUsers() {
+async function publishOnlineUsers(connectionUserId?: string) {
   const ids = await redisClient.smembers(ONLINE_USERS_SET_KEY);
   const infoArr = ids.length ? await redisClient.hmget(USER_INFO_HASH_KEY, ...ids) : [];
   const parsed = ids.map((id, i) => {
@@ -337,5 +351,99 @@ async function publishOnlineUsers() {
       role: info.role ?? 'USER',
     };
   });
+  await refreshPresenceTTL(connectionUserId, ids);
   await eventBus.publish(REDIS_CHANNELS.CHAT_USERS_ONLINE, parsed);
+}
+
+async function refreshPresenceTTL(connectionUserId?: string, allConnectionIds: string[] = []) {
+  const ttlMs = CACHE_TTL.CHAT_PRESENCE * 1000;
+  const tasks: Array<Promise<unknown>> = [
+    redisClient.pexpire(ONLINE_USERS_SET_KEY, ttlMs),
+    redisClient.pexpire(USER_INFO_HASH_KEY, ttlMs),
+  ];
+
+  const idsToRefresh = new Set<string>();
+  if (connectionUserId) {
+    idsToRefresh.add(connectionUserId);
+  }
+  for (const id of allConnectionIds) {
+    if (id) idsToRefresh.add(id);
+  }
+
+  for (const id of idsToRefresh) {
+    tasks.push(redisClient.pexpire(CONNECTIONS + id, ttlMs));
+  }
+
+  await Promise.all(tasks);
+}
+
+async function markUserTyping(userId: number) {
+  await redisClient.zadd(TYPING_STATE_KEY, Date.now() + TYPING_TTL_MS, String(userId));
+}
+
+async function clearUserTyping(userId: number) {
+  await redisClient.zrem(TYPING_STATE_KEY, String(userId));
+}
+
+function ensureTypingSweep() {
+  if (typingSweepInitialized) return;
+  typingSweepInitialized = true;
+
+  setInterval(() => {
+    sweepExpiredTypingStates().catch((err) =>
+      console.error('[chat] Failed to sweep typing state:', err),
+    );
+  }, TYPING_SWEEP_INTERVAL_MS);
+}
+
+function ensurePresenceHeartbeat() {
+  if (presenceHeartbeatInitialized) return;
+  presenceHeartbeatInitialized = true;
+
+  const runHeartbeat = () => {
+    refreshAllPresenceTTLs().catch((err) =>
+      console.error('[chat] Failed to refresh presence TTL:', err),
+    );
+  };
+
+  runHeartbeat();
+  setInterval(runHeartbeat, PRESENCE_HEARTBEAT_INTERVAL_MS);
+}
+
+async function refreshAllPresenceTTLs() {
+  const ids = await redisClient.smembers(ONLINE_USERS_SET_KEY);
+  if (!ids.length) {
+    await refreshPresenceTTL();
+    return;
+  }
+
+  await refreshPresenceTTL(undefined, ids);
+}
+
+async function sweepExpiredTypingStates() {
+  const now = Date.now();
+
+  while (true) {
+    const entry = (await redisClient.zpopmin(TYPING_STATE_KEY)) as [string, string] | [];
+    if (!entry || entry.length === 0) {
+      break;
+    }
+
+    const [member, scoreStr] = entry;
+    const score = Number(scoreStr);
+
+    if (!member) {
+      continue;
+    }
+
+    if (Number.isNaN(score) || score > now) {
+      // Not yet expired – reinsert and exit loop until next sweep
+      if (!Number.isNaN(score)) {
+        await redisClient.zadd(TYPING_STATE_KEY, score, member);
+      }
+      break;
+    }
+
+    await eventBus.publish(REDIS_CHANNELS.CHAT_STOP_TYPING, { id: Number(member), expired: true });
+  }
 }

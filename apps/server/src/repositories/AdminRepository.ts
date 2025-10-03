@@ -905,6 +905,7 @@ export class PrismaAdminRepository implements IAdminRepository {
       currentPage: page,
       hasNextPage: page < totalPages - 1,
       hasPreviousPage: page > 0,
+      pageSize: limit,
     };
   }
 

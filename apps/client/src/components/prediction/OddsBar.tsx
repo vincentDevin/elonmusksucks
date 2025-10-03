@@ -2,7 +2,7 @@
 // Unified odds bar component merging regular and compact variants
 import { useState, useEffect } from 'react';
 import type { PublicPredictionOption, PublicBet } from '@ems/types';
-import { PredictionType } from '@ems/types';
+import { PredictionType, SOCKET_EVENTS } from '@ems/types';
 import { useSocket } from '../../contexts/SocketContext';
 
 interface FlattenedParlayLeg {
@@ -84,9 +84,9 @@ export default function OddsBar({
       }
     };
 
-    socket.on('oddsUpdatedEnhanced', handleEnhancedOddsUpdate);
+    socket.on(SOCKET_EVENTS.ODDS_UPDATE_ENHANCED, handleEnhancedOddsUpdate);
     return () => {
-      socket.off('oddsUpdatedEnhanced', handleEnhancedOddsUpdate);
+      socket.off(SOCKET_EVENTS.ODDS_UPDATE_ENHANCED, handleEnhancedOddsUpdate);
     };
   }, [socket, predictionId, currentOptions, isMini, isCompact]);
 

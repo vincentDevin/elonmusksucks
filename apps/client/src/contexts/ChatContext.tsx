@@ -80,25 +80,28 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   useSocketEvent(REDIS_CHANNELS.CHAT_HISTORY, handleHistory);
 
   useEffect(() => {
-    if (!socket || !user) return;
+    if (!socket) return;
 
-    // Request chat history when socket is connected
-    if (socket.connected) {
+    const requestHistory = () => {
       console.log('[ChatContext] Requesting chat history...');
       socket.emit('chat:history', {});
-    } else {
-      // Wait for connection - keeping this direct socket listener as it's Socket.IO internal
-      const onConnect = () => {
-        console.log('[ChatContext] Socket connected, requesting chat history...');
-        socket.emit('chat:history', {});
-      };
-      socket.on('connect', onConnect);
+    };
 
-      return () => {
-        socket.off('connect', onConnect);
-      };
+    if (socket.connected) {
+      requestHistory();
+      return undefined;
     }
-  }, [socket, user]);
+
+    const onConnect = () => {
+      console.log('[ChatContext] Socket connected, requesting chat history...');
+      socket.emit('chat:history', {});
+    };
+    socket.on('connect', onConnect);
+
+    return () => {
+      socket.off('connect', onConnect);
+    };
+  }, [socket]);
 
   /* ---------------------------------------------------------------------- */
   /* 2. Live message stream                                                 */

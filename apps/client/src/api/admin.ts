@@ -369,6 +369,7 @@ export interface PaginatedFinancialData {
   currentPage: number;
   hasNextPage: boolean;
   hasPreviousPage: boolean;
+  pageSize?: number;
 }
 
 export interface BulkFinancialOperation {

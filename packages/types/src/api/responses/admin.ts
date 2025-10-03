@@ -81,6 +81,12 @@ export interface AdminTransactionView {
 export interface AdminFinancialDataResponse {
   transactions: AdminTransactionView[];
   bets: AdminBetView[];
+  totalTransactions: number;
+  totalBets: number;
+  totalPages: number;
+  currentPage: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
   summary: {
     totalTransactions: number;
     totalBets: number;
@@ -88,7 +94,7 @@ export interface AdminFinancialDataResponse {
     totalPayouts: string; // BigInt → string
     netRevenue: string; // BigInt → string
   };
-  pagination: {
+  pagination?: {
     page: number;
     limit: number;
     totalPages: number;
