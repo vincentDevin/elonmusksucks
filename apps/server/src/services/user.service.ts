@@ -11,6 +11,7 @@ import { unifiedActivityService } from './unifiedActivity.service';
 import { ImageProcessingService, ProcessedImageSizes } from './imageProcessing.service';
 import { DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { eventBus } from '../lib/EventBus';
+import { activeUserCacheService } from './activeUserCache.service';
 
 // Define a minimal file interface matching Multer's in-memory buffer
 export type UploadedFile = {
@@ -52,6 +53,9 @@ export class UserService {
   }> {
     // Clear cached URLs
     await redisClient.del(CACHE_KEYS.PROFILE_IMAGE_URL(userId));
+
+    // Invalidate active user cache (profile picture changed)
+    await activeUserCacheService.invalidateUser(userId);
 
     // Get current user to check for existing profile picture
     const user = await this.repo.findById(userId);
@@ -213,16 +217,10 @@ export class UserService {
 
           // If URL is expired or will expire in the next 5 minutes, regenerate
           if (expiryDate.getTime() > Date.now() + 5 * 60 * 1000) {
-            console.log(
-              `[user] Using cached avatar for user ${userId}, expires at ${expiryDate.toISOString()}`,
-            );
             return cached;
           }
 
-          // Delete expired cache
-          console.log(
-            `[user] Cached avatar expired for user ${userId}, regenerating (was signed ${amzDate}, expired ${expiryDate.toISOString()})`,
-          );
+          // Delete expired cache - regenerate below
           await redisClient.del(redisKey);
         }
       } catch (error) {
@@ -352,6 +350,10 @@ export class UserService {
     >,
   ): Promise<UserProfileView> {
     await this.repo.updateProfile(userId, data);
+
+    // Invalidate active user cache (profile data changed)
+    await activeUserCacheService.invalidateUser(userId);
+
     return this.getUserProfile(userId, userId);
   }
 
@@ -390,12 +392,160 @@ export class UserService {
 
   /**
    * Enrich multiple users with signed avatar URLs.
-   * Batch processing for performance.
+   * Batch processing for performance using getBatchedAvatarUrls.
    */
   async enrichUsersWithAvatars<
     T extends { id: number; avatarUrl?: string | null; profilePictureKey?: string | null },
   >(users: T[]): Promise<(T & { avatarUrl: string | null })[]> {
-    return Promise.all(users.map((user) => this.enrichUserWithAvatar(user)));
+    if (users.length === 0) {
+      return [];
+    }
+
+    // Use batch method to get all avatar URLs at once
+    const avatarMap = await this.getBatchedAvatarUrls(
+      users.map((u) => ({
+        id: u.id,
+        profilePictureKey: u.profilePictureKey ?? null,
+        avatarUrl: u.avatarUrl,
+      })),
+    );
+
+    // Map results back to users
+    return users.map((user) => ({
+      ...user,
+      avatarUrl: avatarMap.get(user.id) ?? null,
+    }));
+  }
+
+  /**
+   * Get avatar URLs for multiple users in a single batch operation
+   * Uses Redis MGET for efficient cache lookup and parallel S3 URL generation
+   *
+   * This method is optimized to replace N sequential avatar lookups with:
+   * 1. Single MGET for all cached URLs
+   * 2. Parallel S3 signed URL generation for cache misses
+   * 3. Batch cache write for new URLs
+   *
+   * @param users - Array of users with id and profilePictureKey
+   * @returns Map of userId to avatarUrl (null if no avatar)
+   */
+  async getBatchedAvatarUrls(
+    users: Array<{ id: number; profilePictureKey: string | null; avatarUrl?: string | null }>,
+  ): Promise<Map<number, string | null>> {
+    if (users.length === 0) {
+      return new Map();
+    }
+
+    // Deduplicate users by ID
+    const uniqueUsers = Array.from(new Map(users.map((user) => [user.id, user])).values());
+
+    const result = new Map<number, string | null>();
+
+    // Separate users with profilePictureKey from those without
+    const usersWithKeys = uniqueUsers.filter((u) => u.profilePictureKey);
+    const usersWithoutKeys = uniqueUsers.filter((u) => !u.profilePictureKey);
+
+    // Handle users without keys (use avatarUrl directly)
+    for (const user of usersWithoutKeys) {
+      result.set(user.id, user.avatarUrl || null);
+    }
+
+    if (usersWithKeys.length === 0) {
+      return result;
+    }
+
+    // Batch cache lookup with MGET
+    const cacheKeys = usersWithKeys.map((u) => CACHE_KEYS.PROFILE_IMAGE_URL(u.id));
+    let cachedValues: Array<string | null> = [];
+
+    try {
+      cachedValues = await redisClient.mget(...cacheKeys);
+    } catch (error) {
+      console.warn('[user] Batch avatar cache lookup failed:', error);
+      cachedValues = new Array(cacheKeys.length).fill(null);
+    }
+
+    const missingUsers: Array<{ id: number; profilePictureKey: string }> = [];
+
+    // Process cached results
+    for (let i = 0; i < usersWithKeys.length; i++) {
+      const user = usersWithKeys[i];
+      const cached = cachedValues[i];
+
+      if (cached) {
+        // Validate cached URL (check if expired)
+        try {
+          const url = new URL(cached);
+          const amzDate = url.searchParams.get('X-Amz-Date');
+          const expires = url.searchParams.get('X-Amz-Expires');
+
+          if (amzDate && expires) {
+            const year = parseInt(amzDate.substring(0, 4));
+            const month = parseInt(amzDate.substring(4, 6)) - 1;
+            const day = parseInt(amzDate.substring(6, 8));
+            const hour = parseInt(amzDate.substring(9, 11));
+            const minute = parseInt(amzDate.substring(11, 13));
+            const second = parseInt(amzDate.substring(13, 15));
+
+            const signedDate = new Date(Date.UTC(year, month, day, hour, minute, second));
+            const expiryDate = new Date(signedDate.getTime() + parseInt(expires) * 1000);
+
+            // If URL is still valid (expires in more than 5 minutes)
+            if (expiryDate.getTime() > Date.now() + 5 * 60 * 1000) {
+              result.set(user.id, cached);
+              continue;
+            }
+          }
+        } catch (error) {
+          // Invalid cached URL - will regenerate
+        }
+      }
+
+      // Cache miss or expired - need to generate new URL
+      missingUsers.push({
+        id: user.id,
+        profilePictureKey: user.profilePictureKey!,
+      });
+    }
+
+    // Generate signed URLs in parallel for cache misses
+    if (missingUsers.length > 0) {
+      const urlPromises = missingUsers.map(async (user) => {
+        try {
+          const url = await this.getSignedAvatarUrl(user.profilePictureKey, 3600);
+          return { userId: user.id, url };
+        } catch (error) {
+          console.warn(`[user] Failed to generate avatar URL for user ${user.id}:`, error);
+          return { userId: user.id, url: null };
+        }
+      });
+
+      const generatedUrls = await Promise.all(urlPromises);
+
+      // Cache newly generated URLs (fire and forget)
+      const cachePromises = generatedUrls
+        .filter((item) => item.url !== null)
+        .map(async (item) => {
+          const cacheTTL = getProfileImageTTL(3600);
+          try {
+            await redisClient.setex(CACHE_KEYS.PROFILE_IMAGE_URL(item.userId), cacheTTL, item.url!);
+          } catch (error) {
+            console.warn(`[user] Failed to cache avatar URL for user ${item.userId}:`, error);
+          }
+        });
+
+      // Don't await cache writes - fire and forget
+      Promise.all(cachePromises).catch((error) => {
+        console.warn('[user] Batch avatar cache write failed:', error);
+      });
+
+      // Add generated URLs to result
+      for (const item of generatedUrls) {
+        result.set(item.userId, item.url);
+      }
+    }
+
+    return result;
   }
 
   async getUserFeed(userId: number, viewerId?: number): Promise<DbUserFeedContent[]> {
@@ -404,22 +554,18 @@ export class UserService {
     if (user.feedPrivate && user.id !== viewerId) throw new Error('Feed is private');
     const posts: DbUserFeedContent[] = await this.repo.getUserFeed(userId); // no { parentId: null }
 
-    // Enrich posts with author avatar URLs
-    const enrichedPosts = await Promise.all(
-      posts.map(async (post: any) => {
-        let authorAvatar: string | null = null;
+    // Collect all unique authors
+    const authors = posts.filter((post: any) => post.author).map((post: any) => post.author);
 
-        if (post.author) {
-          const enrichedAuthor = await this.enrichUserWithAvatar(post.author);
-          authorAvatar = enrichedAuthor.avatarUrl;
-        }
+    // Batch enrich all authors at once
+    const enrichedAuthors = await this.enrichUsersWithAvatars(authors);
+    const avatarMap = new Map(enrichedAuthors.map((author) => [author.id, author.avatarUrl]));
 
-        return {
-          ...post,
-          authorAvatar,
-        };
-      }),
-    );
+    // Map avatar URLs back to posts
+    const enrichedPosts = posts.map((post: any) => ({
+      ...post,
+      authorAvatar: post.author ? (avatarMap.get(post.author.id) ?? null) : null,
+    }));
 
     return enrichedPosts;
   }
@@ -464,30 +610,38 @@ export class UserService {
     const thread = await this.repo.getUserPostThread(postId);
     if (!thread) return null;
 
-    // Enrich thread and children with author avatars
-    const enrichThread = async (post: any): Promise<any> => {
-      let authorAvatar: string | null = null;
-
-      if (post.author) {
-        const enrichedAuthor = await this.enrichUserWithAvatar(post.author);
-        authorAvatar = enrichedAuthor.avatarUrl;
+    // Collect all unique authors from thread and children recursively
+    const collectAuthors = (post: any): any[] => {
+      const authors = post.author ? [post.author] : [];
+      if (post.children && post.children.length > 0) {
+        for (const child of post.children) {
+          authors.push(...collectAuthors(child));
+        }
       }
+      return authors;
+    };
 
+    const allAuthors = collectAuthors(thread);
+
+    // Batch enrich all authors at once
+    const enrichedAuthors = await this.enrichUsersWithAvatars(allAuthors);
+    const avatarMap = new Map(enrichedAuthors.map((author) => [author.id, author.avatarUrl]));
+
+    // Map avatars back to posts recursively
+    const enrichThread = (post: any): any => {
       const enrichedPost = {
         ...post,
-        authorAvatar,
+        authorAvatar: post.author ? (avatarMap.get(post.author.id) ?? null) : null,
       };
 
       if (post.children && post.children.length > 0) {
-        enrichedPost.children = await Promise.all(
-          post.children.map((child: any) => enrichThread(child)),
-        );
+        enrichedPost.children = post.children.map((child: any) => enrichThread(child));
       }
 
       return enrichedPost;
     };
 
-    const enrichedThread = await enrichThread(thread);
+    const enrichedThread = enrichThread(thread);
 
     return enrichedThread;
   }

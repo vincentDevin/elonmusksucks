@@ -34,7 +34,57 @@ export const searchUsers = async (params: UserSearchParams): Promise<PaginatedUs
 };
 
 export const getUserDetails = async (userId: number): Promise<DetailedUser | null> => {
-  return repo.getUserWithDetails(userId);
+  const user = await repo.getUserWithDetails(userId);
+
+  if (!user) return null;
+
+  // Transform stats to match UserStatsDTO format if stats exist
+  if (user.stats) {
+    // Calculate winRate properly (same logic as getUserStats)
+    const totalBets = user.stats.totalBets;
+    const betsWon = user.stats.betsWon;
+    const winRate = totalBets > 0 ? (betsWon / totalBets) * 100 : 0;
+
+    // Calculate ROI properly
+    const totalWagered = user.stats.totalWagered || BigInt(0);
+    const profit = user.stats.profit || BigInt(0);
+    const roi = totalWagered > BigInt(0) ? (Number(profit) / Number(totalWagered)) * 100 : 0;
+
+    const transformedStats = {
+      totalBets: user.stats.totalBets,
+      betsWon: user.stats.betsWon,
+      betsLost: user.stats.betsLost,
+      totalParlays: user.stats.totalParlays,
+      parlaysWon: user.stats.parlaysWon,
+      parlaysLost: user.stats.parlaysLost,
+      totalParlayLegs: user.stats.totalParlayLegs,
+      parlayLegsWon: user.stats.parlayLegsWon,
+      parlayLegsLost: user.stats.parlayLegsLost,
+      totalWagered: user.stats.totalWagered.toString(),
+      totalWinnings: user.stats.totalWon.toString(),
+      totalLosses: (user.stats.totalWagered - user.stats.totalWon).toString(),
+      netProfit: user.stats.profit.toString(),
+      currentStreak: user.stats.currentStreak,
+      longestWinStreak: user.stats.longestStreak || 0,
+      longestLoseStreak: user.stats.longestLoseStreak || 0,
+      averageBetSize: (user.stats.totalBets > 0
+        ? user.stats.totalWagered / BigInt(user.stats.totalBets)
+        : BigInt(0)
+      ).toString(),
+      averageOdds: user.stats.averageOdds || 0,
+      biggestWin: user.stats.biggestWin?.toString() || '0',
+      biggestLoss: user.stats.biggestLoss?.toString() || '0',
+      winRate: winRate, // Calculated percentage (0-100)
+      roi: roi, // Calculated percentage
+    };
+
+    return {
+      ...user,
+      stats: transformedStats as any,
+    };
+  }
+
+  return user;
 };
 
 export const bulkUpdateUsers = async (

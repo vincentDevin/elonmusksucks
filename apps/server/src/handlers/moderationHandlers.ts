@@ -3,6 +3,29 @@ import type { AuthenticatedSocket } from '../middleware/socketAuthMiddleware';
 import { moderationService } from '../services/moderation.service';
 import type { BanType as PrismaBanType } from '@prisma/client';
 import type { BanType } from '@ems/types';
+import {
+  SOCKET_EVENTS,
+  type AdminBanUserRequest,
+  type AdminBanUserResponse,
+  type AdminUnbanUserRequest,
+  type AdminUnbanUserResponse,
+  type AdminMuteUserRequest,
+  type AdminMuteUserResponse,
+  type AdminKickUserRequest,
+  type AdminKickUserResponse,
+  type AdminDeleteMessageRequest,
+  type AdminDeleteMessageResponse,
+  type AdminDeletePostRequest,
+  type AdminDeletePostResponse,
+  type AdminGetActiveBansResponse,
+  type AdminGetModerationHistoryRequest,
+  type AdminGetModerationHistoryResponse,
+  type AdminGetRecentActionsRequest,
+  type AdminGetRecentActionsResponse,
+  type UserBannedNotification,
+  type UserMutedNotification,
+  type UserKickedNotification,
+} from '@ems/types';
 
 // Convert Prisma BanType (UPPERCASE) to domain BanType (lowercase)
 function convertBanType(prismaBanType: PrismaBanType): BanType {
@@ -25,16 +48,8 @@ export function registerModerationHandlers(socket: AuthenticatedSocket): void {
 
   // Ban user
   socket.on(
-    'admin:banUser',
-    async (
-      data: {
-        userId: number;
-        banType: PrismaBanType;
-        reason: string;
-        duration?: number;
-      },
-      callback,
-    ) => {
+    SOCKET_EVENTS.ADMIN_BAN_USER,
+    async (data: AdminBanUserRequest, callback: (response: AdminBanUserResponse) => void) => {
       try {
         const ban = await moderationService.banUser({
           userId: data.userId,
@@ -51,48 +66,55 @@ export function registerModerationHandlers(socket: AuthenticatedSocket): void {
         for (const [, targetSocket] of sockets) {
           const authSocket = targetSocket as AuthenticatedSocket;
           if (authSocket.user?.id === data.userId) {
-            targetSocket.emit('user:banned', { reason: data.reason, banType: data.banType });
+            const notification: UserBannedNotification = {
+              reason: data.reason,
+              banType: data.banType,
+            };
+            targetSocket.emit(SOCKET_EVENTS.USER_BANNED, notification);
             targetSocket.disconnect(true);
             break;
           }
         }
 
-        callback({ success: true, ban });
+        const response: AdminBanUserResponse = { success: true, ban };
+        callback(response);
       } catch (error) {
         console.error('[moderation] Ban user error:', error);
-        callback({ success: false, error: (error as Error).message });
+        const response: AdminBanUserResponse = { success: false, error: (error as Error).message };
+        callback(response);
       }
     },
   );
 
   // Unban user
-  socket.on('admin:unbanUser', async (data: { userId: number }, callback) => {
-    try {
-      await moderationService.unbanUser(
-        data.userId,
-        socket.user!.id,
-        socket.handshake.address,
-        socket.handshake.headers['user-agent'],
-      );
+  socket.on(
+    SOCKET_EVENTS.ADMIN_UNBAN_USER,
+    async (data: AdminUnbanUserRequest, callback: (response: AdminUnbanUserResponse) => void) => {
+      try {
+        await moderationService.unbanUser(
+          data.userId,
+          socket.user!.id,
+          socket.handshake.address,
+          socket.handshake.headers['user-agent'],
+        );
 
-      callback({ success: true });
-    } catch (error) {
-      console.error('[moderation] Unban user error:', error);
-      callback({ success: false, error: (error as Error).message });
-    }
-  });
+        const response: AdminUnbanUserResponse = { success: true };
+        callback(response);
+      } catch (error) {
+        console.error('[moderation] Unban user error:', error);
+        const response: AdminUnbanUserResponse = {
+          success: false,
+          error: (error as Error).message,
+        };
+        callback(response);
+      }
+    },
+  );
 
   // Mute user
   socket.on(
-    'admin:muteUser',
-    async (
-      data: {
-        userId: number;
-        duration: number;
-        reason: string;
-      },
-      callback,
-    ) => {
+    SOCKET_EVENTS.ADMIN_MUTE_USER,
+    async (data: AdminMuteUserRequest, callback: (response: AdminMuteUserResponse) => void) => {
       try {
         const ban = await moderationService.muteUser(
           data.userId,
@@ -108,33 +130,30 @@ export function registerModerationHandlers(socket: AuthenticatedSocket): void {
         for (const [, targetSocket] of sockets) {
           const authSocket = targetSocket as AuthenticatedSocket;
           if (authSocket.user?.id === data.userId) {
-            targetSocket.emit('user:muted', {
+            const notification: UserMutedNotification = {
               reason: data.reason,
               duration: data.duration,
               expiresAt: ban.expiresAt,
-            });
+            };
+            targetSocket.emit(SOCKET_EVENTS.USER_MUTED, notification);
             break;
           }
         }
 
-        callback({ success: true, ban });
+        const response: AdminMuteUserResponse = { success: true, ban };
+        callback(response);
       } catch (error) {
         console.error('[moderation] Mute user error:', error);
-        callback({ success: false, error: (error as Error).message });
+        const response: AdminMuteUserResponse = { success: false, error: (error as Error).message };
+        callback(response);
       }
     },
   );
 
   // Kick user
   socket.on(
-    'admin:kickUser',
-    async (
-      data: {
-        userId: number;
-        reason: string;
-      },
-      callback,
-    ) => {
+    SOCKET_EVENTS.ADMIN_KICK_USER,
+    async (data: AdminKickUserRequest, callback: (response: AdminKickUserResponse) => void) => {
       try {
         await moderationService.kickUser(
           data.userId,
@@ -149,29 +168,29 @@ export function registerModerationHandlers(socket: AuthenticatedSocket): void {
         for (const [, targetSocket] of sockets) {
           const authSocket = targetSocket as AuthenticatedSocket;
           if (authSocket.user?.id === data.userId) {
-            targetSocket.emit('user:kicked', { reason: data.reason });
+            const notification: UserKickedNotification = { reason: data.reason };
+            targetSocket.emit(SOCKET_EVENTS.USER_KICKED, notification);
             targetSocket.disconnect(true);
             break;
           }
         }
 
-        callback({ success: true });
+        const response: AdminKickUserResponse = { success: true };
+        callback(response);
       } catch (error) {
         console.error('[moderation] Kick user error:', error);
-        callback({ success: false, error: (error as Error).message });
+        const response: AdminKickUserResponse = { success: false, error: (error as Error).message };
+        callback(response);
       }
     },
   );
 
   // Delete message
   socket.on(
-    'admin:deleteMessage',
+    SOCKET_EVENTS.ADMIN_DELETE_MESSAGE,
     async (
-      data: {
-        messageId: number;
-        reason: string;
-      },
-      callback,
+      data: AdminDeleteMessageRequest,
+      callback: (response: AdminDeleteMessageResponse) => void,
     ) => {
       try {
         await moderationService.deleteMessage(
@@ -182,24 +201,23 @@ export function registerModerationHandlers(socket: AuthenticatedSocket): void {
           socket.handshake.headers['user-agent'],
         );
 
-        callback({ success: true });
+        const response: AdminDeleteMessageResponse = { success: true };
+        callback(response);
       } catch (error) {
         console.error('[moderation] Delete message error:', error);
-        callback({ success: false, error: (error as Error).message });
+        const response: AdminDeleteMessageResponse = {
+          success: false,
+          error: (error as Error).message,
+        };
+        callback(response);
       }
     },
   );
 
   // Delete post
   socket.on(
-    'admin:deletePost',
-    async (
-      data: {
-        postId: number;
-        reason: string;
-      },
-      callback,
-    ) => {
+    SOCKET_EVENTS.ADMIN_DELETE_POST,
+    async (data: AdminDeletePostRequest, callback: (response: AdminDeletePostResponse) => void) => {
       try {
         await moderationService.deletePost(
           data.postId,
@@ -209,56 +227,82 @@ export function registerModerationHandlers(socket: AuthenticatedSocket): void {
           socket.handshake.headers['user-agent'],
         );
 
-        callback({ success: true });
+        const response: AdminDeletePostResponse = { success: true };
+        callback(response);
       } catch (error) {
         console.error('[moderation] Delete post error:', error);
-        callback({ success: false, error: (error as Error).message });
+        const response: AdminDeletePostResponse = {
+          success: false,
+          error: (error as Error).message,
+        };
+        callback(response);
       }
     },
   );
 
   // Get active bans
-  socket.on('admin:getActiveBans', async (callback) => {
-    try {
-      const bans = await moderationService.getActiveBans();
-      callback({ success: true, bans });
-    } catch (error) {
-      console.error('[moderation] Get active bans error:', error);
-      callback({ success: false, error: (error as Error).message });
-    }
-  });
+  socket.on(
+    SOCKET_EVENTS.ADMIN_GET_ACTIVE_BANS,
+    async (callback: (response: AdminGetActiveBansResponse) => void) => {
+      try {
+        const bans = await moderationService.getActiveBans();
+        const response: AdminGetActiveBansResponse = { success: true, bans };
+        callback(response);
+      } catch (error) {
+        console.error('[moderation] Get active bans error:', error);
+        const response: AdminGetActiveBansResponse = {
+          success: false,
+          error: (error as Error).message,
+        };
+        callback(response);
+      }
+    },
+  );
 
   // Get moderation history
   socket.on(
-    'admin:getModerationHistory',
+    SOCKET_EVENTS.ADMIN_GET_MODERATION_HISTORY,
     async (
-      data: {
-        targetUserId?: number;
-        moderatorId?: number;
-      },
-      callback,
+      data: AdminGetModerationHistoryRequest,
+      callback: (response: AdminGetModerationHistoryResponse) => void,
     ) => {
       try {
         const history = await moderationService.getModerationHistory(
           data.targetUserId,
           data.moderatorId,
         );
-        callback({ success: true, history });
+        const response: AdminGetModerationHistoryResponse = { success: true, history };
+        callback(response);
       } catch (error) {
         console.error('[moderation] Get moderation history error:', error);
-        callback({ success: false, error: (error as Error).message });
+        const response: AdminGetModerationHistoryResponse = {
+          success: false,
+          error: (error as Error).message,
+        };
+        callback(response);
       }
     },
   );
 
   // Get recent moderation actions
-  socket.on('admin:getRecentActions', async (data: { limit?: number }, callback) => {
-    try {
-      const actions = await moderationService.getRecentModerationActions(data.limit);
-      callback({ success: true, actions });
-    } catch (error) {
-      console.error('[moderation] Get recent actions error:', error);
-      callback({ success: false, error: (error as Error).message });
-    }
-  });
+  socket.on(
+    SOCKET_EVENTS.ADMIN_GET_RECENT_ACTIONS,
+    async (
+      data: AdminGetRecentActionsRequest,
+      callback: (response: AdminGetRecentActionsResponse) => void,
+    ) => {
+      try {
+        const actions = await moderationService.getRecentModerationActions(data.limit);
+        const response: AdminGetRecentActionsResponse = { success: true, actions };
+        callback(response);
+      } catch (error) {
+        console.error('[moderation] Get recent actions error:', error);
+        const response: AdminGetRecentActionsResponse = {
+          success: false,
+          error: (error as Error).message,
+        };
+        callback(response);
+      }
+    },
+  );
 }

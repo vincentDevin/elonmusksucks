@@ -59,7 +59,7 @@ const BannedUsersWall: React.FC = () => {
 
   // Format duration for display
   const formatDuration = (ban: UserBan) => {
-    if (ban.banType === 'PERMANENT') {
+    if (ban.banType === 'permanent') {
       return 'Permanent';
     }
 
@@ -171,7 +171,7 @@ const BannedUsersWall: React.FC = () => {
                 </div>
                 <span
                   className={`px-2 py-1 text-xs rounded ${
-                    ban.banType === 'PERMANENT'
+                    ban.banType === 'permanent'
                       ? 'bg-red-100 text-red-800'
                       : 'bg-yellow-100 text-yellow-800'
                   }`}

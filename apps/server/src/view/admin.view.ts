@@ -162,8 +162,10 @@ export const toAdminFinancialDataResponse = (financialData: {
   const pageSize =
     financialData.pageSize ??
     (financialData.totalPages > 0
-      ? Math.ceil(Math.max(financialData.totalBets, financialData.totalTransactions) /
-          financialData.totalPages)
+      ? Math.ceil(
+          Math.max(financialData.totalBets, financialData.totalTransactions) /
+            financialData.totalPages,
+        )
       : undefined);
 
   return {

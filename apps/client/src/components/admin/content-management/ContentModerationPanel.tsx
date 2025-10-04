@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 
 interface ContentModerationPanelProps {
   selectedContent: Set<string>;
@@ -34,6 +34,28 @@ const ContentModerationPanel: React.FC<ContentModerationPanelProps> = ({
   const [notifyUsers, setNotifyUsers] = useState(true);
   const [suspendDuration, setSuspendDuration] = useState('');
   const [escalateToAdmin, setEscalateToAdmin] = useState(false);
+
+  // Ref for modal content
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  // Handle escape key to close modal
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && onClose) {
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [onClose]);
+
+  // Handle click outside to close modal
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    if (modalRef.current && !modalRef.current.contains(e.target as Node)) {
+      onClose?.();
+    }
+  };
 
   // Primary moderation actions
   const primaryActions = [
@@ -185,132 +207,107 @@ const ContentModerationPanel: React.FC<ContentModerationPanelProps> = ({
     executeAction(quick.action, quick.reason);
   };
 
-  return (
-    <div className={`bg-background rounded-lg border border-muted ${className}`}>
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-muted">
-        <div className="flex items-center gap-3">
-          <h3 className="text-lg font-semibold text-content flex items-center">
-            <span className="mr-2">🛡️</span>
-            Content Moderation
-          </h3>
-          {selectedContent.size > 0 && (
-            <span className="px-2 py-1 bg-primary/10 text-primary text-xs rounded-full border border-primary/20">
-              {selectedContent.size} selected
-            </span>
-          )}
-        </div>
+  // Don't render if no content selected and modal should be closed
+  if (selectedContent.size === 0 && !showQuickActions) {
+    return null;
+  }
 
-        <div className="flex items-center gap-2">
-          {actionSummary && (
-            <div className="text-xs text-tertiary">
-              ~{actionSummary.estimatedReviewTime}min review time
-            </div>
-          )}
-          {onClose && (
+  return (
+    <div
+      className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+      onClick={handleBackdropClick}
+    >
+      <div
+        ref={modalRef}
+        className={`bg-background rounded-lg border border-muted shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto ${className}`}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-muted sticky top-0 bg-background z-10">
+          <div className="flex items-center gap-3">
+            <h3 className="text-lg font-semibold text-content flex items-center">
+              <span className="mr-2">🛡️</span>
+              Content Moderation
+            </h3>
+            {selectedContent.size > 0 && (
+              <span className="px-2 py-1 bg-primary/10 text-primary text-xs rounded-full border border-primary/20">
+                {selectedContent.size} selected
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            {actionSummary && (
+              <div className="text-xs text-tertiary">
+                ~{actionSummary.estimatedReviewTime}min review time
+              </div>
+            )}
             <button
               onClick={onClose}
-              className="p-1 text-tertiary hover:text-content transition-colors rounded"
+              className="p-2 text-tertiary hover:text-content transition-colors rounded-lg hover:bg-muted"
               title="Close moderation panel"
             >
-              ✕
+              <span className="text-xl">✕</span>
             </button>
-          )}
+          </div>
         </div>
-      </div>
 
-      {selectedContent.size > 0 ? (
-        <div className="p-4 space-y-6">
-          {/* Action Summary */}
-          {actionSummary && (
-            <div className="bg-surface rounded-lg p-4 border border-muted">
-              <div className="grid grid-cols-3 gap-4 text-center">
-                <div>
-                  <div className="text-2xl font-bold text-content">
-                    {actionSummary.contentCount}
+        {selectedContent.size > 0 ? (
+          <div className="p-6 space-y-6">
+            {/* Action Summary */}
+            {actionSummary && (
+              <div className="bg-surface rounded-lg p-4 border border-muted">
+                <div className="grid grid-cols-3 gap-4 text-center">
+                  <div>
+                    <div className="text-2xl font-bold text-content">
+                      {actionSummary.contentCount}
+                    </div>
+                    <div className="text-xs text-tertiary">Content Items</div>
                   </div>
-                  <div className="text-xs text-tertiary">Content Items</div>
-                </div>
-                <div>
-                  <div className="text-2xl font-bold text-content">
-                    {actionSummary.potentiallyAffectedUsers}
+                  <div>
+                    <div className="text-2xl font-bold text-content">
+                      {actionSummary.potentiallyAffectedUsers}
+                    </div>
+                    <div className="text-xs text-tertiary">Affected Users</div>
                   </div>
-                  <div className="text-xs text-tertiary">Affected Users</div>
-                </div>
-                <div>
-                  <div className="text-2xl font-bold text-content">
-                    {actionSummary.estimatedReviewTime}m
+                  <div>
+                    <div className="text-2xl font-bold text-content">
+                      {actionSummary.estimatedReviewTime}m
+                    </div>
+                    <div className="text-xs text-tertiary">Review Time</div>
                   </div>
-                  <div className="text-xs text-tertiary">Review Time</div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Quick Actions */}
-          {showQuickActions && (
+            {/* Quick Actions */}
+            {showQuickActions && (
+              <div>
+                <h4 className="text-sm font-semibold text-content mb-3">Quick Actions</h4>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
+                  {quickActions.map((quick, index) => (
+                    <button
+                      key={index}
+                      onClick={() => executeQuickAction(quick)}
+                      className="flex flex-col items-center gap-2 p-3 bg-surface hover:bg-muted border border-muted rounded-lg transition-colors group"
+                      title={quick.description}
+                    >
+                      <span className="text-lg group-hover:scale-110 transition-transform">
+                        {quick.icon}
+                      </span>
+                      <span className="text-xs font-medium text-content text-center">
+                        {quick.label}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Primary Actions */}
             <div>
-              <h4 className="text-sm font-semibold text-content mb-3">Quick Actions</h4>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
-                {quickActions.map((quick, index) => (
-                  <button
-                    key={index}
-                    onClick={() => executeQuickAction(quick)}
-                    className="flex flex-col items-center gap-2 p-3 bg-surface hover:bg-muted border border-muted rounded-lg transition-colors group"
-                    title={quick.description}
-                  >
-                    <span className="text-lg group-hover:scale-110 transition-transform">
-                      {quick.icon}
-                    </span>
-                    <span className="text-xs font-medium text-content text-center">
-                      {quick.label}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Primary Actions */}
-          <div>
-            <h4 className="text-sm font-semibold text-content mb-3">Moderation Actions</h4>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {primaryActions.map((action) => (
-                <button
-                  key={action.key}
-                  onClick={() => setSelectedAction(action.key)}
-                  className={`flex flex-col items-center gap-2 p-4 rounded-lg border transition-all group ${
-                    selectedAction === action.key
-                      ? 'ring-2 ring-primary border-primary'
-                      : action.color
-                  }`}
-                  title={action.description}
-                >
-                  <span className="text-xl group-hover:scale-110 transition-transform">
-                    {action.icon}
-                  </span>
-                  <span className="font-medium text-sm">{action.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Advanced Actions Toggle */}
-          <div className="flex items-center justify-between">
-            <button
-              onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
-              className="flex items-center gap-2 text-sm text-tertiary hover:text-content transition-colors"
-            >
-              <span>{showAdvancedOptions ? '⬇️' : '➡️'}</span>
-              Advanced Moderation Options
-            </button>
-          </div>
-
-          {/* Advanced Actions */}
-          {showAdvancedOptions && (
-            <div className="space-y-4">
+              <h4 className="text-sm font-semibold text-content mb-3">Moderation Actions</h4>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {advancedActions.map((action) => (
+                {primaryActions.map((action) => (
                   <button
                     key={action.key}
                     onClick={() => setSelectedAction(action.key)}
@@ -328,156 +325,226 @@ const ContentModerationPanel: React.FC<ContentModerationPanelProps> = ({
                   </button>
                 ))}
               </div>
-
-              {/* Advanced Options */}
-              <div className="bg-surface rounded-lg p-4 border border-muted space-y-4">
-                <h5 className="text-sm font-semibold text-content">Advanced Options</h5>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={notifyUsers}
-                      onChange={(e) => setNotifyUsers(e.target.checked)}
-                      className="rounded border-muted"
-                    />
-                    <span className="text-sm text-content">Notify affected users</span>
-                  </label>
-
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={escalateToAdmin}
-                      onChange={(e) => setEscalateToAdmin(e.target.checked)}
-                      className="rounded border-muted"
-                    />
-                    <span className="text-sm text-content">Escalate to admin review</span>
-                  </label>
-                </div>
-
-                {(selectedAction === 'suspend_author' || selectedAction === 'quarantine') && (
-                  <div>
-                    <label className="block text-sm font-medium text-content mb-2">Duration</label>
-                    <select
-                      value={suspendDuration}
-                      onChange={(e) => setSuspendDuration(e.target.value)}
-                      className="w-full px-3 py-2 bg-background border border-muted rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-content"
-                    >
-                      <option value="">Select duration...</option>
-                      <option value="1_hour">1 Hour</option>
-                      <option value="6_hours">6 Hours</option>
-                      <option value="1_day">1 Day</option>
-                      <option value="3_days">3 Days</option>
-                      <option value="1_week">1 Week</option>
-                      <option value="1_month">1 Month</option>
-                      <option value="permanent">Permanent</option>
-                    </select>
-                  </div>
-                )}
-              </div>
             </div>
-          )}
 
-          {/* Reason Selection */}
-          {selectedAction && (
-            <div className="bg-surface rounded-lg p-4 border border-muted space-y-4">
-              <h5 className="text-sm font-semibold text-content">
-                Reason for{' '}
-                {primaryActions.find((a) => a.key === selectedAction)?.label ||
-                  advancedActions.find((a) => a.key === selectedAction)?.label}
-              </h5>
+            {/* Advanced Actions Toggle */}
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+                className="flex items-center gap-2 text-sm text-tertiary hover:text-content transition-colors"
+              >
+                <span>{showAdvancedOptions ? '⬇️' : '➡️'}</span>
+                Advanced Moderation Options
+              </button>
+            </div>
 
-              {/* Common Reasons */}
-              <div>
-                <label className="block text-sm font-medium text-content mb-2">
-                  Select a common reason:
-                </label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {commonReasons.map((reason, index) => (
+            {/* Advanced Actions */}
+            {showAdvancedOptions && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {advancedActions.map((action) => (
                     <button
-                      key={index}
-                      onClick={() => setCustomReason(reason)}
-                      className={`p-2 text-left text-sm rounded border transition-colors ${
-                        customReason === reason
-                          ? 'bg-primary/10 border-primary text-primary'
-                          : 'bg-background border-muted text-content hover:bg-muted'
+                      key={action.key}
+                      onClick={() => setSelectedAction(action.key)}
+                      className={`flex flex-col items-center gap-2 p-4 rounded-lg border transition-all group ${
+                        selectedAction === action.key
+                          ? 'ring-2 ring-primary border-primary'
+                          : action.color
                       }`}
+                      title={action.description}
                     >
-                      {reason}
+                      <span className="text-xl group-hover:scale-110 transition-transform">
+                        {action.icon}
+                      </span>
+                      <span className="font-medium text-sm">{action.label}</span>
                     </button>
                   ))}
                 </div>
-              </div>
 
-              {/* Custom Reason */}
-              <div>
-                <label className="block text-sm font-medium text-content mb-2">
-                  Or provide a custom reason:
-                </label>
-                <textarea
-                  value={customReason}
-                  onChange={(e) => setCustomReason(e.target.value)}
-                  placeholder="Enter custom moderation reason..."
-                  rows={3}
-                  className="w-full px-3 py-2 bg-background border border-muted rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-content placeholder-tertiary resize-none"
-                />
-              </div>
+                {/* Advanced Options */}
+                <div className="bg-surface rounded-lg p-4 border border-muted space-y-4">
+                  <h5 className="text-sm font-semibold text-content">Advanced Options</h5>
 
-              {/* Action Buttons */}
-              <div className="flex items-center gap-3 pt-2">
-                <button
-                  onClick={() => executeAction(selectedAction)}
-                  disabled={!customReason.trim()}
-                  className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  Execute Action
-                </button>
-                <button
-                  onClick={() => {
-                    setSelectedAction(null);
-                    setCustomReason('');
-                  }}
-                  className="px-4 py-2 bg-surface text-content border border-muted rounded-lg hover:bg-muted transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="p-6">
-          <div className="text-center py-8 text-tertiary">
-            <div className="text-4xl mb-3">🛡️</div>
-            <div className="text-lg font-medium mb-2">Content Moderation Tools</div>
-            <div className="text-sm mb-4">
-              Select content items to enable bulk moderation actions
-            </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={notifyUsers}
+                        onChange={(e) => setNotifyUsers(e.target.checked)}
+                        className="rounded border-muted"
+                      />
+                      <span className="text-sm text-content">Notify affected users</span>
+                    </label>
 
-            {showQuickActions && (
-              <div className="mt-6">
-                <div className="text-sm font-medium text-content mb-3">Available Tools:</div>
-                <div className="flex flex-wrap justify-center gap-2">
-                  {[
-                    'Bulk Operations',
-                    'Custom Workflows',
-                    'User Management',
-                    'Automated Rules',
-                    'Audit Trails',
-                  ].map((tool) => (
-                    <span
-                      key={tool}
-                      className="px-3 py-1 bg-surface border border-muted rounded-full text-xs text-tertiary"
-                    >
-                      {tool}
-                    </span>
-                  ))}
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={escalateToAdmin}
+                        onChange={(e) => setEscalateToAdmin(e.target.checked)}
+                        className="rounded border-muted"
+                      />
+                      <span className="text-sm text-content">Escalate to admin review</span>
+                    </label>
+                  </div>
+
+                  {(selectedAction === 'suspend_author' || selectedAction === 'quarantine') && (
+                    <div>
+                      <label className="block text-sm font-medium text-content mb-2">
+                        Duration
+                      </label>
+                      <select
+                        value={suspendDuration}
+                        onChange={(e) => setSuspendDuration(e.target.value)}
+                        className="w-full px-3 py-2 bg-background border border-muted rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-content"
+                      >
+                        <option value="">Select duration...</option>
+                        <option value="1_hour">1 Hour</option>
+                        <option value="6_hours">6 Hours</option>
+                        <option value="1_day">1 Day</option>
+                        <option value="3_days">3 Days</option>
+                        <option value="1_week">1 Week</option>
+                        <option value="1_month">1 Month</option>
+                        <option value="permanent">Permanent</option>
+                      </select>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Reason Selection */}
+            {selectedAction && (
+              <div className="bg-surface rounded-lg p-4 border border-muted space-y-4">
+                <h5 className="text-sm font-semibold text-content">
+                  Reason for{' '}
+                  {primaryActions.find((a) => a.key === selectedAction)?.label ||
+                    advancedActions.find((a) => a.key === selectedAction)?.label}
+                </h5>
+
+                {/* Common Reasons */}
+                <div>
+                  <label className="block text-sm font-medium text-content mb-2">
+                    Select a common reason:
+                  </label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {commonReasons.map((reason, index) => (
+                      <button
+                        key={index}
+                        onClick={() => setCustomReason(reason)}
+                        className={`p-2 text-left text-sm rounded border transition-colors ${
+                          customReason === reason
+                            ? 'bg-primary/10 border-primary text-primary'
+                            : 'bg-background border-muted text-content hover:bg-muted'
+                        }`}
+                      >
+                        {reason}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Custom Reason */}
+                <div>
+                  <label className="block text-sm font-medium text-content mb-2">
+                    Or provide a custom reason:
+                  </label>
+                  <textarea
+                    value={customReason}
+                    onChange={(e) => setCustomReason(e.target.value)}
+                    placeholder="Enter custom moderation reason..."
+                    rows={3}
+                    className="w-full px-3 py-2 bg-background border border-muted rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-content placeholder-tertiary resize-none"
+                  />
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex items-center gap-3 pt-2">
+                  <button
+                    onClick={() => executeAction(selectedAction)}
+                    disabled={!customReason.trim()}
+                    className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Execute Action
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSelectedAction(null);
+                      setCustomReason('');
+                    }}
+                    className="px-4 py-2 bg-surface text-content border border-muted rounded-lg hover:bg-muted transition-colors"
+                  >
+                    Cancel
+                  </button>
                 </div>
               </div>
             )}
           </div>
+        ) : (
+          <div className="p-6">
+            <div className="text-center py-8 text-tertiary">
+              <div className="text-4xl mb-3">🛡️</div>
+              <div className="text-lg font-medium mb-2">Content Moderation Tools</div>
+              <div className="text-sm mb-4">
+                Select content items to enable bulk moderation actions
+              </div>
+
+              {showQuickActions && (
+                <div className="mt-6">
+                  <div className="text-sm font-medium text-content mb-3">Available Tools:</div>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    {[
+                      'Bulk Operations',
+                      'Custom Workflows',
+                      'User Management',
+                      'Automated Rules',
+                      'Audit Trails',
+                    ].map((tool) => (
+                      <span
+                        key={tool}
+                        className="px-3 py-1 bg-surface border border-muted rounded-full text-xs text-tertiary"
+                      >
+                        {tool}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Footer with action buttons */}
+        <div className="p-4 border-t border-muted bg-surface sticky bottom-0 flex items-center justify-between">
+          <div className="text-sm text-tertiary">
+            {selectedContent.size > 0 && (
+              <>
+                {selectedContent.size} item{selectedContent.size !== 1 ? 's' : ''} selected
+                {selectedAction && (
+                  <span className="ml-2">
+                    • Action: <span className="font-semibold capitalize">{selectedAction}</span>
+                  </span>
+                )}
+              </>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm text-tertiary hover:text-content border border-muted rounded-lg hover:bg-muted transition-colors"
+            >
+              Cancel
+            </button>
+            {selectedAction && (
+              <button
+                onClick={() => executeAction(selectedAction, customReason)}
+                className="px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors font-medium"
+              >
+                Execute Action
+              </button>
+            )}
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 };

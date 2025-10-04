@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { requireAuth, requireAdmin } from '../middleware/auth.middleware';
 import * as adminController from '../controllers/admin.controller';
 import feedsRoutes from './feeds.routes';
+import unifiedContentRoutes from './unified-content.routes';
 import { AdminActions } from '@ems/types';
 
 const router = Router();
@@ -110,6 +111,10 @@ router.get('/stats/:userId', adminController.getUserStats);
 // — RSS Feeds Management —
 // Mount the feeds routes under /feeds (so they become /api/admin/feeds/*)
 router.use('/feeds', feedsRoutes);
+
+// — Unified Content Management —
+// Mount the unified content routes under /unified-content (so they become /api/admin/unified-content/*)
+router.use('/unified-content', unifiedContentRoutes);
 
 // RBAC Audit Note: All routes currently require ADMIN role via requireAdmin middleware
 // Future enhancement: Implement granular permissions per action type

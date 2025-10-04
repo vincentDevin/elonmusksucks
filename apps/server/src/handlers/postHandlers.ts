@@ -9,8 +9,22 @@
 
 import type { AuthenticatedSocket } from '../middleware/socketAuthMiddleware';
 import { PostService } from '../services/post.service';
-import type { PostContentType, PostVisibility } from '@ems/types';
-import { REDIS_CHANNELS } from '@ems/types';
+import {
+  REDIS_CHANNELS,
+  SOCKET_EVENTS,
+  type PostCreateRequest,
+  type PostCreateResponse,
+  type PostEditRequest,
+  type PostEditResponse,
+  type PostDeleteRequest,
+  type PostDeleteResponse,
+  type PostReactRequest,
+  type PostReactResponse,
+  type CommentCreateRequest,
+  type CommentCreateResponse,
+  type CommentDeleteRequest,
+  type CommentDeleteResponse,
+} from '@ems/types';
 import { eventBus } from '../lib/EventBus';
 
 const postService = new PostService();
@@ -19,13 +33,13 @@ const postService = new PostService();
  * Register all post-related socket handlers
  */
 export function registerPostHandlers(socket: AuthenticatedSocket): void {
-  socket.on('post:create', handlePostCreate);
-  socket.on('post:edit', handlePostEdit);
-  socket.on('post:delete', handlePostDelete);
-  socket.on('post:react', handlePostReact);
-  // socket.on('post:share', handlePostShare); // TODO: Implement sharePost in PostService
-  socket.on('comment:create', handleCommentCreate);
-  socket.on('comment:delete', handleCommentDelete);
+  socket.on(SOCKET_EVENTS.POST_CREATE, handlePostCreate);
+  socket.on(SOCKET_EVENTS.POST_EDIT, handlePostEdit);
+  socket.on(SOCKET_EVENTS.POST_DELETE, handlePostDelete);
+  socket.on(SOCKET_EVENTS.POST_REACT, handlePostReact);
+  // socket.on(SOCKET_EVENTS.POST_SHARE, handlePostShare); // TODO: Implement sharePost in PostService
+  socket.on(SOCKET_EVENTS.COMMENT_CREATE, handleCommentCreate);
+  socket.on(SOCKET_EVENTS.COMMENT_DELETE, handleCommentDelete);
 }
 
 /**
@@ -33,15 +47,8 @@ export function registerPostHandlers(socket: AuthenticatedSocket): void {
  */
 async function handlePostCreate(
   this: AuthenticatedSocket,
-  payload: {
-    content: string;
-    contentType?: PostContentType;
-    visibility?: PostVisibility;
-    mediaUrls?: string[];
-    linkPreview?: any;
-    parentId?: number | null;
-  },
-  callback?: (response: any) => void,
+  payload: PostCreateRequest,
+  callback?: (response: PostCreateResponse) => void,
 ): Promise<void> {
   try {
     const userId = this.user?.id;
@@ -84,8 +91,8 @@ async function handlePostCreate(
  */
 async function handlePostEdit(
   this: AuthenticatedSocket,
-  payload: { postId: number; content: string },
-  callback?: (response: any) => void,
+  payload: PostEditRequest,
+  callback?: (response: PostEditResponse) => void,
 ): Promise<void> {
   try {
     const userId = this.user?.id;
@@ -115,8 +122,8 @@ async function handlePostEdit(
  */
 async function handlePostDelete(
   this: AuthenticatedSocket,
-  payload: { postId: number },
-  callback?: (response: any) => void,
+  payload: PostDeleteRequest,
+  callback?: (response: PostDeleteResponse) => void,
 ): Promise<void> {
   try {
     const userId = this.user?.id;
@@ -146,8 +153,8 @@ async function handlePostDelete(
  */
 async function handlePostReact(
   this: AuthenticatedSocket,
-  payload: { postId: number; type: string },
-  callback?: (response: any) => void,
+  payload: PostReactRequest,
+  callback?: (response: PostReactResponse) => void,
 ): Promise<void> {
   try {
     const userId = this.user?.id;
@@ -205,8 +212,8 @@ async function handlePostShare(
  */
 async function handleCommentCreate(
   this: AuthenticatedSocket,
-  payload: { postId: number; content: string },
-  callback?: (response: any) => void,
+  payload: CommentCreateRequest,
+  callback?: (response: CommentCreateResponse) => void,
 ): Promise<void> {
   try {
     const userId = this.user?.id;
@@ -240,8 +247,8 @@ async function handleCommentCreate(
  */
 async function handleCommentDelete(
   this: AuthenticatedSocket,
-  payload: { commentId: number },
-  callback?: (response: any) => void,
+  payload: CommentDeleteRequest,
+  callback?: (response: CommentDeleteResponse) => void,
 ): Promise<void> {
   try {
     const userId = this.user?.id;

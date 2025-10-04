@@ -1,52 +1,13 @@
 // apps/server/src/handlers/unifiedActivityHandlers.ts
 import type { Socket } from 'socket.io';
 import { unifiedActivityService } from '../services/unifiedActivity.service';
-import { REDIS_CHANNELS } from '@ems/types';
+import {
+  REDIS_CHANNELS,
+  SOCKET_EVENTS,
+  type UnifiedActivityRequest,
+  type VerboseActivity,
+} from '@ems/types';
 import redisClient from '../lib/redis';
-
-interface UnifiedActivityRequest {
-  limit?: number;
-  includePersonal?: boolean;
-  includeSocial?: boolean;
-  includePlatform?: boolean;
-  includeLive?: boolean;
-  timeframe?: '1h' | '6h' | '24h' | '7d' | 'all';
-}
-
-interface VerboseActivity {
-  id: string;
-  type: string;
-  timestamp: string;
-  priority: 'high' | 'medium' | 'low';
-
-  // User context
-  userId?: number;
-  userName: string;
-  userAvatar?: string;
-
-  // Rich content
-  title: string;
-  description: string;
-  icon: string;
-  color: string;
-
-  // Financial context (from bet details if available)
-  amount?: number;
-  odds?: number;
-  payout?: number;
-
-  // Prediction context (from prediction relation if available)
-  predictionId?: number;
-  predictionTitle?: string;
-  category?: string;
-  optionLabel?: string;
-
-  // Meta flags
-  isPersonal: boolean;
-  isHighValue: boolean;
-  isWin?: boolean;
-  streak?: number;
-}
 
 export function setupUnifiedActivityHandlers(socket: Socket) {
   console.log(`[unified-activity] Setting up global activity handlers`);
@@ -54,7 +15,7 @@ export function setupUnifiedActivityHandlers(socket: Socket) {
   /**
    * Handle unified activity feed requests
    */
-  socket.on('unified:activity:request', async (params: UnifiedActivityRequest = {}) => {
+  socket.on(SOCKET_EVENTS.UNIFIED_ACTIVITY_REQUEST, async (params: UnifiedActivityRequest = {}) => {
     const {
       limit = 50,
       includePersonal = true,
@@ -224,10 +185,10 @@ export function setupUnifiedActivityHandlers(socket: Socket) {
       console.log(
         `[unified-activity] Sending ${sortedActivities.length} verbose activities to client`,
       );
-      socket.emit('unified:activity:response', sortedActivities);
+      socket.emit(SOCKET_EVENTS.UNIFIED_ACTIVITY_RESPONSE, sortedActivities);
     } catch (error) {
       console.error(`[unified-activity] Error fetching activities:`, error);
-      socket.emit('unified:activity:response', []);
+      socket.emit(SOCKET_EVENTS.UNIFIED_ACTIVITY_RESPONSE, []);
     }
   });
 
@@ -273,7 +234,7 @@ export async function broadcastNewActivity(io: any, activity: any) {
     };
 
     // Global broadcast to ALL connected clients - no rooms needed
-    io.emit('unified:activity:update', verboseActivity);
+    io.emit(SOCKET_EVENTS.UNIFIED_ACTIVITY_UPDATE, verboseActivity);
 
     console.log(`[unified-activity] Global broadcast: ${verboseActivity.title}`);
   } catch (error) {
@@ -297,7 +258,7 @@ export function setupUnifiedActivityRedisHandlers(io: any) {
 
       if (channel === REDIS_CHANNELS.UNIFIED_ACTIVITY_GLOBAL) {
         // Global broadcast to ALL connected clients
-        io.emit('unified:activity:update', activityData);
+        io.emit(SOCKET_EVENTS.UNIFIED_ACTIVITY_UPDATE, activityData);
       }
     } catch (error) {
       console.error(`[unified-activity-redis] Error processing ${channel}:`, error);

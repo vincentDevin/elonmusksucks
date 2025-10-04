@@ -42,7 +42,6 @@ const ContentTable: React.FC<ContentTableProps> = ({
       user_post: '💬',
       comment: '🗨️',
       prediction: '🔮',
-      feed: '📡',
     };
     return icons[type] || '📄';
   };
@@ -53,7 +52,6 @@ const ContentTable: React.FC<ContentTableProps> = ({
       user_post: 'success',
       comment: 'secondary',
       prediction: 'primary',
-      feed: 'warning',
     };
     return colors[type] || 'tertiary';
   };
@@ -127,21 +125,21 @@ const ContentTable: React.FC<ContentTableProps> = ({
   return (
     <div className={`bg-background rounded-lg border border-muted ${className}`}>
       {/* Header */}
-      <div className="p-6 border-b border-muted">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <h3 className="text-lg font-semibold text-content">Content Items</h3>
-            <div className="text-sm text-tertiary">
+      <div className="p-4 border-b border-muted">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <h3 className="text-base font-semibold text-content">Content Items</h3>
+            <div className="text-xs text-tertiary">
               {content.length} items • Page {currentPage} of {totalPages}
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             {/* View Mode Toggle */}
             <div className="flex items-center bg-surface rounded-lg border border-muted">
               <button
                 onClick={() => setViewMode('table')}
-                className={`px-3 py-1 text-sm rounded-l-lg transition-colors ${
+                className={`px-2 py-1 text-xs rounded-l-lg transition-colors ${
                   viewMode === 'table'
                     ? 'bg-primary text-white'
                     : 'text-tertiary hover:text-content'
@@ -151,7 +149,7 @@ const ContentTable: React.FC<ContentTableProps> = ({
               </button>
               <button
                 onClick={() => setViewMode('cards')}
-                className={`px-3 py-1 text-sm rounded-r-lg transition-colors ${
+                className={`px-2 py-1 text-xs rounded-r-lg transition-colors ${
                   viewMode === 'cards'
                     ? 'bg-primary text-white'
                     : 'text-tertiary hover:text-content'
@@ -167,10 +165,10 @@ const ContentTable: React.FC<ContentTableProps> = ({
       {viewMode === 'table' ? (
         /* Desktop Table View */
         <div className="hidden lg:block overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[800px]">
             <thead>
               <tr className="border-b border-muted">
-                <th className="text-left py-4 px-6 text-sm font-medium text-tertiary">
+                <th className="text-left py-3 px-4 text-sm font-medium text-tertiary w-12">
                   <input
                     type="checkbox"
                     checked={selectedContent.size === content.length && content.length > 0}
@@ -178,22 +176,28 @@ const ContentTable: React.FC<ContentTableProps> = ({
                     className="w-4 h-4 text-primary bg-background border border-muted rounded focus:ring-1 focus:ring-primary"
                   />
                 </th>
-                <th className="text-left py-4 px-6 text-sm font-medium text-tertiary">Content</th>
-                <th className="text-left py-4 px-6 text-sm font-medium text-tertiary">Type</th>
-                <th className="text-left py-4 px-6 text-sm font-medium text-tertiary">Author</th>
-                <th className="text-left py-4 px-6 text-sm font-medium text-tertiary">Status</th>
-                <th className="text-left py-4 px-6 text-sm font-medium text-tertiary">
+                <th className="text-left py-3 px-4 text-sm font-medium text-tertiary">Content</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-tertiary w-24">Type</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-tertiary w-32">
+                  Author
+                </th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-tertiary w-24">
+                  Status
+                </th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-tertiary w-28">
                   Engagement
                 </th>
-                <th className="text-left py-4 px-6 text-sm font-medium text-tertiary">Date</th>
-                <th className="text-right py-4 px-6 text-sm font-medium text-tertiary">Actions</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-tertiary w-28">Date</th>
+                <th className="text-right py-3 px-4 text-sm font-medium text-tertiary w-24">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody>
               {content.map((item) => (
                 <React.Fragment key={item.id}>
                   <tr className="border-b border-muted/50 hover:bg-surface/50 transition-colors">
-                    <td className="py-4 px-6">
+                    <td className="py-3 px-4">
                       <input
                         type="checkbox"
                         checked={selectedContent.has(item.id)}
@@ -202,8 +206,8 @@ const ContentTable: React.FC<ContentTableProps> = ({
                       />
                     </td>
 
-                    <td className="py-4 px-6">
-                      <div className="max-w-sm">
+                    <td className="py-3 px-4 max-w-md">
+                      <div>
                         <div className="font-medium text-content truncate">
                           {item.title || truncateText(item.content, 50)}
                         </div>
@@ -213,7 +217,7 @@ const ContentTable: React.FC<ContentTableProps> = ({
                       </div>
                     </td>
 
-                    <td className="py-4 px-6">
+                    <td className="py-3 px-4">
                       <div className="flex items-center gap-2">
                         <span className="text-lg">{getContentTypeIcon(item.type)}</span>
                         <span
@@ -224,7 +228,7 @@ const ContentTable: React.FC<ContentTableProps> = ({
                       </div>
                     </td>
 
-                    <td className="py-4 px-6">
+                    <td className="py-3 px-4">
                       <div className="flex items-center gap-2">
                         {item.author.avatarUrl && (
                           <img
@@ -240,7 +244,7 @@ const ContentTable: React.FC<ContentTableProps> = ({
                       </div>
                     </td>
 
-                    <td className="py-4 px-6">
+                    <td className="py-3 px-4">
                       <span
                         className={`px-2 py-1 rounded-full text-xs font-medium bg-${getStatusColor(item.status)}/10 text-${getStatusColor(item.status)}`}
                       >
@@ -248,7 +252,7 @@ const ContentTable: React.FC<ContentTableProps> = ({
                       </span>
                     </td>
 
-                    <td className="py-4 px-6">
+                    <td className="py-3 px-4">
                       <div className="text-sm text-tertiary">
                         <div className="flex items-center gap-3">
                           <span>👀 {item.engagement?.views || 0}</span>
@@ -258,13 +262,13 @@ const ContentTable: React.FC<ContentTableProps> = ({
                       </div>
                     </td>
 
-                    <td className="py-4 px-6">
+                    <td className="py-3 px-4">
                       <div className="text-sm text-tertiary">
                         {formatDate(item.timestamps.createdAt)}
                       </div>
                     </td>
 
-                    <td className="py-4 px-6">
+                    <td className="py-3 px-4">
                       <div className="flex items-center gap-1 justify-end">
                         <button
                           onClick={() =>
@@ -294,7 +298,7 @@ const ContentTable: React.FC<ContentTableProps> = ({
                   {/* Expanded Content Row */}
                   {expandedContent === item.id && (
                     <tr className="border-b border-muted bg-surface/30">
-                      <td colSpan={8} className="py-4 px-6">
+                      <td colSpan={8} className="py-3 px-4">
                         <div className="bg-background rounded-lg border border-muted p-4">
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
@@ -440,8 +444,8 @@ const ContentTable: React.FC<ContentTableProps> = ({
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="p-6 border-t border-muted">
-          <div className="flex items-center justify-between">
+        <div className="p-4 border-t border-muted">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="text-sm text-tertiary">
               Showing {(currentPage - 1) * 25 + 1} to {Math.min(currentPage * 25, content.length)}{' '}
               of total results

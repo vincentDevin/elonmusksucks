@@ -16,3 +16,4 @@ export * from './ISocketCleanupManager.js';
 export * from './prediction.js';
 export * from './user-stats.js';
 export * from './pong.js';
+export * from './active-user-cache.js';

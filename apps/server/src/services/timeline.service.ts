@@ -47,19 +47,24 @@ export class TimelineService {
   async getArticleReactions(articleId: number) {
     const reactions = await this.reactionRepository.getArticleReactions(articleId);
 
-    // Enrich user data with signed avatar URLs
-    const enrichedReactions = await Promise.all(
-      reactions.map(async (reaction: any) => {
-        if (reaction.user) {
-          const enrichedUser = await userService.enrichUserWithAvatar(reaction.user);
+    // Batch enrich user avatars
+    const users = reactions.filter((r: any) => r.user).map((r: any) => r.user);
+    const enrichedUsers = await userService.enrichUsersWithAvatars(users);
+    const userMap = new Map(enrichedUsers.map((user) => [user.id, user]));
+
+    // Map enriched users back to reactions
+    const enrichedReactions = reactions.map((reaction: any) => {
+      if (reaction.user) {
+        const enrichedUser = userMap.get(reaction.user.id);
+        if (enrichedUser) {
           return {
             ...reaction,
             user: enrichedUser,
           };
         }
-        return reaction;
-      }),
-    );
+      }
+      return reaction;
+    });
 
     return enrichedReactions;
   }
@@ -88,34 +93,30 @@ export class TimelineService {
         viewerId,
       });
 
-      // Enrich user data with signed avatar URLs
-      const enrichedComments = await Promise.all(
-        result.comments.map(async (comment: any) => {
-          try {
-            if (comment.author) {
-              const enrichedUser = await userService.enrichUserWithAvatar(comment.author);
-              console.log(
-                `[timeline] Enriched comment ${comment.id} author avatarUrl:`,
-                enrichedUser.avatarUrl,
-              );
-              return {
-                ...comment,
-                user: enrichedUser,
-                author: enrichedUser, // Keep both for compatibility
-              };
-            }
-            return comment;
-          } catch (error) {
-            console.error(`[timeline] Error enriching comment ${comment.id}:`, error);
-            // Return comment with basic author data if enrichment fails
+      // Batch enrich user avatars
+      const authors = result.comments.filter((c: any) => c.author).map((c: any) => c.author);
+      const enrichedAuthors = await userService.enrichUsersWithAvatars(authors);
+      const authorMap = new Map(enrichedAuthors.map((author) => [author.id, author]));
+
+      // Map enriched authors back to comments
+      const enrichedComments = result.comments.map((comment: any) => {
+        if (comment.author) {
+          const enrichedUser = authorMap.get(comment.author.id);
+          if (enrichedUser) {
             return {
               ...comment,
-              user: comment.author || { id: comment.authorId, name: 'Unknown', avatarUrl: null },
-              author: comment.author || { id: comment.authorId, name: 'Unknown', avatarUrl: null },
+              user: enrichedUser,
+              author: enrichedUser, // Keep both for compatibility
             };
           }
-        }),
-      );
+        }
+        // Fallback if enrichment fails or no author
+        return {
+          ...comment,
+          user: comment.author || { id: comment.authorId, name: 'Unknown', avatarUrl: null },
+          author: comment.author || { id: comment.authorId, name: 'Unknown', avatarUrl: null },
+        };
+      });
 
       return {
         comments: enrichedComments,

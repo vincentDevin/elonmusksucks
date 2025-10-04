@@ -180,19 +180,20 @@ export const getEloLeaderboard = async (
 
     const stats = await pongRepository.getEloLeaderboard(limit, offset);
 
-    // Enrich user avatars with signed URLs before calculating metrics
-    const enrichedStats = await Promise.all(
-      stats.map(async (stat) => {
-        if (stat.user) {
-          const enrichedUser = await userService.enrichUserWithAvatar(stat.user);
-          return {
-            ...stat,
-            user: enrichedUser,
-          };
-        }
-        return stat;
-      }),
-    );
+    // Batch enrich user avatars with signed URLs before calculating metrics
+    const users = stats.filter((stat) => stat.user).map((stat) => stat.user);
+    const enrichedUsers = await userService.enrichUsersWithAvatars(users);
+    const userMap = new Map(enrichedUsers.map((user) => [user.id, user]));
+
+    const enrichedStats = stats.map((stat) => {
+      if (stat.user) {
+        return {
+          ...stat,
+          user: userMap.get(stat.user.id) || stat.user,
+        };
+      }
+      return stat;
+    });
 
     const leaderboard = PongStatsService.calculateLeaderboardMetrics(enrichedStats, offset);
 
@@ -247,19 +248,20 @@ export const getLeaderboardByMetric = async (
         return;
     }
 
-    // Enrich user avatars with signed URLs before calculating metrics
-    const enrichedStats = await Promise.all(
-      stats.map(async (stat) => {
-        if (stat.user) {
-          const enrichedUser = await userService.enrichUserWithAvatar(stat.user);
-          return {
-            ...stat,
-            user: enrichedUser,
-          };
-        }
-        return stat;
-      }),
-    );
+    // Batch enrich user avatars with signed URLs before calculating metrics
+    const users = stats.filter((stat) => stat.user).map((stat) => stat.user);
+    const enrichedUsers = await userService.enrichUsersWithAvatars(users);
+    const userMap = new Map(enrichedUsers.map((user) => [user.id, user]));
+
+    const enrichedStats = stats.map((stat) => {
+      if (stat.user) {
+        return {
+          ...stat,
+          user: userMap.get(stat.user.id) || stat.user,
+        };
+      }
+      return stat;
+    });
 
     const leaderboard = PongStatsService.calculateLeaderboardMetrics(enrichedStats, offset);
 

@@ -74,7 +74,12 @@ const UserRow: React.FC<UserRowProps> = ({
       if (user.banStatus?.isBanned) {
         await unbanUser(user.id);
       } else {
-        await banUser(user.id, 'Banned by admin', undefined);
+        await banUser({
+          userId: user.id,
+          banType: 'temporary',
+          reason: 'Banned by admin',
+          duration: 1440,
+        });
       }
       onUpdate();
     } catch (error) {

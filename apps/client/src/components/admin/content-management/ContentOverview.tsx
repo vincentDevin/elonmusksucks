@@ -5,7 +5,6 @@ import * as unifiedContentAPI from '../../../api/unifiedContent';
 interface ContentOverviewProps {
   totalContent: number;
   selectedFilters: UnifiedContentFilters;
-  onQuickFilter: (filters: Partial<UnifiedContentFilters>) => void;
   className?: string;
 }
 
@@ -15,11 +14,7 @@ interface ContentOverviewProps {
  * Displays high-level statistics and quick action buttons for content management.
  * Shows analytics, content type breakdown, and provides quick filter options.
  */
-const ContentOverview: React.FC<ContentOverviewProps> = ({
-  totalContent,
-  onQuickFilter,
-  className = '',
-}) => {
+const ContentOverview: React.FC<ContentOverviewProps> = ({ totalContent, className = '' }) => {
   const [analytics, setAnalytics] = useState<UnifiedContentAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -40,53 +35,16 @@ const ContentOverview: React.FC<ContentOverviewProps> = ({
     loadAnalytics();
   }, []);
 
-  // Quick filter options
-  const quickFilters = [
-    {
-      label: 'Pending Review',
-      icon: '⏳',
-      filter: { statuses: ['pending' as const] },
-      color: 'warning',
-    },
-    {
-      label: 'Flagged Content',
-      icon: '🚩',
-      filter: { statuses: ['flagged' as const] },
-      color: 'error',
-    },
-    {
-      label: 'Recent Articles',
-      icon: '📰',
-      filter: {
-        types: ['article' as const],
-        createdAfter: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      },
-      color: 'info',
-    },
-    {
-      label: 'User Posts',
-      icon: '💬',
-      filter: { types: ['user_post' as const] },
-      color: 'success',
-    },
-    {
-      label: 'Comments',
-      icon: '🗨️',
-      filter: { types: ['comment' as const] },
-      color: 'secondary',
-    },
-  ];
-
   if (loading) {
     return (
-      <div className={`bg-background rounded-lg border border-muted p-6 ${className}`}>
-        <div className="animate-pulse space-y-4">
-          <div className="h-6 bg-muted rounded w-48"></div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className={`bg-background rounded-lg border border-muted p-4 ${className}`}>
+        <div className="animate-pulse space-y-3">
+          <div className="h-4 bg-muted rounded w-48"></div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="bg-surface p-4 rounded-lg border border-muted">
-                <div className="h-8 bg-muted rounded w-16 mb-2"></div>
-                <div className="h-4 bg-muted rounded w-24"></div>
+              <div key={i} className="bg-surface p-3 rounded-lg border border-muted">
+                <div className="h-6 bg-muted rounded w-16 mb-2"></div>
+                <div className="h-3 bg-muted rounded w-24"></div>
               </div>
             ))}
           </div>
@@ -96,84 +54,89 @@ const ContentOverview: React.FC<ContentOverviewProps> = ({
   }
 
   return (
-    <div className={`space-y-6 ${className}`}>
+    <div className={`space-y-4 ${className}`}>
       {/* Statistics Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-background p-6 rounded-lg border border-muted">
-          <div className="text-2xl font-bold text-content">{totalContent.toLocaleString()}</div>
-          <div className="text-sm text-tertiary">Total Content Items</div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="bg-background p-3 rounded-lg border border-muted text-center">
+          <div className="text-lg font-bold text-content">{totalContent.toLocaleString()}</div>
+          <div className="text-xs text-tertiary">Total Content Items</div>
           <div className="text-xs text-primary mt-1">All types combined</div>
         </div>
 
-        <div className="bg-background p-6 rounded-lg border border-muted">
-          <div className="text-2xl font-bold text-content">
+        <div className="bg-background p-3 rounded-lg border border-muted text-center">
+          <div className="text-lg font-bold text-content">
             {analytics?.moderation.pendingReview || 0}
           </div>
-          <div className="text-sm text-tertiary">Pending Review</div>
+          <div className="text-xs text-tertiary">Pending Review</div>
           <div className="text-xs text-warning mt-1">Needs moderation</div>
         </div>
 
-        <div className="bg-background p-6 rounded-lg border border-muted">
-          <div className="text-2xl font-bold text-content">
+        <div className="bg-background p-3 rounded-lg border border-muted text-center">
+          <div className="text-lg font-bold text-content">
             {analytics?.overview.totalViews.toLocaleString() || 0}
           </div>
-          <div className="text-sm text-tertiary">Total Views</div>
+          <div className="text-xs text-tertiary">Total Views</div>
           <div className="text-xs text-success mt-1">All content</div>
         </div>
 
-        <div className="bg-background p-6 rounded-lg border border-muted">
-          <div className="text-2xl font-bold text-content">
+        <div className="bg-background p-3 rounded-lg border border-muted text-center">
+          <div className="text-lg font-bold text-content">
             {analytics?.overview.averageQualityScore.toFixed(1) || 0}
           </div>
-          <div className="text-sm text-tertiary">Avg Quality</div>
+          <div className="text-xs text-tertiary">Avg Quality</div>
           <div className="text-xs text-info mt-1">Out of 10</div>
         </div>
       </div>
 
-      {/* Content Type Breakdown */}
-      {analytics?.overview.itemsByType && (
-        <div className="bg-background rounded-lg border border-muted p-6">
-          <h3 className="text-lg font-semibold text-content mb-4 flex items-center">
-            <span className="mr-2">📊</span>
-            Content by Type
+      {/* Moderation Status Breakdown */}
+      {analytics?.overview.itemsByStatus && (
+        <div className="bg-background rounded-lg border border-muted p-4">
+          <h3 className="text-sm font-semibold text-content mb-3 flex items-center">
+            <span className="mr-2">🛡️</span>
+            Moderation Status
           </h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {Object.entries(analytics.overview.itemsByType).map(([type, count]) => {
-              const typeIcons = {
-                article: '📰',
-                user_post: '💬',
-                comment: '🗨️',
-                prediction: '🔮',
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {Object.entries(analytics.overview.itemsByStatus).map(([status, count]) => {
+              const statusIcons = {
+                pending: '⏳',
+                approved: '✅',
+                rejected: '❌',
+                flagged: '🚩',
+                deleted: '🗑️',
+                draft: '📝',
               };
 
-              const typeColors = {
-                article: 'info',
-                user_post: 'success',
-                comment: 'secondary',
-                prediction: 'primary',
+              const statusColors: Record<string, string> = {
+                pending: 'text-warning',
+                approved: 'text-success',
+                rejected: 'text-error',
+                flagged: 'text-error',
+                deleted: 'text-tertiary',
+                draft: 'text-info',
               };
+
+              // Skip if count is 0
+              if ((count as number) === 0) return null;
+
+              const colorClass = statusColors[status] || 'text-content';
 
               return (
                 <div
-                  key={type}
-                  className="flex items-center justify-between p-4 bg-surface rounded-lg border border-muted hover:bg-background transition-colors cursor-pointer"
-                  onClick={() => onQuickFilter({ types: [type as any] })}
+                  key={status}
+                  className="flex items-center justify-between p-3 bg-surface rounded-lg border border-muted"
                 >
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">
-                      {typeIcons[type as keyof typeof typeIcons] || '📄'}
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">
+                      {statusIcons[status as keyof typeof statusIcons] || '📄'}
                     </span>
                     <div>
-                      <div className="font-medium text-content capitalize">
-                        {type.replace('_', ' ')}
+                      <div className="text-sm font-medium text-content capitalize">
+                        {status.replace('_', ' ')}
                       </div>
-                      <div className="text-sm text-tertiary">{count as number} items</div>
+                      <div className={`text-xs font-semibold ${colorClass}`}>
+                        {count as number} items
+                      </div>
                     </div>
-                  </div>
-                  <div
-                    className={`text-xs px-2 py-1 rounded bg-${typeColors[type as keyof typeof typeColors] || 'primary'}/10 text-${typeColors[type as keyof typeof typeColors] || 'primary'}`}
-                  >
-                    {(((count as number) / totalContent) * 100).toFixed(1)}%
                   </div>
                 </div>
               );
@@ -182,49 +145,55 @@ const ContentOverview: React.FC<ContentOverviewProps> = ({
         </div>
       )}
 
-      {/* Quick Actions */}
-      <div className="bg-background rounded-lg border border-muted p-6">
-        <h3 className="text-lg font-semibold text-content mb-4 flex items-center">
-          <span className="mr-2">⚡</span>
-          Quick Filters
-        </h3>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          {quickFilters.map((filter, index) => (
-            <button
-              key={index}
-              onClick={() => onQuickFilter(filter.filter)}
-              className={`flex items-center gap-3 p-4 bg-surface rounded-lg border border-muted hover:bg-background transition-colors group`}
-            >
-              <span className="text-2xl group-hover:scale-110 transition-transform">
-                {filter.icon}
-              </span>
-              <div className="text-left">
-                <div className="font-medium text-content text-sm">{filter.label}</div>
-                <div className="text-xs text-tertiary">Click to filter</div>
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Top Tags */}
-      {analytics?.trends.topTags && analytics.trends.topTags.length > 0 && (
-        <div className="bg-background rounded-lg border border-muted p-6">
-          <h3 className="text-lg font-semibold text-content mb-4 flex items-center">
-            <span className="mr-2">🏷️</span>
-            Trending Tags
+      {/* Content Type Breakdown */}
+      {analytics?.overview.itemsByType && (
+        <div className="bg-background rounded-lg border border-muted p-4">
+          <h3 className="text-sm font-semibold text-content mb-3 flex items-center">
+            <span className="mr-2">📊</span>
+            Content by Type
           </h3>
-          <div className="flex flex-wrap gap-2">
-            {analytics.trends.topTags.slice(0, 10).map((tagData, index) => (
-              <button
-                key={index}
-                onClick={() => onQuickFilter({ tags: [tagData.tag] })}
-                className="px-3 py-2 bg-surface border border-muted rounded-lg hover:bg-background transition-colors"
-              >
-                <div className="text-sm font-medium text-content">{tagData.tag}</div>
-                <div className="text-xs text-tertiary">{tagData.count} uses</div>
-              </button>
-            ))}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {Object.entries(analytics.overview.itemsByType).map(([type, count]) => {
+              const typeIcons = {
+                article: '📰',
+                user_post: '💬',
+                comment: '🗨️',
+                prediction: '🔮',
+              };
+
+              const typeColors: Record<string, string> = {
+                article: 'text-info',
+                user_post: 'text-success',
+                comment: 'text-secondary',
+                prediction: 'text-primary',
+              };
+
+              const colorClass = typeColors[type] || 'text-content';
+
+              return (
+                <div
+                  key={type}
+                  className="flex items-center justify-between p-3 bg-surface rounded-lg border border-muted"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">
+                      {typeIcons[type as keyof typeof typeIcons] || '📄'}
+                    </span>
+                    <div>
+                      <div className="text-sm font-medium text-content capitalize">
+                        {type.replace('_', ' ')}
+                      </div>
+                      <div className={`text-xs font-semibold ${colorClass}`}>
+                        {count as number} items
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-xs px-2 py-1 rounded bg-muted text-tertiary">
+                    {(((count as number) / totalContent) * 100).toFixed(1)}%
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

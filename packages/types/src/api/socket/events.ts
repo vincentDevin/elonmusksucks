@@ -120,6 +120,7 @@ export const REDIS_CHANNELS = {
   POST_CREATED: 'post:created',
   POST_UPDATED: 'post:updated',
   POST_DELETED: 'post:deleted',
+  POST_SHARED: 'post:shared',
   POST_REACTION: 'post:reaction',
   COMMENT_CREATED: 'comment:created',
   COMMENT_DELETED: 'comment:deleted',
@@ -187,14 +188,107 @@ export type RedisChannel = (typeof REDIS_CHANNELS)[keyof typeof REDIS_CHANNELS];
 // ============================================================================
 
 export const SOCKET_ROOMS = {
+  // Core public rooms
   PREDICTIONS: 'predictions',
   BETTING: 'betting',
   LEADERBOARD: 'leaderboard',
   ADMIN: 'admin',
   ACHIEVEMENTS: 'achievements',
+  CHAT: 'chat',
+  TIMELINE: 'timeline',
+
+  // Leaderboard sub-rooms
+  LEADERBOARD_DAILY: 'leaderboard:daily',
+  LEADERBOARD_ALL_TIME: 'leaderboard:allTime',
+
+  // Stats rooms
+  STATS_GLOBAL: 'stats:global',
+
+  // Pong public rooms
+  PONG_STATS: 'pong:stats',
+  PONG_LOBBY: 'pong:lobby',
+  PONG_MATCHES: 'pong:matches',
+
+  // Admin sub-rooms
+  ADMIN_METRICS: 'admin:metrics',
+  ADMIN_MODERATION: 'admin:moderation',
+  ADMIN_FEEDS: 'admin:feeds',
+  ADMIN_EVENTS: 'admin:events',
+  ADMIN_PREDICTIONS: 'admin:predictions',
+  ADMIN_TIMELINE: 'admin:timeline',
+
+  // Timeline sub-rooms
+  PUBLIC_TIMELINE: 'public:timeline',
+
+  // Chat rooms
+  CHAT_GLOBAL: 'global',
 } as const;
 
 export type SocketRoom = (typeof SOCKET_ROOMS)[keyof typeof SOCKET_ROOMS];
+
+/**
+ * Dynamic room name helpers for type-safe room construction
+ */
+export const ROOM_HELPERS = {
+  /** User personal room: user:{userId} */
+  user: (userId: number) => `user:${userId}` as const,
+
+  /** User stats room: stats:user:{userId} */
+  userStats: (userId: number) => `stats:user:${userId}` as const,
+
+  /** User activity room: activity:user:{userId} */
+  userActivity: (userId: number) => `activity:user:${userId}` as const,
+
+  /** Pong user-specific room: pong:user:{userId} */
+  pongUser: (userId: number) => `pong:user:${userId}` as const,
+
+  /** Pong game room: pong:game:{gameId} */
+  pongGame: (gameId: string) => `pong:game:${gameId}` as const,
+
+  /** Pong leaderboard room: pong:leaderboard:{metric} */
+  pongLeaderboard: (metric: string) => `pong:leaderboard:${metric}` as const,
+
+  /** Prediction-specific room: prediction:{predictionId} */
+  prediction: (predictionId: number) => `prediction:${predictionId}` as const,
+
+  /** Chat room: chat:room:{roomId} */
+  chatRoom: (roomId: string) => `chat:room:${roomId}` as const,
+
+  /** User stats subscription room: user:{userId}:stats */
+  userStatsSubscription: (userId: number) => `user:${userId}:stats` as const,
+
+  /** User ranking subscription room: user:{userId}:ranking */
+  userRankingSubscription: (userId: number) => `user:${userId}:ranking` as const,
+
+  /** User achievements subscription room: user:{userId}:achievements */
+  userAchievementsSubscription: (userId: number) => `user:${userId}:achievements` as const,
+} as const;
+
+/**
+ * Room pattern matchers for authorization and validation
+ */
+export const ROOM_PATTERNS = {
+  /** User-specific room pattern: user:{userId} */
+  USER: /^user:(\d+)$/,
+
+  /** User stats room pattern: stats:user:{userId} */
+  USER_STATS: /^stats:user:(\d+)$/,
+
+  /** User activity room pattern: activity:user:{userId} */
+  USER_ACTIVITY: /^activity:user:(\d+)$/,
+
+  /** Pong user room pattern: pong:user:{userId} */
+  PONG_USER: /^pong:user:(\d+)$/,
+
+  /** Pong game room pattern: pong:game:{gameId} */
+  PONG_GAME: /^pong:game:([a-zA-Z0-9]+)$/,
+
+  /** Prediction room pattern: prediction:{predictionId} */
+  PREDICTION: /^prediction:(\d+)$/,
+
+  /** Chat room pattern: chat:room:{roomId} */
+  CHAT_ROOM: /^chat:room:([a-zA-Z0-9]+)$/,
+} as const;
 
 // ============================================================================
 // Socket.IO Event Names (non-Redis fan-out slugs)
@@ -234,6 +328,122 @@ export const SOCKET_EVENTS = {
   PONG_ELO_UPDATE: 'pong:elo:update',
   PONG_TIER_CHANGE: 'pong:tier:change',
   PONG_STATS_UPDATE: 'pong:stats:update',
+
+  // Pong client-to-server events (subscriptions)
+  PONG_SUBSCRIBE_LEADERBOARD: 'pong:subscribe:leaderboard',
+  PONG_UNSUBSCRIBE_LEADERBOARD: 'pong:unsubscribe:leaderboard',
+  PONG_SUBSCRIBE_ELO: 'pong:subscribe:elo',
+  PONG_UNSUBSCRIBE_ELO: 'pong:unsubscribe:elo',
+  PONG_SUBSCRIBE_STATS: 'pong:subscribe:stats',
+  PONG_UNSUBSCRIBE_STATS: 'pong:unsubscribe:stats',
+
+  // Pong server-to-client events (broadcasts)
+  PONG_ELO_UPDATED: 'pong:elo:updated',
+  PONG_PLAYER_ELO_CHANGED: 'pong:player:elo:changed',
+  PONG_TIER_CHANGED: 'pong:tier:changed',
+  PONG_TIER_ANNOUNCEMENT: 'pong:tier:announcement',
+  PONG_STATS_UPDATED: 'pong:stats:updated',
+  PONG_LEADERBOARD_UPDATED: 'pong:leaderboard:updated',
+
+  // Generic socket events
+  DISCONNECT: 'disconnect',
+
+  // Room management events (client-to-server)
+  JOIN: 'join',
+  JOIN_ROOM: 'joinRoom',
+  LEAVE: 'leave',
+  LEAVE_ROOM: 'leaveRoom',
+  ROOMS: 'rooms',
+
+  // Post/Content events (client-to-server)
+  POST_CREATE: 'post:create',
+  POST_EDIT: 'post:edit',
+  POST_DELETE: 'post:delete',
+  POST_REACT: 'post:react',
+  POST_SHARE: 'post:share',
+  COMMENT_CREATE: 'comment:create',
+  COMMENT_DELETE: 'comment:delete',
+
+  // Post/Content events (server-to-client broadcasts)
+  POST_NEW: 'post:new',
+  POST_UPDATED_BROADCAST: 'post:updated',
+  POST_DELETED_BROADCAST: 'post:deleted',
+  POST_SHARED_BROADCAST: 'post:shared',
+  POST_REACTION_BROADCAST: 'post:reaction',
+  COMMENT_NEW: 'comment:new',
+  COMMENT_DELETED_BROADCAST: 'comment:deleted',
+
+  // Statistics events (client-to-server)
+  STATS_SUBSCRIBE: 'stats:subscribe',
+  STATS_UNSUBSCRIBE: 'stats:unsubscribe',
+  RANKING_SUBSCRIBE: 'ranking:subscribe',
+  ACHIEVEMENTS_SUBSCRIBE: 'achievements:subscribe',
+
+  // Statistics events (server-to-client broadcasts)
+  STATS_CURRENT: 'stats:current',
+  STATS_ERROR: 'stats:error',
+  STATS_UPDATED: 'stats:updated',
+  STATS_RANKING: 'stats:ranking',
+  STATS_ACHIEVEMENT: 'stats:achievement',
+  STATS_REFRESHED: 'stats:refreshed',
+  RANKING_CHANGED: 'ranking:changed',
+  ACHIEVEMENT_UNLOCKED_BROADCAST: 'achievement:unlocked',
+
+  // Timeline events (client-to-server)
+  TIMELINE_JOIN: 'timeline:join',
+  TIMELINE_LEAVE: 'timeline:leave',
+  ADMIN_TIMELINE_JOIN: 'admin:timeline:join',
+  ADMIN_TIMELINE_LEAVE: 'admin:timeline:leave',
+  ADMIN_FEED_REFRESH: 'admin:feed:refresh',
+
+  // Timeline events (server-to-client broadcasts)
+  FEED_ARTICLE_APPROVED_BROADCAST: 'feed:article:approved',
+  FEED_ARTICLE_REJECTED_BROADCAST: 'feed:article:rejected',
+  FEED_ARTICLE_NEW_BROADCAST: 'feed:article:new',
+  FEED_TWEET_NEW_BROADCAST: 'feed:tweet:new',
+  FEED_TWEET_HIDDEN_BROADCAST: 'feed:tweet:hidden',
+  FEED_MANAGEMENT_UPDATE: 'feed:management:update',
+  ADMIN_FEED_REFRESH_ACK: 'admin:feed:refresh:ack',
+
+  // Moderation events (client-to-server, admin only)
+  ADMIN_BAN_USER: 'admin:banUser',
+  ADMIN_UNBAN_USER: 'admin:unbanUser',
+  ADMIN_MUTE_USER: 'admin:muteUser',
+  ADMIN_KICK_USER: 'admin:kickUser',
+  ADMIN_DELETE_MESSAGE: 'admin:deleteMessage',
+  ADMIN_DELETE_POST: 'admin:deletePost',
+  ADMIN_GET_ACTIVE_BANS: 'admin:getActiveBans',
+  ADMIN_GET_MODERATION_HISTORY: 'admin:getModerationHistory',
+  ADMIN_GET_RECENT_ACTIONS: 'admin:getRecentActions',
+
+  // Moderation events (server-to-client, user notifications)
+  USER_BANNED: 'user:banned',
+  USER_MUTED: 'user:muted',
+  USER_KICKED: 'user:kicked',
+
+  // Chat events (client-to-server)
+  CHAT_HISTORY_REQUEST: 'chat:history',
+  CHAT_MESSAGE_SEND: 'chat:message',
+  CHAT_TYPING_SEND: 'chat:typing',
+  CHAT_STOP_TYPING_SEND: 'chat:stopTyping',
+
+  // Chat events (server-to-client broadcasts)
+  CHAT_HISTORY_RESPONSE: 'chat:history',
+  CHAT_ERROR_RESPONSE: 'chat:error',
+
+  // Betting events (client-to-server)
+  BET_PLACE: 'bet:place',
+  PARLAY_PLACE: 'parlay:place',
+
+  // Unified Activity events (client-to-server)
+  UNIFIED_ACTIVITY_REQUEST: 'unified:activity:request',
+
+  // Unified Activity events (server-to-client broadcasts)
+  UNIFIED_ACTIVITY_RESPONSE: 'unified:activity:response',
+  UNIFIED_ACTIVITY_UPDATE: 'unified:activity:update',
+
+  // Generic events
+  ERROR: 'error',
 } as const;
 
 export type SocketEvent = (typeof SOCKET_EVENTS)[keyof typeof SOCKET_EVENTS];
@@ -248,3 +458,36 @@ export enum AchievementSocketEvents {
   CELEBRATION = 'achievement:celebration',
   BATCH_UNLOCKED = 'achievement:batch_unlocked',
 }
+
+// ============================================================================
+// Chat Redis Keys
+// ============================================================================
+
+export const CHAT_REDIS_KEYS = {
+  /** Redis set of online user IDs */
+  ONLINE_USERS_SET: 'global:chat:onlineUsers',
+
+  /** Redis hash of user info (name, avatarUrl, role) by user ID */
+  USER_INFO_HASH: 'global:chat:userInfo',
+
+  /** Redis counter prefix for user connections (append user ID) */
+  CONNECTIONS_PREFIX: 'global:chat:connections',
+
+  /** Redis sorted set for typing state with expiry timestamps */
+  TYPING_STATE: 'global:chat:typingUsers',
+} as const;
+
+// ============================================================================
+// Chat Constants
+// ============================================================================
+
+export const CHAT_CONSTANTS = {
+  /** Global chat room ID (database) */
+  GLOBAL_ROOM_ID: 1,
+
+  /** Typing indicator TTL in milliseconds */
+  TYPING_TTL_MS: 4000,
+
+  /** Typing state sweep interval in milliseconds */
+  TYPING_SWEEP_INTERVAL_MS: 2000,
+} as const;

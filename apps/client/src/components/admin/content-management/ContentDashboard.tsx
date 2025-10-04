@@ -8,7 +8,6 @@ import ContentOverview from './ContentOverview';
 import ContentFilters from './ContentFilters';
 import ContentTable from './ContentTable';
 import ContentModerationPanel from './ContentModerationPanel';
-import ContentAnalytics from './ContentAnalytics';
 import { OPMLManager } from './OPMLManager';
 import FeedsManager from './FeedsManager';
 
@@ -16,7 +15,7 @@ interface ContentDashboardProps {
   className?: string;
 }
 
-type DashboardView = 'overview' | 'content' | 'moderation' | 'analytics' | 'feeds';
+type DashboardView = 'overview' | 'content' | 'moderation' | 'feeds';
 
 /**
  * Unified Content Management Dashboard
@@ -36,7 +35,7 @@ type DashboardView = 'overview' | 'content' | 'moderation' | 'analytics' | 'feed
  * - Cross-content analytics
  * - OPML import/export for feeds
  */
-const ContentDashboard: React.FC<ContentDashboardProps> = ({ className = '' }) => {
+const ContentDashboard: React.FC<ContentDashboardProps> = () => {
   const { user } = useAuth();
   const socket = useSocket();
 
@@ -125,6 +124,33 @@ const ContentDashboard: React.FC<ContentDashboardProps> = ({ className = '' }) =
     }));
     setSelectedContent(new Set()); // Clear selections when filters change
   }, []);
+
+  // Clear all filters
+  const clearFilters = useCallback(() => {
+    setFilters({
+      types: [],
+      statuses: undefined,
+      search: '',
+      limit: 25,
+      offset: 0,
+    });
+    setSelectedContent(new Set());
+  }, []);
+
+  // Update filters when switching to moderation tab
+  useEffect(() => {
+    if (activeView === 'moderation') {
+      // Auto-filter to show items that need review
+      setFilters({
+        types: [],
+        statuses: ['pending', 'flagged'],
+        search: '',
+        limit: 25,
+        offset: 0,
+      });
+    }
+    // All Content tab: no auto-filtering, user manually filters
+  }, [activeView]);
 
   // Handle pagination
   const handlePageChange = useCallback(
@@ -216,19 +242,13 @@ const ContentDashboard: React.FC<ContentDashboardProps> = ({ className = '' }) =
       key: 'content',
       label: 'All Content',
       icon: '📄',
-      description: 'Unified view of all content types',
+      description: 'Browse and filter all content',
     },
     {
       key: 'moderation',
       label: 'Moderation',
       icon: '🛡️',
-      description: 'Content approval and moderation tools',
-    },
-    {
-      key: 'analytics',
-      label: 'Analytics',
-      icon: '📈',
-      description: 'Content performance and insights',
+      description: 'Review queue for pending and flagged content',
     },
     {
       key: 'feeds',
@@ -248,16 +268,16 @@ const ContentDashboard: React.FC<ContentDashboardProps> = ({ className = '' }) =
   }
 
   return (
-    <div className={`bg-surface rounded-lg border border-muted ${className}`}>
-      {/* Header */}
-      <div className="p-6 border-b border-muted">
-        <div className="flex items-center justify-between">
+    <div className="max-w-full overflow-hidden space-y-4">
+      {/* Compact Header with Tabs Combined */}
+      <div className="bg-surface rounded-lg border border-muted">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 border-b border-muted">
           <div>
-            <h1 className="text-2xl font-bold text-content flex items-center">
-              <span className="mr-3">🎛️</span>
+            <h1 className="text-xl font-bold text-content flex items-center">
+              <span className="mr-2">🎛️</span>
               Unified Content Management
             </h1>
-            <p className="text-tertiary mt-1">
+            <p className="text-xs text-tertiary mt-1">
               Manage all content types from articles to user posts in one unified interface
             </p>
           </div>
@@ -269,61 +289,59 @@ const ContentDashboard: React.FC<ContentDashboardProps> = ({ className = '' }) =
               </span>
               <button
                 onClick={() => setShowModerationPanel(!showModerationPanel)}
-                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+                className="px-3 py-1 bg-primary text-white rounded hover:bg-primary/90 transition-colors text-xs font-medium"
               >
                 Bulk Actions
               </button>
             </div>
           )}
         </div>
-      </div>
 
-      {/* Navigation */}
-      <div className="px-6 py-4 border-b border-muted">
-        <nav className="flex space-x-1">
+        {/* Navigation Tabs */}
+        <div className="flex overflow-x-auto">
           {navigationItems.map((item) => (
             <button
               key={item.key}
               onClick={() => setActiveView(item.key)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-all ${
                 activeView === item.key
-                  ? 'bg-primary text-white'
-                  : 'text-tertiary hover:text-content hover:bg-background'
+                  ? 'border-primary text-primary bg-primary/5'
+                  : 'border-transparent text-tertiary hover:text-content hover:bg-background'
               }`}
               title={item.description}
             >
-              <span>{item.icon}</span>
-              <span className="font-medium">{item.label}</span>
+              <span className="text-base">{item.icon}</span>
+              <span>{item.label}</span>
             </button>
           ))}
-        </nav>
+        </div>
       </div>
 
-      {/* Bulk Moderation Panel */}
-      {showModerationPanel && (
+      {/* Bulk Moderation Modal */}
+      {showModerationPanel && selectedContent.size > 0 && (
         <ContentModerationPanel
           selectedContent={selectedContent}
           onBulkOperation={handleBulkOperation}
-          onClose={() => setShowModerationPanel(false)}
-          className="mx-6 mt-4"
+          onClose={() => {
+            setShowModerationPanel(false);
+            setSelectedContent(new Set()); // Clear selection when closing modal
+          }}
+          showQuickActions={true}
         />
       )}
 
       {/* Main Content Area */}
-      <div className="p-6">
+      <div>
         {activeView === 'overview' && (
-          <ContentOverview
-            totalContent={totalCount}
-            selectedFilters={filters}
-            onQuickFilter={handleFiltersChange}
-          />
+          <ContentOverview totalContent={totalCount} selectedFilters={filters} />
         )}
 
         {activeView === 'content' && (
-          <div className="space-y-6">
+          <div className="space-y-4">
             <ContentFilters
               filters={filters}
               onFiltersChange={handleFiltersChange}
+              onClearFilters={clearFilters}
               totalCount={totalCount}
             />
 
@@ -342,33 +360,40 @@ const ContentDashboard: React.FC<ContentDashboardProps> = ({ className = '' }) =
         )}
 
         {activeView === 'moderation' && (
-          <ContentModerationPanel
-            selectedContent={selectedContent}
-            onBulkOperation={handleBulkOperation}
-            showQuickActions={true}
-          />
+          <div className="space-y-4">
+            <ContentFilters
+              filters={filters}
+              onFiltersChange={handleFiltersChange}
+              onClearFilters={clearFilters}
+              totalCount={totalCount}
+            />
+
+            <ContentTable
+              content={content}
+              selectedContent={selectedContent}
+              loading={loading}
+              error={error}
+              onContentSelect={handleContentSelect}
+              onSelectAll={handleSelectAll}
+              onPageChange={handlePageChange}
+              currentPage={Math.floor((filters.offset || 0) / (filters.limit || 25)) + 1}
+              totalPages={Math.ceil(totalCount / (filters.limit || 25))}
+            />
+          </div>
         )}
 
-        {activeView === 'analytics' && <ContentAnalytics filters={filters} content={content} />}
-
         {activeView === 'feeds' && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-              {/* RSS Feeds Management - Main Section */}
-              <div className="xl:col-span-2">
-                <FeedsManager />
-              </div>
+          <div className="space-y-4">
+            {/* RSS Feeds Management */}
+            <FeedsManager />
 
-              {/* OPML Tools - Side Panel */}
-              <div className="xl:col-span-1">
-                <div className="bg-background rounded-lg border border-muted p-6">
-                  <div className="text-lg font-semibold text-content mb-4 flex items-center">
-                    <span className="mr-2">📦</span>
-                    OPML Import/Export
-                  </div>
-                  <OPMLManager />
-                </div>
+            {/* OPML Tools */}
+            <div className="bg-background rounded-lg border border-muted p-4">
+              <div className="text-sm font-semibold text-content mb-3 flex items-center">
+                <span className="mr-2">📦</span>
+                OPML Import/Export
               </div>
+              <OPMLManager />
             </div>
           </div>
         )}

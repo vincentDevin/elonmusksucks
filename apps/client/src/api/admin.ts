@@ -47,17 +47,7 @@ export interface DetailedUser extends PublicUser {
     reason?: string;
     expiresAt?: string;
   };
-  stats?: {
-    totalBets: number;
-    totalWagered: number;
-    totalWon: number;
-    winRate: number;
-  };
-  recentActivity?: {
-    lastLogin?: string;
-    lastBet?: string;
-    totalLogins: number;
-  };
+  stats?: UserStatsDTO;
   badges?: PublicBadge[];
 }
 

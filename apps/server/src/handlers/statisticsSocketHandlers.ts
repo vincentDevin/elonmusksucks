@@ -1,10 +1,22 @@
-import { Socket, Server as IOServer } from 'socket.io';
+import { Server as IOServer } from 'socket.io';
+import type IORedis from 'ioredis';
 import {
   StatsUpdatePayload,
   RankingChangePayload,
   AchievementUnlockedPayload,
   REDIS_CHANNELS,
+  SOCKET_EVENTS,
+  ROOM_HELPERS,
+  type StatsCurrentResponse,
+  type StatsErrorResponse,
+  type StatsUpdatedBroadcast,
+  type RankingChangedBroadcast,
+  type StatsRankingBroadcast,
+  type AchievementUnlockedBroadcast,
+  type StatsAchievementBroadcast,
+  type StatsRefreshedBroadcast,
 } from '@ems/types';
+import type { AuthenticatedSocket } from '../middleware/socketAuthMiddleware';
 
 // TEMP: Re-export shared ACK types for backwards compatibility during migration
 export type { AckCallback, AckCallbackObj, AckResult, AckOk, AckErr } from '@ems/types';
@@ -28,51 +40,53 @@ const enhancedUserStatsService = new EnhancedUserStatsService(
 /**
  * Register real-time statistics handlers for individual socket connections
  */
-export function registerStatisticsHandlers(socket: Socket): void {
-  const user = (socket as any).user;
+export function registerStatisticsHandlers(socket: AuthenticatedSocket): void {
+  const user = socket.user;
   if (!user) return;
 
   // Join user's personal statistics room
-  socket.join(`user:${user.id}:stats`);
+  socket.join(ROOM_HELPERS.userStatsSubscription(user.id));
   console.log(`[stats-socket] User ${user.id} joined personal stats room`);
 
   // Handle request for live stats updates
-  socket.on('stats:subscribe', async () => {
+  socket.on(SOCKET_EVENTS.STATS_SUBSCRIBE, async () => {
     try {
       console.log(`[stats-socket] User ${user.id} subscribed to live stats`);
 
       // Send current stats immediately
       const currentStats = await enhancedUserStatsService.getEnhancedStats(user.id);
-      socket.emit('stats:current', {
+      const response: StatsCurrentResponse = {
         stats: currentStats,
         timestamp: new Date().toISOString(),
-      });
+      };
+      socket.emit(SOCKET_EVENTS.STATS_CURRENT, response);
     } catch (error) {
       console.error('[stats-socket] Error fetching current stats:', error);
-      socket.emit('stats:error', { message: 'Failed to fetch current statistics' });
+      const errorResponse: StatsErrorResponse = { message: 'Failed to fetch current statistics' };
+      socket.emit(SOCKET_EVENTS.STATS_ERROR, errorResponse);
     }
   });
 
   // Handle unsubscribe from live stats
-  socket.on('stats:unsubscribe', () => {
-    socket.leave(`user:${user.id}:stats`);
+  socket.on(SOCKET_EVENTS.STATS_UNSUBSCRIBE, () => {
+    socket.leave(ROOM_HELPERS.userStatsSubscription(user.id));
     console.log(`[stats-socket] User ${user.id} unsubscribed from live stats`);
   });
 
   // Handle ranking subscription
-  socket.on('ranking:subscribe', () => {
-    socket.join(`user:${user.id}:ranking`);
+  socket.on(SOCKET_EVENTS.RANKING_SUBSCRIBE, () => {
+    socket.join(ROOM_HELPERS.userRankingSubscription(user.id));
     console.log(`[stats-socket] User ${user.id} subscribed to ranking updates`);
   });
 
   // Handle achievement subscription
-  socket.on('achievements:subscribe', () => {
-    socket.join(`user:${user.id}:achievements`);
+  socket.on(SOCKET_EVENTS.ACHIEVEMENTS_SUBSCRIBE, () => {
+    socket.join(ROOM_HELPERS.userAchievementsSubscription(user.id));
     console.log(`[stats-socket] User ${user.id} subscribed to achievement updates`);
   });
 
   // Cleanup on disconnect
-  socket.on('disconnect', () => {
+  socket.on(SOCKET_EVENTS.DISCONNECT, () => {
     console.log(`[stats-socket] User ${user.id} disconnected from stats`);
   });
 }
@@ -80,9 +94,14 @@ export function registerStatisticsHandlers(socket: Socket): void {
 /**
  * Register Redis event handlers for statistics broadcasts
  */
-export function registerStatisticsRedisHandlers(io: IOServer, redisSub: any): void {
+export function registerStatisticsRedisHandlers(io: IOServer, redisSub: IORedis): void {
   // Subscribe to statistics-related Redis channels
-  redisSub.subscribe('stats:update', 'ranking:change', 'achievement:unlocked', 'stats:refresh');
+  redisSub.subscribe(
+    REDIS_CHANNELS.STATS_UPDATE,
+    REDIS_CHANNELS.RANKING_CHANGE,
+    REDIS_CHANNELS.ACHIEVEMENT_UNLOCKED,
+    REDIS_CHANNELS.STATS_REFRESH,
+  );
 
   redisSub.on('message', (channel: string, message: string) => {
     try {
@@ -117,11 +136,12 @@ function handleStatsUpdate(io: IOServer, payload: StatsUpdatePayload): void {
   const { userId, changes, achievements, timestamp } = payload;
 
   // Emit to user's personal stats room
-  io.to(`user:${userId}:stats`).emit('stats:updated', {
+  const broadcast: StatsUpdatedBroadcast = {
     changes,
     achievements,
     timestamp,
-  });
+  };
+  io.to(ROOM_HELPERS.userStatsSubscription(userId)).emit(SOCKET_EVENTS.STATS_UPDATED, broadcast);
 
   console.log(`[stats-redis] Stats updated for user ${userId}:`, changes);
 }
@@ -133,22 +153,30 @@ function handleRankingChange(io: IOServer, payload: RankingChangePayload): void 
   const { userId, oldRank, newRank, change, category, percentile } = payload;
 
   // Emit to user's ranking room
-  io.to(`user:${userId}:ranking`).emit('ranking:changed', {
+  const rankingBroadcast: RankingChangedBroadcast = {
     oldRank,
     newRank,
     change,
     category,
     percentile,
     timestamp: new Date().toISOString(),
-  });
+  };
+  io.to(ROOM_HELPERS.userRankingSubscription(userId)).emit(
+    SOCKET_EVENTS.RANKING_CHANGED,
+    rankingBroadcast,
+  );
 
   // Also emit to stats room for general updates
-  io.to(`user:${userId}:stats`).emit('stats:ranking', {
+  const statsBroadcast: StatsRankingBroadcast = {
     rank: newRank,
     change,
     category,
     percentile,
-  });
+  };
+  io.to(ROOM_HELPERS.userStatsSubscription(userId)).emit(
+    SOCKET_EVENTS.STATS_RANKING,
+    statsBroadcast,
+  );
 
   console.log(
     `[stats-redis] Ranking changed for user ${userId}: ${oldRank} → ${newRank} (${change > 0 ? '+' : ''}${change})`,
@@ -156,9 +184,23 @@ function handleRankingChange(io: IOServer, payload: RankingChangePayload): void 
 }
 
 /**
+ * Legacy achievement payload format (for backward compatibility)
+ */
+interface LegacyAchievementPayload {
+  userId: number;
+  achievementId?: string;
+  name?: string;
+  description?: string;
+  category?: string;
+}
+
+/**
  * Handle achievement unlocks
  */
-function handleAchievementUnlocked(io: IOServer, payload: any): void {
+function handleAchievementUnlocked(
+  io: IOServer,
+  payload: AchievementUnlockedPayload | LegacyAchievementPayload,
+): void {
   // Ensure payload has required fields
   const userId = payload.userId;
   if (!userId) {
@@ -167,33 +209,47 @@ function handleAchievementUnlocked(io: IOServer, payload: any): void {
   }
 
   // Handle both old and new achievement payload formats
-  const achievement = payload.achievement || {
-    id: payload.achievementId || 'unknown',
-    title: payload.name || 'Achievement Unlocked',
-    description: payload.description || '',
-    category: payload.category || 'general',
-  };
+  const achievement =
+    'achievement' in payload && payload.achievement
+      ? payload.achievement
+      : {
+          id: ('achievementId' in payload && payload.achievementId) || 'unknown',
+          title: ('name' in payload && payload.name) || 'Achievement Unlocked',
+          description: ('description' in payload && payload.description) || '',
+          category: ('category' in payload && payload.category) || 'general',
+        };
 
-  const progress = payload.progress || {
-    previous: 0,
-    current: 1,
-    target: 1,
-  };
+  const progress =
+    'progress' in payload && payload.progress
+      ? payload.progress
+      : {
+          previous: 0,
+          current: 1,
+          target: 1,
+        };
 
-  const timestamp = payload.timestamp || new Date().toISOString();
+  const timestamp = ('timestamp' in payload && payload.timestamp) || new Date().toISOString();
 
   // Emit to user's achievement room
-  io.to(`user:${userId}:achievements`).emit('achievement:unlocked', {
+  const achievementBroadcast: AchievementUnlockedBroadcast = {
     achievement,
     progress,
     timestamp,
-  });
+  };
+  io.to(ROOM_HELPERS.userAchievementsSubscription(userId)).emit(
+    SOCKET_EVENTS.ACHIEVEMENT_UNLOCKED_BROADCAST,
+    achievementBroadcast,
+  );
 
   // Also emit to stats room for general updates
-  io.to(`user:${userId}:stats`).emit('stats:achievement', {
+  const statsAchievementBroadcast: StatsAchievementBroadcast = {
     achievement,
     progress,
-  });
+  };
+  io.to(ROOM_HELPERS.userStatsSubscription(userId)).emit(
+    SOCKET_EVENTS.STATS_ACHIEVEMENT,
+    statsAchievementBroadcast,
+  );
 
   console.log(
     `[stats-redis] Achievement unlocked for user ${userId}: ${achievement.title || 'Unknown'}`,
@@ -210,10 +266,14 @@ function handleStatsRefresh(io: IOServer, payload: { userId: number }): void {
   enhancedUserStatsService
     .getEnhancedStats(userId)
     .then((stats) => {
-      io.to(`user:${userId}:stats`).emit('stats:refreshed', {
+      const refreshBroadcast: StatsRefreshedBroadcast = {
         stats,
         timestamp: new Date().toISOString(),
-      });
+      };
+      io.to(ROOM_HELPERS.userStatsSubscription(userId)).emit(
+        SOCKET_EVENTS.STATS_REFRESHED,
+        refreshBroadcast,
+      );
       console.log(`[stats-redis] Stats refreshed for user ${userId}`);
     })
     .catch((error) => {

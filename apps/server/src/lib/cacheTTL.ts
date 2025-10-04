@@ -21,6 +21,7 @@ export const CACHE_TTL = {
   UNIFIED_ACTIVITY_LIST: 60 * 60 * 24 * 7, // 7 days
   CHAT_PRESENCE: 60 * 60, // 1 hour (user goes offline)
   USER_ONLINE_STATUS: 60 * 5, // 5 minutes (heartbeat timeout)
+  ACTIVE_USER_PROFILE: 60 * 5, // 5 minutes (active user cache)
 
   // Leaderboard and statistics
   LEADERBOARD_CACHE: 60 * 15, // 15 minutes
@@ -85,6 +86,7 @@ export const CACHE_KEYS = {
   USER_STATS: (userId: number) => `user:stats:${userId}`,
   USER_RANK: (userId: number, period: string) => `user:rank:${userId}:${period}`,
   RATE_LIMIT: (identifier: string, action: string) => `rate_limit:${identifier}:${action}`,
+  ACTIVE_USER_PROFILE: (userId: number) => `user:active:profile:${userId}`,
 } as const;
 
 /**

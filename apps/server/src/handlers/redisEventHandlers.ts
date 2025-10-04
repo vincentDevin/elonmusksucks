@@ -103,7 +103,10 @@ export function registerRedisEventHandlers(io: Server, eventSub: any) {
       case REDIS_CHANNELS.ACHIEVEMENT_UNLOCKED:
         const achievementPayload = payload as any;
         if (achievementPayload.userId) {
-          io.to(`user:${achievementPayload.userId}`).emit(REDIS_CHANNELS.ACHIEVEMENT_UNLOCKED, payload);
+          io.to(`user:${achievementPayload.userId}`).emit(
+            REDIS_CHANNELS.ACHIEVEMENT_UNLOCKED,
+            payload,
+          );
         }
         io.emit(REDIS_CHANNELS.ACHIEVEMENT_UNLOCKED, payload); // Also broadcast globally for activity feed
         break;
@@ -124,7 +127,10 @@ export function registerRedisEventHandlers(io: Server, eventSub: any) {
       case REDIS_CHANNELS.PARLAY_STATUS_CHANGE:
         const parlayStatusPayload = payload as any;
         if (parlayStatusPayload.userId) {
-          io.to(`user:${parlayStatusPayload.userId}`).emit(REDIS_CHANNELS.PARLAY_STATUS_CHANGE, payload);
+          io.to(`user:${parlayStatusPayload.userId}`).emit(
+            REDIS_CHANNELS.PARLAY_STATUS_CHANGE,
+            payload,
+          );
         }
         break;
 

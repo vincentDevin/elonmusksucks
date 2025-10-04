@@ -468,42 +468,53 @@ export class PredictionService {
       }>;
     },
   ) {
-    // --- quick helper to resolve a final URL --------------------------------
-    const avatarFor = async (u: {
-      id: number;
-      avatarUrl?: string | null;
-      profilePictureKey?: string | null;
-    }): Promise<string | null> =>
-      u.profilePictureKey
-        ? this.userService.getCachedProfileImageUrl(u.id, u.profilePictureKey, 3600)
-        : (u.avatarUrl ?? null);
+    // --- Collect all unique users from bets and parlay legs ----------------
+    const allUsers = new Map<
+      number,
+      { id: number; avatarUrl?: string | null; profilePictureKey: string | null }
+    >();
+
+    for (const b of pred.bets) {
+      allUsers.set(b.user.id, {
+        id: b.user.id,
+        avatarUrl: b.user.avatarUrl,
+        profilePictureKey: b.user.profilePictureKey ?? null,
+      });
+    }
+
+    for (const leg of pred.parlayLegs) {
+      allUsers.set(leg.user.id, {
+        id: leg.user.id,
+        avatarUrl: leg.user.avatarUrl,
+        profilePictureKey: leg.user.profilePictureKey ?? null,
+      });
+    }
+
+    // --- Batch fetch all avatar URLs in one call ----------------------------
+    const avatarUrlMap = await this.userService.getBatchedAvatarUrls(Array.from(allUsers.values()));
 
     // --- bets (user avatar enrichment) --------------------------------------
-    const bets = await Promise.all(
-      pred.bets.map(async (b) => ({
-        ...b,
-        user: {
-          id: b.user.id,
-          name: b.user.name,
-          avatarUrl: await avatarFor(b.user),
-        },
-      })),
-    );
+    const bets = pred.bets.map((b) => ({
+      ...b,
+      user: {
+        id: b.user.id,
+        name: b.user.name,
+        avatarUrl: avatarUrlMap.get(b.user.id) ?? null,
+      },
+    }));
 
     // --- parlay legs (user avatar enrichment) -------------------------------
-    const parlayLegs: ParlayLegWithUser[] = await Promise.all(
-      pred.parlayLegs.map(async (leg) => ({
-        parlayId: leg.parlayId,
-        stake: leg.stake,
-        optionId: leg.optionId,
-        createdAt: leg.createdAt,
-        user: {
-          id: leg.user.id,
-          name: leg.user.name,
-          avatarUrl: await avatarFor(leg.user),
-        },
-      })),
-    );
+    const parlayLegs: ParlayLegWithUser[] = pred.parlayLegs.map((leg) => ({
+      parlayId: leg.parlayId,
+      stake: leg.stake,
+      optionId: leg.optionId,
+      createdAt: leg.createdAt,
+      user: {
+        id: leg.user.id,
+        name: leg.user.name,
+        avatarUrl: avatarUrlMap.get(leg.user.id) ?? null,
+      },
+    }));
 
     // --- options (strip prisma internals) -----------------------------------
     const options = pred.options.map(({ id, label, odds, predictionId, createdAt }) => ({

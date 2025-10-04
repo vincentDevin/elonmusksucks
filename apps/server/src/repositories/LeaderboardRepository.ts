@@ -327,49 +327,28 @@ export class LeaderboardRepository implements ILeaderboardRepository {
 
   /**
    * Process leaderboard entries with optimized avatar handling
+   * Uses batch avatar URL fetching to reduce N+1 queries
    */
   private async processLeaderboardEntries(rows: any[]): Promise<PublicLeaderboardEntry[]> {
-    // Batch avatar URL generation for better performance
-    const avatarPromises = rows.map(async (r) => {
-      if (r.avatar_key) {
-        const cacheKey = getCacheKey.avatar(r.user_id, r.avatar_key);
+    if (rows.length === 0) {
+      return [];
+    }
 
-        // Check cache first
-        try {
-          const cached = await redisClient.get(cacheKey);
-          if (cached) {
-            return cached;
-          }
-        } catch (error) {
-          console.warn('[leaderboard] Avatar cache read failed:', error);
-        }
+    // Collect all users that need avatar URLs
+    const usersForAvatars = rows.map((r) => ({
+      id: Number(r.user_id),
+      profilePictureKey: r.avatar_key,
+      avatarUrl: r.avatar_url,
+    }));
 
-        // Generate URL and cache it
-        const avatarUrl = await userService.getCachedProfileImageUrl(
-          r.user_id,
-          r.avatar_key,
-          CACHE_TTL.AVATAR,
-        );
+    // Batch fetch avatar URLs (single MGET + parallel S3 calls)
+    const avatarUrlMap = await userService.getBatchedAvatarUrls(usersForAvatars);
 
-        try {
-          await redisClient.setex(cacheKey, CACHE_TTL.AVATAR, avatarUrl || '');
-        } catch (error) {
-          console.warn('[leaderboard] Avatar cache write failed:', error);
-        }
-
-        return avatarUrl;
-      } else if (r.avatar_url) {
-        return r.avatar_url;
-      }
-      return null;
-    });
-
-    const avatarUrls = await Promise.all(avatarPromises);
-
-    return rows.map((r, index) => ({
+    // Map results back to rows
+    return rows.map((r) => ({
       userId: Number(r.user_id),
       userName: r.user_name,
-      avatarUrl: avatarUrls[index],
+      avatarUrl: avatarUrlMap.get(Number(r.user_id)) || null,
       balance: r.balance.toString(),
       totalBets: Number(r.total_bets),
       winRate: Number(r.win_rate),
@@ -388,52 +367,30 @@ export class LeaderboardRepository implements ILeaderboardRepository {
 
   /**
    * Process UserStats entries directly (for all-time leaderboard)
+   * Uses batch avatar URL fetching to reduce N+1 queries
    */
   private async processUserStatsEntries(userStats: any[]): Promise<PublicLeaderboardEntry[]> {
-    // Batch avatar URL generation for better performance
-    const avatarPromises = userStats.map(async (stat) => {
-      const user = stat.user;
-      if (user.profilePictureKey) {
-        const cacheKey = getCacheKey.avatar(user.id, user.profilePictureKey);
+    if (userStats.length === 0) {
+      return [];
+    }
 
-        // Check cache first
-        try {
-          const cached = await redisClient.get(cacheKey);
-          if (cached) {
-            return cached;
-          }
-        } catch (error) {
-          console.warn('[leaderboard] Avatar cache read failed:', error);
-        }
+    // Collect all users that need avatar URLs
+    const usersForAvatars = userStats.map((stat) => ({
+      id: stat.user.id,
+      profilePictureKey: stat.user.profilePictureKey,
+      avatarUrl: stat.user.avatarUrl,
+    }));
 
-        // Generate URL and cache it
-        const avatarUrl = await userService.getCachedProfileImageUrl(
-          user.id,
-          user.profilePictureKey,
-          CACHE_TTL.AVATAR,
-        );
+    // Batch fetch avatar URLs (single MGET + parallel S3 calls)
+    const avatarUrlMap = await userService.getBatchedAvatarUrls(usersForAvatars);
 
-        try {
-          await redisClient.setex(cacheKey, CACHE_TTL.AVATAR, avatarUrl || '');
-        } catch (error) {
-          console.warn('[leaderboard] Avatar cache write failed:', error);
-        }
-
-        return avatarUrl;
-      } else if (user.avatarUrl) {
-        return user.avatarUrl;
-      }
-      return null;
-    });
-
-    const avatarUrls = await Promise.all(avatarPromises);
-
-    return userStats.map((stat, index) => {
+    // Map results back to stats
+    return userStats.map((stat) => {
       const user = stat.user;
       return {
         userId: user.id,
         userName: user.name,
-        avatarUrl: avatarUrls[index],
+        avatarUrl: avatarUrlMap.get(user.id) || null,
         balance: user.muskBucks.toString(),
         totalBets: stat.totalBets + stat.totalParlays,
         winRate:

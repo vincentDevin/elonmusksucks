@@ -5,7 +5,14 @@
 
 import { Socket } from 'socket.io';
 import type { AuthenticatedSocket } from '../middleware/socketAuthMiddleware';
-import type { AckCallback } from '@ems/types';
+import {
+  SOCKET_EVENTS,
+  type BetPlaceRequest,
+  type BetPlaceAck,
+  type ParlayPlaceRequest,
+  type ParlayPlaceAck,
+  type BetErrorCode,
+} from '@ems/types';
 import { bettingService } from '../services/betting.service';
 import { betRateLimiter, createRateLimitMiddleware } from '../middleware/rateLimitMiddleware';
 import { betOperationQueue } from '../lib/BackpressureQueue';
@@ -14,65 +21,72 @@ import { tracingCollector } from '../lib/tracing';
 import { checkPayloadSize } from '../middleware/payloadSizeGuard';
 import { ACKConfigs } from '../lib/ackPolicy';
 
-// TEMP: Re-export for backwards compatibility during migration
-type Ack = AckCallback;
-
 export function registerBetHandlers(socket: Socket) {
   const auth = socket as AuthenticatedSocket;
 
   /* ───────────── bet:place ───────────── */
-  socket.on('bet:place', async (p: { optionId: number; amount: number }, ack?: Ack) => {
-    const ackConfig = ACKConfigs['bet:place'];
-    await tracingCollector.trace(
-      'bet_place_handler',
-      async () => {
-        await metricsCollector.timeHandler('bet_place', async () => {
-          try {
-            if (!auth.user) return ack?.('NOT_AUTHENTICATED');
+  socket.on(
+    SOCKET_EVENTS.BET_PLACE,
+    async (p: BetPlaceRequest, ack?: (response: BetPlaceAck) => void) => {
+      const ackConfig = ACKConfigs[SOCKET_EVENTS.BET_PLACE];
+      await tracingCollector.trace(
+        'bet_place_handler',
+        async () => {
+          await metricsCollector.timeHandler('bet_place', async () => {
+            try {
+              if (!auth.user) return ack?.('NOT_AUTHENTICATED');
 
-            // Check payload size (64KB hard limit)
-            const sizeCheck = checkPayloadSize(p);
-            if (sizeCheck.exceedsHard) {
-              console.error(`[bet] Payload too large: ${sizeCheck.size} bytes`);
-              return ack?.('PAYLOAD_TOO_LARGE');
-            }
+              // Check payload size (64KB hard limit)
+              const sizeCheck = checkPayloadSize(p);
+              if (sizeCheck.exceedsHard) {
+                console.error(`[bet] Payload too large: ${sizeCheck.size} bytes`);
+                return ack?.('PAYLOAD_TOO_LARGE');
+              }
 
-            // Apply rate limiting
-            const rateLimitCheck = createRateLimitMiddleware(betRateLimiter, 'bet:place');
-            await new Promise<void>((resolve, reject) => {
-              rateLimitCheck(auth.user!.id, (error?: string) => {
-                if (error) reject(new Error(error));
-                else resolve();
+              // Apply rate limiting
+              const rateLimitCheck = createRateLimitMiddleware(
+                betRateLimiter,
+                SOCKET_EVENTS.BET_PLACE,
+              );
+              await new Promise<void>((resolve, reject) => {
+                rateLimitCheck(auth.user!.id, (error?: string) => {
+                  if (error) reject(new Error(error));
+                  else resolve();
+                });
               });
-            });
 
-            if (!p || typeof p.optionId !== 'number' || p.amount <= 0)
-              return ack?.('INVALID_PAYLOAD');
+              if (!p || typeof p.optionId !== 'number' || p.amount <= 0)
+                return ack?.('INVALID_PAYLOAD');
 
-            // Queue heavy betting operation to prevent system overload
-            await betOperationQueue.enqueue(async () => {
-              return bettingService.placeBet(auth.user!.id, p.optionId, p.amount);
-            }, 2); // High priority for single bets
+              // Queue heavy betting operation to prevent system overload
+              await betOperationQueue.enqueue(async () => {
+                return bettingService.placeBet(auth.user!.id, p.optionId, p.amount);
+              }, 2); // High priority for single bets
 
-            // Acknowledge success with ACK policy compliance
-            console.log(`[ack-policy] bet:place responding within ${ackConfig.timeoutMs}ms window`);
-            return ack?.(null);
-          } catch (e: any) {
-            console.error('[bet] place error', e);
-            console.error(`[ack-policy] bet:place failed, client should retry within policy`);
-            return ack?.(mapBetError(e));
-            throw e; // Re-throw for metrics error tracking
-          }
-        });
-      },
-      { userId: auth.user?.id, optionId: p?.optionId, amount: p?.amount },
-    );
-  });
+              // Acknowledge success with ACK policy compliance
+              console.log(
+                `[ack-policy] ${SOCKET_EVENTS.BET_PLACE} responding within ${ackConfig.timeoutMs}ms window`,
+              );
+              return ack?.(null);
+            } catch (e: any) {
+              console.error('[bet] place error', e);
+              console.error(
+                `[ack-policy] ${SOCKET_EVENTS.BET_PLACE} failed, client should retry within policy`,
+              );
+              return ack?.(mapBetError(e));
+              throw e; // Re-throw for metrics error tracking
+            }
+          });
+        },
+        { userId: auth.user?.id, optionId: p?.optionId, amount: p?.amount },
+      );
+    },
+  );
 
   /* ───────────── parlay:place ─────────── */
   socket.on(
-    'parlay:place',
-    async (p: { legs: { optionId: number }[]; amount: number }, ack?: Ack) => {
+    SOCKET_EVENTS.PARLAY_PLACE,
+    async (p: ParlayPlaceRequest, ack?: (response: ParlayPlaceAck) => void) => {
       try {
         if (!auth.user) return ack?.('NOT_AUTHENTICATED');
 
@@ -84,7 +98,10 @@ export function registerBetHandlers(socket: Socket) {
         }
 
         // Apply rate limiting
-        const rateLimitCheck = createRateLimitMiddleware(betRateLimiter, 'parlay:place');
+        const rateLimitCheck = createRateLimitMiddleware(
+          betRateLimiter,
+          SOCKET_EVENTS.PARLAY_PLACE,
+        );
         await new Promise<void>((resolve, reject) => {
           rateLimitCheck(auth.user!.id, (error?: string) => {
             if (error) reject(new Error(error));
@@ -116,7 +133,7 @@ export function registerBetHandlers(socket: Socket) {
 }
 
 /* Map service-level errors to simple string codes */
-function mapBetError(err: any): string {
+function mapBetError(err: any): BetErrorCode {
   const message = err?.message || '';
 
   // Handle backpressure queue errors

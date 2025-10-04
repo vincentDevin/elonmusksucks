@@ -28,6 +28,7 @@ import { socketCleanupManager } from './lib/SocketCleanupManager';
 import { setupAchievementRedisHandlers } from './handlers/achievementEventHandler';
 import { registerRoomHandlers } from './handlers/roomHandlers';
 import { eventSystemMetricsService } from './services/eventSystemMetrics.service';
+import { REDIS_CHANNELS } from '@ems/types';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Helpers

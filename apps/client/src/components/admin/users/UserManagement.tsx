@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { searchUsers, type UserSearchParams } from '../../../api/admin';
 import { listBadges } from '../../../api/admin';
 import { SOCKET_EVENTS, type PublicBadge } from '@ems/types';
@@ -205,7 +205,6 @@ const UserManagement: React.FC<UserManagementProps> = ({ className = '' }) => {
           isOpen={showDetailsModal}
           onClose={handleCloseModal}
           onUserUpdate={handleUserUpdate}
-          badges={badges}
         />
       )}
     </div>

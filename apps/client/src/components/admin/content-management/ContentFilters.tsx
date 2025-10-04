@@ -4,6 +4,7 @@ import type { UnifiedContentFilters, UnifiedContentType, UnifiedContentStatus } 
 interface ContentFiltersProps {
   filters: UnifiedContentFilters;
   onFiltersChange: (filters: Partial<UnifiedContentFilters>) => void;
+  onClearFilters?: () => void;
   totalCount: number;
   className?: string;
 }
@@ -25,6 +26,7 @@ interface ContentFiltersProps {
 const ContentFilters: React.FC<ContentFiltersProps> = ({
   filters,
   onFiltersChange,
+  onClearFilters,
   totalCount,
   className = '',
 }) => {
@@ -111,20 +113,26 @@ const ContentFilters: React.FC<ContentFiltersProps> = ({
   // Reset all filters
   const resetFilters = () => {
     setSearchDebounce('');
-    onFiltersChange({
-      search: '',
-      types: undefined,
-      statuses: undefined,
-      createdAfter: undefined,
-      createdBefore: undefined,
-      publishedAfter: undefined,
-      publishedBefore: undefined,
-      authorIds: undefined,
-      minQualityScore: undefined,
-      minViews: undefined,
-      minReactions: undefined,
-      minComments: undefined,
-    });
+    if (onClearFilters) {
+      // Use parent's clear function if provided
+      onClearFilters();
+    } else {
+      // Fallback to local implementation
+      onFiltersChange({
+        search: '',
+        types: undefined,
+        statuses: undefined,
+        createdAfter: undefined,
+        createdBefore: undefined,
+        publishedAfter: undefined,
+        publishedBefore: undefined,
+        authorIds: undefined,
+        minQualityScore: undefined,
+        minViews: undefined,
+        minReactions: undefined,
+        minComments: undefined,
+      });
+    }
   };
 
   // Format date for input

@@ -175,28 +175,29 @@ export class PostService {
       viewerId,
     });
 
-    // Convert to feed content and enrich avatars
-    const posts = await Promise.all(
-      result.content.map(async (post) => {
-        const feedContent = this.toFeedContent(post, viewerId);
+    // Convert to feed content
+    const feedContents = result.content.map((post) => this.toFeedContent(post, viewerId));
 
-        // Enrich author avatar URL
-        if (feedContent.author && feedContent.author.id) {
-          try {
-            const enrichedAuthor = await userService.enrichUserWithAvatar(feedContent.author);
-            return {
-              ...feedContent,
-              author: enrichedAuthor,
-              authorAvatar: enrichedAuthor.avatarUrl,
-            };
-          } catch (error) {
-            console.error(`[post] Error enriching post author ${feedContent.author.id}:`, error);
-          }
+    // Batch enrich all author avatars
+    const authors = feedContents.filter((fc) => fc.author && fc.author.id).map((fc) => fc.author);
+
+    const enrichedAuthors = await userService.enrichUsersWithAvatars(authors);
+    const authorMap = new Map(enrichedAuthors.map((author) => [author.id, author]));
+
+    // Map enriched authors back to posts
+    const posts = feedContents.map((feedContent) => {
+      if (feedContent.author && feedContent.author.id) {
+        const enrichedAuthor = authorMap.get(feedContent.author.id);
+        if (enrichedAuthor) {
+          return {
+            ...feedContent,
+            author: enrichedAuthor,
+            authorAvatar: enrichedAuthor.avatarUrl,
+          };
         }
-
-        return feedContent;
-      }),
-    );
+      }
+      return feedContent;
+    });
 
     return {
       posts,
@@ -221,28 +222,29 @@ export class PostService {
       viewerId,
     });
 
-    // Enrich comments with signed avatar URLs
-    const enrichedComments = await Promise.all(
-      result.replies.map(async (reply) => {
-        const feedContent = this.toFeedContent(reply);
+    // Convert replies to feed content
+    const feedContents = result.replies.map((reply) => this.toFeedContent(reply));
 
-        // Enrich author avatar URL
-        if (feedContent.author && feedContent.author.id) {
-          try {
-            const enrichedAuthor = await userService.enrichUserWithAvatar(feedContent.author);
-            return {
-              ...feedContent,
-              author: enrichedAuthor,
-              authorAvatar: enrichedAuthor.avatarUrl,
-            };
-          } catch (error) {
-            console.error(`[post] Error enriching comment author ${feedContent.author.id}:`, error);
-          }
+    // Batch enrich all author avatars
+    const authors = feedContents.filter((fc) => fc.author && fc.author.id).map((fc) => fc.author);
+
+    const enrichedAuthors = await userService.enrichUsersWithAvatars(authors);
+    const authorMap = new Map(enrichedAuthors.map((author) => [author.id, author]));
+
+    // Map enriched authors back to comments
+    const enrichedComments = feedContents.map((feedContent) => {
+      if (feedContent.author && feedContent.author.id) {
+        const enrichedAuthor = authorMap.get(feedContent.author.id);
+        if (enrichedAuthor) {
+          return {
+            ...feedContent,
+            author: enrichedAuthor,
+            authorAvatar: enrichedAuthor.avatarUrl,
+          };
         }
-
-        return feedContent;
-      }),
-    );
+      }
+      return feedContent;
+    });
 
     return {
       comments: enrichedComments,

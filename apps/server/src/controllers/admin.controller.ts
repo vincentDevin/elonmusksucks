@@ -109,7 +109,7 @@ export async function getUserDetails(
       return;
     }
 
-    res.json(user);
+    res.json(serializeBigInt(user));
   } catch (err) {
     next(err);
   }

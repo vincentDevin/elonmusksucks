@@ -1,54 +1,75 @@
-import { type Server as IOServer, type Socket } from 'socket.io';
-import { IEventBus, REDIS_CHANNELS } from '@ems/types';
+import { type Server as IOServer } from 'socket.io';
+import type IORedis from 'ioredis';
+import {
+  IEventBus,
+  REDIS_CHANNELS,
+  SOCKET_EVENTS,
+  SOCKET_ROOMS,
+  ROOM_HELPERS,
+  type PongEloUpdateRedisPayload,
+  type PongTierChangeRedisPayload,
+  type PongStatsUpdateRedisPayload,
+  type PongLeaderboardUpdateRedisPayload,
+  type PongEloUpdatedBroadcast,
+  type PongPlayerEloChangedBroadcast,
+  type PongTierChangedBroadcast,
+  type PongTierAnnouncementBroadcast,
+  type PongStatsUpdatedBroadcast,
+  type PongLeaderboardUpdatedBroadcast,
+  type PongUserStats,
+  type PongMatchSummary,
+  type PongLeaderboardEntry,
+} from '@ems/types';
+import type { AuthenticatedSocket } from '../middleware/socketAuthMiddleware';
 
 /**
  * Register Pong-specific Socket.IO event handlers
  */
-export function registerPongHandlers(socket: Socket) {
+export function registerPongHandlers(socket: AuthenticatedSocket) {
   // Subscribe to Pong leaderboard updates
-  socket.on('pong:subscribe:leaderboard', (metric: string) => {
-    socket.join(`pong:leaderboard:${metric}`);
+  socket.on(SOCKET_EVENTS.PONG_SUBSCRIBE_LEADERBOARD, (metric: string) => {
+    socket.join(ROOM_HELPERS.pongLeaderboard(metric));
     console.log(`[pong] Socket ${socket.id} subscribed to ${metric} leaderboard`);
   });
 
   // Unsubscribe from Pong leaderboard updates
-  socket.on('pong:unsubscribe:leaderboard', (metric: string) => {
-    socket.leave(`pong:leaderboard:${metric}`);
+  socket.on(SOCKET_EVENTS.PONG_UNSUBSCRIBE_LEADERBOARD, (metric: string) => {
+    socket.leave(ROOM_HELPERS.pongLeaderboard(metric));
     console.log(`[pong] Socket ${socket.id} unsubscribed from ${metric} leaderboard`);
   });
 
   // Subscribe to personal Elo updates
-  socket.on('pong:subscribe:elo', () => {
-    const user = (socket as any).user;
+  socket.on(SOCKET_EVENTS.PONG_SUBSCRIBE_ELO, () => {
+    const user = socket.user;
     if (user?.id) {
-      socket.join(`pong:user:${user.id}`);
+      socket.join(ROOM_HELPERS.pongUser(user.id));
       console.log(`[pong] Socket ${socket.id} subscribed to user ${user.id} Elo updates`);
     }
   });
 
   // Unsubscribe from personal Elo updates
-  socket.on('pong:unsubscribe:elo', () => {
-    const user = (socket as any).user;
+  socket.on(SOCKET_EVENTS.PONG_UNSUBSCRIBE_ELO, () => {
+    const user = socket.user;
     if (user?.id) {
-      socket.leave(`pong:user:${user.id}`);
+      socket.leave(ROOM_HELPERS.pongUser(user.id));
       console.log(`[pong] Socket ${socket.id} unsubscribed from user ${user.id} Elo updates`);
     }
   });
 
   // Subscribe to Pong stats updates
-  socket.on('pong:subscribe:stats', () => {
-    socket.join('pong:stats');
+  socket.on(SOCKET_EVENTS.PONG_SUBSCRIBE_STATS, () => {
+    socket.join(SOCKET_ROOMS.PONG_STATS);
     console.log(`[pong] Socket ${socket.id} subscribed to Pong stats updates`);
   });
 
   // Unsubscribe from Pong stats updates
-  socket.on('pong:unsubscribe:stats', () => {
-    socket.leave('pong:stats');
+  socket.on(SOCKET_EVENTS.PONG_UNSUBSCRIBE_STATS, () => {
+    socket.leave(SOCKET_ROOMS.PONG_STATS);
     console.log(`[pong] Socket ${socket.id} unsubscribed from Pong stats updates`);
   });
 
   // Handle disconnect
-  socket.on('disconnect', () => {
+  socket.on(SOCKET_EVENTS.DISCONNECT, () => {
     console.log(`[pong] Socket ${socket.id} disconnected from Pong handlers`);
   });
 }
@@ -56,7 +77,7 @@ export function registerPongHandlers(socket: Socket) {
 /**
  * Register Redis event handlers for Pong events
  */
-export function registerPongRedisHandlers(io: IOServer, redisSub: any) {
+export function registerPongRedisHandlers(io: IOServer, redisSub: IORedis) {
   redisSub.on('message', (channel: string, message: string) => {
     try {
       const data = JSON.parse(message);
@@ -86,11 +107,11 @@ export function registerPongRedisHandlers(io: IOServer, redisSub: any) {
 /**
  * Handle Elo rating updates
  */
-function handleEloUpdate(io: IOServer, data: any) {
+function handleEloUpdate(io: IOServer, data: PongEloUpdateRedisPayload) {
   const { userId, oldRating, newRating, change, tier, matchId } = data;
 
   // Send to user's personal room
-  io.to(`pong:user:${userId}`).emit('pong:elo:updated', {
+  const eloUpdatedBroadcast: PongEloUpdatedBroadcast = {
     userId,
     oldRating,
     newRating,
@@ -98,15 +119,20 @@ function handleEloUpdate(io: IOServer, data: any) {
     tier,
     matchId,
     timestamp: new Date().toISOString(),
-  });
+  };
+  io.to(ROOM_HELPERS.pongUser(userId)).emit(SOCKET_EVENTS.PONG_ELO_UPDATED, eloUpdatedBroadcast);
 
   // Send to general Pong stats room
-  io.to('pong:stats').emit('pong:player:elo:changed', {
+  const playerEloChangedBroadcast: PongPlayerEloChangedBroadcast = {
     userId,
     newRating,
     change,
     tier,
-  });
+  };
+  io.to(SOCKET_ROOMS.PONG_STATS).emit(
+    SOCKET_EVENTS.PONG_PLAYER_ELO_CHANGED,
+    playerEloChangedBroadcast,
+  );
 
   console.log(
     `[pong] Elo update broadcasted for user ${userId}: ${oldRating} -> ${newRating} (${change > 0 ? '+' : ''}${change})`,
@@ -116,26 +142,31 @@ function handleEloUpdate(io: IOServer, data: any) {
 /**
  * Handle tier promotion/demotion events
  */
-function handleTierChange(io: IOServer, data: any) {
+function handleTierChange(io: IOServer, data: PongTierChangeRedisPayload) {
   const { userId, oldTier, newTier, eloRating, isPromotion } = data;
 
   // Send to user's personal room
-  io.to(`pong:user:${userId}`).emit('pong:tier:changed', {
+  const tierChangedBroadcast: PongTierChangedBroadcast = {
     userId,
     oldTier,
     newTier,
     eloRating,
     isPromotion,
     timestamp: new Date().toISOString(),
-  });
+  };
+  io.to(ROOM_HELPERS.pongUser(userId)).emit(SOCKET_EVENTS.PONG_TIER_CHANGED, tierChangedBroadcast);
 
   // Send to general Pong stats room for celebration
-  io.to('pong:stats').emit('pong:tier:announcement', {
+  const tierAnnouncementBroadcast: PongTierAnnouncementBroadcast = {
     userId,
     newTier,
     isPromotion,
     eloRating,
-  });
+  };
+  io.to(SOCKET_ROOMS.PONG_STATS).emit(
+    SOCKET_EVENTS.PONG_TIER_ANNOUNCEMENT,
+    tierAnnouncementBroadcast,
+  );
 
   console.log(
     `[pong] Tier change broadcasted for user ${userId}: ${oldTier} -> ${newTier} (${isPromotion ? 'promotion' : 'demotion'})`,
@@ -145,16 +176,20 @@ function handleTierChange(io: IOServer, data: any) {
 /**
  * Handle general stats updates
  */
-function handleStatsUpdate(io: IOServer, data: any) {
+function handleStatsUpdate(io: IOServer, data: PongStatsUpdateRedisPayload) {
   const { userId, stats, matchResult } = data;
 
   // Send to user's personal room
-  io.to(`pong:user:${userId}`).emit('pong:stats:updated', {
+  const statsUpdatedBroadcast: PongStatsUpdatedBroadcast = {
     userId,
     stats,
     matchResult,
     timestamp: new Date().toISOString(),
-  });
+  };
+  io.to(ROOM_HELPERS.pongUser(userId)).emit(
+    SOCKET_EVENTS.PONG_STATS_UPDATED,
+    statsUpdatedBroadcast,
+  );
 
   console.log(`[pong] Stats update broadcasted for user ${userId}`);
 }
@@ -162,16 +197,20 @@ function handleStatsUpdate(io: IOServer, data: any) {
 /**
  * Handle leaderboard updates
  */
-function handleLeaderboardUpdate(io: IOServer, data: any) {
+function handleLeaderboardUpdate(io: IOServer, data: PongLeaderboardUpdateRedisPayload) {
   const { metric, rankings, totalPlayers } = data;
 
   // Send to specific leaderboard subscribers
-  io.to(`pong:leaderboard:${metric}`).emit('pong:leaderboard:updated', {
+  const leaderboardUpdatedBroadcast: PongLeaderboardUpdatedBroadcast = {
     metric,
     rankings,
     totalPlayers,
     timestamp: new Date().toISOString(),
-  });
+  };
+  io.to(ROOM_HELPERS.pongLeaderboard(metric)).emit(
+    SOCKET_EVENTS.PONG_LEADERBOARD_UPDATED,
+    leaderboardUpdatedBroadcast,
+  );
 
   console.log(`[pong] Leaderboard update broadcasted for metric: ${metric}`);
 }
@@ -223,8 +262,8 @@ export class PongSocketEmitter {
   /**
    * Emit stats update event
    */
-  async emitStatsUpdate(userId: number, stats: any, matchResult?: any) {
-    const data = {
+  async emitStatsUpdate(userId: number, stats: PongUserStats, matchResult?: PongMatchSummary) {
+    const data: PongStatsUpdateRedisPayload = {
       userId,
       stats,
       matchResult,
@@ -236,8 +275,12 @@ export class PongSocketEmitter {
   /**
    * Emit leaderboard update event
    */
-  async emitLeaderboardUpdate(metric: string, rankings: any[], totalPlayers: number) {
-    const data = {
+  async emitLeaderboardUpdate(
+    metric: string,
+    rankings: PongLeaderboardEntry[],
+    totalPlayers: number,
+  ) {
+    const data: PongLeaderboardUpdateRedisPayload = {
       metric,
       rankings: rankings.slice(0, 50), // Top 50 for real-time updates
       totalPlayers,
