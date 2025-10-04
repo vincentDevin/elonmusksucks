@@ -197,6 +197,7 @@ export function transformPostToUnified(
       name: post.author.name,
       type: 'user' as ContentAuthorType,
       avatarUrl: post.author.avatarUrl || undefined,
+      profilePictureKey: post.author.profilePictureKey || undefined,
     },
 
     status: mapContentStatus(post),
@@ -251,6 +252,7 @@ export function transformCommentToUnified(
       name: comment.author.name,
       type: 'user' as ContentAuthorType,
       avatarUrl: comment.author.avatarUrl || undefined,
+      profilePictureKey: comment.author.profilePictureKey || undefined,
     },
 
     status: mapContentStatus(comment),
@@ -316,6 +318,7 @@ export function transformPredictionToUnified(
       name: creator?.name || 'Unknown',
       type: 'user' as ContentAuthorType,
       avatarUrl: creator?.avatarUrl || undefined,
+      profilePictureKey: creator?.profilePictureKey || undefined,
     },
 
     status: mapPredictionStatus(prediction),

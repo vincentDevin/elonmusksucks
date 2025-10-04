@@ -4,52 +4,17 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { useEventBusCore, useSocketEvent } from './EventBusCoreContext';
 import { useVisibilityGuard } from '../lib/visibilityGuard';
 import { getRecentActivities } from '../api/activity';
-import { REDIS_CHANNELS } from '../types/events';
-import type { ActivityEventType } from '@ems/types';
+import { REDIS_CHANNELS } from '@ems/types';
+import type { UnifiedActivityEvent } from '@ems/types';
 
-// Enhanced activity interface that combines all data sources
-export interface Activity {
-  id: string;
-  type:
-    | ActivityEventType
-    | 'live_bet'
-    | 'live_parlay'
-    | 'market_movement'
-    | 'big_bet_alert'
-    | 'achievement_unlocked'
-    | 'user_followed';
-  timestamp: string;
-  priority: 'high' | 'medium' | 'low';
-
-  // User info
+// Client-side activity with user object for backwards compatibility
+export interface Activity extends Omit<UnifiedActivityEvent, 'userId' | 'userName' | 'userAvatar'> {
   user: {
     id?: number;
     name: string;
     avatar?: string;
   };
-
-  // Rich content
-  title: string;
-  description: string;
-  icon: string;
-  color: string;
-
-  // Financial data
-  amount?: number;
-  odds?: number;
-  payout?: number;
-
-  // Prediction context
-  predictionId?: number;
-  predictionTitle?: string;
-  category?: string;
-  optionLabel?: string;
-
-  // Meta flags
-  isPersonal: boolean;
-  isHighValue: boolean;
-  isWin?: boolean;
-  streak?: number;
+  payout?: number; // Additional client-side field
 }
 
 interface ActivityContextType {
@@ -275,9 +240,7 @@ export function ActivityProvider({ children }: { children: React.ReactNode }) {
       const response = await getRecentActivities(MAX_ACTIVITIES);
 
       if (response.success && response.activities.length > 0) {
-        console.log(
-          `[ActivityContext] Loaded ${response.activities.length} activities from ${response.cached ? 'Redis cache' : 'database'}`,
-        );
+        console.log(`[ActivityContext] Loaded ${response.activities.length} activities`);
 
         // Transform to unified format - handle both Redis and database formats
         const transformedActivities = response.activities

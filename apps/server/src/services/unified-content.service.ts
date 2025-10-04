@@ -11,6 +11,7 @@ import type {
 import type { IUnifiedContentRepository } from '../repositories/interfaces/IUnifiedContentRepository';
 import { UnifiedContentRepository } from '../repositories/UnifiedContentRepository';
 import { PrismaClient } from '@prisma/client';
+import { UserService } from './user.service';
 
 /**
  * Unified Content Service
@@ -20,12 +21,14 @@ import { PrismaClient } from '@prisma/client';
  */
 export class UnifiedContentService {
   private repo: IUnifiedContentRepository;
+  private userService: UserService;
 
   constructor(
     private eventBus: IEventBus,
     private prisma: PrismaClient = new PrismaClient(),
   ) {
     this.repo = new UnifiedContentRepository(prisma);
+    this.userService = new UserService();
   }
 
   /**
@@ -33,6 +36,23 @@ export class UnifiedContentService {
    */
   async getContent(filters: UnifiedContentFilters): Promise<UnifiedContentResponse> {
     const { items, total } = await this.repo.getUnifiedContent(filters);
+
+    // Enrich author avatars for items that have author data
+    const authors = items.filter((item: any) => item.author).map((item: any) => item.author);
+    if (authors.length > 0) {
+      const enrichedAuthors = await this.userService.enrichUsersWithAvatars(authors);
+      const authorMap = new Map(enrichedAuthors.map((author) => [author.id, author]));
+
+      // Map enriched authors back to items
+      items.forEach((item: any) => {
+        if (item.author) {
+          const enrichedAuthor = authorMap.get(item.author.id);
+          if (enrichedAuthor) {
+            item.author = enrichedAuthor;
+          }
+        }
+      });
+    }
 
     const limit = filters.limit || 25;
     const offset = filters.offset || 0;
@@ -59,7 +79,17 @@ export class UnifiedContentService {
    * Get single unified content item by ID
    */
   async getContentById(unifiedId: string): Promise<UnifiedContentItem | null> {
-    return this.repo.getUnifiedContentById(unifiedId);
+    const item = await this.repo.getUnifiedContentById(unifiedId);
+
+    if (!item) return null;
+
+    // Enrich author avatar if author data exists
+    if ((item as any).author) {
+      const enrichedAuthor = await this.userService.enrichUserWithAvatar((item as any).author);
+      (item as any).author = enrichedAuthor;
+    }
+
+    return item;
   }
 
   /**

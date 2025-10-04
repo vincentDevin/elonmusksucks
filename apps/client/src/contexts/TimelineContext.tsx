@@ -5,7 +5,7 @@ import React, { createContext, useContext, useReducer, useEffect, useRef } from 
 import type { TimelineItem, TimelineResponse } from '@ems/types';
 import { useSocket } from './SocketContext';
 import { useEventBusCore } from './EventBusCoreContext';
-import { REDIS_CHANNELS } from '../types/events';
+import { REDIS_CHANNELS } from '@ems/types';
 import { sessionCache } from '../lib/sessionCache';
 
 // State interface

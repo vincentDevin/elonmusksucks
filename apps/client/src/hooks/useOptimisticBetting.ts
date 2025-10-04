@@ -5,11 +5,11 @@
 import { useCallback } from 'react';
 import { useOptimisticUpdate, useOptimisticList } from './useOptimisticUpdate';
 import { useAuth } from '../contexts/AuthContext';
-import { REDIS_CHANNELS } from '../types/events';
+import { REDIS_CHANNELS } from '@ems/types';
 import api from '../api/axios';
 
 interface BetData {
-  id?: number;
+  id: number; // Required for optimistic list operations
   predictionId: number;
   optionId: number;
   amount: number;
@@ -19,19 +19,13 @@ interface BetData {
   timestamp?: string;
 }
 
-interface OptimisticBetState {
-  balance: number;
-  activeBets: BetData[];
-  recentBet: BetData | null;
-}
-
 /**
  * Hook for optimistic betting operations
  * Provides instant balance updates and bet placement feedback
  */
 export function useOptimisticBetting() {
-  const { user, updateUser } = useAuth();
-  const currentBalance = user?.muskBucks || 0;
+  const { user } = useAuth();
+  const currentBalance = typeof user?.muskBucks === 'number' ? user.muskBucks : 0;
 
   // Optimistic balance updates
   const {
@@ -39,17 +33,11 @@ export function useOptimisticBetting() {
     isPending: isBalanceUpdating,
     error: balanceError,
     updateOptimistically: updateBalance,
-  } = useOptimisticUpdate(currentBalance, {
+  } = useOptimisticUpdate<number>(currentBalance, {
     successEvent: REDIS_CHANNELS.BALANCE_UPDATE,
-    failureEvent: REDIS_CHANNELS.BET_FAILED,
+    // Note: Balance updates are handled by AuthContext via BALANCE_UPDATE events
     timeout: 3000,
     autoRollback: true,
-    onSuccess: (newBalance) => {
-      // Update auth context with confirmed balance
-      if (updateUser && user) {
-        updateUser({ ...user, muskBucks: newBalance });
-      }
-    },
   });
 
   // Optimistic active bets list
@@ -61,7 +49,7 @@ export function useOptimisticBetting() {
     updateItem: updateBet,
   } = useOptimisticList<BetData>([], {
     successEvent: REDIS_CHANNELS.BET_PLACED,
-    failureEvent: REDIS_CHANNELS.BET_FAILED,
+    // Note: Bet failures roll back automatically via timeout
     timeout: 5000,
   });
 
@@ -221,8 +209,8 @@ export function useOptimisticBetting() {
  * Hook for optimistic parlay operations
  */
 export function useOptimisticParlay() {
-  const { user, updateUser } = useAuth();
-  const currentBalance = user?.muskBucks || 0;
+  const { user } = useAuth();
+  const currentBalance = typeof user?.muskBucks === 'number' ? user.muskBucks : 0;
 
   const {
     value: parlayLegs,

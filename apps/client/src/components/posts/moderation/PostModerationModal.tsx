@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { UserFeedPost, ReportReason } from '@ems/types';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../../contexts/AuthContext';
 
 interface PostModerationModalProps {
   post: UserFeedPost | null;
@@ -170,9 +170,9 @@ export const PostModerationModal: React.FC<PostModerationModalProps> = ({
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm text-content mb-1">Reported Post</p>
                     <p className="text-sm text-tertiary truncate">
-                      By {post.authorName || `User #${post.authorId}`}
+                      By {post.author.name || `User #${post.authorId}`}
                     </p>
-                    <p className="text-sm text-content mt-2 line-clamp-3">{post.content}</p>
+                    <p className="text-sm text-content mt-2 line-clamp-3">{post.body}</p>
                   </div>
                 </div>
               </div>

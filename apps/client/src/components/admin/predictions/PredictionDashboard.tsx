@@ -399,6 +399,7 @@ const PredictionDashboard: React.FC<PredictionDashboardProps> = ({ className = '
         <ResolvePredictionModal
           prediction={{
             ...predictionToResolve,
+            category: predictionToResolve.categoryId?.toString() || 'Unknown',
             createdAt:
               predictionToResolve.createdAt instanceof Date
                 ? predictionToResolve.createdAt.toISOString()

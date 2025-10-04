@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { searchUsers, type UserSearchParams } from '../../../api/admin';
-import { listBadges } from '../../../api/admin';
-import { SOCKET_EVENTS, type PublicBadge } from '@ems/types';
+import { listBadges, searchUsers } from '../../../api/admin';
+import { SOCKET_EVENTS, type PublicBadge, type UserSearchParams, type Role } from '@ems/types';
 import { useSocket } from '../../../contexts/SocketContext';
 import UserListToolbar from './UserListToolbar';
 import CompactUserList, { type CompactUser } from './CompactUserList';
@@ -20,7 +19,7 @@ interface UserStats {
 
 const UserManagement: React.FC<UserManagementProps> = ({ className = '' }) => {
   const [users, setUsers] = useState<CompactUser[]>([]);
-  const [badges, setBadges] = useState<PublicBadge[]>([]);
+  const [_badges, setBadges] = useState<PublicBadge[]>([]);
   const [stats, setStats] = useState<UserStats>({
     totalCount: 0,
     activeCount: 0,
@@ -69,10 +68,11 @@ const UserManagement: React.FC<UserManagementProps> = ({ className = '' }) => {
         id: user.id,
         name: user.name,
         email: user.email,
-        role: user.role,
+        role: user.role as Role,
         active: user.active,
         createdAt: user.createdAt.toString(),
-        banStatus: user.banStatus,
+        avatarUrl: user.avatarUrl || null,
+        banStatus: user.banStatus || undefined,
       }));
 
       if (append) {
@@ -135,7 +135,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ className = '' }) => {
   };
 
   // User update handler
-  const handleUserUpdate = (userId: number) => {
+  const handleUserUpdate = (_userId: number) => {
     // Refresh the current search to show updated data
     performSearch(currentSearchParams, false);
   };

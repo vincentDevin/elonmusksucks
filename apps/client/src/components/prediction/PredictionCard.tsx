@@ -231,7 +231,12 @@ export default function UnifiedPredictionCard({
             variant="full"
             type={prediction.type as PredictionType}
             options={prediction.options as PublicPredictionOption[]}
-            bets={prediction.bets}
+            bets={prediction.bets.map((bet) => ({
+              ...bet,
+              amount: bet.amount.toString(),
+              potentialPayout: bet.potentialPayout?.toString() ?? null,
+              payout: bet.payout?.toString() ?? null,
+            }))}
             parlayLegs={flatParlays.map((leg) => ({
               ...leg,
               stake: asNum(leg.stake),
@@ -324,7 +329,12 @@ export default function UnifiedPredictionCard({
             variant={isCompact ? 'compact' : 'mini'}
             type={prediction.type as PredictionType}
             options={prediction.options as PublicPredictionOption[]}
-            bets={prediction.bets}
+            bets={prediction.bets.map((bet) => ({
+              ...bet,
+              amount: bet.amount.toString(),
+              potentialPayout: bet.potentialPayout?.toString() ?? null,
+              payout: bet.payout?.toString() ?? null,
+            }))}
             parlayLegs={flatParlays.map((leg) => ({
               ...leg,
               stake: asNum(leg.stake),

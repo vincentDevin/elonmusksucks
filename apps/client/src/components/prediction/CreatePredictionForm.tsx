@@ -42,7 +42,7 @@ export default function CreatePredictionForm({
   const location = useLocation();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [category, setCategory] = useState('');
+  const [categoryId, setCategoryId] = useState<number | ''>('');
   const [expiresAt, setExpiresAt] = useState<string>('');
   const [type, setType] = useState<PredictionType>(PredictionType.MULTIPLE);
   const [threshold, setThreshold] = useState<number | ''>('');
@@ -89,7 +89,7 @@ export default function CreatePredictionForm({
   const canSubmit =
     Boolean(title) &&
     Boolean(description) &&
-    Boolean(category) &&
+    typeof categoryId === 'number' &&
     Boolean(expiresAt) &&
     isExpirationValid &&
     ((isMultiple && options.every((o) => o.trim().length > 0)) ||
@@ -108,7 +108,7 @@ export default function CreatePredictionForm({
     const payload: CreatePredictionPayload = {
       title,
       description,
-      category,
+      categoryId: typeof categoryId === 'number' ? categoryId : Number(categoryId),
       expiresAt: new Date(expiresAt).toISOString(),
       type,
       threshold: isOU ? Number(threshold) : undefined,
@@ -181,15 +181,16 @@ export default function CreatePredictionForm({
         </div>
 
         <div>
-          <label htmlFor="category" className="block mb-1 text-sm">
-            Category
+          <label htmlFor="categoryId" className="block mb-1 text-sm">
+            Category ID
           </label>
           <input
-            id="category"
-            type="text"
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
+            id="categoryId"
+            type="number"
+            value={categoryId}
+            onChange={(e) => setCategoryId(e.target.value === '' ? '' : Number(e.target.value))}
             className={inputBase}
+            placeholder="Enter category ID"
           />
         </div>
 

@@ -4,9 +4,7 @@ import {
   getPredictionPageAnalytics,
   getTrendingCategories,
   getHotMarketIndicators,
-  getRealtimeMetrics,
   formatVolume,
-  formatPercentage,
 } from '../api/analytics';
 
 export interface PredictionAnalyticsData {
@@ -89,45 +87,55 @@ export function usePredictionAnalytics(): PredictionAnalyticsHookReturn {
       setError(null);
 
       // Fetch all analytics data in parallel
-      const [pageAnalytics, trendingCategories, hotMarkets, realtimeMetrics] = await Promise.all([
+      const [pageAnalytics, trendingCategories, hotMarkets] = await Promise.all([
         getPredictionPageAnalytics(),
         getTrendingCategories(),
         getHotMarketIndicators(),
-        getRealtimeMetrics(),
       ]);
+
+      // Calculate resolution rate from available data
+      const resolvedToday = pageAnalytics.platformHealth.predictions.resolvedToday;
+      const totalPredictions = pageAnalytics.platformHealth.predictions.totalPredictions;
+      const resolutionRate = totalPredictions > 0 ? (resolvedToday / totalPredictions) * 100 : 0;
+
+      // Calculate win rate (placeholder - would need actual data)
+      const winRate = 0; // TODO: Get actual win rate from backend
 
       // Process and format the data
       const processedData: PredictionAnalyticsData = {
         platformInsights: {
-          totalPredictions: pageAnalytics.platformHealth.predictions.total,
-          activePredictions: pageAnalytics.platformHealth.predictions.active,
-          resolutionRate: pageAnalytics.platformHealth.predictions.resolutionRate,
-          totalVolume: pageAnalytics.platformHealth.betting.totalVolume,
-          formattedVolume: formatVolume(pageAnalytics.platformHealth.betting.totalVolume),
-          averageBetSize: pageAnalytics.platformHealth.betting.averageBetSize,
+          totalPredictions: pageAnalytics.platformHealth.predictions.totalPredictions,
+          activePredictions: pageAnalytics.platformHealth.predictions.activePredictions,
+          resolutionRate,
+          totalVolume: String(pageAnalytics.platformHealth.betting.totalVolume),
+          formattedVolume: formatVolume(String(pageAnalytics.platformHealth.betting.totalVolume)),
+          averageBetSize: String(pageAnalytics.platformHealth.betting.averageBetSize),
           formattedAverageBetSize: formatVolume(
-            pageAnalytics.platformHealth.betting.averageBetSize,
+            String(pageAnalytics.platformHealth.betting.averageBetSize),
           ),
-          uniqueBettors: pageAnalytics.platformHealth.betting.uniqueBettors,
-          winRate: pageAnalytics.platformHealth.betting.winRate,
+          uniqueBettors: pageAnalytics.platformHealth.engagement.dailyActiveUsers,
+          winRate,
         },
 
         realtimeActivity: {
-          activeUsers: pageAnalytics.realtimeActivity.activeUsers24h,
-          newPredictions: pageAnalytics.realtimeActivity.newPredictions24h,
-          volume24h: pageAnalytics.realtimeActivity.bettingVolume24h,
-          formattedVolume24h: formatVolume(pageAnalytics.realtimeActivity.bettingVolume24h),
+          activeUsers: pageAnalytics.realtimeActivity.activeUsers,
+          newPredictions: pageAnalytics.realtimeActivity.recentPredictions.length,
+          volume24h: String(pageAnalytics.platformHealth.betting.volumeToday),
+          formattedVolume24h: formatVolume(
+            String(pageAnalytics.platformHealth.betting.volumeToday),
+          ),
         },
 
-        categoryInsights: pageAnalytics.categoryPerformance.map((category) => {
-          const trendData = trendingCategories.find((t) => t.category === category.category);
-          return {
-            ...category,
-            formattedVolume: formatVolume(category.totalVolume),
-            trendScore: trendData?.score,
-            isHot: trendData ? trendData.score > 70 : false,
-          };
-        }),
+        categoryInsights: trendingCategories.map((trendData) => ({
+          category: trendData.category,
+          totalPredictions: 0, // Would need backend data
+          avgAccuracy: 0, // Would need backend data
+          totalVolume: String(trendData.recentActivity),
+          formattedVolume: formatVolume(String(trendData.recentActivity)),
+          participationRate: 0, // Would need backend data
+          trendScore: trendData.score,
+          isHot: trendData.score > 70,
+        })),
 
         trendingCategories,
         hotMarkets,

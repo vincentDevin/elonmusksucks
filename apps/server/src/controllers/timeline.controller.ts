@@ -35,21 +35,8 @@ export async function getTimeline(req: Request, res: Response) {
 
     const [articles, posts] = await Promise.all([articlesPromise, postsPromise]);
 
-    // Enrich post authors with signed avatar URLs
-    const enrichedPosts = await Promise.all(
-      posts.map(async (post: any) => {
-        if (post.author) {
-          try {
-            const enrichedAuthor = await userService.enrichUserWithAvatar(post.author);
-            return { ...post, author: enrichedAuthor };
-          } catch (error) {
-            console.error(`[timeline] Error enriching post author ${post.authorId}:`, error);
-            return post;
-          }
-        }
-        return post;
-      }),
-    );
+    // Posts are already enriched with avatar URLs by the service layer
+    // No need to double-enrich here
 
     // Convert articles to TimelineItem format
     const articleItems: TimelineItem[] = articles.map((article: any) => ({
@@ -74,7 +61,7 @@ export async function getTimeline(req: Request, res: Response) {
     }));
 
     // Convert posts to TimelineItem format with embedded post data
-    const postItems: TimelineItem[] = enrichedPosts.map((post: any) => ({
+    const postItems: TimelineItem[] = posts.map((post: any) => ({
       id: `post-${post.id}`,
       type: 'article' as const, // Using 'article' type for posts too (timeline only has article/tweet)
       timestamp: post.createdAt.toISOString(),
@@ -95,6 +82,7 @@ export async function getTimeline(req: Request, res: Response) {
       postData: {
         id: post.id,
         authorId: post.authorId,
+        type: post.type || 'POST',
         content: post.body, // For type compatibility
         body: post.body, // For PostCard component
         contentType: post.contentType,
@@ -103,6 +91,8 @@ export async function getTimeline(req: Request, res: Response) {
         linkPreview: post.linkPreview,
         parentId: post.parentId,
         threadDepth: post.threadDepth,
+        reactionsCount: post._count?.reactions || 0,
+        repliesCount: post._count?.children || 0,
         likesCount: post._count?.reactions || 0,
         commentsCount: post._count?.children || 0,
         sharesCount: post.sharesCount || 0,
@@ -111,12 +101,18 @@ export async function getTimeline(req: Request, res: Response) {
         userReaction: post.userReaction,
         isDeleted: post.isDeleted,
         isFlagged: post.isFlagged,
-        createdAt: post.createdAt.toISOString(),
-        updatedAt: post.updatedAt.toISOString(),
-        editedAt: post.editedAt?.toISOString(),
+        createdAt: post.createdAt,
+        updatedAt: post.updatedAt,
+        editedAt: post.editedAt,
         children: undefined,
         authorName: post.author?.name,
         authorAvatar: post.author?.avatarUrl,
+        author: post.author ||
+          post.user || {
+            id: post.authorId,
+            name: 'Unknown',
+            avatarUrl: null,
+          },
         canEdit: false,
         canDelete: false,
       },

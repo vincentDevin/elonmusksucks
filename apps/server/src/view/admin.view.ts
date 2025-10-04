@@ -25,8 +25,15 @@ export const toAdminUserView = (user: {
   muskBucks: bigint;
   role: string;
   isEmailVerified?: boolean;
+  active?: boolean;
+  avatarUrl?: string | null;
   createdAt: Date;
   updatedAt?: Date;
+  banStatus?: {
+    isBanned: boolean;
+    reason?: string;
+    expiresAt?: Date | string;
+  } | null;
 }): AdminUserView => ({
   id: user.id,
   name: user.name,
@@ -34,8 +41,20 @@ export const toAdminUserView = (user: {
   muskBucks: user.muskBucks.toString(),
   role: user.role,
   isEmailVerified: user.isEmailVerified ?? false,
+  active: user.active ?? true,
+  avatarUrl: user.avatarUrl ?? null,
   createdAt: user.createdAt.toISOString(),
   updatedAt: user.updatedAt ? user.updatedAt.toISOString() : user.createdAt.toISOString(),
+  banStatus: user.banStatus
+    ? {
+        isBanned: user.banStatus.isBanned,
+        reason: user.banStatus.reason,
+        expiresAt:
+          user.banStatus.expiresAt instanceof Date
+            ? user.banStatus.expiresAt.toISOString()
+            : user.banStatus.expiresAt,
+      }
+    : null,
 });
 
 /**
@@ -46,6 +65,7 @@ export const toAdminBetView = (bet: {
   id: number;
   userId: number;
   userName?: string;
+  user?: { name: string; email: string; avatarUrl?: string | null };
   predictionId: number;
   optionId: number | null;
   amount: bigint;
@@ -59,7 +79,9 @@ export const toAdminBetView = (bet: {
 }): AdminBetView => ({
   id: bet.id,
   userId: bet.userId,
-  userName: bet.userName || 'Unknown',
+  userName: bet.userName || bet.user?.name || 'Unknown',
+  userEmail: bet.user?.email,
+  userAvatarUrl: bet.user?.avatarUrl || null,
   predictionId: bet.predictionId,
   predictionTitle: bet.prediction?.title || 'Unknown',
   optionId: bet.optionId,
@@ -79,6 +101,7 @@ export const toAdminTransactionView = (transaction: {
   id: number;
   userId: number;
   userName?: string;
+  user?: { name: string; email: string; avatarUrl?: string | null };
   type: string;
   amount: bigint | string;
   balanceAfter: bigint | string;
@@ -93,7 +116,9 @@ export const toAdminTransactionView = (transaction: {
 }): AdminTransactionView => ({
   id: transaction.id,
   userId: transaction.userId,
-  userName: transaction.userName || 'Unknown',
+  userName: transaction.userName || transaction.user?.name || 'Unknown',
+  userEmail: transaction.user?.email,
+  userAvatarUrl: transaction.user?.avatarUrl || null,
   type: transaction.type,
   amount:
     typeof transaction.amount === 'bigint' ? transaction.amount.toString() : transaction.amount,

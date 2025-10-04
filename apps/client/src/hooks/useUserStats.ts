@@ -7,7 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useVisibilityGuard } from '../lib/visibilityGuard';
 import { useSocket } from '../contexts/SocketContext';
 import { useEventBusCore } from '../contexts/EventBusCoreContext';
-import { REDIS_CHANNELS } from '../types/events';
+import { REDIS_CHANNELS } from '@ems/types';
 import { useMyBets, useMyParlays, useMyPredictions } from './useMeStubs';
 import { useLeaderboard } from './useLeaderboard';
 import { createAbortableRequest } from '../api/axios';
@@ -228,8 +228,7 @@ export function useUserStats() {
         const potentialWinnings =
           myParlays.data?.reduce((sum, parlay) => sum + Number(parlay.potentialPayout || 0), 0) ||
           0;
-        const pendingPredictions =
-          myPredictions.data?.filter((p) => p.status === 'PENDING').length || 0;
+        const pendingPredictions = myPredictions.data?.filter((p) => !p.approved).length || 0;
         const approvalRate = calculateApprovalRate(myPredictions.data || []);
 
         // Extract performance data from enhanced stats or calculate from current data
@@ -380,8 +379,7 @@ export function useUserStats() {
       myBets.data?.reduce((sum, bet) => sum + Number(bet.amount || 0), 0) || 0;
     const activeParlaysValue =
       myParlays.data?.reduce((sum, parlay) => sum + Number(parlay.amount || 0), 0) || 0;
-    const pendingPredictions =
-      myPredictions.data?.filter((p) => p.status === 'PENDING').length || 0;
+    const pendingPredictions = myPredictions.data?.filter((p) => !p.approved).length || 0;
 
     return {
       performance: {
@@ -654,12 +652,10 @@ export function useUserStats() {
 }
 
 // Helper functions
-function calculateApprovalRate(predictions: { status: string }[]): number {
+function calculateApprovalRate(predictions: { approved: boolean }[]): number {
   if (predictions.length === 0) return 0;
-  const approved = predictions.filter(
-    (p) => p.status === 'APPROVED' || p.status === 'RESOLVED',
-  ).length;
-  return approved / predictions.length;
+  const approvedCount = predictions.filter((p) => p.approved).length;
+  return approvedCount / predictions.length;
 }
 
 function calculatePercentile(rank: number, totalUsers: number): number {

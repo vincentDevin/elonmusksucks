@@ -16,7 +16,7 @@ import { useEventBusCore } from './EventBusCoreContext';
 import type { ReactionType } from '@ems/types';
 import { togglePostReaction, getPostReactions } from '../api/posts';
 import { timelineApi } from '../api/timeline';
-import { REDIS_CHANNELS } from '../types/events';
+import { REDIS_CHANNELS } from '@ems/types';
 
 // Unified reaction state for both posts and articles
 interface ReactionState {
@@ -277,11 +277,9 @@ export const ReactionProvider: React.FC<{ children: ReactNode }> = ({ children }
 
             // Determine user reaction from API response
             let newUserReaction: ReactionType | undefined;
-            if (result.reaction?.type) {
-              newUserReaction = result.reaction.type as ReactionType;
-            } else if (result.action === 'added' || result.action === 'changed') {
+            if (result.action === 'added' || result.action === 'changed') {
               newUserReaction = reactionType;
-            } else {
+            } else if (result.action === 'removed') {
               newUserReaction = undefined;
             }
 

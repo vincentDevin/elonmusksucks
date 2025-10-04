@@ -108,6 +108,7 @@ export const REDIS_CHANNELS = {
   PONG_MATCH_COMPLETED: 'pong:match:completed',
   PONG_MATCH_LOST: 'pong:match:lost',
   PONG_ELO_MILESTONE: 'pong:elo:milestone',
+  PONG_ACHIEVEMENT_UNLOCKED: 'pong:achievement:unlocked',
 
   // User activity channels
   USER_ACTIVITY_LOG: 'user:activity:log',
@@ -122,6 +123,8 @@ export const REDIS_CHANNELS = {
   POST_DELETED: 'post:deleted',
   POST_SHARED: 'post:shared',
   POST_REACTION: 'post:reaction',
+  POST_REACTION_UPDATE: 'post:reaction:update',
+  ARTICLE_REACTION_UPDATE: 'article:reaction:update',
   COMMENT_CREATED: 'comment:created',
   COMMENT_DELETED: 'comment:deleted',
 

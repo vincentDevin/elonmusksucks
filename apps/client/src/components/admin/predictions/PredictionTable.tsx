@@ -160,7 +160,7 @@ const PredictionTable: React.FC<PredictionTableProps> = ({
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-secondary/20 text-secondary rounded-full">
-                            {prediction.category}
+                            Category {prediction.categoryId || 'N/A'}
                           </span>
                           {prediction.qualityFlags?.needsReview && (
                             <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-warning/20 text-warning rounded-full">
@@ -319,7 +319,7 @@ const PredictionTable: React.FC<PredictionTableProps> = ({
                   {/* Tags */}
                   <div className="flex flex-wrap gap-2 mb-3">
                     <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-secondary/20 text-secondary rounded-full">
-                      {prediction.category}
+                      Category {prediction.categoryId || 'N/A'}
                     </span>
                     <span
                       className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-full border ${getStatusColor(status)}`}

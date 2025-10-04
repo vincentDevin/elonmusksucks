@@ -168,7 +168,18 @@ export default function PredictionSectionCard({
                 {/* Prediction Card */}
                 <div className="transform transition-all duration-200 hover:scale-[1.02]">
                   <PredictionCard
-                    prediction={prediction}
+                    prediction={
+                      {
+                        ...prediction,
+                        options: prediction.options.map((opt) => ({
+                          ...opt,
+                          createdAt:
+                            typeof opt.createdAt === 'string'
+                              ? new Date(opt.createdAt)
+                              : opt.createdAt,
+                        })),
+                      } as any
+                    }
                     variant="compact"
                     showParlayActions={true}
                     showBetsList={false}

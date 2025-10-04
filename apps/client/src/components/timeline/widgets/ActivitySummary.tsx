@@ -10,7 +10,7 @@ import {
   ChartBarIcon,
 } from '@heroicons/react/24/outline';
 import { useAuth } from '../../../contexts/AuthContext';
-import { getUserActivity, getUserStats } from '../../../api/users';
+import { getUserActivity } from '../../../api/users';
 
 interface ActivityStats {
   today: {
@@ -140,14 +140,14 @@ export const ActivitySummary: React.FC<ActivitySummaryProps> = ({
   }, [user?.id, authLoading]);
 
   // Helper functions for date calculations
-  const isToday = (timestamp: string): boolean => {
-    const date = new Date(timestamp);
+  const isToday = (timestamp: string | Date): boolean => {
+    const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
     const today = new Date();
     return date.toDateString() === today.toDateString();
   };
 
-  const isThisWeek = (timestamp: string): boolean => {
-    const date = new Date(timestamp);
+  const isThisWeek = (timestamp: string | Date): boolean => {
+    const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
     const now = new Date();
     const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     return date >= weekAgo;

@@ -882,3 +882,222 @@ export interface PongLeaderboardUpdatedBroadcast {
   totalPlayers: number;
   timestamp: string;
 }
+
+// ============================================================================
+// Prediction & Betting Event Payloads
+// ============================================================================
+
+export interface ChatErrorPayload {
+  error: string;
+  code?: string;
+  timestamp: string;
+}
+
+export interface PredictionCreatedPayload {
+  key: 'prediction:created';
+  userId: number;
+  occurredAt: string;
+  idempotencyKey: string;
+  payload: {
+    predictionId: number;
+    title: string;
+    category: string | null;
+    description: string;
+    type: string;
+    threshold: number | null;
+    expiresAt: string;
+    optionCount: number;
+  };
+}
+
+export interface BetPlacedPayload {
+  key: 'bet:placed';
+  userId: number;
+  occurredAt: string;
+  idempotencyKey: string;
+  payload: {
+    betId: number;
+    predictionId: number;
+    amount: number;
+    category: string | null;
+    odds: number;
+    optionLabel: string;
+  };
+}
+
+export interface PredictionResolvedPayload {
+  predictionId: number;
+  winningOptionId: number;
+  resolvedAt: string;
+  outcome: string;
+}
+
+export interface ParlayPlacedPayload {
+  key: 'parlay:placed';
+  userId: number;
+  occurredAt: string;
+  idempotencyKey: string;
+  payload: {
+    parlayId: number;
+    amount: number;
+    legCount: number;
+    combinedOdds: number;
+    predictions: Array<{
+      id: number;
+      title: string;
+      category: string | null;
+    }>;
+  };
+}
+
+export interface BalanceUpdatePayload {
+  userId: number;
+  newBalance: number;
+  previousBalance: number;
+  change: number;
+  reason: string;
+  timestamp: string;
+}
+
+export interface BetResolvedPayload {
+  betId: number;
+  userId: number;
+  predictionId: number;
+  won: boolean;
+  payout?: number;
+  timestamp: string;
+}
+
+export interface ParlayResolvedPayload {
+  parlayId: number;
+  userId: number;
+  won: boolean;
+  amount: number;
+  payout?: number;
+  timestamp: string;
+}
+
+export interface PongWagerPayload {
+  userId: number;
+  amount: number;
+  matchId: string;
+  timestamp: string;
+}
+
+export interface PongPayoutPayload {
+  userId: number;
+  payout: number;
+  matchId: string;
+  won: boolean;
+  timestamp: string;
+}
+
+// ============================================================================
+// Reaction Payloads
+// ============================================================================
+
+export interface ReactionUpdatePayload {
+  contentType: 'post' | 'article';
+  contentId: number;
+  userId: number;
+  userName: string;
+  userAvatar?: string;
+  reactionType: string; // ReactionType: 'LIKE' | 'LOVE' | 'LAUGH' | 'WOW' | 'SAD' | 'ANGRY'
+  action: 'added' | 'removed' | 'changed';
+  previousReaction?: string; // Only present when action is 'changed'
+  reactionCounts: Record<string, number>;
+  timestamp: string;
+}
+
+// ============================================================================
+// Event System Types
+// ============================================================================
+
+export type EventPriority = 'high' | 'normal' | 'low';
+
+export interface EventSubscriptionOptions {
+  once?: boolean;
+  priority?: EventPriority;
+}
+
+export type EventHandler<T = any> = (payload: T) => void;
+
+export type EventUnsubscriber = () => void;
+
+export interface EventMetrics {
+  eventsReceived: number;
+  eventsProcessed: number;
+  errors: number;
+  averageProcessingTime: number;
+  lastEventTime: number | null;
+}
+
+// ============================================================================
+// Event Payload Mapping
+// ============================================================================
+
+/**
+ * Maps each Redis channel to its corresponding payload type
+ * This enables type-safe event subscriptions where the payload type
+ * is automatically inferred from the channel name
+ */
+export interface EventPayloadMap {
+  // Prediction events
+  'prediction:created': PredictionCreatedPayload;
+  'prediction:resolved': PredictionResolvedPayload;
+
+  // Betting events
+  'bet:placed': BetPlacedPayload;
+  'bet:resolved': BetResolvedPayload;
+
+  // Parlay events
+  'parlay:placed': ParlayPlacedPayload;
+  'parlay:resolved': ParlayResolvedPayload;
+
+  // Balance events
+  'balance:update': BalanceUpdatePayload;
+
+  // Pong events
+  'pong:wager': PongWagerPayload;
+  'pong:payout': PongPayoutPayload;
+
+  // Reaction events
+  'post:reaction:update': ReactionUpdatePayload;
+  'article:reaction:update': ReactionUpdatePayload;
+
+  // Chat events
+  'chat:error': ChatErrorPayload;
+  'chat:message': any; // ChatMessageDTO from responses
+  'chat:history': any[]; // Array of ChatMessageDTO
+  'chat:typing': any; // ChatTypingPayload
+  'chat:stopTyping': any; // ChatStopTypingPayload
+  'chat:usersOnline': any[]; // ChatUsersOnlinePayload
+  'chat:join': any; // ChatJoinPayload
+  'chat:leave': any; // ChatLeavePayload
+
+  // Stats events
+  'user:stats_update': StatsUpdatePayload;
+
+  // Activity events
+  'unified:activity:update': any; // UnifiedActivityEvent
+  'unified:activity:response': any[]; // Array of UnifiedActivityEvent
+
+  // Leaderboard events
+  'leaderboard:allTime': any;
+  'leaderboard:daily': any;
+  'leaderboard:rank:update': any;
+  'leaderboard:rankChange': any;
+  'leaderboard:milestone': any;
+  'leaderboard:position:reached': any;
+  'leaderboard:comeback:major': any;
+  'leaderboard:comeback:moderate': any;
+}
+
+/**
+ * Helper type to extract the payload type for a given Redis channel
+ * Usage: EventPayload<'bet:placed'> returns BetPlacedPayload
+ * Falls back to `any` for channels not in the map
+ */
+export type EventPayload<T extends string> = T extends keyof EventPayloadMap
+  ? EventPayloadMap[T]
+  : any;

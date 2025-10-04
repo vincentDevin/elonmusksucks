@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { usePredictionMarket } from '../contexts/PredictionContext';
 import { useAuth } from '../contexts/AuthContext';
-import type { PredictionFull } from '@ems/types';
+import type { PredictionView } from '@ems/types';
 
 export interface PredictionFilter {
   categories: string[];
@@ -30,11 +30,23 @@ export interface PredictionRecommendation {
   };
 }
 
-export interface EnhancedPrediction extends PredictionFull {
+export interface EnhancedPrediction extends Omit<PredictionView, 'options'> {
   recommendation?: PredictionRecommendation;
   section: 'trending' | 'ending_soon' | 'personalized' | 'hot' | 'all';
   isNew?: boolean;
   isFavorited?: boolean;
+  // Computed properties for compatibility with PredictionFull
+  resolved: boolean;
+  approved: boolean;
+  creatorId: number;
+  // Override options to include createdAt for PredictionFull compatibility
+  options: Array<{
+    id: number;
+    label: string;
+    odds: number;
+    predictionId: number;
+    createdAt: string;
+  }>;
 }
 
 export interface PredictionSection {
@@ -95,7 +107,7 @@ export function usePredictionDiscovery() {
 
   // Calculate difficulty based on prediction characteristics
   const calculateDifficulty = useCallback(
-    (prediction: PredictionFull): 'easy' | 'medium' | 'hard' | 'expert' => {
+    (prediction: PredictionView): 'easy' | 'medium' | 'hard' | 'expert' => {
       if (!prediction.options || prediction.options.length === 0) return 'medium';
 
       // Find the most favorable odds (highest probability outcome)
@@ -114,20 +126,20 @@ export function usePredictionDiscovery() {
 
   // Calculate recommendation score for personalization
   const calculateRecommendationScore = useCallback(
-    (prediction: PredictionFull): PredictionRecommendation => {
+    (prediction: PredictionView): PredictionRecommendation => {
       let score = 0;
       const reasons: string[] = [];
 
-      // Category preference scoring
-      if (userBettingHistory.includes(prediction.category)) {
+      // Category preference scoring (using categoryName if available, otherwise categoryId)
+      const categoryIdentifier = prediction.categoryName || String(prediction.categoryId);
+      if (userBettingHistory.includes(categoryIdentifier)) {
         score += 30;
-        reasons.push(`You often bet on ${prediction.category}`);
+        reasons.push(`You often bet on ${categoryIdentifier}`);
       }
 
-      // Activity level scoring
+      // Activity level scoring (PredictionView doesn't have parlayLegs)
       const betCount = prediction.bets?.length || 0;
-      const parlayCount = prediction.parlayLegs?.length || 0;
-      const totalActivity = betCount + parlayCount;
+      const totalActivity = betCount;
 
       let popularityScore = 0;
       let bettingVelocity = 0;
@@ -214,7 +226,7 @@ export function usePredictionDiscovery() {
       return {
         score: Math.min(100, score),
         reasons: reasons.slice(0, 3), // Limit to top 3 reasons
-        category: prediction.category,
+        category: categoryIdentifier,
         difficulty,
         socialProof: {
           popularityScore,
@@ -248,11 +260,15 @@ export function usePredictionDiscovery() {
             if (prediction.status !== 'APPROVED' || now > expires) return false;
             break;
           case 'expired':
-            if (prediction.status !== 'APPROVED' || now <= expires || prediction.resolved)
+            if (
+              prediction.status !== 'APPROVED' ||
+              now <= expires ||
+              prediction.resolvedAt !== null
+            )
               return false;
             break;
           case 'resolved':
-            if (!prediction.resolved) return false;
+            if (prediction.resolvedAt === null) return false;
             break;
         }
       } else {
@@ -266,7 +282,8 @@ export function usePredictionDiscovery() {
       }
 
       // Category filter
-      if (filters.categories.length > 0 && !filters.categories.includes(prediction.category)) {
+      const categoryIdentifier = prediction.categoryName || String(prediction.categoryId);
+      if (filters.categories.length > 0 && !filters.categories.includes(categoryIdentifier)) {
         return false;
       }
 
@@ -298,7 +315,7 @@ export function usePredictionDiscovery() {
 
       // Activity filter
       if (filters.activity !== 'all') {
-        const totalActivity = (prediction.bets?.length || 0) + (prediction.parlayLegs?.length || 0);
+        const totalActivity = prediction.bets?.length || 0;
 
         switch (filters.activity) {
           case 'high':
@@ -316,9 +333,12 @@ export function usePredictionDiscovery() {
       // Search filter
       if (filters.search) {
         const searchLower = filters.search.toLowerCase();
+        const categoryStr = (
+          prediction.categoryName || String(prediction.categoryId)
+        ).toLowerCase();
         return (
           prediction.title.toLowerCase().includes(searchLower) ||
-          prediction.category.toLowerCase().includes(searchLower) ||
+          categoryStr.includes(searchLower) ||
           prediction.description?.toLowerCase().includes(searchLower)
         );
       }
@@ -355,6 +375,15 @@ export function usePredictionDiscovery() {
         section,
         isNew: createdHoursAgo <= 2,
         isFavorited: favorites.has(prediction.id),
+        // Computed properties for compatibility with PredictionFull
+        resolved: prediction.resolvedAt !== null,
+        approved: prediction.status === 'APPROVED' || prediction.status === 'RESOLVED',
+        creatorId: prediction.creatorUserId,
+        // Add createdAt to options for PredictionFull compatibility
+        options: prediction.options.map((opt) => ({
+          ...opt,
+          createdAt: prediction.createdAt, // Use prediction's createdAt as fallback
+        })),
       };
     });
   }, [filteredPredictions, calculateRecommendationScore, favorites]);
@@ -432,7 +461,9 @@ export function usePredictionDiscovery() {
 
   // Get available filter options
   const availableCategories = useMemo(() => {
-    const categories = new Set(predictions?.map((p) => p.category) || []);
+    const categories = new Set(
+      predictions?.map((p) => p.categoryName || String(p.categoryId)) || [],
+    );
     return Array.from(categories).sort();
   }, [predictions]);
 

@@ -12,6 +12,7 @@ import {
   type ParlayPlaceRequest,
   type ParlayPlaceAck,
   type BetErrorCode,
+  toError,
 } from '@ems/types';
 import { bettingService } from '../services/betting.service';
 import { betRateLimiter, createRateLimitMiddleware } from '../middleware/rateLimitMiddleware';
@@ -68,13 +69,14 @@ export function registerBetHandlers(socket: Socket) {
                 `[ack-policy] ${SOCKET_EVENTS.BET_PLACE} responding within ${ackConfig.timeoutMs}ms window`,
               );
               return ack?.(null);
-            } catch (e: any) {
-              console.error('[bet] place error', e);
+            } catch (error: unknown) {
+              const err = toError(error);
+              console.error('[bet] place error', err);
               console.error(
                 `[ack-policy] ${SOCKET_EVENTS.BET_PLACE} failed, client should retry within policy`,
               );
-              return ack?.(mapBetError(e));
-              throw e; // Re-throw for metrics error tracking
+              return ack?.(mapBetError(err));
+              throw err; // Re-throw for metrics error tracking
             }
           });
         },
@@ -124,17 +126,18 @@ export function registerBetHandlers(socket: Socket) {
         }, 1); // Medium priority for parlays
 
         return ack?.(null);
-      } catch (e: any) {
-        console.error('[parlay] place error', e);
-        return ack?.(mapBetError(e));
+      } catch (error: unknown) {
+        const err = toError(error);
+        console.error('[parlay] place error', err);
+        return ack?.(mapBetError(err));
       }
     },
   );
 }
 
 /* Map service-level errors to simple string codes */
-function mapBetError(err: any): BetErrorCode {
-  const message = err?.message || '';
+function mapBetError(err: Error): BetErrorCode {
+  const message = err.message || '';
 
   // Handle backpressure queue errors
   if (message.includes('Queue full')) {
@@ -146,7 +149,7 @@ function mapBetError(err: any): BetErrorCode {
 
   // Handle rate limiting errors
   if (message.startsWith('RATE_LIMIT_EXCEEDED:')) {
-    return message; // Pass through with wait time
+    return message as BetErrorCode; // Pass through with wait time (template literal type)
   }
 
   switch (message) {

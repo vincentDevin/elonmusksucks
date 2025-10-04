@@ -50,3 +50,51 @@ export interface PublicLeaderboardEntry {
   parlayLegsWon: number;
   rankChange: number | null;
 }
+
+// ============================================================================
+// Paginated Leaderboard (Phase 3 functionality)
+// ============================================================================
+
+export interface PaginatedLeaderboardResponse {
+  entries: PublicLeaderboardEntry[];
+  totalCount: number;
+  hasNextPage: boolean;
+  hasPrevPage: boolean;
+  currentPage: number;
+  totalPages: number;
+}
+
+// ============================================================================
+// User Rank
+// ============================================================================
+
+export interface UserRankResponse {
+  userId: number;
+  allTimeRank: number | null;
+  dailyRank: number | null;
+  weeklyRank?: number | null;
+  monthlyRank?: number | null;
+}
+
+// ============================================================================
+// Leaderboard Stats
+// ============================================================================
+
+export interface LeaderboardStatsResponse {
+  totalUsers: number;
+  activeUsers: number;
+  totalBets: number;
+  totalVolume: number;
+  lastRefresh: Date | null;
+}
+
+// ============================================================================
+// Leaderboard Query Parameters
+// ============================================================================
+
+export interface LeaderboardQueryParams {
+  limit?: number;
+  offset?: number;
+  period?: string;
+  metric?: 'profit' | 'winRate' | 'volume' | 'roi';
+}

@@ -7,7 +7,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useEventBusCore } from '../contexts/EventBusCoreContext';
 import { useAuth } from '../contexts/AuthContext';
-import { REDIS_CHANNELS } from '../types/events';
+import { REDIS_CHANNELS } from '@ems/types';
 import { safeEventHandler } from '../lib/safeEventHandler';
 
 // Betting alert interface
@@ -48,7 +48,7 @@ export interface BettingMetrics {
 
 export function useBettingEvents() {
   const { subscribe } = useEventBusCore();
-  const { user, updateUser } = useAuth();
+  const { user } = useAuth();
   const [bettingAlerts, setBettingAlerts] = useState<BettingAlert[]>([]);
   const [metrics, setMetrics] = useState<BettingMetrics>({
     totalBets: 0,
@@ -149,10 +149,7 @@ export function useBettingEvents() {
                 totalWagered: metrics.totalWagered + payload.amount,
               });
 
-              // Update user balance optimistically
-              if (updateUser && payload.newBalance !== undefined) {
-                updateUser({ ...user, muskBucks: payload.newBalance });
-              }
+              // Note: Balance updates are handled by AuthContext via BALANCE_UPDATE events
             }
           },
           { eventType: 'BET_PLACE', userId: user.id },
@@ -204,10 +201,7 @@ export function useBettingEvents() {
             currentLossStreak: 0,
           });
 
-          // Update user balance optimistically
-          if (updateUser && payload.newBalance !== undefined) {
-            updateUser({ ...user, muskBucks: payload.newBalance });
-          }
+          // Note: Balance updates are handled by AuthContext via BALANCE_UPDATE events
         }
       }),
 
@@ -307,7 +301,7 @@ export function useBettingEvents() {
     return () => {
       unsubscribers.forEach((unsub) => unsub());
     };
-  }, [user, subscribe, addAlert, updateUser, updateMetrics, metrics]);
+  }, [user, subscribe, addAlert, updateMetrics, metrics]);
 
   return {
     bettingAlerts,

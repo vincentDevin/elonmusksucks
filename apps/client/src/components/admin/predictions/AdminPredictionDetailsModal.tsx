@@ -129,7 +129,7 @@ const AdminPredictionDetailsModal: React.FC<AdminPredictionDetailsModalProps> = 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="text-sm font-medium text-tertiary">Category</label>
-                        <p className="text-content">{prediction.category}</p>
+                        <p className="text-content">{prediction.categoryId}</p>
                       </div>
                       <div>
                         <label className="text-sm font-medium text-tertiary">Type</label>

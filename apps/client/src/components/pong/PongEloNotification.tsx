@@ -10,7 +10,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useSocketEvent } from '../../contexts/EventBusCoreContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { REDIS_CHANNELS } from '../../types/events';
+import { REDIS_CHANNELS } from '@ems/types';
 
 interface EloUpdateEvent {
   userId: number;
@@ -190,7 +190,7 @@ export default function PongEloNotification() {
   // Subscribe to Pong events via EventBus
   useSocketEvent(REDIS_CHANNELS.PONG_ELO_UPDATE, handleEloUpdate);
   useSocketEvent(REDIS_CHANNELS.PONG_TIER_CHANGE, handleTierChange);
-  useSocketEvent('pong:achievement:unlocked', handlePongAchievement);
+  useSocketEvent(REDIS_CHANNELS.PONG_ACHIEVEMENT_UNLOCKED, handlePongAchievement);
 
   // Auto-dismiss notifications after 10 seconds
   useEffect(() => {

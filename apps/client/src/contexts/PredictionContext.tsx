@@ -12,7 +12,6 @@ import {
   useCallback,
   useState,
   useMemo,
-  useRef,
   startTransition,
   useOptimistic,
   type ReactNode,
@@ -31,6 +30,7 @@ import type {
   PredictionCreatedPayload,
   PredictionResolvedPayload,
   BetPlacedPayload,
+  ParlayPlacedPayload,
 } from '@ems/types';
 
 // Extended option type with client-side properties
@@ -107,16 +107,18 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
           }));
         case 'placeParlay':
           // Optimistically update all prediction legs with parlay data
+          // Note: PredictionView doesn't have parlayLegs, this is client-side UI state only
           const { parlay } = action.payload;
           return current.map((pred) => {
-            const hasLegInPrediction = parlay.legs.some((leg: any) =>
+            const hasLegInPrediction = parlay.legs.some((leg: { optionId: number }) =>
               pred.options?.some((opt) => opt.id === leg.optionId),
             );
             if (hasLegInPrediction) {
               return {
                 ...pred,
-                parlayLegs: [...(pred.parlayLegs ?? []), parlay],
-              };
+                // Adding parlayLegs as client-side extension
+                parlayLegs: [...((pred as any).parlayLegs ?? []), parlay],
+              } as any;
             }
             return pred;
           });
@@ -124,7 +126,7 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
           // Remove optimistic parlay legs on error
           return current.map((pred) => ({
             ...pred,
-            parlayLegs: pred.parlayLegs?.filter((leg) => !(leg as any).isOptimistic) ?? [],
+            parlayLegs: (pred as any).parlayLegs?.filter((leg: any) => !leg.isOptimistic) ?? [],
           }));
         case 'createPrediction':
           // Add optimistic prediction to the beginning of the list
@@ -142,7 +144,7 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
-  const [latestBet, setLatestBet] = useState<BetWithUser | null>(null);
+  const [latestBet] = useState<BetWithUser | null>(null);
   const [latestParlay, setLatestParlay] = useState<ParlayLegWithUser | null>(null);
 
   // ── Initial fetch ─────────────────────────────────────────────────────────
@@ -184,32 +186,38 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
     const unsubscribers = [
       // Prediction created events
       subscribe(REDIS_CHANNELS.PREDICTION_CREATED, (p: PredictionCreatedPayload) => {
-        // Convert payload to PredictionView format (might need server updates)
-        setBasePredictions((prev) => [p as any, ...prev]);
+        console.log('🎯 Prediction created event received:', p);
+        // Refresh to get full prediction data from server
+        fetchAll();
       }),
 
       // Prediction resolved events
       subscribe(REDIS_CHANNELS.PREDICTION_RESOLVE, (p: PredictionResolvedPayload) => {
-        // Convert payload to PredictionView format (might need server updates)
+        console.log('🎯 Prediction resolved event received:', p);
         setBasePredictions((prev) =>
-          prev.map((x) => (x.id === p.predictionId ? ({ ...x, ...p } as any) : x)),
+          prev.map((x) =>
+            x.id === p.predictionId
+              ? {
+                  ...x,
+                  resolvedAt: p.resolvedAt,
+                  winningOptionId: p.winningOptionId,
+                }
+              : x,
+          ),
         );
       }),
 
       // Bet placed events
       subscribe(REDIS_CHANNELS.BET_PLACED, (betPayload: BetPlacedPayload) => {
-        // Note: BetPlacedPayload doesn't match BetWithUser structure
-        // Need server updates to provide proper payload structure
         console.log('🎯 Bet placed event received:', betPayload);
-        // For now, refresh predictions to get updated data
+        // Refresh predictions to get updated bet counts and odds
         fetchAll();
       }),
 
       // Parlay placed events
-      subscribe(REDIS_CHANNELS.PARLAY_PLACED, (parlayPayload: any) => {
-        // Note: Need proper payload type definition
+      subscribe(REDIS_CHANNELS.PARLAY_PLACED, (parlayPayload: ParlayPlacedPayload) => {
         console.log('🎯 Parlay placed event received:', parlayPayload);
-        // For now, refresh predictions to get updated data
+        // Refresh predictions to get updated parlay counts and data
         fetchAll();
       }),
 
@@ -261,10 +269,12 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
       const optimisticPredictionId = Math.floor(Date.now() / 1000); // Temporary ID
 
       // Determine final options based on type (matching server logic)
+      // Note: CreatePredictionPayload.type could be lowercase or uppercase
       let finalOptions: Array<{ label: string }> = [];
-      if (input.type === 'binary') {
+      const typeUpper = (input.type as string).toUpperCase();
+      if (typeUpper === 'BINARY') {
         finalOptions = [{ label: 'Yes' }, { label: 'No' }];
-      } else if (input.type === 'over_under') {
+      } else if (typeUpper === 'OVER_UNDER') {
         if (input.threshold != null) {
           finalOptions = [
             { label: `Over ${input.threshold}` },
@@ -272,7 +282,7 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
           ];
         }
       } else {
-        // For 'multiple' type, use provided options
+        // For 'MULTIPLE' type, use provided options
         finalOptions = input.options || [];
       }
 
@@ -282,31 +292,29 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
         id: optimisticPredictionId,
         title: input.title,
         description: input.description,
-        category: input.category,
-        type: input.type,
+        categoryId: (input as any).categoryId || null,
+        categoryName: (input as any).category,
+        status: 'pending',
+        type: input.type as string,
         threshold: input.threshold,
-        expiresAt: input.expiresAt,
-        resolved: false,
-        approved: false,
+        expiresAt:
+          typeof input.expiresAt === 'string'
+            ? input.expiresAt
+            : new Date(input.expiresAt).toISOString(),
         resolvedAt: null,
+        creatorUserId: 0, // Will be set by server
         winningOptionId: null,
-        viewCount: 0,
-        firstCorrectBetUserId: null,
-        resolvedWithinHour: null,
-        createdAt: new Date(),
-        creatorId: 0, // Will be set by server
+        createdAt: new Date().toISOString(),
         options: finalOptions.map((opt, index) => ({
           id: optimisticPredictionId * 10 + index, // Temporary ID
           label: opt.label,
           odds: 2.0, // Default odds
           predictionId: optimisticPredictionId,
-          createdAt: new Date(),
         })),
         bets: [],
-        parlayLegs: [],
         sourceLinks: [],
         isOptimistic: true, // Mark as optimistic for potential rollback
-      };
+      } as any;
 
       // Apply optimistic update within startTransition
       startTransition(() => {

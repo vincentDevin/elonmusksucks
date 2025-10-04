@@ -9,10 +9,13 @@
 import { createContext, useContext, useReducer, useEffect, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import { useEventBusCore } from './EventBusCoreContext';
-import { REDIS_CHANNELS } from '../types/events';
+import { REDIS_CHANNELS } from '@ems/types';
 import { useAuth } from './AuthContext';
 
 /* ---------- Types ---------- */
+// Client-only type for parlay builder UI
+// Note: Different from ParlayLegWithUser in @ems/types (which is for server responses)
+// This type includes UI-specific fields (label, predictionTitle, odds) needed for the builder
 export interface Leg {
   optionId: number;
   predictionId: number;

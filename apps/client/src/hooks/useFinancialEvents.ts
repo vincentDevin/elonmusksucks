@@ -7,7 +7,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useEventBusCore } from '../contexts/EventBusCoreContext';
 import { useAuth } from '../contexts/AuthContext';
-import { REDIS_CHANNELS } from '../types/events';
+import { REDIS_CHANNELS } from '@ems/types';
 
 // Financial alert interface
 export interface FinancialAlert {
@@ -41,7 +41,7 @@ export interface FinancialMetrics {
 
 export function useFinancialEvents() {
   const { subscribe } = useEventBusCore();
-  const { user, updateUser } = useAuth();
+  const { user } = useAuth();
   const [financialAlerts, setFinancialAlerts] = useState<FinancialAlert[]>([]);
   const [metrics, setMetrics] = useState<FinancialMetrics>({
     totalGains: 0,
@@ -116,10 +116,7 @@ export function useFinancialEvents() {
             ],
           });
 
-          // Update user balance optimistically
-          if (updateUser) {
-            updateUser({ ...user, muskBucks: payload.currentBalance });
-          }
+          // Note: Balance updates are handled by AuthContext via BALANCE_UPDATE events
 
           // Update metrics
           updateMetrics({
@@ -281,10 +278,7 @@ export function useFinancialEvents() {
             duration: 6000,
           });
 
-          // Update user balance optimistically
-          if (updateUser && payload.newBalance) {
-            updateUser({ ...user, muskBucks: payload.newBalance });
-          }
+          // Note: Balance updates are handled by AuthContext via BALANCE_UPDATE events
         }
       }),
 
@@ -313,7 +307,7 @@ export function useFinancialEvents() {
     return () => {
       unsubscribers.forEach((unsub) => unsub());
     };
-  }, [user, subscribe, addAlert, updateUser, updateMetrics, metrics]);
+  }, [user, subscribe, addAlert, updateMetrics, metrics]);
 
   return {
     financialAlerts,

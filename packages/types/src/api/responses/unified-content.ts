@@ -68,6 +68,7 @@ export interface UnifiedContentItem {
     name: string;                // Display name
     type: ContentAuthorType;     // Type of author
     avatarUrl?: string;          // Profile picture or feed icon
+    profilePictureKey?: string;  // S3 key for avatar (needed for enrichment)
     reputation?: number;         // User reputation score (optional)
   };
 

@@ -1,184 +1,23 @@
 // apps/client/src/api/analytics.ts
 import api from './axios';
+import type {
+  PlatformHealthMetricsResponse,
+  TrendAnalysisResponse,
+  CrossFeatureAnalyticsResponse,
+  ContentAnalyticsResponse,
+  ComprehensiveDashboardResponse,
+  RealtimeMetricsResponse,
+  AnalyticsSummaryResponse,
+} from '@ems/types';
 
-// Import interfaces from the server types
-export interface PlatformHealthMetrics {
-  activeUsers: {
-    last24h: number;
-    last7d: number;
-    last30d: number;
-    growth: number; // percentage change from previous period
-  };
-  predictions: {
-    total: number;
-    active: number;
-    resolved: number;
-    createdLast24h: number;
-    resolutionRate: number; // percentage of predictions resolved on time
-  };
-  betting: {
-    totalVolume: string; // BigInt as string
-    volumeLast24h: string;
-    uniqueBettors: number;
-    averageBetSize: string;
-    winRate: number;
-  };
-  engagement: {
-    commentsLast24h: number;
-    likesLast24h: number;
-    pongMatchesLast24h: number;
-    timelineViews: number;
-  };
-  performance: {
-    averageResponseTime: number;
-    errorRate: number;
-    systemLoad: number;
-    databaseConnections: number;
-  };
-}
-
-export interface TrendAnalysis {
-  userRegistrations: Array<{
-    date: string;
-    count: number;
-    cumulativeCount: number;
-  }>;
-  bettingVolume: Array<{
-    date: string;
-    volume: string;
-    averageBetSize: string;
-    uniqueBettors: number;
-  }>;
-  predictionActivity: Array<{
-    date: string;
-    created: number;
-    resolved: number;
-    totalVolume: string;
-  }>;
-  engagement: Array<{
-    date: string;
-    comments: number;
-    likes: number;
-    views: number;
-    pongMatches: number;
-  }>;
-}
-
-export interface CrossFeatureAnalytics {
-  userSegmentation: {
-    highValueUsers: number;
-    activeUsers: number;
-    newUsers: number;
-    dormantUsers: number;
-  };
-  featureCorrelations: Array<{
-    feature1: string;
-    feature2: string;
-    correlation: number;
-    significance: number;
-  }>;
-  userJourney: Array<{
-    step: string;
-    users: number;
-    conversionRate: number;
-  }>;
-  retention: {
-    day1: number;
-    day7: number;
-    day30: number;
-  };
-}
-
-export interface ContentAnalytics {
-  categoryPerformance: Array<{
-    category: string;
-    totalPredictions: number;
-    avgAccuracy: number;
-    totalVolume: string;
-    participationRate: number;
-  }>;
-  topCreators: Array<{
-    userId: number;
-    username: string;
-    totalPredictions: number;
-    avgAccuracy: number;
-    totalFollowers: number;
-  }>;
-  contentMetrics: {
-    totalArticles: number;
-    articlesLast24h: number;
-    avgEngagementPerPost: number;
-    topSources: Array<{
-      source: string;
-      articles: number;
-    }>;
-  };
-}
-
-export interface ComprehensiveDashboard {
-  healthMetrics: PlatformHealthMetrics;
-  trends: TrendAnalysis;
-  crossFeature: CrossFeatureAnalytics;
-  content: ContentAnalytics;
-  generatedAt: string;
-  timeRange: {
-    days: number;
-    startDate: string;
-    endDate: string;
-  };
-}
-
-export interface RealtimeMetrics {
-  activeUsers24h: number;
-  newPredictions24h: number;
-  bettingVolume24h: string;
-  engagement24h: {
-    totalComments: number;
-    averageCommentsPerPrediction: number;
-    mostActiveUsers: number;
-    pongMatchesLast24h: number;
-  };
-  performance: {
-    avgBetResolutionTime: number;
-    avgPredictionAccuracy: number;
-    platformUptime: number;
-    avgLoadTime: number;
-  };
-  timestamp: string;
-}
-
-export interface AnalyticsSummary {
-  period: 'week' | 'month' | 'quarter';
-  days: number;
-  overview: {
-    totalUsers: number;
-    userGrowth: number;
-    totalPredictions: number;
-    activePredictions: number;
-    totalBettingVolume: string;
-    averageBetSize: string;
-  };
-  engagement: {
-    dailyComments: number;
-    dailyPongMatches: number;
-    totalEngagement: number;
-  };
-  trends: {
-    userRegistrations: Array<{
-      date: string;
-      count: number;
-      cumulativeCount: number;
-    }>;
-    topCategories: Array<{
-      category: string;
-      totalPredictions: number;
-      avgAccuracy: number;
-      totalVolume: string;
-      participationRate: number;
-    }>;
-  };
-  generatedAt: string;
-}
+// Type aliases for backwards compatibility
+export type PlatformHealthMetrics = PlatformHealthMetricsResponse;
+export type TrendAnalysis = TrendAnalysisResponse;
+export type CrossFeatureAnalytics = CrossFeatureAnalyticsResponse;
+export type ContentAnalytics = ContentAnalyticsResponse;
+export type ComprehensiveDashboard = ComprehensiveDashboardResponse;
+export type RealtimeMetrics = RealtimeMetricsResponse;
+export type AnalyticsSummary = AnalyticsSummaryResponse;
 
 /** — Core Analytics API Functions — **/
 
@@ -256,12 +95,17 @@ export async function getAnalyticsSummary(
  * Combines relevant metrics for prediction discovery and filtering
  */
 export async function getPredictionPageAnalytics(): Promise<{
-  platformHealth: Pick<PlatformHealthMetrics, 'predictions' | 'betting' | 'engagement'>;
-  categoryPerformance: ContentAnalytics['categoryPerformance'];
-  realtimeActivity: Pick<
-    RealtimeMetrics,
-    'activeUsers24h' | 'newPredictions24h' | 'bettingVolume24h'
-  >;
+  platformHealth: {
+    predictions: PlatformHealthMetrics['predictionMetrics'];
+    betting: PlatformHealthMetrics['financialMetrics'];
+    engagement: PlatformHealthMetrics['engagementMetrics'];
+  };
+  contentMetrics: ContentAnalytics;
+  realtimeActivity: {
+    activeUsers: number;
+    recentPredictions: RealtimeMetrics['recentPredictions'];
+    recentBets: RealtimeMetrics['recentBets'];
+  };
 }> {
   // Get multiple analytics in parallel for predictions page
   const [healthMetrics, contentAnalytics, realtimeMetrics] = await Promise.all([
@@ -272,15 +116,15 @@ export async function getPredictionPageAnalytics(): Promise<{
 
   return {
     platformHealth: {
-      predictions: healthMetrics.predictions,
-      betting: healthMetrics.betting,
-      engagement: healthMetrics.engagement,
+      predictions: healthMetrics.predictionMetrics,
+      betting: healthMetrics.financialMetrics,
+      engagement: healthMetrics.engagementMetrics,
     },
-    categoryPerformance: contentAnalytics.categoryPerformance,
+    contentMetrics: contentAnalytics,
     realtimeActivity: {
-      activeUsers24h: realtimeMetrics.activeUsers24h,
-      newPredictions24h: realtimeMetrics.newPredictions24h,
-      bettingVolume24h: realtimeMetrics.bettingVolume24h,
+      activeUsers: realtimeMetrics.activeUsers,
+      recentPredictions: realtimeMetrics.recentPredictions,
+      recentBets: realtimeMetrics.recentBets,
     },
   };
 }
@@ -297,32 +141,15 @@ export async function getTrendingCategories(): Promise<
     growth: number;
   }>
 > {
-  const [contentAnalytics, trends] = await Promise.all([
-    getContentAnalytics(),
-    getTrendAnalysis(7), // Last 7 days for trending data
-  ]);
+  const trends = await getTrendAnalysis(7); // Last 7 days for trending data
 
-  // Calculate trending scores based on recent activity and growth
-  return contentAnalytics.categoryPerformance
-    .map((category) => {
-      // Calculate growth based on recent prediction activity
-      const recentPredictions = trends.predictionActivity
-        .slice(-3) // Last 3 days
-        .reduce((sum, day) => sum + day.created, 0);
-
-      const score =
-        category.participationRate * 0.4 +
-        (recentPredictions / 10) * 0.3 +
-        category.avgAccuracy * 0.3;
-
-      return {
-        category: category.category,
-        score: Math.round(score * 100) / 100,
-        recentActivity: recentPredictions,
-        growth: category.participationRate, // Using participation rate as growth proxy
-      };
-    })
-    .sort((a, b) => b.score - a.score);
+  // Map category trends from analytics
+  return trends.categoryTrends.trending.map((item) => ({
+    category: item.category,
+    score: item.growth,
+    recentActivity: item.volume,
+    growth: item.growth,
+  }));
 }
 
 /**
@@ -343,8 +170,6 @@ export async function getHotMarketIndicators(): Promise<{
 }> {
   // This would integrate with the hot market detection we built
   // For now, return structure that components can use
-  const healthMetrics = await getPlatformHealthMetrics();
-
   return {
     hotPredictions: [], // Would be populated by hot market algorithm
     marketTrends: {

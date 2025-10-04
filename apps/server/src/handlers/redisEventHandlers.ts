@@ -4,15 +4,34 @@
 // -----------------------------------------------------------------------------
 
 import { Server } from 'socket.io';
+import type { Redis } from 'ioredis';
 import { SOCKET_ROOMS, REDIS_CHANNELS, SOCKET_EVENTS } from '@ems/types';
-import type { RedisChannel } from '@ems/types';
+import type {
+  RedisChannel,
+  // These payload types are imported for future type-safe event handling
+  // StatsUpdatePayload,
+  // RankingChangePayload,
+  // AchievementUnlockedPayload,
+} from '@ems/types';
 
 const ADMIN_ROOM = 'admin';
 const ADMIN_PREDICTIONS_ROOM = 'admin:predictions';
 
 // All channels now available in REDIS_CHANNELS
 
-export function registerRedisEventHandlers(io: Server, eventSub: any) {
+/**
+ * Type guard to check if payload has userId field
+ */
+function hasUserId(payload: unknown): payload is { userId: number } & Record<string, unknown> {
+  return (
+    typeof payload === 'object' &&
+    payload !== null &&
+    'userId' in payload &&
+    typeof (payload as { userId: unknown }).userId === 'number'
+  );
+}
+
+export function registerRedisEventHandlers(io: Server, eventSub: Redis) {
   eventSub.on('message', async (channel: RedisChannel, message: string) => {
     let payload: unknown;
     try {
@@ -80,57 +99,44 @@ export function registerRedisEventHandlers(io: Server, eventSub: any) {
       // Stats and achievements events
       case REDIS_CHANNELS.STATS_UPDATE:
         // Emit to specific user room if userId is in payload
-        const statsPayload = payload as any;
-        if (statsPayload.userId) {
-          io.to(`user:${statsPayload.userId}`).emit(REDIS_CHANNELS.STATS_UPDATE, payload);
+        if (hasUserId(payload)) {
+          io.to(`user:${payload.userId}`).emit(REDIS_CHANNELS.STATS_UPDATE, payload);
         } else {
           io.emit(REDIS_CHANNELS.STATS_UPDATE, payload);
         }
         break;
       case REDIS_CHANNELS.STATS_REFRESH:
-        const refreshPayload = payload as any;
-        if (refreshPayload.userId) {
-          io.to(`user:${refreshPayload.userId}`).emit(REDIS_CHANNELS.STATS_REFRESH, payload);
+        if (hasUserId(payload)) {
+          io.to(`user:${payload.userId}`).emit(REDIS_CHANNELS.STATS_REFRESH, payload);
         }
         break;
       case REDIS_CHANNELS.RANKING_CHANGE:
-        const rankingPayload = payload as any;
-        if (rankingPayload.userId) {
-          io.to(`user:${rankingPayload.userId}`).emit(REDIS_CHANNELS.RANKING_CHANGE, payload);
+        if (hasUserId(payload)) {
+          io.to(`user:${payload.userId}`).emit(REDIS_CHANNELS.RANKING_CHANGE, payload);
         }
         io.emit(REDIS_CHANNELS.RANKING_CHANGE, payload); // Also broadcast globally for leaderboard updates
         break;
       case REDIS_CHANNELS.ACHIEVEMENT_UNLOCKED:
-        const achievementPayload = payload as any;
-        if (achievementPayload.userId) {
-          io.to(`user:${achievementPayload.userId}`).emit(
-            REDIS_CHANNELS.ACHIEVEMENT_UNLOCKED,
-            payload,
-          );
+        if (hasUserId(payload)) {
+          io.to(`user:${payload.userId}`).emit(REDIS_CHANNELS.ACHIEVEMENT_UNLOCKED, payload);
         }
         io.emit(REDIS_CHANNELS.ACHIEVEMENT_UNLOCKED, payload); // Also broadcast globally for activity feed
         break;
       case REDIS_CHANNELS.USER_STATS_UPDATE:
-        const userStatsPayload = payload as any;
-        if (userStatsPayload.userId) {
-          io.to(`user:${userStatsPayload.userId}`).emit(REDIS_CHANNELS.USER_STATS_UPDATE, payload);
+        if (hasUserId(payload)) {
+          io.to(`user:${payload.userId}`).emit(REDIS_CHANNELS.USER_STATS_UPDATE, payload);
         }
         break;
 
       // Bet and parlay status events
       case REDIS_CHANNELS.BET_STATUS_CHANGE:
-        const betStatusPayload = payload as any;
-        if (betStatusPayload.userId) {
-          io.to(`user:${betStatusPayload.userId}`).emit(REDIS_CHANNELS.BET_STATUS_CHANGE, payload);
+        if (hasUserId(payload)) {
+          io.to(`user:${payload.userId}`).emit(REDIS_CHANNELS.BET_STATUS_CHANGE, payload);
         }
         break;
       case REDIS_CHANNELS.PARLAY_STATUS_CHANGE:
-        const parlayStatusPayload = payload as any;
-        if (parlayStatusPayload.userId) {
-          io.to(`user:${parlayStatusPayload.userId}`).emit(
-            REDIS_CHANNELS.PARLAY_STATUS_CHANGE,
-            payload,
-          );
+        if (hasUserId(payload)) {
+          io.to(`user:${payload.userId}`).emit(REDIS_CHANNELS.PARLAY_STATUS_CHANGE, payload);
         }
         break;
 

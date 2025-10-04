@@ -1,10 +1,15 @@
 import api, { setAccessToken } from './axios';
+import type {
+  RegisterPayload,
+  LoginPayload,
+  PasswordResetPayload,
+  AuthUserView,
+  UserBalanceView,
+} from '@ems/types';
 
-export interface RegisterPayload {
-  name: string;
-  email: string;
-  password: string;
-}
+// Type alias for backwards compatibility
+export type User = AuthUserView;
+
 /**
  * Register a new user. Returns a simple message; no user object is returned.
  */
@@ -13,10 +18,6 @@ export async function register(data: RegisterPayload): Promise<{ message: string
   return res.data;
 }
 
-export interface LoginPayload {
-  email: string;
-  password: string;
-}
 /**
  * Log in an existing user. Sets the HTTP‐only refresh cookie and returns
  * the new access token.
@@ -47,24 +48,11 @@ export async function logout(): Promise<void> {
   setAccessToken('');
 }
 
-export interface User {
-  id: number;
-  name: string;
-  email: string;
-  role: string;
-  muskBucks: number;
-  profileComplete: boolean;
-  avatarUrl: string | null;
-  theme: string;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
 /**
- * Fetch the currently authenticated user’s profile.
+ * Fetch the currently authenticated user's profile.
  */
-export async function me(): Promise<User> {
-  const res = await api.get<User>('/api/auth/me');
+export async function me(): Promise<AuthUserView> {
+  const res = await api.get<AuthUserView>('/api/auth/me');
   return res.data;
 }
 
@@ -87,10 +75,6 @@ export async function requestPasswordReset(email: string): Promise<{ message: st
   return res.data;
 }
 
-export interface PasswordResetPayload {
-  token: string;
-  newPassword: string;
-}
 /**
  * Actually perform the password reset.
  */
@@ -112,7 +96,7 @@ export async function updateTheme(themeId: string): Promise<{ success: boolean; 
 /**
  * Fetch only the user's current balance without affecting auth state
  */
-export async function getBalance(): Promise<{ muskBucks: string }> {
-  const res = await api.get<{ muskBucks: string }>('/api/auth/balance');
+export async function getBalance(): Promise<UserBalanceView> {
+  const res = await api.get<UserBalanceView>('/api/auth/balance');
   return res.data;
 }

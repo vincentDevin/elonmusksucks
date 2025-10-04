@@ -119,7 +119,7 @@ export default function Profile() {
     );
   }
 
-  // Full stats object (new fields) with a fallback
+  // Full stats object (new fields) with a fallback matching UserStatsDTO
   const statsData = stats ?? {
     totalBets: 0,
     betsWon: 0,
@@ -130,15 +130,19 @@ export default function Profile() {
     totalParlayLegs: 0,
     parlayLegsWon: 0,
     parlayLegsLost: 0,
-    totalWagered: 0,
-    totalWon: 0,
-    profit: 0,
-    roi: 0,
+    totalWagered: '0',
+    totalWinnings: '0',
+    totalLosses: '0',
+    netProfit: '0',
     currentStreak: 0,
-    longestStreak: 0,
-    mostCommonBet: null,
-    biggestWin: 0,
-    updatedAt: new Date().toISOString(),
+    longestWinStreak: 0,
+    longestLoseStreak: 0,
+    averageBetSize: '0',
+    averageOdds: 0,
+    biggestWin: '0',
+    biggestLoss: '0',
+    winRate: 0,
+    roi: 0,
   };
 
   return (

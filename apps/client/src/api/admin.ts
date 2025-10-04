@@ -8,27 +8,18 @@ import type {
   PublicBadge,
   PublicUserBadge,
   UserStatsDTO,
-  PublicAITweet,
   Role,
   AdminFinancialAnalyticsResponse,
+  UserSearchParams,
+  AdminUserView,
+  AdminUserSearchResponse,
+  AdminFinancialDataResponse,
 } from '@ems/types';
 
 /** — Enhanced User Management — **/
-export async function listUsers(): Promise<PublicUser[]> {
-  const res = await api.get<PublicUser[]>('/api/admin/users');
+export async function listUsers(): Promise<AdminUserView[]> {
+  const res = await api.get<AdminUserView[]>('/api/admin/users');
   return res.data;
-}
-
-// Enhanced search and pagination types
-export interface UserSearchParams {
-  search?: string;
-  role?: string[];
-  active?: boolean;
-  bannedOnly?: boolean;
-  page: number;
-  limit: number;
-  sortBy?: 'name' | 'email' | 'createdAt' | 'muskBucks' | 'role';
-  sortOrder?: 'asc' | 'desc';
 }
 
 export interface PaginatedUsers {
@@ -75,7 +66,7 @@ export interface BulkOperationResult {
 }
 
 // Enhanced user search with pagination
-export async function searchUsers(params: UserSearchParams): Promise<PaginatedUsers> {
+export async function searchUsers(params: UserSearchParams): Promise<AdminUserSearchResponse> {
   const queryParams = new URLSearchParams();
 
   if (params.search) queryParams.append('search', params.search);
@@ -87,7 +78,7 @@ export async function searchUsers(params: UserSearchParams): Promise<PaginatedUs
   if (params.sortBy) queryParams.append('sortBy', params.sortBy);
   if (params.sortOrder) queryParams.append('sortOrder', params.sortOrder);
 
-  const res = await api.get<PaginatedUsers>(`/api/admin/users/search?${queryParams}`);
+  const res = await api.get<AdminUserSearchResponse>(`/api/admin/users/search?${queryParams}`);
   return res.data;
 }
 
@@ -326,6 +317,7 @@ export interface DetailedBet extends PublicBet {
 export interface DetailedTransaction extends PublicTransaction {
   userName?: string;
   userEmail?: string;
+  userAvatarUrl?: string | null;
   subtype?: string;
   description?: string;
   metadata?: any;
@@ -384,7 +376,7 @@ export interface BulkFinancialResult {
 // Enhanced financial data endpoints
 export async function searchFinancialData(
   params: FinancialSearchParams,
-): Promise<PaginatedFinancialData> {
+): Promise<AdminFinancialDataResponse> {
   const queryParams = new URLSearchParams();
 
   if (params.search) queryParams.append('search', params.search);
@@ -408,7 +400,9 @@ export async function searchFinancialData(
   if (params.sortBy) queryParams.append('sortBy', params.sortBy);
   if (params.sortOrder) queryParams.append('sortOrder', params.sortOrder);
 
-  const res = await api.get<PaginatedFinancialData>(`/api/admin/financial/search?${queryParams}`);
+  const res = await api.get<AdminFinancialDataResponse>(
+    `/api/admin/financial/search?${queryParams}`,
+  );
   return res.data;
 }
 
@@ -754,12 +748,6 @@ export async function refreshLeaderboard(): Promise<void> {
 
 export async function getUserStats(userId: number): Promise<UserStatsDTO | null> {
   const res = await api.get<UserStatsDTO>(`/api/admin/stats/${userId}`);
-  return res.data;
-}
-
-/** — Miscellaneous — **/
-export async function triggerAITweet(): Promise<PublicAITweet> {
-  const res = await api.post<PublicAITweet>('/api/admin/aitweet');
   return res.data;
 }
 

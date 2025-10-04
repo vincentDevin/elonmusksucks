@@ -32,7 +32,7 @@ const BanManagementSection: React.FC<BanManagementSectionProps> = ({
   };
 
   const formatDuration = () => {
-    if (!currentBan || currentBan.banType === 'permanent') return null;
+    if (!currentBan || currentBan.banType === 'PERMANENT') return null;
 
     if (currentBan.expiresAt) {
       const expiryDate = new Date(currentBan.expiresAt);
@@ -82,9 +82,9 @@ const BanManagementSection: React.FC<BanManagementSectionProps> = ({
                 <h4 className="text-lg font-semibold text-red-900">Currently Banned</h4>
                 <span
                   className={`inline-block px-3 py-1 rounded-full text-xs font-medium mt-1 ${
-                    currentBan.banType === 'permanent'
+                    currentBan.banType === 'PERMANENT'
                       ? 'bg-red-600 text-white'
-                      : currentBan.banType === 'shadow'
+                      : currentBan.banType === 'CHAT_ONLY'
                         ? 'bg-purple-600 text-white'
                         : 'bg-orange-600 text-white'
                   }`}

@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import type { UserSearchParams } from '../../../api/admin';
-import type { Role } from '@ems/types';
+import type { Role, UserSearchParams } from '@ems/types';
 
 interface UserListToolbarProps {
   onSearch: (params: UserSearchParams) => void;
@@ -64,7 +63,7 @@ const UserListToolbar: React.FC<UserListToolbarProps> = ({
     }
 
     if (selectedRoles.length > 0) {
-      params.role = selectedRoles.map((r) => r.toString());
+      params.role = selectedRoles;
     }
 
     switch (statusFilter) {

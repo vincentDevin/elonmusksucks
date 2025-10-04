@@ -834,7 +834,9 @@ export class PrismaAdminRepository implements IAdminRepository {
         skip: offset,
         take: limit,
         include: {
-          user: { select: { name: true, email: true } },
+          user: {
+            select: { id: true, name: true, email: true, profilePictureKey: true, avatarUrl: true },
+          },
           prediction: { select: { id: true, title: true, category: true, resolved: true } },
           optionOption: { select: { id: true, label: true } },
         },
@@ -846,7 +848,9 @@ export class PrismaAdminRepository implements IAdminRepository {
         skip: offset,
         take: limit,
         include: {
-          user: { select: { name: true, email: true } },
+          user: {
+            select: { id: true, name: true, email: true, profilePictureKey: true, avatarUrl: true },
+          },
         },
       }),
       this.prisma.transaction.count({ where: transactionWhere }),

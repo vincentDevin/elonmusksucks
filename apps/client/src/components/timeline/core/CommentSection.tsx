@@ -234,8 +234,8 @@ export const CommentSection: React.FC<CommentSectionProps> = ({
           // Transform article comments to match the expected structure
           const transformedComments = response.comments.map((comment) => ({
             ...comment,
-            authorName: comment.author?.name || comment.user?.name,
-            authorAvatar: comment.author?.avatarUrl || comment.user?.avatarUrl,
+            authorName: comment.user?.name,
+            authorAvatar: comment.user?.avatarUrl,
             parentId: contentId, // Article comments are always top-level
             reactionCounts: { LIKE: 0, LOVE: 0, LAUGH: 0, ANGRY: 0, SAD: 0 }, // Will be populated by ReactionContext
             userReaction: null, // Will be populated by ReactionContext
@@ -274,8 +274,8 @@ export const CommentSection: React.FC<CommentSectionProps> = ({
         // Transform article comment to match expected structure
         const transformedComment = {
           ...comment,
-          authorName: comment.author?.name || comment.user?.name || user?.name,
-          authorAvatar: comment.author?.avatarUrl || comment.user?.avatarUrl || user?.avatarUrl,
+          authorName: comment.user?.name || user?.name,
+          authorAvatar: comment.user?.avatarUrl || user?.avatarUrl,
           parentId: contentId, // Article comments are always top-level
           reactionCounts: { LIKE: 0, LOVE: 0, LAUGH: 0, ANGRY: 0, SAD: 0 }, // Will be populated by ReactionContext
           userReaction: null, // Will be populated by ReactionContext

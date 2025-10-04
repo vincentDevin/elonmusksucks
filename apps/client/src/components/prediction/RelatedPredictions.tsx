@@ -63,10 +63,10 @@ export default function RelatedPredictions({
       if (prediction.resolved && activeTab !== 'trending') return;
 
       // Same category (high score)
-      if (prediction.category === currentPrediction.category) {
+      if (prediction.categoryId === currentPrediction.categoryId) {
         relationScore += 40;
         relationReason = 'category';
-        relationText = `Same category: ${prediction.category}`;
+        relationText = `Same category: ${prediction.categoryId}`;
       }
 
       // Same creator (medium score)
@@ -301,7 +301,7 @@ export default function RelatedPredictions({
 
                   <div className="flex items-center justify-between">
                     <span className="px-2 py-0.5 bg-primary/10 text-primary rounded text-xs">
-                      {prediction.category}
+                      {prediction.categoryId}
                     </span>
                     <ChevronRight className="w-4 h-4 text-tertiary group-hover:text-primary transition-colors" />
                   </div>
@@ -363,7 +363,7 @@ export default function RelatedPredictions({
               onClick={() =>
                 navigate('/predictions', {
                   state: {
-                    category: currentPrediction.category,
+                    categoryId: currentPrediction.categoryId,
                     excludeId: currentPrediction.id,
                   },
                 })

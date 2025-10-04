@@ -206,7 +206,7 @@ export const UserDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     // 2. shouldRefresh is true (tab became visible after being hidden)
     if (!state.isHydrated) {
       refreshUserData(RefetchReasons.HYDRATION_GUARD);
-    } else if (shouldRefresh) {
+    } else if (shouldRefresh()) {
       refreshUserData(RefetchReasons.TAB_VISIBLE);
     }
   }, [user?.id, state.isHydrated, shouldRefresh]); // FIXED: Removed refreshUserData from dependencies to prevent infinite loop

@@ -43,8 +43,13 @@ export const MentionAutocomplete: React.FC<MentionAutocompleteProps> = ({
     }
 
     try {
-      const users = await searchUsers(query);
-      setSuggestions(users.slice(0, 5)); // Limit to 5 suggestions
+      const results = await searchUsers(query);
+      // Map to convert null avatarUrl to undefined
+      const users = results.slice(0, 5).map((user) => ({
+        ...user,
+        avatarUrl: user.avatarUrl ?? undefined,
+      }));
+      setSuggestions(users);
     } catch (error) {
       console.error('Failed to search users:', error);
       setSuggestions([]);

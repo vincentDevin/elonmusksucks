@@ -161,7 +161,7 @@ export default function PredictionDetailView({
                 </h1>
                 <div className="flex items-center gap-2 mt-1">
                   <span className="px-2 py-0.5 bg-primary/10 text-primary rounded text-sm">
-                    {prediction.category}
+                    {prediction.categoryId}
                   </span>
                   <span
                     className={`px-2 py-0.5 rounded text-sm flex items-center gap-1 ${status.color}`}
@@ -270,7 +270,12 @@ export default function PredictionDetailView({
                         variant="full"
                         type={prediction.type as any}
                         options={prediction.options as any}
-                        bets={prediction.bets}
+                        bets={prediction.bets.map((bet) => ({
+                          ...bet,
+                          amount: bet.amount.toString(),
+                          potentialPayout: bet.potentialPayout?.toString() ?? null,
+                          payout: bet.payout?.toString() ?? null,
+                        }))}
                         parlayLegs={
                           prediction.parlayLegs?.map((leg) => ({
                             ...leg,

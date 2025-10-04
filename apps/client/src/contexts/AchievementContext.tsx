@@ -1,6 +1,6 @@
 // AchievementContext with hydration guard to prevent redundant API calls on navigation
 // PERFORMANCE FIX: Prevents /api/users/{id}/achievements API call on every mount
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { useEventBusCore } from './EventBusCoreContext';
 import api from '../api/axios';

@@ -1,15 +1,11 @@
 import api from './axios';
-import type { UserFeedPost, PostContentType, PostVisibility } from '@ems/types';
+import type { UserFeedPost, CreatePostRequest } from '@ems/types';
 
-export interface CreatePostPayload {
-  content: string;
-  contentType?: PostContentType;
-  visibility?: PostVisibility;
-  mediaUrls?: string[];
-  linkPreview?: any;
-  parentId?: number | null;
-}
+// Type aliases for backwards compatibility
+export type CreatePostPayload = CreatePostRequest;
 
+// Local version kept due to API contract differences
+// TODO: Reconcile with GetPostsOptionsRequest in @ems/types (missing cursor, sortBy)
 export interface GetPostsOptions {
   cursor?: number;
   limit?: number;
@@ -136,12 +132,12 @@ export async function togglePostReaction(
   postId: number,
   type: string,
 ): Promise<{
-  action: 'added' | 'removed';
+  action: 'added' | 'removed' | 'changed';
   type: string;
   counts: Record<string, number>;
 }> {
   const response = await api.post<{
-    action: 'added' | 'removed';
+    action: 'added' | 'removed' | 'changed';
     type: string;
     counts: Record<string, number>;
   }>(`/api/posts/${postId}/reactions`, { type });

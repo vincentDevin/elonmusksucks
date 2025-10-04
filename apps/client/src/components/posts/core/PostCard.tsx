@@ -28,15 +28,25 @@ export const PostCard: React.FC<PostCardProps> = ({
 }) => {
   const { getReactionState, toggleReaction, initializeReactions } = useReactions();
   const [showReplies, setShowReplies] = useState(showComments);
-  const [isDeleted, setIsDeleted] = useState(post.isDeleted);
+  const [isDeleted, setIsDeleted] = useState(false);
 
-  // Initialize reactions on mount
+  // Initialize reactions on mount with actual data from post
   useEffect(() => {
-    initializeReactions('post', post.id, post.reactionCounts, post.userReaction);
+    // Use reaction counts from post data, fallback to empty if not available
+    const initialCounts = post.reactionCounts || {
+      LIKE: 0,
+      LOVE: 0,
+      LAUGH: 0,
+      WOW: 0,
+      ANGRY: 0,
+      SAD: 0,
+    };
+    const initialUserReaction = post.userReaction || undefined;
+    initializeReactions('post', post.id, initialCounts, initialUserReaction);
   }, [post.id, post.reactionCounts, post.userReaction, initializeReactions]);
 
   // Get current reaction state from context
-  const { reactionCounts, userReaction, isReacting } = getReactionState('post', post.id);
+  const { reactionCounts, userReaction } = getReactionState('post', post.id);
 
   const handlePostUpdate = (updatedPost: UserFeedPost) => {
     onUpdate?.(updatedPost);
@@ -72,15 +82,15 @@ export const PostCard: React.FC<PostCardProps> = ({
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-start space-x-3">
             <Link to={`/profile/${post.authorId}`} className="flex-shrink-0">
-              {post.authorAvatar ? (
+              {post.author?.avatarUrl ? (
                 <img
-                  src={post.authorAvatar}
-                  alt={post.authorName || 'User'}
+                  src={post.author.avatarUrl}
+                  alt={post.author.name || 'User'}
                   className="w-11 h-11 rounded-full object-cover hover:ring-2 hover:ring-primary/30 transition-all"
                 />
               ) : (
                 <div className="w-11 h-11 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white font-semibold hover:ring-2 hover:ring-primary/30 transition-all">
-                  {post.authorName?.[0]?.toUpperCase() || '?'}
+                  {post.author?.name?.[0]?.toUpperCase() || '?'}
                 </div>
               )}
             </Link>
@@ -90,22 +100,11 @@ export const PostCard: React.FC<PostCardProps> = ({
                   to={`/profile/${post.authorId}`}
                   className="font-semibold text-content hover:text-primary transition-colors"
                 >
-                  {post.authorName || 'Unknown User'}
+                  {post.author?.name || 'Unknown User'}
                 </Link>
-                {post.visibility && post.visibility !== 'PUBLIC' && (
-                  <span className="px-2 py-0.5 bg-muted/50 rounded-full text-xs font-medium text-tertiary">
-                    {post.visibility.toLowerCase()}
-                  </span>
-                )}
               </div>
               <div className="flex items-center space-x-2 text-sm text-tertiary">
                 <span>{formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}</span>
-                {post.editedAt && (
-                  <>
-                    <span>•</span>
-                    <span className="italic">edited</span>
-                  </>
-                )}
               </div>
             </div>
           </div>
@@ -114,50 +113,6 @@ export const PostCard: React.FC<PostCardProps> = ({
         {/* Post Content */}
         <div className="mb-4">
           <MentionRenderer content={post.body || ''} className="text-content leading-relaxed" />
-
-          {/* Media URLs */}
-          {post.mediaUrls && post.mediaUrls.length > 0 && (
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              {post.mediaUrls.map((url, index) => (
-                <img
-                  key={index}
-                  src={url}
-                  alt={`Media ${index + 1}`}
-                  className="rounded-lg w-full h-48 object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                  onClick={() => window.open(url, '_blank')}
-                />
-              ))}
-            </div>
-          )}
-
-          {/* Link Preview */}
-          {post.linkPreview && (
-            <div className="mt-3 border border-muted rounded-lg p-3 hover:bg-muted/10 transition-colors">
-              <a
-                href={post.linkPreview.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block"
-              >
-                {post.linkPreview.image && (
-                  <img
-                    src={post.linkPreview.image}
-                    alt={post.linkPreview.title}
-                    className="w-full h-32 object-cover rounded mb-2"
-                  />
-                )}
-                <h4 className="font-semibold text-content hover:text-primary">
-                  {post.linkPreview.title}
-                </h4>
-                {post.linkPreview.description && (
-                  <p className="text-sm text-tertiary line-clamp-2">
-                    {post.linkPreview.description}
-                  </p>
-                )}
-                <p className="text-xs text-muted mt-1">{new URL(post.linkPreview.url).hostname}</p>
-              </a>
-            </div>
-          )}
         </div>
 
         {/* Stats and Actions */}
@@ -177,32 +132,15 @@ export const PostCard: React.FC<PostCardProps> = ({
               className="flex items-center space-x-1.5 hover:text-primary transition-colors text-tertiary hover:bg-muted/30 px-2 py-1 rounded-lg"
             >
               <span className="text-base">💬</span>
-              <span className="font-medium">{post.commentsCount || 0}</span>
-              {post.commentsCount > 0 && <span className="text-xs">{showReplies ? '▲' : '▼'}</span>}
+              <span className="font-medium">{post.repliesCount || 0}</span>
+              {post.repliesCount > 0 && <span className="text-xs">{showReplies ? '▲' : '▼'}</span>}
             </button>
-
-            {/* Views */}
-            <div className="flex items-center space-x-1.5 text-tertiary">
-              <span className="text-base">👁</span>
-              <span className="font-medium">{Number(post.viewsCount) || 0}</span>
-            </div>
-
-            {/* Shares */}
-            {post.sharesCount > 0 && (
-              <div className="flex items-center space-x-1.5 text-tertiary">
-                <span className="text-base">🔄</span>
-                <span className="font-medium">{post.sharesCount}</span>
-              </div>
-            )}
           </div>
 
           <PostActions
             post={post}
             onShare={() => {
-              handlePostUpdate({
-                ...post,
-                sharesCount: (post.sharesCount || 0) + 1,
-              });
+              handlePostUpdate(post);
             }}
             onReport={() => {
               // Handle report
@@ -221,14 +159,10 @@ export const PostCard: React.FC<PostCardProps> = ({
               contentType="post"
               contentId={post.id}
               comments={[]} // Always fetch fresh comments to get updated avatar URLs
-              commentsCount={post.commentsCount || 0}
-              onCommentsUpdate={(updatedComments) => {
-                // Update post with new comment count
-                handlePostUpdate({
-                  ...post,
-                  commentsCount: updatedComments.length,
-                  children: updatedComments,
-                });
+              commentsCount={post.repliesCount || 0}
+              onCommentsUpdate={() => {
+                // Update post with new comment count (can't update repliesCount on DbUserFeedContent)
+                handlePostUpdate(post);
               }}
             />
           </div>

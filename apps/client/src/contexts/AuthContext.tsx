@@ -1,5 +1,5 @@
 // Rollback: Remove refreshUserData call from login/logout handlers
-import React, {
+import {
   createContext,
   useState,
   useEffect,
@@ -7,6 +7,7 @@ import React, {
   useContext,
   useOptimistic,
   startTransition,
+  type ReactNode,
 } from 'react';
 import {
   login as loginApi,
@@ -17,18 +18,18 @@ import {
   getBalance as getBalanceApi,
 } from '../api/auth';
 import type { User } from '../api/auth';
-import type { ReactNode } from 'react';
 import { setAccessToken, setAuthFailureCallback, setTokenRefreshCallback } from '../api/axios';
 import { useEventBusCore } from './EventBusCoreContext';
 import { useSocket } from './SocketContext';
-import { REDIS_CHANNELS } from '../types/events';
-import type {
-  BalanceUpdatePayload,
-  BetPlacedPayload,
-  BetResolvedPayload,
-  PayoutCompletedPayload,
-  PongWagerPayload,
-  PongPayoutPayload,
+import {
+  REDIS_CHANNELS,
+  type BalanceUpdatePayload,
+  type BetPlacedPayload,
+  type ParlayPlacedPayload,
+  type BetResolvedPayload,
+  type ParlayResolvedPayload,
+  type PongWagerPayload,
+  type PongPayoutPayload,
 } from '@ems/types';
 
 interface AuthContextType {
@@ -61,28 +62,28 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       switch (action.type) {
         case 'bet':
-          // Optimistically subtract bet amount
+          // Optimistically subtract bet amount (muskBucks is string, convert to number for math)
           return {
             ...current,
-            muskBucks: Math.max(0, current.muskBucks - action.payload.amount),
+            muskBucks: String(Math.max(0, Number(current.muskBucks) - action.payload.amount)),
           };
         case 'parlay':
-          // Optimistically subtract parlay amount
+          // Optimistically subtract parlay amount (muskBucks is string, convert to number for math)
           return {
             ...current,
-            muskBucks: Math.max(0, current.muskBucks - action.payload.amount),
+            muskBucks: String(Math.max(0, Number(current.muskBucks) - action.payload.amount)),
           };
         case 'payout':
-          // Optimistically add payout amount
+          // Optimistically add payout amount (muskBucks is string, convert to number for math)
           return {
             ...current,
-            muskBucks: current.muskBucks + action.payload.amount,
+            muskBucks: String(Number(current.muskBucks) + action.payload.amount),
           };
         case 'refresh':
           // Set exact balance from server (not optimistic)
           return {
             ...current,
-            muskBucks: action.payload.newBalance,
+            muskBucks: String(action.payload.newBalance),
           };
         default:
           return current;
@@ -163,9 +164,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       if (!user?.id) return;
       const balanceData = await getBalanceApi();
-      // Update base user balance (not optimistic)
+      // Update base user balance (not optimistic) - muskBucks stays as string
       setBaseUser((prevUser) =>
-        prevUser ? { ...prevUser, muskBucks: parseInt(balanceData.muskBucks) } : null,
+        prevUser ? { ...prevUser, muskBucks: balanceData.muskBucks } : null,
       );
     } catch (error) {
       // Silently fail for balance refresh to avoid breaking other functionality
@@ -238,32 +239,49 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       // Bet placed events
       subscribe(REDIS_CHANNELS.BET_PLACED, (data: BetPlacedPayload) => {
-        // Note: BetPlacedPayload doesn't have userId, might need server update
-        // For now, refresh user to get accurate balance
-        refreshUser();
+        // BetPlacedPayload has userId in the wrapper
+        if (data.userId === user.id) {
+          console.log('[Auth] Bet placed by user, refreshing balance');
+          refreshUser();
+        }
       }),
 
       // Parlay placed events
-      subscribe(REDIS_CHANNELS.PARLAY_PLACED, (data: any) => {
-        // Note: Need to check payload structure, might need server update
-        refreshUser();
+      subscribe(REDIS_CHANNELS.PARLAY_PLACED, (data: ParlayPlacedPayload) => {
+        if (data.userId === user.id) {
+          console.log('[Auth] Parlay placed by user, refreshing balance');
+          refreshUser();
+        }
       }),
 
       // Bet resolved events
       subscribe(REDIS_CHANNELS.BET_RESOLVED, (data: BetResolvedPayload) => {
-        // Note: BetResolvedPayload doesn't have userId, need server updates
-        refreshUser();
+        if (data.userId === user.id) {
+          console.log('[Auth] Bet resolved for user, refreshing balance');
+          if (data.won && data.payout) {
+            startTransition(() => {
+              optimisticUpdateUser({
+                type: 'payout',
+                payload: { amount: data.payout! },
+              });
+            });
+          }
+          refreshUser();
+        }
       }),
 
       // Parlay resolved events
-      subscribe(REDIS_CHANNELS.PARLAY_RESOLVED, (data: PayoutCompletedPayload) => {
-        if (data.userId === user.id && data.amount) {
-          startTransition(() => {
-            optimisticUpdateUser({
-              type: 'payout',
-              payload: { amount: data.amount },
+      subscribe(REDIS_CHANNELS.PARLAY_RESOLVED, (data: ParlayResolvedPayload) => {
+        if (data.userId === user.id) {
+          console.log('[Auth] Parlay resolved for user, refreshing balance');
+          if (data.won && data.payout) {
+            startTransition(() => {
+              optimisticUpdateUser({
+                type: 'payout',
+                payload: { amount: data.payout! },
+              });
             });
-          });
+          }
           refreshUser();
         }
       }),
@@ -271,6 +289,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // Pong wager events
       subscribe(REDIS_CHANNELS.PONG_WAGER, (data: PongWagerPayload) => {
         if (data.userId === user.id) {
+          console.log('[Auth] Pong wager placed by user');
           startTransition(() => {
             optimisticUpdateUser({
               type: 'bet',
@@ -284,6 +303,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // Pong payout events
       subscribe(REDIS_CHANNELS.PONG_PAYOUT, (data: PongPayoutPayload) => {
         if (data.userId === user.id) {
+          console.log('[Auth] Pong payout received by user');
           startTransition(() => {
             optimisticUpdateUser({
               type: 'payout',

@@ -14,11 +14,14 @@ export default function PredictionFeed() {
   ];
 
   // Create filters for categories
-  const categories = useMemo(() => [...new Set(predictions.map((p) => p.category))], [predictions]);
-  const filters: FeedFilter[] = categories.map((category) => ({
-    id: category,
-    label: category,
-    value: category,
+  const categories = useMemo(
+    () => [...new Set(predictions.map((p) => p.categoryId))],
+    [predictions],
+  );
+  const filters: FeedFilter[] = categories.map((categoryId) => ({
+    id: String(categoryId),
+    label: `Category ${categoryId}`,
+    value: String(categoryId),
     active: false,
   }));
 
@@ -45,7 +48,7 @@ export default function PredictionFeed() {
       // Apply category filters
       const activeCategories = Object.keys(activeFilters);
       if (activeCategories.length > 0) {
-        filtered = filtered.filter((p) => activeCategories.includes(p.category));
+        filtered = filtered.filter((p) => activeCategories.includes(String(p.categoryId)));
       }
 
       // Apply sorting based on tab

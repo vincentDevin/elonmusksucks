@@ -33,7 +33,33 @@ export class TimelineService {
     viewerId?: number;
   }) {
     const result = await this.contentRepository.getPublicTimeline(params);
-    return result.content;
+
+    // Batch enrich user avatars - access author directly from repository result
+    const authors = result.content.filter((c: any) => c.author).map((c: any) => c.author);
+    const enrichedAuthors = await userService.enrichUsersWithAvatars(authors);
+    const authorMap = new Map(enrichedAuthors.map((author) => [author.id, author]));
+
+    // Map enriched authors back to posts
+    const enrichedPosts = result.content.map((post: any) => {
+      if (post.author) {
+        const enrichedUser = authorMap.get(post.author.id);
+        if (enrichedUser) {
+          return {
+            ...post,
+            user: enrichedUser,
+            author: enrichedUser, // Keep both for compatibility
+          };
+        }
+      }
+      // Fallback if enrichment fails or no author
+      return {
+        ...post,
+        user: post.author || { id: post.authorId, name: 'Unknown', avatarUrl: null },
+        author: post.author || { id: post.authorId, name: 'Unknown', avatarUrl: null },
+      };
+    });
+
+    return enrichedPosts;
   }
 
   async getArticleDetails(articleId: number): Promise<any> {

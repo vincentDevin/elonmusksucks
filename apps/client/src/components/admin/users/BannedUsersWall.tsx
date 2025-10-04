@@ -59,7 +59,7 @@ const BannedUsersWall: React.FC = () => {
 
   // Format duration for display
   const formatDuration = (ban: UserBan) => {
-    if (ban.banType === 'permanent') {
+    if (ban.banType === 'PERMANENT') {
       return 'Permanent';
     }
 
@@ -166,12 +166,14 @@ const BannedUsersWall: React.FC = () => {
             >
               <div className="flex justify-between items-start mb-3">
                 <div>
-                  <h3 className="font-semibold text-[var(--color-content)]">{ban.user.name}</h3>
-                  <p className="text-sm text-[var(--color-muted)]">{ban.user.email}</p>
+                  <h3 className="font-semibold text-[var(--color-content)]">
+                    {ban.user?.name || 'Unknown User'}
+                  </h3>
+                  <p className="text-sm text-[var(--color-muted)]">{ban.user?.email || 'N/A'}</p>
                 </div>
                 <span
                   className={`px-2 py-1 text-xs rounded ${
-                    ban.banType === 'permanent'
+                    ban.banType === 'PERMANENT'
                       ? 'bg-red-100 text-red-800'
                       : 'bg-yellow-100 text-yellow-800'
                   }`}
@@ -210,7 +212,7 @@ const BannedUsersWall: React.FC = () => {
 
               <div className="mt-4 pt-3 border-t border-[var(--color-muted)]">
                 <button
-                  onClick={() => handleUnban(ban.userId, ban.user.name)}
+                  onClick={() => handleUnban(ban.userId, ban.user?.name || 'Unknown User')}
                   className="w-full px-3 py-2 text-sm bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
                 >
                   Unban User

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { createPost } from '../../../api/posts';
 import BaseModal from '../../BaseModal';
-import type { PostContentType, PostVisibility } from '@ems/types';
+import type { PostContentType } from '@ems/types';
 
 interface CreatePostProps {
   onPostCreated?: () => void;
@@ -24,7 +24,7 @@ export const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated, className
   const { user } = useAuth();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [content, setContent] = useState('');
-  const [visibility, setVisibility] = useState<PostVisibility>('PUBLIC');
+  const [visibility, setVisibility] = useState<'PUBLIC' | 'PRIVATE' | 'FOLLOWERS'>('PUBLIC');
   const [contentType, setContentType] = useState<PostContentType>('TEXT');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,7 +53,6 @@ export const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated, className
     try {
       await createPost({
         content: content.trim(),
-        contentType,
         visibility,
       });
 

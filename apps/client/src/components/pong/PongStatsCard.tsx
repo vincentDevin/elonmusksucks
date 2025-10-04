@@ -1,12 +1,5 @@
 import { useState, useEffect } from 'react';
-import {
-  ChartBarIcon,
-  TrophyIcon,
-  CurrencyDollarIcon,
-  FireIcon,
-  StarIcon,
-  ClockIcon,
-} from '@heroicons/react/24/outline';
+import { TrophyIcon, CurrencyDollarIcon, FireIcon } from '@heroicons/react/24/outline';
 import api from '../../api/axios';
 import BaseCard from '../BaseCard';
 import { formatMuskBucks } from '../../utils/formatting';
@@ -138,18 +131,16 @@ export default function PongStatsCard({
   }
 
   return (
-    <BaseCard
-      variant="full"
-      className={className}
-      title="📊 Pong Statistics"
-      headerContent={
-        stats.riskTaker && (
+    <BaseCard variant="full" className={className} title="📊 Pong Statistics">
+      {/* High Roller Badge */}
+      {stats.riskTaker && (
+        <div className="mb-4">
           <span className="px-2 py-1 bg-warning/10 text-warning rounded-full text-xs font-medium">
             🎲 High Roller
           </span>
-        )
-      }
-    >
+        </div>
+      )}
+
       {/* Core Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <div className="text-center p-3 bg-muted/30 rounded-lg">

@@ -1,10 +1,11 @@
 // Rollback: Delete this file and restore direct fetch usage in Home.tsx
 import { useState, useEffect, useCallback } from 'react';
-import { getMarketOverview, type MarketStats } from '../api/market';
+import { getMarketOverview } from '../api/market';
+import type { MarketStatsResponse } from '@ems/types';
 import { cache, CACHE_KEYS, CACHE_TTL } from '../utils/cache';
 
 export const useMarketOverview = () => {
-  const [data, setData] = useState<MarketStats | null>(null);
+  const [data, setData] = useState<MarketStatsResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -13,7 +14,7 @@ export const useMarketOverview = () => {
 
     // Check cache first unless forcing refresh
     if (!force && cache.has(cacheKey)) {
-      const cachedData = cache.get<MarketStats>(cacheKey);
+      const cachedData = cache.get<MarketStatsResponse>(cacheKey);
       if (cachedData) {
         setData(cachedData);
         setLoading(false);

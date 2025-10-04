@@ -175,28 +175,29 @@ export class PostService {
       viewerId,
     });
 
-    // Convert to feed content
-    const feedContents = result.content.map((post) => this.toFeedContent(post, viewerId));
-
-    // Batch enrich all author avatars
-    const authors = feedContents.filter((fc) => fc.author && fc.author.id).map((fc) => fc.author);
-
+    // Batch enrich user avatars - access author directly from repository result
+    const authors = result.content.filter((c: any) => c.author).map((c: any) => c.author);
     const enrichedAuthors = await userService.enrichUsersWithAvatars(authors);
     const authorMap = new Map(enrichedAuthors.map((author) => [author.id, author]));
 
-    // Map enriched authors back to posts
-    const posts = feedContents.map((feedContent) => {
-      if (feedContent.author && feedContent.author.id) {
-        const enrichedAuthor = authorMap.get(feedContent.author.id);
-        if (enrichedAuthor) {
-          return {
-            ...feedContent,
-            author: enrichedAuthor,
-            authorAvatar: enrichedAuthor.avatarUrl,
-          };
+    // Map enriched authors back to posts and convert to feed content
+    const posts = result.content.map((post: any) => {
+      let finalAuthor;
+
+      if (post.author) {
+        const enrichedUser = authorMap.get(post.author.id);
+        if (enrichedUser) {
+          finalAuthor = enrichedUser;
+        } else {
+          finalAuthor = post.author;
         }
+      } else {
+        // Fallback if no author
+        finalAuthor = { id: post.authorId, name: 'Unknown', avatarUrl: null };
       }
-      return feedContent;
+
+      // Convert to DbUserFeedContent format with enriched author
+      return this.toFeedContent({ ...post, author: finalAuthor }, viewerId);
     });
 
     return {
@@ -222,32 +223,33 @@ export class PostService {
       viewerId,
     });
 
-    // Convert replies to feed content
-    const feedContents = result.replies.map((reply) => this.toFeedContent(reply));
-
-    // Batch enrich all author avatars
-    const authors = feedContents.filter((fc) => fc.author && fc.author.id).map((fc) => fc.author);
-
+    // Batch enrich user avatars - access author directly from repository result
+    const authors = result.replies.filter((c: any) => c.author).map((c: any) => c.author);
     const enrichedAuthors = await userService.enrichUsersWithAvatars(authors);
     const authorMap = new Map(enrichedAuthors.map((author) => [author.id, author]));
 
-    // Map enriched authors back to comments
-    const enrichedComments = feedContents.map((feedContent) => {
-      if (feedContent.author && feedContent.author.id) {
-        const enrichedAuthor = authorMap.get(feedContent.author.id);
-        if (enrichedAuthor) {
-          return {
-            ...feedContent,
-            author: enrichedAuthor,
-            authorAvatar: enrichedAuthor.avatarUrl,
-          };
+    // Map enriched authors back to comments and convert to feed content
+    const comments = result.replies.map((reply: any) => {
+      let finalAuthor;
+
+      if (reply.author) {
+        const enrichedUser = authorMap.get(reply.author.id);
+        if (enrichedUser) {
+          finalAuthor = enrichedUser;
+        } else {
+          finalAuthor = reply.author;
         }
+      } else {
+        // Fallback if no author
+        finalAuthor = { id: reply.authorId, name: 'Unknown', avatarUrl: null };
       }
-      return feedContent;
+
+      // Convert to DbUserFeedContent format with enriched author
+      return this.toFeedContent({ ...reply, author: finalAuthor }, viewerId);
     });
 
     return {
-      comments: enrichedComments,
+      comments,
       nextCursor: result.nextCursor,
     };
   }

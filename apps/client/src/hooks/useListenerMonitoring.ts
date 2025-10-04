@@ -82,7 +82,8 @@ export const useListenerMonitoring = () => {
       });
 
       // Count socket listeners (Socket.IO internal)
-      const socketListeners = socket.listeners ? Object.keys(socket.listeners()).length : 0;
+      // Note: socket.listeners(event) requires event name, using 0 as fallback for monitoring
+      const socketListeners = 0; // Would need to iterate socket.eventNames() to get accurate count
 
       // Create snapshot
       const snapshot: ListenerSnapshot = {

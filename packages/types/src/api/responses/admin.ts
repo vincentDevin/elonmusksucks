@@ -17,8 +17,15 @@ export interface AdminUserView {
   muskBucks: string;
   role: string;
   isEmailVerified: boolean;
+  active: boolean;
+  avatarUrl?: string | null;
   createdAt: string;
   updatedAt: string;
+  banStatus?: {
+    isBanned: boolean;
+    reason?: string;
+    expiresAt?: string;
+  } | null;
 }
 
 // ============================================================================
@@ -42,6 +49,8 @@ export interface AdminBetView {
   id: number;
   userId: number;
   userName: string;
+  userEmail?: string;
+  userAvatarUrl?: string | null;
   predictionId: number;
   predictionTitle: string;
   optionId: number | null;
@@ -61,6 +70,8 @@ export interface AdminTransactionView {
   id: number;
   userId: number;
   userName: string;
+  userEmail?: string;
+  userAvatarUrl?: string | null;
   type: string;
   amount: string;
   balanceAfter: string;

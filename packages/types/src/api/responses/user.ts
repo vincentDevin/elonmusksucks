@@ -88,6 +88,19 @@ export interface UnifiedActivityEvent {
   details?: Record<string, any>;
 }
 
+// Alias for backwards compatibility
+export type UserActivity = UnifiedActivityEvent;
+
+// ============================================================================
+// User Search
+// ============================================================================
+
+export interface SearchUserResult {
+  id: number;
+  name: string;
+  avatarUrl?: string | null;
+}
+
 // ============================================================================
 // User Stats View
 // ============================================================================

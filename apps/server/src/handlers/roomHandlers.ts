@@ -1,5 +1,11 @@
 import { Server, Socket } from 'socket.io';
-import { SOCKET_EVENTS, SOCKET_ROOMS, ROOM_PATTERNS } from '@ems/types';
+import {
+  SOCKET_EVENTS,
+  SOCKET_ROOMS,
+  ROOM_PATTERNS,
+  type JoinRoomResponse,
+  type LeaveRoomResponse,
+} from '@ems/types';
 import type { AuthenticatedSocket } from '../middleware/socketAuthMiddleware';
 
 /**
@@ -32,6 +38,20 @@ const ADMIN_ROOMS = [
 ] as const;
 
 /**
+ * Type guard to check if room is in PUBLIC_ROOMS
+ */
+function isPublicRoom(room: string): boolean {
+  return PUBLIC_ROOMS.includes(room as (typeof PUBLIC_ROOMS)[number]);
+}
+
+/**
+ * Type guard to check if room is in ADMIN_ROOMS
+ */
+function isAdminRoom(room: string): boolean {
+  return ADMIN_ROOMS.includes(room as (typeof ADMIN_ROOMS)[number]);
+}
+
+/**
  * Authorizes room access based on user permissions and room type
  */
 function authorizeRoomAccess(
@@ -52,12 +72,12 @@ function authorizeRoomAccess(
   }
 
   // Check public rooms first
-  if (PUBLIC_ROOMS.includes(roomName as any)) {
+  if (isPublicRoom(roomName)) {
     return { authorized: true };
   }
 
   // Check admin rooms
-  if (ADMIN_ROOMS.includes(roomName as any)) {
+  if (isAdminRoom(roomName)) {
     if (user.role !== 'ADMIN') {
       return {
         authorized: false,
@@ -191,7 +211,7 @@ export function registerRoomHandlers(_io: Server, socket: Socket) {
   const authSocket = socket as AuthenticatedSocket;
 
   // Handle both 'join' and 'joinRoom' events for compatibility
-  const handleJoinRoom = (room: string, callback?: (response: any) => void) => {
+  const handleJoinRoom = (room: string, callback?: (response: JoinRoomResponse) => void) => {
     const validation = validateRoomName(room);
     if (!validation.valid) {
       const error = `Room validation failed: ${validation.reason}`;
@@ -217,12 +237,12 @@ export function registerRoomHandlers(_io: Server, socket: Socket) {
     callback?.({ success: true, room });
   };
 
-  const handleLeaveRoom = (room: string, callback?: (response: any) => void) => {
+  const handleLeaveRoom = (room: string, callback?: (response: LeaveRoomResponse) => void) => {
     socket.leave(room);
     console.log(
       `[room-auth] User ${authSocket.user?.id} left room: ${room} - socket: ${socket.id}`,
     );
-    callback?.({ success: true, room });
+    callback?.({ success: true });
   };
 
   // Support both event names for backward compatibility

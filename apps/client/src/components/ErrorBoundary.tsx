@@ -1,6 +1,7 @@
 // apps/client/src/components/ErrorBoundary.tsx
 // Consolidated error boundary with optional retry logic
-import React, { Component, ReactNode, ErrorInfo } from 'react';
+import React, { Component } from 'react';
+import type { ReactNode, ErrorInfo } from 'react';
 
 interface Props {
   children: ReactNode;

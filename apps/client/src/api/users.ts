@@ -1,5 +1,11 @@
 import api from './axios';
-import type { PublicUserProfile, UserFeedPost, UserActivity, UserStatsDTO } from '@ems/types';
+import type {
+  PublicUserProfile,
+  UserFeedPost,
+  UserActivity,
+  UserStatsDTO,
+  SearchUserResult,
+} from '@ems/types';
 
 export type UserProfile = PublicUserProfile;
 
@@ -90,12 +96,6 @@ export async function getUserStats(userId: number): Promise<UserStatsDTO> {
 }
 
 /** ----------- SEARCH ----------- */
-export interface SearchUserResult {
-  id: number;
-  name: string;
-  avatarUrl?: string;
-}
-
 export async function searchUsers(query: string): Promise<SearchUserResult[]> {
   if (!query || query.trim().length === 0) {
     return [];

@@ -7,7 +7,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useEventBusCore } from '../contexts/EventBusCoreContext';
 import { useAuth } from '../contexts/AuthContext';
-import { REDIS_CHANNELS } from '../types/events';
+import { REDIS_CHANNELS } from '@ems/types';
 
 // Rank update interface
 export interface RankUpdate {
@@ -156,32 +156,38 @@ export function useLeaderboardEvents() {
           });
 
           // Update user ranking
-          setUserRanking((prev) => ({
-            ...prev,
-            [payload.category]: {
-              rank: payload.newRank,
-              total: payload.totalUsers || prev[payload.category as keyof UserRanking].total,
-              percentile: Math.round((1 - payload.newRank / (payload.totalUsers || 1000)) * 100),
-            },
-            // Update highest rank if this is better
-            highestRank:
-              payload.newRank < prev.highestRank.rank
-                ? {
-                    rank: payload.newRank,
-                    category: payload.category,
-                    achievedAt: payload.timestamp,
-                  }
-                : prev.highestRank,
-            // Update biggest climb if this is bigger
-            biggestClimb:
-              improvement && rankChange > prev.biggestClimb.positions
-                ? {
-                    positions: rankChange,
-                    category: payload.category,
-                    achievedAt: payload.timestamp,
-                  }
-                : prev.biggestClimb,
-          }));
+          setUserRanking((prev) => {
+            const categoryData = prev[payload.category as keyof UserRanking];
+            const previousTotal =
+              categoryData && 'total' in categoryData ? categoryData.total : 1000;
+
+            return {
+              ...prev,
+              [payload.category]: {
+                rank: payload.newRank,
+                total: payload.totalUsers || previousTotal,
+                percentile: Math.round((1 - payload.newRank / (payload.totalUsers || 1000)) * 100),
+              },
+              // Update highest rank if this is better
+              highestRank:
+                payload.newRank < prev.highestRank.rank
+                  ? {
+                      rank: payload.newRank,
+                      category: payload.category,
+                      achievedAt: payload.timestamp,
+                    }
+                  : prev.highestRank,
+              // Update biggest climb if this is bigger
+              biggestClimb:
+                improvement && rankChange > prev.biggestClimb.positions
+                  ? {
+                      positions: rankChange,
+                      category: payload.category,
+                      achievedAt: payload.timestamp,
+                    }
+                  : prev.biggestClimb,
+            };
+          });
         }
       }),
 
@@ -323,9 +329,9 @@ export function useLeaderboardEvents() {
   const getCurrentPosition = useCallback(
     (category: keyof LeaderboardData) => {
       const data = leaderboardData[category];
-      if (!data || !user) return null;
+      if (!data || !Array.isArray(data) || !user) return null;
 
-      const userEntry = data.find((entry) => entry.userId === user.id);
+      const userEntry = data.find((entry: LeaderboardEntry) => entry.userId === user.id);
       return userEntry ? userEntry.rank : null;
     },
     [leaderboardData, user],

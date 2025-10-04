@@ -7,10 +7,14 @@ import {
   bulkFinancialOperation,
   exportFinancialData,
   type FinancialSearchParams,
-  type PaginatedFinancialData,
-  type DetailedBet,
 } from '../../../api/admin';
-import { REDIS_CHANNELS, SOCKET_EVENTS, type AdminFinancialAnalyticsResponse } from '@ems/types';
+import {
+  REDIS_CHANNELS,
+  SOCKET_EVENTS,
+  type AdminFinancialAnalyticsResponse,
+  type AdminFinancialDataResponse,
+  type AdminBetView,
+} from '@ems/types';
 
 // Sub-components
 import FinancialStatsOverview from './FinancialStatsOverview';
@@ -71,7 +75,7 @@ const FinancialDashboard: React.FC<FinancialDashboardProps> = ({ className = '' 
   const [pageSize, setPageSize] = useState(25);
 
   // Data states
-  const [financialData, setFinancialData] = useState<PaginatedFinancialData | null>(null);
+  const [financialData, setFinancialData] = useState<AdminFinancialDataResponse | null>(null);
   const [analytics, setAnalytics] = useState<AdminFinancialAnalyticsResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -644,7 +648,7 @@ const FinancialDashboard: React.FC<FinancialDashboardProps> = ({ className = '' 
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-muted/50">
-                  {financialData.bets.map((bet: DetailedBet) => (
+                  {financialData.bets.map((bet: AdminBetView) => (
                     <tr key={bet.id} className="hover:bg-background/50 transition-colors">
                       <td className="px-3 py-2">
                         <input
@@ -663,19 +667,38 @@ const FinancialDashboard: React.FC<FinancialDashboardProps> = ({ className = '' 
                         />
                       </td>
                       <td className="px-3 py-2 text-xs">
-                        <div className="font-medium text-content truncate max-w-24">
-                          {bet.userName}
+                        <div className="flex items-center gap-2">
+                          {bet.userAvatarUrl ? (
+                            <img
+                              src={bet.userAvatarUrl}
+                              alt={bet.userName}
+                              className="w-6 h-6 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-6 h-6 bg-primary/10 rounded-full flex items-center justify-center">
+                              <span className="text-xs font-bold text-primary">
+                                {bet.userName?.charAt(0).toUpperCase()}
+                              </span>
+                            </div>
+                          )}
+                          <div>
+                            <div className="font-medium text-content truncate max-w-24">
+                              {bet.userName}
+                            </div>
+                            {bet.userEmail && (
+                              <div className="text-tertiary truncate max-w-24">{bet.userEmail}</div>
+                            )}
+                          </div>
                         </div>
-                        <div className="text-tertiary truncate max-w-24">{bet.userEmail}</div>
                       </td>
                       <td className="px-3 py-2 text-xs">
                         <div
                           className="font-medium text-content truncate max-w-32"
-                          title={bet.prediction?.title}
+                          title={bet.predictionTitle}
                         >
-                          {bet.prediction?.title || 'Unknown'}
+                          {bet.predictionTitle || 'Unknown'}
                         </div>
-                        <div className="text-tertiary">{bet.prediction?.category}</div>
+                        <div className="text-tertiary">{bet.optionLabel}</div>
                       </td>
                       <td className="px-3 py-2 text-xs font-semibold text-content">
                         ${formatMuskBucks(asNum(bet.amount))}

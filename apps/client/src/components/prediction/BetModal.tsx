@@ -42,7 +42,7 @@ export default function BetModal({
   // Optimistic betting hook (only when enabled)
   const optimisticBetting = enableOptimistic ? useOptimisticBetting() : null;
 
-  const balance = optimisticBetting?.balance ?? user?.muskBucks ?? 0;
+  const balance = Number(optimisticBetting?.balance ?? user?.muskBucks ?? 0);
   const [amount, setAmount] = useState(0);
   const [optionId, setOptionId] = useState(prediction?.options[0]?.id ?? 0);
   const [placing, setPlacing] = useState(false);
@@ -67,7 +67,7 @@ export default function BetModal({
     const filtered = active.filter(
       (pred) =>
         pred.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        pred.category?.toLowerCase().includes(searchTerm.toLowerCase()),
+        pred.categoryId?.toString().toLowerCase().includes(searchTerm.toLowerCase()),
     );
 
     return filtered
@@ -204,18 +204,21 @@ export default function BetModal({
           id: Date.now(),
           userId: user.id,
           predictionId: activePrediction?.id || 0,
-          amount: amount.toString(),
+          amount: BigInt(amount),
           oddsAtPlacement: 0,
-          potentialPayout: '0',
+          potentialPayout: BigInt(0),
           status: 'PENDING' as any,
           optionId,
           won: null as any,
-          payout: '0',
+          payout: BigInt(0),
           createdAt: new Date(),
+          wasAllIn: betCalculations?.isAllIn ?? false,
+          idempotencyKey: null,
           user: {
             id: user.id,
             name: user.name,
             avatarUrl: user.avatarUrl ?? null,
+            profilePictureKey: null,
           },
         };
         onBetPlaced(optimistic);
@@ -284,7 +287,7 @@ export default function BetModal({
                 className="p-4 bg-background border border-muted rounded-lg hover:bg-surface cursor-pointer transition-colors"
               >
                 <h4 className="font-semibold text-content mb-1">{pred.title}</h4>
-                <p className="text-sm text-tertiary mb-2">{pred.category}</p>
+                <p className="text-sm text-tertiary mb-2">Category {pred.categoryId || 'N/A'}</p>
                 <div className="flex gap-2">
                   {pred.options.map((opt) => (
                     <span key={opt.id} className="text-xs bg-muted px-2 py-1 rounded">

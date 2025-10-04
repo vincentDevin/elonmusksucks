@@ -40,11 +40,10 @@ export const CommunityPosts: React.FC<CommunityPostsProps> = ({
     try {
       await createPost({
         content,
-        contentType: options?.contentType || 'TEXT',
         visibility: options?.visibility || 'PUBLIC',
         mediaUrls: options?.mediaUrls || [],
         linkPreview: options?.linkPreview,
-        parentId,
+        parentId: parentId ?? undefined, // Convert null to undefined
       });
 
       // Refresh the feed by incrementing the key

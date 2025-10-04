@@ -13,28 +13,25 @@ import {
   useMemo,
   type ReactNode,
 } from 'react';
-import { useSocketEvent, useEventBusCore } from './EventBusCoreContext';
+import { useSocketEvent } from './EventBusCoreContext';
 import { useSocket } from './SocketContext';
 import { useAuth } from './AuthContext';
-import { REDIS_CHANNELS } from '../types/events';
+import { REDIS_CHANNELS, type ChatErrorPayload } from '@ems/types';
+import type {
+  ChatMessageDTO,
+  ChatTypingPayload,
+  ChatStopTypingPayload,
+  ChatUserOnlineInfo,
+  ChatUsersOnlinePayload,
+  ChatJoinPayload,
+  ChatLeavePayload,
+} from '@ems/types';
 
 /* ---------- Types ---------- */
-export interface ChatMessage {
-  user: { id: number; name: string; role: string; avatarUrl: string | null };
-  message: string;
-  timestamp: string | number;
-  id?: number;
-}
-export interface TypingUser {
-  id: number;
-  name: string;
-}
-export interface OnlineUser {
-  id: number;
-  name: string;
-  avatarUrl: string | null;
-  role: string;
-}
+// Type aliases for backwards compatibility
+export type ChatMessage = ChatMessageDTO;
+export type TypingUser = ChatTypingPayload;
+export type OnlineUser = ChatUserOnlineInfo;
 
 interface ChatCtx {
   messages: ChatMessage[];
@@ -110,8 +107,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setMessages((prev) => [...prev, m]);
   }, []);
 
-  const handleChatError = useCallback((e: any) => {
-    setError(e.message || 'Chat error');
+  const handleChatError = useCallback((e: ChatErrorPayload) => {
+    setError(e.error || 'Chat error');
   }, []);
 
   // Set up direct socket listener for chat errors (not a Redis channel)
@@ -124,12 +121,16 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   /* ---------------------------------------------------------------------- */
   /* 3. Typing indicators                                                   */
   /* ---------------------------------------------------------------------- */
-  const addTyper = useCallback(({ id, name }: TypingUser) => {
-    setTypingUsers((prev) => (prev.some((u) => u.id === id) ? prev : [...prev, { id, name }]));
+  const addTyper = useCallback((payload: ChatTypingPayload) => {
+    setTypingUsers((prev) =>
+      prev.some((u) => u.id === payload.id)
+        ? prev
+        : [...prev, { id: payload.id, name: payload.name }],
+    );
   }, []);
 
-  const removeTyper = useCallback(({ id }: { id: number }) => {
-    setTypingUsers((prev) => prev.filter((u) => u.id !== id));
+  const removeTyper = useCallback((payload: ChatStopTypingPayload) => {
+    setTypingUsers((prev) => prev.filter((u) => u.id !== payload.id));
   }, []);
 
   useSocketEvent(REDIS_CHANNELS.CHAT_TYPING, addTyper);
@@ -138,7 +139,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   /* ---------------------------------------------------------------------- */
   /* 4. Online-users list                                                   */
   /* ---------------------------------------------------------------------- */
-  const updateOnlineUsers = useCallback((users: OnlineUser[]) => {
+  const updateOnlineUsers = useCallback((users: ChatUsersOnlinePayload) => {
     setOnlineUsers(users);
   }, []);
 
@@ -151,24 +152,30 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const seenEventsRef = useRef<Set<string>>(new Set());
 
   const handleUserJoined = useCallback(
-    ({ id, name }: { id: number; name: string }) => {
-      const key = `joined-${id}`;
+    (payload: ChatJoinPayload) => {
+      const key = `joined-${payload.id}`;
       if (seenEventsRef.current.has(key)) return;
       seenEventsRef.current.add(key);
-      if (!user || id !== user.id) {
-        setUserEvents((prev) => [...prev, { type: 'joined', id, name, timestamp: Date.now() }]);
+      if (!user || payload.id !== user.id) {
+        setUserEvents((prev) => [
+          ...prev,
+          { type: 'joined', id: payload.id, name: payload.name, timestamp: Date.now() },
+        ]);
       }
     },
     [user],
   );
 
   const handleUserLeft = useCallback(
-    ({ id, name }: { id: number; name: string }) => {
-      const key = `left-${id}`;
+    (payload: ChatLeavePayload) => {
+      const key = `left-${payload.id}`;
       if (seenEventsRef.current.has(key)) return;
       seenEventsRef.current.add(key);
-      if (!user || id !== user.id) {
-        setUserEvents((prev) => [...prev, { type: 'left', id, name, timestamp: Date.now() }]);
+      if (!user || payload.id !== user.id) {
+        setUserEvents((prev) => [
+          ...prev,
+          { type: 'left', id: payload.id, name: payload.name, timestamp: Date.now() },
+        ]);
       }
     },
     [user],

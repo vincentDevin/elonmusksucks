@@ -230,12 +230,18 @@ const ContentTable: React.FC<ContentTableProps> = ({
 
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2">
-                        {item.author.avatarUrl && (
+                        {item.author.avatarUrl ? (
                           <img
                             src={item.author.avatarUrl}
                             alt={item.author.name}
-                            className="w-6 h-6 rounded-full"
+                            className="w-6 h-6 rounded-full object-cover"
                           />
+                        ) : (
+                          <div className="w-6 h-6 bg-primary/10 rounded-full flex items-center justify-center">
+                            <span className="text-xs font-bold text-primary">
+                              {item.author.name.charAt(0).toUpperCase()}
+                            </span>
+                          </div>
                         )}
                         <div>
                           <div className="text-sm font-medium text-content">{item.author.name}</div>

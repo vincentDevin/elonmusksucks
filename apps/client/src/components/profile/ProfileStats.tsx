@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
 import { useAdmin } from '../../contexts/AdminContext';
 import { formatMuskBucks, getMuskBucksColorClasses } from '../../utils/formatting';
 
@@ -48,9 +47,6 @@ export function ProfileStats({
   users,
   allStats,
 }: ProfileStatsProps) {
-  const { user } = useAuth();
-  const isAdmin = user?.role === 'ADMIN';
-
   // State management
   const [showRawStats, setShowRawStats] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('achievements');
@@ -66,10 +62,10 @@ export function ProfileStats({
   const displayStats = allStats || statsFor || {};
 
   // Calculate derived stats if we have stats
-  const betWinRate = stats?.totalBets > 0 ? stats.betsWon / stats.totalBets : 0;
-  const parlayWinRate = stats?.totalParlays > 0 ? stats.parlaysWon / stats.totalParlays : 0;
+  const betWinRate = stats && stats.totalBets > 0 ? stats.betsWon / stats.totalBets : 0;
+  const parlayWinRate = stats && stats.totalParlays > 0 ? stats.parlaysWon / stats.totalParlays : 0;
   const parlayAccuracy =
-    stats?.totalParlayLegs > 0 ? stats.parlayLegsWon / stats.totalParlayLegs : 0;
+    stats && stats.totalParlayLegs > 0 ? stats.parlayLegsWon / stats.totalParlayLegs : 0;
 
   // Calculate overall win rate (combines bets and parlays)
   const totalGames = (stats?.totalBets || 0) + (stats?.totalParlays || 0);
@@ -167,8 +163,8 @@ export function ProfileStats({
                         <td className="px-2 py-1">{s.parlaysWon}</td>
                         <td className="px-2 py-1">{s.parlaysLost}</td>
                         <td className="px-2 py-1">${formatMuskBucks(s.totalWagered)}</td>
-                        <td className="px-2 py-1">${formatMuskBucks(s.totalWon)}</td>
-                        <td className="px-2 py-1">${formatMuskBucks(s.profit)}</td>
+                        <td className="px-2 py-1">${formatMuskBucks(s.totalWinnings)}</td>
+                        <td className="px-2 py-1">${formatMuskBucks(s.netProfit)}</td>
                         <td className="px-2 py-1">{(s.roi * 100).toFixed(1)}%</td>
                         <td className="px-2 py-1">
                           <button
@@ -299,9 +295,9 @@ export function ProfileStats({
         </div>
         <div className="text-center">
           <div
-            className={`text-lg font-bold ${asNum(stats.profit) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
+            className={`text-lg font-bold ${asNum(stats?.netProfit) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
           >
-            {asNum(stats.profit) >= 0 ? '+' : ''}${formatMuskBucks(stats.profit)}
+            {asNum(stats?.netProfit) >= 0 ? '+' : ''}${formatMuskBucks(stats?.netProfit)}
           </div>
           <div className="text-xs text-tertiary">Profit</div>
         </div>
@@ -321,9 +317,9 @@ export function ProfileStats({
 
           <div className="bg-background/50 border border-muted rounded-xl p-4 hover:bg-background/70 transition-colors duration-200">
             <FinancialBarChart
-              wagered={asNum(stats.totalWagered)}
-              won={asNum(stats.totalWon)}
-              profit={asNum(stats.profit)}
+              wagered={asNum(stats?.totalWagered)}
+              won={asNum(stats?.totalWinnings)}
+              profit={asNum(stats?.netProfit)}
             />
           </div>
 
@@ -364,7 +360,7 @@ export function ProfileStats({
             </div>
             <div className="bg-background/30 p-3 rounded">
               <div className="text-tertiary text-xs">Total Won</div>
-              <div className="font-semibold">${formatMuskBucks(stats.totalWon)}</div>
+              <div className="font-semibold">${formatMuskBucks(stats.totalWinnings)}</div>
             </div>
             <div className="bg-background/30 p-3 rounded">
               <div className="text-tertiary text-xs">Biggest Win</div>
@@ -375,8 +371,8 @@ export function ProfileStats({
               <div className="font-semibold">{stats.currentStreak || 0}</div>
             </div>
             <div className="bg-background/30 p-3 rounded">
-              <div className="text-tertiary text-xs">Longest Streak</div>
-              <div className="font-semibold">{stats.longestStreak || 0}</div>
+              <div className="text-tertiary text-xs">Longest Win Streak</div>
+              <div className="font-semibold">{stats.longestWinStreak || 0}</div>
             </div>
             <div className="bg-background/30 p-3 rounded">
               <div className="text-tertiary text-xs">ROI</div>

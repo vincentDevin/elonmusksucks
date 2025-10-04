@@ -96,7 +96,11 @@ export function registerPongRedisHandlers(io: IOServer, redisSub: IORedis) {
           handleLeaderboardUpdate(io, data);
           break;
         default:
-          console.log(`[pong] Unhandled Redis channel: ${channel}`);
+          // Silently ignore non-pong channels - they're handled by other Redis event handlers
+          // Only log if it's a pong-related channel we don't recognize
+          if (channel.startsWith('pong:')) {
+            console.warn(`[pong] Unrecognized pong channel: ${channel}`);
+          }
       }
     } catch (error) {
       console.error(`[pong] Error processing Redis message from ${channel}:`, error);

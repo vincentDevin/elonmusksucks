@@ -20,10 +20,12 @@ export async function getPredictionById(id: number): Promise<PredictionView> {
   return data;
 }
 
+// Local version kept due to API contract differences
+// TODO: Reconcile with CreatePredictionRequest in @ems/types (uses categoryId: number instead of category: string)
 export interface CreatePredictionPayload {
   title: string;
   description: string;
-  category: string;
+  categoryId: number; // Use categoryId instead of category string
   expiresAt: Date;
   options?: Array<{ label: string }>;
   type: PredictionType;

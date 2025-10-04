@@ -5,7 +5,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useEventBusCore } from '../contexts/EventBusCoreContext';
 import { eventSystemMetricsApi } from '../api/axios';
-import { REDIS_CHANNELS } from '../types/events';
+import { REDIS_CHANNELS } from '@ems/types';
 
 interface EventMetrics {
   eventType: string;

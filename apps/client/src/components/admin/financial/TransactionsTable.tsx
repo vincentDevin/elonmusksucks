@@ -1,9 +1,9 @@
 import React from 'react';
 import { formatMuskBucks } from '../../../utils/formatting';
-import type { DetailedTransaction } from '../../../api/admin';
+import type { AdminTransactionView } from '@ems/types';
 
 interface TransactionsTableProps {
-  transactions: DetailedTransaction[];
+  transactions: AdminTransactionView[];
   className?: string;
 }
 
@@ -34,7 +34,7 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({ transactions, cla
     return { color: 'bg-gray-100 text-gray-800', icon: '💳', label: subtype.replace('_', ' ') };
   };
 
-  const getRelatedBadge = (tx: DetailedTransaction) => {
+  const getRelatedBadge = (tx: AdminTransactionView) => {
     if (tx.relatedBetId) {
       return {
         color: 'bg-orange-50 text-orange-700',
@@ -49,11 +49,11 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({ transactions, cla
         label: `Parlay #${tx.relatedParlayId}`,
       };
     }
-    if (tx.relatedPongMatch) {
+    if (tx.relatedPongMatchId) {
       return {
         color: 'bg-purple-50 text-purple-700',
         icon: '🏓',
-        label: `Pong #${tx.relatedPongMatch.id}`,
+        label: `Pong #${tx.relatedPongMatchId}`,
       };
     }
     return null;
@@ -89,7 +89,7 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({ transactions, cla
             </tr>
           </thead>
           <tbody className="divide-y divide-muted/50">
-            {transactions.map((tx: DetailedTransaction) => {
+            {transactions.map((tx) => {
               const categoryBadge = getCategoryBadge(tx.subtype);
               const relatedBadge = getRelatedBadge(tx);
 
@@ -97,11 +97,19 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({ transactions, cla
                 <tr key={`tx-${tx.id}`} className="hover:bg-background/50 transition-colors">
                   <td className="px-3 py-2 text-xs">
                     <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 bg-primary/10 rounded-full flex items-center justify-center">
-                        <span className="text-xs font-bold text-primary">
-                          {tx.userName?.charAt(0).toUpperCase()}
-                        </span>
-                      </div>
+                      {tx.userAvatarUrl ? (
+                        <img
+                          src={tx.userAvatarUrl}
+                          alt={tx.userName || 'User'}
+                          className="w-6 h-6 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-6 h-6 bg-primary/10 rounded-full flex items-center justify-center">
+                          <span className="text-xs font-bold text-primary">
+                            {tx.userName?.charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                      )}
                       <div>
                         <div
                           className="font-medium text-content truncate max-w-24"

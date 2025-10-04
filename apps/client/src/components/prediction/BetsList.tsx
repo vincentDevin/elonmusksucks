@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import type { PublicPredictionOption, BetWithUser, ParlayLegWithUser } from '@ems/types';
 import { PredictionType } from '@ems/types';
+import { formatMuskBucks } from '../../utils/formatting';
 
 interface BetsListProps {
   type: PredictionType;
@@ -88,8 +89,8 @@ export default function BetsList({ type, bets, parlayLegs = [], options }: BetsL
               >
                 <span className="flex items-center gap-2">
                   <SafeAvatar name={u?.name} avatarUrl={u?.avatarUrl as string | null} />
-                  <strong>{u?.name ?? 'Anonymous'}</strong> bet <em>{b.amount}</em> on{' '}
-                  <strong className={colorClass}>{label}</strong>
+                  <strong>{u?.name ?? 'Anonymous'}</strong> bet <em>{formatMuskBucks(b.amount)}</em>{' '}
+                  on <strong className={colorClass}>{label}</strong>
                 </span>
                 <span className="text-xs text-[var(--color-tertiary)]">
                   {new Date(b.createdAt).toLocaleTimeString()}
@@ -107,7 +108,8 @@ export default function BetsList({ type, bets, parlayLegs = [], options }: BetsL
               >
                 <span className="flex items-center gap-2">
                   <SafeAvatar name={u?.name} avatarUrl={u?.avatarUrl as string | null} />
-                  <strong>{u?.name ?? 'Anonymous'}</strong> parlayed <em>{l.stake}</em> on{' '}
+                  <strong>{u?.name ?? 'Anonymous'}</strong> parlayed{' '}
+                  <em>{formatMuskBucks(l.stake)}</em> on{' '}
                   <strong className={colorClass}>{label}</strong>
                 </span>
                 <span className="text-xs text-[var(--color-tertiary)]">

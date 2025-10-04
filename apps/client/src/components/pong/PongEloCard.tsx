@@ -1,9 +1,5 @@
 import { useState, useEffect } from 'react';
-import {
-  TrophyIcon,
-  ArrowTrendingUpIcon,
-  ArrowTrendingDownIcon,
-} from '@heroicons/react/24/outline';
+import { ArrowTrendingUpIcon, ArrowTrendingDownIcon } from '@heroicons/react/24/outline';
 import api from '../../api/axios';
 import BaseCard from '../BaseCard';
 
@@ -92,12 +88,10 @@ export default function PongEloCard({
   const pointsToNextTier = nextTierName && tierData ? tierData.max + 1 - eloRating : 0;
 
   return (
-    <BaseCard
-      variant="full"
-      className={className}
-      title="🏆 Elo Rating"
-      headerContent={
-        lastEloChange !== 0 && (
+    <BaseCard variant="full" className={className} title="🏆 Elo Rating">
+      {/* Recent ELO Change Badge */}
+      {lastEloChange !== 0 && (
+        <div className="mb-3 flex justify-end">
           <div
             className={`flex items-center space-x-1 px-2 py-1 rounded-full text-sm font-medium ${
               lastEloChange > 0 ? 'bg-success/10 text-success' : 'bg-error/10 text-error'
@@ -113,9 +107,9 @@ export default function PongEloCard({
               {lastEloChange}
             </span>
           </div>
-        )
-      }
-    >
+        </div>
+      )}
+
       {/* Main Elo Display */}
       <div className="text-center mb-4">
         <div className="text-4xl font-bold text-primary mb-2">{eloRating.toLocaleString()}</div>

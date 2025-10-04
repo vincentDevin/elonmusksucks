@@ -1,6 +1,8 @@
 // Enhanced Predictions page with integrated parlay workflow
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { SOCKET_EVENTS } from '@ems/types';
+import type { PredictionCreatedPayload, BetPlacedPayload } from '@ems/types';
 
 // New components
 import SimplePredictionCard from '../components/prediction/SimplePredictionCard';
@@ -86,12 +88,12 @@ export default function Predictions() {
   }, [parlayState.legs.length]);
 
   // Real-time event handlers
-  const handleNewPrediction = useCallback((data: any) => {
+  const handleNewPrediction = useCallback((data: PredictionCreatedPayload) => {
     const notification = {
-      id: `new_${data.id}`,
+      id: `new_${data.payload.predictionId}`,
       type: 'new',
       title: 'New Prediction',
-      message: data.title,
+      message: data.payload.title,
       timestamp: Date.now(),
     };
     setLiveNotifications((prev) => [notification, ...prev.slice(0, 4)]);
@@ -102,32 +104,31 @@ export default function Predictions() {
     }, 10000);
   }, []);
 
-  const handleHotMarket = useCallback((data: any) => {
-    toast('🔥 ' + data.title + ' is trending!', {
-      duration: 5000,
-      position: 'top-right',
-    });
-  }, []);
-
-  const handleBettingActivity = useCallback((data: any) => {
-    // Update live indicators on predictions
-    console.log('Betting activity:', data);
+  const handleBettingActivity = useCallback((data: BetPlacedPayload) => {
+    // Show high-value bets as notifications
+    if (data.payload.amount > 10000) {
+      toast(
+        `💰 ${data.payload.amount.toLocaleString()} MuskBucks bet on ${data.payload.optionLabel}!`,
+        {
+          duration: 5000,
+          position: 'top-right',
+        },
+      );
+    }
   }, []);
 
   // Socket event subscriptions
   useEffect(() => {
     if (!socket) return;
 
-    socket.on('prediction:created', handleNewPrediction);
-    socket.on('prediction:hot', handleHotMarket);
-    socket.on('betting:activity', handleBettingActivity);
+    socket.on(SOCKET_EVENTS.PREDICTION_CREATED, handleNewPrediction);
+    socket.on(SOCKET_EVENTS.BET_PLACED, handleBettingActivity);
 
     return () => {
-      socket.off('prediction:created', handleNewPrediction);
-      socket.off('prediction:hot', handleHotMarket);
-      socket.off('betting:activity', handleBettingActivity);
+      socket.off(SOCKET_EVENTS.PREDICTION_CREATED, handleNewPrediction);
+      socket.off(SOCKET_EVENTS.BET_PLACED, handleBettingActivity);
     };
-  }, [socket, handleNewPrediction, handleHotMarket, handleBettingActivity]);
+  }, [socket, handleNewPrediction, handleBettingActivity]);
 
   // Handle prediction card click for detailed view
   const handlePredictionClick = useCallback(
@@ -275,7 +276,18 @@ export default function Predictions() {
                 )}
 
                 <SimplePredictionCard
-                  prediction={prediction}
+                  prediction={
+                    {
+                      ...prediction,
+                      options: prediction.options.map((opt) => ({
+                        ...opt,
+                        createdAt:
+                          typeof opt.createdAt === 'string'
+                            ? new Date(opt.createdAt)
+                            : opt.createdAt,
+                      })),
+                    } as any
+                  }
                   onCardClick={() => handlePredictionClick(prediction.id)}
                   onQuickBet={handleQuickBet}
                   onAddToParlay={handleAddToParlay}
@@ -312,7 +324,18 @@ export default function Predictions() {
                 onMouseLeave={handlePredictionLeave}
               >
                 <PredictionCard
-                  prediction={prediction}
+                  prediction={
+                    {
+                      ...prediction,
+                      options: prediction.options.map((opt) => ({
+                        ...opt,
+                        createdAt:
+                          typeof opt.createdAt === 'string'
+                            ? new Date(opt.createdAt)
+                            : opt.createdAt,
+                      })),
+                    } as any
+                  }
                   variant="compact"
                   showActions={true}
                   showBetsList={false}
@@ -384,7 +407,16 @@ export default function Predictions() {
     return (
       <div className="min-h-screen bg-background">
         <PredictionDetailView
-          prediction={detailedPrediction}
+          prediction={
+            {
+              ...detailedPrediction,
+              options: detailedPrediction.options.map((opt) => ({
+                ...opt,
+                createdAt:
+                  typeof opt.createdAt === 'string' ? new Date(opt.createdAt) : opt.createdAt,
+              })),
+            } as any
+          }
           onBack={() => navigate('/predictions')}
         />
 

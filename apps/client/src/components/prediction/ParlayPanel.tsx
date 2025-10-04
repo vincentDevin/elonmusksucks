@@ -19,7 +19,7 @@ export default function ParlayPanel() {
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const balance = user?.muskBucks ?? 0;
+  const balance = Number(user?.muskBucks ?? 0);
 
   /* ---------- Helpers ---------- */
   const findPrediction = (predId: number) => predictions.find((p) => p.id === predId);

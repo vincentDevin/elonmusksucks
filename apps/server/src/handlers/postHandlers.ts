@@ -24,6 +24,8 @@ import {
   type CommentCreateResponse,
   type CommentDeleteRequest,
   type CommentDeleteResponse,
+  // type SharePostResponse, // TODO: Uncomment when sharePost is implemented
+  toError,
 } from '@ems/types';
 import { eventBus } from '../lib/EventBus';
 
@@ -80,9 +82,10 @@ async function handlePostCreate(
     });
 
     callback?.({ success: true, post: newPost });
-  } catch (error: any) {
-    console.error('Error creating post:', error);
-    callback?.({ error: error.message || 'Failed to create post' });
+  } catch (error: unknown) {
+    const err = toError(error);
+    console.error('Error creating post:', err);
+    callback?.({ error: err.message || 'Failed to create post' });
   }
 }
 
@@ -111,9 +114,10 @@ async function handlePostEdit(
     });
 
     callback?.({ success: true, post: updatedPost });
-  } catch (error: any) {
-    console.error('Error editing post:', error);
-    callback?.({ error: error.message || 'Failed to edit post' });
+  } catch (error: unknown) {
+    const err = toError(error);
+    console.error('Error editing post:', err);
+    callback?.({ error: err.message || 'Failed to edit post' });
   }
 }
 
@@ -142,9 +146,10 @@ async function handlePostDelete(
     });
 
     callback?.({ success: true });
-  } catch (error: any) {
-    console.error('Error deleting post:', error);
-    callback?.({ error: error.message || 'Failed to delete post' });
+  } catch (error: unknown) {
+    const err = toError(error);
+    console.error('Error deleting post:', err);
+    callback?.({ error: err.message || 'Failed to delete post' });
   }
 }
 
@@ -172,9 +177,10 @@ async function handlePostReact(
     });
 
     callback?.({ success: true });
-  } catch (error: any) {
-    console.error('Error reacting to post:', error);
-    callback?.({ error: error.message || 'Failed to react to post' });
+  } catch (error: unknown) {
+    const err = toError(error);
+    console.error('Error reacting to post:', err);
+    callback?.({ error: err.message || 'Failed to react to post' });
   }
 }
 
@@ -186,12 +192,12 @@ async function handlePostReact(
 async function handlePostShare(
   this: AuthenticatedSocket,
   payload: { postId: number },
-  callback?: (response: any) => void,
+  callback?: (response: SharePostResponse) => void,
 ): Promise<void> {
   try {
     const userId = this.user?.id;
     if (!userId) {
-      callback?.({ error: 'Not authenticated' });
+      callback?.({ success: false, error: 'Not authenticated' });
       return;
     }
 
@@ -200,9 +206,10 @@ async function handlePostShare(
 
     // The service already publishes to Redis, so we just need to callback
     callback?.({ success: true, sharesCount: result.sharesCount });
-  } catch (error: any) {
-    console.error('Error sharing post:', error);
-    callback?.({ error: error.message || 'Failed to share post' });
+  } catch (error: unknown) {
+    const err = toError(error);
+    console.error('Error sharing post:', err);
+    callback?.({ success: false, error: err.message || 'Failed to share post' });
   }
 }
 */
@@ -236,9 +243,10 @@ async function handleCommentCreate(
     });
 
     callback?.({ success: true, comment: newComment });
-  } catch (error: any) {
-    console.error('Error creating comment:', error);
-    callback?.({ error: error.message || 'Failed to create comment' });
+  } catch (error: unknown) {
+    const err = toError(error);
+    console.error('Error creating comment:', err);
+    callback?.({ error: err.message || 'Failed to create comment' });
   }
 }
 
@@ -267,8 +275,9 @@ async function handleCommentDelete(
     });
 
     callback?.({ success: true });
-  } catch (error: any) {
-    console.error('Error deleting comment:', error);
-    callback?.({ error: error.message || 'Failed to delete comment' });
+  } catch (error: unknown) {
+    const err = toError(error);
+    console.error('Error deleting comment:', err);
+    callback?.({ error: err.message || 'Failed to delete comment' });
   }
 }

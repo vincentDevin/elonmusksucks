@@ -10,12 +10,14 @@ import {
   getTopDailyPaginated,
   getUserRank,
   getLeaderboardStats,
-  type PaginatedLeaderboard,
-  type UserRank,
-  type LeaderboardStats,
-  type LeaderboardQuery,
 } from '../api/leaderboard';
-import { cache, CACHE_KEYS, CACHE_TTL } from '../utils/cache';
+import type {
+  PaginatedLeaderboardResponse,
+  UserRankResponse,
+  LeaderboardStatsResponse,
+  LeaderboardQueryParams,
+} from '@ems/types';
+import { cache, CACHE_KEYS } from '../utils/cache';
 
 export type LeaderboardPeriod = 'all-time' | 'daily';
 export type LeaderboardMetric = 'profit' | 'winRate' | 'volume' | 'roi';
@@ -48,8 +50,8 @@ export interface LeaderboardState {
     hasPrevPage: boolean;
     totalCount: number;
   };
-  userRank: UserRank | null;
-  stats: LeaderboardStats | null;
+  userRank: UserRankResponse | null;
+  stats: LeaderboardStatsResponse | null;
   recentChanges: RankChange[];
   achievements: Achievement[];
   loading: boolean;
@@ -112,13 +114,13 @@ export function useLeaderboard(
       setState((prev) => ({ ...prev, loading: true, error: null }));
 
       try {
-        const query: LeaderboardQuery = {
+        const query: LeaderboardQueryParams = {
           limit,
           offset: (page - 1) * limit,
           metric,
         };
 
-        const result: PaginatedLeaderboard =
+        const result: PaginatedLeaderboardResponse =
           period === 'all-time'
             ? await getTopAllTimePaginated(query)
             : await getTopDailyPaginated(query);
@@ -299,38 +301,8 @@ export function useLeaderboard(
     [fetchLeaderboard, currentPage],
   );
 
-  // Real-time updates via Socket.IO with enhanced change detection
+  // Real-time updates via Socket.IO with debounced refresh
   useEffect(() => {
-    const handleLeaderboardUpdate = (entries: PublicLeaderboardEntry[]) => {
-      if (currentPage === 1) {
-        // Only update if on first page
-        const oldData = state.data;
-
-        // Detect changes and generate achievements
-        const changes = trackRankChanges ? detectRankChanges(oldData, entries) : [];
-        const newAchievements = generateAchievements(changes);
-
-        setState((prev) => ({
-          ...prev,
-          data: entries,
-          recentChanges: [...prev.recentChanges, ...changes].slice(-50),
-          achievements: [...prev.achievements, ...newAchievements],
-        }));
-
-        previousDataRef.current = entries;
-
-        // Auto-clear new achievement flags after 5 seconds
-        if (newAchievements.length > 0) {
-          if (achievementTimeoutRef.current) {
-            clearTimeout(achievementTimeoutRef.current);
-          }
-          achievementTimeoutRef.current = setTimeout(() => {
-            clearAchievements();
-          }, 5000);
-        }
-      }
-    };
-
     const handleAllTime = (entries: PublicLeaderboardEntry[]) => {
       console.log('[useEnhancedLeaderboard] All-time update (debounced):', entries);
       if (period === 'all-time') debouncedUpdate();

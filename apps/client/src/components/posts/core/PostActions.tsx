@@ -22,10 +22,12 @@ export const PostActions: React.FC<PostActionsProps> = ({
 }) => {
   const { user } = useAuth();
   const [sharing, setSharing] = useState(false);
-  const [shareCount, setShareCount] = useState(post.sharesCount);
+  const [shareCount, setShareCount] = useState(0); // sharesCount not available on DbUserFeedContent
 
   const isAuthor = user?.id === post.authorId;
-  const canEdit = isAuthor && post.canEdit;
+  // Calculate if post can be edited (within 15 minutes of creation)
+  const postAge = Date.now() - new Date(post.createdAt).getTime();
+  const canEdit = isAuthor && postAge < 15 * 60 * 1000; // 15 minutes
   const canDelete = isAuthor || user?.role === 'ADMIN';
 
   const handleShare = async () => {

@@ -20,17 +20,32 @@ import type {
 import { PrismaAdminRepository } from '../repositories/AdminRepository';
 import type { UserStatsDTO } from '@ems/types';
 import { eventBus } from '../lib/EventBus';
+import { UserService } from './user.service';
 
 const repo: IAdminRepository = new PrismaAdminRepository();
+const userService = new UserService();
 
 // -- Enhanced User Management --
 export const listUsers = async () => {
   // Legacy method - kept for backward compatibility
-  return repo.findAllUsers();
+  const users = await repo.findAllUsers();
+
+  // Enrich users with signed avatar URLs
+  const enrichedUsers = await userService.enrichUsersWithAvatars(users);
+
+  return enrichedUsers;
 };
 
 export const searchUsers = async (params: UserSearchParams): Promise<PaginatedUsers> => {
-  return repo.searchUsers(params);
+  const result = await repo.searchUsers(params);
+
+  // Enrich users with signed avatar URLs
+  const enrichedUsers = await userService.enrichUsersWithAvatars(result.users);
+
+  return {
+    ...result,
+    users: enrichedUsers,
+  };
 };
 
 export const getUserDetails = async (userId: number): Promise<DetailedUser | null> => {
@@ -38,53 +53,56 @@ export const getUserDetails = async (userId: number): Promise<DetailedUser | nul
 
   if (!user) return null;
 
+  // Enrich user with signed avatar URL
+  const enrichedUser = await userService.enrichUserWithAvatar(user);
+
   // Transform stats to match UserStatsDTO format if stats exist
-  if (user.stats) {
+  if (enrichedUser.stats) {
     // Calculate winRate properly (same logic as getUserStats)
-    const totalBets = user.stats.totalBets;
-    const betsWon = user.stats.betsWon;
+    const totalBets = enrichedUser.stats.totalBets;
+    const betsWon = enrichedUser.stats.betsWon;
     const winRate = totalBets > 0 ? (betsWon / totalBets) * 100 : 0;
 
     // Calculate ROI properly
-    const totalWagered = user.stats.totalWagered || BigInt(0);
-    const profit = user.stats.profit || BigInt(0);
+    const totalWagered = enrichedUser.stats.totalWagered || BigInt(0);
+    const profit = enrichedUser.stats.profit || BigInt(0);
     const roi = totalWagered > BigInt(0) ? (Number(profit) / Number(totalWagered)) * 100 : 0;
 
     const transformedStats = {
-      totalBets: user.stats.totalBets,
-      betsWon: user.stats.betsWon,
-      betsLost: user.stats.betsLost,
-      totalParlays: user.stats.totalParlays,
-      parlaysWon: user.stats.parlaysWon,
-      parlaysLost: user.stats.parlaysLost,
-      totalParlayLegs: user.stats.totalParlayLegs,
-      parlayLegsWon: user.stats.parlayLegsWon,
-      parlayLegsLost: user.stats.parlayLegsLost,
-      totalWagered: user.stats.totalWagered.toString(),
-      totalWinnings: user.stats.totalWon.toString(),
-      totalLosses: (user.stats.totalWagered - user.stats.totalWon).toString(),
-      netProfit: user.stats.profit.toString(),
-      currentStreak: user.stats.currentStreak,
-      longestWinStreak: user.stats.longestStreak || 0,
-      longestLoseStreak: user.stats.longestLoseStreak || 0,
-      averageBetSize: (user.stats.totalBets > 0
-        ? user.stats.totalWagered / BigInt(user.stats.totalBets)
+      totalBets: enrichedUser.stats.totalBets,
+      betsWon: enrichedUser.stats.betsWon,
+      betsLost: enrichedUser.stats.betsLost,
+      totalParlays: enrichedUser.stats.totalParlays,
+      parlaysWon: enrichedUser.stats.parlaysWon,
+      parlaysLost: enrichedUser.stats.parlaysLost,
+      totalParlayLegs: enrichedUser.stats.totalParlayLegs,
+      parlayLegsWon: enrichedUser.stats.parlayLegsWon,
+      parlayLegsLost: enrichedUser.stats.parlayLegsLost,
+      totalWagered: enrichedUser.stats.totalWagered.toString(),
+      totalWinnings: enrichedUser.stats.totalWon.toString(),
+      totalLosses: (enrichedUser.stats.totalWagered - enrichedUser.stats.totalWon).toString(),
+      netProfit: enrichedUser.stats.profit.toString(),
+      currentStreak: enrichedUser.stats.currentStreak,
+      longestWinStreak: enrichedUser.stats.longestStreak || 0,
+      longestLoseStreak: enrichedUser.stats.longestLoseStreak || 0,
+      averageBetSize: (enrichedUser.stats.totalBets > 0
+        ? enrichedUser.stats.totalWagered / BigInt(enrichedUser.stats.totalBets)
         : BigInt(0)
       ).toString(),
-      averageOdds: user.stats.averageOdds || 0,
-      biggestWin: user.stats.biggestWin?.toString() || '0',
-      biggestLoss: user.stats.biggestLoss?.toString() || '0',
+      averageOdds: enrichedUser.stats.averageOdds || 0,
+      biggestWin: enrichedUser.stats.biggestWin?.toString() || '0',
+      biggestLoss: enrichedUser.stats.biggestLoss?.toString() || '0',
       winRate: winRate, // Calculated percentage (0-100)
       roi: roi, // Calculated percentage
     };
 
     return {
-      ...user,
+      ...enrichedUser,
       stats: transformedStats as any,
     };
   }
 
-  return user;
+  return enrichedUser;
 };
 
 export const bulkUpdateUsers = async (
@@ -273,7 +291,47 @@ export const listTransactions = async (filters?: QueryParams) => {
 
 // -- Enhanced Financial Operations Dashboard --
 export const searchFinancialData = async (params: any) => {
-  return repo.searchFinancialData(params);
+  const result = await repo.searchFinancialData(params);
+
+  // Enrich user avatars in transactions
+  if (result.transactions && result.transactions.length > 0) {
+    const users = result.transactions.filter((t: any) => t.user).map((t: any) => t.user);
+
+    if (users.length > 0) {
+      const enrichedUsers = await userService.enrichUsersWithAvatars(users);
+      const userMap = new Map(enrichedUsers.map((user) => [user.id, user]));
+
+      result.transactions.forEach((t: any) => {
+        if (t.user) {
+          const enrichedUser = userMap.get(t.user.id);
+          if (enrichedUser) {
+            t.user = enrichedUser;
+          }
+        }
+      });
+    }
+  }
+
+  // Enrich user avatars in bets
+  if (result.bets && result.bets.length > 0) {
+    const betUsers = result.bets.filter((b: any) => b.user).map((b: any) => b.user);
+
+    if (betUsers.length > 0) {
+      const enrichedUsers = await userService.enrichUsersWithAvatars(betUsers);
+      const userMap = new Map(enrichedUsers.map((user) => [user.id, user]));
+
+      result.bets.forEach((b: any) => {
+        if (b.user) {
+          const enrichedUser = userMap.get(b.user.id);
+          if (enrichedUser) {
+            b.user = enrichedUser;
+          }
+        }
+      });
+    }
+  }
+
+  return result;
 };
 
 export const getFinancialAnalytics = async (params: any) => {

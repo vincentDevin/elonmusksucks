@@ -1,5 +1,6 @@
 // apps/client/src/api/activity.ts
 import axios from 'axios';
+import type { ActivityFeedResponse } from '@ems/types';
 
 // Create a public API client that doesn't require authentication
 const publicApi = axios.create({
@@ -8,12 +9,8 @@ const publicApi = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-export interface ActivityResponse {
-  success: boolean;
-  activities: any[];
-  count: number;
-  cached: boolean;
-}
+// Type alias for backwards compatibility
+export type ActivityResponse = ActivityFeedResponse;
 
 /**
  * Get recent activities from Redis cache

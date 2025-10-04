@@ -1,5 +1,3 @@
-import { TrophyIcon } from '@heroicons/react/24/outline';
-
 interface PongTierBadgeProps {
   tier: string;
   eloRating?: number;
