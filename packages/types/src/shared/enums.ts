@@ -156,10 +156,44 @@ export type LobbyStatus = 'waiting' | 'full';
 export type AIDifficulty = keyof typeof AI_DIFFICULTIES;
 
 export const AI_DIFFICULTIES = {
-  easy: { reactionTime: 450, accuracy: 0.45, speed: 0.35 },
-  medium: { reactionTime: 200, accuracy: 0.82, speed: 0.85 },
-  hard: { reactionTime: 120, accuracy: 0.88, speed: 0.92 },
-  impossible: { reactionTime: 80, accuracy: 0.95, speed: 1.0 },
+  EASY: { reactionTime: 450, accuracy: 0.45, speed: 0.35 },
+  MEDIUM: { reactionTime: 200, accuracy: 0.82, speed: 0.85 },
+  HARD: { reactionTime: 120, accuracy: 0.88, speed: 0.92 },
+  IMPOSSIBLE: { reactionTime: 80, accuracy: 0.95, speed: 1.0 },
+} as const;
+
+/**
+ * AI Player Database IDs (negative IDs for AI system accounts)
+ * These correspond to actual User records in the database
+ */
+export const AI_PLAYER_IDS = {
+  EASY: -1,       // Grimes' Laptop
+  MEDIUM: -2,     // Zuck's Metaverse
+  HARD: -3,       // Bezos' Rocket
+  IMPOSSIBLE: -4, // X Æ A-XII
+} as const;
+
+/**
+ * AI Player UI Metadata (emoji and description)
+ * Names are fetched from database to stay in sync
+ */
+export const AI_PLAYER_UI = {
+  EASY: {
+    emoji: '🎹',
+    desc: 'Just a MacBook Pro making techno beats',
+  },
+  MEDIUM: {
+    emoji: '🥽',
+    desc: 'No legs, moderate Pong skills',
+  },
+  HARD: {
+    emoji: '🚀',
+    desc: 'Compensating with superior skills',
+  },
+  IMPOSSIBLE: {
+    emoji: '🤖',
+    desc: "Elon's child has chosen violence",
+  },
 } as const;
 
 export const PONG_PHYSICS = {

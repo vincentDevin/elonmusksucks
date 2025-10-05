@@ -50,12 +50,14 @@ export function PongGame() {
     }
   }, [isConnected, socket, connect]);
 
-  // Cleanup on unmount
+  // Cleanup on unmount - only disconnect when component actually unmounts (user leaves page)
+  // NOT when user object updates (e.g., balance changes)
   useEffect(() => {
     return () => {
       disconnect();
     };
-  }, [disconnect]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty deps - only run on actual mount/unmount
 
   // Auto-refresh lobby when in lobby mode (not in game or spectating)
   useEffect(() => {

@@ -76,10 +76,10 @@ export class AchievementEngine {
       const rules = this.rulesCache.get(event.key) || [];
       result.rulesEvaluated = rules.length;
 
-      console.log(
-        `[AchievementEngine] Processing ${event.key} for user ${event.userId}: ${rules.length} rules`,
-      );
-      console.log(`[AchievementEngine] Event payload:`, JSON.stringify(event.payload, null, 2));
+      //console.log(
+      //  `[AchievementEngine] Processing ${event.key} for user ${event.userId}: ${rules.length} rules`,
+      //);
+      //console.log(`[AchievementEngine] Event payload:`, JSON.stringify(event.payload, null, 2));
 
       if (rules.length === 0) {
         return result; // No rules for this event type
@@ -169,23 +169,23 @@ export class AchievementEngine {
       // Debug logging for Bot Breaker: Easy
       const isBotBreakerEasy = rule.achievementId === 292;
       if (isBotBreakerEasy) {
-        console.log(`[AchievementEngine] 🐛 DEBUG Bot Breaker: Easy rule evaluation`);
-        console.log(`[AchievementEngine] 🐛 Rule:`, JSON.stringify(rule.ruleData, null, 2));
+        //console.log(`[AchievementEngine] 🐛 DEBUG Bot Breaker: Easy rule evaluation`);
+        //console.log(`[AchievementEngine] 🐛 Rule:`, JSON.stringify(rule.ruleData, null, 2));
       }
 
       // Compile the rule
       const compiledRule = this.ruleEvaluator.compileRule(rule.ruleData);
       if (!compiledRule) {
-        console.warn(`Invalid rule structure for achievement ${rule.achievementId}`);
+        //console.warn(`Invalid rule structure for achievement ${rule.achievementId}`);
         if (isBotBreakerEasy) {
-          console.log(`[AchievementEngine] 🐛 Bot Breaker: Easy rule compilation FAILED`);
+          //console.log(`[AchievementEngine] 🐛 Bot Breaker: Easy rule compilation FAILED`);
         }
         return false;
       }
 
       if (isBotBreakerEasy) {
-        console.log(`[AchievementEngine] 🐛 Bot Breaker: Easy rule compiled successfully`);
-        console.log(`[AchievementEngine] 🐛 Compiled rule:`, JSON.stringify(compiledRule, null, 2));
+        //console.log(`[AchievementEngine] 🐛 Bot Breaker: Easy rule compiled successfully`);
+        //console.log(`[AchievementEngine] 🐛 Compiled rule:`, JSON.stringify(compiledRule, null, 2));
       }
 
       // Get current user achievement progress
@@ -212,7 +212,7 @@ export class AchievementEngine {
       // Skip if already completed
       if (isCompleted) {
         if (isBotBreakerEasy) {
-          console.log(`[AchievementEngine] 🐛 Bot Breaker: Easy already completed, skipping`);
+          //console.log(`[AchievementEngine] 🐛 Bot Breaker: Easy already completed, skipping`);
         }
         return false;
       }
@@ -225,18 +225,18 @@ export class AchievementEngine {
       );
 
       if (isBotBreakerEasy) {
-        console.log(
-          `[AchievementEngine] 🐛 Bot Breaker: Easy evaluation result:`,
-          JSON.stringify(evaluation, null, 2),
-        );
+        //console.log(
+        //  `[AchievementEngine] 🐛 Bot Breaker: Easy evaluation result:`,
+        //  JSON.stringify(evaluation, null, 2),
+        //);
       }
 
       // Update progress if needed
       if (evaluation.newProgress !== currentProgress) {
         if (isBotBreakerEasy) {
-          console.log(
-            `[AchievementEngine] 🐛 Bot Breaker: Easy updating progress: ${currentProgress} -> ${evaluation.newProgress}`,
-          );
+          //console.log(
+          //  `[AchievementEngine] 🐛 Bot Breaker: Easy updating progress: ${currentProgress} -> ${evaluation.newProgress}`,
+          //);
         }
         await this.updateUserAchievementProgress(
           event.userId,
@@ -248,7 +248,7 @@ export class AchievementEngine {
       // Handle achievement unlock
       if (evaluation.shouldUnlock && !isCompleted) {
         if (isBotBreakerEasy) {
-          console.log(`[AchievementEngine] 🐛 Bot Breaker: Easy UNLOCKING!`);
+          //console.log(`[AchievementEngine] 🐛 Bot Breaker: Easy UNLOCKING!`);
         }
         await this.unlockAchievement(event.userId, rule.achievementId, evaluation.newProgress);
 

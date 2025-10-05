@@ -1,5 +1,54 @@
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import { MatchResult } from '@ems/types';
+
+// ============================================================================
+// API Request/Response Types
+// ============================================================================
+
+interface AuthResponse {
+  id: number;
+  name: string;
+  muskBucks: number;
+}
+
+interface ValidateWagerRequest {
+  userId: number;
+  amount: number;
+}
+
+interface ValidateWagerResponse {
+  valid: boolean;
+}
+
+interface ProcessWagerRequest {
+  playerOneId: number;
+  playerTwoId: number | null;
+  wagerAmount: number;
+  isAI: boolean;
+}
+
+interface ProcessWagerResponse {
+  success: boolean;
+  transactionId: string;
+}
+
+interface RecordMatchRequest {
+  matchId: string;
+  winnerId: number | null;
+  winnerName: string;
+  winnerScore: number;
+  loserId: number | null;
+  loserName: string | null;
+  loserScore: number;
+  wagerAmount: number;
+  payoutAmount: number;
+  duration: number;
+  isAI: boolean;
+}
+
+// ============================================================================
+// Pong API Client
+// ============================================================================
 
 export class PongApiClient {
   private baseUrl: string;
@@ -10,9 +59,13 @@ export class PongApiClient {
     this.gameServerSecret = process.env.GAME_SERVER_SECRET || 'pong-internal-secret-2024';
   }
 
-  private async request<T>(endpoint: string, method: string = 'GET', data?: any): Promise<T> {
+  private async request<TResponse, TRequest = unknown>(
+    endpoint: string,
+    method: string = 'GET',
+    data?: TRequest,
+  ): Promise<TResponse> {
     try {
-      const response = await axios({
+      const response = await axios<TResponse>({
         method,
         url: `${this.baseUrl}${endpoint}`,
         data,
@@ -23,20 +76,22 @@ export class PongApiClient {
         timeout: 5000,
       });
       return response.data;
-    } catch (error: any) {
-      console.error(`API request failed: ${endpoint}`, error.response?.data || error.message);
+    } catch (error) {
+      const axiosError = error as AxiosError;
+      console.error(
+        `API request failed: ${endpoint}`,
+        axiosError.response?.data || axiosError.message,
+      );
       throw error;
     }
   }
 
-  async authenticateUser(
-    token: string,
-  ): Promise<{ id: number; name: string; muskBucks: number } | null> {
+  async authenticateUser(token: string): Promise<AuthResponse | null> {
     try {
       console.log(`🔐 Authenticating user via API: ${this.baseUrl}/auth`);
       console.log(`🔑 Token preview: ${token.substring(0, 20)}...`);
 
-      const response = await axios({
+      const response = await axios<AuthResponse>({
         method: 'POST',
         url: `${this.baseUrl}/auth`,
         headers: {
@@ -49,21 +104,36 @@ export class PongApiClient {
 
       console.log(`✅ API auth successful:`, response.data);
       return response.data;
-    } catch (error: any) {
-      console.error(`❌ API auth failed:`, error.response?.data || error.message);
+    } catch (error) {
+      const axiosError = error as AxiosError;
+      console.error(`❌ API auth failed:`, axiosError.response?.data || axiosError.message);
       return null;
     }
   }
 
   async validateWager(playerId: number, amount: number): Promise<boolean> {
     try {
-      const result = await this.request<{ valid: boolean }>('/validate-wager', 'POST', {
-        userId: playerId,
-        amount,
-      });
+      const result = await this.request<ValidateWagerResponse, ValidateWagerRequest>(
+        '/validate-wager',
+        'POST',
+        {
+          userId: playerId,
+          amount,
+        },
+      );
       return result.valid;
     } catch (error) {
       return false;
+    }
+  }
+
+  async getUserById(userId: number): Promise<{ id: number; name: string } | null> {
+    try {
+      const result = await this.request<{ id: number; name: string }>(`/users/${userId}`);
+      return result;
+    } catch (error) {
+      console.warn(`Failed to fetch user ${userId}`);
+      return null;
     }
   }
 
@@ -72,9 +142,9 @@ export class PongApiClient {
     playerTwoId: number | null,
     wagerAmount: number,
     isAI: boolean,
-  ): Promise<{ success: boolean; transactionId: string } | null> {
+  ): Promise<ProcessWagerResponse | null> {
     try {
-      return await this.request<{ success: boolean; transactionId: string }>(
+      return await this.request<ProcessWagerResponse, ProcessWagerRequest>(
         '/process-wager',
         'POST',
         {
@@ -91,7 +161,7 @@ export class PongApiClient {
 
   async recordMatchResult(result: MatchResult): Promise<void> {
     try {
-      await this.request('/record-match', 'POST', {
+      const requestData: RecordMatchRequest = {
         matchId: result.matchId,
         winnerId: result.winnerId,
         winnerName: result.winnerName,
@@ -103,9 +173,12 @@ export class PongApiClient {
         payoutAmount: result.payoutAmount,
         duration: result.duration,
         isAI: result.isAI,
-      });
+      };
+
+      await this.request<void, RecordMatchRequest>('/record-match', 'POST', requestData);
     } catch (error) {
-      console.error('Failed to record match result:', error);
+      const axiosError = error as AxiosError;
+      console.error('Failed to record match result:', axiosError.message);
     }
   }
 }

@@ -414,6 +414,11 @@ export interface PongPayoutResult {
   loserLoss?: string; // BigInt as string
   vsAI: boolean;
   timestamp: Date;
+  // Balance tracking for event emission
+  winnerPreviousBalance: string; // BigInt as string
+  winnerNewBalance: string; // BigInt as string
+  loserPreviousBalance?: string; // BigInt as string (for PVP)
+  loserNewBalance?: string; // BigInt as string (for PVP)
 }
 
 /**
@@ -426,22 +431,40 @@ export const PONG_PAYOUT_CONSTANTS = {
   HOUSE_RAKE: 0.05,
 
   /**
-   * Minimum wager
+   * AI match payout multiplier (profit on top of returned wager)
+   * Winner gets: wager + (wager * multiplier)
+   *
+   * Examples:
+   * - EASY (0.25): Bet 100, win 125 (100 + 25)
+   * - MEDIUM (0.5): Bet 100, win 150 (100 + 50)
+   * - HARD (1.0): Bet 100, win 200 (100 + 100)
+   * - IMPOSSIBLE (3.0): Bet 100, win 400 (100 + 300)
+   */
+  AI_PAYOUT_MULTIPLIER: {
+    EASY: 0.25,
+    MEDIUM: 0.5,
+    HARD: 1.0,
+    IMPOSSIBLE: 3.0,
+  },
+} as const;
+
+/**
+ * Pong Wager Limits
+ */
+export const PONG_WAGER_LIMITS = {
+  /**
+   * Minimum wager for all matches
    */
   MIN_WAGER: 10,
 
   /**
-   * Maximum wager
+   * AI match maximum wagers (house protection)
+   * PVP matches have no maximum wager
    */
-  MAX_WAGER: 10000,
-
-  /**
-   * AI match payout multiplier (less than PvP)
-   */
-  AI_PAYOUT_MULTIPLIER: {
-    EASY: 0.5,
-    MEDIUM: 0.75,
-    HARD: 1.0,
-    IMPOSSIBLE: 1.25,
+  AI_MAX_WAGERS: {
+    EASY: 1000,        // Low difficulty, low limit
+    MEDIUM: 100000,    // Medium difficulty, medium limit
+    HARD: 1000000,     // High difficulty, high limit
+    IMPOSSIBLE: null,  // No limit - prove you can beat it!
   },
 } as const;

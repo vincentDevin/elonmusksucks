@@ -1,17 +1,19 @@
 // apps/server/src/workers/pong-payout.worker.ts
 // -----------------------------------------------------------------------------
 // BullMQ worker that processes Pong match payouts with idempotency protection
-// Handles both PVP (pot splitting) and PVE_AI (2x player stake) payout logic
+// Handles both PVP (pot splitting) and PVE_AI (difficulty-based multipliers) payout logic
+// AI Payouts: EASY: 1.25x, MEDIUM: 1.5x, HARD: 2x, IMPOSSIBLE: 4x
 // Uses PongRepository for all database operations
 // -----------------------------------------------------------------------------
 
 import 'dotenv/config';
 import { Worker, Job } from 'bullmq';
-import { PongPayoutJobData, PongPayoutResult, QUEUE_NAMES } from '@ems/types';
+import { PongPayoutJobData, PongPayoutResult, QUEUE_NAMES, REDIS_CHANNELS } from '@ems/types';
 import redisClient from '../lib/redis';
 import { PrismaClient } from '@prisma/client';
-import { serializeBigInt } from '../utils/bigintSerializer';
+import { serializeBigInt, toBigInt } from '../utils/bigintSerializer';
 import { PongRepository } from '../repositories/PongRepository';
+import { eventBus } from '../lib/EventBus';
 
 const prisma = new PrismaClient();
 const pongRepo = new PongRepository();
@@ -39,8 +41,8 @@ const pongPayoutWorker = new Worker<PongPayoutJobData>(
 
       // 2. Process payout based on mode
       let result: PongPayoutResult;
-      const payoutBigInt = BigInt(payout);
-      const houseRakeBigInt = BigInt(houseRake);
+      const payoutBigInt = toBigInt(payout);
+      const houseRakeBigInt = toBigInt(houseRake);
 
       if (vsAI) {
         result = await pongRepo.processPVEPayout(
@@ -64,6 +66,39 @@ const pongPayoutWorker = new Worker<PongPayoutJobData>(
       console.log(
         `[pong-payout-worker] Successfully processed payout for match ${matchId}: ${result.netPayout} to user ${winnerId}`,
       );
+
+      // 3. Emit balance update events for affected users
+      // Winner balance update
+      if (winnerId > 0) {
+        await eventBus.publish(REDIS_CHANNELS.BALANCE_UPDATE, {
+          userId: winnerId,
+          newBalance: Number(result.winnerNewBalance),
+          previousBalance: Number(result.winnerPreviousBalance),
+          change: Number(result.netPayout),
+          reason: vsAI ? `Pong AI match payout (${matchId})` : `Pong PVP match payout (${matchId})`,
+          timestamp: new Date().toISOString(),
+        });
+
+        console.log(
+          `[pong-payout-worker] Emitted balance update for winner ${winnerId}: ${result.winnerPreviousBalance} -> ${result.winnerNewBalance}`,
+        );
+      }
+
+      // Loser balance update (PVP only - balance already decreased during wager)
+      if (!vsAI && loserId && result.loserPreviousBalance && result.loserNewBalance) {
+        await eventBus.publish(REDIS_CHANNELS.BALANCE_UPDATE, {
+          userId: loserId,
+          newBalance: Number(result.loserNewBalance),
+          previousBalance: Number(result.loserPreviousBalance),
+          change: 0, // No change at payout time (wager already deducted)
+          reason: `Pong PVP match loss confirmation (${matchId})`,
+          timestamp: new Date().toISOString(),
+        });
+
+        console.log(
+          `[pong-payout-worker] Emitted balance update for loser ${loserId} (no change, already deducted)`,
+        );
+      }
 
       return serializeBigInt(result);
     } catch (error) {

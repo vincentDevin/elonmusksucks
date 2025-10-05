@@ -14,22 +14,93 @@ import {
   MatchResult,
   PONG_PHYSICS,
   AI_DIFFICULTIES,
+  AI_PLAYER_IDS,
+  AIDifficulty,
+  MatchType,
+  PONG_PAYOUT_CONSTANTS,
+  PONG_WAGER_LIMITS,
 } from '@ems/types';
 
 // AI Player ID mapping - matches our database seed
-const AI_PLAYER_IDS = {
-  easy: -1, // Grimes' Laptop
-  medium: -2, // Zuck's Metaverse
-  hard: -3, // Bezos' Rocket
-  impossible: -4, // X Æ A-XII
-} as const;
+// Note: AI_PLAYER_IDS now imported from @ems/types for consistency
+// AI player names are fetched from the database (see createAIPlayer function)
 
-const AI_PLAYER_NAMES = {
-  easy: "Grimes' Laptop",
-  medium: "Zuck's Metaverse",
-  hard: "Bezos' Rocket",
-  impossible: 'X Æ A-XII',
-} as const;
+// ——————————————————————————————————————————————————————————————————————————————————
+// VALIDATION HELPERS (Type guards and input validation)
+// ——————————————————————————————————————————————————————————————————————————————————
+
+/**
+ * Type guard: Validates AI difficulty from user input
+ */
+function isValidAIDifficulty(difficulty: unknown): difficulty is AIDifficulty {
+  return (
+    typeof difficulty === 'string' &&
+    (difficulty === 'EASY' ||
+      difficulty === 'MEDIUM' ||
+      difficulty === 'HARD' ||
+      difficulty === 'IMPOSSIBLE')
+  );
+}
+
+/**
+ * Fetches AI player data from database by difficulty
+ * Returns Player object with name from database or fallback name
+ */
+async function createAIPlayer(difficulty: AIDifficulty, apiClient: PongApiClient): Promise<Player> {
+  const aiPlayerId = AI_PLAYER_IDS[difficulty];
+  let aiPlayerName = `AI-${difficulty}`; // Fallback name
+
+  try {
+    // Fetch AI player from database to get current name
+    const aiUser = await apiClient.getUserById(aiPlayerId);
+    if (aiUser && aiUser.name) {
+      aiPlayerName = aiUser.name;
+    }
+  } catch (error) {
+    console.warn(`Failed to fetch AI player ${aiPlayerId} from database, using fallback name`);
+  }
+
+  return {
+    id: aiPlayerId,
+    name: aiPlayerName,
+    paddleY: PONG_PHYSICS.FIELD_HEIGHT / 2 - PONG_PHYSICS.PADDLE_HEIGHT / 2,
+    score: 0,
+    ping: 0,
+    lastInputTime: Date.now(),
+  };
+}
+
+/**
+ * Validates wager amount based on match type and AI difficulty
+ * Returns error message if invalid, null if valid
+ */
+function validateWager(
+  wager: number,
+  matchType: MatchType,
+  aiDifficulty?: AIDifficulty,
+): string | null {
+  // Check minimum wager
+  if (wager < PONG_WAGER_LIMITS.MIN_WAGER) {
+    return `Wager must be at least ${PONG_WAGER_LIMITS.MIN_WAGER} MuskBucks`;
+  }
+
+  // Check for negative or invalid wager
+  if (wager < 0 || !Number.isFinite(wager)) {
+    return 'Invalid wager amount';
+  }
+
+  // For AI matches, check difficulty-specific max wager
+  if (matchType === 'ai' && aiDifficulty) {
+    const maxWager = PONG_WAGER_LIMITS.AI_MAX_WAGERS[aiDifficulty];
+
+    if (maxWager !== null && wager > maxWager) {
+      return `Maximum wager for ${aiDifficulty} difficulty is ${maxWager} MuskBucks`;
+    }
+  }
+
+  // PVP matches have no max wager, only balance check
+  return null;
+}
 
 // ——————————————————————————————————————————————————————————————————————————————————
 // DATABASE MANAGER (Minimal DB usage)
@@ -64,6 +135,10 @@ class DatabaseManager {
       console.error('Wager validation error:', error);
       return false;
     }
+  }
+
+  async createAIPlayer(difficulty: AIDifficulty): Promise<Player> {
+    return await createAIPlayer(difficulty, this.api);
   }
 
   async processWagerTransaction(
@@ -289,7 +364,7 @@ class GameManager {
     players: [Player, Player | null],
     wager: number,
     isAI: boolean,
-    aiDifficulty?: keyof typeof AI_DIFFICULTIES,
+    aiDifficulty?: AIDifficulty,
   ): Promise<{ success: boolean; error?: string }> {
     // Reset player scores for new game
     players[0].score = 0;
@@ -332,7 +407,7 @@ class GameManager {
       tick: 0,
       wager,
       isAI,
-      aiDifficulty: isAI ? aiDifficulty || 'medium' : undefined,
+      aiDifficulty: isAI ? aiDifficulty || 'MEDIUM' : undefined,
       aiState: isAI
         ? {
             targetY: PONG_PHYSICS.FIELD_HEIGHT / 2,
@@ -479,10 +554,10 @@ class GameManager {
 
       // Difficulty degrades over time - easier AI degrades faster
       const difficultyDropoff = {
-        easy: 0.15, // Loses 15% effectiveness per 5 hits
-        medium: 0.08, // Loses 8% effectiveness per 5 hits
-        hard: 0.04, // Loses 4% effectiveness per 5 hits
-        impossible: 0.02, // Loses 2% effectiveness per 5 hits
+        EASY: 0.15, // Loses 15% effectiveness per 5 hits
+        MEDIUM: 0.08, // Loses 8% effectiveness per 5 hits
+        HARD: 0.04, // Loses 4% effectiveness per 5 hits
+        IMPOSSIBLE: 0.02, // Loses 2% effectiveness per 5 hits
       };
 
       const degradationFactor = Math.max(
@@ -541,10 +616,10 @@ class GameManager {
       const rallyLength = Math.min(speedIncrements, 15);
 
       const difficultyDropoff = {
-        easy: 0.15,
-        medium: 0.08,
-        hard: 0.04,
-        impossible: 0.02,
+        EASY: 0.15,
+        MEDIUM: 0.08,
+        HARD: 0.04,
+        IMPOSSIBLE: 0.02,
       };
       const degradationFactor = Math.max(
         0.5,
@@ -766,8 +841,19 @@ class GameManager {
     let payoutAmount = 0;
     if (winnerId) {
       if (game.isAI) {
-        // AI match: house pays 2x stake if human wins, no payout if AI wins
-        payoutAmount = winnerId > 0 ? game.wager * 2 : 0;
+        // AI match: difficulty-based payout multipliers
+        // Winner gets: wager + (wager * multiplier)
+        if (winnerId > 0 && game.aiDifficulty) {
+          // Human won - apply difficulty multiplier
+          const multiplier = PONG_PAYOUT_CONSTANTS.AI_PAYOUT_MULTIPLIER[game.aiDifficulty];
+          payoutAmount = Math.floor(game.wager + game.wager * multiplier);
+          console.log(
+            `💰 AI payout (${game.aiDifficulty}): ${game.wager} + (${game.wager} * ${multiplier}) = ${payoutAmount}`,
+          );
+        } else {
+          // AI won - no payout
+          payoutAmount = 0;
+        }
       } else {
         // PVP match: winner gets the full pot (2x stake total)
         payoutAmount = game.wager * 2;
@@ -1211,7 +1297,30 @@ export class PongGameServer {
         const player = this.auth.getPlayer(socket.id);
         if (!player) return;
 
-        // Validate wager (skip validation for free games)
+        // Validate match type
+        if (data.type !== 'ai' && data.type !== 'pvp') {
+          socket.emit('error', { code: 'INVALID_MATCH_TYPE', message: 'Invalid match type' });
+          return;
+        }
+
+        // Validate AI difficulty for AI matches
+        let validatedDifficulty: AIDifficulty = 'MEDIUM'; // default
+        if (data.type === 'ai') {
+          if (!data.aiDifficulty || !isValidAIDifficulty(data.aiDifficulty)) {
+            socket.emit('error', { code: 'INVALID_DIFFICULTY', message: 'Invalid AI difficulty' });
+            return;
+          }
+          validatedDifficulty = data.aiDifficulty as AIDifficulty;
+        }
+
+        // Validate wager amount
+        const wagerError = validateWager(data.wager, data.type, validatedDifficulty);
+        if (wagerError) {
+          socket.emit('error', { code: 'INVALID_WAGER', message: wagerError });
+          return;
+        }
+
+        // Validate user has sufficient balance (skip for free games)
         if (data.wager > 0) {
           const canAfford = await this.db.validateWager(player.id, data.wager);
           if (!canAfford) {
@@ -1228,18 +1337,8 @@ export class PongGameServer {
 
         if (data.type === 'ai') {
           // Start AI game immediately
-          const difficulty = (data.aiDifficulty || 'medium') as keyof typeof AI_PLAYER_IDS;
-          const aiPlayerId = AI_PLAYER_IDS[difficulty];
-          const aiPlayerName = AI_PLAYER_NAMES[difficulty];
-
-          const aiPlayer: Player = {
-            id: aiPlayerId,
-            name: aiPlayerName,
-            paddleY: PONG_PHYSICS.FIELD_HEIGHT / 2 - PONG_PHYSICS.PADDLE_HEIGHT / 2,
-            score: 0,
-            ping: 0,
-            lastInputTime: Date.now(),
-          };
+          const difficulty = validatedDifficulty;
+          const aiPlayer = await this.db.createAIPlayer(difficulty);
 
           const gameId = `game-${Date.now()}-${Math.random().toString(36).slice(2)}`;
           socket.join(`game:${gameId}`);
@@ -1257,7 +1356,7 @@ export class PongGameServer {
             [player, aiPlayer],
             data.wager,
             true,
-            data.aiDifficulty as keyof typeof AI_DIFFICULTIES,
+            validatedDifficulty,
           );
           if (!gameResult.success) {
             socket.emit('error', {

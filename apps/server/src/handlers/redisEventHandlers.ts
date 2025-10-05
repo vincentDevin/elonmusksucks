@@ -96,6 +96,14 @@ export function registerRedisEventHandlers(io: Server, eventSub: Redis) {
         io.to(SOCKET_ROOMS.LEADERBOARD).emit(REDIS_CHANNELS.LEADERBOARD_MILESTONE, payload);
         break;
 
+      // Balance update events
+      case REDIS_CHANNELS.BALANCE_UPDATE:
+        // Emit to specific user room (critical for real-time balance updates)
+        if (hasUserId(payload)) {
+          io.to(`user:${payload.userId}`).emit(REDIS_CHANNELS.BALANCE_UPDATE, payload);
+        }
+        break;
+
       // Stats and achievements events
       case REDIS_CHANNELS.STATS_UPDATE:
         // Emit to specific user room if userId is in payload

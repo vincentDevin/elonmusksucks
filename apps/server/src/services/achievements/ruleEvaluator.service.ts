@@ -55,7 +55,7 @@ export class RuleEvaluator {
 
     // Check if this rule applies to this event
     if (!rule.eventKeys.includes(event.key)) {
-      console.log(`[RuleEvaluator] Event ${event.key} not in rule eventKeys:`, rule.eventKeys);
+      //console.log(`[RuleEvaluator] Event ${event.key} not in rule eventKeys:`, rule.eventKeys);
       return result;
     }
 
@@ -145,9 +145,9 @@ export class RuleEvaluator {
     // Debug logging for Cable Pulled achievement (event key includes pong:match:lost and userId is 5)
     const isCablePulledDebug = event.key === 'pong:match:lost' && event.userId === 5;
     if (isBotBreakerEasyDebug || isCablePulledDebug) {
-      console.log(`[RuleEvaluator] 🐛 Evaluating condition:`, JSON.stringify(condition, null, 2));
-      console.log(`[RuleEvaluator] 🐛 Event structure:`, JSON.stringify(event, null, 2));
-      console.log(`[RuleEvaluator] 🐛 Event payload:`, JSON.stringify(event.payload, null, 2));
+      //console.log(`[RuleEvaluator] 🐛 Evaluating condition:`, JSON.stringify(condition, null, 2));
+      //console.log(`[RuleEvaluator] 🐛 Event structure:`, JSON.stringify(event, null, 2));
+      //console.log(`[RuleEvaluator] 🐛 Event payload:`, JSON.stringify(event.payload, null, 2));
     }
 
     for (const [key, expectedValue] of Object.entries(condition)) {
@@ -181,18 +181,18 @@ export class RuleEvaluator {
         const result = actualValue === resolvedExpectedValue;
 
         if (isBotBreakerEasyDebug || isCablePulledDebug) {
-          console.log(`[RuleEvaluator] 🐛 Condition check: ${key}`);
-          console.log(`[RuleEvaluator] 🐛   Expected: ${JSON.stringify(expectedValue)}`);
-          console.log(
-            `[RuleEvaluator] 🐛   Resolved Expected: ${JSON.stringify(resolvedExpectedValue)}`,
-          );
-          console.log(`[RuleEvaluator] 🐛   Actual: ${JSON.stringify(actualValue)}`);
-          console.log(`[RuleEvaluator] 🐛   Result: ${result}`);
+          //console.log(`[RuleEvaluator] 🐛 Condition check: ${key}`);
+          //console.log(`[RuleEvaluator] 🐛   Expected: ${JSON.stringify(expectedValue)}`);
+          //console.log(
+          //  `[RuleEvaluator] 🐛   Resolved Expected: ${JSON.stringify(resolvedExpectedValue)}`,
+          //);
+          //console.log(`[RuleEvaluator] 🐛   Actual: ${JSON.stringify(actualValue)}`);
+          //console.log(`[RuleEvaluator] 🐛   Result: ${result}`);
         }
 
         if (!result) {
           if (isBotBreakerEasyDebug || isCablePulledDebug) {
-            console.log(`[RuleEvaluator] 🐛 ❌ Condition FAILED: ${key}`);
+            //console.log(`[RuleEvaluator] 🐛 ❌ Condition FAILED: ${key}`);
           }
           return false;
         }
@@ -347,8 +347,8 @@ export class RuleEvaluator {
     // Handle placeholders
     if (path === '$.userId') {
       if (isBotBreakerEasyDebug)
-        console.log(`[RuleEvaluator] 🐛 getValue(${path}) -> userId: ${event.userId}`);
-      return event.userId;
+        //.log(`[RuleEvaluator] 🐛 getValue(${path}) -> userId: ${event.userId}`);
+        return event.userId;
     }
 
     // Handle counter references
@@ -356,8 +356,8 @@ export class RuleEvaluator {
       const counterName = path.substring(8);
       const value = userCounters[counterName] || 0;
       if (isBotBreakerEasyDebug)
-        console.log(`[RuleEvaluator] 🐛 getValue(${path}) -> counter: ${value}`);
-      return value;
+        //console.log(`[RuleEvaluator] 🐛 getValue(${path}) -> counter: ${value}`);
+        return value;
     }
 
     // Handle payload references
@@ -365,8 +365,8 @@ export class RuleEvaluator {
       const payloadPath = path.substring(8);
       const value = this.getNestedValue(event.payload, payloadPath);
       if (isBotBreakerEasyDebug)
-        console.log(`[RuleEvaluator] 🐛 getValue(${path}) -> payload path: ${value}`);
-      return value;
+        //console.log(`[RuleEvaluator] 🐛 getValue(${path}) -> payload path: ${value}`);
+        return value;
     }
 
     // Handle data references (common in achievement rules)
@@ -374,8 +374,8 @@ export class RuleEvaluator {
       const dataPath = path.substring(5);
       const value = this.getNestedValue(event.payload, dataPath);
       if (isBotBreakerEasyDebug)
-        console.log(`[RuleEvaluator] 🐛 getValue(${path}) -> data path: ${value}`);
-      return value;
+        //console.log(`[RuleEvaluator] 🐛 getValue(${path}) -> data path: ${value}`);
+        return value;
     }
 
     // Handle event properties
@@ -390,9 +390,9 @@ export class RuleEvaluator {
     // Direct payload access (for backwards compatibility)
     const value = this.getNestedValue(event.payload, path);
     if (isBotBreakerEasyDebug) {
-      console.log(`[RuleEvaluator] 🐛 getValue(${path}) -> direct payload access:`);
-      console.log(`[RuleEvaluator] 🐛   event.payload:`, JSON.stringify(event.payload, null, 2));
-      console.log(`[RuleEvaluator] 🐛   getNestedValue result: ${value}`);
+      //console.log(`[RuleEvaluator] 🐛 getValue(${path}) -> direct payload access:`);
+      //console.log(`[RuleEvaluator] 🐛   event.payload:`, JSON.stringify(event.payload, null, 2));
+      //console.log(`[RuleEvaluator] 🐛   getNestedValue result: ${value}`);
     }
     return value;
   }
@@ -467,13 +467,13 @@ export class RuleEvaluator {
    * Compile a raw rule object into a validated CompiledRule
    */
   compileRule(rawRule: any): CompiledRule | null {
-    console.log(`[RuleEvaluator] Compiling rule:`, JSON.stringify(rawRule, null, 2));
+    //console.log(`[RuleEvaluator] Compiling rule:`, JSON.stringify(rawRule, null, 2));
 
     const validation = this.validateRuleWithErrors(rawRule);
-    console.log(`[RuleEvaluator] Validation result:`, validation);
+    //console.log(`[RuleEvaluator] Validation result:`, validation);
 
     if (!validation.ok) {
-      console.warn(`[RuleEvaluator] Rule validation failed:`, validation.errors);
+      //console.warn(`[RuleEvaluator] Rule validation failed:`, validation.errors);
       return null;
     }
 

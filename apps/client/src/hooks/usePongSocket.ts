@@ -394,7 +394,7 @@ export function usePongSocket(): PongSocketHook {
           : null,
       );
 
-      // Auto-clear game state after 5 seconds
+      // Auto-clear game state after 5 seconds (gives time to see win screen and payout)
       setTimeout(() => {
         setCurrentGame(null);
       }, 5000);

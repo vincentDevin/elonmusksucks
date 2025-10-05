@@ -3,6 +3,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { formatMuskBucks } from '../../utils/formatting';
 import BaseModal from '../BaseModal';
 import EloPredictionCard from './EloPredictionCard';
+import { PONG_PAYOUT_CONSTANTS, PONG_WAGER_LIMITS, AI_PLAYER_UI } from '@ems/types';
+import type { AIDifficulty } from '@ems/types';
 
 // Helper to convert string/number to number
 const asNum = (v: string | number | bigint | undefined | null) => Number(v ?? 0);
@@ -10,7 +12,7 @@ const asNum = (v: string | number | bigint | undefined | null) => Number(v ?? 0)
 interface PongMatchCreatorModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onCreateMatch: (wager: number, type: 'ai' | 'pvp', aiDifficulty?: string) => void;
+  onCreateMatch: (wager: number, type: 'ai' | 'pvp', aiDifficulty?: AIDifficulty) => void;
 }
 
 type MatchMode = 'ai' | 'pvp' | null;
@@ -33,9 +35,20 @@ export function PongMatchCreatorModal({
 
   const [selectedMode, setSelectedMode] = useState<MatchMode>('ai'); // Default to AI mode
   const [aiWager, setAiWager] = useState(() => getSmartDefaultWager());
-  const [aiDifficulty, setAiDifficulty] = useState(() => {
-    // Remember user's last difficulty preference
-    return localStorage.getItem('pong_last_difficulty') || 'medium';
+  const [aiDifficulty, setAiDifficulty] = useState<AIDifficulty>(() => {
+    // Remember user's last difficulty preference (with migration from lowercase to UPPERCASE)
+    const saved = localStorage.getItem('pong_last_difficulty');
+
+    // Migration: convert old lowercase values to UPPERCASE
+    if (saved) {
+      const normalized = saved.toUpperCase() as AIDifficulty;
+      // Validate it's a valid difficulty
+      if (['EASY', 'MEDIUM', 'HARD', 'IMPOSSIBLE'].includes(normalized)) {
+        return normalized;
+      }
+    }
+
+    return 'MEDIUM';
   });
   const [pvpWager, setPvpWager] = useState(() => {
     // Smart default for PVP - slightly higher than AI
@@ -45,9 +58,15 @@ export function PongMatchCreatorModal({
   const [isAiWagerLocked, setIsAiWagerLocked] = useState(false);
   const [isPvpWagerLocked, setIsPvpWagerLocked] = useState(false);
 
-  // Auto-unlock wager when settings change
+  // Auto-unlock wager when settings change and enforce max wager limits
   useEffect(() => {
     setIsAiWagerLocked(false);
+
+    // Enforce max wager limit for selected AI difficulty
+    const maxWager = aiDifficultyInfo[aiDifficulty].maxWager;
+    if (maxWager !== null && aiWager > maxWager) {
+      setAiWager(maxWager);
+    }
   }, [aiWager, aiDifficulty]);
 
   useEffect(() => {
@@ -106,33 +125,42 @@ export function PongMatchCreatorModal({
     onClose();
   };
 
-  const aiDifficultyInfo = {
-    easy: {
-      emoji: '🎹',
-      name: "Grimes' Laptop",
-      desc: 'Just a MacBook Pro making techno beats',
-      multiplier: '1.2x',
+  const aiDifficultyInfo: Record<
+    AIDifficulty,
+    {
+      emoji: string;
+      desc: string;
+      multiplier: string;
+      maxWager: number | null;
+      color: string;
+    }
+  > = {
+    EASY: {
+      emoji: AI_PLAYER_UI.EASY.emoji,
+      desc: AI_PLAYER_UI.EASY.desc,
+      multiplier: `${PONG_PAYOUT_CONSTANTS.AI_PAYOUT_MULTIPLIER.EASY}x`,
+      maxWager: PONG_WAGER_LIMITS.AI_MAX_WAGERS.EASY,
       color: 'border-success bg-success/10',
     },
-    medium: {
-      emoji: '🥽',
-      name: "Zuck's Metaverse",
-      desc: 'No legs, moderate Pong skills',
-      multiplier: '1.5x',
+    MEDIUM: {
+      emoji: AI_PLAYER_UI.MEDIUM.emoji,
+      desc: AI_PLAYER_UI.MEDIUM.desc,
+      multiplier: `${PONG_PAYOUT_CONSTANTS.AI_PAYOUT_MULTIPLIER.MEDIUM}x`,
+      maxWager: PONG_WAGER_LIMITS.AI_MAX_WAGERS.MEDIUM,
       color: 'border-info bg-info/10',
     },
-    hard: {
-      emoji: '🚀',
-      name: "Bezos' Rocket",
-      desc: 'Compensating with superior skills',
-      multiplier: '2.0x',
+    HARD: {
+      emoji: AI_PLAYER_UI.HARD.emoji,
+      desc: AI_PLAYER_UI.HARD.desc,
+      multiplier: `${PONG_PAYOUT_CONSTANTS.AI_PAYOUT_MULTIPLIER.HARD}x`,
+      maxWager: PONG_WAGER_LIMITS.AI_MAX_WAGERS.HARD,
       color: 'border-warning bg-warning/10',
     },
-    impossible: {
-      emoji: '🤖',
-      name: 'X Æ A-XII',
-      desc: "Elon's child has chosen violence",
-      multiplier: '3.0x',
+    IMPOSSIBLE: {
+      emoji: AI_PLAYER_UI.IMPOSSIBLE.emoji,
+      desc: AI_PLAYER_UI.IMPOSSIBLE.desc,
+      multiplier: `${PONG_PAYOUT_CONSTANTS.AI_PAYOUT_MULTIPLIER.IMPOSSIBLE}x`,
+      maxWager: PONG_WAGER_LIMITS.AI_MAX_WAGERS.IMPOSSIBLE,
       color: 'border-error bg-error/10',
     },
   };
@@ -148,6 +176,12 @@ export function PongMatchCreatorModal({
     showFree: boolean = false,
   ) => {
     const buttons = [];
+
+    // Get effective max (for AI mode, respect max wager limits)
+    const effectiveMax =
+      selectedMode === 'ai' && aiDifficultyInfo[aiDifficulty].maxWager !== null
+        ? Math.min(balance, aiDifficultyInfo[aiDifficulty].maxWager!)
+        : balance;
 
     // Add Free button for AI mode
     if (showFree) {
@@ -172,22 +206,22 @@ export function PongMatchCreatorModal({
 
     // Add percentage buttons
     [0.1, 0.25, 0.5, 1.0].forEach((percent) => {
+      const amount = Math.floor(effectiveMax * percent);
       buttons.push(
         <button
           key={percent}
           onClick={() => {
-            const amount = Math.floor(balance * percent);
             setWager(amount);
             if (selectedMode === 'ai') setIsAiWagerLocked(false);
             else setIsPvpWagerLocked(false);
           }}
           className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer ${
-            wager === Math.floor(balance * percent)
+            wager === amount
               ? 'bg-primary text-white shadow-lg'
               : 'bg-muted/20 text-content hover:bg-primary hover:text-white hover:shadow-xl hover:shadow-primary/50'
           }`}
         >
-          {percent === 1.0 ? '🚀 ALL IN' : `${percent * 100}%`}
+          {percent === 1.0 ? '🚀 MAX' : `${percent * 100}%`}
         </button>,
       );
     });
@@ -246,7 +280,12 @@ export function PongMatchCreatorModal({
             <div>
               <h3 className="text-lg font-semibold mb-3 text-content">Select AI Difficulty</h3>
               <div className="grid grid-cols-4 gap-3">
-                {Object.entries(aiDifficultyInfo).map(([level, info]) => (
+                {(
+                  Object.entries(aiDifficultyInfo) as [
+                    AIDifficulty,
+                    (typeof aiDifficultyInfo)[AIDifficulty],
+                  ][]
+                ).map(([level, info]) => (
                   <button
                     key={level}
                     onClick={() => setAiDifficulty(level)}
@@ -256,11 +295,11 @@ export function PongMatchCreatorModal({
                         : 'border-muted bg-surface hover:border-accent hover:shadow-lg hover:bg-accent/5'
                     }`}
                   >
-                    {/* First Row: Emoji + Name + Multiplier */}
+                    {/* First Row: Emoji + Difficulty + Multiplier */}
                     <div className="flex items-center justify-between mb-1">
                       <div className="flex items-center space-x-1">
                         <span className="text-lg">{info.emoji}</span>
-                        <span className="font-bold text-content text-sm">{info.name}</span>
+                        <span className="font-bold text-content text-sm">{level}</span>
                       </div>
                       <div className="px-1.5 py-0.5 bg-accent/20 text-accent text-xs font-bold rounded">
                         {info.multiplier}
@@ -288,6 +327,17 @@ export function PongMatchCreatorModal({
                     <span className="font-bold text-content">{formatMuskBucks(balance)} 🪙</span>
                   </div>
 
+                  {/* Max Wager Limit Warning */}
+                  {aiDifficultyInfo[aiDifficulty].maxWager !== null && (
+                    <div className="bg-warning/10 border border-warning/20 rounded p-2">
+                      <div className="flex items-center text-xs text-warning">
+                        <span className="mr-1">⚠️</span>
+                        Max wager for {aiDifficulty} difficulty:{' '}
+                        {formatMuskBucks(aiDifficultyInfo[aiDifficulty].maxWager!)} 🪙
+                      </div>
+                    </div>
+                  )}
+
                   {aiWager === getSmartDefaultWager() && aiWager > 0 && (
                     <div className="bg-accent/10 border border-accent/20 rounded p-2">
                       <div className="flex items-center text-xs text-accent">
@@ -314,15 +364,22 @@ export function PongMatchCreatorModal({
                         type="number"
                         value={aiWager}
                         onChange={(e) => {
+                          const maxWager = aiDifficultyInfo[aiDifficulty].maxWager;
+                          const effectiveMax =
+                            maxWager !== null ? Math.min(balance, maxWager) : balance;
                           const value = Math.max(
                             0,
-                            Math.min(balance, parseInt(e.target.value) || 0),
+                            Math.min(effectiveMax, parseInt(e.target.value) || 0),
                           );
                           setAiWager(value);
                           setIsAiWagerLocked(false);
                         }}
                         min="0"
-                        max={balance}
+                        max={
+                          aiDifficultyInfo[aiDifficulty].maxWager !== null
+                            ? Math.min(balance, aiDifficultyInfo[aiDifficulty].maxWager!)
+                            : balance
+                        }
                         step="10"
                         placeholder="0"
                         className="w-32 px-3 py-2 bg-background border border-muted rounded text-right font-bold text-content focus:ring-2 focus:ring-accent focus:border-accent"
@@ -336,7 +393,11 @@ export function PongMatchCreatorModal({
                     <input
                       type="range"
                       min="0"
-                      max={balance}
+                      max={
+                        aiDifficultyInfo[aiDifficulty].maxWager !== null
+                          ? Math.min(balance, aiDifficultyInfo[aiDifficulty].maxWager!)
+                          : balance
+                      }
                       step="10"
                       value={aiWager}
                       onChange={(e) => {
@@ -346,13 +407,19 @@ export function PongMatchCreatorModal({
                       }}
                       className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer slider"
                       style={{
-                        background: `linear-gradient(to right, var(--color-accent) 0%, var(--color-accent) ${(aiWager / balance) * 100}%, var(--color-muted) ${(aiWager / balance) * 100}%, var(--color-muted) 100%)`,
+                        background: `linear-gradient(to right, var(--color-accent) 0%, var(--color-accent) ${(aiWager / (aiDifficultyInfo[aiDifficulty].maxWager !== null ? Math.min(balance, aiDifficultyInfo[aiDifficulty].maxWager!) : balance)) * 100}%, var(--color-muted) ${(aiWager / (aiDifficultyInfo[aiDifficulty].maxWager !== null ? Math.min(balance, aiDifficultyInfo[aiDifficulty].maxWager!) : balance)) * 100}%, var(--color-muted) 100%)`,
                       }}
                     />
                     <div className="flex justify-between text-xs text-tertiary mt-1">
                       <span>0</span>
                       <span className="text-accent font-medium">{formatMuskBucks(aiWager)}</span>
-                      <span>{formatMuskBucks(balance)}</span>
+                      <span>
+                        {formatMuskBucks(
+                          aiDifficultyInfo[aiDifficulty].maxWager !== null
+                            ? Math.min(balance, aiDifficultyInfo[aiDifficulty].maxWager!)
+                            : balance,
+                        )}
+                      </span>
                     </div>
                   </div>
 
@@ -363,25 +430,31 @@ export function PongMatchCreatorModal({
                   <div className="pt-2 border-t border-muted">
                     <div className="text-xs text-tertiary mb-2">Popular Stakes</div>
                     <div className="grid grid-cols-4 gap-1">
-                      {[50, 100, 250, 500].map((amount) => (
-                        <button
-                          key={amount}
-                          onClick={() => {
-                            setAiWager(Math.min(amount, balance));
-                            setIsAiWagerLocked(false);
-                          }}
-                          disabled={amount > balance}
-                          className={`px-2 py-1 text-xs rounded transition-all ${
-                            amount > balance
-                              ? 'opacity-60 cursor-not-allowed bg-muted/20 text-tertiary'
-                              : aiWager === amount
-                                ? 'bg-accent text-white'
-                                : 'bg-muted/20 text-content hover:bg-accent hover:text-white hover:shadow-lg hover:shadow-accent/50 cursor-pointer'
-                          }`}
-                        >
-                          {formatMuskBucks(amount)}
-                        </button>
-                      ))}
+                      {[50, 100, 250, 500].map((amount) => {
+                        const maxWager = aiDifficultyInfo[aiDifficulty].maxWager;
+                        const effectiveMax =
+                          maxWager !== null ? Math.min(balance, maxWager) : balance;
+                        const isDisabled = amount > effectiveMax;
+                        return (
+                          <button
+                            key={amount}
+                            onClick={() => {
+                              setAiWager(Math.min(amount, effectiveMax));
+                              setIsAiWagerLocked(false);
+                            }}
+                            disabled={isDisabled}
+                            className={`px-2 py-1 text-xs rounded transition-all ${
+                              isDisabled
+                                ? 'opacity-60 cursor-not-allowed bg-muted/20 text-tertiary'
+                                : aiWager === amount
+                                  ? 'bg-accent text-white'
+                                  : 'bg-muted/20 text-content hover:bg-accent hover:text-white hover:shadow-lg hover:shadow-accent/50 cursor-pointer'
+                            }`}
+                          >
+                            {formatMuskBucks(amount)}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>

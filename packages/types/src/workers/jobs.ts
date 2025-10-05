@@ -52,7 +52,7 @@ export interface PongPayoutJobData {
   payout: string; // BigInt as string
   houseRake: string; // BigInt as string
   vsAI: boolean;
-  aiDifficulty?: string;
+  aiDifficulty?: import('../shared/enums').AIDifficulty;
   winnerScore: number;
   loserScore: number;
   duration: number;

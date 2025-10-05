@@ -885,10 +885,40 @@ export class PongRepository implements IPongRepository {
     loserLoss?: string;
     vsAI: boolean;
     timestamp: Date;
+    winnerPreviousBalance: string;
+    winnerNewBalance: string;
+    loserPreviousBalance?: string;
+    loserNewBalance?: string;
   }> {
     const netPayout = payoutAmount - houseRake;
 
     return await this.executeInTransaction(async (tx) => {
+      // Get winner's balance before update
+      const winnerBefore = await tx.user.findUnique({
+        where: { id: winnerId },
+        select: { muskBucks: true },
+      });
+
+      if (!winnerBefore) {
+        throw new Error(`Winner ${winnerId} not found for payout`);
+      }
+
+      const winnerPreviousBalance = winnerBefore.muskBucks;
+
+      // Get loser's balance if available (loser already had wager deducted)
+      let loserPreviousBalance: bigint | undefined;
+      let loserNewBalance: bigint | undefined;
+      if (loserId) {
+        const loserUser = await tx.user.findUnique({
+          where: { id: loserId },
+          select: { muskBucks: true },
+        });
+        if (loserUser) {
+          loserPreviousBalance = loserUser.muskBucks;
+          loserNewBalance = loserUser.muskBucks; // No change on payout (wager already deducted)
+        }
+      }
+
       // Credit winner with net payout
       const updatedUser = await tx.user.update({
         where: { id: winnerId },
@@ -928,6 +958,10 @@ export class PongRepository implements IPongRepository {
         loserLoss: loserId ? payoutAmount.toString() : undefined,
         vsAI: false,
         timestamp: new Date(),
+        winnerPreviousBalance: winnerPreviousBalance.toString(),
+        winnerNewBalance: updatedUser.muskBucks.toString(),
+        loserPreviousBalance: loserPreviousBalance?.toString(),
+        loserNewBalance: loserNewBalance?.toString(),
       };
     });
   }
@@ -949,6 +983,8 @@ export class PongRepository implements IPongRepository {
     netPayout: string;
     vsAI: boolean;
     timestamp: Date;
+    winnerPreviousBalance: string;
+    winnerNewBalance: string;
   }> {
     // Only human players get payouts (AI wins don't trigger payouts)
     if (winnerId < 0) {
@@ -960,12 +996,26 @@ export class PongRepository implements IPongRepository {
         netPayout: '0',
         vsAI: true,
         timestamp: new Date(),
+        winnerPreviousBalance: '0',
+        winnerNewBalance: '0',
       };
     }
 
     const netPayout = payoutAmount - houseRake;
 
     return await this.executeInTransaction(async (tx) => {
+      // Get user's current balance before update
+      const userBefore = await tx.user.findUnique({
+        where: { id: winnerId },
+        select: { muskBucks: true },
+      });
+
+      if (!userBefore) {
+        throw new Error(`User ${winnerId} not found for payout`);
+      }
+
+      const previousBalance = userBefore.muskBucks;
+
       // Credit human winner with net payout
       const updatedUser = await tx.user.update({
         where: { id: winnerId },
@@ -1003,6 +1053,8 @@ export class PongRepository implements IPongRepository {
         netPayout: netPayout.toString(),
         vsAI: true,
         timestamp: new Date(),
+        winnerPreviousBalance: previousBalance.toString(),
+        winnerNewBalance: updatedUser.muskBucks.toString(),
       };
     });
   }

@@ -43,6 +43,7 @@ import { streakManager } from './StreakManager.service';
 import { eventCorrelator } from './EventCorrelator.service';
 import { unifiedActivityService } from './unifiedActivity.service';
 import { UserService } from './user.service';
+import { toBigInt } from '../utils/bigintSerializer';
 
 // Note: Pong service interfaces now imported from @ems/types
 // MatchResult -> PongMatchResult, other interfaces imported directly
@@ -249,8 +250,8 @@ export class PongStatsService {
         loserId: loserId || undefined,
         winnerScore: winnerScore || 5, // Use actual winner score
         loserScore: loserScore || 0, // Use actual loser score
-        wagerAmount: BigInt(wagerAmount),
-        payoutAmount: BigInt(payoutAmount),
+        wagerAmount: toBigInt(wagerAmount),
+        payoutAmount: toBigInt(payoutAmount),
         aiDifficulty: isAIMatch
           ? this.getAIDifficultyFromId(winnerId < 0 ? winnerId : loserId)
           : undefined,

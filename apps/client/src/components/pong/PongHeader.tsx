@@ -1,3 +1,7 @@
+import { PONG_PAYOUT_CONSTANTS } from '@ems/types';
+import type { AIDifficulty } from '@ems/types';
+import { formatMuskBucks } from '../../utils/formatting';
+
 interface PongHeaderProps {
   mode: 'lobby' | 'game' | 'spectator';
 
@@ -170,16 +174,31 @@ export function PongHeader({
                 </span>
               </div>
               {/* Wager/Pot Display */}
-              {currentGame?.wager !== undefined && (
-                <div className="mt-1 text-sm text-warning">
-                  💰 Pot:{' '}
-                  {currentGame.pot ||
-                    (currentGame.players[1]?.name === 'AI'
-                      ? currentGame.wager
-                      : currentGame.wager * 2)}{' '}
-                  MB
-                </div>
-              )}
+              {currentGame?.wager !== undefined &&
+                (() => {
+                  let potValue: number;
+
+                  if (currentGame.pot) {
+                    // Use explicit pot if provided
+                    potValue = currentGame.pot;
+                  } else if (currentGame.isAI && currentGame.aiDifficulty) {
+                    // AI match: wager + (wager * multiplier)
+                    const multiplier =
+                      PONG_PAYOUT_CONSTANTS.AI_PAYOUT_MULTIPLIER[
+                        currentGame.aiDifficulty.toUpperCase() as AIDifficulty
+                      ];
+                    potValue = currentGame.wager + currentGame.wager * multiplier;
+                  } else {
+                    // PVP match: wager * 2
+                    potValue = currentGame.wager * 2;
+                  }
+
+                  return (
+                    <div className="mt-1 text-sm text-warning">
+                      💰 Pot: {formatMuskBucks(potValue)}
+                    </div>
+                  );
+                })()}
             </div>
           </div>
 
