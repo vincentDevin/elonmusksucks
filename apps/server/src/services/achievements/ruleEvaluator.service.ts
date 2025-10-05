@@ -1,9 +1,10 @@
 import type { AchievementEvent } from '@ems/types';
 
 export interface RuleProgress {
-  kind: 'count' | 'streak' | 'binary';
+  kind: 'count' | 'streak' | 'binary' | 'threshold';
   incrementIf?: Record<string, any>;
   resetIf?: Record<string, any>;
+  setIf?: Record<string, any>;
   counters?: string[];
 }
 
@@ -95,6 +96,18 @@ export class RuleEvaluator {
         );
         if (result.shouldIncrement) {
           result.newProgress = 1;
+        }
+        break;
+
+      case 'threshold':
+        // Threshold achievements set progress to a specific value from the event payload
+        if (rule.progress.setIf) {
+          // Extract the value from the event payload using the setIf mapping
+          const setValue = this.evaluateSetIfCondition(rule.progress.setIf, event, userCounters);
+          if (setValue !== null) {
+            result.newProgress = setValue;
+            result.shouldIncrement = setValue !== currentProgress;
+          }
         }
         break;
     }
@@ -247,6 +260,38 @@ export class RuleEvaluator {
   }
 
   /**
+   * Evaluate setIf condition to extract a value from the event payload
+   * Returns the extracted value or null if not found
+   */
+  private evaluateSetIfCondition(
+    setIf: Record<string, any>,
+    event: AchievementEvent,
+    userCounters: Record<string, number>,
+  ): number | null {
+    // setIf should have a single key-value pair where the value is a path to extract
+    // Example: {"netProfit": "$.netProfit"} means "set progress to the netProfit value from event payload"
+    for (const [_fieldName, valuePath] of Object.entries(setIf)) {
+      const extractedValue = this.getValue(valuePath, event, userCounters);
+
+      // Convert to number if possible
+      if (typeof extractedValue === 'number') {
+        return extractedValue;
+      }
+      if (typeof extractedValue === 'string') {
+        const parsed = parseFloat(extractedValue);
+        if (!isNaN(parsed)) {
+          return parsed;
+        }
+      }
+      if (typeof extractedValue === 'bigint') {
+        return Number(extractedValue);
+      }
+    }
+
+    return null;
+  }
+
+  /**
    * Evaluate unlock conditions using comparison operators
    */
   private evaluateUnlockCondition(
@@ -379,13 +424,21 @@ export class RuleEvaluator {
     if (!rule.progress) {
       errors.push('progress missing');
     } else {
-      if (!rule.progress.kind || !['count', 'streak', 'binary'].includes(rule.progress.kind)) {
-        errors.push('progress.kind must be count, streak, or binary');
+      if (
+        !rule.progress.kind ||
+        !['count', 'streak', 'binary', 'threshold'].includes(rule.progress.kind)
+      ) {
+        errors.push('progress.kind must be count, streak, binary, or threshold');
       }
 
       // Streak rules require resetIf
       if (rule.progress.kind === 'streak' && !rule.progress.resetIf) {
         errors.push('streak rules require progress.resetIf');
+      }
+
+      // Threshold rules require setIf
+      if (rule.progress.kind === 'threshold' && !rule.progress.setIf) {
+        errors.push('threshold rules require progress.setIf');
       }
     }
 
@@ -430,6 +483,7 @@ export class RuleEvaluator {
         kind: rawRule.progress.kind,
         incrementIf: rawRule.progress.incrementIf,
         resetIf: rawRule.progress.resetIf,
+        setIf: rawRule.progress.setIf,
         counters: rawRule.progress.counters,
       },
       unlockWhen: rawRule.unlockWhen,

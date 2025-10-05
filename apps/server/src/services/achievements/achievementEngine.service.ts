@@ -170,11 +170,11 @@ export class AchievementEngine {
       const isBotBreakerEasy = rule.achievementId === 292;
       if (isBotBreakerEasy) {
         console.log(`[AchievementEngine] 🐛 DEBUG Bot Breaker: Easy rule evaluation`);
-        console.log(`[AchievementEngine] 🐛 Rule:`, JSON.stringify(rule.rule, null, 2));
+        console.log(`[AchievementEngine] 🐛 Rule:`, JSON.stringify(rule.ruleData, null, 2));
       }
 
       // Compile the rule
-      const compiledRule = this.ruleEvaluator.compileRule(rule.rule);
+      const compiledRule = this.ruleEvaluator.compileRule(rule.ruleData);
       if (!compiledRule) {
         console.warn(`Invalid rule structure for achievement ${rule.achievementId}`);
         if (isBotBreakerEasy) {

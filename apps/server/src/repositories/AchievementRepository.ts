@@ -442,9 +442,10 @@ export class AchievementRepository implements IAchievementRepository {
           }
 
           // Create enriched rule object
-          const enrichedRule: DbAchievementRule = {
+          const enrichedRule: DbAchievementRule & { achievementName: string } = {
             id: achievement.id,
             achievementId: achievement.id,
+            achievementName: achievement.name,
             eventKey: rule.eventKeys[0], // Primary event key
             ruleData: rule,
             isActive: true,
