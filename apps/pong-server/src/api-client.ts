@@ -127,9 +127,13 @@ export class PongApiClient {
     }
   }
 
-  async getUserById(userId: number): Promise<{ id: number; name: string } | null> {
+  async getUserById(
+    userId: number,
+  ): Promise<{ id: number; name: string; avatarUrl?: string | null } | null> {
     try {
-      const result = await this.request<{ id: number; name: string }>(`/users/${userId}`);
+      const result = await this.request<{ id: number; name: string; avatarUrl?: string | null }>(
+        `/ai-players/${userId}`,
+      );
       return result;
     } catch (error) {
       console.warn(`Failed to fetch user ${userId}`);

@@ -107,4 +107,9 @@ export interface IPongRepository {
 
   // Utility operations
   executeInTransaction<T>(callback: (tx: DbPrismaTransaction) => Promise<T>): Promise<T>;
+
+  // AI player operations
+  getAIPlayerById(
+    userId: number,
+  ): Promise<{ id: number; name: string; avatarUrl: string | null } | null>;
 }

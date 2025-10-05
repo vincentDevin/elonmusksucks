@@ -9,6 +9,8 @@ import {
   processWager,
   validateWager,
   healthCheck,
+  getAIPlayerById,
+  getAllAIPlayers,
 } from '../controllers/pong.controller';
 
 const router = Router();
@@ -40,6 +42,12 @@ router.post('/record-match', verifyGameServerAuth, recordMatch);
 
 // GET /api/pong/health - Health check for game servers
 router.get('/health', verifyGameServerAuth, healthCheck);
+
+// GET /api/pong/ai-players - Get all AI players (cached, public) - MUST come before /:id route
+router.get('/ai-players', getAllAIPlayers);
+
+// GET /api/pong/ai-players/:id - Fetch AI player data from database (for pong-server)
+router.get('/ai-players/:id', verifyGameServerAuth, getAIPlayerById);
 
 // ============================================
 // PONG STATS & ELO ENDPOINTS

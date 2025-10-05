@@ -3,12 +3,10 @@ import {
   ClockIcon,
   TrophyIcon,
   UserIcon,
-  ComputerDesktopIcon,
   ArrowTrendingUpIcon,
   ArrowTrendingDownIcon,
 } from '@heroicons/react/24/outline';
 import api from '../../api/axios';
-import PongTierBadge from './PongTierBadge';
 
 interface PongMatchHistoryProps {
   userId: number;

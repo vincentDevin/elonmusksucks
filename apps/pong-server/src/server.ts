@@ -25,6 +25,16 @@ import {
 // Note: AI_PLAYER_IDS now imported from @ems/types for consistency
 // AI player names are fetched from the database (see createAIPlayer function)
 
+// AI Player cache - refresh every 5 minutes to match server cache
+const AI_PLAYER_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const aiPlayerCache = new Map<
+  number,
+  {
+    data: { id: number; name: string; avatarUrl?: string | null };
+    timestamp: number;
+  }
+>();
+
 // ——————————————————————————————————————————————————————————————————————————————————
 // VALIDATION HELPERS (Type guards and input validation)
 // ——————————————————————————————————————————————————————————————————————————————————
@@ -43,7 +53,7 @@ function isValidAIDifficulty(difficulty: unknown): difficulty is AIDifficulty {
 }
 
 /**
- * Fetches AI player data from database by difficulty
+ * Fetches AI player data from database by difficulty (with caching)
  * Returns Player object with name from database or fallback name
  */
 async function createAIPlayer(difficulty: AIDifficulty, apiClient: PongApiClient): Promise<Player> {
@@ -51,10 +61,24 @@ async function createAIPlayer(difficulty: AIDifficulty, apiClient: PongApiClient
   let aiPlayerName = `AI-${difficulty}`; // Fallback name
 
   try {
-    // Fetch AI player from database to get current name
-    const aiUser = await apiClient.getUserById(aiPlayerId);
-    if (aiUser && aiUser.name) {
-      aiPlayerName = aiUser.name;
+    // Check cache first
+    const cached = aiPlayerCache.get(aiPlayerId);
+    const now = Date.now();
+
+    if (cached && now - cached.timestamp < AI_PLAYER_CACHE_TTL) {
+      aiPlayerName = cached.data.name;
+    } else {
+      // Fetch AI player from database to get current name
+      const aiUser = await apiClient.getUserById(aiPlayerId);
+      if (aiUser && aiUser.name) {
+        aiPlayerName = aiUser.name;
+
+        // Update cache
+        aiPlayerCache.set(aiPlayerId, {
+          data: aiUser,
+          timestamp: now,
+        });
+      }
     }
   } catch (error) {
     console.warn(`Failed to fetch AI player ${aiPlayerId} from database, using fallback name`);

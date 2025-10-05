@@ -1094,4 +1094,17 @@ export class PongRepository implements IPongRepository {
 
     return null;
   }
+
+  /**
+   * Get AI player basic info (id, name, avatarUrl)
+   * Used by pong-server to fetch AI player data from database
+   */
+  async getAIPlayerById(
+    userId: number,
+  ): Promise<{ id: number; name: string; avatarUrl: string | null } | null> {
+    return await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, name: true, avatarUrl: true },
+    });
+  }
 }

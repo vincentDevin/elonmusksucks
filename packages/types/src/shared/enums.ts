@@ -174,27 +174,10 @@ export const AI_PLAYER_IDS = {
 } as const;
 
 /**
- * AI Player UI Metadata (emoji and description)
- * Names are fetched from database to stay in sync
+ * AI Player UI Metadata
+ * All AI player data (names, avatars) are fetched from the database
+ * UI components should fetch from /api/pong/ai-players/:id endpoint
  */
-export const AI_PLAYER_UI = {
-  EASY: {
-    emoji: '🎹',
-    desc: 'Just a MacBook Pro making techno beats',
-  },
-  MEDIUM: {
-    emoji: '🥽',
-    desc: 'No legs, moderate Pong skills',
-  },
-  HARD: {
-    emoji: '🚀',
-    desc: 'Compensating with superior skills',
-  },
-  IMPOSSIBLE: {
-    emoji: '🤖',
-    desc: "Elon's child has chosen violence",
-  },
-} as const;
 
 export const PONG_PHYSICS = {
   FIELD_WIDTH: 800,

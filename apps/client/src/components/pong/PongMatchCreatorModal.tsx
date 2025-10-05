@@ -3,8 +3,9 @@ import { useAuth } from '../../contexts/AuthContext';
 import { formatMuskBucks } from '../../utils/formatting';
 import BaseModal from '../BaseModal';
 import EloPredictionCard from './EloPredictionCard';
-import { PONG_PAYOUT_CONSTANTS, PONG_WAGER_LIMITS, AI_PLAYER_UI } from '@ems/types';
+import { PONG_PAYOUT_CONSTANTS, PONG_WAGER_LIMITS, AI_PLAYER_IDS } from '@ems/types';
 import type { AIDifficulty } from '@ems/types';
+import api from '../../api/axios';
 
 // Helper to convert string/number to number
 const asNum = (v: string | number | bigint | undefined | null) => Number(v ?? 0);
@@ -17,6 +18,12 @@ interface PongMatchCreatorModalProps {
 
 type MatchMode = 'ai' | 'pvp' | null;
 
+interface AIPlayerData {
+  id: number;
+  name: string;
+  avatarUrl: string | null;
+}
+
 export function PongMatchCreatorModal({
   isOpen,
   onClose,
@@ -24,6 +31,14 @@ export function PongMatchCreatorModal({
 }: PongMatchCreatorModalProps) {
   const { user } = useAuth();
   const balance = asNum(user?.muskBucks || 0);
+
+  // AI player data from database
+  const [aiPlayers, setAiPlayers] = useState<Record<AIDifficulty, AIPlayerData>>({
+    EASY: { id: AI_PLAYER_IDS.EASY, name: 'AI Easy', avatarUrl: null },
+    MEDIUM: { id: AI_PLAYER_IDS.MEDIUM, name: 'AI Medium', avatarUrl: null },
+    HARD: { id: AI_PLAYER_IDS.HARD, name: 'AI Hard', avatarUrl: null },
+    IMPOSSIBLE: { id: AI_PLAYER_IDS.IMPOSSIBLE, name: 'AI Impossible', avatarUrl: null },
+  });
 
   // Smart defaults based on user balance
   const getSmartDefaultWager = () => {
@@ -79,6 +94,43 @@ export function PongMatchCreatorModal({
     setIsPvpWagerLocked(false);
   }, [selectedMode]);
 
+  // Fetch AI player data from database (cached on server, fetched once per session)
+  useEffect(() => {
+    const fetchAIPlayers = async () => {
+      try {
+        // Fetch all AI players in one request (server-side cached)
+        const response = await api.get('/api/pong/ai-players');
+        const players = response.data as Array<{
+          id: number;
+          name: string;
+          avatarUrl: string | null;
+        }>;
+
+        // Map players to difficulties
+        const newAiPlayers = { ...aiPlayers };
+        players.forEach((player) => {
+          // Find difficulty by matching ID
+          const difficulty = (Object.keys(AI_PLAYER_IDS) as AIDifficulty[]).find(
+            (key) => AI_PLAYER_IDS[key] === player.id,
+          );
+          if (difficulty) {
+            newAiPlayers[difficulty] = player;
+          }
+        });
+
+        setAiPlayers(newAiPlayers);
+      } catch (error) {
+        console.error('Failed to fetch AI player data:', error);
+        // Keep fallback values if fetch fails
+      }
+    };
+
+    // Only fetch once when modal first opens
+    if (isOpen && aiPlayers.EASY.name === 'AI Easy') {
+      fetchAIPlayers();
+    }
+  }, [isOpen]);
+
   // Update defaults when balance changes
   useEffect(() => {
     if (balance > 0) {
@@ -128,37 +180,27 @@ export function PongMatchCreatorModal({
   const aiDifficultyInfo: Record<
     AIDifficulty,
     {
-      emoji: string;
-      desc: string;
       multiplier: string;
       maxWager: number | null;
       color: string;
     }
   > = {
     EASY: {
-      emoji: AI_PLAYER_UI.EASY.emoji,
-      desc: AI_PLAYER_UI.EASY.desc,
       multiplier: `${PONG_PAYOUT_CONSTANTS.AI_PAYOUT_MULTIPLIER.EASY}x`,
       maxWager: PONG_WAGER_LIMITS.AI_MAX_WAGERS.EASY,
       color: 'border-success bg-success/10',
     },
     MEDIUM: {
-      emoji: AI_PLAYER_UI.MEDIUM.emoji,
-      desc: AI_PLAYER_UI.MEDIUM.desc,
       multiplier: `${PONG_PAYOUT_CONSTANTS.AI_PAYOUT_MULTIPLIER.MEDIUM}x`,
       maxWager: PONG_WAGER_LIMITS.AI_MAX_WAGERS.MEDIUM,
       color: 'border-info bg-info/10',
     },
     HARD: {
-      emoji: AI_PLAYER_UI.HARD.emoji,
-      desc: AI_PLAYER_UI.HARD.desc,
       multiplier: `${PONG_PAYOUT_CONSTANTS.AI_PAYOUT_MULTIPLIER.HARD}x`,
       maxWager: PONG_WAGER_LIMITS.AI_MAX_WAGERS.HARD,
       color: 'border-warning bg-warning/10',
     },
     IMPOSSIBLE: {
-      emoji: AI_PLAYER_UI.IMPOSSIBLE.emoji,
-      desc: AI_PLAYER_UI.IMPOSSIBLE.desc,
       multiplier: `${PONG_PAYOUT_CONSTANTS.AI_PAYOUT_MULTIPLIER.IMPOSSIBLE}x`,
       maxWager: PONG_WAGER_LIMITS.AI_MAX_WAGERS.IMPOSSIBLE,
       color: 'border-error bg-error/10',
@@ -285,30 +327,38 @@ export function PongMatchCreatorModal({
                     AIDifficulty,
                     (typeof aiDifficultyInfo)[AIDifficulty],
                   ][]
-                ).map(([level, info]) => (
-                  <button
-                    key={level}
-                    onClick={() => setAiDifficulty(level)}
-                    className={`p-2 rounded-lg border-2 transition-all cursor-pointer ${
-                      aiDifficulty === level
-                        ? `${info.color} shadow-lg`
-                        : 'border-muted bg-surface hover:border-accent hover:shadow-lg hover:bg-accent/5'
-                    }`}
-                  >
-                    {/* First Row: Emoji + Difficulty + Multiplier */}
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center space-x-1">
-                        <span className="text-lg">{info.emoji}</span>
-                        <span className="font-bold text-content text-sm">{level}</span>
+                ).map(([level, info]) => {
+                  const player = aiPlayers[level];
+                  return (
+                    <button
+                      key={level}
+                      onClick={() => setAiDifficulty(level)}
+                      className={`p-2 rounded-lg border-2 transition-all cursor-pointer ${
+                        aiDifficulty === level
+                          ? `${info.color} shadow-lg`
+                          : 'border-muted bg-surface hover:border-accent hover:shadow-lg hover:bg-accent/5'
+                      }`}
+                    >
+                      {/* First Row: Avatar + AI Name + Multiplier */}
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center space-x-1">
+                          <span className="text-lg">{player.avatarUrl || '🤖'}</span>
+                          <span
+                            className="font-bold text-content text-sm truncate"
+                            title={player.name}
+                          >
+                            {player.name}
+                          </span>
+                        </div>
+                        <div className="px-1.5 py-0.5 bg-accent/20 text-accent text-xs font-bold rounded">
+                          {info.multiplier}
+                        </div>
                       </div>
-                      <div className="px-1.5 py-0.5 bg-accent/20 text-accent text-xs font-bold rounded">
-                        {info.multiplier}
-                      </div>
-                    </div>
-                    {/* Second Row: Description */}
-                    <div className="text-xs text-tertiary">{info.desc}</div>
-                  </button>
-                ))}
+                      {/* Second Row: Difficulty Level */}
+                      <div className="text-xs text-tertiary">{level}</div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
