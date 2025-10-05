@@ -124,6 +124,30 @@ export default function OddsBar({
     [PredictionType.MULTIPLE]: ['bg-info', 'bg-success', 'bg-warning', 'bg-error'],
   };
 
+  // Border color mappings for each palette color
+  const borderColors: Record<string, string> = {
+    'bg-success': 'border-success',
+    'bg-error': 'border-error',
+    'bg-info': 'border-info',
+    'bg-warning': 'border-warning',
+  };
+
+  // Background tint mappings for each palette color
+  const bgTints: Record<string, string> = {
+    'bg-success': 'bg-success/10',
+    'bg-error': 'bg-error/10',
+    'bg-info': 'bg-info/10',
+    'bg-warning': 'bg-warning/10',
+  };
+
+  // Glow effect mappings for hot options
+  const glowEffects: Record<string, string> = {
+    'bg-success': 'shadow-lg shadow-success/50',
+    'bg-error': 'shadow-lg shadow-error/50',
+    'bg-info': 'shadow-lg shadow-info/50',
+    'bg-warning': 'shadow-lg shadow-warning/50',
+  };
+
   const palette = palettes[type] ?? palettes[PredictionType.MULTIPLE];
 
   // Calculate total staked
@@ -149,36 +173,43 @@ export default function OddsBar({
                 : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
           }`}
         >
-          {currentOptions.map((option) => (
-            <div
-              key={option.id}
-              className={`relative border border-muted bg-surface hover:shadow-sm transition-all duration-300 ${
-                isMini
-                  ? 'p-1.5 rounded'
-                  : isCompact
-                    ? 'p-2 rounded-md'
-                    : 'p-3 rounded-lg hover:shadow-md'
-              }`}
-            >
+          {currentOptions.map((option, optionIndex) => {
+            // Get this option's color from palette
+            const optionColor = palette[optionIndex % palette.length];
+            const borderClass = borderColors[optionColor] || 'border-muted';
+            const bgTintClass = bgTints[optionColor] || 'bg-surface';
+
+            return (
               <div
-                className={`font-semibold truncate text-content ${
-                  isMini ? 'text-xs' : isCompact ? 'text-sm' : 'text-lg'
+                key={option.id}
+                className={`relative border-2 ${borderClass} ${bgTintClass} hover:shadow-sm transition-all duration-300 ${
+                  isMini
+                    ? 'p-1.5 rounded'
+                    : isCompact
+                      ? 'p-2 rounded-md'
+                      : 'p-3 rounded-lg hover:shadow-md'
                 }`}
               >
-                {option.label}
+                <div
+                  className={`font-semibold truncate text-content ${
+                    isMini ? 'text-xs' : isCompact ? 'text-sm' : 'text-lg'
+                  }`}
+                >
+                  {option.label}
+                </div>
+                <div
+                  className={`font-bold text-primary ${
+                    isMini ? 'text-sm' : isCompact ? 'text-lg' : 'text-2xl'
+                  }`}
+                >
+                  {option.odds.toFixed(isMini ? 1 : 2)}x
+                </div>
+                {!isMini && !isCompact && (
+                  <div className="text-xs text-tertiary mt-1">🎯 Early Bird Bonus Available!</div>
+                )}
               </div>
-              <div
-                className={`font-bold text-primary ${
-                  isMini ? 'text-sm' : isCompact ? 'text-lg' : 'text-2xl'
-                }`}
-              >
-                {option.odds.toFixed(isMini ? 1 : 2)}x
-              </div>
-              {!isMini && !isCompact && (
-                <div className="text-xs text-tertiary mt-1">🎯 Early Bird Bonus Available!</div>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     );
@@ -271,7 +302,7 @@ export default function OddsBar({
               : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
         }`}
       >
-        {currentOptions.map((option) => {
+        {currentOptions.map((option, optionIndex) => {
           const animation = oddsAnimations[option.id];
           const optionStake =
             bets
@@ -282,18 +313,24 @@ export default function OddsBar({
               .reduce<number>((s, l) => s + asNum(l.stake), 0);
           const marketShare = optionStake / totalStaked;
 
+          // Get this option's color from palette
+          const optionColor = palette[optionIndex % palette.length];
+          const borderClass = borderColors[optionColor] || 'border-muted';
+          const bgTintClass = bgTints[optionColor] || 'bg-surface';
+          const glowClass = glowEffects[optionColor] || '';
+
+          // Determine if this option is "hot" - high market share, recent changes, or blazing market
+          const isHotOption =
+            marketShare > 0.4 ||
+            animation !== null ||
+            (excitementLevel === 'blazing' && marketShare > 0.25);
+
           return (
             <div
               key={option.id}
-              className={`relative border-2 transition-all duration-300 ${
-                excitementLevel === 'blazing'
-                  ? 'border-error bg-error/5 shadow-lg shadow-error/20'
-                  : excitementLevel === 'hot'
-                    ? 'border-warning bg-warning/5 shadow-md shadow-warning/20'
-                    : excitementLevel === 'warm'
-                      ? 'border-info bg-info/5 shadow-sm shadow-info/20'
-                      : 'border-muted bg-surface'
-              } hover:scale-105 ${
+              className={`relative border-2 transition-all duration-300 ${borderClass} ${bgTintClass} ${
+                isHotOption ? `${glowClass} animate-pulse` : ''
+              } hover:scale-105 hover:brightness-110 ${
                 isMini ? 'p-1.5 rounded' : isCompact ? 'p-2 rounded-md' : 'p-3 rounded-lg'
               }`}
             >
@@ -375,15 +412,48 @@ export default function OddsBar({
       {/* Pool Distribution Bar (only for full size) */}
       {isFullSize && (
         <div className="mt-2">
-          <div className="text-xs text-tertiary mb-1">Pool Distribution</div>
-          <div className="relative w-full h-2 bg-muted rounded-full overflow-hidden">
-            {pools.map((p) => (
-              <div
-                key={p.label}
-                className={`absolute top-0 h-full ${p.color}`}
-                style={{ left: `${p.left * 100}%`, width: `${p.pct * 100}%` }}
-              />
-            ))}
+          <div className="text-xs text-tertiary mb-1 flex items-center justify-between">
+            <span>Pool Distribution</span>
+            <span className="text-xs font-semibold text-content">
+              Total: ${(totalStaked / 1000).toFixed(1)}k
+            </span>
+          </div>
+          <div className="relative w-full h-3 bg-muted rounded-full overflow-hidden border border-border">
+            {pools.map((p, idx) => {
+              const poolColor = palette[idx % palette.length];
+              const isLargeSegment = p.pct > 0.4;
+
+              return (
+                <div
+                  key={p.label}
+                  className={`absolute top-0 h-full ${p.color} transition-all duration-500 ${
+                    isLargeSegment ? 'opacity-90' : 'opacity-80'
+                  } hover:opacity-100`}
+                  style={{ left: `${p.left * 100}%`, width: `${p.pct * 100}%` }}
+                  title={`${p.label}: ${(p.pct * 100).toFixed(1)}%`}
+                >
+                  {/* Add a subtle border between segments */}
+                  {idx > 0 && (
+                    <div className="absolute left-0 top-0 bottom-0 w-px bg-background/50" />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          {/* Legend */}
+          <div className="flex flex-wrap gap-2 mt-2">
+            {pools.map((p, idx) => {
+              const poolColor = palette[idx % palette.length];
+              const borderClass = borderColors[poolColor] || 'border-muted';
+
+              return (
+                <div key={p.label} className="flex items-center gap-1">
+                  <div className={`w-3 h-3 rounded-sm ${p.color} border ${borderClass}`} />
+                  <span className="text-xs text-content font-medium">{p.label}</span>
+                  <span className="text-xs text-tertiary">({(p.pct * 100).toFixed(1)}%)</span>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

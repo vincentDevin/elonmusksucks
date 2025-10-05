@@ -27,6 +27,8 @@ import BetModal from './BetModal';
 import BetsList from './BetsList';
 import { PredictionSourceList } from './PredictionSourceList';
 import { FloatingParlayIndicator } from './ParlaySelectionIndicator';
+import PredictionAnalytics from './PredictionAnalytics';
+import PredictionComments from './PredictionComments';
 
 interface PredictionDetailViewProps {
   prediction: PredictionFull;
@@ -304,20 +306,32 @@ export default function PredictionDetailView({
                         <div className="space-y-2">
                           {recentBets.map((bet) => {
                             const option = prediction.options.find((o) => o.id === bet.optionId);
+                            // Handle both flattened and nested user data
+                            const userName = (bet as any).userName ?? bet.user?.name ?? 'Anonymous';
+                            const avatarUrl = (bet as any).avatarUrl ?? bet.user?.avatarUrl ?? null;
+
                             return (
                               <div
                                 key={bet.id}
                                 className="flex items-center justify-between p-3 bg-muted/30 rounded-lg"
                               >
                                 <div className="flex items-center gap-3">
-                                  <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center">
-                                    <span className="text-primary font-bold text-sm">
-                                      {bet.user?.name?.charAt(0) || '?'}
-                                    </span>
-                                  </div>
+                                  {avatarUrl ? (
+                                    <img
+                                      src={avatarUrl}
+                                      alt={userName}
+                                      className="w-8 h-8 rounded-full border border-border object-cover"
+                                    />
+                                  ) : (
+                                    <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center border border-border">
+                                      <span className="text-primary font-bold text-sm">
+                                        {userName.charAt(0).toUpperCase()}
+                                      </span>
+                                    </div>
+                                  )}
                                   <div>
                                     <p className="text-sm font-medium text-content">
-                                      {bet.user?.name || 'Anonymous'} bet on "{option?.label}"
+                                      {userName} bet on "{option?.label}"
                                     </p>
                                     <p className="text-xs text-tertiary">
                                       {new Date(bet.createdAt).toLocaleString()}
@@ -341,12 +355,7 @@ export default function PredictionDetailView({
                   </div>
                 )}
 
-                {activeTab === 'stats' && (
-                  <div className="text-center py-8 text-tertiary">
-                    <BarChart3 className="w-12 h-12 mx-auto mb-3" />
-                    <p>Advanced analytics coming soon...</p>
-                  </div>
-                )}
+                {activeTab === 'stats' && <PredictionAnalytics predictionId={prediction.id} />}
 
                 {activeTab === 'history' && (
                   <div>
@@ -359,12 +368,7 @@ export default function PredictionDetailView({
                   </div>
                 )}
 
-                {activeTab === 'comments' && (
-                  <div className="text-center py-8 text-tertiary">
-                    <MessageCircle className="w-12 h-12 mx-auto mb-3" />
-                    <p>Comments and discussions coming soon...</p>
-                  </div>
-                )}
+                {activeTab === 'comments' && <PredictionComments predictionId={prediction.id} />}
               </div>
             </div>
           </div>
@@ -463,15 +467,47 @@ export default function PredictionDetailView({
                   {!isInParlay && (
                     <div className="space-y-2">
                       <p className="text-sm text-tertiary text-center">Add to parlay:</p>
-                      {prediction.options.map((option) => (
-                        <button
-                          key={option.id}
-                          onClick={() => handleAddToParlay(option.id)}
-                          className="w-full py-2 px-3 bg-secondary/20 hover:bg-secondary/30 text-secondary border border-secondary/30 font-medium rounded-lg transition-colors text-sm"
-                        >
-                          {option.label} ({option.odds.toFixed(2)}x)
-                        </button>
-                      ))}
+                      {prediction.options.map((option, idx) => {
+                        // Color palette matching OddsBar
+                        const palette = ['bg-success', 'bg-error', 'bg-info', 'bg-warning'];
+                        const optionColor = palette[idx % palette.length];
+
+                        // Color mappings
+                        const borderColors: Record<string, string> = {
+                          'bg-success': 'border-success',
+                          'bg-error': 'border-error',
+                          'bg-info': 'border-info',
+                          'bg-warning': 'border-warning',
+                        };
+
+                        const textColors: Record<string, string> = {
+                          'bg-success': 'text-success',
+                          'bg-error': 'text-error',
+                          'bg-info': 'text-info',
+                          'bg-warning': 'text-warning',
+                        };
+
+                        const bgTints: Record<string, string> = {
+                          'bg-success': 'bg-success/10 hover:bg-success/20',
+                          'bg-error': 'bg-error/10 hover:bg-error/20',
+                          'bg-info': 'bg-info/10 hover:bg-info/20',
+                          'bg-warning': 'bg-warning/10 hover:bg-warning/20',
+                        };
+
+                        const borderClass = borderColors[optionColor] || 'border-muted';
+                        const textClass = textColors[optionColor] || 'text-content';
+                        const bgTintClass = bgTints[optionColor] || 'bg-muted/20 hover:bg-muted/30';
+
+                        return (
+                          <button
+                            key={option.id}
+                            onClick={() => handleAddToParlay(option.id)}
+                            className={`w-full py-2 px-3 ${bgTintClass} ${textClass} border-2 ${borderClass} font-medium rounded-lg transition-all text-sm hover:scale-[1.02]`}
+                          >
+                            {option.label} ({option.odds.toFixed(2)}x)
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
                   {isInParlay && (

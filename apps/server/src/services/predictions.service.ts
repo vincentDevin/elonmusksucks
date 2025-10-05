@@ -2143,7 +2143,25 @@ export class PredictionService {
       predictionId,
     });
 
-    return comment;
+    // Serialize BigInt fields and dates before returning
+    const serializedComment = serializeBigInt(comment);
+
+    // Fetch and enrich user data
+    const user = await this.userService.getPublicSocketUser(userId);
+    if (user) {
+      return {
+        ...serializedComment,
+        createdAt: comment.createdAt.toISOString(),
+        updatedAt: comment.updatedAt.toISOString(),
+        user,
+      };
+    }
+
+    return {
+      ...serializedComment,
+      createdAt: comment.createdAt.toISOString(),
+      updatedAt: comment.updatedAt.toISOString(),
+    };
   }
 
   /**
@@ -2156,17 +2174,24 @@ export class PredictionService {
       cursor: cursor ? parseInt(cursor) : undefined,
     });
 
-    // Enrich user data with signed avatar URLs
+    // Serialize and enrich user data with signed avatar URLs
     const enrichedComments = await Promise.all(
       result.comments.map(async (comment: any) => {
+        const serializedComment = serializeBigInt(comment);
         if (comment.author) {
           const enrichedUser = await this.userService.enrichUserWithAvatar(comment.author);
           return {
-            ...comment,
+            ...serializedComment,
+            createdAt: comment.createdAt.toISOString(),
+            updatedAt: comment.updatedAt.toISOString(),
             user: enrichedUser,
           };
         }
-        return comment;
+        return {
+          ...serializedComment,
+          createdAt: comment.createdAt.toISOString(),
+          updatedAt: comment.updatedAt.toISOString(),
+        };
       }),
     );
 

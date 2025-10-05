@@ -93,9 +93,28 @@ export function usePredictionAnalytics(): PredictionAnalyticsHookReturn {
         getHotMarketIndicators(),
       ]);
 
+      // Safely extract data with fallbacks
+      const predictions = pageAnalytics?.platformHealth?.predictions || {
+        totalPredictions: 0,
+        activePredictions: 0,
+        resolvedToday: 0,
+      };
+      const betting = pageAnalytics?.platformHealth?.betting || {
+        totalVolume: 0,
+        volumeToday: 0,
+        averageBetSize: 0,
+      };
+      const engagement = pageAnalytics?.platformHealth?.engagement || {
+        dailyActiveUsers: 0,
+      };
+      const realtime = pageAnalytics?.realtimeActivity || {
+        activeUsers: 0,
+        recentPredictions: [],
+      };
+
       // Calculate resolution rate from available data
-      const resolvedToday = pageAnalytics.platformHealth.predictions.resolvedToday;
-      const totalPredictions = pageAnalytics.platformHealth.predictions.totalPredictions;
+      const resolvedToday = predictions.resolvedToday;
+      const totalPredictions = predictions.totalPredictions;
       const resolutionRate = totalPredictions > 0 ? (resolvedToday / totalPredictions) * 100 : 0;
 
       // Calculate win rate (placeholder - would need actual data)
@@ -104,29 +123,25 @@ export function usePredictionAnalytics(): PredictionAnalyticsHookReturn {
       // Process and format the data
       const processedData: PredictionAnalyticsData = {
         platformInsights: {
-          totalPredictions: pageAnalytics.platformHealth.predictions.totalPredictions,
-          activePredictions: pageAnalytics.platformHealth.predictions.activePredictions,
+          totalPredictions: predictions.totalPredictions,
+          activePredictions: predictions.activePredictions,
           resolutionRate,
-          totalVolume: String(pageAnalytics.platformHealth.betting.totalVolume),
-          formattedVolume: formatVolume(String(pageAnalytics.platformHealth.betting.totalVolume)),
-          averageBetSize: String(pageAnalytics.platformHealth.betting.averageBetSize),
-          formattedAverageBetSize: formatVolume(
-            String(pageAnalytics.platformHealth.betting.averageBetSize),
-          ),
-          uniqueBettors: pageAnalytics.platformHealth.engagement.dailyActiveUsers,
+          totalVolume: String(betting.totalVolume),
+          formattedVolume: formatVolume(String(betting.totalVolume)),
+          averageBetSize: String(betting.averageBetSize),
+          formattedAverageBetSize: formatVolume(String(betting.averageBetSize)),
+          uniqueBettors: engagement.dailyActiveUsers,
           winRate,
         },
 
         realtimeActivity: {
-          activeUsers: pageAnalytics.realtimeActivity.activeUsers,
-          newPredictions: pageAnalytics.realtimeActivity.recentPredictions.length,
-          volume24h: String(pageAnalytics.platformHealth.betting.volumeToday),
-          formattedVolume24h: formatVolume(
-            String(pageAnalytics.platformHealth.betting.volumeToday),
-          ),
+          activeUsers: realtime.activeUsers,
+          newPredictions: realtime.recentPredictions?.length || 0,
+          volume24h: String(betting.volumeToday),
+          formattedVolume24h: formatVolume(String(betting.volumeToday)),
         },
 
-        categoryInsights: trendingCategories.map((trendData) => ({
+        categoryInsights: (trendingCategories || []).map((trendData) => ({
           category: trendData.category,
           totalPredictions: 0, // Would need backend data
           avgAccuracy: 0, // Would need backend data
@@ -137,8 +152,15 @@ export function usePredictionAnalytics(): PredictionAnalyticsHookReturn {
           isHot: trendData.score > 70,
         })),
 
-        trendingCategories,
-        hotMarkets,
+        trendingCategories: trendingCategories || [],
+        hotMarkets: hotMarkets || {
+          hotPredictions: [],
+          marketTrends: {
+            mostActivePredictions: [],
+            rapidlyChangingOdds: [],
+            highVolumePredictions: [],
+          },
+        },
       };
 
       setData(processedData);

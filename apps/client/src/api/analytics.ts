@@ -143,6 +143,11 @@ export async function getTrendingCategories(): Promise<
 > {
   const trends = await getTrendAnalysis(7); // Last 7 days for trending data
 
+  // Safely check if categoryTrends exists and has trending data
+  if (!trends.categoryTrends || !trends.categoryTrends.trending) {
+    return [];
+  }
+
   // Map category trends from analytics
   return trends.categoryTrends.trending.map((item) => ({
     category: item.category,

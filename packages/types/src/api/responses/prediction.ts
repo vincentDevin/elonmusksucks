@@ -71,7 +71,9 @@ export interface PredictionView {
   bets: Array<{
     id: number;
     userId: number;
+    optionId: number | null;
     userName: string;
+    avatarUrl: string | null;
     amount: string; // BigInt → string
     potentialPayout: string | null; // BigInt → string
     payout: string | null; // BigInt → string

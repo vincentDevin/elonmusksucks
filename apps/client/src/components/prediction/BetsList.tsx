@@ -75,22 +75,27 @@ export default function BetsList({ type, bets, parlayLegs = [], options }: BetsL
       <ul className="space-y-2 text-sm">
         {shown.map((item) => {
           const optId = item.data.optionId;
-          const optIndex = options.findIndex((o) => o.id === optId);
+          const optIndex = optId ? options.findIndex((o) => o.id === optId) : -1;
           const colorClass = textPalette[Math.max(0, optIndex)] ?? textPalette[0];
 
           if (item.kind === 'bet') {
             const b = item.data;
-            const u = b.user ?? null;
-            const label = options.find((o) => o.id === b.optionId)?.label ?? 'Unknown';
+            // Handle both BetWithUser (nested user) and flattened PredictionView format
+            const userName = (b as any).userName ?? b.user?.name ?? null;
+            const avatarUrl = (b as any).avatarUrl ?? b.user?.avatarUrl ?? null;
+            const label = b.optionId
+              ? (options.find((o) => o.id === b.optionId)?.label ?? 'Unknown')
+              : 'Unknown';
             return (
               <li
                 key={`bet-${b.id}`}
                 className="flex justify-between bg-[var(--color-surface)] border border-[var(--color-muted)] rounded-lg px-3 py-2 shadow-sm"
               >
                 <span className="flex items-center gap-2">
-                  <SafeAvatar name={u?.name} avatarUrl={u?.avatarUrl as string | null} />
-                  <strong>{u?.name ?? 'Anonymous'}</strong> bet <em>{formatMuskBucks(b.amount)}</em>{' '}
-                  on <strong className={colorClass}>{label}</strong>
+                  <SafeAvatar name={userName} avatarUrl={avatarUrl} />
+                  <strong>{userName ?? 'Anonymous'}</strong> bet{' '}
+                  <em>{formatMuskBucks(b.amount)}</em> on{' '}
+                  <strong className={colorClass}>&quot;{label}&quot;</strong>
                 </span>
                 <span className="text-xs text-[var(--color-tertiary)]">
                   {new Date(b.createdAt).toLocaleTimeString()}
@@ -110,7 +115,7 @@ export default function BetsList({ type, bets, parlayLegs = [], options }: BetsL
                   <SafeAvatar name={u?.name} avatarUrl={u?.avatarUrl as string | null} />
                   <strong>{u?.name ?? 'Anonymous'}</strong> parlayed{' '}
                   <em>{formatMuskBucks(l.stake)}</em> on{' '}
-                  <strong className={colorClass}>{label}</strong>
+                  <strong className={colorClass}>&quot;{label}&quot;</strong>
                 </span>
                 <span className="text-xs text-[var(--color-tertiary)]">
                   {new Date(l.createdAt).toLocaleTimeString()}

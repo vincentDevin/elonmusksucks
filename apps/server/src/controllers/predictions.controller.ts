@@ -633,3 +633,79 @@ export const getSimilarPredictions = async (
     next(err);
   }
 };
+
+/**
+ * GET /api/predictions/:id/comments
+ * Get comments for a specific prediction
+ */
+export const getPredictionComments = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const predictionId = parseInt(req.params.id);
+    const cursor = req.query.cursor ? parseInt(req.query.cursor as string) : undefined;
+    const limit = req.query.limit ? parseInt(req.query.limit as string) : 20;
+
+    if (isNaN(predictionId)) {
+      res.status(400).json({ error: 'Invalid prediction ID' });
+      return;
+    }
+
+    const result = await predictionService.getPredictionComments(
+      predictionId,
+      limit,
+      cursor?.toString(),
+    );
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * POST /api/predictions/:id/comments
+ * Create a comment on a prediction
+ */
+export const createPredictionComment = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const predictionId = parseInt(req.params.id);
+    const userId = (req as any).user?.id;
+
+    if (!userId) {
+      res.status(401).json({ error: 'Not authenticated' });
+      return;
+    }
+
+    if (isNaN(predictionId)) {
+      res.status(400).json({ error: 'Invalid prediction ID' });
+      return;
+    }
+
+    const { content } = req.body;
+
+    if (!content || typeof content !== 'string' || content.trim().length === 0) {
+      res.status(400).json({ error: 'Comment content is required' });
+      return;
+    }
+
+    if (content.length > 1000) {
+      res.status(400).json({ error: 'Comment content too long (max 1000 characters)' });
+      return;
+    }
+
+    const comment = await predictionService.createPredictionComment(
+      predictionId,
+      userId,
+      content.trim(),
+    );
+    res.status(201).json(comment);
+  } catch (err) {
+    next(err);
+  }
+};

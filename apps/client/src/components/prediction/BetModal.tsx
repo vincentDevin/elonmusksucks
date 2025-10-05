@@ -288,12 +288,37 @@ export default function BetModal({
               >
                 <h4 className="font-semibold text-content mb-1">{pred.title}</h4>
                 <p className="text-sm text-tertiary mb-2">Category {pred.categoryId || 'N/A'}</p>
-                <div className="flex gap-2">
-                  {pred.options.map((opt) => (
-                    <span key={opt.id} className="text-xs bg-muted px-2 py-1 rounded">
-                      {opt.label} ({(opt.odds || 0).toFixed(2)}x)
-                    </span>
-                  ))}
+                <div className="flex flex-wrap gap-2">
+                  {pred.options.map((opt, idx) => {
+                    const palette = ['bg-success', 'bg-error', 'bg-info', 'bg-warning'];
+                    const optionColor = palette[idx % palette.length];
+
+                    const borderColors: Record<string, string> = {
+                      'bg-success': 'border-success',
+                      'bg-error': 'border-error',
+                      'bg-info': 'border-info',
+                      'bg-warning': 'border-warning',
+                    };
+
+                    const textColors: Record<string, string> = {
+                      'bg-success': 'text-success',
+                      'bg-error': 'text-error',
+                      'bg-info': 'text-info',
+                      'bg-warning': 'text-warning',
+                    };
+
+                    const borderClass = borderColors[optionColor] || 'border-muted';
+                    const textClass = textColors[optionColor] || 'text-content';
+
+                    return (
+                      <span
+                        key={opt.id}
+                        className={`text-xs px-2 py-1 rounded border ${borderClass} ${textClass} font-medium`}
+                      >
+                        {opt.label} ({(opt.odds || 0).toFixed(2)}x)
+                      </span>
+                    );
+                  })}
                 </div>
               </div>
             ))}
@@ -347,24 +372,116 @@ export default function BetModal({
         {/* Option Selection */}
         <div className="space-y-3">
           <label className="block text-sm font-medium text-content">Choose Option</label>
-          <div className="grid gap-2">
-            {activePrediction.options.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                onClick={() => setOptionId(option.id)}
-                className={`p-3 rounded-lg border text-left transition-colors ${
-                  optionId === option.id
-                    ? 'border-primary bg-primary/10 text-primary'
-                    : 'border-muted bg-background hover:bg-surface text-content'
-                }`}
-              >
-                <div className="flex justify-between items-center">
-                  <span className="font-medium">{option.label}</span>
-                  <span className="text-sm font-bold">{(option.odds || 0).toFixed(2)}x</span>
-                </div>
-              </button>
-            ))}
+          <div className="grid gap-3">
+            {activePrediction.options.map((option, idx) => {
+              // Color palette matching OddsBar
+              const palette = ['bg-success', 'bg-error', 'bg-info', 'bg-warning'];
+              const optionColor = palette[idx % palette.length];
+
+              // Color mappings
+              const borderColors: Record<string, string> = {
+                'bg-success': 'border-success',
+                'bg-error': 'border-error',
+                'bg-info': 'border-info',
+                'bg-warning': 'border-warning',
+              };
+
+              const textColors: Record<string, string> = {
+                'bg-success': 'text-success',
+                'bg-error': 'text-error',
+                'bg-info': 'text-info',
+                'bg-warning': 'text-warning',
+              };
+
+              const bgTints: Record<string, string> = {
+                'bg-success': 'bg-success/10',
+                'bg-error': 'bg-error/10',
+                'bg-info': 'bg-info/10',
+                'bg-warning': 'bg-warning/10',
+              };
+
+              const bgTintsHover: Record<string, string> = {
+                'bg-success': 'hover:bg-success/20',
+                'bg-error': 'hover:bg-error/20',
+                'bg-info': 'hover:bg-info/20',
+                'bg-warning': 'hover:bg-warning/20',
+              };
+
+              const badgeColors: Record<string, string> = {
+                'bg-success': 'bg-success text-surface',
+                'bg-error': 'bg-error text-surface',
+                'bg-info': 'bg-info text-surface',
+                'bg-warning': 'bg-warning text-surface',
+              };
+
+              const borderClass = borderColors[optionColor] || 'border-muted';
+              const textClass = textColors[optionColor] || 'text-content';
+              const bgTintClass = bgTints[optionColor] || 'bg-muted/10';
+              const bgTintHoverClass = bgTintsHover[optionColor] || 'hover:bg-muted/20';
+              const badgeClass = badgeColors[optionColor] || 'bg-muted text-content';
+
+              const isSelected = optionId === option.id;
+
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => setOptionId(option.id)}
+                  className={`p-4 rounded-xl border-2 text-left transition-all ${
+                    isSelected
+                      ? `${borderClass} ${bgTintClass} ${textClass} scale-[1.02] shadow-lg ring-2 ring-offset-2 ${borderClass.replace('border-', 'ring-')}`
+                      : `border-muted bg-background ${bgTintHoverClass} text-content hover:${borderClass} hover:scale-[1.01]`
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    {/* Option Number Badge */}
+                    <div
+                      className={`w-8 h-8 rounded-lg ${isSelected ? badgeClass : 'bg-muted/50 text-tertiary'} flex items-center justify-center font-bold text-sm flex-shrink-0`}
+                    >
+                      {idx + 1}
+                    </div>
+
+                    {/* Option Label */}
+                    <div className="flex-1 min-w-0">
+                      <div
+                        className={`font-semibold text-base ${isSelected ? '' : 'text-content'}`}
+                      >
+                        {option.label}
+                      </div>
+                    </div>
+
+                    {/* Odds Display */}
+                    <div className={`flex flex-col items-end ${isSelected ? '' : 'text-content'}`}>
+                      <div className="text-2xl font-bold leading-none">
+                        {(option.odds || 0).toFixed(2)}x
+                      </div>
+                      <div className="text-xs text-tertiary mt-0.5">odds</div>
+                    </div>
+
+                    {/* Selected Checkmark */}
+                    {isSelected && (
+                      <div
+                        className={`w-6 h-6 rounded-full ${badgeClass} flex items-center justify-center flex-shrink-0`}
+                      >
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={3}
+                            d="M5 13l4 4L19 7"
+                          />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -429,7 +546,7 @@ export default function BetModal({
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 px-4 py-2 border border-muted rounded-lg text-content hover:bg-surface transition-colors"
+            className="flex-1 px-4 py-3 border-2 border-muted rounded-lg text-content hover:bg-muted/30 hover:border-content transition-all cursor-pointer font-medium"
           >
             Cancel
           </button>
@@ -437,7 +554,7 @@ export default function BetModal({
             type="button"
             onClick={submit}
             disabled={!amount || amount > balance || placing}
-            className="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="flex-1 px-4 py-3 bg-primary text-surface rounded-lg hover:bg-primary-hover hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 transition-all cursor-pointer font-medium shadow-md hover:shadow-lg"
           >
             {placing ? 'Placing...' : `Place Bet`}
           </button>
@@ -460,7 +577,7 @@ export default function BetModal({
   // Modal mode: render with portal
   return createPortal(
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[100]">
-      <div className="bg-surface border border-muted rounded-2xl shadow-2xl max-w-lg p-6 space-y-4 relative overflow-hidden">
+      <div className="bg-surface border border-muted rounded-2xl shadow-2xl max-w-2xl w-full p-6 space-y-4 relative overflow-hidden">
         {renderBettingForm()}
       </div>
     </div>,

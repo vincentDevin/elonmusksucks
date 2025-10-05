@@ -43,3 +43,47 @@ export async function createPrediction(payload: CreatePredictionPayload): Promis
   });
   return data;
 }
+
+/**
+ * Get detailed analytics for a prediction
+ */
+export async function getPredictionAnalytics(predictionId: number): Promise<{
+  totalBets: number;
+  totalVolume: number;
+  uniqueBettors: number;
+  controversyScore: number;
+  popularityScore: number;
+  viewStats: {
+    totalViews: number;
+    uniqueUserViews: number;
+    viewToEngagementRatio: number;
+  };
+  difficultyLevel: 'easy' | 'medium' | 'hard' | 'expert';
+  activityLevel: 'high' | 'medium' | 'low';
+}> {
+  const { data } = await api.get(`/api/predictions/${predictionId}/analytics`);
+  return data;
+}
+
+/**
+ * Get comments for a prediction
+ */
+export async function getPredictionComments(
+  predictionId: number,
+  options: { cursor?: number; limit?: number } = {},
+): Promise<{ comments: any[]; nextCursor?: number }> {
+  const params = new URLSearchParams();
+  if (options.cursor) params.append('cursor', options.cursor.toString());
+  if (options.limit) params.append('limit', options.limit.toString());
+
+  const { data } = await api.get(`/api/predictions/${predictionId}/comments?${params.toString()}`);
+  return data;
+}
+
+/**
+ * Create a comment on a prediction
+ */
+export async function createPredictionComment(predictionId: number, content: string): Promise<any> {
+  const { data } = await api.post(`/api/predictions/${predictionId}/comments`, { content });
+  return data;
+}

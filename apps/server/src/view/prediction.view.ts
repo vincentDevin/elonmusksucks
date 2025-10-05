@@ -27,6 +27,7 @@ export const toPredictionView = (prediction: {
   bets: Array<{
     id: number;
     userId: number;
+    optionId: number | null;
     amount: bigint;
     potentialPayout: bigint | null;
     payout: bigint | null;
@@ -65,7 +66,9 @@ export const toPredictionView = (prediction: {
   bets: prediction.bets.map((bet) => ({
     id: bet.id,
     userId: bet.userId,
+    optionId: bet.optionId,
     userName: bet.user.name,
+    avatarUrl: bet.user.avatarUrl,
     amount: bet.amount.toString(),
     potentialPayout: bet.potentialPayout ? bet.potentialPayout.toString() : null,
     payout: bet.payout ? bet.payout.toString() : null,
