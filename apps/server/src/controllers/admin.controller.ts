@@ -151,7 +151,7 @@ export async function updateUserRole(
     const userId = Number(req.params.id);
     const { role } = req.body as { role: Role };
     const updated: PublicUser = await adminService.changeUserRole(userId, role);
-    res.json(updated);
+    res.json(serializeBigInt(updated));
   } catch (err) {
     next(err);
   }
@@ -162,7 +162,7 @@ export async function activateUser(req: Request, res: Response, next: NextFuncti
     const userId = Number(req.params.id);
     const { active } = req.body as { active: boolean };
     const updated: PublicUser = await adminService.setUserActive(userId, active);
-    res.json(updated);
+    res.json(serializeBigInt(updated));
   } catch (err) {
     next(err);
   }
@@ -177,7 +177,7 @@ export async function updateUserBalance(
     const userId = Number(req.params.id);
     const { amount } = req.body as { amount: number };
     const updated: PublicUser = await adminService.adjustUserBalance(userId, amount);
-    res.json(updated);
+    res.json(serializeBigInt(updated));
   } catch (err) {
     next(err);
   }
@@ -192,7 +192,7 @@ export async function getPredictions(
   try {
     const filters = req.query as unknown as QueryParams;
     const preds: PublicPrediction[] = await adminService.listPredictions(filters);
-    res.json(preds);
+    res.json(serializeBigInt(preds));
   } catch (err) {
     next(err);
   }
@@ -304,7 +304,7 @@ export async function approvePrediction(
   try {
     const id = Number(req.params.id);
     const updated: PublicPrediction = await adminService.setPredictionStatus(id, 'approved');
-    res.json(updated);
+    res.json(serializeBigInt(updated));
   } catch (err) {
     next(err);
   }
@@ -318,7 +318,7 @@ export async function rejectPrediction(
   try {
     const id = Number(req.params.id);
     const updated: PublicPrediction = await adminService.setPredictionStatus(id, 'rejected');
-    res.json(updated);
+    res.json(serializeBigInt(updated));
   } catch (err) {
     next(err);
   }
@@ -365,7 +365,7 @@ export async function refundBet(req: Request, res: Response, next: NextFunction)
   try {
     const id = Number(req.params.id);
     const updated: PublicBet = await adminService.refundBet(id);
-    res.json(updated);
+    res.json(serializeBigInt(updated));
   } catch (err) {
     next(err);
   }

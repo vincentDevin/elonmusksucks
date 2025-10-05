@@ -3,8 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useEventBusCore, useSocketEvent } from './EventBusCoreContext';
 import { useVisibilityGuard } from '../lib/visibilityGuard';
-import { getRecentActivities } from '../api/activity';
-import { REDIS_CHANNELS } from '@ems/types';
+import { SOCKET_EVENTS } from '@ems/types';
 import type { UnifiedActivityEvent } from '@ems/types';
 
 // Client-side activity with user object for backwards compatibility
@@ -103,11 +102,22 @@ let globalHasRequestedInitialData = false;
 let globalActivities: Activity[] = getStoredActivities();
 let globalHasInitialized = getStoredHasInitialized();
 
+// Hot reload detection - clear global state when module reloads in development
+if (import.meta.hot) {
+  import.meta.hot.accept(() => {
+    console.log('[ActivityContext] Hot reload detected, clearing global state');
+    globalHasRequestedInitialData = false;
+    globalActivities = [];
+    globalHasInitialized = false;
+    clearStoredActivities();
+  });
+}
+
 // Activity feed configuration - FILO queue with max 25 items
 const MAX_ACTIVITIES = 25;
 
 export function ActivityProvider({ children }: { children: React.ReactNode }) {
-  const { isConnected } = useEventBusCore();
+  const { isConnected, socket } = useEventBusCore();
   const { shouldRefresh, updateLastFetch } = useVisibilityGuard(5 * 60 * 1000); // 5 minutes
 
   // Show cached data immediately if available, only show loading if no cache
@@ -115,62 +125,6 @@ export function ActivityProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(globalActivities.length === 0);
   const [error, setError] = useState<string | null>(null);
   const [hasInitialized, setHasInitialized] = useState(globalActivities.length > 0);
-
-  // Handle unified activity feed response
-  const handleActivityFeedResponse = useCallback((data: any[]) => {
-    setLoading(false);
-    setError(null);
-
-    const unifiedActivities: Activity[] = data.map((activity) => ({
-      id: activity.id,
-      type: activity.type,
-      timestamp: activity.timestamp,
-      priority: activity.priority || 'medium',
-      user: {
-        id: activity.userId,
-        name: activity.userName || 'Anonymous',
-        avatar: activity.userAvatar,
-      },
-      title: activity.title || '',
-      description: activity.description || '',
-      icon: activity.icon || '•',
-      color: activity.color || '',
-      amount: activity.amount,
-      odds: activity.odds,
-      payout: activity.payout,
-      predictionId: activity.predictionId,
-      predictionTitle: activity.predictionTitle,
-      category: activity.category,
-      optionLabel: activity.optionLabel,
-      isPersonal: activity.isPersonal || false,
-      isHighValue: activity.amount && activity.amount >= 1000,
-      isWin: activity.isWin,
-      streak: activity.streak,
-    }));
-
-    // If we have cached data, merge with server data intelligently
-    let finalActivities = unifiedActivities;
-    if (globalActivities.length > 0) {
-      // Merge server data with cached data, removing duplicates and keeping latest
-      const existingIds = new Set(unifiedActivities.map((a) => a.id));
-      const uniqueCachedActivities = globalActivities.filter((a) => !existingIds.has(a.id));
-
-      // Combine and sort by timestamp (newest first), then limit to MAX_ACTIVITIES (FILO queue)
-      finalActivities = [...unifiedActivities, ...uniqueCachedActivities]
-        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-        .slice(0, MAX_ACTIVITIES);
-    }
-
-    // Update both local and global state
-    globalActivities = finalActivities;
-    globalHasInitialized = true;
-
-    // Store in sessionStorage for persistence across page refreshes
-    storeActivities(finalActivities);
-
-    setActivities(finalActivities);
-    setHasInitialized(true);
-  }, []);
 
   // Handle real-time activity updates
   const handleActivityUpdate = useCallback((activity: any) => {
@@ -220,101 +174,104 @@ export function ActivityProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  // Load initial data from Redis cache on connection
-  const loadInitialData = useCallback(async () => {
+  // Load initial data via Socket.IO
+  const loadInitialData = useCallback(() => {
+    console.log('[ActivityContext] loadInitialData called', {
+      hasRequested: globalHasRequestedInitialData,
+      hasData: globalActivities.length > 0,
+      socketExists: !!socket,
+      socketConnected: socket?.connected,
+    });
+
     // Only prevent duplicate requests if we already have data
-    if (globalHasRequestedInitialData && globalActivities.length > 0) return;
-    globalHasRequestedInitialData = true;
+    if (globalHasRequestedInitialData && globalActivities.length > 0) {
+      console.log('[ActivityContext] Skipping - already have data');
+      return;
+    }
 
     // Skip refresh if tab was hidden and data isn't stale
     if (!shouldRefresh()) {
+      console.log('[ActivityContext] Skipping - shouldRefresh returned false');
       setLoading(false);
       return;
     }
 
+    // Ensure socket is connected
+    if (!socket) {
+      console.warn('[ActivityContext] ⚠️ Socket is null/undefined!');
+      setError('Socket not available');
+      setLoading(false);
+      return;
+    }
+
+    // Check socket.connected directly (not the stale isConnected state)
+    if (!socket.connected) {
+      console.log('[ActivityContext] Socket not connected yet, deferring load');
+      return;
+    }
+
+    globalHasRequestedInitialData = true;
     setLoading(true);
     setError(null);
 
-    try {
-      console.log('[ActivityContext] Loading initial activities from Redis cache...');
-      const response = await getRecentActivities(MAX_ACTIVITIES);
+    console.log('[ActivityContext] 🚀 Requesting initial activities via socket...');
+    console.log('[ActivityContext] Socket ID:', socket.id);
+    console.log('[ActivityContext] Socket connected:', socket.connected);
+    console.log('[ActivityContext] Emitting event:', SOCKET_EVENTS.UNIFIED_ACTIVITY_REQUEST);
 
-      if (response.success && response.activities.length > 0) {
-        console.log(`[ActivityContext] Loaded ${response.activities.length} activities`);
+    // Request activities via socket (will receive response via UNIFIED_ACTIVITY_RESPONSE event)
+    socket.emit(SOCKET_EVENTS.UNIFIED_ACTIVITY_REQUEST, {
+      limit: MAX_ACTIVITIES,
+      includePersonal: true,
+      includeSocial: true,
+      includePlatform: true,
+      includeLive: true,
+      timeframe: 'all',
+    });
 
-        // Transform to unified format - handle both Redis and database formats
-        const transformedActivities = response.activities
-          .filter((activity: any) => {
-            // Filter out raw database entries that don't have proper formatting
-            // Keep only activities that have either Redis format (userId/userName) or database format with proper details
-            return (
-              (activity.userId && activity.userName) ||
-              (activity.user && (activity.title || activity.details?.icon))
-            );
-          })
-          .map((activity: any) => {
-            // Detect format and transform accordingly
-            const isRedisFormat = activity.userId && activity.userName;
+    console.log('[ActivityContext] ✅ Event emitted to server');
+  }, [socket, shouldRefresh]);
 
-            if (isRedisFormat) {
-              // Redis format - direct mapping
-              return {
-                id: activity.id,
-                type: activity.type,
-                timestamp: activity.timestamp,
-                priority: activity.priority || 'medium',
-                user: {
-                  id: activity.userId,
-                  name: activity.userName || 'Anonymous',
-                  avatar: activity.userAvatar,
-                },
-                title: activity.title || '',
-                description: activity.description || '',
-                icon: activity.icon || '•',
-                color: activity.color || '',
-                amount: activity.amount,
-                odds: activity.odds,
-                payout: activity.payout,
-                predictionId: activity.predictionId,
-                predictionTitle: activity.predictionTitle,
-                category: activity.category,
-                optionLabel: activity.optionLabel,
-                isPersonal: activity.isPersonal || false,
-                isHighValue: activity.amount && activity.amount >= 1000,
-                isWin: activity.isWin,
-                streak: activity.streak,
-              };
-            } else {
-              // Database format - extract from nested structure
-              const details = activity.details || {};
-              return {
-                id: activity.id,
-                type: activity.type.toLowerCase(),
-                timestamp: activity.createdAt,
-                priority: activity.priority || 'medium',
-                user: {
-                  id: activity.user?.id,
-                  name: activity.user?.name || 'Anonymous',
-                  avatar: activity.user?.avatarUrl,
-                },
-                title: activity.title || details.title || '',
-                description: activity.description || details.description || '',
-                icon: details.icon || '•',
-                color: details.color || '',
-                amount: details.amount,
-                odds: details.odds,
-                payout: details.payout,
-                predictionId: activity.prediction?.id || details.predictionId,
-                predictionTitle: activity.prediction?.title || details.predictionTitle,
-                category: activity.prediction?.category || details.category,
-                optionLabel: details.optionLabel,
-                isPersonal: details.isPersonal || false,
-                isHighValue: details.isHighValue || (details.amount && details.amount >= 1000),
-                isWin: details.isWin,
-                streak: details.streak,
-              };
-            }
-          });
+  // Handle unified activity feed response from socket
+  const handleActivityFeedResponse = useCallback(
+    (data: any[]) => {
+      console.log('[ActivityContext] Received socket response:', {
+        count: data?.length,
+        firstActivity: data?.[0],
+      });
+
+      setLoading(false);
+      setError(null);
+
+      if (data && data.length > 0) {
+        const transformedActivities = data.map((activity: any) => ({
+          id: activity.id,
+          type: activity.type,
+          timestamp: activity.timestamp,
+          priority: activity.priority || 'medium',
+          user: {
+            id: activity.userId,
+            name: activity.userName || 'Anonymous',
+            avatar: activity.userAvatar,
+          },
+          title: activity.title || '',
+          description: activity.description || '',
+          icon: activity.icon || '•',
+          color: activity.color || '',
+          amount: activity.amount,
+          odds: activity.odds,
+          payout: activity.payout,
+          predictionId: activity.predictionId,
+          predictionTitle: activity.predictionTitle,
+          category: activity.category,
+          optionLabel: activity.optionLabel,
+          isPersonal: activity.isPersonal || false,
+          isHighValue: activity.amount && activity.amount >= 1000,
+          isWin: activity.isWin,
+          streak: activity.streak,
+        }));
+
+        console.log('[ActivityContext] Transformed activities:', transformedActivities.length);
 
         // Update global state and storage
         globalActivities = transformedActivities;
@@ -325,55 +282,30 @@ export function ActivityProvider({ children }: { children: React.ReactNode }) {
         setHasInitialized(true);
         updateLastFetch();
       } else {
-        console.log('[ActivityContext] No initial activities found, waiting for real-time events');
+        console.log(
+          '[ActivityContext] No activities in socket response, waiting for real-time events',
+        );
         globalHasInitialized = true;
         setHasInitialized(true);
         updateLastFetch();
       }
-    } catch (error) {
-      console.error('[ActivityContext] Error loading initial activities:', error);
+    },
+    [updateLastFetch],
+  );
 
-      // Reset request flag so it can retry
-      globalHasRequestedInitialData = false;
-
-      // Fall back to cached data if available
-      const cached = getStoredActivities();
-      if (cached.length > 0) {
-        console.log(
-          '[ActivityContext] Falling back to browser cache:',
-          cached.length,
-          'activities',
-        );
-        setActivities(cached);
-        globalActivities = cached;
-        globalHasInitialized = true;
-        setHasInitialized(true);
-        setError(null); // Clear error since we have cached data
-      } else {
-        console.log('[ActivityContext] No cache available, showing error');
-        setError('Failed to load activity feed');
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [shouldRefresh, updateLastFetch]);
-
-  // Handle connection state changes via EventBus
+  // Listen for socket connect event to load initial data (like ChatContext does)
   useEffect(() => {
-    console.log(
-      '[ActivityContext] Connection state:',
-      isConnected,
-      'Has initialized:',
-      globalHasInitialized,
-      'Cached activities:',
-      globalActivities.length,
-    );
+    if (!socket) {
+      console.warn('[ActivityContext] No socket available');
+      return;
+    }
 
-    if (isConnected) {
+    const onConnect = () => {
+      console.log('[ActivityContext] ✅ Socket connected, requesting activities...');
       setError(null);
+
       // Load initial data from server if not already done OR if we have no data
       if (!globalHasInitialized || globalActivities.length === 0) {
-        console.log('[ActivityContext] Loading initial data...');
         loadInitialData();
       } else {
         // Use existing global data
@@ -382,29 +314,60 @@ export function ActivityProvider({ children }: { children: React.ReactNode }) {
         setHasInitialized(true);
         setLoading(false);
       }
-    } else {
+    };
+
+    const onDisconnect = () => {
+      console.warn('[ActivityContext] ⚠️ Socket disconnected');
       // Only show error if we have no cached data to fall back to
       if (globalActivities.length === 0) {
+        console.error('[ActivityContext] No cache available, showing error to user');
         setError('Connection lost');
+        setLoading(false);
       } else {
         console.log('[ActivityContext] Offline but using cached data');
         setActivities(globalActivities);
         setHasInitialized(true);
         setLoading(false);
       }
-    }
-  }, [isConnected, loadInitialData]);
+    };
 
-  // Subscribe to activity events via EventBus
-  useSocketEvent(REDIS_CHANNELS.UNIFIED_ACTIVITY_RESPONSE, handleActivityFeedResponse);
-  useSocketEvent(REDIS_CHANNELS.UNIFIED_ACTIVITY_UPDATE, handleActivityUpdate);
+    // Register socket event listeners
+    socket.on('connect', onConnect);
+    socket.on('disconnect', onDisconnect);
+
+    // If already connected, load immediately
+    if (socket.connected) {
+      console.log('[ActivityContext] Socket already connected on mount');
+      onConnect();
+    }
+
+    return () => {
+      socket.off('connect', onConnect);
+      socket.off('disconnect', onDisconnect);
+    };
+  }, [socket, loadInitialData]);
+
+  // Subscribe to activity events via EventBus (Socket.IO events, not Redis channels)
+  useSocketEvent(SOCKET_EVENTS.UNIFIED_ACTIVITY_RESPONSE, handleActivityFeedResponse);
+  useSocketEvent(SOCKET_EVENTS.UNIFIED_ACTIVITY_UPDATE, handleActivityUpdate);
 
   const refresh = useCallback(() => {
-    // In event-driven system, we don't request - we just clear and wait for new events
-    setActivities([]);
+    // Clear state and request fresh data via socket
     globalActivities = [];
+    globalHasInitialized = false;
+    globalHasRequestedInitialData = false;
     clearStoredActivities();
-  }, []);
+
+    setActivities([]);
+    setHasInitialized(false);
+    setLoading(true);
+    setError(null);
+
+    // Request fresh data if socket is connected
+    if (socket && isConnected) {
+      loadInitialData();
+    }
+  }, [socket, isConnected, loadInitialData]);
 
   // Clean up on component unmount but preserve storage for page refreshes
   useEffect(() => {

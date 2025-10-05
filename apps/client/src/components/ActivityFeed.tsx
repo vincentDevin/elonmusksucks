@@ -117,6 +117,18 @@ function formatTickerActivity(activity: Activity): {
       text = `${userName} commented: "${description}"`;
       break;
 
+    case ActivityEventType.PONG_TIER_PROMOTION:
+      icon = '🏅';
+      text = `${title} - ${description}`; // "username promoted to TIER - Achieved 2275 Elo (from PLATINUM)"
+      className += 'font-semibold ';
+      break;
+
+    case ActivityEventType.PONG_IMPOSSIBLE_VICTORY:
+      icon = '🎯';
+      text = title; // "username defeated the IMPOSSIBLE AI!"
+      className += 'text-red-400 font-bold animate-pulse ';
+      break;
+
     case ActivityEventType.LEADERBOARD_UPDATE:
       icon = '📊';
       text = 'Leaderboard updated';

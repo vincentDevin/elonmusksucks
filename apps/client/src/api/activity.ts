@@ -18,8 +18,20 @@ export type ActivityResponse = ActivityFeedResponse;
  * PUBLIC ENDPOINT - No authentication required
  */
 export const getRecentActivities = async (limit = 50): Promise<ActivityResponse> => {
-  const response = await publicApi.get(`/activity/recent?limit=${limit}`);
-  return response.data;
+  try {
+    console.log('[activity.ts] Fetching recent activities, limit:', limit);
+    const response = await publicApi.get(`/activity/recent?limit=${limit}`);
+    console.log('[activity.ts] Response received:', response.status, response.data);
+    return response.data;
+  } catch (error: any) {
+    console.error('[activity.ts] Error fetching activities:', {
+      message: error.message,
+      status: error.response?.status,
+      data: error.response?.data,
+      url: error.config?.url,
+    });
+    throw error;
+  }
 };
 
 /**

@@ -1,11 +1,14 @@
 import { Response, NextFunction } from 'express';
 import { PostService } from '../services/post.service';
 import { ReactionService } from '../services/reaction.service';
+import { unifiedActivityService } from '../services/unifiedActivity.service';
+import { UserService } from '../services/user.service';
 import type { ReqWithUser } from './user.controller';
 import type { CreateUserPostPayload, ReactionType } from '@ems/types';
 
 const postService = new PostService();
 const reactionService = new ReactionService();
+const userService = new UserService();
 
 /**
  * Create a new post
@@ -39,6 +42,30 @@ export async function createPost(
       linkPreview,
       parentId,
     });
+
+    // Add to unified activity feed
+    // Fetch full user data since req.user only has id and role
+    try {
+      const user = await userService.getPublicSocketUser(userId);
+      if (user) {
+        await unifiedActivityService.createPostActivity(
+          {
+            id: user.id,
+            name: user.name,
+            avatarUrl: user.avatarUrl || undefined,
+          },
+          {
+            id: post.id,
+            content: post.body,
+            isComment: !!parentId,
+          },
+        );
+        console.log('[post.controller] ✅ Post activity created for post', post.id);
+      }
+    } catch (activityError) {
+      console.error('[post.controller] Error creating post activity:', activityError);
+      // Don't fail the request if activity creation fails
+    }
 
     res.status(201).json(post);
   } catch (error) {
@@ -247,6 +274,30 @@ export async function createComment(
       content,
       parentId: postId,
     });
+
+    // Add to unified activity feed (as comment)
+    // Fetch full user data since req.user only has id and role
+    try {
+      const user = await userService.getPublicSocketUser(userId);
+      if (user) {
+        await unifiedActivityService.createPostActivity(
+          {
+            id: user.id,
+            name: user.name,
+            avatarUrl: user.avatarUrl || undefined,
+          },
+          {
+            id: comment.id,
+            content: comment.body,
+            isComment: true,
+          },
+        );
+        console.log('[post.controller] ✅ Comment activity created for comment', comment.id);
+      }
+    } catch (activityError) {
+      console.error('[post.controller] Error creating comment activity:', activityError);
+      // Don't fail the request if activity creation fails
+    }
 
     res.status(201).json(comment);
   } catch (error) {

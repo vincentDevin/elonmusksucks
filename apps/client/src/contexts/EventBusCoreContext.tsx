@@ -76,6 +76,9 @@ interface EventBusCoreContextType {
   // Connection status (stable)
   isConnected: boolean;
 
+  // Raw socket access for non-typed events (SOCKET_EVENTS)
+  socket: ReturnType<typeof useSocket>;
+
   // Batch subscription
   subscribeBatch: <T extends RedisChannel>(
     events: T[],
@@ -302,11 +305,12 @@ export function EventBusCoreProvider({ children }: { children: ReactNode }) {
       subscribe,
       emit,
       isConnected,
+      socket,
       subscribeBatch,
       getActiveEvents,
       getHandlerCount,
     }),
-    [subscribe, emit, isConnected, subscribeBatch, getActiveEvents, getHandlerCount],
+    [subscribe, emit, isConnected, socket, subscribeBatch, getActiveEvents, getHandlerCount],
   );
 
   return <EventBusCoreContext.Provider value={value}>{children}</EventBusCoreContext.Provider>;

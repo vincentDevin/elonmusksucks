@@ -75,11 +75,19 @@ async function handlePostCreate(
     // Create post via service
     const newPost = await postService.createPost(userId, servicePayload);
 
+    console.log('[postHandlers] Post created, publishing to Redis:', {
+      postId: newPost.id,
+      authorId: userId,
+      channel: REDIS_CHANNELS.POST_CREATED,
+    });
+
     // Publish to Redis for cross-server broadcasting
     await eventBus.publish(REDIS_CHANNELS.POST_CREATED, {
       post: newPost,
       authorId: userId,
     });
+
+    console.log('[postHandlers] ✅ Published POST_CREATED to Redis');
 
     callback?.({ success: true, post: newPost });
   } catch (error: unknown) {

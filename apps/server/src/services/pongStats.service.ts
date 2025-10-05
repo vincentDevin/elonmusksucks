@@ -41,6 +41,8 @@ import { pongPayoutQueueService } from './pongPayoutQueue.service';
 import { eventBus } from '../lib/EventBus';
 import { streakManager } from './StreakManager.service';
 import { eventCorrelator } from './EventCorrelator.service';
+import { unifiedActivityService } from './unifiedActivity.service';
+import { UserService } from './user.service';
 
 // Note: Pong service interfaces now imported from @ems/types
 // MatchResult -> PongMatchResult, other interfaces imported directly
@@ -480,6 +482,31 @@ export class PongStatsService {
           calculations.socketEvents.winnerTierChange.newTier,
           calculations.socketEvents.winnerTierChange.newElo,
         );
+
+        // Add tier promotion to activity feed
+        try {
+          const userService = new UserService();
+          const user = await userService.getPublicSocketUser(
+            calculations.socketEvents.winnerTierChange.userId,
+          );
+          if (user) {
+            await unifiedActivityService.createPongTierPromotionActivity(
+              {
+                id: user.id,
+                name: user.name,
+                avatarUrl: user.avatarUrl || undefined,
+              },
+              {
+                oldTier: calculations.socketEvents.winnerTierChange.oldTier,
+                newTier: calculations.socketEvents.winnerTierChange.newTier,
+                newElo: calculations.socketEvents.winnerTierChange.newElo,
+              },
+            );
+            console.log('[pongStats] ✅ Tier promotion activity created');
+          }
+        } catch (activityError) {
+          console.error('[pongStats] Error creating tier promotion activity:', activityError);
+        }
       }
 
       if (calculations.socketEvents.loserElo) {
@@ -537,6 +564,35 @@ export class PongStatsService {
 
         await eventBus.publish('pong:match:completed', achievementPayload);
         console.log(`[PongStats] Achievement event emitted for winner ${winnerId}`);
+
+        // Check if this is an IMPOSSIBLE AI victory for activity feed
+        const aiDifficulty = isAIMatch
+          ? PongStatsService.getAIDifficultyFromId(loserId)
+          : undefined;
+        if (isAIMatch && aiDifficulty === 'IMPOSSIBLE') {
+          try {
+            const userService = new UserService();
+            const user = await userService.getPublicSocketUser(winnerId);
+            if (user) {
+              await unifiedActivityService.createPongImpossibleVictoryActivity(
+                {
+                  id: user.id,
+                  name: user.name,
+                  avatarUrl: user.avatarUrl || undefined,
+                },
+                {
+                  matchId,
+                  score: `${winnerScore || 5}-${loserScore || 0}`,
+                  wagerAmount,
+                  eloGained: calculations?.winnerEloChange?.totalChange,
+                },
+              );
+              console.log('[pongStats] ✅ IMPOSSIBLE AI victory activity created');
+            }
+          } catch (activityError) {
+            console.error('[pongStats] Error creating IMPOSSIBLE victory activity:', activityError);
+          }
+        }
       } catch (error) {
         console.error(`[PongStats] Failed to emit achievement event for winner:`, error);
       }

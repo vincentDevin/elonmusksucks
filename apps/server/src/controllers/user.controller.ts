@@ -132,27 +132,28 @@ export async function followUserHandler(
     }
     await userService.followUser(followerId, followingId);
 
-    // Publish follow activity through unified system
-    const followedUser = await userService.getUserProfile(followingId);
-    const followerUser = await userService.getUserProfile(followerId);
+    // Add to unified activity feed
+    try {
+      const followedUser = await userService.getPublicSocketUser(followingId);
+      const followerUser = await userService.getPublicSocketUser(followerId);
 
-    if (followedUser && followerUser) {
-      await unifiedActivityService.publishActivity({
-        type: 'user_followed',
-        userId: followerId,
-        userName: followerUser.name,
-        title: `${followerUser.name} followed ${followedUser.name}`,
-        description: `New connection in the prediction community`,
-        icon: '👥',
-        color: 'text-blue-400',
-        priority: 'low',
-        isPersonal: false, // User follows are public social activities
-        isHighValue: false, // Low priority social activity
-        meta: {
-          followedUserId: followingId,
-          followedUserName: followedUser.name,
-        },
-      });
+      if (followedUser && followerUser) {
+        await unifiedActivityService.createFollowActivity(
+          {
+            id: followerUser.id,
+            name: followerUser.name,
+            avatarUrl: followerUser.avatarUrl || undefined,
+          },
+          {
+            id: followedUser.id,
+            name: followedUser.name,
+          },
+        );
+        console.log('[user.controller] ✅ Follow activity created');
+      }
+    } catch (activityError) {
+      console.error('[user.controller] Error creating follow activity:', activityError);
+      // Don't fail the request if activity creation fails
     }
 
     res.sendStatus(204);

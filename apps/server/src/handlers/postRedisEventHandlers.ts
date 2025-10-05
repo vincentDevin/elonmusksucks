@@ -26,6 +26,7 @@ import {
   type CommentDeletedBroadcast,
 } from '@ems/types';
 import redisClient from '../lib/redis';
+import { unifiedActivityService } from '../services/unifiedActivity.service';
 
 /**
  * Register all post-related Redis event handlers
@@ -49,13 +50,18 @@ export function registerPostRedisHandlers(io: IOServer): IORedis {
   postSub.subscribe(...channels);
 
   postSub.on('message', (channel: string, message: string | Buffer) => {
+    console.log('[postRedisEventHandlers] Received Redis message:', channel);
     try {
       // Convert message to string if it's a Buffer
       const messageStr = typeof message === 'string' ? message : message.toString();
       const data = JSON.parse(messageStr);
+      console.log('[postRedisEventHandlers] Parsed data, calling handler...');
       handleRedisEvent(io, channel, data);
     } catch (error) {
-      console.error(`Failed to parse Redis message for ${channel}:`, String(error));
+      console.error(
+        `[postRedisEventHandlers] Failed to parse Redis message for ${channel}:`,
+        String(error),
+      );
     }
   });
 
@@ -78,8 +84,11 @@ type PostRedisPayload =
  * Handle individual Redis events and broadcast to appropriate rooms
  */
 function handleRedisEvent(io: IOServer, channel: string, data: PostRedisPayload): void {
+  console.log('[postRedisEventHandlers] handleRedisEvent called for channel:', channel);
+
   switch (channel) {
     case REDIS_CHANNELS.POST_CREATED:
+      console.log('[postRedisEventHandlers] Matched POST_CREATED, calling handlePostCreated...');
       handlePostCreated(io, data as PostCreatedRedisPayload);
       break;
     case REDIS_CHANNELS.POST_UPDATED:
@@ -108,8 +117,8 @@ function handleRedisEvent(io: IOServer, channel: string, data: PostRedisPayload)
 /**
  * Broadcast new post to relevant users
  */
-function handlePostCreated(io: IOServer, data: PostCreatedRedisPayload): void {
-  const { post } = data;
+async function handlePostCreated(io: IOServer, data: PostCreatedRedisPayload): Promise<void> {
+  const { post, authorId } = data;
 
   // Broadcast to public timeline if post is public
   if (post.visibility === 'PUBLIC') {
@@ -127,6 +136,37 @@ function handlePostCreated(io: IOServer, data: PostCreatedRedisPayload): void {
       const broadcast: PostNewBroadcast = post;
       io.to(ROOM_HELPERS.user(mention.userId)).emit(SOCKET_EVENTS.POST_NEW, broadcast);
     });
+  }
+
+  // Add to unified activity feed
+  console.log('[postRedisEventHandlers] Processing post for activity feed:', {
+    postId: post.id,
+    authorId,
+    hasAuthor: !!post.author,
+    visibility: post.visibility,
+  });
+
+  try {
+    if (post.author) {
+      console.log('[postRedisEventHandlers] Creating post activity...');
+      await unifiedActivityService.createPostActivity(
+        {
+          id: authorId,
+          name: post.author.name,
+          avatarUrl: post.author.avatarUrl,
+        },
+        {
+          id: post.id,
+          content: post.content,
+          isComment: false,
+        },
+      );
+      console.log('[postRedisEventHandlers] ✅ Post activity created successfully');
+    } else {
+      console.warn('[postRedisEventHandlers] ⚠️ Post has no author, skipping activity');
+    }
+  } catch (error) {
+    console.error('[postRedisEventHandlers] ❌ Error creating post activity:', error);
   }
 }
 
@@ -196,7 +236,7 @@ function handlePostReaction(io: IOServer, data: PostReactionRedisPayload): void 
 /**
  * Broadcast new comment to viewers
  */
-function handleCommentCreated(io: IOServer, data: CommentCreatedRedisPayload): void {
+async function handleCommentCreated(io: IOServer, data: CommentCreatedRedisPayload): Promise<void> {
   const { comment, postId, authorId } = data;
 
   // Broadcast to all users viewing the parent post
@@ -206,6 +246,26 @@ function handleCommentCreated(io: IOServer, data: CommentCreatedRedisPayload): v
     authorId,
   };
   io.emit(SOCKET_EVENTS.COMMENT_NEW, broadcast);
+
+  // Add to unified activity feed
+  try {
+    if (comment.author) {
+      await unifiedActivityService.createPostActivity(
+        {
+          id: authorId,
+          name: comment.author.name,
+          avatarUrl: comment.author.avatarUrl,
+        },
+        {
+          id: comment.id,
+          content: comment.content,
+          isComment: true,
+        },
+      );
+    }
+  } catch (error) {
+    console.error('[postRedisEventHandlers] Error creating comment activity:', error);
+  }
 }
 
 /**

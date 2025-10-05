@@ -123,6 +123,8 @@ export const ActivityEventType = {
   BIG_BET_ALERT: 'big_bet_alert',
   ACHIEVEMENT_UNLOCKED: 'achievement_unlocked',
   USER_FOLLOWED: 'user_followed',
+  PONG_TIER_PROMOTION: 'pong_tier_promotion',
+  PONG_IMPOSSIBLE_VICTORY: 'pong_impossible_victory',
 } as const;
 
 export type ActivityEventType = (typeof ActivityEventType)[keyof typeof ActivityEventType];
