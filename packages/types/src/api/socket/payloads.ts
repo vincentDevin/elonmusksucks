@@ -92,6 +92,129 @@ export interface PongAchievementContext {
 }
 
 // ============================================================================
+// Betting Outcome Payloads
+// ============================================================================
+
+export interface BetWonPayload {
+  userId: number;
+  betId: string;
+  amount: number;
+  payout: number;
+  profit: number;
+  prediction: {
+    id: string;
+    title: string;
+  };
+  option: {
+    id: string;
+    text: string;
+  };
+  odds: number;
+  timestamp: string;
+}
+
+export interface BetLostPayload {
+  userId: number;
+  betId: string;
+  amount: number;
+  prediction: {
+    id: string;
+    title: string;
+  };
+  option: {
+    id: string;
+    text: string;
+  };
+  odds: number;
+  timestamp: string;
+}
+
+export interface ParlayWonPayload {
+  userId: number;
+  parlayId: string;
+  amount: number;
+  payout: number;
+  profit: number;
+  multiplier: number;
+  legs: Array<{
+    predictionId: string;
+    predictionTitle: string;
+    optionText: string;
+    odds: number;
+  }>;
+  legCount: number;
+  timestamp: string;
+}
+
+export interface ParlayLostPayload {
+  userId: number;
+  parlayId: string;
+  amount: number;
+  multiplier: number;
+  legs: Array<{
+    predictionId: string;
+    predictionTitle: string;
+    optionText: string;
+    odds: number;
+    isWon: boolean;
+  }>;
+  legCount: number;
+  failedLegs: number;
+  timestamp: string;
+}
+
+// ============================================================================
+// Financial Event Payloads
+// ============================================================================
+
+export interface BalanceMilestonePayload {
+  userId: number;
+  milestone: number;
+  newBalance: number;
+  previousBalance: number;
+  milestoneType: 'reached' | 'crossed';
+  timestamp: string;
+}
+
+export interface BankruptcyPayload {
+  userId: number;
+  previousBalance: number;
+  timestamp: string;
+}
+
+export interface RagsToRichesPayload {
+  userId: number;
+  startBalance: number;
+  currentBalance: number;
+  gain: number;
+  timestamp: string;
+}
+
+export interface MassiveLossPayload {
+  userId: number;
+  previousBalance: number;
+  newBalance: number;
+  loss: number;
+  timestamp: string;
+}
+
+export interface MassiveGainPayload {
+  userId: number;
+  previousBalance: number;
+  newBalance: number;
+  gain: number;
+  timestamp: string;
+}
+
+export interface ComebackPayload {
+  userId: number;
+  previousLowBalance: number;
+  currentBalance: number;
+  recovery: number;
+  timestamp: string;
+}
+
+// ============================================================================
 // Pong Socket Event Payloads
 // ============================================================================
 
@@ -1049,17 +1172,35 @@ export interface EventPayloadMap {
   // Betting events
   'bet:placed': BetPlacedPayload;
   'bet:resolved': BetResolvedPayload;
+  'bet:won': BetWonPayload;
+  'bet:lost': BetLostPayload;
 
   // Parlay events
   'parlay:placed': ParlayPlacedPayload;
   'parlay:resolved': ParlayResolvedPayload;
+  'parlay:won': ParlayWonPayload;
+  'parlay:lost': ParlayLostPayload;
 
   // Balance events
   'balance:update': BalanceUpdatePayload;
+  'balance:milestone:reached': BalanceMilestonePayload;
+
+  // Financial events
+  'bankruptcy:detected': BankruptcyPayload;
+  'rags:to:riches': RagsToRichesPayload;
+  'massive:loss:detected': MassiveLossPayload;
+  'massive:gain:detected': MassiveGainPayload;
+  'comeback:detected': ComebackPayload;
+
+  // Achievement events
+  'achievement:unlocked': AchievementUnlockedPayload;
+  'pong:achievement:unlocked': any; // Pong-specific achievement payload
 
   // Pong events
   'pong:wager': PongWagerPayload;
   'pong:payout': PongPayoutPayload;
+  'pong:elo:update': any; // PongEloUpdatePayload
+  'pong:tier:change': any; // PongTierChangePayload
 
   // Reaction events
   'post:reaction:update': ReactionUpdatePayload;
@@ -1077,6 +1218,8 @@ export interface EventPayloadMap {
 
   // Stats events
   'user:stats_update': StatsUpdatePayload;
+  'stats:update': StatsUpdatePayload;
+  'ranking:change': RankingChangePayload;
 
   // Activity events
   'unified:activity:update': any; // UnifiedActivityEvent

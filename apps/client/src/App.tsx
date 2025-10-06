@@ -11,10 +11,9 @@ import { ChatProvider } from './contexts/ChatContext';
 import { ActivityProvider } from './contexts/ActivityContext';
 import { AchievementProvider } from './contexts/AchievementContext';
 import { ReactionProvider } from './contexts/ReactionContext';
+import { NotificationProvider, NotificationContainer, NotificationEventHandlers } from './components/notifications';
 import AppRoutes from './routes/AppRoutes';
 import { useAuth } from './contexts/AuthContext';
-import PongEloNotification from './components/pong/PongEloNotification';
-import { AchievementCelebrationContainer } from './components/achievements/AchievementCelebrationContainer';
 import EventFlowTest from './components/debug/EventFlowTest';
 import { EventMetricsDashboard } from './components/debug/EventMetricsDashboard';
 import { LeakDetectionPanel } from './components/debug/LeakDetectionPanel';
@@ -44,26 +43,29 @@ function AppContent() {
                 <PredictionProvider>
                   <ParlayProvider>
                     <ChatProvider>
-                      {/* Hydration marker to enable safe event processing */}
-                      <HydrationMarker />
-                      {/* Central event handlers for all 73+ Redis channels */}
-                      <EventHandlers />
-                      <AppRoutes />
-                      {/* Global Pong Elo notifications */}
-                      <PongEloNotification />
-                      {/* Global Achievement celebrations */}
-                      <AchievementCelebrationContainer />
-                      {/* Development tools - only in development */}
-                      {/* 
-                    {(import.meta.env.DEV || process.env.NODE_ENV === 'development') && (
-                      <>
-                        <ListenerMonitor />
-                        {// <EventFlowTest /> - DISABLED to reduce duplicate listeners }
-                        <EventMetricsDashboard />
-                        <LeakDetectionPanel />
-                      </>
-                    )}
-                    */}
+                      {/* Unified Notification System */}
+                      <NotificationProvider>
+                        {/* Hydration marker to enable safe event processing */}
+                        <HydrationMarker />
+                        {/* Central event handlers for all 73+ Redis channels */}
+                        <EventHandlers />
+                        {/* Unified notification event handlers */}
+                        <NotificationEventHandlers />
+                        <AppRoutes />
+                        {/* Unified notification container (replaces PongEloNotification & AchievementCelebrationContainer) */}
+                        <NotificationContainer />
+                        {/* Development tools - only in development */}
+                        {/*
+                      {(import.meta.env.DEV || process.env.NODE_ENV === 'development') && (
+                        <>
+                          <ListenerMonitor />
+                          {// <EventFlowTest /> - DISABLED to reduce duplicate listeners }
+                          <EventMetricsDashboard />
+                          <LeakDetectionPanel />
+                        </>
+                      )}
+                      */}
+                      </NotificationProvider>
                     </ChatProvider>
                   </ParlayProvider>
                 </PredictionProvider>
