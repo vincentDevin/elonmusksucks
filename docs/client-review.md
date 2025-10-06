@@ -1,4 +1,5 @@
 # Client Frontend Review: TypeScript Rigor & React 19 Readiness
+molly
 
 ## 1. Executive Summary
 - The `apps/client` refactor introduced modern concurrency primitives such as `useOptimistic`, yet the codebase still leans heavily on `any` casts and untyped payloads that undermine TypeScript's safety guarantees. 【F:apps/client/src/contexts/PredictionContext.tsx†L60-L137】【F:apps/client/src/types/events.ts†L56-L168】
