@@ -1,5 +1,6 @@
 import { useNotificationSystem } from './NotificationContext';
 import { NotificationToast } from './NotificationToast';
+import { PongNotificationToast } from './PongNotificationToast';
 
 export function NotificationContainer() {
   const { notifications, removeNotification } = useNotificationSystem();
@@ -7,6 +8,20 @@ export function NotificationContainer() {
   if (notifications.length === 0) {
     return null;
   }
+
+  // Determine which toast component to use based on notification type
+  const renderNotification = (notification: typeof notifications[0]) => {
+    const isPongNotification =
+      notification.type === 'pong-elo' ||
+      notification.type === 'pong-tier' ||
+      notification.type === 'pong-achievement';
+
+    if (isPongNotification) {
+      return <PongNotificationToast notification={notification} onDismiss={removeNotification} />;
+    }
+
+    return <NotificationToast notification={notification} onDismiss={removeNotification} />;
+  };
 
   return (
     <div
@@ -21,7 +36,7 @@ export function NotificationContainer() {
             animationDelay: `${index * 100}ms`,
           }}
         >
-          <NotificationToast notification={notification} onDismiss={removeNotification} />
+          {renderNotification(notification)}
         </div>
       ))}
     </div>

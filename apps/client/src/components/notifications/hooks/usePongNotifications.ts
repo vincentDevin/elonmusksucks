@@ -49,13 +49,10 @@ export function usePongNotifications() {
     (payload: PongEloUpdatePayload) => {
       if (!user || payload.userId !== user.id) return;
 
-      const eloDirection = payload.change > 0 ? '↑' : '↓';
-      const eloChangeText = payload.change > 0 ? `+${payload.change}` : `${payload.change}`;
-
       addNotification(
         'pong-elo',
-        'Pong Rating Update',
-        `${eloDirection} ${eloChangeText} Elo (Now: ${payload.newRating}) • ${payload.tier}`,
+        'Elo Update',
+        '', // Message handled by PongNotificationToast
         {
           priority: payload.change > 0 ? 'high' : 'normal',
           duration: 8000,
@@ -71,15 +68,10 @@ export function usePongNotifications() {
     (payload: PongTierChangePayload) => {
       if (!user || payload.userId !== user.id) return;
 
-      const tierEmoji =
-        TIER_EMOJIS[payload.newTier as keyof typeof TIER_EMOJIS] || TIER_EMOJIS.BRONZE;
-
-      const title = payload.isPromotion ? `Tier Promotion! ${tierEmoji}` : `Tier Change ${tierEmoji}`;
-
       addNotification(
         'pong-tier',
-        title,
-        `${payload.oldTier} → ${payload.newTier} (${payload.eloRating} Elo)`,
+        'Tier Promotion!',
+        '', // Message handled by PongNotificationToast
         {
           priority: 'high',
           duration: 12000,
@@ -97,8 +89,8 @@ export function usePongNotifications() {
 
       addNotification(
         'pong-achievement',
-        'Pong Achievement! 🏓',
-        `${payload.title}: ${payload.description}`,
+        'Pong Achievement!',
+        '', // Message handled by PongNotificationToast
         {
           priority: 'high',
           duration: 12000,
