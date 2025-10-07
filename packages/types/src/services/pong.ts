@@ -455,7 +455,7 @@ export const PONG_WAGER_LIMITS = {
   /**
    * Minimum wager for all matches
    */
-  MIN_WAGER: 10,
+  MIN_WAGER: 0,
 
   /**
    * AI match maximum wagers (house protection)

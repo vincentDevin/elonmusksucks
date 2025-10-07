@@ -126,9 +126,14 @@ export function registerRedisEventHandlers(io: Server, eventSub: Redis) {
         break;
       case REDIS_CHANNELS.ACHIEVEMENT_UNLOCKED:
         if (hasUserId(payload)) {
+          // Emit to the user who unlocked it (for notification)
           io.to(`user:${payload.userId}`).emit(REDIS_CHANNELS.ACHIEVEMENT_UNLOCKED, payload);
+          // Broadcast to everyone EXCEPT the user (for activity feed)
+          io.except(`user:${payload.userId}`).emit(REDIS_CHANNELS.ACHIEVEMENT_UNLOCKED, payload);
+        } else {
+          // No userId, broadcast globally
+          io.emit(REDIS_CHANNELS.ACHIEVEMENT_UNLOCKED, payload);
         }
-        io.emit(REDIS_CHANNELS.ACHIEVEMENT_UNLOCKED, payload); // Also broadcast globally for activity feed
         break;
       case REDIS_CHANNELS.USER_STATS_UPDATE:
         if (hasUserId(payload)) {

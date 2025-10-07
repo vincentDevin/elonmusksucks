@@ -10,7 +10,7 @@ export function NotificationContainer() {
   }
 
   // Determine which toast component to use based on notification type
-  const renderNotification = (notification: typeof notifications[0]) => {
+  const renderNotification = (notification: (typeof notifications)[0]) => {
     const isPongNotification =
       notification.type === 'pong-elo' ||
       notification.type === 'pong-tier' ||

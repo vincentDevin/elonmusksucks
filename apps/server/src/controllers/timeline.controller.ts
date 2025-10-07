@@ -19,17 +19,23 @@ const userService = new UserService();
  */
 export async function getTimeline(req: Request, res: Response) {
   try {
-    const { limit = '30' } = req.query;
+    const { limit = '30', cursor } = req.query;
     const pageLimit = Math.min(parseInt(limit as string) || 30, 100);
     const viewerId = (req as any).user?.id; // Optional: include user reactions if authenticated
 
+    // Parse cursor as timestamp for filtering
+    const cursorDate = cursor ? new Date(cursor as string) : undefined;
+
     // Get both articles and posts, then merge and sort
+    // Fetch more items than requested to ensure we have enough after merging and sorting
     const articlesPromise = timelineService.getArticles({
-      limit: pageLimit,
+      cursor: cursorDate,
+      limit: pageLimit * 2,
     });
 
     const postsPromise = timelineService.getPublicPosts({
-      limit: pageLimit,
+      cursor: undefined, // Posts use numeric cursor, skip for now - will filter in memory
+      limit: pageLimit * 2,
       viewerId,
     });
 
@@ -38,95 +44,123 @@ export async function getTimeline(req: Request, res: Response) {
     // Posts are already enriched with avatar URLs by the service layer
     // No need to double-enrich here
 
-    // Convert articles to TimelineItem format
-    const articleItems: TimelineItem[] = articles.map((article: any) => ({
-      id: `article-${article.id}`,
-      type: 'article' as const,
-      timestamp: article.publishedAt?.toISOString() || article.createdAt.toISOString(),
-      content: {
-        title: article.title,
-        excerpt: article.excerpt || undefined,
-        url: article.url,
-        imageUrl: article.leadImageUrl || null,
-        author: article.feed?.name,
-        source: article.feed?.siteUrl || undefined,
-      },
-      engagement: {
-        reactions: 0, // TODO: Get from article reactions
-        comments: 0, // TODO: Get from article comments
-      },
-      tags: Array.isArray(article.tags)
-        ? article.tags.map((t: any) => t.tag?.name || t.name || t).filter(Boolean)
-        : [],
-    }));
+    // Fetch reactions for all articles in bulk
+    const articleIds = articles.map((a: any) => a.id);
+    const articlesWithReactions = await timelineService.getArticlesWithReactions(
+      articleIds,
+      viewerId,
+    );
+
+    // Convert articles to TimelineItem format with reaction data
+    const articleItems: TimelineItem[] = articles.map((article: any) => {
+      const reactionData = articlesWithReactions.get(article.id) || {
+        counts: {},
+        userReaction: undefined,
+        totalCount: 0,
+      };
+
+      return {
+        id: `article-${article.id}`,
+        type: 'article' as const,
+        timestamp: article.publishedAt?.toISOString() || article.createdAt.toISOString(),
+        content: {
+          title: article.title,
+          excerpt: article.excerpt || undefined,
+          url: article.url,
+          imageUrl: article.leadImageUrl || null,
+          author: article.feed?.name,
+          source: article.feed?.siteUrl || undefined,
+        },
+        engagement: {
+          reactions: reactionData.totalCount,
+          comments: 0, // TODO: Get from article comments
+        },
+        reactionCounts: reactionData.counts,
+        userReaction: reactionData.userReaction,
+        tags: Array.isArray(article.tags)
+          ? article.tags.map((t: any) => t.tag?.name || t.name || t).filter(Boolean)
+          : [],
+      };
+    });
 
     // Convert posts to TimelineItem format with embedded post data
-    const postItems: TimelineItem[] = posts.map((post: any) => ({
-      id: `post-${post.id}`,
-      type: 'article' as const, // Using 'article' type for posts too (timeline only has article/tweet)
-      timestamp: post.createdAt.toISOString(),
-      content: {
-        title: post.author?.name || 'User Post',
-        excerpt: post.body.substring(0, 200),
-        url: `/posts/${post.id}`, // Internal post URL
-        imageUrl: post.mediaUrls?.[0] || null,
-        author: post.author?.name,
-        source: 'Community Post',
-      },
-      engagement: {
-        reactions: post._count?.reactions || 0,
-        comments: post._count?.children || 0,
-      },
-      tags: [],
-      // Add full post data for frontend to use
-      postData: {
-        id: post.id,
-        authorId: post.authorId,
-        type: post.type || 'POST',
-        content: post.body, // For type compatibility
-        body: post.body, // For PostCard component
-        contentType: post.contentType,
-        visibility: post.visibility,
-        mediaUrls: post.mediaUrls,
-        linkPreview: post.linkPreview,
-        parentId: post.parentId,
-        threadDepth: post.threadDepth,
-        reactionsCount: post._count?.reactions || 0,
-        repliesCount: post._count?.children || 0,
-        likesCount: post._count?.reactions || 0,
-        commentsCount: post._count?.children || 0,
-        sharesCount: post.sharesCount || 0,
-        viewsCount: post.viewCount?.toString() || '0',
-        reactionCounts: post.reactionCounts,
-        userReaction: post.userReaction,
-        isDeleted: post.isDeleted,
-        isFlagged: post.isFlagged,
-        createdAt: post.createdAt,
-        updatedAt: post.updatedAt,
-        editedAt: post.editedAt,
-        children: undefined,
-        authorName: post.author?.name,
-        authorAvatar: post.author?.avatarUrl,
-        author: post.author ||
-          post.user || {
-            id: post.authorId,
-            name: 'Unknown',
-            avatarUrl: null,
-          },
-        canEdit: false,
-        canDelete: false,
-      },
-    }));
+    const postItems: TimelineItem[] = posts
+      .filter((post: any) => {
+        // Filter posts by cursor if provided
+        if (!cursorDate) return true;
+        return new Date(post.createdAt) < cursorDate;
+      })
+      .map((post: any) => ({
+        id: `post-${post.id}`,
+        type: 'article' as const, // Using 'article' type for posts too (timeline only has article/tweet)
+        timestamp: post.createdAt.toISOString(),
+        content: {
+          title: post.author?.name || 'User Post',
+          excerpt: post.body.substring(0, 200),
+          url: `/posts/${post.id}`, // Internal post URL
+          imageUrl: post.mediaUrls?.[0] || null,
+          author: post.author?.name,
+          source: 'Community Post',
+        },
+        engagement: {
+          reactions: post._count?.reactions || 0,
+          comments: post._count?.children || 0,
+        },
+        tags: [],
+        // Add full post data for frontend to use
+        postData: {
+          id: post.id,
+          authorId: post.authorId,
+          type: post.type || 'POST',
+          content: post.body, // For type compatibility
+          body: post.body, // For PostCard component
+          contentType: post.contentType,
+          visibility: post.visibility,
+          mediaUrls: post.mediaUrls,
+          linkPreview: post.linkPreview,
+          parentId: post.parentId,
+          threadDepth: post.threadDepth,
+          reactionsCount: post._count?.reactions || 0,
+          repliesCount: post._count?.children || 0,
+          likesCount: post._count?.reactions || 0,
+          commentsCount: post._count?.children || 0,
+          sharesCount: post.sharesCount || 0,
+          viewsCount: post.viewCount?.toString() || '0',
+          reactionCounts: post.reactionCounts,
+          userReaction: post.userReaction,
+          isDeleted: post.isDeleted,
+          isFlagged: post.isFlagged,
+          createdAt: post.createdAt,
+          updatedAt: post.updatedAt,
+          editedAt: post.editedAt,
+          children: undefined,
+          authorName: post.author?.name,
+          authorAvatar: post.author?.avatarUrl,
+          author: post.author ||
+            post.user || {
+              id: post.authorId,
+              name: 'Unknown',
+              avatarUrl: null,
+            },
+          canEdit: false,
+          canDelete: false,
+        },
+      }));
 
-    // Merge and sort by timestamp
+    // Merge and sort by timestamp (newest first)
     const allItems = [...articleItems, ...postItems].sort(
       (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
     );
 
-    // Apply pagination
+    // Apply pagination - take only the requested limit
     const items = allItems.slice(0, pageLimit);
+
+    // Check if there are more items
+    // We fetched pageLimit * 2 of each type, so if we have more than pageLimit after merging, there's more
     const hasMore = allItems.length > pageLimit;
-    const nextCursor = hasMore ? items[items.length - 1].timestamp : undefined;
+
+    // Next cursor is the timestamp of the last item in this page
+    const nextCursor = items.length > 0 ? items[items.length - 1].timestamp : undefined;
 
     const payload: TimelineResponse = {
       items,

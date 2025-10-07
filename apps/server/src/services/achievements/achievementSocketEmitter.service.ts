@@ -44,18 +44,33 @@ export class AchievementSocketEmitter implements IAchievementSocketEmitter {
     },
   ): Promise<void> {
     try {
+      console.log(
+        `[AchievementSocketEmitter] emitUnlocked called for user ${userId}, achievement: ${payload.achievement.name}`,
+      );
+
+      // Transform payload to match AchievementUnlockedPayload interface
+      const transformedPayload = {
+        userId,
+        achievement: {
+          id: String(payload.achievement.id),
+          title: payload.achievement.name, // Map 'name' to 'title'
+          description: payload.achievement.description,
+          category: payload.achievement.category,
+          iconUrl: payload.achievement.iconUrl,
+        },
+        progress: {
+          previous: 0, // Previous progress not available in current payload
+          current: payload.progress,
+          target: payload.progressMax,
+        },
+        timestamp: payload.unlockedAt,
+      };
+
       // Use coalescer with minimal batching (100ms) for achievement unlocks
       // This provides near-immediate delivery while allowing micro-batching
       await this.eventCoalescer.addEvent(
         REDIS_CHANNELS.ACHIEVEMENT_UNLOCKED,
-        {
-          type: AchievementSocketEvents.UNLOCKED,
-          userId,
-          timestamp: new Date().toISOString(),
-          data: payload,
-          achievementName: payload.achievement.name,
-          rarity: payload.achievement.rarity,
-        },
+        transformedPayload,
         userId,
       );
     } catch (error) {

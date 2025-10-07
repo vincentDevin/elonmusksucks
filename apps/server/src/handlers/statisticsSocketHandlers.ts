@@ -3,7 +3,6 @@ import type IORedis from 'ioredis';
 import {
   StatsUpdatePayload,
   RankingChangePayload,
-  AchievementUnlockedPayload,
   REDIS_CHANNELS,
   SOCKET_EVENTS,
   ROOM_HELPERS,
@@ -12,8 +11,6 @@ import {
   type StatsUpdatedBroadcast,
   type RankingChangedBroadcast,
   type StatsRankingBroadcast,
-  type AchievementUnlockedBroadcast,
-  type StatsAchievementBroadcast,
   type StatsRefreshedBroadcast,
 } from '@ems/types';
 import type { AuthenticatedSocket } from '../middleware/socketAuthMiddleware';
@@ -96,10 +93,10 @@ export function registerStatisticsHandlers(socket: AuthenticatedSocket): void {
  */
 export function registerStatisticsRedisHandlers(io: IOServer, redisSub: IORedis): void {
   // Subscribe to statistics-related Redis channels
+  // NOTE: ACHIEVEMENT_UNLOCKED is handled by redisEventHandlers.ts to avoid duplicate emissions
   redisSub.subscribe(
     REDIS_CHANNELS.STATS_UPDATE,
     REDIS_CHANNELS.RANKING_CHANGE,
-    REDIS_CHANNELS.ACHIEVEMENT_UNLOCKED,
     REDIS_CHANNELS.STATS_REFRESH,
   );
 
@@ -113,9 +110,6 @@ export function registerStatisticsRedisHandlers(io: IOServer, redisSub: IORedis)
           break;
         case REDIS_CHANNELS.RANKING_CHANGE:
           handleRankingChange(io, data);
-          break;
-        case REDIS_CHANNELS.ACHIEVEMENT_UNLOCKED:
-          handleAchievementUnlocked(io, data);
           break;
         case REDIS_CHANNELS.STATS_REFRESH:
           handleStatsRefresh(io, data);
@@ -184,79 +178,6 @@ function handleRankingChange(io: IOServer, payload: RankingChangePayload): void 
 }
 
 /**
- * Legacy achievement payload format (for backward compatibility)
- */
-interface LegacyAchievementPayload {
-  userId: number;
-  achievementId?: string;
-  name?: string;
-  description?: string;
-  category?: string;
-}
-
-/**
- * Handle achievement unlocks
- */
-function handleAchievementUnlocked(
-  io: IOServer,
-  payload: AchievementUnlockedPayload | LegacyAchievementPayload,
-): void {
-  // Ensure payload has required fields
-  const userId = payload.userId;
-  if (!userId) {
-    console.error('[stats-redis] Achievement payload missing userId');
-    return;
-  }
-
-  // Handle both old and new achievement payload formats
-  const achievement =
-    'achievement' in payload && payload.achievement
-      ? payload.achievement
-      : {
-          id: ('achievementId' in payload && payload.achievementId) || 'unknown',
-          title: ('name' in payload && payload.name) || 'Achievement Unlocked',
-          description: ('description' in payload && payload.description) || '',
-          category: ('category' in payload && payload.category) || 'general',
-        };
-
-  const progress =
-    'progress' in payload && payload.progress
-      ? payload.progress
-      : {
-          previous: 0,
-          current: 1,
-          target: 1,
-        };
-
-  const timestamp = ('timestamp' in payload && payload.timestamp) || new Date().toISOString();
-
-  // Emit to user's achievement room
-  const achievementBroadcast: AchievementUnlockedBroadcast = {
-    achievement,
-    progress,
-    timestamp,
-  };
-  io.to(ROOM_HELPERS.userAchievementsSubscription(userId)).emit(
-    SOCKET_EVENTS.ACHIEVEMENT_UNLOCKED_BROADCAST,
-    achievementBroadcast,
-  );
-
-  // Also emit to stats room for general updates
-  const statsAchievementBroadcast: StatsAchievementBroadcast = {
-    achievement,
-    progress,
-  };
-  io.to(ROOM_HELPERS.userStatsSubscription(userId)).emit(
-    SOCKET_EVENTS.STATS_ACHIEVEMENT,
-    statsAchievementBroadcast,
-  );
-
-  console.log(
-    `[stats-redis] Achievement unlocked for user ${userId}: ${achievement.title || 'Unknown'}`,
-  );
-}
-
-/**
  * Handle stats refresh events (when stats are recalculated)
  */
 function handleStatsRefresh(io: IOServer, payload: { userId: number }): void {
@@ -315,21 +236,6 @@ export class StatisticsEventEmitter {
     };
 
     await eventBus.publish(REDIS_CHANNELS.RANKING_CHANGE, payload);
-  }
-
-  static async emitAchievementUnlocked(
-    userId: number,
-    achievement: AchievementUnlockedPayload['achievement'],
-    progress: AchievementUnlockedPayload['progress'],
-  ): Promise<void> {
-    const payload: AchievementUnlockedPayload = {
-      userId,
-      achievement,
-      progress,
-      timestamp: new Date().toISOString(),
-    };
-
-    await eventBus.publish(REDIS_CHANNELS.ACHIEVEMENT_UNLOCKED, payload);
   }
 
   static async emitStatsRefresh(userId: number): Promise<void> {

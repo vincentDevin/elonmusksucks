@@ -159,8 +159,8 @@ export function AchievementProvider({ children }: AchievementProviderProps) {
           isCompleted: true,
           completedAt: new Date().toISOString(),
           progress: payload.progress.current,
-          targetValue: payload.progress.current, // Since it's unlocked, current = target
-          iconUrl: null, // No icon in unlock payload
+          targetValue: payload.progress.target,
+          iconUrl: payload.achievement.iconUrl || null,
         };
 
         // Update achievements list with the newly unlocked achievement
@@ -197,7 +197,7 @@ export function AchievementProvider({ children }: AchievementProviderProps) {
           description: payload.achievement.description,
           category: payload.achievement.category,
           rarity: 'common', // Default rarity
-          iconUrl: null,
+          iconUrl: payload.achievement.iconUrl || null,
           completedAt: new Date().toISOString(),
         };
 

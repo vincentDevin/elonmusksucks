@@ -65,6 +65,13 @@ export interface IReactionRepository {
   /** Get reaction counts for article */
   getArticleReactionCounts(articleId: number): Promise<Record<PrismaReactionType, number>>;
 
+  /** Get reactions for multiple articles (bulk) */
+  getArticleReactionsBulk(
+    articleIds: number[],
+  ): Promise<
+    Array<{ id: number; articleId: number | null; userId: number; type: PrismaReactionType }>
+  >;
+
   // ============================================
   // PREDICTION REACTIONS
   // ============================================

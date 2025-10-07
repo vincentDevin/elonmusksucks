@@ -131,6 +131,9 @@ export interface TimelineItem {
     comments: number;
   };
   tags: string[];
+  // Reaction data from backend (prevents N+1 queries)
+  reactionCounts?: Record<string, number>;
+  userReaction?: string;
   sourceLinks?: Array<{
     id: number;
     url: string;

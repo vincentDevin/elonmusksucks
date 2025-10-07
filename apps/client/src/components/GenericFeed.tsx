@@ -124,15 +124,37 @@ export default function GenericFeed<T extends FeedItem>({
   const [activeFilters, setActiveFilters] = useState<FeedFilter[]>(filters || []);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Refs for intersection observer
+  // Refs for intersection observer and state tracking
   const observerRef = useRef<HTMLDivElement>(null);
   const observerInstance = useRef<IntersectionObserver | null>(null);
+  const loadingRef = useRef(false);
+  const hasMoreRef = useRef(true);
+  const cursorRef = useRef<string | undefined>(undefined);
+
+  // Update refs when state changes
+  useEffect(() => {
+    loadingRef.current = loading;
+  }, [loading]);
+
+  useEffect(() => {
+    hasMoreRef.current = hasMore;
+  }, [hasMore]);
+
+  useEffect(() => {
+    cursorRef.current = cursor;
+  }, [cursor]);
 
   // Load items function
   const loadItems = useCallback(
     async (reset = false) => {
+      // Prevent concurrent loads
+      if (loadingRef.current && !reset) {
+        return;
+      }
+
       try {
         setLoading(true);
+        loadingRef.current = true;
         setError(null);
 
         const filterValues = activeFilters.reduce(
@@ -146,7 +168,7 @@ export default function GenericFeed<T extends FeedItem>({
         );
 
         const response = await fetchItems({
-          cursor: !reset ? cursor : undefined,
+          cursor: !reset ? cursorRef.current : undefined,
           limit: itemsPerPage,
           tab: activeTab,
           filters: filterValues,
@@ -164,15 +186,18 @@ export default function GenericFeed<T extends FeedItem>({
         }
 
         setHasMore(response.pagination.hasMore);
+        hasMoreRef.current = response.pagination.hasMore;
         setCursor(response.pagination.cursor);
+        cursorRef.current = response.pagination.cursor;
       } catch (err) {
         console.error('Feed loading error:', err);
         setError(err instanceof Error ? err.message : 'Failed to load items');
       } finally {
         setLoading(false);
+        loadingRef.current = false;
       }
     },
-    [fetchItems, cursor, itemsPerPage, activeTab, activeFilters],
+    [fetchItems, itemsPerPage, activeTab, activeFilters],
   );
 
   // Tab change handler
@@ -206,9 +231,10 @@ export default function GenericFeed<T extends FeedItem>({
 
   // Infinite scroll setup
   useEffect(() => {
-    if (!enableInfiniteScroll) return;
+    if (!enableInfiniteScroll || items.length === 0) return;
 
     const currentObserverRef = observerRef.current;
+    if (!currentObserverRef) return; // Wait for ref to be attached
 
     if (observerInstance.current) {
       observerInstance.current.disconnect();
@@ -216,23 +242,22 @@ export default function GenericFeed<T extends FeedItem>({
 
     observerInstance.current = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loading) {
+        // Use refs to get current values, preventing stale closures
+        if (entries[0].isIntersecting && hasMoreRef.current && !loadingRef.current) {
           loadItems(false);
         }
       },
-      { threshold: 1.0 },
+      { threshold: 0.5 }, // Trigger slightly before reaching the bottom
     );
 
-    if (currentObserverRef) {
-      observerInstance.current.observe(currentObserverRef);
-    }
+    observerInstance.current.observe(currentObserverRef);
 
     return () => {
       if (observerInstance.current) {
         observerInstance.current.disconnect();
       }
     };
-  }, [hasMore, loading, loadItems, enableInfiniteScroll]);
+  }, [loadItems, enableInfiniteScroll, items.length]);
 
   // Realtime updates
   useEffect(() => {

@@ -255,6 +255,22 @@ export class ReactionRepository implements IReactionRepository {
     return counts;
   }
 
+  async getArticleReactionsBulk(
+    articleIds: number[],
+  ): Promise<Array<{ id: number; articleId: number | null; userId: number; type: ReactionType }>> {
+    return this.prisma.reaction.findMany({
+      where: {
+        articleId: { in: articleIds },
+      },
+      select: {
+        id: true,
+        articleId: true,
+        userId: true,
+        type: true,
+      },
+    });
+  }
+
   // ============================================
   // PREDICTION REACTIONS
   // ============================================

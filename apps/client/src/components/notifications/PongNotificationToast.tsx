@@ -226,9 +226,7 @@ export function PongNotificationToast({ notification, onDismiss }: PongNotificat
       <div className="pt-2 border-t border-accent/20 mt-3">
         <div className="text-xs text-tertiary flex items-center justify-between">
           <span>
-            {notification.type === 'pong-achievement'
-              ? 'Achievement unlocked'
-              : 'Match completed'}
+            {notification.type === 'pong-achievement' ? 'Achievement unlocked' : 'Match completed'}
           </span>
           <span>{new Date(notification.timestamp).toLocaleTimeString()}</span>
         </div>

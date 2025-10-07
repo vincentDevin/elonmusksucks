@@ -402,10 +402,10 @@ export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     dispatch({ type: 'SET_USE_AS_SOURCE_ITEM', payload: undefined });
   };
 
-  // Initial load
-  useEffect(() => {
-    loadArticles(true);
-  }, []);
+  // Initial load removed - using unified timeline via TimelineWithPosts instead
+  // useEffect(() => {
+  //   loadArticles(true);
+  // }, []);
 
   // Socket.IO integration for real-time updates
   useEffect(() => {

@@ -346,44 +346,49 @@ export class RuleEvaluator {
 
     // Handle placeholders
     if (path === '$.userId') {
-      if (isBotBreakerEasyDebug)
-        //.log(`[RuleEvaluator] 🐛 getValue(${path}) -> userId: ${event.userId}`);
-        return event.userId;
+      if (isBotBreakerEasyDebug) {
+        //console.log(`[RuleEvaluator] 🐛 getValue(${path}) -> userId: ${event.userId}`);
+      }
+      return event.userId;
     }
 
     // Handle counter references
     if (path.startsWith('counter.')) {
       const counterName = path.substring(8);
       const value = userCounters[counterName] || 0;
-      if (isBotBreakerEasyDebug)
+      if (isBotBreakerEasyDebug) {
         //console.log(`[RuleEvaluator] 🐛 getValue(${path}) -> counter: ${value}`);
-        return value;
+      }
+      return value;
     }
 
     // Handle payload references
     if (path.startsWith('payload.')) {
       const payloadPath = path.substring(8);
       const value = this.getNestedValue(event.payload, payloadPath);
-      if (isBotBreakerEasyDebug)
+      if (isBotBreakerEasyDebug) {
         //console.log(`[RuleEvaluator] 🐛 getValue(${path}) -> payload path: ${value}`);
-        return value;
+      }
+      return value;
     }
 
     // Handle data references (common in achievement rules)
     if (path.startsWith('data.')) {
       const dataPath = path.substring(5);
       const value = this.getNestedValue(event.payload, dataPath);
-      if (isBotBreakerEasyDebug)
+      if (isBotBreakerEasyDebug) {
         //console.log(`[RuleEvaluator] 🐛 getValue(${path}) -> data path: ${value}`);
-        return value;
+      }
+      return value;
     }
 
     // Handle event properties
     if (path.startsWith('event.')) {
       const eventPath = path.substring(6);
       const value = this.getNestedValue(event, eventPath);
-      if (isBotBreakerEasyDebug)
-        console.log(`[RuleEvaluator] 🐛 getValue(${path}) -> event path: ${value}`);
+      if (isBotBreakerEasyDebug) {
+        //console.log(`[RuleEvaluator] 🐛 getValue(${path}) -> event path: ${value}`);
+      }
       return value;
     }
 

@@ -3,5 +3,9 @@ export { NotificationProvider, useNotificationSystem } from './NotificationConte
 export { NotificationContainer } from './NotificationContainer';
 export { NotificationToast } from './NotificationToast';
 export { PongNotificationToast } from './PongNotificationToast';
-export { NotificationEventHandlers } from './NotificationEventHandlers';
-export type { Notification, NotificationType, NotificationPriority, NotificationOptions } from './types';
+export type {
+  Notification,
+  NotificationType,
+  NotificationPriority,
+  NotificationOptions,
+} from './types';

@@ -153,9 +153,7 @@ export function NotificationToast({ notification, onDismiss }: NotificationToast
         <div className="text-xs text-tertiary flex items-center justify-between">
           <span>{new Date(notification.timestamp).toLocaleTimeString()}</span>
           {notification.duration > 0 && (
-            <span className="text-xs opacity-60">
-              {Math.ceil(notification.duration / 1000)}s
-            </span>
+            <span className="text-xs opacity-60">{Math.ceil(notification.duration / 1000)}s</span>
           )}
         </div>
       </div>

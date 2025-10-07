@@ -67,6 +67,7 @@ export interface AchievementUnlockedPayload {
     title: string;
     description: string;
     category: string;
+    iconUrl?: string | null;
   };
   progress: {
     previous: number;

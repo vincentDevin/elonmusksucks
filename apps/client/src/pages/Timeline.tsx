@@ -10,12 +10,7 @@ import {
   CreatePost,
 } from '../components/timeline/core';
 import { TrendingHashtags } from '../components/posts/feeds';
-import {
-  TrendingContent,
-  ActivitySummary,
-  NotificationWidget,
-  BookmarkSystem,
-} from '../components/timeline/widgets';
+import { TrendingContent, ActivitySummary, BookmarkSystem } from '../components/timeline/widgets';
 import { convertArticleToFeedItem, type UnifiedFeedItem } from '../utils/feedAdapter';
 import { useAuth } from '../contexts/AuthContext';
 import { timelineApi } from '../api/timeline';
@@ -147,11 +142,8 @@ export default function Timeline() {
                   </p>
                 </div>
                 {user && (
-                  <div className="flex items-center space-x-3">
-                    <NotificationWidget variant="bell" />
-                    <div className="text-sm text-content/60">
-                      Welcome back, <span className="font-medium text-primary">{user.name}</span>!
-                    </div>
+                  <div className="text-sm text-content/60">
+                    Welcome back, <span className="font-medium text-primary">{user.name}</span>!
                   </div>
                 )}
               </div>

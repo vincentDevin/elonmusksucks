@@ -26,6 +26,66 @@ export class TimelineService {
     return this.repository.getApprovedArticles(params);
   }
 
+  async getArticlesWithReactions(
+    articleIds: number[],
+    viewerId?: number,
+  ): Promise<
+    Map<
+      number,
+      {
+        counts: Record<string, number>;
+        userReaction?: string;
+        totalCount: number;
+      }
+    >
+  > {
+    if (articleIds.length === 0) {
+      return new Map();
+    }
+
+    // Fetch all reactions for these articles
+    const reactions = await this.reactionRepository.getArticleReactionsBulk(articleIds);
+
+    // Group by article ID and count by type
+    const reactionMap = new Map<
+      number,
+      {
+        counts: Record<string, number>;
+        userReaction?: string;
+        totalCount: number;
+      }
+    >();
+
+    // Initialize all articles with empty counts
+    articleIds.forEach((id) => {
+      reactionMap.set(id, {
+        counts: {},
+        userReaction: undefined,
+        totalCount: 0,
+      });
+    });
+
+    // Process reactions
+    reactions.forEach((reaction: any) => {
+      const articleId = reaction.articleId;
+      if (!articleId) return;
+
+      const data = reactionMap.get(articleId);
+      if (!data) return;
+
+      // Increment count for this reaction type
+      data.counts[reaction.type] = (data.counts[reaction.type] || 0) + 1;
+      data.totalCount += 1;
+
+      // Check if this is the viewer's reaction
+      if (viewerId && reaction.userId === viewerId) {
+        data.userReaction = reaction.type;
+      }
+    });
+
+    return reactionMap;
+  }
+
   async getPublicPosts(params: {
     cursor?: number;
     limit: number;

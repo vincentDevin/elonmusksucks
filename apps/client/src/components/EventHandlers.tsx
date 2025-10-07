@@ -1,247 +1,443 @@
 // apps/client/src/components/EventHandlers.tsx
 // -----------------------------------------------------------------------------
-// Central event handler component that integrates all event handler hooks
-// Provides comprehensive event coverage for all 73+ Redis channels
+// Central event handler component - Single source of truth for all event subscriptions
+// Routes notification-worthy events to the notification system
+// State management is handled by dedicated contexts (Chat, Predictions, Achievements, etc.)
 // -----------------------------------------------------------------------------
 
-import { useEffect, useState } from 'react';
+import { useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useSocketEvent } from '../contexts/EventBusCoreContext';
+import { useNotificationSystem } from './notifications/NotificationContext';
+import { REDIS_CHANNELS, type AchievementUnlockedPayload } from '@ems/types';
 import { EventHandlerErrorBoundary } from './ErrorBoundary';
 
-// Import notification/alert-only event handler hooks (Smart Hybrid approach)
-// Note: Chat, Prediction, Achievement, Activity, Parlay use dedicated contexts for state management
-import { useBettingEvents } from '../hooks/useBettingEvents';
-import { usePongEvents } from '../hooks/usePongEvents';
-import { useFinancialEvents } from '../hooks/useFinancialEvents';
-import { useSocialEvents } from '../hooks/useSocialEvents';
-import { useLeaderboardEvents } from '../hooks/useLeaderboardEvents';
-import { useTimelineEvents } from '../hooks/useTimelineEvents';
+// ============================================================================
+// Type Definitions for Event Payloads
+// ============================================================================
 
-// EMERGENCY FIX: Updated to prevent duplicate hook calls
-interface NotificationDisplayData {
-  bettingEvents: any;
-  pongEvents: any;
-  financialEvents: any;
-  socialEvents: any;
-  leaderboardEvents: any;
-  timelineEvents: any;
+interface BetEventPayload {
+  userId: number;
+  payload: {
+    betId: string;
+    predictionId: string;
+    amount: number;
+    payout: number;
+    won: boolean;
+    category: string | null;
+    odds: number;
+    wasAllIn: boolean;
+  };
 }
 
-interface NotificationDisplayProps {
-  show: boolean;
-  eventData: NotificationDisplayData;
+interface ParlayEventPayload {
+  userId: number;
+  payload: {
+    parlayId: string;
+    legCount: number;
+    legsWon: number;
+    amount: number;
+    payout: number;
+    won: boolean;
+    odds: number;
+  };
 }
 
-function NotificationDisplay({ show, eventData }: NotificationDisplayProps) {
-  // EMERGENCY FIX: Receive data as props instead of calling hooks again
-  const {
-    bettingEvents,
-    pongEvents,
-    financialEvents,
-    socialEvents,
-    leaderboardEvents,
-    timelineEvents,
-  } = eventData;
-
-  if (!show) return null;
-
-  // Calculate total notification alerts active
-  const totalAlerts = [
-    ...bettingEvents.bettingAlerts,
-    ...pongEvents.pongAlerts,
-    ...financialEvents.financialAlerts,
-    ...socialEvents.socialAlerts,
-    ...leaderboardEvents.leaderboardAlerts,
-    ...timelineEvents.timelineAlerts,
-  ];
-
-  return (
-    <div className="fixed top-4 right-4 z-50 max-w-sm">
-      <div className="bg-surface border border-border rounded-lg shadow-lg p-4 mb-4">
-        <h3 className="text-sm font-semibold text-content mb-2">Event System Status</h3>
-        <div className="text-xs text-tertiary space-y-1">
-          <div>Total Active Alerts: {totalAlerts.length}</div>
-          <div>Betting: {bettingEvents.bettingAlerts.length}</div>
-          <div>Pong: {pongEvents.pongAlerts.length}</div>
-          <div>Financial: {financialEvents.financialAlerts.length}</div>
-          <div>Social: {socialEvents.socialAlerts.length}</div>
-          <div>Leaderboard: {leaderboardEvents.leaderboardAlerts.length}</div>
-          <div>Timeline: {timelineEvents.timelineAlerts.length}</div>
-          <div className="mt-2 pt-2 border-t border-border">
-            <div className="text-xs text-tertiary">State managed by contexts:</div>
-            <div className="text-xs text-muted">
-              Chat, Predictions, Achievements, Activity, Parlays
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Display recent alerts */}
-      {totalAlerts.slice(0, 3).map((alert) => (
-        <div
-          key={alert.id}
-          className={`bg-surface border rounded-lg shadow-lg p-3 mb-2 transition-all duration-300 ${
-            alert.severity === 'success'
-              ? 'border-success'
-              : alert.severity === 'error'
-                ? 'border-error'
-                : alert.severity === 'warning'
-                  ? 'border-warning'
-                  : 'border-info'
-          }`}
-        >
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <div className="text-sm font-medium text-content flex items-center gap-2">
-                <span>{alert.icon}</span>
-                {alert.title}
-              </div>
-              <div className="text-xs text-tertiary mt-1">{alert.description}</div>
-            </div>
-            <button
-              onClick={() => {
-                // Clear alert based on type (Smart Hybrid approach)
-                if (
-                  'clearAlert' in bettingEvents &&
-                  bettingEvents.bettingAlerts.find((a) => a.id === alert.id)
-                ) {
-                  bettingEvents.clearAlert(alert.id);
-                } else if (
-                  'clearAlert' in pongEvents &&
-                  pongEvents.pongAlerts.find((a) => a.id === alert.id)
-                ) {
-                  pongEvents.clearAlert(alert.id);
-                } else if (
-                  'clearAlert' in financialEvents &&
-                  financialEvents.financialAlerts.find((a) => a.id === alert.id)
-                ) {
-                  financialEvents.clearAlert(alert.id);
-                } else if (
-                  'clearAlert' in socialEvents &&
-                  socialEvents.socialAlerts.find((a) => a.id === alert.id)
-                ) {
-                  socialEvents.clearAlert(alert.id);
-                } else if (
-                  'clearAlert' in leaderboardEvents &&
-                  leaderboardEvents.leaderboardAlerts.find((a) => a.id === alert.id)
-                ) {
-                  leaderboardEvents.clearAlert(alert.id);
-                } else if (
-                  'clearAlert' in timelineEvents &&
-                  timelineEvents.timelineAlerts.find((a) => a.id === alert.id)
-                ) {
-                  timelineEvents.clearAlert(alert.id);
-                }
-              }}
-              className="text-tertiary hover:text-content text-xs"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
+interface BalanceMilestoneEvent {
+  userId: number;
+  payload: {
+    milestone: string;
+    milestoneDisplay: string;
+    threshold: string;
+    newBalance: string;
+    oldBalance: string;
+    direction: string;
+  };
 }
 
-// Main event handlers component (Smart Hybrid approach)
+interface BankruptcyEvent {
+  userId: number;
+  payload: {
+    lostAmount: string;
+    timestamp: string;
+  };
+}
+
+interface RagsToRichesEvent {
+  userId: number;
+  payload: {
+    startBalance: string;
+    endBalance: string;
+    multiplier: number;
+  };
+}
+
+interface MassiveLossEvent {
+  userId: number;
+  payload: {
+    lossAmount: string;
+    balanceBefore: string;
+    balanceAfter: string;
+    timestamp: string;
+  };
+}
+
+interface MassiveGainEvent {
+  userId: number;
+  payload: {
+    gainAmount: string;
+    balanceBefore: string;
+    balanceAfter: string;
+    timestamp: string;
+  };
+}
+
+interface ComebackEvent {
+  userId: number;
+  payload: {
+    recoveryAmount: string;
+    lowPoint: string;
+    currentBalance: string;
+    timestamp: string;
+  };
+}
+
+interface PongEloUpdatePayload {
+  userId: number;
+  oldRating: number;
+  newRating: number;
+  change: number;
+  tier: string;
+  matchId: string;
+}
+
+interface PongTierChangePayload {
+  userId: number;
+  oldTier: string;
+  newTier: string;
+  eloRating: number;
+  isPromotion: boolean;
+}
+
+interface PongAchievementPayload {
+  userId: number;
+  achievementId: string;
+  title: string;
+  description: string;
+  type: 'pong_streak' | 'pong_skill' | 'pong_earnings' | 'pong_milestone';
+}
+
+// ============================================================================
+// Main Event Handlers Component
+// ============================================================================
+
 function EventHandlersCore() {
   const { user } = useAuth();
-  const [showNotifications, setShowNotifications] = useState(false);
+  const { addNotification } = useNotificationSystem();
 
-  // Initialize notification/alert-only event handler hooks with error boundaries
-  // State management handled by dedicated contexts: Chat, Prediction, Achievement, Activity, Parlay
-  const bettingEvents = useBettingEvents();
-  const pongEvents = usePongEvents();
-  const financialEvents = useFinancialEvents();
-  const socialEvents = useSocialEvents();
-  const leaderboardEvents = useLeaderboardEvents();
-  const timelineEvents = useTimelineEvents();
+  // Helper to format currency
+  const formatMB = useCallback((amountStr: string | number) => {
+    const num = typeof amountStr === 'string' ? Number(amountStr) : amountStr;
+    return num.toLocaleString('en-US', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    });
+  }, []);
 
-  // Debug logging to verify notification hooks are working
-  useEffect(() => {
-    if (user) {
-      console.log('[EventHandlers] Smart Hybrid event system initialized for user:', user.id);
-      console.log('[EventHandlers] Active notification systems:', {
-        betting: !!bettingEvents,
-        pong: !!pongEvents,
-        financial: !!financialEvents,
-        social: !!socialEvents,
-        leaderboard: !!leaderboardEvents,
-        timeline: !!timelineEvents,
-      });
-      console.log(
-        '[EventHandlers] State managed by contexts: Chat, Predictions, Achievements, Activity, Parlays',
+  // ============================================================================
+  // Achievement Event Handlers
+  // ============================================================================
+
+  const handleAchievementUnlocked = useCallback(
+    (payload: AchievementUnlockedPayload) => {
+      if (!user || payload.userId !== user.id) return;
+
+      addNotification(
+        'achievement',
+        'Achievement Unlocked! 🎉',
+        `${payload.achievement.title}: ${payload.achievement.description}`,
+        {
+          priority: 'high',
+          duration: 12000,
+          data: payload,
+        },
       );
-    }
-  }, [
-    user,
-    bettingEvents,
-    pongEvents,
-    financialEvents,
-    socialEvents,
-    leaderboardEvents,
-    timelineEvents,
-  ]);
-
-  // Enable debug notifications with keyboard shortcut
-  useEffect(() => {
-    const handleKeyPress = (event: KeyboardEvent) => {
-      if (event.ctrlKey && event.shiftKey && event.key === 'E') {
-        setShowNotifications((prev) => !prev);
-        console.log('[EventHandlers] Debug notifications toggled:', !showNotifications);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyPress);
-    return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [showNotifications]);
-
-  // Only render if user is authenticated
-  if (!user) {
-    return null;
-  }
-
-  return (
-    <>
-      {/* Hidden component that just initializes all event handlers */}
-      <div className="hidden" data-component="event-handlers">
-        Event handlers active for {user.name || `User ${user.id}`}
-      </div>
-
-      {/* Debug notification display (Ctrl+Shift+E to toggle) */}
-      <NotificationDisplay
-        show={showNotifications}
-        eventData={{
-          bettingEvents,
-          pongEvents,
-          financialEvents,
-          socialEvents,
-          leaderboardEvents,
-          timelineEvents,
-        }}
-      />
-    </>
+    },
+    [user, addNotification],
   );
+
+  // ============================================================================
+  // Betting Event Handlers
+  // ============================================================================
+
+  const handleBetWon = useCallback(
+    (data: BetEventPayload) => {
+      if (!user || data.userId !== user.id) return;
+
+      const profit = data.payload.payout - data.payload.amount;
+      const profitAmount = formatMB(profit);
+
+      addNotification(
+        'bet-won',
+        'Bet Won! 🎉',
+        `+${profitAmount} MB profit (${data.payload.odds.toFixed(2)}x odds)`,
+        {
+          priority: 'high',
+          duration: 10000,
+          data: data.payload,
+        },
+      );
+    },
+    [user, addNotification, formatMB],
+  );
+
+  const handleBetLost = useCallback(
+    (data: BetEventPayload) => {
+      if (!user || data.userId !== user.id) return;
+
+      const lossAmount = formatMB(data.payload.amount);
+
+      addNotification('bet-lost', 'Bet Lost', `-${lossAmount} MB`, {
+        priority: 'normal',
+        duration: 8000,
+        data: data.payload,
+      });
+    },
+    [user, addNotification, formatMB],
+  );
+
+  const handleParlayWon = useCallback(
+    (data: ParlayEventPayload) => {
+      if (!user || data.userId !== user.id) return;
+
+      const profit = data.payload.payout - data.payload.amount;
+      const profitAmount = formatMB(profit);
+
+      addNotification(
+        'parlay-won',
+        `${data.payload.legCount}-Leg Parlay Won! 🏆`,
+        `+${profitAmount} MB (${data.payload.odds.toFixed(2)}x odds)`,
+        {
+          priority: 'high',
+          duration: 12000,
+          data: data.payload,
+        },
+      );
+    },
+    [user, addNotification, formatMB],
+  );
+
+  const handleParlayLost = useCallback(
+    (data: ParlayEventPayload) => {
+      if (!user || data.userId !== user.id) return;
+
+      const lossAmount = formatMB(data.payload.amount);
+      const failedLegs = data.payload.legCount - data.payload.legsWon;
+
+      addNotification(
+        'parlay-lost',
+        'Parlay Lost',
+        `-${lossAmount} MB (${failedLegs}/${data.payload.legCount} legs failed)`,
+        {
+          priority: 'normal',
+          duration: 8000,
+          data: data.payload,
+        },
+      );
+    },
+    [user, addNotification, formatMB],
+  );
+
+  // ============================================================================
+  // Financial Event Handlers
+  // ============================================================================
+
+  const handleBalanceMilestone = useCallback(
+    (data: BalanceMilestoneEvent) => {
+      if (!user || data.userId !== user.id) return;
+
+      addNotification(
+        'balance-milestone',
+        'Balance Milestone! 💰',
+        `You've reached ${data.payload.milestoneDisplay}!`,
+        {
+          priority: 'high',
+          duration: 10000,
+          data: data.payload,
+        },
+      );
+    },
+    [user, addNotification],
+  );
+
+  const handleBankruptcy = useCallback(
+    (data: BankruptcyEvent) => {
+      if (!user || data.userId !== user.id) return;
+
+      addNotification(
+        'bankruptcy',
+        'Bankruptcy Detected 📉',
+        'You ran out of MuskBucks! Time to start fresh.',
+        {
+          priority: 'high',
+          duration: 12000,
+          data: data.payload,
+        },
+      );
+    },
+    [user, addNotification],
+  );
+
+  const handleRagsToRiches = useCallback(
+    (data: RagsToRichesEvent) => {
+      if (!user || data.userId !== user.id) return;
+
+      addNotification(
+        'rags-to-riches',
+        'Rags to Riches! 🚀',
+        `From ${formatMB(data.payload.startBalance)} to ${formatMB(data.payload.endBalance)} MB!`,
+        {
+          priority: 'high',
+          duration: 15000,
+          data: data.payload,
+        },
+      );
+    },
+    [user, addNotification, formatMB],
+  );
+
+  const handleMassiveLoss = useCallback(
+    (data: MassiveLossEvent) => {
+      if (!user || data.userId !== user.id) return;
+
+      addNotification(
+        'massive-loss',
+        'Massive Loss 📉',
+        `Lost ${formatMB(data.payload.lossAmount)} MuskBucks in a single event`,
+        {
+          priority: 'normal',
+          duration: 10000,
+          data: data.payload,
+        },
+      );
+    },
+    [user, addNotification, formatMB],
+  );
+
+  const handleMassiveGain = useCallback(
+    (data: MassiveGainEvent) => {
+      if (!user || data.userId !== user.id) return;
+
+      addNotification(
+        'massive-gain',
+        'Massive Win! 💸',
+        `Gained ${formatMB(data.payload.gainAmount)} MuskBucks in a single event!`,
+        {
+          priority: 'high',
+          duration: 12000,
+          data: data.payload,
+        },
+      );
+    },
+    [user, addNotification, formatMB],
+  );
+
+  const handleComeback = useCallback(
+    (data: ComebackEvent) => {
+      if (!user || data.userId !== user.id) return;
+
+      addNotification(
+        'comeback',
+        'Epic Comeback! 🔥',
+        `Recovered ${formatMB(data.payload.recoveryAmount)} MB from rock bottom!`,
+        {
+          priority: 'high',
+          duration: 12000,
+          data: data.payload,
+        },
+      );
+    },
+    [user, addNotification, formatMB],
+  );
+
+  // ============================================================================
+  // Pong Event Handlers
+  // ============================================================================
+
+  const handlePongEloUpdate = useCallback(
+    (payload: PongEloUpdatePayload) => {
+      if (!user || payload.userId !== user.id) return;
+
+      addNotification('pong-elo', 'Elo Update', '', {
+        priority: payload.change > 0 ? 'high' : 'normal',
+        duration: 8000,
+        data: payload,
+      });
+    },
+    [user, addNotification],
+  );
+
+  const handlePongTierChange = useCallback(
+    (payload: PongTierChangePayload) => {
+      if (!user || payload.userId !== user.id) return;
+
+      addNotification('pong-tier', 'Tier Promotion!', '', {
+        priority: 'high',
+        duration: 12000,
+        data: payload,
+      });
+    },
+    [user, addNotification],
+  );
+
+  const handlePongAchievement = useCallback(
+    (payload: PongAchievementPayload) => {
+      if (!user || payload.userId !== user.id) return;
+
+      addNotification('pong-achievement', 'Pong Achievement!', '', {
+        priority: 'high',
+        duration: 12000,
+        data: payload,
+      });
+    },
+    [user, addNotification],
+  );
+
+  // ============================================================================
+  // Event Subscriptions (Single source of truth via EventBusCore)
+  // ============================================================================
+
+  // Achievement events
+  useSocketEvent(REDIS_CHANNELS.ACHIEVEMENT_UNLOCKED, handleAchievementUnlocked);
+
+  // Betting events
+  useSocketEvent(REDIS_CHANNELS.BET_WON, handleBetWon);
+  useSocketEvent(REDIS_CHANNELS.BET_LOST, handleBetLost);
+  useSocketEvent(REDIS_CHANNELS.PARLAY_WON, handleParlayWon);
+  useSocketEvent(REDIS_CHANNELS.PARLAY_LOST, handleParlayLost);
+
+  // Financial events
+  useSocketEvent(REDIS_CHANNELS.BALANCE_MILESTONE_REACHED, handleBalanceMilestone);
+  useSocketEvent(REDIS_CHANNELS.BANKRUPTCY_DETECTED, handleBankruptcy);
+  useSocketEvent(REDIS_CHANNELS.RAGS_TO_RICHES, handleRagsToRiches);
+  useSocketEvent(REDIS_CHANNELS.MASSIVE_LOSS_DETECTED, handleMassiveLoss);
+  useSocketEvent(REDIS_CHANNELS.MASSIVE_GAIN_DETECTED, handleMassiveGain);
+  useSocketEvent(REDIS_CHANNELS.COMEBACK_DETECTED, handleComeback);
+
+  // Pong events
+  useSocketEvent(REDIS_CHANNELS.PONG_ELO_UPDATE, handlePongEloUpdate);
+  useSocketEvent(REDIS_CHANNELS.PONG_TIER_CHANGE, handlePongTierChange);
+  useSocketEvent(REDIS_CHANNELS.PONG_ACHIEVEMENT_UNLOCKED, handlePongAchievement);
+
+  // No UI needed - this is a pure event orchestrator
+  return null;
 }
 
-// Export wrapped with comprehensive error boundaries
+// Export wrapped with error boundary
 export default function EventHandlers() {
   return (
     <EventHandlerErrorBoundary eventType="EventHandlers">
-      <EventHandlerErrorBoundary eventType="BettingEvents">
-        <EventHandlerErrorBoundary eventType="PongEvents">
-          <EventHandlerErrorBoundary eventType="FinancialEvents">
-            <EventHandlerErrorBoundary eventType="SocialEvents">
-              <EventHandlerErrorBoundary eventType="LeaderboardEvents">
-                <EventHandlerErrorBoundary eventType="TimelineEvents">
-                  <EventHandlersCore />
-                </EventHandlerErrorBoundary>
-              </EventHandlerErrorBoundary>
-            </EventHandlerErrorBoundary>
-          </EventHandlerErrorBoundary>
-        </EventHandlerErrorBoundary>
-      </EventHandlerErrorBoundary>
+      <EventHandlersCore />
     </EventHandlerErrorBoundary>
   );
 }

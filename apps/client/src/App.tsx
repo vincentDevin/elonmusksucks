@@ -11,7 +11,7 @@ import { ChatProvider } from './contexts/ChatContext';
 import { ActivityProvider } from './contexts/ActivityContext';
 import { AchievementProvider } from './contexts/AchievementContext';
 import { ReactionProvider } from './contexts/ReactionContext';
-import { NotificationProvider, NotificationContainer, NotificationEventHandlers } from './components/notifications';
+import { NotificationProvider, NotificationContainer } from './components/notifications';
 import AppRoutes from './routes/AppRoutes';
 import { useAuth } from './contexts/AuthContext';
 import EventFlowTest from './components/debug/EventFlowTest';
@@ -47,12 +47,10 @@ function AppContent() {
                       <NotificationProvider>
                         {/* Hydration marker to enable safe event processing */}
                         <HydrationMarker />
-                        {/* Central event handlers for all 73+ Redis channels */}
+                        {/* Central event handlers - subscribes to all events and routes notifications */}
                         <EventHandlers />
-                        {/* Unified notification event handlers */}
-                        <NotificationEventHandlers />
                         <AppRoutes />
-                        {/* Unified notification container (replaces PongEloNotification & AchievementCelebrationContainer) */}
+                        {/* Unified notification container */}
                         <NotificationContainer />
                         {/* Development tools - only in development */}
                         {/*
