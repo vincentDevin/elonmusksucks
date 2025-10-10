@@ -1,7 +1,7 @@
 // apps/client/src/components/admin/BannedUsersWall.tsx
 import React, { useState, useEffect } from 'react';
-import { SOCKET_EVENTS } from '@ems/types';
-import { useSocket } from '../../../contexts/SocketContext';
+import { REDIS_CHANNELS } from '@ems/types';
+import { useEventBusCore } from '../../../contexts/EventBusCoreContext';
 import * as moderationApi from '../../../api/moderation';
 import type { UserBan } from '../../../api/moderation';
 
@@ -9,7 +9,7 @@ const BannedUsersWall: React.FC = () => {
   const [bans, setBans] = useState<UserBan[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const socket = useSocket();
+  const { subscribe, socket } = useEventBusCore();
 
   // Load banned users
   const loadBannedUsers = async () => {
@@ -95,24 +95,21 @@ const BannedUsersWall: React.FC = () => {
 
   // Listen for real-time updates
   useEffect(() => {
-    if (socket) {
-      const handleUserBan = () => {
-        loadBannedUsers(); // Reload the list
-      };
+    const handleUserBan = () => {
+      loadBannedUsers(); // Reload the list
+    };
 
-      const handleUserUnban = (data: { targetUserId: number }) => {
-        setBans((prev) => prev.filter((ban) => ban.userId !== data.targetUserId));
-      };
+    const handleUserUnban = (data: { targetUserId: number }) => {
+      setBans((prev) => prev.filter((ban) => ban.userId !== data.targetUserId));
+    };
 
-      socket.on(SOCKET_EVENTS.ADMIN_MODERATION_USER_BAN, handleUserBan);
-      socket.on(SOCKET_EVENTS.ADMIN_MODERATION_USER_UNBAN, handleUserUnban);
+    const unsubscribers = [
+      subscribe(REDIS_CHANNELS.MODERATION_USER_BAN, handleUserBan),
+      subscribe(REDIS_CHANNELS.MODERATION_USER_UNBAN, handleUserUnban),
+    ];
 
-      return () => {
-        socket.off(SOCKET_EVENTS.ADMIN_MODERATION_USER_BAN, handleUserBan);
-        socket.off(SOCKET_EVENTS.ADMIN_MODERATION_USER_UNBAN, handleUserUnban);
-      };
-    }
-  }, [socket]);
+    return () => unsubscribers.forEach((unsub) => unsub());
+  }, [subscribe]);
 
   // Load banned users on mount
   useEffect(() => {

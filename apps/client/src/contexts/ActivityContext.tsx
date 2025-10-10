@@ -1,6 +1,14 @@
 // apps/client/src/contexts/ActivityContext.tsx
 // Migrated to use EventBus system for centralized event handling
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  startTransition,
+} from 'react';
 import { useEventBusCore, useSocketEvent } from './EventBusCoreContext';
 import { useVisibilityGuard } from '../lib/visibilityGuard';
 import { SOCKET_EVENTS } from '@ems/types';
@@ -161,16 +169,19 @@ export function ActivityProvider({ children }: { children: React.ReactNode }) {
       streak: activity.streak,
     };
 
-    setActivities((prev) => {
-      // Add new activity and remove duplicates, keeping only latest MAX_ACTIVITIES (FILO queue)
-      const newActivities = [unifiedActivity, ...prev.filter((a) => a.id !== unifiedActivity.id)];
-      const trimmedActivities = newActivities.slice(0, MAX_ACTIVITIES);
+    // Use startTransition for non-urgent activity feed updates (React 19 optimization)
+    startTransition(() => {
+      setActivities((prev) => {
+        // Add new activity and remove duplicates, keeping only latest MAX_ACTIVITIES (FILO queue)
+        const newActivities = [unifiedActivity, ...prev.filter((a) => a.id !== unifiedActivity.id)];
+        const trimmedActivities = newActivities.slice(0, MAX_ACTIVITIES);
 
-      // Update global cache and storage
-      globalActivities = trimmedActivities;
-      storeActivities(trimmedActivities);
+        // Update global cache and storage
+        globalActivities = trimmedActivities;
+        storeActivities(trimmedActivities);
 
-      return trimmedActivities;
+        return trimmedActivities;
+      });
     });
   }, []);
 
@@ -278,8 +289,11 @@ export function ActivityProvider({ children }: { children: React.ReactNode }) {
         globalHasInitialized = true;
         storeActivities(transformedActivities);
 
-        setActivities(transformedActivities);
-        setHasInitialized(true);
+        // Use startTransition for non-urgent activity feed updates (React 19 optimization)
+        startTransition(() => {
+          setActivities(transformedActivities);
+          setHasInitialized(true);
+        });
         updateLastFetch();
       } else {
         console.log(
@@ -380,13 +394,20 @@ export function ActivityProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  return (
-    <ActivityContext.Provider
-      value={{ activities, loading, error, isConnected, hasInitialized, refresh }}
-    >
-      {children}
-    </ActivityContext.Provider>
+  // Memoize context value to prevent unnecessary re-renders
+  const contextValue = useMemo(
+    () => ({
+      activities,
+      loading,
+      error,
+      isConnected,
+      hasInitialized,
+      refresh,
+    }),
+    [activities, loading, error, isConnected, hasInitialized, refresh],
   );
+
+  return <ActivityContext.Provider value={contextValue}>{children}</ActivityContext.Provider>;
 }
 
 export function useActivity() {

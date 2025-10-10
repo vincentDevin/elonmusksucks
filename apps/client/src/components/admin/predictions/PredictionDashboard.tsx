@@ -6,7 +6,7 @@ import {
   getPredictionDetails,
   resolvePrediction,
 } from '../../../api/admin';
-import { useSocket } from '../../../contexts/SocketContext';
+import { useEventBusCore } from '../../../contexts/EventBusCoreContext';
 import type {
   PredictionSearchParams,
   DetailedPrediction,
@@ -29,7 +29,7 @@ interface PredictionDashboardProps {
 }
 
 const PredictionDashboard: React.FC<PredictionDashboardProps> = ({ className = '' }) => {
-  const socket = useSocket();
+  const { subscribe, socket } = useEventBusCore();
   const hasJoinedRoom = useRef(false);
 
   // Core state
@@ -167,7 +167,7 @@ const PredictionDashboard: React.FC<PredictionDashboardProps> = ({ className = '
 
   // Real-time event listeners (separate from room management)
   useEffect(() => {
-    if (!socket || !realtimeEnabled) return;
+    if (!realtimeEnabled) return;
 
     const handlePredictionUpdate = () => {
       setLastUpdateTime(new Date().toLocaleTimeString());
@@ -180,25 +180,18 @@ const PredictionDashboard: React.FC<PredictionDashboardProps> = ({ className = '
     };
 
     // Register event listeners for prediction-related events
-    socket.on(REDIS_CHANNELS.PREDICTION_CREATED, handlePredictionUpdate);
-    socket.on(REDIS_CHANNELS.PREDICTION_APPROVED, handlePredictionUpdate);
-    socket.on(REDIS_CHANNELS.PREDICTION_REJECTED, handlePredictionUpdate);
-    socket.on(REDIS_CHANNELS.PREDICTION_RESOLVED, handlePredictionUpdate);
-    socket.on(REDIS_CHANNELS.PREDICTION_STATUS_CHANGE, handlePredictionUpdate);
-    socket.on(REDIS_CHANNELS.BET_PLACED, handlePredictionUpdate); // May affect prediction analytics
-    socket.on(REDIS_CHANNELS.PARLAY_PLACED, handlePredictionUpdate); // May affect prediction analytics
+    const unsubscribers = [
+      subscribe(REDIS_CHANNELS.PREDICTION_CREATED, handlePredictionUpdate),
+      subscribe(REDIS_CHANNELS.PREDICTION_APPROVED, handlePredictionUpdate),
+      subscribe(REDIS_CHANNELS.PREDICTION_REJECTED, handlePredictionUpdate),
+      subscribe(REDIS_CHANNELS.PREDICTION_RESOLVED, handlePredictionUpdate),
+      subscribe(REDIS_CHANNELS.PREDICTION_STATUS_CHANGE, handlePredictionUpdate),
+      subscribe(REDIS_CHANNELS.BET_PLACED, handlePredictionUpdate),
+      subscribe(REDIS_CHANNELS.PARLAY_PLACED, handlePredictionUpdate),
+    ];
 
-    // Cleanup function
-    return () => {
-      socket.off(REDIS_CHANNELS.PREDICTION_CREATED, handlePredictionUpdate);
-      socket.off(REDIS_CHANNELS.PREDICTION_APPROVED, handlePredictionUpdate);
-      socket.off(REDIS_CHANNELS.PREDICTION_REJECTED, handlePredictionUpdate);
-      socket.off(REDIS_CHANNELS.PREDICTION_RESOLVED, handlePredictionUpdate);
-      socket.off(REDIS_CHANNELS.PREDICTION_STATUS_CHANGE, handlePredictionUpdate);
-      socket.off(REDIS_CHANNELS.BET_PLACED, handlePredictionUpdate);
-      socket.off(REDIS_CHANNELS.PARLAY_PLACED, handlePredictionUpdate);
-    };
-  }, [socket, realtimeEnabled, paginationInfo.currentPage, fetchPredictions]);
+    return () => unsubscribers.forEach((unsub) => unsub());
+  }, [subscribe, realtimeEnabled, paginationInfo.currentPage, fetchPredictions]);
 
   // Selection handlers
   const handlePredictionSelect = useCallback((predictionId: number, selected: boolean) => {

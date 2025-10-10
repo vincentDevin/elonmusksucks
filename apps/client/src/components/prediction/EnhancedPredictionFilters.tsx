@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useDeferredValue } from 'react';
 import {
   MagnifyingGlassIcon as Search,
   FunnelIcon as Filter,
@@ -25,7 +25,7 @@ interface EnhancedPredictionFiltersProps {
   isMobile?: boolean;
 }
 
-export default function EnhancedPredictionFilters({
+function EnhancedPredictionFilters({
   filters,
   availableCategories,
   onFiltersChange,
@@ -41,6 +41,11 @@ export default function EnhancedPredictionFilters({
   const [searchFocused, setSearchFocused] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Defer expensive filter rendering for better performance
+  const deferredSearch = useDeferredValue(filters.search);
+  const deferredCategories = useDeferredValue(availableCategories);
+  const isSearchPending = deferredSearch !== filters.search;
 
   // Load recent searches
   useEffect(() => {
@@ -254,7 +259,7 @@ export default function EnhancedPredictionFilters({
 
             {activeTab === 'categories' && (
               <div className="space-y-2">
-                {availableCategories.map((category) => (
+                {deferredCategories.map((category) => (
                   <button
                     key={category}
                     onClick={() => {
@@ -380,7 +385,9 @@ export default function EnhancedPredictionFilters({
                 handleSearchSubmit(filters.search);
               }
             }}
-            className="w-full pl-10 pr-10 py-2 bg-muted border border-transparent rounded-lg text-content placeholder-tertiary focus:outline-none focus:border-primary transition-colors"
+            className={`w-full pl-10 pr-10 py-2 bg-muted border rounded-lg text-content placeholder-tertiary focus:outline-none focus:border-primary transition-colors ${
+              isSearchPending ? 'border-primary/50' : 'border-transparent'
+            }`}
           />
           {filters.search && (
             <button
@@ -453,7 +460,7 @@ export default function EnhancedPredictionFilters({
             <div>
               <h4 className="text-xs font-medium text-tertiary mb-2">Categories</h4>
               <div className="grid grid-cols-1 gap-1.5">
-                {availableCategories.map((category) => (
+                {deferredCategories.map((category) => (
                   <button
                     key={category}
                     onClick={() => {
@@ -567,3 +574,36 @@ export default function EnhancedPredictionFilters({
     </div>
   );
 }
+
+function arePropsEqual(
+  prev: EnhancedPredictionFiltersProps,
+  next: EnhancedPredictionFiltersProps,
+): boolean {
+  // Check filters object equality (deep comparison)
+  const filtersEqual =
+    prev.filters.search === next.filters.search &&
+    prev.filters.timeRemaining === next.filters.timeRemaining &&
+    prev.filters.activity === next.filters.activity &&
+    prev.filters.status === next.filters.status &&
+    prev.filters.sortBy === next.filters.sortBy &&
+    prev.filters.categories.length === next.filters.categories.length &&
+    prev.filters.categories.every((cat) => next.filters.categories.includes(cat)) &&
+    prev.filters.difficulties.length === next.filters.difficulties.length &&
+    prev.filters.difficulties.every((diff) => next.filters.difficulties.includes(diff));
+
+  if (!filtersEqual) return false;
+
+  // Check other props
+  if (prev.totalResults !== next.totalResults) return false;
+  if (prev.isMobile !== next.isMobile) return false;
+  if (prev.className !== next.className) return false;
+
+  // Check availableCategories array
+  if (prev.availableCategories.length !== next.availableCategories.length) return false;
+  if (!prev.availableCategories.every((cat) => next.availableCategories.includes(cat)))
+    return false;
+
+  return true;
+}
+
+export default React.memo(EnhancedPredictionFilters, arePropsEqual);

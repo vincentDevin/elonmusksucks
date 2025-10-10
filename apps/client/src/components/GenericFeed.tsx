@@ -5,7 +5,7 @@
 // Supports infinite scroll, tabs, filtering, real-time updates, and loading states
 // -----------------------------------------------------------------------------
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { ReactNode } from 'react';
 
 export interface FeedItem {
@@ -90,7 +90,7 @@ interface GenericFeedProps<T extends FeedItem> {
   spacing?: 'compact' | 'normal' | 'loose';
 }
 
-export default function GenericFeed<T extends FeedItem>({
+function GenericFeedComponent<T extends FeedItem>({
   fetchItems,
   renderItem,
   className = '',
@@ -444,6 +444,42 @@ export default function GenericFeed<T extends FeedItem>({
     </div>
   );
 }
+
+// Custom comparison function to prevent unnecessary re-renders
+function arePropsEqual<T extends FeedItem>(
+  prevProps: GenericFeedProps<T>,
+  nextProps: GenericFeedProps<T>,
+): boolean {
+  // Check primitive props
+  if (prevProps.className !== nextProps.className) return false;
+  if (prevProps.itemsPerPage !== nextProps.itemsPerPage) return false;
+  if (prevProps.enableInfiniteScroll !== nextProps.enableInfiniteScroll) return false;
+  if (prevProps.initialTab !== nextProps.initialTab) return false;
+  if (prevProps.enableRealtimeUpdates !== nextProps.enableRealtimeUpdates) return false;
+  if (prevProps.enableSearch !== nextProps.enableSearch) return false;
+  if (prevProps.searchPlaceholder !== nextProps.searchPlaceholder) return false;
+  if (prevProps.variant !== nextProps.variant) return false;
+  if (prevProps.spacing !== nextProps.spacing) return false;
+
+  // Check tabs array (shallow comparison)
+  if (prevProps.tabs !== nextProps.tabs) {
+    if (!prevProps.tabs || !nextProps.tabs) return false;
+    if (prevProps.tabs.length !== nextProps.tabs.length) return false;
+  }
+
+  // Check filters array (shallow comparison)
+  if (prevProps.filters !== nextProps.filters) {
+    if (!prevProps.filters || !nextProps.filters) return false;
+    if (prevProps.filters.length !== nextProps.filters.length) return false;
+  }
+
+  // Function props are typically stable, so we skip them
+  return true;
+}
+
+const GenericFeed = React.memo(GenericFeedComponent, arePropsEqual) as typeof GenericFeedComponent;
+
+export default GenericFeed;
 
 // Convenience hooks for common feed patterns
 export function useGenericFeed<T extends FeedItem>(

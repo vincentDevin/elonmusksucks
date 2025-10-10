@@ -29,6 +29,7 @@ interface PongOverviewData {
 
 function ProfilePongStatsComponent({ userId, isOwn, userName }: ProfilePongStatsProps) {
   const [activeTab, setActiveTab] = useState<PongTab>('overview');
+  const [visitedTabs, setVisitedTabs] = useState<Set<PongTab>>(new Set(['overview']));
   const [overviewData, setOverviewData] = useState<PongOverviewData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -216,7 +217,10 @@ function ProfilePongStatsComponent({ userId, isOwn, userName }: ProfilePongStats
         {tabs.map(({ key, label, icon: Icon, description }) => (
           <button
             key={key}
-            onClick={() => setActiveTab(key)}
+            onClick={() => {
+              setActiveTab(key);
+              setVisitedTabs((prev) => new Set(prev).add(key));
+            }}
             title={description}
             className={`
               flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-all duration-200
@@ -233,35 +237,59 @@ function ProfilePongStatsComponent({ userId, isOwn, userName }: ProfilePongStats
         ))}
       </div>
 
-      {/* Tab Content - Keep all tabs mounted but hidden for instant switching + caching */}
-      <div className="min-h-[300px]">
-        {/* Overview Tab - Always mounted, hidden when not active */}
-        <div className={`grid md:grid-cols-2 gap-6 ${activeTab === 'overview' ? '' : 'hidden'}`}>
-          <PongEloCard
-            userId={userId}
-            eloRating={overviewData.eloRating}
-            tier={overviewData.tier}
-            peakElo={overviewData.peakElo}
-            lastEloChange={overviewData.lastEloChange}
-            showDetails={true}
-          />
-          <PongStatsCard userId={userId} compact={true} />
-        </div>
+      {/* Tab Content - Lazy mount on first visit, then keep mounted */}
+      <div className="min-h-[300px] relative">
+        {visitedTabs.has('overview') && (
+          <div
+            className={`grid md:grid-cols-2 gap-6 ${activeTab === 'overview' ? '' : 'absolute inset-0 invisible pointer-events-none opacity-0'}`}
+          >
+            <PongEloCard
+              userId={userId}
+              eloRating={overviewData.eloRating}
+              tier={overviewData.tier}
+              peakElo={overviewData.peakElo}
+              lastEloChange={overviewData.lastEloChange}
+              showDetails={true}
+            />
+            <PongStatsCard userId={userId} compact={true} />
+          </div>
+        )}
 
-        {/* Detailed Stats Tab - Always mounted, hidden when not active */}
-        <div className={activeTab === 'stats' ? '' : 'hidden'}>
-          <PongStatsCard userId={userId} compact={false} />
-        </div>
+        {visitedTabs.has('stats') && (
+          <div
+            className={
+              activeTab === 'stats'
+                ? ''
+                : 'absolute inset-0 invisible pointer-events-none opacity-0'
+            }
+          >
+            <PongStatsCard userId={userId} compact={false} />
+          </div>
+        )}
 
-        {/* Match History Tab - Always mounted, hidden when not active */}
-        <div className={activeTab === 'history' ? '' : 'hidden'}>
-          <PongMatchHistory userId={userId} />
-        </div>
+        {visitedTabs.has('history') && (
+          <div
+            className={
+              activeTab === 'history'
+                ? ''
+                : 'absolute inset-0 invisible pointer-events-none opacity-0'
+            }
+          >
+            <PongMatchHistory userId={userId} />
+          </div>
+        )}
 
-        {/* Elo Chart Tab - Always mounted, hidden when not active */}
-        <div className={activeTab === 'elo-chart' ? '' : 'hidden'}>
-          <EloChart userId={userId} />
-        </div>
+        {visitedTabs.has('elo-chart') && (
+          <div
+            className={
+              activeTab === 'elo-chart'
+                ? ''
+                : 'absolute inset-0 invisible pointer-events-none opacity-0'
+            }
+          >
+            <EloChart userId={userId} />
+          </div>
+        )}
       </div>
     </div>
   );

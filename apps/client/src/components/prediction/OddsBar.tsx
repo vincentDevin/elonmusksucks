@@ -2,8 +2,8 @@
 // Unified odds bar component merging regular and compact variants
 import { useState, useEffect } from 'react';
 import type { PublicPredictionOption, PublicBet } from '@ems/types';
-import { PredictionType, SOCKET_EVENTS } from '@ems/types';
-import { useSocket } from '../../contexts/SocketContext';
+import { PredictionType, REDIS_CHANNELS } from '@ems/types';
+import { useEventBusCore } from '../../contexts/EventBusCoreContext';
 
 interface FlattenedParlayLeg {
   parlayId: number;
@@ -34,7 +34,7 @@ export default function OddsBar({
   expiresAt,
   className = '',
 }: OddsBarProps) {
-  const socket = useSocket();
+  const { subscribe } = useEventBusCore();
   const [currentOptions, setCurrentOptions] = useState(options);
   const [oddsAnimations, setOddsAnimations] = useState<Record<number, 'up' | 'down' | null>>({});
   const [hotMarket, setHotMarket] = useState(false);
@@ -43,9 +43,9 @@ export default function OddsBar({
   const isMini = variant === 'mini';
   const isFullSize = variant === 'full';
 
-  // Listen for enhanced odds updates
+  // Listen for enhanced odds updates via EventBusCore
   useEffect(() => {
-    if (!socket || !predictionId) return;
+    if (!predictionId) return;
 
     const handleEnhancedOddsUpdate = (data: {
       predictionId: number;
@@ -84,11 +84,8 @@ export default function OddsBar({
       }
     };
 
-    socket.on(SOCKET_EVENTS.ODDS_UPDATE_ENHANCED, handleEnhancedOddsUpdate);
-    return () => {
-      socket.off(SOCKET_EVENTS.ODDS_UPDATE_ENHANCED, handleEnhancedOddsUpdate);
-    };
-  }, [socket, predictionId, currentOptions, isMini, isCompact]);
+    return subscribe(REDIS_CHANNELS.ODDS_UPDATE_ENHANCED, handleEnhancedOddsUpdate);
+  }, [subscribe, predictionId, currentOptions, isMini, isCompact]);
 
   // Calculate excitement level
   const getExcitementLevel = () => {

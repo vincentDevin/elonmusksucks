@@ -1,7 +1,15 @@
 // apps/client/src/contexts/TimelineContext.tsx
 // Rollback: Remove AbortController integration and revert to original fetch calls
 // Rollback: Remove sessionStorage caching and restore direct API fetching
-import React, { createContext, useContext, useReducer, useEffect, useRef } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useReducer,
+  useEffect,
+  useRef,
+  useMemo,
+  startTransition,
+} from 'react';
 import type { TimelineItem, TimelineResponse } from '@ems/types';
 import { useSocket } from './SocketContext';
 import { useEventBusCore } from './EventBusCoreContext';
@@ -255,14 +263,17 @@ export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         );
       }
 
-      dispatch({
-        type: 'LOAD_ARTICLES_SUCCESS',
-        payload: {
-          items: data.items,
-          cursor: data.pagination.cursor,
-          hasMore: data.pagination.hasMore,
-          reset,
-        },
+      // Use startTransition for non-urgent list updates (React 19 optimization)
+      startTransition(() => {
+        dispatch({
+          type: 'LOAD_ARTICLES_SUCCESS',
+          payload: {
+            items: data.items,
+            cursor: data.pagination.cursor,
+            hasMore: data.pagination.hasMore,
+            reset,
+          },
+        });
       });
     } catch (error) {
       // Don't set error state if request was aborted
@@ -337,14 +348,17 @@ export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         );
       }
 
-      dispatch({
-        type: 'LOAD_TWEETS_SUCCESS',
-        payload: {
-          items: data.items,
-          cursor: data.pagination.cursor,
-          hasMore: data.pagination.hasMore,
-          reset,
-        },
+      // Use startTransition for non-urgent list updates (React 19 optimization)
+      startTransition(() => {
+        dispatch({
+          type: 'LOAD_TWEETS_SUCCESS',
+          payload: {
+            items: data.items,
+            cursor: data.pagination.cursor,
+            hasMore: data.pagination.hasMore,
+            reset,
+          },
+        });
       });
     } catch (error) {
       // Don't set error state if request was aborted
@@ -435,9 +449,11 @@ export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         tags: data.tags || [],
       };
 
-      // Add to timeline if user is viewing articles
+      // Add to timeline if user is viewing articles (use startTransition for non-blocking update)
       if (state.activeTab === 'articles') {
-        dispatch({ type: 'ADD_NEW_ITEM', payload: { item: timelineItem, type: 'articles' } });
+        startTransition(() => {
+          dispatch({ type: 'ADD_NEW_ITEM', payload: { item: timelineItem, type: 'articles' } });
+        });
       }
     };
 
@@ -462,9 +478,11 @@ export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         tags: [],
       };
 
-      // Add to timeline if user is viewing tweets
+      // Add to timeline if user is viewing tweets (use startTransition for non-blocking update)
       if (state.activeTab === 'tweets') {
-        dispatch({ type: 'ADD_NEW_ITEM', payload: { item: timelineItem, type: 'tweets' } });
+        startTransition(() => {
+          dispatch({ type: 'ADD_NEW_ITEM', payload: { item: timelineItem, type: 'tweets' } });
+        });
       }
     };
 
@@ -491,24 +509,35 @@ export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     };
   }, []);
 
-  return (
-    <TimelineContext.Provider
-      value={{
-        state,
-        dispatch,
-        loadArticles,
-        loadTweets,
-        setActiveTab,
-        updateFilters,
-        openArticle,
-        closeArticle,
-        openUseAsSource,
-        closeUseAsSource,
-      }}
-    >
-      {children}
-    </TimelineContext.Provider>
+  // Memoize context value to prevent unnecessary re-renders
+  // Note: Functions are recreated when state changes, which is intentional
+  const contextValue = useMemo(
+    () => ({
+      state,
+      dispatch,
+      loadArticles,
+      loadTweets,
+      setActiveTab,
+      updateFilters,
+      openArticle,
+      closeArticle,
+      openUseAsSource,
+      closeUseAsSource,
+    }),
+    [
+      state,
+      loadArticles,
+      loadTweets,
+      setActiveTab,
+      updateFilters,
+      openArticle,
+      closeArticle,
+      openUseAsSource,
+      closeUseAsSource,
+    ],
   );
+
+  return <TimelineContext.Provider value={contextValue}>{children}</TimelineContext.Provider>;
 };
 
 // Hook

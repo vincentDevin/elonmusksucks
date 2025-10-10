@@ -25,7 +25,7 @@ interface ArticleCardProps {
  * - "Read Full Article" action
  * - Engagement metrics (reactions, comments)
  */
-export const ArticleCard: React.FC<ArticleCardProps> = ({
+const ArticleCardComponent: React.FC<ArticleCardProps> = ({
   item,
   onUseAsSource,
   onViewDetails,
@@ -189,5 +189,47 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({
     </BaseArticleCard>
   );
 };
+
+// Custom comparison function to prevent unnecessary re-renders
+function arePropsEqual(prevProps: ArticleCardProps, nextProps: ArticleCardProps): boolean {
+  // Check if it's the same article
+  if (prevProps.item.id !== nextProps.item.id) return false;
+
+  // Check key content fields that would require a re-render
+  if (prevProps.item.content?.title !== nextProps.item.content?.title) return false;
+  if (prevProps.item.content?.excerpt !== nextProps.item.content?.excerpt) return false;
+  if (prevProps.item.content?.imageUrl !== nextProps.item.content?.imageUrl) return false;
+
+  // Check engagement metrics
+  if (prevProps.item.engagement?.comments !== nextProps.item.engagement?.comments) return false;
+
+  // Check reaction counts (shallow comparison)
+  const prevReactions = prevProps.item.reactionCounts;
+  const nextReactions = nextProps.item.reactionCounts;
+  if (prevReactions !== nextReactions) {
+    // Deep comparison only if references differ
+    if (
+      prevReactions?.like !== nextReactions?.like ||
+      prevReactions?.love !== nextReactions?.love ||
+      prevReactions?.laugh !== nextReactions?.laugh ||
+      prevReactions?.wow !== nextReactions?.wow ||
+      prevReactions?.sad !== nextReactions?.sad ||
+      prevReactions?.angry !== nextReactions?.angry
+    ) {
+      return false;
+    }
+  }
+
+  // Check user reaction
+  if (prevProps.item.userReaction !== nextProps.item.userReaction) return false;
+
+  // Check className
+  if (prevProps.className !== nextProps.className) return false;
+
+  // Function props are typically stable, so we skip them
+  return true;
+}
+
+export const ArticleCard = React.memo(ArticleCardComponent, arePropsEqual);
 
 export default ArticleCard;

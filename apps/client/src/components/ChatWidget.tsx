@@ -11,9 +11,9 @@ import { Link } from 'react-router-dom';
 import { ChatBubbleLeftRightIcon, MinusIcon, PlusIcon } from '@heroicons/react/24/solid';
 import { useAuth } from '../contexts/AuthContext';
 import { useChat } from '../contexts/ChatContext';
-import { useSocket } from '../contexts/SocketContext';
+import { useEventBusCore } from '../contexts/EventBusCoreContext';
 import api from '../api/axios';
-import { SOCKET_EVENTS } from '@ems/types';
+import { REDIS_CHANNELS } from '@ems/types';
 
 const FALLBACK_AVATAR =
   'https://ui-avatars.com/api/?name=Unknown&background=64748b&color=fff&size=48';
@@ -69,7 +69,7 @@ interface ModerationEvent {
 
 export default function ChatWidget({ mode = 'widget', className }: ChatWidgetProps) {
   const { user } = useAuth();
-  const socket = useSocket();
+  const { subscribe } = useEventBusCore();
   const {
     messages,
     loading,
@@ -125,10 +125,8 @@ export default function ChatWidget({ mode = 'widget', className }: ChatWidgetPro
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userEvents]);
 
-  /* ---------- moderation events listener ---------- */
+  /* ---------- moderation events listener via EventBusCore ---------- */
   useEffect(() => {
-    if (!socket) return;
-
     const handleModerationEvent = (event: any) => {
       let moderationEvent: ModerationEvent;
 
@@ -185,31 +183,29 @@ export default function ChatWidget({ mode = 'widget', className }: ChatWidgetPro
       pushModerationEvent(moderationEvent);
     };
 
-    // Listen for moderation events
-    socket.on(SOCKET_EVENTS.MODERATION_USER_BAN, (data) =>
-      handleModerationEvent({ ...data, type: 'userBan' }),
-    );
-    socket.on(SOCKET_EVENTS.MODERATION_USER_UNBAN, (data) =>
-      handleModerationEvent({ ...data, type: 'userUnban' }),
-    );
-    socket.on(SOCKET_EVENTS.MODERATION_USER_MUTE, (data) =>
-      handleModerationEvent({ ...data, type: 'userMute' }),
-    );
-    socket.on(SOCKET_EVENTS.MODERATION_USER_KICK, (data) =>
-      handleModerationEvent({ ...data, type: 'userKick' }),
-    );
-    socket.on(SOCKET_EVENTS.MODERATION_MESSAGE_DELETE, (data) =>
-      handleModerationEvent({ ...data, type: 'messageDeleted' }),
-    );
+    // Subscribe to moderation events via EventBusCore
+    const unsubscribers = [
+      subscribe(REDIS_CHANNELS.MODERATION_USER_BAN, (data) =>
+        handleModerationEvent({ ...data, type: 'userBan' }),
+      ),
+      subscribe(REDIS_CHANNELS.MODERATION_USER_UNBAN, (data) =>
+        handleModerationEvent({ ...data, type: 'userUnban' }),
+      ),
+      subscribe(REDIS_CHANNELS.MODERATION_USER_MUTE, (data) =>
+        handleModerationEvent({ ...data, type: 'userMute' }),
+      ),
+      subscribe(REDIS_CHANNELS.MODERATION_USER_KICK, (data) =>
+        handleModerationEvent({ ...data, type: 'userKick' }),
+      ),
+      subscribe(REDIS_CHANNELS.MODERATION_MESSAGE_DELETE, (data) =>
+        handleModerationEvent({ ...data, type: 'messageDeleted' }),
+      ),
+    ];
 
     return () => {
-      socket.off(SOCKET_EVENTS.MODERATION_USER_BAN);
-      socket.off(SOCKET_EVENTS.MODERATION_USER_UNBAN);
-      socket.off(SOCKET_EVENTS.MODERATION_USER_MUTE);
-      socket.off(SOCKET_EVENTS.MODERATION_USER_KICK);
-      socket.off(SOCKET_EVENTS.MODERATION_MESSAGE_DELETE);
+      unsubscribers.forEach((unsub) => unsub());
     };
-  }, [socket, pushModerationEvent]);
+  }, [subscribe, pushModerationEvent]);
 
   /* ---------- group consecutive messages by user ---------- */
   const grouped = useMemo(() => {

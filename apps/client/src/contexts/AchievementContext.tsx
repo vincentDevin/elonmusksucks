@@ -1,6 +1,6 @@
 // AchievementContext with hydration guard to prevent redundant API calls on navigation
 // PERFORMANCE FIX: Prevents /api/users/{id}/achievements API call on every mount
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useMemo, type ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { useEventBusCore } from './EventBusCoreContext';
 import api from '../api/axios';
@@ -214,18 +214,32 @@ export function AchievementProvider({ children }: AchievementProviderProps) {
   const totalAvailable = allAchievements.length;
   const completionRate = totalAvailable > 0 ? totalBadges / totalAvailable : 0;
 
-  const value: AchievementContextType = {
-    achievements,
-    recentAchievements,
-    allAchievements,
-    totalBadges,
-    totalAvailable,
-    completionRate,
-    loading,
-    error,
-    isHydrated,
-    refreshAchievements: fetchAchievements,
-  };
+  const value = useMemo<AchievementContextType>(
+    () => ({
+      achievements,
+      recentAchievements,
+      allAchievements,
+      totalBadges,
+      totalAvailable,
+      completionRate,
+      loading,
+      error,
+      isHydrated,
+      refreshAchievements: fetchAchievements,
+    }),
+    [
+      achievements,
+      recentAchievements,
+      allAchievements,
+      totalBadges,
+      totalAvailable,
+      completionRate,
+      loading,
+      error,
+      isHydrated,
+      fetchAchievements,
+    ],
+  );
 
   return <AchievementContext.Provider value={value}>{children}</AchievementContext.Provider>;
 }

@@ -1,6 +1,14 @@
 // apps/client/src/contexts/BookmarkContext.tsx
 // Bulk bookmark checking context to prevent N+1 queries
-import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useRef,
+  useEffect,
+  useMemo,
+} from 'react';
 import { timelineApi } from '../api/timeline';
 import { useAuth } from './AuthContext';
 
@@ -101,13 +109,13 @@ export function BookmarkProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  return (
-    <BookmarkContext.Provider
-      value={{ isBookmarked, requestBookmarkCheck, setBookmarked, loading }}
-    >
-      {children}
-    </BookmarkContext.Provider>
+  // Memoize context value to prevent unnecessary re-renders
+  const contextValue = useMemo(
+    () => ({ isBookmarked, requestBookmarkCheck, setBookmarked, loading }),
+    [isBookmarked, requestBookmarkCheck, setBookmarked, loading],
   );
+
+  return <BookmarkContext.Provider value={contextValue}>{children}</BookmarkContext.Provider>;
 }
 
 export function useBookmarks() {

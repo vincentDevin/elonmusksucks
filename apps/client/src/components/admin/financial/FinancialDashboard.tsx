@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { formatMuskBucks } from '../../../utils/formatting';
-import { useSocket } from '../../../contexts/SocketContext';
+import { useEventBusCore } from '../../../contexts/EventBusCoreContext';
 import {
   searchFinancialData,
   getFinancialAnalytics,
@@ -10,7 +10,6 @@ import {
 } from '../../../api/admin';
 import {
   REDIS_CHANNELS,
-  SOCKET_EVENTS,
   type AdminFinancialAnalyticsResponse,
   type AdminFinancialDataResponse,
   type AdminBetView,
@@ -63,7 +62,7 @@ interface FinancialDashboardProps {
 }
 
 const FinancialDashboard: React.FC<FinancialDashboardProps> = ({ className = '' }) => {
-  const socket = useSocket();
+  const { subscribe, socket } = useEventBusCore();
   const hasJoinedRoom = useRef(false);
 
   // Tab and filter state
@@ -183,7 +182,7 @@ const FinancialDashboard: React.FC<FinancialDashboardProps> = ({ className = '' 
 
   // Real-time event listeners (separate from room management)
   useEffect(() => {
-    if (!socket || !realtimeEnabled) return;
+    if (!realtimeEnabled) return;
 
     const handleFinancialUpdate = () => {
       setLastUpdateTime(new Date().toLocaleTimeString());
@@ -196,24 +195,18 @@ const FinancialDashboard: React.FC<FinancialDashboardProps> = ({ className = '' 
     };
 
     // Register event listeners
-    socket.on(SOCKET_EVENTS.BET_PLACED, handleFinancialUpdate);
-    socket.on(SOCKET_EVENTS.PARLAY_PLACED, handleFinancialUpdate);
-    socket.on(REDIS_CHANNELS.BET_STATUS_CHANGE, handleFinancialUpdate);
-    socket.on(REDIS_CHANNELS.PARLAY_STATUS_CHANGE, handleFinancialUpdate);
-    socket.on(SOCKET_EVENTS.PONG_STATS_UPDATE, handleFinancialUpdate);
-    socket.on(REDIS_CHANNELS.ADMIN_METRICS_UPDATE, handleFinancialUpdate);
-    socket.on(REDIS_CHANNELS.USER_STATS_UPDATE, handleFinancialUpdate);
+    const unsubscribers = [
+      subscribe(REDIS_CHANNELS.BET_PLACED, handleFinancialUpdate),
+      subscribe(REDIS_CHANNELS.PARLAY_PLACED, handleFinancialUpdate),
+      subscribe(REDIS_CHANNELS.BET_STATUS_CHANGE, handleFinancialUpdate),
+      subscribe(REDIS_CHANNELS.PARLAY_STATUS_CHANGE, handleFinancialUpdate),
+      subscribe(REDIS_CHANNELS.PONG_STATS_UPDATE, handleFinancialUpdate),
+      subscribe(REDIS_CHANNELS.ADMIN_METRICS_UPDATE, handleFinancialUpdate),
+      subscribe(REDIS_CHANNELS.USER_STATS_UPDATE, handleFinancialUpdate),
+    ];
 
-    return () => {
-      socket.off(SOCKET_EVENTS.BET_PLACED);
-      socket.off(SOCKET_EVENTS.PARLAY_PLACED);
-      socket.off(REDIS_CHANNELS.BET_STATUS_CHANGE);
-      socket.off(REDIS_CHANNELS.PARLAY_STATUS_CHANGE);
-      socket.off(SOCKET_EVENTS.PONG_STATS_UPDATE);
-      socket.off(REDIS_CHANNELS.ADMIN_METRICS_UPDATE);
-      socket.off(REDIS_CHANNELS.USER_STATS_UPDATE);
-    };
-  }, [socket, realtimeEnabled]);
+    return () => unsubscribers.forEach((unsub) => unsub());
+  }, [subscribe, realtimeEnabled]);
 
   // Handle filter changes
   const updateFilters = (newFilters: Partial<FilterState>) => {

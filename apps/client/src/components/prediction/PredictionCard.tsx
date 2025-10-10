@@ -1,6 +1,6 @@
 // apps/client/src/components/UnifiedPredictionCard.tsx
 // Unified prediction card component merging full and compact variants
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { formatMuskBucks } from '../../utils/formatting';
 import {
   PlusIcon as Plus,
@@ -37,7 +37,7 @@ interface UnifiedPredictionCardProps {
   onCardView?: () => void; // Callback when card is viewed (not when buttons are clicked)
 }
 
-export default function UnifiedPredictionCard({
+function UnifiedPredictionCard({
   prediction,
   variant = 'full',
   showActions = true,
@@ -522,3 +522,26 @@ export default function UnifiedPredictionCard({
     </>
   );
 }
+
+function arePropsEqual(
+  prev: UnifiedPredictionCardProps,
+  next: UnifiedPredictionCardProps,
+): boolean {
+  // Core prediction data
+  if (prev.prediction.id !== next.prediction.id) return false;
+  if (prev.prediction.resolved !== next.prediction.resolved) return false;
+  if (prev.prediction.bets.length !== next.prediction.bets.length) return false;
+
+  // Variant and display settings
+  if (prev.variant !== next.variant) return false;
+  if (prev.showActions !== next.showActions) return false;
+  if (prev.showBetsList !== next.showBetsList) return false;
+  if (prev.showParlayActions !== next.showParlayActions) return false;
+  if (prev.hideInlineParlaySelector !== next.hideInlineParlaySelector) return false;
+
+  // For efficiency, check only shallow props
+  // Deep comparison of bets array would be expensive
+  return true;
+}
+
+export default React.memo(UnifiedPredictionCard, arePropsEqual);

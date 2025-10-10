@@ -94,18 +94,18 @@ export async function bulkUpdateUsers(operation: BulkUserOperation): Promise<Bul
   return res.data;
 }
 
-export async function updateUserRole(userId: number, role: Role): Promise<PublicUser> {
-  const res = await api.patch<PublicUser>(`/api/admin/users/${userId}/role`, { role });
+export async function updateUserRole(userId: number, role: Role): Promise<AdminUserView> {
+  const res = await api.patch<AdminUserView>(`/api/admin/users/${userId}/role`, { role });
   return res.data;
 }
 
-export async function activateUser(userId: number, active: boolean): Promise<PublicUser> {
-  const res = await api.patch<PublicUser>(`/api/admin/users/${userId}/activate`, { active });
+export async function activateUser(userId: number, active: boolean): Promise<AdminUserView> {
+  const res = await api.patch<AdminUserView>(`/api/admin/users/${userId}/activate`, { active });
   return res.data;
 }
 
-export async function updateUserBalance(userId: number, amount: number): Promise<PublicUser> {
-  const res = await api.patch<PublicUser>(`/api/admin/users/${userId}/balance`, { amount });
+export async function updateUserBalance(userId: number, amount: number): Promise<AdminUserView> {
+  const res = await api.patch<AdminUserView>(`/api/admin/users/${userId}/balance`, { amount });
   return res.data;
 }
 

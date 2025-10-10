@@ -1,17 +1,17 @@
 // apps/client/src/components/dashboard/ParlayPanel.tsx
 // Rollback: git checkout HEAD -- apps/client/src/components/dashboard/ParlayPanel.tsx
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { SOCKET_EVENTS } from '@ems/types';
+import { REDIS_CHANNELS } from '@ems/types';
 import { useParlay } from '../../contexts/ParlayContext';
 import { usePredictionMarket } from '../../contexts/PredictionContext';
-import { useSocket } from '../../contexts/SocketContext';
+import { useEventBusCore } from '../../contexts/EventBusCoreContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatMuskBucks } from '../../utils/formatting';
 
 export default function ParlayPanel() {
   const { state, dispatch, clear } = useParlay();
   const { predictions, placeParlay } = usePredictionMarket();
-  const socket = useSocket();
+  const { subscribe } = useEventBusCore();
   const { user } = useAuth();
 
   const [isExpanded, setIsExpanded] = useState(false);
@@ -123,20 +123,18 @@ export default function ParlayPanel() {
     setTimeout(() => setIsCalculating(false), 500);
   }, []);
 
-  /* ---------- Real-time odds updates ---------- */
+  /* ---------- Real-time odds updates via EventBusCore ---------- */
   useEffect(() => {
-    if (!socket) return;
-
-    socket.on(SOCKET_EVENTS.BET_PLACED, handleBetPlaced);
-    socket.on(SOCKET_EVENTS.PREDICTION_CREATED, handlePredictionUpdate);
-    socket.on(SOCKET_EVENTS.PREDICTION_RESOLVED, handlePredictionUpdate);
+    const unsubscribers = [
+      subscribe(REDIS_CHANNELS.BET_PLACED, handleBetPlaced),
+      subscribe(REDIS_CHANNELS.PREDICTION_CREATED, handlePredictionUpdate),
+      subscribe(REDIS_CHANNELS.PREDICTION_RESOLVED, handlePredictionUpdate),
+    ];
 
     return () => {
-      socket.off(SOCKET_EVENTS.BET_PLACED, handleBetPlaced);
-      socket.off(SOCKET_EVENTS.PREDICTION_CREATED, handlePredictionUpdate);
-      socket.off(SOCKET_EVENTS.PREDICTION_RESOLVED, handlePredictionUpdate);
+      unsubscribers.forEach((unsub) => unsub());
     };
-  }, [socket, handleBetPlaced, handlePredictionUpdate]);
+  }, [subscribe, handleBetPlaced, handlePredictionUpdate]);
 
   /* ---------- Parlay placement handler ---------- */
   const handlePlaceParlay = async () => {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { formatMuskBucks } from '../../utils/formatting';
 import { useParlay } from '../../contexts/ParlayContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -24,7 +24,7 @@ interface FloatingParlayBuilderProps {
   onToggleMinimize?: () => void;
 }
 
-export default function FloatingParlayBuilder({
+function FloatingParlayBuilder({
   className = '',
   onClose,
   isMinimized: controlledMinimized,
@@ -348,3 +348,21 @@ export default function FloatingParlayBuilder({
     </div>
   );
 }
+
+// Custom comparison function to prevent unnecessary re-renders
+function arePropsEqual(
+  prevProps: FloatingParlayBuilderProps,
+  nextProps: FloatingParlayBuilderProps,
+): boolean {
+  // Check if minimized state changed
+  if (prevProps.isMinimized !== nextProps.isMinimized) return false;
+
+  // Check if className changed
+  if (prevProps.className !== nextProps.className) return false;
+
+  // Function props are typically stable, so we skip them
+  // The component re-renders when parlay state changes via useParlay hook
+  return true;
+}
+
+export default React.memo(FloatingParlayBuilder, arePropsEqual);

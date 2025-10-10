@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useDeferredValue } from 'react';
 import {
   MagnifyingGlassIcon,
   XMarkIcon,
@@ -48,6 +48,10 @@ export const TimelineSearch: React.FC<TimelineSearchProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
 
   const debouncedQuery = useDebounce(query, 300);
+
+  // Defer suggestions rendering for better performance
+  const deferredSuggestions = useDeferredValue(suggestions);
+  const isPending = deferredSuggestions !== suggestions;
 
   // Helper function to get icon for suggestion type
   const getIconForType = (type: 'article' | 'post' | 'user' | 'hashtag' | 'recent') => {
@@ -175,7 +179,7 @@ export const TimelineSearch: React.FC<TimelineSearchProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Handle keyboard navigation
+  // Handle keyboard navigation (use actual suggestions, not deferred, for immediate response)
   const handleKeyDown = (e: React.KeyboardEvent) => {
     const totalItems =
       suggestions.length + (recentSearches.length > 0 && !query ? recentSearches.length : 0);
@@ -254,7 +258,8 @@ export const TimelineSearch: React.FC<TimelineSearchProps> = ({
   }, []);
 
   const showDropdown =
-    isFocused && (suggestions.length > 0 || (recentSearches.length > 0 && !query) || loading);
+    isFocused &&
+    (deferredSuggestions.length > 0 || (recentSearches.length > 0 && !query) || loading);
 
   return (
     <div ref={searchRef} className={`relative ${className}`}>
@@ -335,16 +340,17 @@ export const TimelineSearch: React.FC<TimelineSearchProps> = ({
               )}
 
               {/* Search Suggestions */}
-              {suggestions.length > 0 && (
-                <div>
+              {deferredSuggestions.length > 0 && (
+                <div className={isPending ? 'opacity-60 transition-opacity' : ''}>
                   {query && (
-                    <div className="px-4 py-2 border-b border-border bg-primary/10">
+                    <div className="px-4 py-2 border-b border-border bg-primary/10 flex items-center justify-between">
                       <span className="text-xs font-medium text-tertiary uppercase">
                         Suggestions
                       </span>
+                      {isPending && <span className="text-xs text-tertiary">Updating...</span>}
                     </div>
                   )}
-                  {suggestions.map((suggestion, index) => {
+                  {deferredSuggestions.map((suggestion, index) => {
                     const actualIndex =
                       !query && recentSearches.length > 0 ? index + recentSearches.length : index;
 

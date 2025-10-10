@@ -1,6 +1,6 @@
 // UserDataContext with hydration guard to prevent redundant API calls on navigation
 // PERFORMANCE FIX: Prevents 3 API calls (stats, achievements, activities) on every Dashboard mount
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from './AuthContext';
 import { useEventBusCore } from './EventBusCoreContext';
 import { useVisibilityGuard } from '../lib/visibilityGuard';
@@ -348,16 +348,16 @@ export const UserDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return unsubscribe;
   }, [user?.id, subscribe]);
 
-  return (
-    <UserDataContext.Provider
-      value={{
-        ...state,
-        refreshUserData,
-      }}
-    >
-      {children}
-    </UserDataContext.Provider>
+  // Memoize context value to prevent unnecessary re-renders
+  const contextValue = useMemo(
+    () => ({
+      ...state,
+      refreshUserData,
+    }),
+    [state, refreshUserData],
   );
+
+  return <UserDataContext.Provider value={contextValue}>{children}</UserDataContext.Provider>;
 };
 
 export const useUserData = () => {

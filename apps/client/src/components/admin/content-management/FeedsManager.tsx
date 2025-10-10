@@ -7,7 +7,7 @@ import type {
   UpdateFeedRequest,
   FeedStatsResponse,
 } from '@ems/types';
-import { useSocket } from '../../../contexts/SocketContext';
+import { useEventBusCore } from '../../../contexts/EventBusCoreContext';
 import * as feedsAPI from '../../../api/feeds';
 
 interface FeedsManagerProps {
@@ -32,7 +32,7 @@ export const FeedsManager: React.FC<FeedsManagerProps> = ({ className = '' }) =>
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingFeed, setEditingFeed] = useState<PublicFeedSource | null>(null);
   const [refreshingFeeds, setRefreshingFeeds] = useState<Set<number>>(new Set());
-  const socket = useSocket();
+  const { subscribe } = useEventBusCore();
 
   useEffect(() => {
     loadFeeds();
@@ -62,17 +62,14 @@ export const FeedsManager: React.FC<FeedsManagerProps> = ({ className = '' }) =>
 
   // Socket.IO integration for real-time feed updates
   useEffect(() => {
-    if (!socket) return;
-
     // Register event listeners
-    socket.on('admin:feed:refresh', handleAdminFeedRefresh);
-    socket.on('timeline:feed:refresh', handleFeedRefresh);
+    const unsubscribers = [
+      subscribe('admin:feed:refresh', handleAdminFeedRefresh),
+      subscribe('timeline:feed:refresh', handleFeedRefresh),
+    ];
 
-    return () => {
-      socket.off('admin:feed:refresh', handleAdminFeedRefresh);
-      socket.off('timeline:feed:refresh', handleFeedRefresh);
-    };
-  }, [socket, handleAdminFeedRefresh, handleFeedRefresh]);
+    return () => unsubscribers.forEach((unsub) => unsub());
+  }, [subscribe, handleAdminFeedRefresh, handleFeedRefresh]);
 
   const loadFeeds = async () => {
     try {

@@ -57,6 +57,13 @@ function EloChartComponent({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [timeframe, setTimeframe] = useState<'7d' | '30d' | '90d' | 'all'>('30d');
+  const [isReady, setIsReady] = useState(false);
+
+  // Delay chart rendering to ensure DOM is ready
+  useEffect(() => {
+    const timer = setTimeout(() => setIsReady(true), 100);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     const fetchEloHistory = async () => {
@@ -235,49 +242,58 @@ function EloChartComponent({
       </div>
 
       {/* Chart */}
-      <div style={{ height: `${height}px` }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={eloHistory} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" opacity={0.3} />
-            <XAxis dataKey="date" tickFormatter={formatXAxisLabel} stroke="#6b7280" fontSize={12} />
-            <YAxis
-              domain={[yAxisMin, yAxisMax]}
-              stroke="#6b7280"
-              fontSize={12}
-              tickFormatter={(value) => value.toString()}
-            />
-            <Tooltip content={<CustomTooltip />} />
-
-            {/* Tier boundary lines */}
-            {visibleTierLines.map(({ tier, rating }) => (
-              <ReferenceLine
-                key={tier}
-                y={rating}
-                stroke={TIER_COLORS[tier as keyof typeof TIER_COLORS]}
-                strokeDasharray="5 5"
-                strokeOpacity={0.5}
-                label={{
-                  value: tier,
-                  position: 'right',
-                  style: {
-                    fontSize: 10,
-                    fill: TIER_COLORS[tier as keyof typeof TIER_COLORS],
-                    fontWeight: 'bold',
-                  },
-                }}
+      <div style={{ height: `${height}px`, minHeight: `${height}px` }} className="w-full">
+        {!isReady ? (
+          <div className="animate-pulse bg-muted/30 rounded-lg w-full h-full" />
+        ) : (
+          <ResponsiveContainer width="100%" height="100%" minWidth={200} minHeight={height}>
+            <LineChart data={eloHistory} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" opacity={0.3} />
+              <XAxis
+                dataKey="date"
+                tickFormatter={formatXAxisLabel}
+                stroke="#6b7280"
+                fontSize={12}
               />
-            ))}
+              <YAxis
+                domain={[yAxisMin, yAxisMax]}
+                stroke="#6b7280"
+                fontSize={12}
+                tickFormatter={(value) => value.toString()}
+              />
+              <Tooltip content={<CustomTooltip />} />
 
-            <Line
-              type="monotone"
-              dataKey="rating"
-              stroke="#3b82f6"
-              strokeWidth={3}
-              dot={{ fill: '#3b82f6', strokeWidth: 2, r: 4 }}
-              activeDot={{ r: 6, stroke: '#3b82f6', strokeWidth: 2, fill: '#ffffff' }}
-            />
-          </LineChart>
-        </ResponsiveContainer>
+              {/* Tier boundary lines */}
+              {visibleTierLines.map(({ tier, rating }) => (
+                <ReferenceLine
+                  key={tier}
+                  y={rating}
+                  stroke={TIER_COLORS[tier as keyof typeof TIER_COLORS]}
+                  strokeDasharray="5 5"
+                  strokeOpacity={0.5}
+                  label={{
+                    value: tier,
+                    position: 'right',
+                    style: {
+                      fontSize: 10,
+                      fill: TIER_COLORS[tier as keyof typeof TIER_COLORS],
+                      fontWeight: 'bold',
+                    },
+                  }}
+                />
+              ))}
+
+              <Line
+                type="monotone"
+                dataKey="rating"
+                stroke="#3b82f6"
+                strokeWidth={3}
+                dot={{ fill: '#3b82f6', strokeWidth: 2, r: 4 }}
+                activeDot={{ r: 6, stroke: '#3b82f6', strokeWidth: 2, fill: '#ffffff' }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
       </div>
 
       {/* Legend */}

@@ -6,7 +6,7 @@
 // using the live `parlayPlaced` broadcast.
 // -----------------------------------------------------------------------------
 
-import { createContext, useContext, useReducer, useEffect, useCallback } from 'react';
+import { createContext, useContext, useReducer, useEffect, useCallback, useMemo } from 'react';
 import type { ReactNode } from 'react';
 import { useEventBusCore } from './EventBusCoreContext';
 import { REDIS_CHANNELS } from '@ems/types';
@@ -124,22 +124,22 @@ export function ParlayProvider({ children }: { children: ReactNode }) {
   const clearOptimistic = useCallback(() => dispatch({ type: 'CLEAR_OPTIMISTIC' }), []);
   const clear = useCallback(() => dispatch({ type: 'CLEAR' }), []);
 
-  return (
-    <ParlayCtx.Provider
-      value={{
-        state,
-        dispatch,
-        addLeg,
-        removeLeg,
-        setAmount,
-        setOptimisticPending,
-        clearOptimistic,
-        clear,
-      }}
-    >
-      {children}
-    </ParlayCtx.Provider>
+  // Memoize context value to prevent unnecessary re-renders
+  const contextValue = useMemo(
+    () => ({
+      state,
+      dispatch,
+      addLeg,
+      removeLeg,
+      setAmount,
+      setOptimisticPending,
+      clearOptimistic,
+      clear,
+    }),
+    [state, addLeg, removeLeg, setAmount, setOptimisticPending, clearOptimistic, clear],
   );
+
+  return <ParlayCtx.Provider value={contextValue}>{children}</ParlayCtx.Provider>;
 }
 
 export function useParlay() {

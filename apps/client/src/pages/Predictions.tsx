@@ -1,7 +1,7 @@
 // Enhanced Predictions page with integrated parlay workflow
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { SOCKET_EVENTS } from '@ems/types';
+import { REDIS_CHANNELS } from '@ems/types';
 import type { PredictionCreatedPayload, BetPlacedPayload } from '@ems/types';
 
 // New components
@@ -21,7 +21,7 @@ import PredictionAnalyticsInsights from '../components/prediction/PredictionAnal
 // Hooks and contexts
 import { usePredictionDiscovery } from '../hooks/usePredictionDiscovery';
 import { usePredictionMarket } from '../contexts/PredictionContext';
-import { useSocket } from '../contexts/SocketContext';
+import { useEventBusCore } from '../contexts/EventBusCoreContext';
 import { useParlay } from '../contexts/ParlayContext';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -44,7 +44,7 @@ export default function Predictions() {
   const { user } = useAuth();
   const { createPrediction } = usePredictionMarket();
   const { state: parlayState, dispatch: parlayDispatch } = useParlay();
-  const socket = useSocket();
+  const { subscribe } = useEventBusCore();
 
   // AI-powered discovery system
   const {
@@ -117,18 +117,17 @@ export default function Predictions() {
     }
   }, []);
 
-  // Socket event subscriptions
+  // Real-time event subscriptions via EventBusCore
   useEffect(() => {
-    if (!socket) return;
-
-    socket.on(SOCKET_EVENTS.PREDICTION_CREATED, handleNewPrediction);
-    socket.on(SOCKET_EVENTS.BET_PLACED, handleBettingActivity);
+    const unsubscribers = [
+      subscribe(REDIS_CHANNELS.PREDICTION_CREATED, handleNewPrediction),
+      subscribe(REDIS_CHANNELS.BET_PLACED, handleBettingActivity),
+    ];
 
     return () => {
-      socket.off(SOCKET_EVENTS.PREDICTION_CREATED, handleNewPrediction);
-      socket.off(SOCKET_EVENTS.BET_PLACED, handleBettingActivity);
+      unsubscribers.forEach((unsub) => unsub());
     };
-  }, [socket, handleNewPrediction, handleBettingActivity]);
+  }, [subscribe, handleNewPrediction, handleBettingActivity]);
 
   // Handle prediction card click for detailed view
   const handlePredictionClick = useCallback(

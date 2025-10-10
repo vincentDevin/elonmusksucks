@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useSocket } from '../../../contexts/SocketContext';
+import { useEventBusCore } from '../../../contexts/EventBusCoreContext';
 import {
   getAllAchievements,
   getAchievementAnalytics,
@@ -40,7 +40,7 @@ interface AdminAchievementDashboardProps {
 const AdminAchievementDashboard: React.FC<AdminAchievementDashboardProps> = ({
   className = '',
 }) => {
-  const socket = useSocket();
+  const { subscribe, socket } = useEventBusCore();
   const hasJoinedRoom = useRef(false);
 
   // Core state
@@ -138,7 +138,7 @@ const AdminAchievementDashboard: React.FC<AdminAchievementDashboardProps> = ({
 
   // Real-time event listeners
   useEffect(() => {
-    if (!socket || !realtimeEnabled) return;
+    if (!realtimeEnabled) return;
 
     const handleAchievementUpdate = () => {
       setLastUpdateTime(new Date().toLocaleTimeString());
@@ -151,21 +151,17 @@ const AdminAchievementDashboard: React.FC<AdminAchievementDashboardProps> = ({
     };
 
     // Register event listeners for achievement-related events
-    socket.on('achievement:created', handleAchievementUpdate);
-    socket.on('achievement:updated', handleAchievementUpdate);
-    socket.on('achievement:deleted', handleAchievementUpdate);
-    socket.on('achievement:granted', handleAchievementUpdate);
-    socket.on('achievement:revoked', handleAchievementUpdate);
+    // Note: These events are not yet in REDIS_CHANNELS, using type assertion
+    const unsubscribers = [
+      subscribe('achievement:created' as any, handleAchievementUpdate),
+      subscribe('achievement:updated' as any, handleAchievementUpdate),
+      subscribe('achievement:deleted' as any, handleAchievementUpdate),
+      subscribe('achievement:granted' as any, handleAchievementUpdate),
+      subscribe('achievement:revoked' as any, handleAchievementUpdate),
+    ];
 
-    // Cleanup function
-    return () => {
-      socket.off('achievement:created', handleAchievementUpdate);
-      socket.off('achievement:updated', handleAchievementUpdate);
-      socket.off('achievement:deleted', handleAchievementUpdate);
-      socket.off('achievement:granted', handleAchievementUpdate);
-      socket.off('achievement:revoked', handleAchievementUpdate);
-    };
-  }, [socket, realtimeEnabled, fetchData]);
+    return () => unsubscribers.forEach((unsub) => unsub());
+  }, [subscribe, realtimeEnabled, fetchData]);
 
   // Selection handlers
   const handleAchievementSelect = useCallback((achievementId: number, selected: boolean) => {

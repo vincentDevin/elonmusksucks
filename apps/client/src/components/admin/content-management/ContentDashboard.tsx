@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { REDIS_CHANNELS } from '@ems/types';
-import { useSocket } from '../../../contexts/SocketContext';
+import { useEventBusCore } from '../../../contexts/EventBusCoreContext';
 import { useAuth } from '../../../contexts/AuthContext';
 import type { UnifiedContentItem, UnifiedContentFilters, UnifiedContentResponse } from '@ems/types';
 import * as unifiedContentAPI from '../../../api/unifiedContent';
@@ -37,7 +37,7 @@ type DashboardView = 'overview' | 'content' | 'moderation' | 'feeds';
  */
 const ContentDashboard: React.FC<ContentDashboardProps> = () => {
   const { user } = useAuth();
-  const socket = useSocket();
+  const { subscribe } = useEventBusCore();
 
   // State for content data
   const [content, setContent] = useState<UnifiedContentItem[]>([]);
@@ -78,8 +78,6 @@ const ContentDashboard: React.FC<ContentDashboardProps> = () => {
 
   // Handle real-time content updates
   useEffect(() => {
-    if (!socket) return;
-
     const handleContentUpdate = (data: any) => {
       console.log('[ContentDashboard] Content update received:', data);
       // Reload content when updates occur
@@ -97,18 +95,15 @@ const ContentDashboard: React.FC<ContentDashboardProps> = () => {
     };
 
     // Subscribe to real-time events
-    socket.on(REDIS_CHANNELS.CONTENT_UPDATED, handleContentUpdate);
-    socket.on(REDIS_CHANNELS.CONTENT_MODERATED, handleModerationUpdate);
-    socket.on(REDIS_CHANNELS.FEEDS_UPDATED, handleContentUpdate);
-    socket.on(REDIS_CHANNELS.ARTICLES_BULK_MODERATED, handleContentUpdate);
+    const unsubscribers = [
+      subscribe(REDIS_CHANNELS.CONTENT_UPDATED, handleContentUpdate),
+      subscribe(REDIS_CHANNELS.CONTENT_MODERATED, handleModerationUpdate),
+      subscribe(REDIS_CHANNELS.FEEDS_UPDATED, handleContentUpdate),
+      subscribe(REDIS_CHANNELS.ARTICLES_BULK_MODERATED, handleContentUpdate),
+    ];
 
-    return () => {
-      socket.off(REDIS_CHANNELS.CONTENT_UPDATED, handleContentUpdate);
-      socket.off(REDIS_CHANNELS.CONTENT_MODERATED, handleModerationUpdate);
-      socket.off(REDIS_CHANNELS.FEEDS_UPDATED, handleContentUpdate);
-      socket.off(REDIS_CHANNELS.ARTICLES_BULK_MODERATED, handleContentUpdate);
-    };
-  }, [socket, loadContent]);
+    return () => unsubscribers.forEach((unsub) => unsub());
+  }, [subscribe, loadContent]);
 
   // Load initial data
   useEffect(() => {

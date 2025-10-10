@@ -7,6 +7,7 @@ import {
   useContext,
   useOptimistic,
   startTransition,
+  useMemo,
   type ReactNode,
 } from 'react';
 import {
@@ -321,24 +322,35 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
   }, [user?.id, subscribe, refreshUser, refreshUserBalance, optimisticUpdateUser]);
 
-  return (
-    <AuthContext.Provider
-      value={{
-        accessToken,
-        user,
-        loading,
-        login,
-        register,
-        logout,
-        refreshUser,
-        refreshUserBalance,
-        clearAuth,
-        onUserDataRefresh,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
+  // Memoize context value to prevent unnecessary re-renders
+  const contextValue = useMemo(
+    () => ({
+      accessToken,
+      user,
+      loading,
+      login,
+      register,
+      logout,
+      refreshUser,
+      refreshUserBalance,
+      clearAuth,
+      onUserDataRefresh,
+    }),
+    [
+      accessToken,
+      user,
+      loading,
+      login,
+      register,
+      logout,
+      refreshUser,
+      refreshUserBalance,
+      clearAuth,
+      onUserDataRefresh,
+    ],
   );
+
+  return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>;
 };
 
 /** Hook to access auth context */

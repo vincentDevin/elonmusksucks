@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { formatMuskBucks } from '../../utils/formatting';
 import type { PredictionFull, BetWithUser } from '@ems/types';
 import BetModal from './BetModal';
@@ -23,7 +23,7 @@ interface SimplePredictionCardProps {
 
 const asNum = (v: string | number | bigint | undefined | null) => Number(v ?? 0);
 
-export default function SimplePredictionCard({
+function SimplePredictionCard({
   prediction,
   onCardClick,
   onQuickBet,
@@ -263,3 +263,22 @@ export default function SimplePredictionCard({
     </>
   );
 }
+
+// Custom comparison function to prevent unnecessary re-renders
+function arePropsEqual(
+  prevProps: SimplePredictionCardProps,
+  nextProps: SimplePredictionCardProps,
+): boolean {
+  // Compare prediction by ID and key fields instead of deep comparison
+  if (prevProps.prediction.id !== nextProps.prediction.id) return false;
+  if (prevProps.prediction.resolved !== nextProps.prediction.resolved) return false;
+  if (prevProps.prediction.bets.length !== nextProps.prediction.bets.length) return false;
+  if (prevProps.prediction.expiresAt !== nextProps.prediction.expiresAt) return false;
+
+  // Compare other props (functions and strings are typically stable)
+  if (prevProps.className !== nextProps.className) return false;
+
+  return true;
+}
+
+export default React.memo(SimplePredictionCard, arePropsEqual);

@@ -50,6 +50,7 @@ export function ProfileStats({
   // State management
   const [showRawStats, setShowRawStats] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('achievements');
+  const [visitedTabs, setVisitedTabs] = useState<Set<TabType>>(new Set(['achievements']));
 
   // Admin state
   const adminContext = mode === 'admin' ? useAdmin() : null;
@@ -205,7 +206,10 @@ export function ProfileStats({
             {tabs.map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => {
+                  setActiveTab(tab.id);
+                  setVisitedTabs((prev) => new Set(prev).add(tab.id));
+                }}
                 className={`flex-1 px-4 py-4 text-sm font-medium transition-all duration-200 flex items-center justify-center gap-2 ${
                   activeTab === tab.id
                     ? 'bg-surface text-content border-b-2 border-primary shadow-sm'
@@ -219,30 +223,37 @@ export function ProfileStats({
           </div>
         </div>
 
-        {/* Tab Content - Keep all tabs mounted but hidden for instant switching + caching */}
-        <div className="min-h-[400px]">
-          {/* Achievements Tab - Always mounted, hidden when not active */}
-          <div className={`p-6 ${activeTab === 'achievements' ? '' : 'hidden'}`}>
-            <ProfileAchievements
-              achievements={profile?.achievements || (profile?.badges as any)}
-              embedded={true}
-            />
-          </div>
+        {/* Tab Content - Lazy mount on first visit, then keep mounted */}
+        <div className="min-h-[400px] relative">
+          {visitedTabs.has('achievements') && (
+            <div
+              className={`p-6 ${activeTab === 'achievements' ? '' : 'absolute inset-0 invisible pointer-events-none opacity-0'}`}
+            >
+              <ProfileAchievements
+                achievements={profile?.achievements || (profile?.badges as any)}
+                embedded={true}
+              />
+            </div>
+          )}
 
-          {/* Stats Tab - Always mounted, hidden when not active */}
-          <div className={`p-6 ${activeTab === 'stats' ? '' : 'hidden'}`}>
-            <ProfileStats
-              profile={profile && { muskBucks: asNum(profile.muskBucks), rank: profile.rank }}
-              stats={stats}
-              isOwn={isOwn}
-              mode="card"
-              compact={true}
-            />
-          </div>
+          {visitedTabs.has('stats') && (
+            <div
+              className={`p-6 ${activeTab === 'stats' ? '' : 'absolute inset-0 invisible pointer-events-none opacity-0'}`}
+            >
+              <ProfileStats
+                profile={profile && { muskBucks: asNum(profile.muskBucks), rank: profile.rank }}
+                stats={stats}
+                isOwn={isOwn}
+                mode="card"
+                compact={true}
+              />
+            </div>
+          )}
 
-          {/* Pong Stats Tab - Always mounted, hidden when not active */}
-          {profile?.id && (
-            <div className={`p-6 ${activeTab === 'pong' ? '' : 'hidden'}`}>
+          {visitedTabs.has('pong') && profile?.id && (
+            <div
+              className={`p-6 ${activeTab === 'pong' ? '' : 'absolute inset-0 invisible pointer-events-none opacity-0'}`}
+            >
               <ProfilePongStats
                 userId={profile.id}
                 isOwn={isOwn}

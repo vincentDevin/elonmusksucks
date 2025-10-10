@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { listBadges, searchUsers } from '../../../api/admin';
-import { SOCKET_EVENTS, type PublicBadge, type UserSearchParams, type Role } from '@ems/types';
-import { useSocket } from '../../../contexts/SocketContext';
+import { REDIS_CHANNELS, type PublicBadge, type UserSearchParams, type Role } from '@ems/types';
+import { useEventBusCore } from '../../../contexts/EventBusCoreContext';
 import UserListToolbar from './UserListToolbar';
 import CompactUserList, { type CompactUser } from './CompactUserList';
 import UserDetailsModal from './UserDetailsModal';
@@ -39,7 +39,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ className = '' }) => {
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
 
-  const socket = useSocket();
+  const { subscribe } = useEventBusCore();
 
   // Load badges on component mount
   useEffect(() => {
@@ -153,25 +153,20 @@ const UserManagement: React.FC<UserManagementProps> = ({ className = '' }) => {
 
   // Listen for real-time updates
   useEffect(() => {
-    if (socket) {
-      const handleUserUpdate = () => {
-        // Refresh current search when user updates occur
-        performSearch(currentSearchParams, false);
-      };
+    const handleUserUpdate = () => {
+      // Refresh current search when user updates occur
+      performSearch(currentSearchParams, false);
+    };
 
-      socket.on(SOCKET_EVENTS.ADMIN_MODERATION_USER_BAN, handleUserUpdate);
-      socket.on(SOCKET_EVENTS.ADMIN_MODERATION_USER_UNBAN, handleUserUpdate);
-      socket.on(SOCKET_EVENTS.ADMIN_MODERATION_USER_MUTE, handleUserUpdate);
-      socket.on(SOCKET_EVENTS.ADMIN_MODERATION_USER_KICK, handleUserUpdate);
+    const unsubscribers = [
+      subscribe(REDIS_CHANNELS.MODERATION_USER_BAN, handleUserUpdate),
+      subscribe(REDIS_CHANNELS.MODERATION_USER_UNBAN, handleUserUpdate),
+      subscribe(REDIS_CHANNELS.MODERATION_USER_MUTE, handleUserUpdate),
+      subscribe(REDIS_CHANNELS.MODERATION_USER_KICK, handleUserUpdate),
+    ];
 
-      return () => {
-        socket.off(SOCKET_EVENTS.ADMIN_MODERATION_USER_BAN, handleUserUpdate);
-        socket.off(SOCKET_EVENTS.ADMIN_MODERATION_USER_UNBAN, handleUserUpdate);
-        socket.off(SOCKET_EVENTS.ADMIN_MODERATION_USER_MUTE, handleUserUpdate);
-        socket.off(SOCKET_EVENTS.ADMIN_MODERATION_USER_KICK, handleUserUpdate);
-      };
-    }
-  }, [socket, currentSearchParams]);
+    return () => unsubscribers.forEach((unsub) => unsub());
+  }, [subscribe, currentSearchParams]);
 
   return (
     <div className={`space-y-6 ${className}`}>

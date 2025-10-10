@@ -1,4 +1,5 @@
 import { useState, useMemo, memo } from 'react';
+import { FixedSizeList as List } from 'react-window';
 import { useAchievements } from '../../contexts/AchievementContext';
 import type { ComponentAchievement } from '../../utils/achievementDataTransform';
 import AchievementCard from '../achievements/AchievementCard';
@@ -107,6 +108,19 @@ function ProfileAchievementsComponent({
 
     return stats.rarestAchievement || completedAchievements[0] || null;
   }, [displayAchievements, pinnedAchievementId, stats.rarestAchievement]);
+
+  // Memoize sorted completed achievements for virtualized list
+  const sortedCompletedAchievements = useMemo(() => {
+    return displayAchievements
+      .filter((a) => a.isCompleted)
+      .sort((a, b) => {
+        const rarityOrder = { legendary: 0, rare: 1, uncommon: 2, common: 3, shame: 4 };
+        const aRarity = rarityOrder[a.rarity as keyof typeof rarityOrder] ?? 5;
+        const bRarity = rarityOrder[b.rarity as keyof typeof rarityOrder] ?? 5;
+        if (aRarity !== bRarity) return aRarity - bRarity;
+        return new Date(b.completedAt || '').getTime() - new Date(a.completedAt || '').getTime();
+      });
+  }, [displayAchievements]);
 
   if (loading && !propAchievements) {
     return (
@@ -239,43 +253,49 @@ function ProfileAchievementsComponent({
         </div>
       )}
 
-      {/* Expanded view - unlocked achievements only */}
+      {/* Expanded view - unlocked achievements only with virtualization */}
       {expanded && (
-        <div className="space-y-3">
-          {displayAchievements
-            .filter((a) => a.isCompleted) // Only show completed/unlocked achievements
-            .sort((a, b) => {
-              const rarityOrder = { legendary: 0, rare: 1, uncommon: 2, common: 3, shame: 4 };
-              const aRarity = rarityOrder[a.rarity as keyof typeof rarityOrder] ?? 5;
-              const bRarity = rarityOrder[b.rarity as keyof typeof rarityOrder] ?? 5;
-              if (aRarity !== bRarity) return aRarity - bRarity;
-              return (
-                new Date(b.completedAt || '').getTime() - new Date(a.completedAt || '').getTime()
-              );
-            })
-            .map((achievement) => (
-              <AchievementCard
-                key={achievement.id}
-                achievement={achievement}
-                viewMode="list"
-                showProgress={false}
-                onTogglePin={(achievementId) => {
-                  setPinnedAchievementId(
-                    pinnedAchievementId === achievementId ? null : achievementId,
-                  );
-                }}
-                isPinned={pinnedAchievementId === achievement.id}
-              />
-            ))}
-
-          {displayAchievements.filter((a) => a.isCompleted).length === 0 && (
+        <>
+          {sortedCompletedAchievements.length > 0 ? (
+            <List
+              height={Math.min(sortedCompletedAchievements.length * 100, 600)}
+              itemCount={sortedCompletedAchievements.length}
+              itemSize={100}
+              width="100%"
+              itemData={{
+                achievements: sortedCompletedAchievements,
+                pinnedAchievementId,
+                setPinnedAchievementId,
+              }}
+            >
+              {({ index, style, data }) => {
+                const achievement = data.achievements[index];
+                return (
+                  <div style={style} className="pb-3">
+                    <AchievementCard
+                      key={achievement.id}
+                      achievement={achievement}
+                      viewMode="list"
+                      showProgress={false}
+                      onTogglePin={(achievementId) => {
+                        data.setPinnedAchievementId(
+                          data.pinnedAchievementId === achievementId ? null : achievementId,
+                        );
+                      }}
+                      isPinned={data.pinnedAchievementId === achievement.id}
+                    />
+                  </div>
+                );
+              }}
+            </List>
+          ) : (
             <div className="text-center py-8 text-tertiary">
               <div className="text-4xl mb-3">🎯</div>
               <p className="text-sm font-medium">No achievements unlocked yet</p>
               <p className="text-xs mt-1">Start engaging to unlock your first achievements!</p>
             </div>
           )}
-        </div>
+        </>
       )}
 
       {/* Empty state for collapsed view */}

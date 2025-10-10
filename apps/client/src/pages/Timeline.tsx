@@ -341,7 +341,7 @@ export default function Timeline() {
                 {/* Timeline Feed */}
                 <div className=" shadow rounded-lg transition-colors duration-300">
                   <TimelineWithPosts
-                    key={refreshKey}
+                    key={`${refreshKey}-${searchQuery}-${JSON.stringify(filters.authors)}-${JSON.stringify(filters.contentType)}`}
                     initialTab="posts"
                     searchQuery={searchQuery}
                     filters={filters}
