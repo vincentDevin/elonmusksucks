@@ -509,6 +509,25 @@ export async function getTrendingContent(req: Request, res: Response) {
 // Bookmark System Controllers
 // ===============================================
 
+export async function checkArticleBookmark(req: AuthRequest, res: Response) {
+  try {
+    const articleId = parseInt(req.params.id);
+    const userId = req.user!.id;
+
+    if (isNaN(articleId)) {
+      res.status(400).json({ error: 'Invalid article ID' });
+      return;
+    }
+
+    const isBookmarked = await timelineService.checkArticleBookmark(articleId, userId);
+
+    res.json({ isBookmarked });
+  } catch (error) {
+    console.error('[timeline] Error checking bookmark status:', error);
+    res.status(500).json({ error: 'Failed to check bookmark status' });
+  }
+}
+
 export async function toggleArticleBookmark(req: AuthRequest, res: Response) {
   try {
     const articleId = parseInt(req.params.id);

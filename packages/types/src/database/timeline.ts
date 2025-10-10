@@ -212,6 +212,8 @@ export interface DbArticleWithTags {
   hash: string;
   status: PrismaArticleStatus;
   modNotes: string | null;
+  reactionsCount: number;
+  commentsCount: number;
   createdAt: Date;
   updatedAt: Date;
   feed?: PrismaFeedSource;
@@ -278,6 +280,9 @@ export interface DbTrendingContent {
     content: string;
     createdAt: Date;
     authorId: number;
+    reactionsCount: number;
+    repliesCount: number;
+    viewsCount: number;
     author: {
       id: number;
       name: string;

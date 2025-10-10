@@ -5,6 +5,7 @@ import type { TimelineItem, ReactionType } from '@ems/types';
 import { ArticleCard as BaseArticleCard } from '../../BaseCard';
 import { PostReactions } from '../../posts/core/PostReactions';
 import { useReactions } from '../../../contexts/ReactionContext';
+import { BookmarkSystem } from '../widgets/BookmarkSystem';
 
 interface ArticleCardProps {
   item: TimelineItem;
@@ -142,6 +143,14 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({
             <span className="text-base">💬</span>
             <span className="font-medium">{commentsCount}</span>
           </button>
+
+          {/* Bookmark */}
+          <BookmarkSystem
+            contentId={String(articleId)}
+            contentType="article"
+            contentTitle={item.content?.title}
+            variant="button"
+          />
         </div>
       </div>
 

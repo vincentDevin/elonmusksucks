@@ -40,8 +40,10 @@ export default function PredictionPreview({
     if (!isVisible || !triggerRef.current || !previewRef.current) return;
 
     const calculatePosition = () => {
-      const triggerRect = triggerRef.current!.getBoundingClientRect();
-      const previewRect = previewRef.current!.getBoundingClientRect();
+      if (!triggerRef.current || !previewRef.current) return;
+
+      const triggerRect = triggerRef.current.getBoundingClientRect();
+      const previewRect = previewRef.current.getBoundingClientRect();
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
 

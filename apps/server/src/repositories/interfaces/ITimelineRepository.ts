@@ -49,6 +49,8 @@ export interface ITimelineRepository {
   getTrendingContent(params: DbTrendingContentParams): Promise<DbTrendingContent>;
 
   // Bookmark System
+  checkArticleBookmark(articleId: number, userId: number): Promise<boolean>;
+
   toggleArticleBookmark(
     articleId: number,
     userId: number,

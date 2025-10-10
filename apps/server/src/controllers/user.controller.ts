@@ -294,12 +294,11 @@ export async function getUserActivityHandler(
       return;
     }
 
-    // For now, return all public activities - in future this could be filtered by userId
-    // when the unified activity service adds user-specific query support
-    const activities: UnifiedActivityEvent[] = await unifiedActivityService.getPublicActivities(50);
-
-    // Filter activities for this specific user (temporary solution)
-    const userActivities = activities.filter((activity) => activity.userId === userId);
+    // Get activities for this specific user
+    const userActivities: UnifiedActivityEvent[] = await unifiedActivityService.getUserActivities(
+      userId,
+      200,
+    );
 
     res.json(userActivities);
   } catch (err) {
@@ -333,6 +332,34 @@ export async function getUserStatsHandler(
     // Service already returns UserStatsView, no need to transform
     res.json(stats);
   } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * GET /api/users/:userId/activity-stats
+ * Get aggregated activity stats (posts, reactions, comments, predictions) for today, week, and all time
+ */
+export async function getUserActivityStatsHandler(
+  req: ReqWithUser,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const userId = Number(req.params.userId);
+
+    if (isNaN(userId)) {
+      res.status(400).json({ error: 'Invalid user ID' });
+      return;
+    }
+
+    const activityStats = await userService.getUserActivityStats(userId);
+    res.json(activityStats);
+  } catch (err) {
+    if (err instanceof Error && err.message === 'User not found') {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
     next(err);
   }
 }

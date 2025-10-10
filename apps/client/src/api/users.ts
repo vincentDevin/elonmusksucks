@@ -3,6 +3,7 @@ import type {
   PublicUserProfile,
   UserFeedPost,
   UserActivity,
+  UserActivityStats,
   UserStatsDTO,
   SearchUserResult,
 } from '@ems/types';
@@ -92,6 +93,11 @@ export async function getUserActivity(userId: number): Promise<UserActivity[]> {
 /** ----------- STATS (OPTIONAL) ----------- */
 export async function getUserStats(userId: number): Promise<UserStatsDTO> {
   const res = await api.get<UserStatsDTO>(`/api/users/${userId}/stats`);
+  return res.data;
+}
+
+export async function getUserActivityStats(userId: number): Promise<UserActivityStats> {
+  const res = await api.get<UserActivityStats>(`/api/users/${userId}/activity-stats`);
   return res.data;
 }
 

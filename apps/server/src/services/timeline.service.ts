@@ -259,17 +259,90 @@ export class TimelineService {
       contentType: params.type,
     });
 
+    // Helper function to calculate trending score
+    // Formula: reactions × 2 + comments × 3 + views × 0.0001 + shares × 5
+    const calculateScore = (reactions: number, comments: number, views: number, shares = 0) => {
+      return reactions * 2 + comments * 3 + views * 0.0001 + shares * 5;
+    };
+
+    // Transform articles to TrendingItem
+    const articleItems = trendingData.articles.map((article) => ({
+      id: `article-${article.id}`,
+      type: 'article' as const,
+      title: article.title,
+      excerpt: article.excerpt || undefined,
+      author: {
+        id: String(article.feed?.id || 0),
+        name: article.feed?.name || 'Unknown Source',
+        avatar: undefined,
+      },
+      engagement: {
+        views: 0, // Articles don't track views currently
+        reactions: article.reactionsCount || 0,
+        comments: article.commentsCount || 0,
+        shares: 0, // Not tracked yet
+        score: calculateScore(article.reactionsCount || 0, article.commentsCount || 0, 0, 0),
+      },
+      timestamp: article.publishedAt?.toISOString() || article.createdAt.toISOString(),
+      tags: article.tags?.map((at) => at.tag.name) || [],
+      mediaUrl: article.leadImageUrl || undefined,
+      trendingRank: undefined, // Will be set after sorting
+      trendingChange: 'new' as const, // Default to 'new' (could be enhanced with Redis cache)
+    }));
+
+    // Transform posts to TrendingItem
+    const postItems = trendingData.posts.map((post) => ({
+      id: `post-${post.id}`,
+      type: 'post' as const,
+      title: post.content.length > 100 ? post.content.substring(0, 97) + '...' : post.content,
+      excerpt: undefined,
+      author: {
+        id: String(post.author.id),
+        name: post.author.name,
+        avatar: post.author.avatarUrl || undefined,
+      },
+      engagement: {
+        views: post.viewsCount || 0,
+        reactions: post.reactionsCount || 0,
+        comments: post.repliesCount || 0,
+        shares: 0, // Not tracked yet
+        score: calculateScore(
+          post.reactionsCount || 0,
+          post.repliesCount || 0,
+          post.viewsCount || 0,
+          0,
+        ),
+      },
+      timestamp: post.createdAt.toISOString(),
+      tags: undefined,
+      mediaUrl: undefined,
+      trendingRank: undefined,
+      trendingChange: 'new' as const,
+    }));
+
+    // Combine and sort by score
+    const allItems = [...articleItems, ...postItems].sort(
+      (a, b) => b.engagement.score - a.engagement.score,
+    );
+
+    // Assign trending ranks
+    const itemsWithRanks = allItems.slice(0, params.limit).map((item, index) => ({
+      ...item,
+      trendingRank: index + 1,
+    }));
+
     return {
-      articles: trendingData.articles || [],
-      posts: trendingData.posts || [],
-      tags: trendingData.tags || [],
-      authors: trendingData.authors || [],
+      items: itemsWithRanks,
     };
   }
 
   // ===============================================
   // Bookmark System Methods
   // ===============================================
+
+  async checkArticleBookmark(articleId: number, userId: number): Promise<boolean> {
+    return this.repository.checkArticleBookmark(articleId, userId);
+  }
 
   async toggleArticleBookmark(articleId: number, userId: number, collectionId?: number) {
     return this.repository.toggleArticleBookmark(articleId, userId, collectionId);

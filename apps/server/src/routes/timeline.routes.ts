@@ -10,6 +10,7 @@ import {
   searchTimeline,
   getSearchSuggestions,
   getTrendingContent,
+  checkArticleBookmark,
   toggleArticleBookmark,
   getUserBookmarks,
   getBookmarkCollections,
@@ -67,6 +68,9 @@ router.get('/trending', getTrendingContent);
 // ===============================================
 // Bookmark System API
 // ===============================================
+
+// GET /api/timeline/bookmarks/check/:id - Check if article is bookmarked
+router.get('/bookmarks/check/:id', requireAuth, checkArticleBookmark);
 
 // POST /api/timeline/articles/:id/bookmark - Bookmark article
 router.post('/articles/:id/bookmark', requireAuth, toggleArticleBookmark);

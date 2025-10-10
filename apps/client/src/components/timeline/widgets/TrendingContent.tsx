@@ -9,30 +9,8 @@ import {
   SparklesIcon,
 } from '@heroicons/react/24/outline';
 import { FireIcon as FireIconSolid } from '@heroicons/react/24/solid';
-
-interface TrendingItem {
-  id: string;
-  type: 'article' | 'post';
-  title: string;
-  excerpt?: string;
-  author: {
-    id: string;
-    name: string;
-    avatar?: string;
-  };
-  engagement: {
-    views: number;
-    reactions: number;
-    comments: number;
-    shares: number;
-    score: number; // Trending score calculation
-  };
-  timestamp: string;
-  tags?: string[];
-  mediaUrl?: string;
-  trendingRank?: number;
-  trendingChange?: 'up' | 'down' | 'same' | 'new';
-}
+import type { TrendingItem } from '@ems/types';
+import { timelineApi } from '../../../api/timeline';
 
 interface TrendingContentProps {
   timeRange?: 'hour' | 'day' | 'week' | 'month';
@@ -156,20 +134,17 @@ export const TrendingContent: React.FC<TrendingContentProps> = ({
     setError(null);
 
     try {
-      // TODO: Replace with actual API call
-      const response = await fetch(
-        `/api/timeline/trending?timeRange=${selectedTimeRange}&limit=${limit}`,
-      );
+      const data = await timelineApi.getTrending({
+        timeRange: selectedTimeRange,
+        limit: limit,
+        type: 'all',
+      });
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch trending content');
-      }
-
-      const data = await response.json();
       setItems(data.items || []);
     } catch (err) {
       console.error('Error fetching trending content:', err);
-      // Use mock data for now
+      setError('Failed to load trending content');
+      // Use mock data as fallback
       setItems(getMockTrendingItems());
     } finally {
       setLoading(false);

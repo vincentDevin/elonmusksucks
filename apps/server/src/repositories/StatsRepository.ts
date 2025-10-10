@@ -610,4 +610,137 @@ export class StatsRepository implements IStatsRepository {
       allRounder: 0,
     };
   }
+
+  /**
+   * Get aggregated activity stats for a user
+   * @param userId - ID of the user
+   * @returns Aggregated stats for today, week, and all time
+   */
+  async getUserActivityStats(userId: number) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { createdAt: true },
+    });
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    // Count posts (Content model with type POST)
+    const [postsToday, postsWeek, postsAllTime] = await Promise.all([
+      this.prisma.content.count({
+        where: { authorId: userId, type: 'POST', createdAt: { gte: todayStart } },
+      }),
+      this.prisma.content.count({
+        where: { authorId: userId, type: 'POST', createdAt: { gte: weekStart } },
+      }),
+      this.prisma.content.count({
+        where: { authorId: userId, type: 'POST' },
+      }),
+    ]);
+
+    // Count reactions given by user
+    const [reactionsToday, reactionsWeek, reactionsAllTime] = await Promise.all([
+      this.prisma.reaction.count({
+        where: { userId, createdAt: { gte: todayStart } },
+      }),
+      this.prisma.reaction.count({
+        where: { userId, createdAt: { gte: weekStart } },
+      }),
+      this.prisma.reaction.count({
+        where: { userId },
+      }),
+    ]);
+
+    // Count comments (Content model with type COMMENT)
+    const [commentsToday, commentsWeek, commentsAllTime] = await Promise.all([
+      this.prisma.content.count({
+        where: { authorId: userId, type: 'COMMENT', createdAt: { gte: todayStart } },
+      }),
+      this.prisma.content.count({
+        where: { authorId: userId, type: 'COMMENT', createdAt: { gte: weekStart } },
+      }),
+      this.prisma.content.count({
+        where: { authorId: userId, type: 'COMMENT' },
+      }),
+    ]);
+
+    // Count predictions created
+    const [predictionsToday, predictionsWeek, predictionsAllTime] = await Promise.all([
+      this.prisma.prediction.count({
+        where: { creatorId: userId, createdAt: { gte: todayStart } },
+      }),
+      this.prisma.prediction.count({
+        where: { creatorId: userId, createdAt: { gte: weekStart } },
+      }),
+      this.prisma.prediction.count({
+        where: { creatorId: userId },
+      }),
+    ]);
+
+    // Calculate account age in days
+    const accountAge = Math.floor(
+      (now.getTime() - user.createdAt.getTime()) / (1000 * 60 * 60 * 24),
+    );
+
+    // Calculate current streak (days with activity)
+    let currentStreak = 0;
+    for (let i = 0; i < 365; i++) {
+      const checkDate = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+      const dayStart = new Date(checkDate.getFullYear(), checkDate.getMonth(), checkDate.getDate());
+      const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+
+      const hasActivity = await this.prisma.userActivity.count({
+        where: {
+          userId,
+          createdAt: {
+            gte: dayStart,
+            lt: dayEnd,
+          },
+        },
+        take: 1,
+      });
+
+      if (hasActivity > 0) {
+        currentStreak++;
+      } else if (i > 0) {
+        // Don't break on day 0 (today) if no activity yet
+        break;
+      }
+    }
+
+    // For best streak, use longestStreak from UserStats if it exists
+    const userStats = await this.prisma.userStats.findUnique({
+      where: { userId },
+      select: { longestStreak: true },
+    });
+
+    return {
+      today: {
+        posts: postsToday,
+        reactions: reactionsToday,
+        comments: commentsToday,
+        predictions: predictionsToday,
+      },
+      week: {
+        posts: postsWeek,
+        reactions: reactionsWeek,
+        comments: commentsWeek,
+        predictions: predictionsWeek,
+        streak: currentStreak,
+      },
+      allTime: {
+        totalPosts: postsAllTime,
+        totalReactions: reactionsAllTime,
+        totalComments: commentsAllTime,
+        totalPredictions: predictionsAllTime,
+        accountAge,
+        bestStreak: userStats?.longestStreak || currentStreak,
+      },
+    };
+  }
 }

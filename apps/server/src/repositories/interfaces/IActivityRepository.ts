@@ -12,6 +12,8 @@ export interface IActivityRepository {
 
   getPublicActivities(limit: number): Promise<PublicActivity[]>;
 
+  getUserActivities(userId: number, limit: number): Promise<PublicActivity[]>;
+
   createActivityRecord(data: DbCreateActivityRecordData): Promise<{ id: number }>;
 
   findActivitiesWithFilters(

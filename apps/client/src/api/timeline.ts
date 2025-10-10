@@ -10,6 +10,7 @@ import type {
   ArticleModerationData,
   OPMLImportResult,
   FeedStatsResponse,
+  TrendingContentResponse,
 } from '@ems/types';
 
 /**
@@ -199,18 +200,21 @@ export const timelineApi = {
     timeRange?: 'hour' | 'day' | 'week' | 'month';
     limit?: number;
     type?: 'articles' | 'posts' | 'all';
-  }): Promise<{
-    articles: any[];
-    posts: any[];
-    tags: any[];
-    authors: any[];
-  }> => {
+  }): Promise<TrendingContentResponse> => {
     const searchParams = new URLSearchParams();
     searchParams.set('timeRange', params?.timeRange || 'day');
     searchParams.set('limit', String(params?.limit || 10));
     searchParams.set('type', params?.type || 'all');
 
     const response = await api.get(`/api/timeline/trending?${searchParams.toString()}`);
+    return response.data;
+  },
+
+  /**
+   * Check if article is bookmarked
+   */
+  checkBookmarkStatus: async (articleId: number): Promise<{ isBookmarked: boolean }> => {
+    const response = await api.get(`/api/timeline/bookmarks/check/${articleId}`);
     return response.data;
   },
 
@@ -248,6 +252,44 @@ export const timelineApi = {
     if (params?.collectionId) searchParams.set('collectionId', String(params.collectionId));
 
     const response = await api.get(`/api/timeline/bookmarks?${searchParams.toString()}`);
+    return response.data;
+  },
+
+  /**
+   * Get user's bookmark collections
+   */
+  getBookmarkCollections: async (): Promise<{
+    collections: Array<{
+      id: number;
+      name: string;
+      description?: string | null;
+      isPrivate: boolean;
+      createdAt: string;
+      updatedAt: string;
+      _count: { bookmarks: number };
+    }>;
+  }> => {
+    const response = await api.get('/api/timeline/bookmark-collections');
+    return response.data;
+  },
+
+  /**
+   * Create a new bookmark collection
+   */
+  createBookmarkCollection: async (data: {
+    name: string;
+    description?: string;
+    isPrivate?: boolean;
+  }): Promise<{
+    id: number;
+    name: string;
+    description?: string | null;
+    isPrivate: boolean;
+    createdAt: string;
+    updatedAt: string;
+    _count: { bookmarks: number };
+  }> => {
+    const response = await api.post('/api/timeline/bookmark-collections', data);
     return response.data;
   },
 

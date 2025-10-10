@@ -11,6 +11,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { BookmarkIcon as BookmarkIconSolid } from '@heroicons/react/24/solid';
 import { useAuth } from '../../../contexts/AuthContext';
+import { timelineApi } from '../../../api/timeline';
 
 interface Bookmark {
   id: string;
@@ -51,8 +52,8 @@ interface BookmarkSystemProps {
 
 export const BookmarkSystem: React.FC<BookmarkSystemProps> = ({
   contentId,
-  contentType = 'article',
-  contentTitle,
+  contentType: _contentType = 'article', // Available for future use
+  contentTitle: _contentTitle, // Available for future use
   variant = 'button',
   onBookmarkChange,
   className = '',
@@ -74,11 +75,8 @@ export const BookmarkSystem: React.FC<BookmarkSystemProps> = ({
 
     const checkBookmarkStatus = async () => {
       try {
-        const response = await fetch(`/api/bookmarks/check/${contentId}`);
-        if (response.ok) {
-          const data = await response.json();
-          setIsBookmarked(data.isBookmarked);
-        }
+        const data = await timelineApi.checkBookmarkStatus(parseInt(contentId));
+        setIsBookmarked(data.isBookmarked);
       } catch (error) {
         console.error('Failed to check bookmark status:', error);
       }
@@ -87,27 +85,47 @@ export const BookmarkSystem: React.FC<BookmarkSystemProps> = ({
     checkBookmarkStatus();
   }, [contentId, user]);
 
-  // Fetch bookmarks and collections for manager variant
+  // Fetch bookmarks and collections for manager and widget variants
   useEffect(() => {
-    if (variant !== 'manager' || !user) return;
+    if ((variant !== 'manager' && variant !== 'widget') || !user) return;
 
     const fetchBookmarksAndCollections = async () => {
       setLoading(true);
       try {
-        const [bookmarksRes, collectionsRes] = await Promise.all([
-          fetch('/api/bookmarks'),
-          fetch('/api/bookmarks/collections'),
+        const [bookmarksData, collectionsData] = await Promise.all([
+          timelineApi.getBookmarks(),
+          timelineApi.getBookmarkCollections(),
         ]);
 
-        if (bookmarksRes.ok) {
-          const bookmarksData = await bookmarksRes.json();
-          setBookmarks(bookmarksData.bookmarks || []);
-        }
+        // Transform backend bookmarks to frontend interface
+        const transformedBookmarks = (bookmarksData.bookmarks || []).map((bm: any) => ({
+          id: String(bm.id),
+          contentId: String(bm.article.id),
+          contentType: 'article' as const,
+          title: bm.article.title,
+          excerpt: bm.article.excerpt || undefined,
+          url: bm.article.url,
+          author: bm.article.feed
+            ? { id: String(bm.article.feed.id), name: bm.article.feed.name }
+            : undefined,
+          collectionId: bm.collectionId ? String(bm.collectionId) : undefined,
+          tags: bm.article.tags?.map((at: any) => at.tag?.name).filter(Boolean) || [],
+          createdAt: new Date(bm.createdAt).toISOString(),
+        }));
 
-        if (collectionsRes.ok) {
-          const collectionsData = await collectionsRes.json();
-          setCollections(collectionsData.collections || []);
-        }
+        setBookmarks(transformedBookmarks);
+
+        // Transform collections to match local interface (convert _count to bookmarkCount)
+        const transformedCollections = (collectionsData.collections || []).map((col) => ({
+          id: String(col.id),
+          name: col.name,
+          description: col.description || undefined,
+          bookmarkCount: col._count.bookmarks,
+          isPrivate: col.isPrivate,
+          createdAt: col.createdAt,
+          updatedAt: col.updatedAt,
+        }));
+        setCollections(transformedCollections);
       } catch (error) {
         console.error('Failed to fetch bookmarks:', error);
         // Mock data for development
@@ -168,34 +186,16 @@ export const BookmarkSystem: React.FC<BookmarkSystemProps> = ({
 
     setLoading(true);
     try {
-      if (isBookmarked) {
-        // Remove bookmark
-        const response = await fetch(`/api/bookmarks/${contentId}`, {
-          method: 'DELETE',
-        });
+      const result = await timelineApi.toggleBookmark(
+        parseInt(contentId),
+        selectedCollection ? parseInt(selectedCollection) : undefined,
+      );
 
-        if (response.ok) {
-          setIsBookmarked(false);
-          onBookmarkChange?.(false);
-        }
-      } else {
-        // Add bookmark
-        const response = await fetch('/api/bookmarks', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contentId,
-            contentType,
-            title: contentTitle,
-            collectionId: selectedCollection,
-          }),
-        });
-
-        if (response.ok) {
-          setIsBookmarked(true);
-          onBookmarkChange?.(true);
-          setShowCollectionMenu(false);
-        }
+      const newBookmarkState = result.action === 'added';
+      setIsBookmarked(newBookmarkState);
+      onBookmarkChange?.(newBookmarkState);
+      if (newBookmarkState) {
+        setShowCollectionMenu(false);
       }
     } catch (error) {
       console.error('Failed to toggle bookmark:', error);
@@ -209,19 +209,25 @@ export const BookmarkSystem: React.FC<BookmarkSystemProps> = ({
     if (!newCollectionName.trim() || !user) return;
 
     try {
-      const response = await fetch('/api/bookmarks/collections', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newCollectionName }),
+      const newCollection = await timelineApi.createBookmarkCollection({
+        name: newCollectionName.trim(),
       });
 
-      if (response.ok) {
-        const newCollection = await response.json();
-        setCollections([...collections, newCollection]);
-        setNewCollectionName('');
-        setShowCreateCollection(false);
-        setSelectedCollection(newCollection.id);
-      }
+      // Transform the new collection to match local interface
+      const transformedCollection: Collection = {
+        id: String(newCollection.id),
+        name: newCollection.name,
+        description: newCollection.description || undefined,
+        bookmarkCount: newCollection._count.bookmarks,
+        isPrivate: newCollection.isPrivate,
+        createdAt: newCollection.createdAt,
+        updatedAt: newCollection.updatedAt,
+      };
+
+      setCollections([...collections, transformedCollection]);
+      setNewCollectionName('');
+      setShowCreateCollection(false);
+      setSelectedCollection(String(newCollection.id));
     } catch (error) {
       console.error('Failed to create collection:', error);
     }
@@ -230,13 +236,15 @@ export const BookmarkSystem: React.FC<BookmarkSystemProps> = ({
   // Delete bookmark
   const handleDeleteBookmark = async (bookmarkId: string) => {
     try {
-      const response = await fetch(`/api/bookmarks/${bookmarkId}`, {
-        method: 'DELETE',
-      });
+      // Find the bookmark to get the articleId
+      const bookmark = bookmarks.find((b) => b.id === bookmarkId);
+      if (!bookmark) return;
 
-      if (response.ok) {
-        setBookmarks(bookmarks.filter((b) => b.id !== bookmarkId));
-      }
+      // Toggle the bookmark (which will remove it since it's already bookmarked)
+      await timelineApi.toggleBookmark(parseInt(bookmark.contentId));
+
+      // Remove from local state
+      setBookmarks(bookmarks.filter((b) => b.id !== bookmarkId));
     } catch (error) {
       console.error('Failed to delete bookmark:', error);
     }
@@ -282,7 +290,14 @@ export const BookmarkSystem: React.FC<BookmarkSystemProps> = ({
     return (
       <div className={`relative ${className}`}>
         <button
-          onClick={() => (isBookmarked ? handleToggleBookmark() : setShowCollectionMenu(true))}
+          onClick={(e) => {
+            e.stopPropagation(); // Prevent event bubbling to parent card
+            if (isBookmarked) {
+              handleToggleBookmark();
+            } else {
+              setShowCollectionMenu(true);
+            }
+          }}
           disabled={loading || !user}
           className={`p-2 rounded-lg transition-colors ${
             isBookmarked ? 'text-primary hover:text-error' : 'text-tertiary hover:text-primary'
@@ -298,13 +313,17 @@ export const BookmarkSystem: React.FC<BookmarkSystemProps> = ({
 
         {/* Collection selection menu */}
         {showCollectionMenu && !isBookmarked && (
-          <div className="absolute z-50 mt-2 bg-surface border border-border rounded-lg shadow-lg min-w-[200px]">
+          <div
+            className="absolute z-50 mt-2 bg-surface border border-border rounded-lg shadow-lg min-w-[200px]"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="p-2 border-b border-border">
               <p className="text-xs font-medium text-tertiary">Save to collection:</p>
             </div>
             <div className="p-2 space-y-1 max-h-[200px] overflow-y-auto">
               <button
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   setSelectedCollection(null);
                   handleToggleBookmark();
                 }}
@@ -316,7 +335,8 @@ export const BookmarkSystem: React.FC<BookmarkSystemProps> = ({
               {collections.map((collection) => (
                 <button
                   key={collection.id}
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     setSelectedCollection(collection.id);
                     handleToggleBookmark();
                   }}
@@ -332,7 +352,10 @@ export const BookmarkSystem: React.FC<BookmarkSystemProps> = ({
             </div>
             <div className="p-2 border-t border-border">
               <button
-                onClick={() => setShowCreateCollection(true)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowCreateCollection(true);
+                }}
                 className="w-full text-left px-3 py-2 text-sm text-primary hover:bg-hover rounded transition-colors"
               >
                 <PlusIcon className="w-4 h-4 inline mr-2" />
@@ -340,7 +363,10 @@ export const BookmarkSystem: React.FC<BookmarkSystemProps> = ({
               </button>
             </div>
             <button
-              onClick={() => setShowCollectionMenu(false)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowCollectionMenu(false);
+              }}
               className="absolute top-2 right-2 text-tertiary hover:text-content"
             >
               <XMarkIcon className="w-4 h-4" />
@@ -350,11 +376,15 @@ export const BookmarkSystem: React.FC<BookmarkSystemProps> = ({
 
         {/* Create collection mini-form */}
         {showCreateCollection && (
-          <div className="absolute z-50 mt-2 bg-surface border border-border rounded-lg shadow-lg p-3 w-[250px]">
+          <div
+            className="absolute z-50 mt-2 bg-surface border border-border rounded-lg shadow-lg p-3 w-[250px]"
+            onClick={(e) => e.stopPropagation()}
+          >
             <input
               type="text"
               value={newCollectionName}
               onChange={(e) => setNewCollectionName(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
               placeholder="Collection name..."
               className="w-full px-3 py-2 bg-background border border-border rounded text-sm
                          focus:outline-none focus:border-primary"
@@ -362,13 +392,17 @@ export const BookmarkSystem: React.FC<BookmarkSystemProps> = ({
             />
             <div className="flex space-x-2 mt-2">
               <button
-                onClick={handleCreateCollection}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCreateCollection();
+                }}
                 className="flex-1 px-3 py-1.5 bg-primary text-primary-foreground text-sm rounded hover:bg-primary/90"
               >
                 Create
               </button>
               <button
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   setShowCreateCollection(false);
                   setNewCollectionName('');
                 }}
@@ -483,6 +517,7 @@ export const BookmarkSystem: React.FC<BookmarkSystemProps> = ({
         </div>
       </div>
 
+      {/* Bookmark list */}
       <div className="p-4">
         {loading ? (
           <div className="space-y-3">

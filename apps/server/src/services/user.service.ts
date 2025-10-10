@@ -2,8 +2,10 @@ import redisClient from '../lib/redis';
 import { CACHE_KEYS, getProfileImageTTL, getTTLUntilMidnight } from '../lib/cacheTTL';
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { PrismaClient } from '@prisma/client';
 import type { IUserRepository } from '../repositories/interfaces/IUserRepository';
 import { UserRepository } from '../repositories/UserRepository';
+import { StatsRepository } from '../repositories/StatsRepository';
 import type { DbUser, DbUserBadge, DbBadge, DbUserStats, DbUserFeedContent } from '@ems/types';
 // TODO: Branded types available: UserId, PredictionId, ISODateString, TimestampMs
 import type { UserProfileView, UserStatsView } from '@ems/types';
@@ -22,11 +24,13 @@ export type UploadedFile = {
 
 export class UserService {
   private repo: IUserRepository;
+  private statsRepo: StatsRepository;
   private s3: S3Client;
   private bucket: string;
 
   constructor(repo: IUserRepository = new UserRepository()) {
     this.repo = repo;
+    this.statsRepo = new StatsRepository(new PrismaClient());
     this.s3 = new S3Client({
       region: 'auto',
       endpoint: process.env.TIGRIS_S3_ENDPOINT,
@@ -916,5 +920,14 @@ export class UserService {
     },
   ) {
     return this.repo.getUserFollowing(userId, params);
+  }
+
+  /**
+   * Get aggregated activity stats for a user
+   * @param userId - ID of the user
+   * @returns Aggregated stats for today, week, and all time
+   */
+  async getUserActivityStats(userId: number) {
+    return this.statsRepo.getUserActivityStats(userId);
   }
 }

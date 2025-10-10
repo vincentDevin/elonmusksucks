@@ -94,6 +94,53 @@ export class ActivityRepository implements IActivityRepository {
   }
 
   /**
+   * Get activities for a specific user
+   * @param userId - ID of the user
+   * @param limit - Maximum number of activities to return
+   * @returns Array of user activities with relations
+   */
+  async getUserActivities(userId: number, limit: number): Promise<PublicActivity[]> {
+    const activities = await prisma.userActivity.findMany({
+      where: {
+        userId,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      include: {
+        user: { select: { id: true, name: true, avatarUrl: true } },
+        prediction: { select: { id: true, title: true, category: true } },
+        bet: { select: { id: true, amount: true } },
+      },
+    });
+
+    // Transform to PublicActivity type
+    return activities.map((activity) => ({
+      id: activity.id,
+      type: activity.type,
+      title: activity.title,
+      description: activity.description,
+      details: (activity.details as Record<string, any>) ?? {},
+      isPersonal: activity.isPersonal,
+      priority: activity.priority,
+      createdAt: activity.createdAt,
+      user: activity.user,
+      prediction: activity.prediction
+        ? {
+            id: activity.prediction.id,
+            title: activity.prediction.title,
+            category: activity.prediction.category?.name ?? 'Uncategorized',
+          }
+        : null,
+      bet: activity.bet
+        ? {
+            id: activity.bet.id,
+            amount: activity.bet.amount,
+          }
+        : null,
+    }));
+  }
+
+  /**
    * Create a new activity record (full version with all optional fields)
    * @param data - Complete activity record data
    * @returns Object with the created activity ID

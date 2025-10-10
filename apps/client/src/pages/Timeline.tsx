@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
+import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
 import { TimelineProvider } from '../contexts/TimelineContext';
 import {
   TimelineWithPosts,
@@ -9,8 +10,7 @@ import {
   ContentModal,
   CreatePost,
 } from '../components/timeline/core';
-import { TrendingHashtags } from '../components/posts/feeds';
-import { TrendingContent, ActivitySummary, BookmarkSystem } from '../components/timeline/widgets';
+import { TrendingWidget, ActivitySummary, BookmarkSystem } from '../components/timeline/widgets';
 import { convertArticleToFeedItem, type UnifiedFeedItem } from '../utils/feedAdapter';
 import { useAuth } from '../contexts/AuthContext';
 import { timelineApi } from '../api/timeline';
@@ -33,6 +33,13 @@ export default function Timeline() {
   });
   const [showFilters, setShowFilters] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // Widget expansion states
+  const [expandedWidgets, setExpandedWidgets] = useState({
+    trending: false,
+    activity: false,
+    bookmarks: false,
+  });
 
   // Handle search
   const handleSearch = useCallback(async (query: string) => {
@@ -127,6 +134,14 @@ export default function Timeline() {
     setRefreshKey((prev) => prev + 1);
   }, []);
 
+  // Toggle widget expansion
+  const toggleWidget = useCallback((widget: keyof typeof expandedWidgets) => {
+    setExpandedWidgets((prev) => ({
+      ...prev,
+      [widget]: !prev[widget],
+    }));
+  }, []);
+
   return (
     <div className="bg-background text-content min-h-screen transition-colors duration-300">
       <TimelineProvider>
@@ -187,8 +202,32 @@ export default function Timeline() {
               </div>
             </div>
 
+            {/* Quick Actions Section */}
+            <div className="bg-surface rounded-lg p-4 shadow mb-6 transition-colors duration-300">
+              <div className="flex items-center gap-4 justify-between">
+                <Link
+                  to="/predictions"
+                  className="flex-1 px-4 py-2 text-sm bg-primary text-primary-foreground rounded hover:bg-primary-hover transition-colors text-center"
+                >
+                  Make Prediction
+                </Link>
+                <Link
+                  to="/leaderboard"
+                  className="flex-1 px-4 py-2 text-sm bg-surface border border-border text-content rounded hover:bg-primary/10 transition-colors text-center"
+                >
+                  View Leaderboard
+                </Link>
+                <Link
+                  to="/pong"
+                  className="flex-1 px-4 py-2 text-sm bg-surface border border-border text-content rounded hover:bg-primary/10 transition-colors text-center"
+                >
+                  Play Pong
+                </Link>
+              </div>
+            </div>
+
             {/* Main Content Layout */}
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
               {/* Main Timeline Content - Takes up 3 columns on large screens */}
               <div className="lg:col-span-3 space-y-6">
                 {/* Create Post Component - Only shown for authenticated users */}
@@ -207,44 +246,58 @@ export default function Timeline() {
                 </div>
               </div>
 
-              {/* Right Sidebar - Takes up 1 column on large screens */}
-              <div className="lg:col-span-1">
+              {/* Right Sidebar - Takes up 2 columns on large screens */}
+              <div className="lg:col-span-2">
                 {/* Sticky sidebar container */}
-                <div className="sticky top-4 space-y-6">
-                  {/* Trending Content */}
-                  <TrendingContent variant="sidebar" timeRange="day" limit={5} />
+                <div className="sticky top-4 space-y-4 self-start">
+                  {/* Trending Content & Topics - Combined Widget */}
+                  <div className="relative group">
+                    <div
+                      onClick={() => toggleWidget('trending')}
+                      className="absolute left-0 top-0 right-16 h-10 cursor-pointer z-10 rounded-tl-lg hover:bg-muted/5 transition-colors"
+                      title={expandedWidgets.trending ? 'Click to collapse' : 'Click to expand'}
+                    />
+                    <TrendingWidget timeRange="day" limit={expandedWidgets.trending ? 12 : 3} />
+                    <div className="absolute top-3 right-4 pointer-events-none">
+                      {expandedWidgets.trending ? (
+                        <ChevronUpIcon className="w-5 h-5 text-tertiary group-hover:text-primary transition-colors" />
+                      ) : (
+                        <ChevronDownIcon className="w-5 h-5 text-tertiary group-hover:text-primary transition-colors" />
+                      )}
+                    </div>
+                  </div>
 
                   {/* Activity Summary - Replaces static stats */}
-                  <ActivitySummary variant="compact" />
-
-                  {/* Trending Hashtags */}
-                  <TrendingHashtags limit={6} />
+                  <div className="relative group">
+                    <div
+                      onClick={() => toggleWidget('activity')}
+                      className="absolute inset-x-0 top-0 h-14 cursor-pointer z-10 rounded-t-lg hover:bg-muted/5 transition-colors"
+                      title={expandedWidgets.activity ? 'Click to collapse' : 'Click to expand'}
+                    />
+                    <ActivitySummary variant={expandedWidgets.activity ? 'full' : 'compact'} />
+                    <div className="absolute top-4 right-4 pointer-events-none">
+                      {expandedWidgets.activity ? (
+                        <ChevronUpIcon className="w-5 h-5 text-tertiary group-hover:text-primary transition-colors" />
+                      ) : (
+                        <ChevronDownIcon className="w-5 h-5 text-tertiary group-hover:text-primary transition-colors" />
+                      )}
+                    </div>
+                  </div>
 
                   {/* Bookmarks Widget */}
-                  <BookmarkSystem variant="widget" />
-
-                  {/* Quick Actions Card */}
-                  <div className="bg-surface rounded-lg p-4 shadow transition-colors duration-300">
-                    <h3 className="text-lg font-semibold mb-3 text-content">Quick Actions</h3>
-                    <div className="space-y-2">
-                      <Link
-                        to="/predictions"
-                        className="block w-full px-4 py-2 text-sm bg-primary text-primary-foreground rounded hover:bg-primary-hover transition-colors text-center"
-                      >
-                        Make Prediction
-                      </Link>
-                      <Link
-                        to="/leaderboard"
-                        className="block w-full px-4 py-2 text-sm bg-surface border border-border text-content rounded hover:bg-primary/10 transition-colors text-center"
-                      >
-                        View Leaderboard
-                      </Link>
-                      <Link
-                        to="/pong"
-                        className="block w-full px-4 py-2 text-sm bg-surface border border-border text-content rounded hover:bg-primary/10 transition-colors text-center"
-                      >
-                        Play Pong
-                      </Link>
+                  <div className="relative group">
+                    <div
+                      onClick={() => toggleWidget('bookmarks')}
+                      className="absolute inset-x-0 top-0 h-14 cursor-pointer z-10 rounded-t-lg hover:bg-muted/5 transition-colors"
+                      title={expandedWidgets.bookmarks ? 'Click to collapse' : 'Click to expand'}
+                    />
+                    <BookmarkSystem variant={expandedWidgets.bookmarks ? 'manager' : 'widget'} />
+                    <div className="absolute top-[1.125rem] right-4 pointer-events-none">
+                      {expandedWidgets.bookmarks ? (
+                        <ChevronUpIcon className="w-5 h-5 text-tertiary group-hover:text-primary transition-colors" />
+                      ) : (
+                        <ChevronDownIcon className="w-5 h-5 text-tertiary group-hover:text-primary transition-colors" />
+                      )}
                     </div>
                   </div>
                 </div>

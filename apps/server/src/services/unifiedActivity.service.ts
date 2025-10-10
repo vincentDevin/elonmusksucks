@@ -166,6 +166,45 @@ export class UnifiedActivityService {
     });
   }
 
+  /**
+   * Get activities for a specific user
+   * @param userId - ID of the user
+   * @param limit - Maximum number of activities to return (default 50)
+   * @returns Array of unified activity events for the user
+   */
+  async getUserActivities(userId: number, limit = 50): Promise<UnifiedActivityEvent[]> {
+    const activities = await this.repo.getUserActivities(userId, limit);
+
+    // Transform to unified Redis format for consistency
+    return activities.map((activity) => {
+      const details = (activity.details as any) || {};
+      return {
+        id: activity.id.toString(),
+        type: activity.type as any,
+        timestamp: activity.createdAt.toISOString(),
+        priority: activity.priority as 'high' | 'medium' | 'low',
+        userId: activity.user.id,
+        userName: activity.user.name,
+        userAvatar: activity.user.avatarUrl || undefined,
+        title: activity.title || details.title || '',
+        description: activity.description || details.description || '',
+        icon: details.icon || '•',
+        color: details.color,
+        amount: details.amount,
+        odds: details.odds,
+        predictionId: activity.prediction?.id || details.predictionId,
+        predictionTitle: activity.prediction?.title || details.predictionTitle,
+        category: activity.prediction?.category || details.category,
+        optionLabel: details.optionLabel,
+        isPersonal: activity.isPersonal,
+        isHighValue: details.isHighValue || (details.amount && details.amount >= 1000),
+        isWin: details.isWin,
+        streak: details.streak,
+        meta: details,
+      } as UnifiedActivityEvent;
+    });
+  }
+
   // ===== Activity Creation Helpers =====
 
   /**

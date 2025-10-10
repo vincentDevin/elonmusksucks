@@ -9,6 +9,7 @@ import {
   createUserPostHandler,
   getUserActivityHandler,
   getUserStatsHandler,
+  getUserActivityStatsHandler,
   uploadProfileImageHandler,
   getUserBetsHandler,
   getUserParlaysHandler,
@@ -69,6 +70,7 @@ router.get('/:userId/following', getUserFollowingHandler);
 
 // User stats
 router.get('/:userId/stats', requireAuth, getUserStatsHandler);
+router.get('/:userId/activity-stats', requireAuth, getUserActivityStatsHandler);
 router.get('/:userId/enhanced-stats', requireAuth, getEnhancedUserStatsHandler);
 router.get('/:userId/achievements', requireAuth, getUserAchievementsHandler);
 router.get('/:userId/achievements/recent', requireAuth, getRecentAchievementsHandler);

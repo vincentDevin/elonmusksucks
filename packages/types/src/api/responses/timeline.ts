@@ -135,3 +135,35 @@ export interface OPMLExportResult {
     docs: string;
   };
 }
+
+// ============================================================================
+// Trending Content Types
+// ============================================================================
+
+export interface TrendingItem {
+  id: string;
+  type: 'article' | 'post';
+  title: string;
+  excerpt?: string;
+  author: {
+    id: string;
+    name: string;
+    avatar?: string;
+  };
+  engagement: {
+    views: number;
+    reactions: number;
+    comments: number;
+    shares: number;
+    score: number; // Trending score calculation
+  };
+  timestamp: string;
+  tags?: string[];
+  mediaUrl?: string;
+  trendingRank?: number;
+  trendingChange?: 'up' | 'down' | 'same' | 'new';
+}
+
+export interface TrendingContentResponse {
+  items: TrendingItem[];
+}

@@ -115,6 +115,8 @@ export class TimelineRepository implements ITimelineRepository {
       hash: article.hash,
       status: article.status,
       modNotes: article.modNotes,
+      reactionsCount: article.reactionsCount,
+      commentsCount: article.commentsCount,
       createdAt: article.createdAt,
       updatedAt: article.updatedAt,
       feed: article.feed,
@@ -183,6 +185,8 @@ export class TimelineRepository implements ITimelineRepository {
       hash: article.hash,
       status: article.status,
       modNotes: article.modNotes,
+      reactionsCount: article.reactionsCount,
+      commentsCount: article.commentsCount,
       createdAt: article.createdAt,
       updatedAt: article.updatedAt,
       feed: article.feed,
@@ -271,6 +275,8 @@ export class TimelineRepository implements ITimelineRepository {
         hash: article.hash,
         status: article.status,
         modNotes: article.modNotes,
+        reactionsCount: article.reactionsCount,
+        commentsCount: article.commentsCount,
         createdAt: article.createdAt,
         updatedAt: article.updatedAt,
         feed: article.feed,
@@ -410,6 +416,8 @@ export class TimelineRepository implements ITimelineRepository {
         hash: article.hash,
         status: article.status,
         modNotes: article.modNotes,
+        reactionsCount: article.reactionsCount,
+        commentsCount: article.commentsCount,
         createdAt: article.createdAt,
         updatedAt: article.updatedAt,
         feed: article.feed,
@@ -588,6 +596,8 @@ export class TimelineRepository implements ITimelineRepository {
         hash: article.hash,
         status: article.status,
         modNotes: article.modNotes,
+        reactionsCount: article.reactionsCount,
+        commentsCount: article.commentsCount,
         createdAt: article.createdAt,
         updatedAt: article.updatedAt,
         feed: article.feed,
@@ -602,6 +612,87 @@ export class TimelineRepository implements ITimelineRepository {
         })),
       }));
     }
+
+    // Get trending posts
+    if (params.contentType === 'posts' || params.contentType === 'all') {
+      const trendingPosts = await this.prisma.content.findMany({
+        where: {
+          type: 'POST',
+          createdAt: { gte: since },
+        },
+        include: {
+          author: {
+            select: {
+              id: true,
+              name: true,
+              avatarUrl: true,
+            },
+          },
+        },
+        orderBy: [
+          { reactionsCount: 'desc' },
+          { repliesCount: 'desc' },
+          { viewsCount: 'desc' },
+          { createdAt: 'desc' },
+        ],
+        take: limit,
+      });
+
+      result.posts = trendingPosts.map((post) => ({
+        id: post.id,
+        content: post.body,
+        createdAt: post.createdAt,
+        authorId: post.authorId,
+        reactionsCount: post.reactionsCount,
+        repliesCount: post.repliesCount,
+        viewsCount: Number(post.viewsCount), // BigInt to number
+        author: {
+          id: post.author.id,
+          name: post.author.name,
+          avatarUrl: post.author.avatarUrl,
+        },
+      }));
+    }
+
+    // Get trending tags
+    const trendingTags = await this.prisma.articleTag.groupBy({
+      by: ['tagId'],
+      where: {
+        article: {
+          status: 'APPROVED',
+          publishedAt: { gte: since },
+        },
+      },
+      _count: {
+        articleId: true,
+      },
+      orderBy: {
+        _count: {
+          articleId: 'desc',
+        },
+      },
+      take: Math.min(limit, 20),
+    });
+
+    const tagIds = trendingTags.map((t) => t.tagId);
+    const tags = await this.prisma.tag.findMany({
+      where: { id: { in: tagIds } },
+      select: { id: true, name: true, slug: true },
+    });
+
+    const tagMap = new Map(tags.map((tag) => [tag.id, tag]));
+    result.tags = trendingTags
+      .map((tt) => {
+        const tag = tagMap.get(tt.tagId);
+        if (!tag) return null;
+        return {
+          id: tag.id,
+          name: tag.name,
+          slug: tag.slug,
+          articleCount: tt._count.articleId,
+        };
+      })
+      .filter((t): t is NonNullable<typeof t> => t !== null);
 
     // Get trending feeds (as authors)
     const trendingFeeds = await this.prisma.feedSource.findMany({
@@ -644,6 +735,23 @@ export class TimelineRepository implements ITimelineRepository {
     }));
 
     return result;
+  }
+
+  /**
+   * Check if an article is bookmarked by a user
+   * @param articleId - ID of the article
+   * @param userId - ID of the user
+   * @returns True if bookmarked, false otherwise
+   */
+  async checkArticleBookmark(articleId: number, userId: number): Promise<boolean> {
+    const bookmark = await this.prisma.articleBookmark.findFirst({
+      where: {
+        articleId,
+        userId,
+      },
+    });
+
+    return bookmark !== null;
   }
 
   /**
@@ -799,6 +907,8 @@ export class TimelineRepository implements ITimelineRepository {
           hash: bookmark.article.hash,
           status: bookmark.article.status,
           modNotes: bookmark.article.modNotes,
+          reactionsCount: bookmark.article.reactionsCount,
+          commentsCount: bookmark.article.commentsCount,
           createdAt: bookmark.article.createdAt,
           updatedAt: bookmark.article.updatedAt,
           feed: bookmark.article.feed,

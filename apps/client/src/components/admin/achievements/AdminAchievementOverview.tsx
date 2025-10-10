@@ -181,14 +181,17 @@ const AdminAchievementOverview: React.FC<AdminAchievementOverviewProps> = ({
               Category Distribution
             </h3>
             <div className="space-y-3">
-              {analytics.categoryBreakdown.slice(0, 5).map((category: any) => (
-                <div key={category.categoryName} className="flex items-center justify-between">
+              {analytics.categoryBreakdown.slice(0, 5).map((category: any, index: number) => (
+                <div
+                  key={category.category || `category-${index}`}
+                  className="flex items-center justify-between"
+                >
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-content capitalize">{category.categoryName}</span>
+                    <span className="text-sm text-content capitalize">{category.category}</span>
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="text-sm text-tertiary">
-                      {category.badgeCount} achievements
+                      {category.achievementCount} achievements
                     </span>
                     <div className="w-20 bg-muted rounded-full h-2 overflow-hidden">
                       <div
@@ -196,7 +199,8 @@ const AdminAchievementOverview: React.FC<AdminAchievementOverviewProps> = ({
                         style={{
                           width: `${
                             analytics.overview.totalAchievements > 0
-                              ? (category.badgeCount / analytics.overview.totalAchievements) * 100
+                              ? (category.achievementCount / analytics.overview.totalAchievements) *
+                                100
                               : 0
                           }%`,
                         }}
@@ -216,8 +220,11 @@ const AdminAchievementOverview: React.FC<AdminAchievementOverviewProps> = ({
             </h3>
             {analytics.recentActivity && analytics.recentActivity.length > 0 ? (
               <div className="space-y-3">
-                {analytics.recentActivity.slice(0, 5).map((activity, index) => (
-                  <div key={index} className="flex items-center justify-between text-sm">
+                {analytics.recentActivity.slice(0, 5).map((activity) => (
+                  <div
+                    key={`${activity.userName}-${activity.achievementTitle}-${activity.completedAt}`}
+                    className="flex items-center justify-between text-sm"
+                  >
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 bg-success rounded-full"></div>
                       <span className="text-content truncate">{activity.userName}</span>
@@ -254,7 +261,7 @@ const AdminAchievementOverview: React.FC<AdminAchievementOverviewProps> = ({
 
               return (
                 <div
-                  key={achievement.id}
+                  key={achievement.id || `achievement-${index}`}
                   className={`relative overflow-hidden p-4 rounded-lg border-2 transition-all hover:scale-105 ${rarityStyle.bg} ${rarityStyle.border}`}
                 >
                   {/* Gradient overlay */}

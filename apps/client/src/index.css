@@ -3,9 +3,41 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* 
+/* ============================================================================
+ * Global Scrollbar Hiding
+ * Hides scrollbars site-wide for a cleaner UI while maintaining functionality
+ * ============================================================================ */
+
+/* Hide scrollbar for Webkit browsers (Chrome, Safari, Edge, Opera) */
+* {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+*::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+  width: 0;
+  height: 0;
+}
+
+/* Ensure body and html don't show scrollbars */
+html,
+body {
+  overflow-x: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/*
  * NOTE: Theme variables are now managed by the UnifiedThemeProvider
- * These are fallback values only. The JavaScript theme system will 
+ * These are fallback values only. The JavaScript theme system will
  * override these with proper theme colors.
  */
 @theme {

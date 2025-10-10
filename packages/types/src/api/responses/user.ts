@@ -92,6 +92,34 @@ export interface UnifiedActivityEvent {
 export type UserActivity = UnifiedActivityEvent;
 
 // ============================================================================
+// User Activity Stats
+// ============================================================================
+
+export interface UserActivityStats {
+  today: {
+    posts: number;
+    reactions: number;
+    comments: number;
+    predictions: number;
+  };
+  week: {
+    posts: number;
+    reactions: number;
+    comments: number;
+    predictions: number;
+    streak: number;
+  };
+  allTime: {
+    totalPosts: number;
+    totalReactions: number;
+    totalComments: number;
+    totalPredictions: number;
+    accountAge: number; // in days
+    bestStreak: number;
+  };
+}
+
+// ============================================================================
 // User Search
 // ============================================================================
 

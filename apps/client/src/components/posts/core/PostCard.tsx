@@ -8,6 +8,7 @@ import { PostReactions } from './PostReactions';
 import BaseCard from '../../BaseCard';
 import { useReactions } from '../../../contexts/ReactionContext';
 import { CommentSection } from '../../timeline/core/CommentSection';
+import { BookmarkSystem } from '../../timeline/widgets/BookmarkSystem';
 
 interface PostCardProps {
   post: UserFeedPost;
@@ -135,6 +136,14 @@ export const PostCard: React.FC<PostCardProps> = ({
               <span className="font-medium">{post.repliesCount || 0}</span>
               {post.repliesCount > 0 && <span className="text-xs">{showReplies ? '▲' : '▼'}</span>}
             </button>
+
+            {/* Bookmark */}
+            <BookmarkSystem
+              contentId={String(post.id)}
+              contentType="post"
+              contentTitle={post.content}
+              variant="button"
+            />
           </div>
 
           <PostActions
