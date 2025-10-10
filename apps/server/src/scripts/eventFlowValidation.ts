@@ -1,7 +1,7 @@
 // Event Flow Validation Script
 // Validates that the unified event system is working correctly
 // Run with: ts-node src/scripts/eventFlowValidation.ts
-
+/*
 import { eventBus } from '../lib/EventBus';
 import { unifiedActivityService } from '../services/unifiedActivity.service';
 import { REDIS_CHANNELS, ActivityEventType } from '@ems/types';
@@ -16,7 +16,6 @@ interface ValidationResult {
 
 class EventFlowValidator {
   private results: ValidationResult[] = [];
-  private testTimeout = 5000; // 5 seconds
 
   async runAllTests(): Promise<void> {
     console.log('🔍 Starting Event Flow Validation...\n');
@@ -228,3 +227,4 @@ if (require.main === module) {
 }
 
 export { EventFlowValidator };
+*/

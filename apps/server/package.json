@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "nodemon --watch src --ext ts --exec \"ts-node src/index.ts\"",
     "worker": "concurrently \"ts-node src/workers/payout.worker.ts\" \"ts-node src/workers/leaderboard.worker.ts\" \"ts-node src/workers/leaderboard-snapshot.worker.ts\" \"ts-node src/workers/feed.worker.ts\" \"ts-node src/workers/article.worker.ts\" \"ts-node src/workers/pong-payout.worker.ts\"",
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json --listEmittedFiles --diagnostics",
     "start": "node dist/index.js",
     "prisma:generate": "dotenv -e ../../.env -- prisma generate --schema ../../prisma/schema.prisma",
     "prisma:migrate:dev": "dotenv -e ../../.env -- prisma migrate reset --force --skip-generate --schema ../../prisma/schema.prisma",

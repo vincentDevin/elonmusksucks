@@ -86,6 +86,7 @@ export const toArticleCommentResponse = (comment: {
 }): ArticleCommentResponse => ({
   id: comment.id,
   content: comment.content,
+  body: comment.content, // For PostCard compatibility
   authorId: comment.authorId,
   authorName: comment.authorName,
   articleId: comment.articleId,

@@ -7,7 +7,6 @@ import type {
   DbUserStats,
   DetailedUserAchievement,
   DbUserFeedContent,
-  PrismaContent,
 } from '@ems/types';
 import type { Prisma } from '@prisma/client';
 

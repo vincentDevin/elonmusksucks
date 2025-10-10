@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import type { JsonRuleAchievementData, RuleSimulationResult, IEventBus } from '@ems/types';
+import type { JsonRuleAchievementData, RuleSimulationResult } from '@ems/types';
 
 interface TestScenario {
   name: string;

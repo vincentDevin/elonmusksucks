@@ -1,8 +1,6 @@
 // apps/server/src/repositories/IPredictionRepository.ts
 import type {
-  PrismaPredictionOption,
   PrismaPredictionSourceLink,
-  ParlayLegWithUser,
   PredictionType,
   BetWithUser,
   DbPredictionActivity,
