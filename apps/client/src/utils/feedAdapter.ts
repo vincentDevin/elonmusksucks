@@ -4,7 +4,7 @@
 import type { TimelineItem, UserFeedPost } from '@ems/types';
 import type { FeedItem, FeedResponse } from '../components/GenericFeed';
 import { timelineApi } from '../api/timeline';
-import { getTimeline, getUserPosts } from '../api/posts';
+import { getUserPosts } from '../api/posts';
 
 export interface UnifiedFeedItem extends FeedItem {
   type: 'article' | 'post';
@@ -22,7 +22,7 @@ export function convertArticleToFeedItem(item: TimelineItem): UnifiedFeedItem {
   const type = isPost ? 'post' : 'article';
 
   // If it's a post and we have postData, use that as originalData
-  const originalData = isPost && item.postData ? (item.postData as UserFeedPost) : item;
+  const originalData = isPost && item.postData ? (item.postData as any as UserFeedPost) : item;
 
   return {
     id: item.id,
@@ -44,7 +44,7 @@ export function convertPostToFeedItem(item: UserFeedPost): UnifiedFeedItem {
     id: uniqueId,
     type: 'post',
     createdAt: item.createdAt,
-    updatedAt: item.updatedAt || item.createdAt,
+    updatedAt: item.createdAt,
     originalData: item,
   };
 }
@@ -64,11 +64,7 @@ export function convertToFeedItem(item: TimelineItem | UserFeedPost): UnifiedFee
 /**
  * Calculate next cursor for unified pagination
  */
-function calculateNextCursor(
-  items: UnifiedFeedItem[],
-  articlesPagination?: { cursor?: string; hasMore?: boolean },
-  postsCursor?: number,
-): string | undefined {
+function calculateNextCursor(items: UnifiedFeedItem[]): string | undefined {
   if (items.length === 0) {
     return undefined;
   }
@@ -93,12 +89,45 @@ export async function fetchUnifiedFeed(params: {
   try {
     const limit = params.limit || 20;
 
-    // Use the unified timeline endpoint which already merges articles and posts
-    const response = await timelineApi.getTimeline({
-      cursor: params.cursor,
-      limit: limit,
-      search: params.filters?.search,
-    });
+    // Check if there are meaningful filters (not just default values)
+    const hasSearch = params.filters?.search && params.filters.search.trim().length > 0;
+    const hasDateRange = params.filters?.dateRange?.start || params.filters?.dateRange?.end;
+    const hasContentTypeFilter =
+      params.filters?.contentType &&
+      params.filters.contentType.length > 0 &&
+      !params.filters.contentType.includes('all');
+    const hasSources = params.filters?.sources && params.filters.sources.length > 0;
+    const hasAuthors = params.filters?.authors && params.filters.authors.length > 0;
+    const hasEngagementFilter =
+      params.filters?.engagementLevel && params.filters.engagementLevel !== 'all';
+    const hasMediaFilter =
+      params.filters?.hasMedia !== null && params.filters?.hasMedia !== undefined;
+    const hasReactionsFilter =
+      params.filters?.hasReactions !== null && params.filters?.hasReactions !== undefined;
+
+    const hasMeaningfulFilters =
+      hasSearch ||
+      hasDateRange ||
+      hasContentTypeFilter ||
+      hasSources ||
+      hasAuthors ||
+      hasEngagementFilter ||
+      hasMediaFilter ||
+      hasReactionsFilter;
+
+    // If we have meaningful filters, use the search endpoint which supports full filtering
+    // Otherwise use the regular timeline endpoint for better performance
+    const response = hasMeaningfulFilters
+      ? await timelineApi.search({
+          query: params.filters?.search || '',
+          cursor: params.cursor,
+          limit: limit,
+          filters: params.filters,
+        })
+      : await timelineApi.getTimeline({
+          cursor: params.cursor,
+          limit: limit,
+        });
 
     // Convert TimelineItems to UnifiedFeedItems
     const items = response.items.map(convertArticleToFeedItem);

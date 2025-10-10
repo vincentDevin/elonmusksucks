@@ -81,33 +81,45 @@ export class PredictionRepository implements IPredictionRepository {
   /**
    * List all predictions with options, bets, and parlay legs
    * @returns Array of all predictions with related data
+   * NOTE: Uses manual batch queries instead of nested includes to avoid N+1 issues
    */
   async listAllPredictions(): Promise<PredictionWithRelations[]> {
+    // Step 1: Fetch predictions with direct relations only (categories, options)
     const preds = await prisma.prediction.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
         category: true,
-        options: {
-          include: {
-            parlayLegs: {
-              include: {
-                parlay: {
-                  include: {
-                    user: {
-                      select: {
-                        id: true,
-                        name: true,
-                        avatarUrl: true,
-                        profilePictureKey: true,
-                      },
-                    },
-                  },
-                },
-              },
-            },
+        options: true, // No nested includes - we'll batch fetch related data
+      },
+    });
+
+    if (preds.length === 0) {
+      return [];
+    }
+
+    const predictionIds = preds.map((p) => p.id);
+    const optionIds = preds.flatMap((p) => p.options.map((o) => o.id));
+
+    // Step 2: Batch fetch all bets for these predictions
+    const bets = await prisma.bet.findMany({
+      where: { predictionId: { in: predictionIds } },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            avatarUrl: true,
+            profilePictureKey: true,
           },
         },
-        bets: {
+      },
+    });
+
+    // Step 3: Batch fetch all parlay legs for these options
+    const parlayLegs = await prisma.parlayLeg.findMany({
+      where: { optionId: { in: optionIds } },
+      include: {
+        parlay: {
           include: {
             user: {
               select: {
@@ -122,14 +134,32 @@ export class PredictionRepository implements IPredictionRepository {
       },
     });
 
-    return preds.map((pred) => {
-      const { options, bets, ...rest } = pred;
+    // Create lookup maps for efficient joins
+    const betsByPrediction = new Map<number, typeof bets>();
+    bets.forEach((bet) => {
+      const existing = betsByPrediction.get(bet.predictionId) || [];
+      existing.push(bet);
+      betsByPrediction.set(bet.predictionId, existing);
+    });
 
-      // Flatten parlay legs from nested structure
-      const parlayLegs: ParlayLegWithUser[] = [];
-      options.forEach((opt) =>
-        opt.parlayLegs.forEach((leg) => {
-          parlayLegs.push({
+    const legsByOption = new Map<number, typeof parlayLegs>();
+    parlayLegs.forEach((leg) => {
+      const existing = legsByOption.get(leg.optionId) || [];
+      existing.push(leg);
+      legsByOption.set(leg.optionId, existing);
+    });
+
+    // Step 4: Join data client-side using maps
+    return preds.map((pred) => {
+      // Get bets for this prediction from lookup map
+      const predictionBets = betsByPrediction.get(pred.id) || [];
+
+      // Get parlay legs for all options in this prediction
+      const predParlayLegs: ParlayLegWithUser[] = [];
+      pred.options.forEach((opt) => {
+        const legs = legsByOption.get(opt.id) || [];
+        legs.forEach((leg) => {
+          predParlayLegs.push({
             parlayId: leg.parlay.id,
             user: {
               id: leg.parlay.user.id,
@@ -143,11 +173,11 @@ export class PredictionRepository implements IPredictionRepository {
             optionId: opt.id,
             createdAt: leg.createdAt,
           });
-        }),
-      );
+        });
+      });
 
-      // Transform options to remove nested parlayLegs
-      const cleanOptions: PrismaPredictionOption[] = options.map((opt) => ({
+      // Transform options to match expected interface
+      const cleanOptions: PrismaPredictionOption[] = pred.options.map((opt) => ({
         id: opt.id,
         label: opt.label,
         odds: opt.odds,
@@ -156,11 +186,10 @@ export class PredictionRepository implements IPredictionRepository {
       }));
 
       return {
-        ...rest,
-        category: pred.category,
+        ...pred,
         options: cleanOptions,
-        bets: bets as BetWithUser[],
-        parlayLegs,
+        bets: predictionBets as BetWithUser[],
+        parlayLegs: predParlayLegs,
       } as PredictionWithRelations;
     });
   }

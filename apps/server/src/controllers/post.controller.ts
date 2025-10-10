@@ -1,14 +1,20 @@
 import { Response, NextFunction } from 'express';
 import { PostService } from '../services/post.service';
 import { ReactionService } from '../services/reaction.service';
-import { unifiedActivityService } from '../services/unifiedActivity.service';
-import { UserService } from '../services/user.service';
 import type { ReqWithUser } from './user.controller';
 import type { CreateUserPostPayload, ReactionType } from '@ems/types';
 
 const postService = new PostService();
 const reactionService = new ReactionService();
-const userService = new UserService();
+
+/**
+ * Helper function to parse post ID from route parameter
+ * Handles both numeric IDs and prefixed IDs (e.g., "post-24")
+ */
+function parsePostId(idParam: string): number {
+  const cleanId = idParam.replace(/^post-/, '');
+  return Number(cleanId);
+}
 
 /**
  * Create a new post
@@ -42,31 +48,6 @@ export async function createPost(
       linkPreview,
       parentId,
     });
-
-    // Add to unified activity feed
-    // Fetch full user data since req.user only has id and role
-    try {
-      const user = await userService.getPublicSocketUser(userId);
-      if (user) {
-        await unifiedActivityService.createPostActivity(
-          {
-            id: user.id,
-            name: user.name,
-            avatarUrl: user.avatarUrl || undefined,
-          },
-          {
-            id: post.id,
-            content: post.body,
-            isComment: !!parentId,
-          },
-        );
-        console.log('[post.controller] ✅ Post activity created for post', post.id);
-      }
-    } catch (activityError) {
-      console.error('[post.controller] Error creating post activity:', activityError);
-      // Don't fail the request if activity creation fails
-    }
-
     res.status(201).json(post);
   } catch (error) {
     next(error);
@@ -79,7 +60,7 @@ export async function createPost(
  */
 export async function getPost(req: ReqWithUser, res: Response, next: NextFunction): Promise<void> {
   try {
-    const postId = Number(req.params.id);
+    const postId = parsePostId(req.params.id);
     const viewerId = req.user?.id;
 
     const post = await postService.getPost(postId, viewerId);
@@ -99,7 +80,7 @@ export async function updatePost(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const postId = Number(req.params.id);
+    const postId = parsePostId(req.params.id);
     const userId = req.user?.id;
 
     if (!userId) {
@@ -126,7 +107,7 @@ export async function deletePost(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const postId = Number(req.params.id);
+    const postId = parsePostId(req.params.id);
     const userId = req.user?.id;
 
     if (!userId) {
@@ -234,7 +215,7 @@ export async function getPostComments(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const postId = Number(req.params.id);
+    const postId = parsePostId(req.params.id);
     const viewerId = req.user?.id;
     const cursor = req.query.cursor ? Number(req.query.cursor) : undefined;
     const limit = req.query.limit ? Number(req.query.limit) : 20;
@@ -260,7 +241,7 @@ export async function createComment(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const postId = Number(req.params.id);
+    const postId = parsePostId(req.params.id);
     const userId = req.user?.id;
 
     if (!userId) {
@@ -274,30 +255,6 @@ export async function createComment(
       content,
       parentId: postId,
     });
-
-    // Add to unified activity feed (as comment)
-    // Fetch full user data since req.user only has id and role
-    try {
-      const user = await userService.getPublicSocketUser(userId);
-      if (user) {
-        await unifiedActivityService.createPostActivity(
-          {
-            id: user.id,
-            name: user.name,
-            avatarUrl: user.avatarUrl || undefined,
-          },
-          {
-            id: comment.id,
-            content: comment.body,
-            isComment: true,
-          },
-        );
-        console.log('[post.controller] ✅ Comment activity created for comment', comment.id);
-      }
-    } catch (activityError) {
-      console.error('[post.controller] Error creating comment activity:', activityError);
-      // Don't fail the request if activity creation fails
-    }
 
     res.status(201).json(comment);
   } catch (error) {
@@ -315,7 +272,15 @@ export async function toggleReaction(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const postId = Number(req.params.id);
+    // Strip 'post-' prefix if present (e.g., "post-24" -> 24)
+    const idParam = req.params.id.replace(/^post-/, '');
+    const postId = Number(idParam);
+
+    if (isNaN(postId)) {
+      res.status(400).json({ error: 'Invalid post ID' });
+      return;
+    }
+
     const userId = req.user?.id;
 
     if (!userId) {
@@ -347,7 +312,7 @@ export async function getPostReactions(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const postId = Number(req.params.id);
+    const postId = parsePostId(req.params.id);
     const userId = req.user?.id;
     const cursor = req.query.cursor ? Number(req.query.cursor) : undefined;
     const limit = req.query.limit ? Number(req.query.limit) : 20;
@@ -375,7 +340,7 @@ export async function removeReaction(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const postId = Number(req.params.id);
+    const postId = parsePostId(req.params.id);
     const type = req.params.type as ReactionType;
     const userId = req.user?.id;
 
@@ -401,7 +366,7 @@ export async function getReactionCounts(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const postId = Number(req.params.id);
+    const postId = parsePostId(req.params.id);
 
     const counts = await reactionService.getReactionCounts(postId);
     res.json(counts);
@@ -421,7 +386,7 @@ export async function sharePost(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const postId = Number(req.params.id);
+    const postId = parsePostId(req.params.id);
     const userId = req.user?.id;
 
     if (!userId) {
@@ -446,7 +411,7 @@ export async function reportPost(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const postId = Number(req.params.id);
+    const postId = parsePostId(req.params.id);
     const userId = req.user?.id;
 
     if (!userId) {

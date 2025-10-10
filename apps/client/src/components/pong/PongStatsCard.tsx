@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { TrophyIcon, CurrencyDollarIcon, FireIcon } from '@heroicons/react/24/outline';
 import api from '../../api/axios';
 import BaseCard from '../BaseCard';
@@ -48,11 +48,7 @@ interface PongStats {
   roi: number;
 }
 
-export default function PongStatsCard({
-  userId,
-  className = '',
-  compact = false,
-}: PongStatsCardProps) {
+function PongStatsCardComponent({ userId, className = '', compact = false }: PongStatsCardProps) {
   const [stats, setStats] = useState<PongStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -265,3 +261,12 @@ export default function PongStatsCard({
     </BaseCard>
   );
 }
+
+// Memoize to prevent re-fetching stats when parent re-renders
+export default memo(PongStatsCardComponent, (prevProps, nextProps) => {
+  return (
+    prevProps.userId === nextProps.userId &&
+    prevProps.className === nextProps.className &&
+    prevProps.compact === nextProps.compact
+  );
+});

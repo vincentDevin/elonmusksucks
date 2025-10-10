@@ -184,6 +184,7 @@ export const timelineApi = {
     suggestions: Array<{
       type: 'article' | 'tag' | 'author' | 'feed';
       value: string;
+      id?: number;
       count?: number;
     }>;
   }> => {
@@ -215,6 +216,16 @@ export const timelineApi = {
    */
   checkBookmarkStatus: async (articleId: number): Promise<{ isBookmarked: boolean }> => {
     const response = await api.get(`/api/timeline/bookmarks/check/${articleId}`);
+    return response.data;
+  },
+
+  /**
+   * Check bookmark status for multiple articles at once (bulk operation)
+   */
+  checkBookmarkStatusBulk: async (
+    articleIds: number[],
+  ): Promise<{ bookmarks: Record<number, boolean> }> => {
+    const response = await api.post('/api/timeline/bookmarks/check-bulk', { articleIds });
     return response.data;
   },
 

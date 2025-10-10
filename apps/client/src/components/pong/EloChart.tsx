@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import {
   LineChart,
   Line,
@@ -47,7 +47,7 @@ const TIER_RANGES = {
   GRANDMASTER: { min: 3000, max: 10000 },
 };
 
-export default function EloChart({
+function EloChartComponent({
   userId,
   className = '',
   height = 400,
@@ -288,6 +288,18 @@ export default function EloChart({
     </div>
   );
 }
+
+// Memoize to prevent re-fetching elo history when parent re-renders
+const EloChart = memo(EloChartComponent, (prevProps, nextProps) => {
+  return (
+    prevProps.userId === nextProps.userId &&
+    prevProps.className === nextProps.className &&
+    prevProps.height === nextProps.height &&
+    prevProps.showControls === nextProps.showControls
+  );
+});
+
+export default EloChart;
 
 // Compact version for smaller spaces
 export function MiniEloChart({

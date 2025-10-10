@@ -9,7 +9,6 @@ import { StatsRepository } from '../repositories/StatsRepository';
 import type { DbUser, DbUserBadge, DbBadge, DbUserStats, DbUserFeedContent } from '@ems/types';
 // TODO: Branded types available: UserId, PredictionId, ISODateString, TimestampMs
 import type { UserProfileView, UserStatsView } from '@ems/types';
-import { unifiedActivityService } from './unifiedActivity.service';
 import { ImageProcessingService, ProcessedImageSizes } from './imageProcessing.service';
 import { DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { eventBus } from '../lib/EventBus';
@@ -586,23 +585,6 @@ export class UserService {
       content,
       parentId: parentId || null,
     });
-
-    // Create unified activity event
-    const author = await this.getPublicSocketUser(authorId);
-    if (author) {
-      await unifiedActivityService.createPostActivity(
-        {
-          id: author.id,
-          name: author.name || 'Unknown User',
-          avatarUrl: author.avatarUrl || null,
-        },
-        {
-          id: post.id,
-          content,
-          isComment: !!parentId,
-        },
-      );
-    }
 
     // Repository already returns DbUserFeedContent with author included
     return post;

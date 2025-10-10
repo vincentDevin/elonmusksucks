@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { ArrowTrendingUpIcon, ArrowTrendingDownIcon } from '@heroicons/react/24/outline';
 import api from '../../api/axios';
 import BaseCard from '../BaseCard';
@@ -33,7 +33,7 @@ const TIER_REQUIREMENTS = {
   GRANDMASTER: { min: 3000, max: 10000 },
 };
 
-export default function PongEloCard({
+function PongEloCardComponent({
   userId,
   eloRating = 1200,
   tier = 'SILVER',
@@ -179,3 +179,16 @@ export default function PongEloCard({
     </BaseCard>
   );
 }
+
+// Memoize to prevent unnecessary re-renders
+export default memo(PongEloCardComponent, (prevProps, nextProps) => {
+  return (
+    prevProps.userId === nextProps.userId &&
+    prevProps.eloRating === nextProps.eloRating &&
+    prevProps.tier === nextProps.tier &&
+    prevProps.peakElo === nextProps.peakElo &&
+    prevProps.lastEloChange === nextProps.lastEloChange &&
+    prevProps.showDetails === nextProps.showDetails &&
+    prevProps.className === nextProps.className
+  );
+});

@@ -36,17 +36,19 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({
 
   // Initialize reactions on mount with initial counts from backend
   useEffect(() => {
-    const articleId = parseInt(item.id.replace('article-', ''));
+    const articleId =
+      typeof item.id === 'number' ? item.id : parseInt(String(item.id).replace('article-', ''));
     initializeReactions(
       'article',
       articleId,
       item.reactionCounts, // Pass initial counts from backend
-      item.userReaction, // Pass user's reaction from backend
+      item.userReaction as ReactionType | undefined, // Pass user's reaction from backend
     );
   }, [item.id, item.reactionCounts, item.userReaction, initializeReactions]);
 
   // Get current reaction state from context
-  const articleId = parseInt(item.id.replace('article-', ''));
+  const articleId =
+    typeof item.id === 'number' ? item.id : parseInt(String(item.id).replace('article-', ''));
   const { reactionCounts, userReaction } = getReactionState('article', articleId);
 
   const handleViewDetails = () => {

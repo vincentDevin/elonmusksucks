@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { TrophyIcon, ChartBarIcon, ClockIcon, PuzzlePieceIcon } from '@heroicons/react/24/outline';
 import api from '../../api/axios';
 import PongEloCard from '../pong/PongEloCard';
@@ -27,7 +27,7 @@ interface PongOverviewData {
   riskTaker: boolean;
 }
 
-export default function ProfilePongStats({ userId, isOwn, userName }: ProfilePongStatsProps) {
+function ProfilePongStatsComponent({ userId, isOwn, userName }: ProfilePongStatsProps) {
   const [activeTab, setActiveTab] = useState<PongTab>('overview');
   const [overviewData, setOverviewData] = useState<PongOverviewData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -233,28 +233,46 @@ export default function ProfilePongStats({ userId, isOwn, userName }: ProfilePon
         ))}
       </div>
 
-      {/* Tab Content */}
+      {/* Tab Content - Keep all tabs mounted but hidden for instant switching + caching */}
       <div className="min-h-[300px]">
-        {activeTab === 'overview' && (
-          <div className="grid md:grid-cols-2 gap-6">
-            <PongEloCard
-              userId={userId}
-              eloRating={overviewData.eloRating}
-              tier={overviewData.tier}
-              peakElo={overviewData.peakElo}
-              lastEloChange={overviewData.lastEloChange}
-              showDetails={true}
-            />
-            <PongStatsCard userId={userId} compact={true} />
-          </div>
-        )}
+        {/* Overview Tab - Always mounted, hidden when not active */}
+        <div className={`grid md:grid-cols-2 gap-6 ${activeTab === 'overview' ? '' : 'hidden'}`}>
+          <PongEloCard
+            userId={userId}
+            eloRating={overviewData.eloRating}
+            tier={overviewData.tier}
+            peakElo={overviewData.peakElo}
+            lastEloChange={overviewData.lastEloChange}
+            showDetails={true}
+          />
+          <PongStatsCard userId={userId} compact={true} />
+        </div>
 
-        {activeTab === 'stats' && <PongStatsCard userId={userId} compact={false} />}
+        {/* Detailed Stats Tab - Always mounted, hidden when not active */}
+        <div className={activeTab === 'stats' ? '' : 'hidden'}>
+          <PongStatsCard userId={userId} compact={false} />
+        </div>
 
-        {activeTab === 'history' && <PongMatchHistory userId={userId} />}
+        {/* Match History Tab - Always mounted, hidden when not active */}
+        <div className={activeTab === 'history' ? '' : 'hidden'}>
+          <PongMatchHistory userId={userId} />
+        </div>
 
-        {activeTab === 'elo-chart' && <EloChart userId={userId} />}
+        {/* Elo Chart Tab - Always mounted, hidden when not active */}
+        <div className={activeTab === 'elo-chart' ? '' : 'hidden'}>
+          <EloChart userId={userId} />
+        </div>
       </div>
     </div>
   );
 }
+
+// Memoize to prevent re-renders when parent re-renders
+// Only re-render if userId, isOwn, or userName actually changes
+export default memo(ProfilePongStatsComponent, (prevProps, nextProps) => {
+  return (
+    prevProps.userId === nextProps.userId &&
+    prevProps.isOwn === nextProps.isOwn &&
+    prevProps.userName === nextProps.userName
+  );
+});

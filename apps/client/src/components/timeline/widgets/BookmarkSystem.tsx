@@ -11,6 +11,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { BookmarkIcon as BookmarkIconSolid } from '@heroicons/react/24/solid';
 import { useAuth } from '../../../contexts/AuthContext';
+import { useBookmarks } from '../../../contexts/BookmarkContext';
 import { timelineApi } from '../../../api/timeline';
 
 interface Bookmark {
@@ -47,6 +48,7 @@ interface BookmarkSystemProps {
   contentTitle?: string;
   variant?: 'button' | 'manager' | 'widget';
   onBookmarkChange?: (isBookmarked: boolean) => void;
+  onBookmarkClick?: (articleId: number) => void;
   className?: string;
 }
 
@@ -56,10 +58,11 @@ export const BookmarkSystem: React.FC<BookmarkSystemProps> = ({
   contentTitle: _contentTitle, // Available for future use
   variant = 'button',
   onBookmarkChange,
+  onBookmarkClick,
   className = '',
 }) => {
   const { user } = useAuth();
-  const [isBookmarked, setIsBookmarked] = useState(false);
+  const { isBookmarked: checkIsBookmarked, requestBookmarkCheck, setBookmarked } = useBookmarks();
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [collections, setCollections] = useState<Collection[]>([]);
   const [selectedCollection, setSelectedCollection] = useState<string | null>(null);
@@ -69,21 +72,31 @@ export const BookmarkSystem: React.FC<BookmarkSystemProps> = ({
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<'all' | 'recent' | 'articles' | 'posts'>('all');
 
-  // Check if content is bookmarked
+  // Extract numeric article ID for batched bookmark checking
+  const numericId = React.useMemo(() => {
+    if (!contentId) return null;
+
+    // Skip posts (only articles can be bookmarked)
+    if (String(contentId).startsWith('post-')) {
+      return null;
+    }
+
+    const id =
+      typeof contentId === 'number'
+        ? contentId
+        : parseInt(String(contentId).replace('article-', ''));
+
+    return isNaN(id) ? null : id;
+  }, [contentId]);
+
+  // Request bookmark check using batched context
   useEffect(() => {
-    if (!contentId || !user) return;
+    if (!numericId || !user) return;
+    requestBookmarkCheck(numericId);
+  }, [numericId, user, requestBookmarkCheck]);
 
-    const checkBookmarkStatus = async () => {
-      try {
-        const data = await timelineApi.checkBookmarkStatus(parseInt(contentId));
-        setIsBookmarked(data.isBookmarked);
-      } catch (error) {
-        console.error('Failed to check bookmark status:', error);
-      }
-    };
-
-    checkBookmarkStatus();
-  }, [contentId, user]);
+  // Get bookmark status from context
+  const isBookmarked = numericId ? (checkIsBookmarked(numericId) ?? false) : false;
 
   // Fetch bookmarks and collections for manager and widget variants
   useEffect(() => {
@@ -182,17 +195,20 @@ export const BookmarkSystem: React.FC<BookmarkSystemProps> = ({
 
   // Toggle bookmark
   const handleToggleBookmark = async () => {
-    if (!user || !contentId) return;
+    if (!user || !numericId) return;
 
     setLoading(true);
     try {
       const result = await timelineApi.toggleBookmark(
-        parseInt(contentId),
+        numericId,
         selectedCollection ? parseInt(selectedCollection) : undefined,
       );
 
       const newBookmarkState = result.action === 'added';
-      setIsBookmarked(newBookmarkState);
+
+      // Update bookmark context
+      setBookmarked(numericId, newBookmarkState);
+
       onBookmarkChange?.(newBookmarkState);
       if (newBookmarkState) {
         setShowCollectionMenu(false);
@@ -434,7 +450,16 @@ export const BookmarkSystem: React.FC<BookmarkSystemProps> = ({
         ) : (
           <div className="space-y-2">
             {bookmarks.slice(0, 3).map((bookmark) => (
-              <div key={bookmark.id} className="text-sm">
+              <div
+                key={bookmark.id}
+                className="text-sm p-2 rounded hover:bg-hover transition-colors cursor-pointer"
+                onClick={() => {
+                  const articleId = parseInt(bookmark.contentId);
+                  if (!isNaN(articleId) && onBookmarkClick) {
+                    onBookmarkClick(articleId);
+                  }
+                }}
+              >
                 <p className="font-medium text-content truncate">{bookmark.title}</p>
                 <p className="text-xs text-tertiary">{formatTimeAgo(bookmark.createdAt)}</p>
               </div>
@@ -538,7 +563,14 @@ export const BookmarkSystem: React.FC<BookmarkSystemProps> = ({
             {filteredBookmarks.map((bookmark) => (
               <div
                 key={bookmark.id}
-                className="p-3 bg-muted rounded-lg hover:bg-hover transition-colors group"
+                className="p-3 bg-muted rounded-lg hover:bg-hover transition-colors group cursor-pointer"
+                onClick={() => {
+                  // Extract article ID from contentId
+                  const articleId = parseInt(bookmark.contentId);
+                  if (!isNaN(articleId) && onBookmarkClick) {
+                    onBookmarkClick(articleId);
+                  }
+                }}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0 mr-2">
@@ -569,7 +601,10 @@ export const BookmarkSystem: React.FC<BookmarkSystemProps> = ({
                     </div>
                   </div>
                   <button
-                    onClick={() => handleDeleteBookmark(bookmark.id)}
+                    onClick={(e) => {
+                      e.stopPropagation(); // Prevent card click
+                      handleDeleteBookmark(bookmark.id);
+                    }}
                     className="opacity-0 group-hover:opacity-100 transition-opacity p-1
                                text-tertiary hover:text-error"
                   >

@@ -7,6 +7,7 @@ import type {
   PrismaContentType,
   PostVisibility,
   ReportReason,
+  ReactionType,
 } from '@ems/types';
 import { NotFoundError, ForbiddenError, ValidationError } from '../errors';
 import { unifiedActivityService } from './unifiedActivity.service';
@@ -86,13 +87,25 @@ export class PostService {
       this.processHashtags(content.id, hashtags).catch(console.error);
     }
 
-    // Get full content with author to return DbUserFeedContent
-    const fullContent = await this.contentRepository.getContentById(content.id);
+    // Get full content with author and reactions to return DbUserFeedContent
+    const fullContent = await this.contentRepository.getContentWithDetails(content.id);
     if (!fullContent) {
       throw new Error('Failed to retrieve created post');
     }
 
-    return this.toFeedContent(fullContent);
+    // Enrich author avatar URL
+    let enrichedAuthor = fullContent.author;
+    if (fullContent.author) {
+      const enrichedAuthors = await userService.enrichUsersWithAvatars([fullContent.author]);
+      if (enrichedAuthors.length > 0) {
+        enrichedAuthor = enrichedAuthors[0];
+      }
+    }
+
+    return this.toFeedContent({
+      ...fullContent,
+      author: enrichedAuthor,
+    });
   }
 
   /**
@@ -147,13 +160,73 @@ export class PostService {
    * Get a single post with full details
    */
   async getPost(postId: number, viewerId?: number): Promise<DbUserFeedContent> {
-    const post = await this.contentRepository.getContentById(postId);
+    const post = await this.contentRepository.getContentWithDetails(postId);
 
     if (!post) {
       throw new NotFoundError('Post not found');
     }
 
-    return this.toFeedContent(post, viewerId);
+    console.log(
+      '[post.service] getPost - post.reactions:',
+      post.reactions?.length || 0,
+      'reactions',
+    );
+
+    // Calculate reaction counts and user's reaction
+    const reactionCounts: Record<ReactionType, number> = {
+      LIKE: 0,
+      LOVE: 0,
+      LAUGH: 0,
+      ANGRY: 0,
+      SAD: 0,
+      WOW: 0,
+    };
+
+    let userReaction: ReactionType | null = null;
+
+    if (post.reactions) {
+      post.reactions.forEach((reaction: any) => {
+        const type = reaction.type as ReactionType;
+        reactionCounts[type] = (reactionCounts[type] || 0) + 1;
+
+        if (viewerId && reaction.userId === viewerId) {
+          userReaction = type;
+        }
+      });
+    }
+
+    console.log(
+      '[post.service] getPost - calculated reactionCounts:',
+      reactionCounts,
+      'userReaction:',
+      userReaction,
+    );
+
+    // Enrich author avatar URL
+    let enrichedAuthor = post.author;
+    if (post.author) {
+      const enrichedAuthors = await userService.enrichUsersWithAvatars([post.author]);
+      if (enrichedAuthors.length > 0) {
+        enrichedAuthor = enrichedAuthors[0];
+      }
+    }
+
+    const result = this.toFeedContent(
+      {
+        ...post,
+        author: enrichedAuthor,
+        reactionCounts,
+        userReaction,
+      },
+      viewerId,
+    );
+
+    console.log(
+      '[post.service] getPost - returning result with reactionCounts:',
+      result.reactionCounts,
+    );
+
+    return result;
   }
 
   /**

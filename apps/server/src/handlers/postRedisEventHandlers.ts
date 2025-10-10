@@ -26,7 +26,6 @@ import {
   type CommentDeletedBroadcast,
 } from '@ems/types';
 import redisClient from '../lib/redis';
-import { unifiedActivityService } from '../services/unifiedActivity.service';
 
 /**
  * Register all post-related Redis event handlers
@@ -118,7 +117,7 @@ function handleRedisEvent(io: IOServer, channel: string, data: PostRedisPayload)
  * Broadcast new post to relevant users
  */
 async function handlePostCreated(io: IOServer, data: PostCreatedRedisPayload): Promise<void> {
-  const { post, authorId } = data;
+  const { post } = data;
 
   // Broadcast to public timeline if post is public
   if (post.visibility === 'PUBLIC') {
@@ -136,37 +135,6 @@ async function handlePostCreated(io: IOServer, data: PostCreatedRedisPayload): P
       const broadcast: PostNewBroadcast = post;
       io.to(ROOM_HELPERS.user(mention.userId)).emit(SOCKET_EVENTS.POST_NEW, broadcast);
     });
-  }
-
-  // Add to unified activity feed
-  console.log('[postRedisEventHandlers] Processing post for activity feed:', {
-    postId: post.id,
-    authorId,
-    hasAuthor: !!post.author,
-    visibility: post.visibility,
-  });
-
-  try {
-    if (post.author) {
-      console.log('[postRedisEventHandlers] Creating post activity...');
-      await unifiedActivityService.createPostActivity(
-        {
-          id: authorId,
-          name: post.author.name,
-          avatarUrl: post.author.avatarUrl,
-        },
-        {
-          id: post.id,
-          content: post.content,
-          isComment: false,
-        },
-      );
-      console.log('[postRedisEventHandlers] ✅ Post activity created successfully');
-    } else {
-      console.warn('[postRedisEventHandlers] ⚠️ Post has no author, skipping activity');
-    }
-  } catch (error) {
-    console.error('[postRedisEventHandlers] ❌ Error creating post activity:', error);
   }
 }
 
@@ -246,26 +214,6 @@ async function handleCommentCreated(io: IOServer, data: CommentCreatedRedisPaylo
     authorId,
   };
   io.emit(SOCKET_EVENTS.COMMENT_NEW, broadcast);
-
-  // Add to unified activity feed
-  try {
-    if (comment.author) {
-      await unifiedActivityService.createPostActivity(
-        {
-          id: authorId,
-          name: comment.author.name,
-          avatarUrl: comment.author.avatarUrl,
-        },
-        {
-          id: comment.id,
-          content: comment.content,
-          isComment: true,
-        },
-      );
-    }
-  } catch (error) {
-    console.error('[postRedisEventHandlers] Error creating comment activity:', error);
-  }
 }
 
 /**

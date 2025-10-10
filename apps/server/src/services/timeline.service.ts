@@ -218,21 +218,100 @@ export class TimelineService {
   // Search and Discovery Methods
   // ===============================================
 
-  async searchTimeline(params: { query: string; filters?: any; limit: number; cursor?: string }) {
-    // Basic text search implementation
-    const searchResults = await this.repository.searchContent({
-      query: params.query,
-      filters: params.filters || {},
-      limit: params.limit,
-      cursor: params.cursor,
+  async searchTimeline(params: {
+    query: string;
+    filters?: any;
+    limit: number;
+    cursor?: string;
+    viewerId?: number;
+  }) {
+    const pageLimit = Math.min(params.limit || 30, 100);
+
+    // Map frontend filters to backend format
+    const mappedFilters = {
+      ...params.filters,
+      // Map authors array to authorId number (take first author if multiple)
+      authorId: params.filters?.authors?.[0] ? parseInt(params.filters.authors[0]) : undefined,
+    };
+
+    // If filtering by author, only search posts (articles don't have authors)
+    // Otherwise, fetch both articles and posts
+    const shouldSearchArticles = !mappedFilters.authorId;
+
+    const [articleResults, postResults] = await Promise.all([
+      shouldSearchArticles
+        ? this.repository.searchContent({
+            query: params.query,
+            filters: mappedFilters,
+            limit: pageLimit,
+            cursor: params.cursor,
+          })
+        : { items: [], nextCursor: undefined, hasMore: false },
+      this.repository.searchPosts({
+        query: params.query,
+        filters: mappedFilters,
+        limit: pageLimit,
+        cursor: params.cursor,
+        viewerId: params.viewerId,
+      }),
+    ]);
+
+    // Batch enrich post authors with avatar URLs
+    const postAuthors = postResults.items.filter((p: any) => p.author).map((p: any) => p.author);
+    const enrichedPostAuthors = await userService.enrichUsersWithAvatars(postAuthors);
+    const postAuthorMap = new Map(enrichedPostAuthors.map((author) => [author.id, author]));
+
+    // Merge and sort by timestamp
+    const allItems = [
+      ...articleResults.items.map((article: any) => ({
+        ...article,
+        id: `article-${article.id}`, // Prefix with article- for consistency
+        timestamp: article.publishedAt || article.createdAt,
+        type: 'article' as const,
+      })),
+      ...postResults.items.map((post: any) => {
+        // Enrich author with avatar URL
+        const enrichedAuthor = post.author ? postAuthorMap.get(post.author.id) : null;
+        const finalAuthor = enrichedAuthor ||
+          post.author || { id: post.authorId, name: 'Unknown', avatarUrl: null };
+
+        return {
+          ...post,
+          id: `post-${post.id}`, // Prefix with post- for consistency
+          timestamp: post.createdAt,
+          type: 'post' as const,
+          author: finalAuthor,
+          // Add flat fields for ContentModal compatibility
+          authorName: finalAuthor.name,
+          authorAvatar: finalAuthor.avatarUrl,
+          content: post.body, // Map body to content for compatibility
+        };
+      }),
+    ].sort((a, b) => {
+      const aTime = new Date(a.timestamp).getTime();
+      const bTime = new Date(b.timestamp).getTime();
+      return bTime - aTime; // Descending order (newest first)
     });
 
+    // Take only the requested limit
+    const paginatedItems = allItems.slice(0, pageLimit);
+    const hasMore = allItems.length > pageLimit;
+
+    // Calculate next cursor from the last item
+    // timestamp is already an ISO string from searchPosts/searchContent
+    const nextCursor =
+      hasMore && paginatedItems.length > 0
+        ? typeof paginatedItems[paginatedItems.length - 1].timestamp === 'string'
+          ? paginatedItems[paginatedItems.length - 1].timestamp
+          : paginatedItems[paginatedItems.length - 1].timestamp.toISOString()
+        : undefined;
+
     return {
-      items: searchResults.items || [],
+      items: paginatedItems,
       pagination: {
-        cursor: searchResults.nextCursor,
-        hasMore: searchResults.hasMore || false,
-        total: searchResults.total,
+        cursor: nextCursor,
+        hasMore,
+        total: paginatedItems.length,
       },
     };
   }
@@ -244,6 +323,7 @@ export class TimelineService {
     return suggestions.map((suggestion) => ({
       type: suggestion.type,
       value: suggestion.value,
+      id: suggestion.id,
       count: suggestion.count || 0,
     }));
   }
@@ -342,6 +422,13 @@ export class TimelineService {
 
   async checkArticleBookmark(articleId: number, userId: number): Promise<boolean> {
     return this.repository.checkArticleBookmark(articleId, userId);
+  }
+
+  async checkArticleBookmarksBulk(
+    articleIds: number[],
+    userId: number,
+  ): Promise<Map<number, boolean>> {
+    return this.repository.checkArticleBookmarksBulk(articleIds, userId);
   }
 
   async toggleArticleBookmark(articleId: number, userId: number, collectionId?: number) {

@@ -1,7 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, memo } from 'react';
 import { useAchievements } from '../../contexts/AchievementContext';
-import { useAchievementTheme } from '../../theme/hooks/useAchievementTheme';
-import type { AchievementRarity } from '../../theme/utils/achievement-colors';
 import type { ComponentAchievement } from '../../utils/achievementDataTransform';
 import AchievementCard from '../achievements/AchievementCard';
 
@@ -10,14 +8,11 @@ interface ProfileAchievementsProps {
   embedded?: boolean;
 }
 
-export function ProfileAchievements({
+function ProfileAchievementsComponent({
   achievements: propAchievements,
   embedded = false,
 }: ProfileAchievementsProps) {
-  const { achievements, recentAchievements, totalBadges, totalAvailable, completionRate, loading } =
-    useAchievements();
-
-  const { getRarityClasses, getCategoryIcon, getCardClasses, utils } = useAchievementTheme();
+  const { achievements, loading } = useAchievements();
 
   const [expanded, setExpanded] = useState(false);
   const [pinnedAchievementId, setPinnedAchievementId] = useState<string | null>(null);
@@ -294,3 +289,11 @@ export function ProfileAchievements({
     </div>
   );
 }
+
+// Memoize to prevent expensive re-calculations of 130+ achievements
+// Only re-render if achievements array actually changes (by reference)
+export const ProfileAchievements = memo(ProfileAchievementsComponent, (prevProps, nextProps) => {
+  return (
+    prevProps.achievements === nextProps.achievements && prevProps.embedded === nextProps.embedded
+  );
+});

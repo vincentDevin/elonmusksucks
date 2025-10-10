@@ -1,4 +1,5 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
 import { TimelineProvider } from '../contexts/TimelineContext';
 import {
@@ -10,13 +11,20 @@ import {
   CreatePost,
 } from '../components/timeline/core';
 import { TrendingWidget, ActivitySummary, BookmarkSystem } from '../components/timeline/widgets';
-import { convertArticleToFeedItem, type UnifiedFeedItem } from '../utils/feedAdapter';
+import {
+  convertArticleToFeedItem,
+  convertPostToFeedItem,
+  type UnifiedFeedItem,
+} from '../utils/feedAdapter';
 import { useAuth } from '../contexts/AuthContext';
 import { timelineApi } from '../api/timeline';
-import type { TimelineItem } from '@ems/types';
+import { getPost } from '../api/posts';
+import type { TimelineItem, TrendingItem } from '@ems/types';
 
 export default function Timeline() {
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedContent, setSelectedContent] = useState<UnifiedFeedItem | null>(null);
   const [showUnifiedModal, setShowUnifiedModal] = useState(false);
@@ -30,7 +38,6 @@ export default function Timeline() {
     hasMedia: null,
     hasReactions: null,
   });
-  const [showFilters, setShowFilters] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
   // Widget expansion states
@@ -40,82 +47,92 @@ export default function Timeline() {
     bookmarks: false,
   });
 
-  // Handle search
-  const handleSearch = useCallback(async (query: string) => {
-    setSearchQuery(query);
+  // Initialize from URL parameters on mount, then clear them
+  useEffect(() => {
+    const search = searchParams.get('search');
+    const hashtag = searchParams.get('hashtag');
+    const author = searchParams.get('author');
 
-    if (!query.trim()) {
-      // Clear search results if query is empty
-      return;
-    }
-
-    try {
-      // Call the search API using the existing axios pattern
-      const data = await timelineApi.search({
-        query,
-        limit: 20,
-      });
-      console.log('Search results:', data);
-      // Results will be handled by the TimelineWithPosts component
-    } catch (error) {
-      console.error('Search failed:', error);
-    }
-  }, []);
-
-  // Handle search suggestion clicks
-  const handleSuggestionClick = useCallback(async (suggestion: any) => {
-    if (suggestion.type === 'article' && suggestion.id) {
-      try {
-        // Extract article ID from suggestion (assuming format 'article-123' or just '123')
-        const articleId = parseInt(suggestion.id.toString().replace('article-', ''));
-
-        if (!isNaN(articleId)) {
-          // Fetch full article details using existing API
-          const articleData = await timelineApi.getArticleDetails(articleId);
-
-          // Convert to TimelineItem format for ArticleDrawer
-          const timelineItem: TimelineItem = {
-            id: `article-${articleId}`,
-            type: 'article',
-            timestamp: articleData.publishedAt || new Date().toISOString(),
-            content: {
-              title: articleData.title,
-              excerpt: articleData.excerpt || undefined,
-              author: articleData.feed?.name || 'Unknown Source',
-              imageUrl: articleData.leadImageUrl || undefined,
-              url: articleData.url,
-            },
-            engagement: {
-              reactions: articleData.reactionsCount || 0,
-              comments: articleData.commentsCount || 0,
-            },
-            tags: articleData.tags?.map((t) => t.name || String(t)) || [],
-          };
-
-          // Convert to UnifiedFeedItem and open ContentModal
-          const unifiedItem = convertArticleToFeedItem(timelineItem);
-          setSelectedContent(unifiedItem);
-          setShowUnifiedModal(true);
-          return;
-        }
-      } catch (error) {
-        console.error('Failed to load article from suggestion:', error);
+    // Only process if there are URL params
+    if (search || hashtag || author) {
+      // Set search query if present
+      if (search) {
+        setSearchQuery(search);
       }
+
+      // Set hashtag filter if present
+      if (hashtag) {
+        setSearchQuery(`#${hashtag}`);
+      }
+
+      // Set author filter if present
+      if (author) {
+        const authorId = parseInt(author);
+        if (!isNaN(authorId)) {
+          setFilters((prev) => ({
+            ...prev,
+            authors: [author],
+          }));
+        }
+      }
+
+      // Clear URL params after reading them so they don't persist
+      setSearchParams({});
     }
+  }, [searchParams, setSearchParams]);
 
-    // Fallback: just perform a search for all other types or if article loading fails
-    setSearchQuery(suggestion.title || suggestion.value || suggestion);
+  // Helper function to fetch and open article in modal
+  const fetchAndOpenArticle = useCallback(async (articleId: number) => {
+    try {
+      // Fetch full article details
+      const articleData = await timelineApi.getArticleDetails(articleId);
+
+      // Convert to TimelineItem format
+      const timelineItem: TimelineItem = {
+        id: `article-${articleId}`,
+        type: 'article',
+        timestamp: articleData.publishedAt || new Date().toISOString(),
+        content: {
+          title: articleData.title,
+          excerpt: articleData.excerpt || undefined,
+          author: articleData.feed?.name || 'Unknown Source',
+          imageUrl: articleData.leadImageUrl || undefined,
+          url: articleData.url,
+        },
+        engagement: {
+          reactions: articleData.reactionsCount || 0,
+          comments: articleData.commentsCount || 0,
+        },
+        tags: articleData.tags?.map((t) => t.name || String(t)) || [],
+      };
+
+      // Convert to UnifiedFeedItem and open modal
+      const unifiedItem = convertArticleToFeedItem(timelineItem);
+      setSelectedContent(unifiedItem);
+      setShowUnifiedModal(true);
+    } catch (error) {
+      console.error('Failed to load article:', error);
+    }
   }, []);
 
-  // Handle filter changes
-  const handleFilterChange = useCallback((newFilters: TimelineFilter) => {
-    setFilters(newFilters);
-    // TODO: Implement filter functionality
-    console.log('Filters updated:', newFilters);
+  // Helper function to fetch and open post in modal
+  const fetchAndOpenPost = useCallback(async (postId: number) => {
+    try {
+      // Fetch full post details
+      const postData = await getPost(postId);
+
+      // Convert to UnifiedFeedItem and open modal
+      const unifiedItem = convertPostToFeedItem(postData);
+      setSelectedContent(unifiedItem);
+      setShowUnifiedModal(true);
+    } catch (error) {
+      console.error('Failed to load post:', error);
+    }
   }, []);
 
-  // Reset filters
-  const handleResetFilters = useCallback(() => {
+  // Handle search - clears filters and sets new search query
+  const handleSearch = useCallback((query: string) => {
+    // Reset all filters when doing a new search
     setFilters({
       dateRange: { start: null, end: null, preset: 'all' },
       contentType: ['all'],
@@ -126,6 +143,96 @@ export default function Timeline() {
       hasMedia: null,
       hasReactions: null,
     });
+    setSearchQuery(query);
+    // TimelineWithPosts will automatically fetch results when searchQuery changes
+  }, []);
+
+  // Handle search suggestion clicks
+  const handleSuggestionClick = useCallback(
+    async (suggestion: any) => {
+      const searchTerm = suggestion.title || suggestion.value || suggestion;
+
+      // For user/author suggestions, filter by author ID
+      if (suggestion.type === 'user') {
+        // Reset all filters and search, then set author filter
+        setSearchQuery('');
+        setFilters({
+          dateRange: { start: null, end: null, preset: 'all' },
+          contentType: ['all'],
+          sources: [],
+          authors: [String(suggestion.id)],
+          engagementLevel: 'all',
+          sortBy: 'recent',
+          hasMedia: null,
+          hasReactions: null,
+        });
+        return;
+      }
+
+      // For article/post suggestions, fetch results and open the first one
+      if (suggestion.type === 'article' || suggestion.type === 'post') {
+        try {
+          const data = await timelineApi.search({
+            query: searchTerm,
+            limit: 1, // Just need the first result
+          });
+
+          if (data.items && data.items.length > 0) {
+            const firstResult = data.items[0];
+
+            // Extract numeric ID from string (e.g., "post-29" -> 29 or "article-123" -> 123)
+            const idString = String(firstResult.id);
+            const numericId = parseInt(idString.replace(/^(post-|article-)/, ''));
+
+            if (isNaN(numericId)) {
+              console.error('Invalid content ID:', firstResult.id);
+              handleSearch(searchTerm);
+              return;
+            }
+
+            // Check if it's a post or article based on ID prefix
+            if (idString.startsWith('post-')) {
+              // It's a post
+              await fetchAndOpenPost(numericId);
+            } else {
+              // It's an article
+              await fetchAndOpenArticle(numericId);
+            }
+          } else {
+            // No results, just show search
+            handleSearch(searchTerm);
+          }
+        } catch (error) {
+          console.error('Failed to fetch search results:', error);
+          handleSearch(searchTerm);
+        }
+      } else {
+        // For hashtags, feeds, etc., just perform search
+        handleSearch(searchTerm);
+      }
+    },
+    [handleSearch, fetchAndOpenArticle, fetchAndOpenPost],
+  );
+
+  // Handle filter changes
+  const handleFilterChange = useCallback((newFilters: TimelineFilter) => {
+    setFilters(newFilters);
+  }, []);
+
+  // Reset filters and search completely
+  const handleResetFilters = useCallback(() => {
+    setSearchQuery(''); // Clear search query
+    setFilters({
+      dateRange: { start: null, end: null, preset: 'all' },
+      contentType: ['all'],
+      sources: [],
+      authors: [],
+      engagementLevel: 'all',
+      sortBy: 'recent',
+      hasMedia: null,
+      hasReactions: null,
+    });
+    setRefreshKey((prev) => prev + 1); // Force refresh to show default timeline
   }, []);
 
   // Handle post created - refresh timeline feed
@@ -139,6 +246,40 @@ export default function Timeline() {
       ...prev,
       [widget]: !prev[widget],
     }));
+  }, []);
+
+  // Handle trending item clicks
+  const handleTrendingItemClick = useCallback(
+    async (item: TrendingItem) => {
+      // Extract numeric ID from string ID (e.g., "article-123" -> 123)
+      const numericId = parseInt(item.id.replace(/^(article-|post-)/, ''));
+
+      if (isNaN(numericId)) {
+        console.error('Invalid content ID:', item.id);
+        return;
+      }
+
+      if (item.type === 'article') {
+        await fetchAndOpenArticle(numericId);
+      } else if (item.type === 'post') {
+        await fetchAndOpenPost(numericId);
+      }
+    },
+    [fetchAndOpenArticle, fetchAndOpenPost],
+  );
+
+  // Handle bookmark clicks
+  const handleBookmarkClick = useCallback(
+    async (articleId: number) => {
+      await fetchAndOpenArticle(articleId);
+    },
+    [fetchAndOpenArticle],
+  );
+
+  // Handle hashtag clicks from TrendingWidget
+  const handleHashtagClick = useCallback((tag: string) => {
+    // Use search functionality instead of URL params
+    setSearchQuery(`#${tag}`);
   }, []);
 
   return (
@@ -172,30 +313,20 @@ export default function Timeline() {
                     className="w-full"
                   />
 
-                  {/* Filter Toggle and Filters */}
-                  <div className="flex items-center justify-between">
-                    <button
-                      onClick={() => setShowFilters(!showFilters)}
-                      className="text-sm text-primary hover:text-primary/80 transition-colors"
-                    >
-                      {showFilters ? 'Hide Filters' : 'Show Filters'}
-                    </button>
-                    {searchQuery && (
-                      <div className="text-sm text-content/70">
-                        Searching for: <span className="font-medium">"{searchQuery}"</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Expandable Filters */}
-                  {showFilters && (
-                    <TimelineFilters
-                      filters={filters}
-                      onFilterChange={handleFilterChange}
-                      onReset={handleResetFilters}
-                      compact={false}
-                    />
+                  {/* Active Search Indicator */}
+                  {searchQuery && (
+                    <div className="text-sm text-content/70 text-center">
+                      Searching for: <span className="font-medium">"{searchQuery}"</span>
+                    </div>
                   )}
+
+                  {/* Filters - Always Visible */}
+                  <TimelineFilters
+                    filters={filters}
+                    onFilterChange={handleFilterChange}
+                    onReset={handleResetFilters}
+                    hasSearchQuery={!!searchQuery}
+                  />
                 </div>
               </div>
             </div>
@@ -229,7 +360,12 @@ export default function Timeline() {
                       className="absolute left-0 top-0 right-16 h-10 cursor-pointer z-10 rounded-tl-lg hover:bg-muted/5 transition-colors"
                       title={expandedWidgets.trending ? 'Click to collapse' : 'Click to expand'}
                     />
-                    <TrendingWidget timeRange="day" limit={expandedWidgets.trending ? 12 : 3} />
+                    <TrendingWidget
+                      timeRange="day"
+                      limit={expandedWidgets.trending ? 12 : 3}
+                      onItemClick={handleTrendingItemClick}
+                      onHashtagClick={handleHashtagClick}
+                    />
                     <div className="absolute top-3 right-4 pointer-events-none">
                       {expandedWidgets.trending ? (
                         <ChevronUpIcon className="w-5 h-5 text-tertiary group-hover:text-primary transition-colors" />
@@ -263,7 +399,10 @@ export default function Timeline() {
                       className="absolute inset-x-0 top-0 h-14 cursor-pointer z-10 rounded-t-lg hover:bg-muted/5 transition-colors"
                       title={expandedWidgets.bookmarks ? 'Click to collapse' : 'Click to expand'}
                     />
-                    <BookmarkSystem variant={expandedWidgets.bookmarks ? 'manager' : 'widget'} />
+                    <BookmarkSystem
+                      variant={expandedWidgets.bookmarks ? 'manager' : 'widget'}
+                      onBookmarkClick={handleBookmarkClick}
+                    />
                     <div className="absolute top-[1.125rem] right-4 pointer-events-none">
                       {expandedWidgets.bookmarks ? (
                         <ChevronUpIcon className="w-5 h-5 text-tertiary group-hover:text-primary transition-colors" />

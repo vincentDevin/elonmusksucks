@@ -8,6 +8,7 @@ import type {
   ArticleCommentResponse,
 } from '@ems/types';
 import { validateArticleId } from '../utils/timeline';
+import { serializeBigInt } from '../utils/bigintSerializer';
 import type { AuthRequest } from '../middleware/auth.middleware';
 
 const timelineService = new TimelineService();
@@ -421,12 +422,16 @@ export const getArticleComments = async (req: Request, res: Response) => {
 // Search and Discovery Controllers
 // ===============================================
 
-export async function searchTimeline(req: Request, res: Response) {
+export async function searchTimeline(req: AuthRequest, res: Response) {
   try {
     const { q, filters, limit = '30', cursor } = req.query;
+    const viewerId = req.user?.id; // Get authenticated user's ID
 
-    if (!q || typeof q !== 'string') {
-      return res.status(400).json({ error: 'Search query is required' });
+    // Allow empty query if filters are provided (for filtering without search)
+    if (typeof q !== 'string') {
+      return res
+        .status(400)
+        .json({ error: 'Search query parameter is required (can be empty string)' });
     }
 
     const pageLimit = Math.min(parseInt(limit as string) || 30, 100);
@@ -444,10 +449,11 @@ export async function searchTimeline(req: Request, res: Response) {
       filters: parsedFilters,
       limit: pageLimit,
       cursor: cursor as string | undefined,
+      viewerId,
     };
 
     const results = await timelineService.searchTimeline(searchParams);
-    res.json(results);
+    res.json(serializeBigInt(results));
   } catch (error) {
     console.error('[timeline] Error searching timeline:', error);
     res.status(500).json({ error: 'Failed to search timeline' });
@@ -524,6 +530,48 @@ export async function checkArticleBookmark(req: AuthRequest, res: Response) {
     res.json({ isBookmarked });
   } catch (error) {
     console.error('[timeline] Error checking bookmark status:', error);
+    res.status(500).json({ error: 'Failed to check bookmark status' });
+  }
+}
+
+export async function checkArticleBookmarksBulk(req: AuthRequest, res: Response) {
+  try {
+    const { articleIds } = req.body;
+    const userId = req.user!.id;
+
+    if (!Array.isArray(articleIds)) {
+      res.status(400).json({ error: 'articleIds must be an array' });
+      return;
+    }
+
+    if (articleIds.length === 0) {
+      res.json({ bookmarks: {} });
+      return;
+    }
+
+    if (articleIds.length > 100) {
+      res.status(400).json({ error: 'Maximum 100 article IDs allowed' });
+      return;
+    }
+
+    const parsedIds = articleIds.map((id) => parseInt(id as string)).filter((id) => !isNaN(id));
+
+    if (parsedIds.length !== articleIds.length) {
+      res.status(400).json({ error: 'All article IDs must be valid numbers' });
+      return;
+    }
+
+    const bookmarkMap = await timelineService.checkArticleBookmarksBulk(parsedIds, userId);
+
+    // Convert Map to object for JSON serialization
+    const bookmarks: Record<number, boolean> = {};
+    bookmarkMap.forEach((isBookmarked, articleId) => {
+      bookmarks[articleId] = isBookmarked;
+    });
+
+    res.json({ bookmarks });
+  } catch (error) {
+    console.error('[timeline] Error checking bulk bookmark status:', error);
     res.status(500).json({ error: 'Failed to check bookmark status' });
   }
 }

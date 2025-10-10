@@ -11,6 +11,7 @@ import { ChatProvider } from './contexts/ChatContext';
 import { ActivityProvider } from './contexts/ActivityContext';
 import { AchievementProvider } from './contexts/AchievementContext';
 import { ReactionProvider } from './contexts/ReactionContext';
+import { BookmarkProvider } from './contexts/BookmarkContext';
 import { NotificationProvider, NotificationContainer } from './components/notifications';
 import AppRoutes from './routes/AppRoutes';
 import { useAuth } from './contexts/AuthContext';
@@ -40,20 +41,21 @@ function AppContent() {
           <ActivityProvider>
             <AchievementProvider>
               <ReactionProvider>
-                <PredictionProvider>
-                  <ParlayProvider>
-                    <ChatProvider>
-                      {/* Unified Notification System */}
-                      <NotificationProvider>
-                        {/* Hydration marker to enable safe event processing */}
-                        <HydrationMarker />
-                        {/* Central event handlers - subscribes to all events and routes notifications */}
-                        <EventHandlers />
-                        <AppRoutes />
-                        {/* Unified notification container */}
-                        <NotificationContainer />
-                        {/* Development tools - only in development */}
-                        {/*
+                <BookmarkProvider>
+                  <PredictionProvider>
+                    <ParlayProvider>
+                      <ChatProvider>
+                        {/* Unified Notification System */}
+                        <NotificationProvider>
+                          {/* Hydration marker to enable safe event processing */}
+                          <HydrationMarker />
+                          {/* Central event handlers - subscribes to all events and routes notifications */}
+                          <EventHandlers />
+                          <AppRoutes />
+                          {/* Unified notification container */}
+                          <NotificationContainer />
+                          {/* Development tools - only in development */}
+                          {/*
                       {(import.meta.env.DEV || process.env.NODE_ENV === 'development') && (
                         <>
                           <ListenerMonitor />
@@ -63,10 +65,11 @@ function AppContent() {
                         </>
                       )}
                       */}
-                      </NotificationProvider>
-                    </ChatProvider>
-                  </ParlayProvider>
-                </PredictionProvider>
+                        </NotificationProvider>
+                      </ChatProvider>
+                    </ParlayProvider>
+                  </PredictionProvider>
+                </BookmarkProvider>
               </ReactionProvider>
             </AchievementProvider>
           </ActivityProvider>

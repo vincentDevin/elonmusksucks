@@ -11,6 +11,7 @@ import {
   getSearchSuggestions,
   getTrendingContent,
   checkArticleBookmark,
+  checkArticleBookmarksBulk,
   toggleArticleBookmark,
   getUserBookmarks,
   getBookmarkCollections,
@@ -71,6 +72,9 @@ router.get('/trending', getTrendingContent);
 
 // GET /api/timeline/bookmarks/check/:id - Check if article is bookmarked
 router.get('/bookmarks/check/:id', requireAuth, checkArticleBookmark);
+
+// POST /api/timeline/bookmarks/check-bulk - Check multiple bookmarks at once
+router.post('/bookmarks/check-bulk', requireAuth, checkArticleBookmarksBulk);
 
 // POST /api/timeline/articles/:id/bookmark - Bookmark article
 router.post('/articles/:id/bookmark', requireAuth, toggleArticleBookmark);

@@ -248,11 +248,10 @@ export const TrendingWidget: React.FC<TrendingWidgetProps> = ({
             ) : (
               <div className="space-y-2">
                 {hashtags.map((hashtag, index) => (
-                  <Link
+                  <button
                     key={hashtag.id}
-                    to={`/hashtag/${hashtag.tag}`}
                     onClick={() => onHashtagClick?.(hashtag.tag)}
-                    className="block group hover:bg-muted/10 rounded-lg p-2 transition-colors"
+                    className="w-full text-left group hover:bg-muted/10 rounded-lg p-2 transition-colors"
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
@@ -276,12 +275,12 @@ export const TrendingWidget: React.FC<TrendingWidgetProps> = ({
                         </span>
                       )}
                     </div>
-                  </Link>
+                  </button>
                 ))}
               </div>
             )}
             <Link
-              to="/hashtags/all"
+              to="/timeline"
               className="block mt-3 text-xs text-primary hover:text-primary/80 transition-colors text-center"
             >
               View all topics →

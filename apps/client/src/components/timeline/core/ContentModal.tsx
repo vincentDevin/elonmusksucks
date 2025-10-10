@@ -4,10 +4,12 @@ import { PostReactions } from '../../posts/core/PostReactions';
 import { CommentSection } from './CommentSection';
 import { useReactions } from '../../../contexts/ReactionContext';
 import type { UnifiedFeedItem } from '../../../utils/feedAdapter';
-import type { TimelineItem, ReactionType } from '@ems/types';
+import type { TimelineItem, ReactionType, UserFeedPost } from '@ems/types';
 
-// Type for the full post data structure
-type FullPostData = NonNullable<TimelineItem['postData']>;
+// Type for the full post data structure - can be either from timeline or direct fetch
+// TimelineItem['postData'] uses 'content' field, UserFeedPost uses 'body' field
+type TimelinePostData = NonNullable<TimelineItem['postData']>;
+type FullPostData = TimelinePostData | UserFeedPost;
 
 interface ContentModalProps {
   isOpen: boolean;
@@ -32,8 +34,18 @@ export const ContentModal: React.FC<ContentModalProps> = ({ isOpen, onClose, con
   React.useEffect(() => {
     if (isOpen) {
       if (contentType === 'post' && contentData) {
-        const postData = contentData as unknown as FullPostData;
-        initializeReactions('post', contentId, postData.reactionCounts, postData.userReaction);
+        const postData = contentData as any;
+        // Handle both UserFeedPost (has reactionCounts) and TimelineItem.postData structures
+        const counts = postData.reactionCounts || {};
+        const reaction = postData.userReaction || undefined;
+
+        console.log('[ContentModal] Initializing reactions:', {
+          contentId,
+          counts,
+          reaction,
+          postData,
+        });
+        initializeReactions('post', contentId, counts, reaction);
       } else if (contentType === 'article') {
         initializeReactions('article', contentId);
       }
@@ -115,7 +127,7 @@ export const ContentModal: React.FC<ContentModalProps> = ({ isOpen, onClose, con
           {/* Post Content */}
           <div className="mb-4 px-4">
             <p className="text-content leading-relaxed whitespace-pre-wrap text-base">
-              {postData.content}
+              {'body' in postData ? postData.body : postData.content}
             </p>
 
             {/* Media Content */}
@@ -250,7 +262,7 @@ export const ContentModal: React.FC<ContentModalProps> = ({ isOpen, onClose, con
                 <span>{postData.commentsCount || 0} comments</span>
                 <span>•</span>
                 <span>{postData.viewsCount ? Number(postData.viewsCount) : 0} views</span>
-                {postData.sharesCount > 0 && (
+                {postData.sharesCount && postData.sharesCount > 0 && (
                   <>
                     <span>•</span>
                     <span>{postData.sharesCount} shares</span>
@@ -266,10 +278,10 @@ export const ContentModal: React.FC<ContentModalProps> = ({ isOpen, onClose, con
               contentType="post"
               contentId={contentId}
               comments={[]} // Always fetch fresh comments to get updated avatar URLs
-              commentsCount={postData.commentsCount || 0}
+              commentsCount={(postData as any).commentsCount || (postData as any).repliesCount || 0}
               onCommentsUpdate={(updatedComments) => {
                 // Update post data with new comments
-                console.log('Comments updated:', updatedComments);
+                console.log('[ContentModal] Comments updated:', updatedComments);
               }}
             />
           </div>

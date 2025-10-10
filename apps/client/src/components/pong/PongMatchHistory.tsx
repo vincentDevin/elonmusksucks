@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import {
   ClockIcon,
   TrophyIcon,
@@ -37,11 +37,7 @@ interface MatchHistoryEntry {
   economyComponent?: number;
 }
 
-export default function PongMatchHistory({
-  userId,
-  limit = 10,
-  className = '',
-}: PongMatchHistoryProps) {
+function PongMatchHistoryComponent({ userId, limit = 10, className = '' }: PongMatchHistoryProps) {
   const [matches, setMatches] = useState<MatchHistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -212,3 +208,12 @@ export default function PongMatchHistory({
     </div>
   );
 }
+
+// Memoize to prevent re-fetching match history when parent re-renders
+export default memo(PongMatchHistoryComponent, (prevProps, nextProps) => {
+  return (
+    prevProps.userId === nextProps.userId &&
+    prevProps.limit === nextProps.limit &&
+    prevProps.className === nextProps.className
+  );
+});

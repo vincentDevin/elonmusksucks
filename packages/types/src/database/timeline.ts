@@ -262,8 +262,9 @@ export interface DbSearchResult {
 }
 
 export interface DbSearchSuggestion {
-  type: 'article' | 'tag' | 'author' | 'feed';
+  type: 'article' | 'post' | 'tag' | 'author' | 'feed';
   value: string;
+  id?: number;
   count?: number;
 }
 

@@ -5,7 +5,8 @@
 // Supports infinite scroll, tabs, filtering, real-time updates, and loading states
 // -----------------------------------------------------------------------------
 
-import React, { useState, useEffect, useRef, useCallback, ReactNode } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import type { ReactNode } from 'react';
 
 export interface FeedItem {
   id: string | number;
@@ -78,7 +79,6 @@ interface GenericFeedProps<T extends FeedItem> {
 
   // Item actions
   onItemClick?: (item: T) => void;
-  onItemAction?: (action: string, item: T) => void;
 
   // Advanced features
   enableSearch?: boolean;
@@ -107,7 +107,6 @@ export default function GenericFeed<T extends FeedItem>({
   errorComponent,
   emptyComponent,
   onItemClick,
-  onItemAction,
   enableSearch = false,
   searchPlaceholder = 'Search...',
   onSearch,
@@ -224,10 +223,10 @@ export default function GenericFeed<T extends FeedItem>({
     onSearch?.(query);
   };
 
-  // Initial load and tab changes
+  // Initial load and tab/filter/search changes
   useEffect(() => {
     loadItems(true);
-  }, [activeTab, activeFilters, searchQuery]);
+  }, [loadItems]);
 
   // Infinite scroll setup
   useEffect(() => {

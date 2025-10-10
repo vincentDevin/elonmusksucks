@@ -331,7 +331,7 @@ export function ActivityProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
-    // Register socket event listeners
+    // Register socket event listeners - CRITICAL: Store refs for cleanup
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
 
@@ -341,7 +341,9 @@ export function ActivityProvider({ children }: { children: React.ReactNode }) {
       onConnect();
     }
 
+    // CRITICAL: Clean up listeners on unmount to prevent memory leaks
     return () => {
+      console.log('[ActivityContext] Cleaning up socket listeners');
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);
     };

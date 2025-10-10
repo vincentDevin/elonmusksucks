@@ -94,13 +94,23 @@ export const TimelineSearch: React.FC<TimelineSearchProps> = ({
         const data = await timelineApi.getSearchSuggestions(debouncedQuery);
         // Transform API response to match SearchSuggestion interface
         const transformedSuggestions: SearchSuggestion[] =
-          data.suggestions?.map((item, index) => ({
-            id: `${item.type}-${index}`,
-            type: item.type as 'article' | 'post' | 'user' | 'hashtag' | 'recent',
-            title: item.value,
-            subtitle: item.count ? `${item.count} items` : undefined,
-            icon: getIconForType(item.type as 'article' | 'post' | 'user' | 'hashtag' | 'recent'),
-          })) || [];
+          data.suggestions?.map((item, index) => {
+            // Map API types to SearchSuggestion types
+            let suggestionType: 'article' | 'post' | 'user' | 'hashtag' | 'recent' = 'article';
+            if (item.type === 'tag') suggestionType = 'hashtag';
+            else if (item.type === 'author') suggestionType = 'user';
+            else if (item.type === 'article') suggestionType = 'article';
+            else if (item.type === 'feed') suggestionType = 'article';
+
+            return {
+              // Use numeric ID if available (for authors, articles, etc), otherwise generate string ID
+              id: item.id !== undefined ? String(item.id) : `${item.type}-${item.value}-${index}`,
+              type: suggestionType,
+              title: item.value,
+              subtitle: item.count ? `${item.count} items` : undefined,
+              icon: getIconForType(suggestionType),
+            };
+          }) || [];
         setSuggestions(transformedSuggestions);
       } catch (error) {
         console.error('Failed to fetch suggestions:', error);

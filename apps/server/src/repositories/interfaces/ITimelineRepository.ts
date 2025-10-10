@@ -44,12 +44,28 @@ export interface ITimelineRepository {
     cursor?: string;
   }): Promise<DbSearchResult>;
 
+  searchPosts(params: {
+    query: string;
+    filters: DbSearchFilters & {
+      hashtag?: string;
+      authorId?: number;
+      hasMedia?: boolean;
+      hasReactions?: boolean;
+      engagementLevel?: 'all' | 'low' | 'medium' | 'high' | 'viral';
+    };
+    limit: number;
+    cursor?: string;
+    viewerId?: number;
+  }): Promise<any>;
+
   getSearchSuggestions(query: string): Promise<DbSearchSuggestion[]>;
 
   getTrendingContent(params: DbTrendingContentParams): Promise<DbTrendingContent>;
 
   // Bookmark System
   checkArticleBookmark(articleId: number, userId: number): Promise<boolean>;
+
+  checkArticleBookmarksBulk(articleIds: number[], userId: number): Promise<Map<number, boolean>>;
 
   toggleArticleBookmark(
     articleId: number,

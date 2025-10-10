@@ -208,29 +208,6 @@ export class UnifiedActivityService {
   // ===== Activity Creation Helpers =====
 
   /**
-   * Create a post/comment activity
-   */
-  async createPostActivity(
-    user: { id: number; name: string; avatarUrl?: string | null },
-    post: { id: number; content: string; isComment: boolean },
-  ): Promise<UnifiedActivityEvent> {
-    const preview = post.content.length > 50 ? post.content.substring(0, 47) + '...' : post.content;
-
-    return this.publishActivity({
-      type: post.isComment ? 'comment_created' : 'post_created',
-      userId: user.id,
-      userName: user.name,
-      userAvatar: user.avatarUrl || undefined,
-      title: preview, // Post content snippet for ticker display
-      description: preview, // Also in description for consistency
-      icon: post.isComment ? '💬' : '📝',
-      isPersonal: false,
-      isHighValue: false,
-      priority: 'low',
-    });
-  }
-
-  /**
    * Create a bet placed activity
    */
   async createBetActivity(

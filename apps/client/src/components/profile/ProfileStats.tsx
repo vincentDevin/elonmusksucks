@@ -219,31 +219,30 @@ export function ProfileStats({
           </div>
         </div>
 
-        {/* Tab Content */}
+        {/* Tab Content - Keep all tabs mounted but hidden for instant switching + caching */}
         <div className="min-h-[400px]">
-          {activeTab === 'achievements' && (
-            <div className="p-6">
-              <ProfileAchievements
-                achievements={profile?.achievements || (profile?.badges as any)}
-                embedded={true}
-              />
-            </div>
-          )}
+          {/* Achievements Tab - Always mounted, hidden when not active */}
+          <div className={`p-6 ${activeTab === 'achievements' ? '' : 'hidden'}`}>
+            <ProfileAchievements
+              achievements={profile?.achievements || (profile?.badges as any)}
+              embedded={true}
+            />
+          </div>
 
-          {activeTab === 'stats' && (
-            <div className="p-6">
-              <ProfileStats
-                profile={profile && { muskBucks: asNum(profile.muskBucks), rank: profile.rank }}
-                stats={stats}
-                isOwn={isOwn}
-                mode="card"
-                compact={true}
-              />
-            </div>
-          )}
+          {/* Stats Tab - Always mounted, hidden when not active */}
+          <div className={`p-6 ${activeTab === 'stats' ? '' : 'hidden'}`}>
+            <ProfileStats
+              profile={profile && { muskBucks: asNum(profile.muskBucks), rank: profile.rank }}
+              stats={stats}
+              isOwn={isOwn}
+              mode="card"
+              compact={true}
+            />
+          </div>
 
-          {activeTab === 'pong' && profile?.id && (
-            <div className="p-6">
+          {/* Pong Stats Tab - Always mounted, hidden when not active */}
+          {profile?.id && (
+            <div className={`p-6 ${activeTab === 'pong' ? '' : 'hidden'}`}>
               <ProfilePongStats
                 userId={profile.id}
                 isOwn={isOwn}

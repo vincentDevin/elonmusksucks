@@ -20,8 +20,6 @@ const Profile = lazy(() => import('../pages/Profile'));
 const AdminDashboard = lazy(() => import('../pages/AdminDashboard'));
 const Pong = lazy(() => import('../pages/Pong'));
 
-import { HashtagFeed } from '../components/posts/feeds';
-
 // Redirect to public site component
 const PublicSiteRedirect = () => {
   React.useEffect(() => {
@@ -141,16 +139,6 @@ export default function AppRoutes() {
               <Suspense fallback={<RouteFallback />}>
                 <Profile />
               </Suspense>
-            </MainLayout>
-          }
-        />
-
-        {/* Hashtag feed route */}
-        <Route
-          path="/hashtag/:tag"
-          element={
-            <MainLayout>
-              <HashtagFeed />
             </MainLayout>
           }
         />

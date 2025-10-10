@@ -307,7 +307,11 @@ export class TimelineRepository implements ITimelineRepository {
    */
   async searchContent(params: {
     query: string;
-    filters: DbSearchFilters;
+    filters: DbSearchFilters & {
+      hasMedia?: boolean;
+      hasReactions?: boolean;
+      engagementLevel?: 'all' | 'low' | 'medium' | 'high' | 'viral';
+    };
     limit: number;
     cursor?: string;
   }): Promise<DbSearchResult> {
@@ -353,6 +357,24 @@ export class TimelineRepository implements ITimelineRepository {
 
     if (params.filters.feedIds && params.filters.feedIds.length > 0) {
       articleWhere.feedId = { in: params.filters.feedIds };
+    }
+
+    // Apply media filter
+    if (params.filters.hasMedia === true) {
+      articleWhere.leadImageUrl = {
+        not: null,
+      };
+    } else if (params.filters.hasMedia === false) {
+      articleWhere.leadImageUrl = null;
+    }
+
+    // Apply reactions filter
+    if (params.filters.hasReactions === true) {
+      articleWhere.reactionsCount = {
+        gt: 0,
+      };
+    } else if (params.filters.hasReactions === false) {
+      articleWhere.reactionsCount = 0;
     }
 
     const articles = await this.prisma.article.findMany({
@@ -438,9 +460,192 @@ export class TimelineRepository implements ITimelineRepository {
   }
 
   /**
+   * Search posts with filters and cursor-based pagination
+   * @param params - Search query, filters, limit, and cursor
+   * @returns Posts matching search criteria
+   */
+  async searchPosts(params: {
+    query: string;
+    filters: DbSearchFilters & {
+      hashtag?: string;
+      authorId?: number;
+      hasMedia?: boolean;
+      hasReactions?: boolean;
+      engagementLevel?: 'all' | 'low' | 'medium' | 'high' | 'viral';
+    };
+    limit: number;
+    cursor?: string;
+    viewerId?: number;
+  }) {
+    const pageLimit = Math.min(params.limit || 30, 100);
+
+    // Build search where clause for posts
+    const postWhere: Prisma.ContentWhereInput = {
+      type: 'POST',
+      visibility: 'PUBLIC',
+      body: { contains: params.query, mode: 'insensitive' },
+    };
+
+    // Apply cursor for pagination
+    if (params.cursor) {
+      const cursorDate = new Date(params.cursor);
+      if (!isNaN(cursorDate.getTime())) {
+        postWhere.createdAt = { lt: cursorDate };
+      }
+    }
+
+    // Apply date filters
+    if (params.filters.startDate || params.filters.endDate) {
+      postWhere.createdAt = {
+        ...(typeof postWhere.createdAt === 'object' ? postWhere.createdAt : {}),
+      };
+      if (params.filters.startDate) {
+        (postWhere.createdAt as Prisma.DateTimeFilter).gte = params.filters.startDate;
+      }
+      if (params.filters.endDate) {
+        (postWhere.createdAt as Prisma.DateTimeFilter).lte = params.filters.endDate;
+      }
+    }
+
+    // Apply hashtag filter
+    if (params.filters.hashtag) {
+      postWhere.body = {
+        contains: `#${params.filters.hashtag}`,
+        mode: 'insensitive',
+      };
+    }
+
+    // Apply author filter
+    if (params.filters.authorId) {
+      postWhere.authorId = params.filters.authorId;
+    }
+
+    // Apply media filter
+    if (params.filters.hasMedia === true) {
+      postWhere.NOT = {
+        mediaUrls: { equals: [] },
+      };
+    } else if (params.filters.hasMedia === false) {
+      postWhere.mediaUrls = { equals: [] };
+    }
+
+    // Apply reactions filter
+    if (params.filters.hasReactions === true) {
+      postWhere.reactions = {
+        some: {},
+      };
+    } else if (params.filters.hasReactions === false) {
+      postWhere.reactions = {
+        none: {},
+      };
+    }
+
+    const posts = await this.prisma.content.findMany({
+      where: postWhere,
+      include: {
+        author: {
+          select: {
+            id: true,
+            name: true,
+            avatarUrl: true,
+            profilePictureKey: true, // Needed for enrichUsersWithAvatars to generate fresh signed URLs
+          },
+        },
+        reactions: {
+          select: {
+            id: true,
+            type: true,
+            userId: true,
+          },
+        },
+        _count: {
+          select: {
+            reactions: true,
+            children: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: pageLimit + 1,
+    });
+
+    // Filter by engagement level after fetching (can't easily do in SQL)
+    let filteredPosts = posts;
+    if (params.filters.engagementLevel && params.filters.engagementLevel !== 'all') {
+      filteredPosts = posts.filter((post) => {
+        const totalEngagement = post._count.reactions + post._count.children;
+        switch (params.filters.engagementLevel) {
+          case 'low':
+            return totalEngagement < 50;
+          case 'medium':
+            return totalEngagement >= 50 && totalEngagement < 200;
+          case 'high':
+            return totalEngagement >= 200 && totalEngagement < 1000;
+          case 'viral':
+            return totalEngagement >= 1000;
+          default:
+            return true;
+        }
+      });
+    }
+
+    const hasMore = filteredPosts.length > pageLimit;
+    const items = filteredPosts.slice(0, pageLimit);
+
+    const nextCursor =
+      hasMore && items.length > 0 ? items[items.length - 1].createdAt.toISOString() : undefined;
+
+    return {
+      items: items.map((post) => {
+        // Calculate reaction counts by type
+        const reactionCounts: Record<string, number> = {
+          LIKE: 0,
+          LOVE: 0,
+          LAUGH: 0,
+          ANGRY: 0,
+          SAD: 0,
+          WOW: 0,
+        };
+
+        let userReaction: string | null = null;
+
+        if (post.reactions) {
+          post.reactions.forEach((reaction: any) => {
+            const type = reaction.type;
+            reactionCounts[type] = (reactionCounts[type] || 0) + 1;
+
+            if (params.viewerId && reaction.userId === params.viewerId) {
+              userReaction = type;
+            }
+          });
+        }
+
+        return {
+          // Spread all post fields
+          ...post,
+          // Convert dates to ISO strings
+          editedAt: post.editedAt?.toISOString() || null,
+          createdAt: post.createdAt.toISOString(),
+          updatedAt: post.updatedAt.toISOString(),
+          // Add count fields with correct naming
+          reactionsCount: post._count.reactions,
+          repliesCount: post._count.children,
+          // Ensure author is included
+          author: post.author,
+          // Add reaction breakdown
+          reactionCounts,
+          userReaction,
+        };
+      }),
+      nextCursor,
+      hasMore,
+    };
+  }
+
+  /**
    * Get search suggestions based on query
    * @param query - Search query string
-   * @returns Array of suggestions (articles, tags, authors, feeds)
+   * @returns Array of suggestions (articles, posts, hashtags, users, feeds)
    */
   async getSearchSuggestions(query: string): Promise<DbSearchSuggestion[]> {
     const suggestions: DbSearchSuggestion[] = [];
@@ -451,14 +656,94 @@ export class TimelineRepository implements ITimelineRepository {
         status: 'APPROVED',
         title: { contains: query, mode: 'insensitive' },
       },
-      select: { title: true },
-      take: 5,
+      select: { id: true, title: true },
+      take: 3,
     });
 
     articles.forEach((article) => {
       suggestions.push({
         type: 'article',
         value: article.title,
+        id: article.id,
+        count: 1,
+      });
+    });
+
+    // Post content suggestions
+    const posts = await this.prisma.content.findMany({
+      where: {
+        type: 'POST',
+        visibility: 'PUBLIC',
+        body: { contains: query, mode: 'insensitive' },
+      },
+      select: {
+        id: true,
+        body: true,
+        author: {
+          select: { name: true },
+        },
+      },
+      take: 3,
+    });
+
+    posts.forEach((post) => {
+      const preview = post.body.length > 60 ? post.body.substring(0, 57) + '...' : post.body;
+      suggestions.push({
+        type: 'post',
+        value: `${post.author.name}: ${preview}`,
+        id: post.id,
+        count: 1,
+      });
+    });
+
+    // Hashtag suggestions (if query starts with #)
+    if (query.startsWith('#')) {
+      const hashtag = query.substring(1);
+      const tags = await this.prisma.tag.findMany({
+        where: {
+          name: { contains: hashtag, mode: 'insensitive' },
+        },
+        select: {
+          id: true,
+          name: true,
+          _count: {
+            select: { articles: true },
+          },
+        },
+        take: 3,
+      });
+
+      tags.forEach((tag) => {
+        suggestions.push({
+          type: 'tag',
+          value: `#${tag.name}`,
+          id: tag.id,
+          count: tag._count.articles,
+        });
+      });
+    }
+
+    // User suggestions
+    const users = await this.prisma.user.findMany({
+      where: {
+        name: { contains: query, mode: 'insensitive' },
+      },
+      select: {
+        id: true,
+        name: true,
+        _count: {
+          select: { contents: true },
+        },
+      },
+      take: 3,
+    });
+
+    users.forEach((user) => {
+      suggestions.push({
+        type: 'author',
+        value: user.name,
+        id: user.id,
+        count: user._count.contents,
       });
     });
 
@@ -468,18 +753,19 @@ export class TimelineRepository implements ITimelineRepository {
         status: 'ACTIVE',
         name: { contains: query, mode: 'insensitive' },
       },
-      select: { name: true },
-      take: 3,
+      select: { id: true, name: true },
+      take: 2,
     });
 
     feeds.forEach((feed) => {
       suggestions.push({
         type: 'feed',
         value: feed.name,
+        id: feed.id,
       });
     });
 
-    return suggestions.slice(0, 8); // Limit total suggestions
+    return suggestions.slice(0, 10); // Limit total suggestions
   }
 
   /**
@@ -752,6 +1038,42 @@ export class TimelineRepository implements ITimelineRepository {
     });
 
     return bookmark !== null;
+  }
+
+  /**
+   * Check bookmark status for multiple articles (bulk operation to prevent N+1)
+   * @param articleIds - Array of article IDs
+   * @param userId - ID of the user
+   * @returns Map of articleId -> isBookmarked
+   */
+  async checkArticleBookmarksBulk(
+    articleIds: number[],
+    userId: number,
+  ): Promise<Map<number, boolean>> {
+    if (articleIds.length === 0) {
+      return new Map();
+    }
+
+    const bookmarks = await this.prisma.articleBookmark.findMany({
+      where: {
+        articleId: { in: articleIds },
+        userId,
+      },
+      select: {
+        articleId: true,
+      },
+    });
+
+    // Create a set of bookmarked article IDs for O(1) lookup
+    const bookmarkedIds = new Set(bookmarks.map((b) => b.articleId));
+
+    // Return map with boolean for each requested article
+    const resultMap = new Map<number, boolean>();
+    articleIds.forEach((id) => {
+      resultMap.set(id, bookmarkedIds.has(id));
+    });
+
+    return resultMap;
   }
 
   /**

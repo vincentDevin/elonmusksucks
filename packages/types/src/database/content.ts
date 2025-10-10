@@ -175,6 +175,20 @@ export interface DbUserFeedContent {
     body: string;
     authorId: number;
   } | null;
+  // Additional fields for UI compatibility
+  authorName?: string;
+  authorAvatar?: string | null;
+  commentsCount?: number;
+  visibility?: string;
+  mediaUrls?: string[];
+  linkPreview?: any;
+  viewsCount?: string;
+  sharesCount?: number;
+  editedAt?: Date | null;
+  updatedAt?: Date;
+  reactionCounts?: Record<string, number>;
+  userReaction?: string | null;
+  children?: DbUserFeedContent[];
 }
 
 export interface DbUserMention {
