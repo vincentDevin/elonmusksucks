@@ -1,5 +1,4 @@
 import { useState, useCallback } from 'react';
-import { Link } from 'react-router-dom';
 import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
 import { TimelineProvider } from '../contexts/TimelineContext';
 import {
@@ -143,7 +142,7 @@ export default function Timeline() {
   }, []);
 
   return (
-    <div className="bg-background text-content min-h-screen transition-colors duration-300">
+    <div className="bg-background text-content min-h-screen transition-colors duration-300 mt-4">
       <TimelineProvider>
         <div className="w-full px-4 lg:px-6 xl:px-8">
           <div className="max-w-none">
@@ -151,7 +150,6 @@ export default function Timeline() {
             <div className="mb-6">
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-4">
                 <div>
-                  <h1 className="text-3xl font-bold mb-2">Community Timeline</h1>
                   <p className="text-content/70">
                     Discover articles, join discussions, and stay connected with the community
                   </p>
@@ -202,30 +200,6 @@ export default function Timeline() {
               </div>
             </div>
 
-            {/* Quick Actions Section */}
-            <div className="bg-surface rounded-lg p-4 shadow mb-6 transition-colors duration-300">
-              <div className="flex items-center gap-4 justify-between">
-                <Link
-                  to="/predictions"
-                  className="flex-1 px-4 py-2 text-sm bg-primary text-primary-foreground rounded hover:bg-primary-hover transition-colors text-center"
-                >
-                  Make Prediction
-                </Link>
-                <Link
-                  to="/leaderboard"
-                  className="flex-1 px-4 py-2 text-sm bg-surface border border-border text-content rounded hover:bg-primary/10 transition-colors text-center"
-                >
-                  View Leaderboard
-                </Link>
-                <Link
-                  to="/pong"
-                  className="flex-1 px-4 py-2 text-sm bg-surface border border-border text-content rounded hover:bg-primary/10 transition-colors text-center"
-                >
-                  Play Pong
-                </Link>
-              </div>
-            </div>
-
             {/* Main Content Layout */}
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
               {/* Main Timeline Content - Takes up 3 columns on large screens */}
@@ -234,15 +208,13 @@ export default function Timeline() {
                 {user && <CreatePost onPostCreated={handlePostCreated} />}
 
                 {/* Timeline Feed */}
-                <div className="bg-surface shadow rounded-lg transition-colors duration-300">
-                  <div className="p-6">
-                    <TimelineWithPosts
-                      key={refreshKey}
-                      initialTab="posts"
-                      searchQuery={searchQuery}
-                      filters={filters}
-                    />
-                  </div>
+                <div className=" shadow rounded-lg transition-colors duration-300">
+                  <TimelineWithPosts
+                    key={refreshKey}
+                    initialTab="posts"
+                    searchQuery={searchQuery}
+                    filters={filters}
+                  />
                 </div>
               </div>
 
