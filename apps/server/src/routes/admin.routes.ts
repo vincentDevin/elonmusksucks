@@ -5,6 +5,7 @@ import * as adminController from '../controllers/admin.controller';
 import feedsRoutes from './feeds.routes';
 import unifiedContentRoutes from './unified-content.routes';
 import { AdminActions } from '@ems/types';
+import { uploadConfig, validateFileContent } from '../middleware/fileValidation.middleware';
 
 const router = Router();
 
@@ -29,6 +30,25 @@ router.post('/users/bulk', adminController.bulkUpdateUsers); // Bulk operations
 router.patch('/users/:id/role', adminController.updateUserRole);
 router.patch('/users/:id/activate', adminController.activateUser);
 router.patch('/users/:id/balance', adminController.updateUserBalance);
+
+// — Admin Avatar Management —
+router.post(
+  '/users/:userId/profile-picture',
+  uploadConfig.single('image'),
+  validateFileContent,
+  adminController.uploadUserProfileImage,
+);
+router.delete('/users/:userId/profile-picture', adminController.deleteUserProfileImage);
+
+// — Site Default Avatar Management —
+router.get('/settings/default-avatar', adminController.getDefaultAvatar);
+router.post(
+  '/settings/default-avatar',
+  uploadConfig.single('image'),
+  validateFileContent,
+  adminController.uploadDefaultAvatar,
+);
+router.delete('/settings/default-avatar', adminController.deleteDefaultAvatar);
 
 // — Enhanced Prediction Management —
 router.get('/predictions', adminController.getPredictions); // Legacy endpoint

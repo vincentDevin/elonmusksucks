@@ -11,6 +11,7 @@ import {
   getUserStatsHandler,
   getUserActivityStatsHandler,
   uploadProfileImageHandler,
+  deleteProfileImageHandler,
   getUserBetsHandler,
   getUserParlaysHandler,
   getUserPredictionsHandler,
@@ -49,6 +50,9 @@ router.post(
   validateFileContent,
   uploadProfileImageHandler,
 );
+
+// Delete profile picture (revert to default)
+router.delete('/:userId/profile-picture', requireAuth, deleteProfileImageHandler);
 
 // User feed endpoints (legacy - will be deprecated)
 router.get('/:userId/feed', requireAuth, getUserFeedHandler);

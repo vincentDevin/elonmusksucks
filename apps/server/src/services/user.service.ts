@@ -115,6 +115,140 @@ export class UserService {
   }
 
   /**
+   * Admin-only method to upload profile image for any user (including AI users)
+   * Bypasses auth checks and logs admin action
+   */
+  async adminUploadUserProfileImage(
+    adminId: number,
+    targetUserId: number,
+    file: UploadedFile,
+  ): Promise<{
+    avatarUrl: string;
+    sizes: {
+      thumbnail: string;
+      profile: string;
+      full: string;
+    };
+  }> {
+    console.log(`[admin-avatar] Admin ${adminId} uploading profile image for user ${targetUserId}`);
+
+    // Use the same upload logic as regular users
+    const result = await this.uploadUserProfileImage(targetUserId, file);
+
+    // Log the admin action (can be extended to ModerationLog table if needed)
+    console.log(
+      `[admin-avatar] ✅ Admin ${adminId} successfully uploaded avatar for user ${targetUserId}`,
+    );
+
+    return result;
+  }
+
+  /**
+   * Delete user's profile image and revert to default avatar
+   * Clears S3 storage and resets database fields
+   */
+  async deleteUserProfileImage(userId: number): Promise<void> {
+    // Clear cached URLs
+    await redisClient.del(CACHE_KEYS.PROFILE_IMAGE_URL(userId));
+
+    // Invalidate active user cache
+    await activeUserCacheService.invalidateUser(userId);
+
+    // Get current user to check for existing profile picture
+    const user = await this.repo.findById(userId);
+    if (!user) throw new Error('User not found');
+
+    // Clean up S3 storage if profile picture exists
+    if (user.profilePictureKey) {
+      await this.cleanupOldProfileImages(user.profilePictureKey);
+    }
+
+    // Clear the profilePictureKey to revert to default avatar
+    await this.repo.updateProfile(userId, {
+      profilePictureKey: null,
+    });
+
+    console.log(`[user-avatar] Profile image deleted for user ${userId}`);
+  }
+
+  // --- DEFAULT AVATAR MANAGEMENT ---
+
+  /**
+   * Get the default avatar URL (if one is set)
+   * Returns a signed URL for the default avatar, or null if not set
+   */
+  async getDefaultAvatarUrl(): Promise<string | null> {
+    const defaultKey = 'defaults/avatar.webp';
+
+    try {
+      // Try to get a signed URL - if file doesn't exist, AWS will error
+      const url = await this.getSignedAvatarUrl(defaultKey, 3600);
+      return url;
+    } catch (error) {
+      // File doesn't exist
+      return null;
+    }
+  }
+
+  /**
+   * Upload a new default avatar image for the site
+   * Replaces any existing default avatar
+   */
+  async uploadDefaultAvatar(file: UploadedFile): Promise<{ avatarUrl: string }> {
+    console.log('[default-avatar] Uploading new default avatar');
+
+    // Validate and process the image
+    const isValidImage = await ImageProcessingService.validateImage(file.buffer);
+    if (!isValidImage) {
+      throw new Error('Invalid image file. Please upload a valid JPEG, PNG, or WebP image.');
+    }
+
+    // Process image into a single size (profile size is fine for default)
+    const processedImages: ProcessedImageSizes = await ImageProcessingService.processProfileImage(
+      file.buffer,
+      0, // userId 0 for default avatar
+    );
+
+    // Upload to fixed location
+    const defaultKey = 'defaults/avatar.webp';
+    await this.s3.send(
+      new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: defaultKey,
+        Body: processedImages.profile.buffer,
+        ContentType: processedImages.profile.contentType,
+        CacheControl: 'public, max-age=2592000', // 30 days
+        Metadata: {
+          'uploaded-at': new Date().toISOString(),
+          'is-default-avatar': 'true',
+        },
+      }),
+    );
+
+    // Get signed URL
+    const avatarUrl = await this.getSignedAvatarUrl(defaultKey, 60 * 60 * 24 * 7); // 7 days
+
+    console.log('[default-avatar] ✅ Default avatar uploaded successfully');
+
+    return { avatarUrl };
+  }
+
+  /**
+   * Delete the default avatar
+   */
+  async deleteDefaultAvatar(): Promise<void> {
+    const defaultKey = 'defaults/avatar.webp';
+
+    try {
+      await this.s3.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: defaultKey }));
+      console.log('[default-avatar] Default avatar deleted successfully');
+    } catch (error) {
+      console.warn('[default-avatar] Failed to delete default avatar:', error);
+      throw new Error('Failed to delete default avatar');
+    }
+  }
+
+  /**
    * Upload a processed image to S3-compatible storage
    */
   private async uploadImageToStorage(image: {
@@ -282,7 +416,7 @@ export class UserService {
     // Generate signed avatar URL if we have a storage key (use cached version)
     const avatarUrl = user.profilePictureKey
       ? await this.getCachedProfileImageUrl(user.id, user.profilePictureKey, 3600)
-      : user.avatarUrl;
+      : user.avatarUrl || (await this.getDefaultAvatarUrl());
 
     return {
       id: user.id,
@@ -384,7 +518,8 @@ export class UserService {
         avatarUrl = user.avatarUrl || null;
       }
     } else {
-      avatarUrl = user.avatarUrl || null;
+      // No profile picture key - fall back to default avatar or user's avatarUrl
+      avatarUrl = user.avatarUrl || (await this.getDefaultAvatarUrl());
     }
 
     return {
@@ -448,9 +583,12 @@ export class UserService {
     const usersWithKeys = uniqueUsers.filter((u) => u.profilePictureKey);
     const usersWithoutKeys = uniqueUsers.filter((u) => !u.profilePictureKey);
 
-    // Handle users without keys (use avatarUrl directly)
+    // Get default avatar URL once for all users without keys
+    const defaultAvatarUrl = usersWithoutKeys.length > 0 ? await this.getDefaultAvatarUrl() : null;
+
+    // Handle users without keys (use avatarUrl or default)
     for (const user of usersWithoutKeys) {
-      result.set(user.id, user.avatarUrl || null);
+      result.set(user.id, user.avatarUrl || defaultAvatarUrl);
     }
 
     if (usersWithKeys.length === 0) {

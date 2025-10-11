@@ -109,6 +109,46 @@ export async function updateUserBalance(userId: number, amount: number): Promise
   return res.data;
 }
 
+/** — Admin Avatar Management — **/
+export async function uploadUserProfileImage(
+  userId: number,
+  file: File,
+): Promise<{ avatarUrl: string; sizes: { thumbnail: string; profile: string; full: string } }> {
+  const formData = new FormData();
+  formData.append('image', file);
+  const res = await api.post(`/api/admin/users/${userId}/profile-picture`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return res.data;
+}
+
+export async function deleteUserProfileImage(userId: number): Promise<void> {
+  await api.delete(`/api/admin/users/${userId}/profile-picture`);
+}
+
+/** — Site Default Avatar Management — **/
+export async function getDefaultAvatar(): Promise<{ avatarUrl: string | null }> {
+  const res = await api.get<{ avatarUrl: string | null }>('/api/admin/settings/default-avatar');
+  return res.data;
+}
+
+export async function uploadDefaultAvatar(file: File): Promise<{ avatarUrl: string }> {
+  const formData = new FormData();
+  formData.append('image', file);
+  const res = await api.post<{ avatarUrl: string }>(
+    '/api/admin/settings/default-avatar',
+    formData,
+    {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    },
+  );
+  return res.data;
+}
+
+export async function deleteDefaultAvatar(): Promise<void> {
+  await api.delete('/api/admin/settings/default-avatar');
+}
+
 /** — Enhanced Prediction Management — **/
 export async function listPredictions(params?: Record<string, any>): Promise<PublicPrediction[]> {
   const res = await api.get<PublicPrediction[]>('/api/admin/predictions', { params });

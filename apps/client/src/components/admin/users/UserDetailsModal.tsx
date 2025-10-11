@@ -14,6 +14,7 @@ import AchievementSection from './sections/AchievementSection';
 import BalanceSection from './sections/BalanceSection';
 import BanManagementSection from './sections/BanManagementSection';
 import ModerationHistorySection from './sections/ModerationHistorySection';
+import AvatarManagementSection from './sections/AvatarManagementSection';
 
 interface UserDetailsModalProps {
   userId: number;
@@ -33,6 +34,7 @@ const tabs: TabConfig[] = [
   { id: 'badges', label: 'Badges', icon: '🏅' },
   { id: 'achievements', label: 'Achievements', icon: '🏆' },
   { id: 'balance', label: 'Balance', icon: '💰' },
+  { id: 'avatar', label: 'Avatar', icon: '🖼️' },
   { id: 'moderation', label: 'Moderation', icon: '🔨' },
 ];
 
@@ -173,6 +175,15 @@ const UserDetailsModal: React.FC<UserDetailsModalProps> = ({
                   userId={userId}
                   userName={userData?.name}
                   currentBalance={userData?.muskBucks ? Number(userData.muskBucks) : 0}
+                  onUpdate={handleUpdate}
+                />
+              )}
+
+              {activeTab === 'avatar' && (
+                <AvatarManagementSection
+                  userId={userId}
+                  userName={userData?.name}
+                  currentAvatarUrl={userData?.avatarUrl}
                   onUpdate={handleUpdate}
                 />
               )}

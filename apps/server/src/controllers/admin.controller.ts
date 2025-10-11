@@ -5,8 +5,10 @@ import { payoutService } from '../services/payout.service';
 import { adminAchievementService } from '../services/achievements/adminAchievement.service';
 import { shameWallService } from '../services/shameWall.service';
 import { RuleSimulationService } from '../services/achievements/ruleSimulation.service';
+import { UserService } from '../services/user.service';
 
 const ruleSimulationService = new RuleSimulationService();
+const userService = new UserService();
 import { serializeBigInt } from '../utils/bigintSerializer';
 import {
   toAdminUserView,
@@ -179,6 +181,128 @@ export async function updateUserBalance(
     const updated: PublicUser = await adminService.adjustUserBalance(userId, amount);
     res.json(serializeBigInt(updated));
   } catch (err) {
+    next(err);
+  }
+}
+
+// -- Admin Avatar Management --
+export async function uploadUserProfileImage(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const targetUserId = Number(req.params.userId);
+    const adminId = (req as any).user?.id;
+    const file = (req as any).file;
+
+    if (!adminId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    if (!file) {
+      res.status(400).json({ error: 'No file uploaded' });
+      return;
+    }
+
+    console.log(`[admin-avatar] Admin ${adminId} uploading profile image for user ${targetUserId}`);
+
+    const result = await userService.adminUploadUserProfileImage(adminId, targetUserId, file);
+    res.json(result);
+  } catch (err) {
+    console.error('[admin-avatar] Upload error:', err);
+    next(err);
+  }
+}
+
+export async function deleteUserProfileImage(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const targetUserId = Number(req.params.userId);
+    const adminId = (req as any).user?.id;
+
+    if (!adminId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    console.log(`[admin-avatar] Admin ${adminId} deleting profile image for user ${targetUserId}`);
+
+    await userService.deleteUserProfileImage(targetUserId);
+    res.status(204).send();
+  } catch (err) {
+    console.error('[admin-avatar] Delete error:', err);
+    next(err);
+  }
+}
+
+// -- Site Default Avatar Management --
+export async function getDefaultAvatar(
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const defaultAvatarUrl = await userService.getDefaultAvatarUrl();
+    res.json({ avatarUrl: defaultAvatarUrl });
+  } catch (err) {
+    console.error('[admin-default-avatar] Get error:', err);
+    next(err);
+  }
+}
+
+export async function uploadDefaultAvatar(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const adminId = (req as any).user?.id;
+    const file = (req as any).file;
+
+    if (!adminId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    if (!file) {
+      res.status(400).json({ error: 'No file uploaded' });
+      return;
+    }
+
+    console.log(`[admin-default-avatar] Admin ${adminId} uploading default avatar`);
+
+    const result = await userService.uploadDefaultAvatar(file);
+    res.json(result);
+  } catch (err) {
+    console.error('[admin-default-avatar] Upload error:', err);
+    next(err);
+  }
+}
+
+export async function deleteDefaultAvatar(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const adminId = (req as any).user?.id;
+
+    if (!adminId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    console.log(`[admin-default-avatar] Admin ${adminId} deleting default avatar`);
+
+    await userService.deleteDefaultAvatar();
+    res.status(204).send();
+  } catch (err) {
+    console.error('[admin-default-avatar] Delete error:', err);
     next(err);
   }
 }

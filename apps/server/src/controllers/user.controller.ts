@@ -115,6 +115,31 @@ export async function uploadProfileImageHandler(
 }
 
 /**
+ * DELETE /api/users/:userId/profile-picture
+ * Delete user's custom profile image (revert to default avatar)
+ */
+export async function deleteProfileImageHandler(
+  req: ReqWithUser,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const targetUserId = Number(req.params.userId);
+    const authUserId = req.user?.id;
+
+    if (authUserId !== targetUserId) {
+      res.status(403).json({ error: 'Forbidden' });
+      return;
+    }
+
+    await userService.deleteUserProfileImage(targetUserId);
+    res.status(204).send();
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
  * POST /api/users/:userId/follow
  * Authenticated user follows another user
  */

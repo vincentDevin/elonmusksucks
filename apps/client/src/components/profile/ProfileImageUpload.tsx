@@ -35,6 +35,7 @@ export function ProfileImageUpload({
 }: ProfileImageUploadProps) {
   const { accessToken } = useAuth();
   const [isUploading, setIsUploading] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>('');
@@ -142,8 +143,43 @@ export function ProfileImageUpload({
   };
 
   const handleButtonClick = () => {
-    if (disabled || isUploading) return;
+    if (disabled || isUploading || isDeleting) return;
     fileInputRef.current?.click();
+  };
+
+  const handleUseDefault = async () => {
+    if (!accessToken) {
+      onUploadError('Authentication required');
+      return;
+    }
+
+    if (!confirm('Use the site default avatar? This will remove your custom profile picture.')) {
+      return;
+    }
+
+    setIsDeleting(true);
+
+    try {
+      const response = await fetch(`/api/users/${userId}/profile-picture`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to reset avatar');
+      }
+
+      // Notify parent of success - need to refresh to get the new default avatar URL
+      window.location.reload();
+    } catch (error) {
+      console.error('Delete avatar error:', error);
+      onUploadError(error instanceof Error ? error.message : 'Failed to reset avatar');
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   if (showCropper && previewUrl) {
@@ -183,11 +219,11 @@ export function ProfileImageUpload({
 
         {/* Upload Controls */}
         <div className="flex-1 space-y-2">
-          <div>
+          <div className="flex gap-2">
             <button
               type="button"
               onClick={handleButtonClick}
-              disabled={disabled || isUploading}
+              disabled={disabled || isUploading || isDeleting}
               className="inline-flex items-center px-4 py-2 bg-surface text-content shadow-sm border border-muted rounded-md cursor-pointer hover:bg-muted hover:border-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isUploading ? (
@@ -219,6 +255,15 @@ export function ProfileImageUpload({
               )}
             </button>
 
+            <button
+              type="button"
+              onClick={handleUseDefault}
+              disabled={disabled || isUploading || isDeleting}
+              className="inline-flex items-center px-4 py-2 bg-surface text-content shadow-sm border border-muted rounded-md cursor-pointer hover:bg-muted hover:border-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isDeleting ? 'Setting...' : 'Use Default'}
+            </button>
+
             {/* Hidden file input */}
             <input
               ref={fileInputRef}
@@ -226,7 +271,7 @@ export function ProfileImageUpload({
               accept="image/jpeg,image/png,image/webp"
               className="sr-only"
               onChange={handleFileSelect}
-              disabled={disabled || isUploading}
+              disabled={disabled || isUploading || isDeleting}
             />
           </div>
 
