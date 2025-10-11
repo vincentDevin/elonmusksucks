@@ -19,6 +19,11 @@ export const toPredictionView = (prediction: {
   resolvedAt: Date | null;
   creatorId: number;
   winningOptionId: number | null;
+  creator?: {
+    id: number;
+    name: string;
+    avatarUrl: string | null;
+  };
   options: Array<{
     id: number;
     label: string;
@@ -64,6 +69,7 @@ export const toPredictionView = (prediction: {
   resolvedAt: prediction.resolvedAt ? prediction.resolvedAt.toISOString() : null,
   creatorUserId: prediction.creatorId,
   winningOptionId: prediction.winningOptionId,
+  creator: prediction.creator,
   options: prediction.options,
   bets: prediction.bets.map((bet) => ({
     id: bet.id,

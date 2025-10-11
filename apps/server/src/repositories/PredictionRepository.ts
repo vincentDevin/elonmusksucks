@@ -51,6 +51,14 @@ export class PredictionRepository implements IPredictionRepository {
       },
       include: {
         category: true,
+        creator: {
+          select: {
+            id: true,
+            name: true,
+            avatarUrl: true,
+            profilePictureKey: true,
+          },
+        },
         options: {
           select: {
             id: true,
@@ -84,11 +92,19 @@ export class PredictionRepository implements IPredictionRepository {
    * NOTE: Uses manual batch queries instead of nested includes to avoid N+1 issues
    */
   async listAllPredictions(): Promise<PredictionWithRelations[]> {
-    // Step 1: Fetch predictions with direct relations only (categories, options)
+    // Step 1: Fetch predictions with direct relations only (categories, options, creator)
     const preds = await prisma.prediction.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
         category: true,
+        creator: {
+          select: {
+            id: true,
+            name: true,
+            avatarUrl: true,
+            profilePictureKey: true,
+          },
+        },
         options: true, // No nested includes - we'll batch fetch related data
       },
     });
@@ -274,6 +290,14 @@ export class PredictionRepository implements IPredictionRepository {
       where: { id },
       include: {
         category: true,
+        creator: {
+          select: {
+            id: true,
+            name: true,
+            avatarUrl: true,
+            profilePictureKey: true,
+          },
+        },
         options: {
           include: {
             parlayLegs: {
@@ -411,6 +435,14 @@ export class PredictionRepository implements IPredictionRepository {
       where: { id: { in: ids } },
       include: {
         category: true,
+        creator: {
+          select: {
+            id: true,
+            name: true,
+            avatarUrl: true,
+            profilePictureKey: true,
+          },
+        },
         options: {
           include: {
             parlayLegs: {

@@ -156,6 +156,23 @@ function SimplePredictionCard({
               </div>
             </div>
 
+            {/* Creator Info */}
+            {prediction.creator && (
+              <div className="flex items-center gap-2 mb-3 text-sm">
+                {prediction.creator.avatarUrl && (
+                  <img
+                    src={prediction.creator.avatarUrl}
+                    alt={prediction.creator.name}
+                    className="w-5 h-5 rounded-full object-cover"
+                  />
+                )}
+                <span className="text-tertiary">
+                  Created by{' '}
+                  <span className="text-content font-medium">{prediction.creator.name}</span>
+                </span>
+              </div>
+            )}
+
             {/* Stats Row */}
             <div className="flex items-center gap-4 text-sm text-tertiary">
               <div className="flex items-center gap-1">
@@ -277,6 +294,10 @@ function arePropsEqual(
   if (prevProps.prediction.resolved !== nextProps.prediction.resolved) return false;
   if (prevProps.prediction.bets.length !== nextProps.prediction.bets.length) return false;
   if (prevProps.prediction.expiresAt !== nextProps.prediction.expiresAt) return false;
+
+  // Compare creator info
+  if (prevProps.prediction.creator?.id !== nextProps.prediction.creator?.id) return false;
+  if (prevProps.prediction.creator?.name !== nextProps.prediction.creator?.name) return false;
 
   // Compare other props (functions and strings are typically stable)
   if (prevProps.className !== nextProps.className) return false;

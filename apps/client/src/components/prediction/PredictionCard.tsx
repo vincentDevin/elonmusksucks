@@ -180,6 +180,23 @@ function UnifiedPredictionCard({
           {/* Title */}
           <h3 className={titleClasses}>{prediction.title}</h3>
 
+          {/* Creator Info */}
+          {prediction.creator && (
+            <div className="flex items-center gap-2 mb-3 text-sm">
+              {prediction.creator.avatarUrl && (
+                <img
+                  src={prediction.creator.avatarUrl}
+                  alt={prediction.creator.name}
+                  className="w-5 h-5 rounded-full object-cover"
+                />
+              )}
+              <span className="text-tertiary">
+                Created by{' '}
+                <span className="text-content font-medium">{prediction.creator.name}</span>
+              </span>
+            </div>
+          )}
+
           {/* Engagement metrics */}
           <div className="flex items-center gap-4 text-sm text-tertiary mb-3">
             <span className="flex items-center gap-1">
@@ -294,6 +311,22 @@ function UnifiedPredictionCard({
 
           {/* Title */}
           <h3 className={titleClasses}>{prediction.title}</h3>
+
+          {/* Creator Info */}
+          {prediction.creator && !isMini && (
+            <div className="flex items-center gap-2 mb-2 text-sm">
+              {prediction.creator.avatarUrl && (
+                <img
+                  src={prediction.creator.avatarUrl}
+                  alt={prediction.creator.name}
+                  className="w-4 h-4 rounded-full object-cover"
+                />
+              )}
+              <span className="text-tertiary text-xs">
+                by <span className="text-content font-medium">{prediction.creator.name}</span>
+              </span>
+            </div>
+          )}
 
           {/* Quick stats */}
           <div
@@ -531,6 +564,10 @@ function arePropsEqual(
   if (prev.prediction.id !== next.prediction.id) return false;
   if (prev.prediction.resolved !== next.prediction.resolved) return false;
   if (prev.prediction.bets.length !== next.prediction.bets.length) return false;
+
+  // Creator info
+  if (prev.prediction.creator?.id !== next.prediction.creator?.id) return false;
+  if (prev.prediction.creator?.name !== next.prediction.creator?.name) return false;
 
   // Variant and display settings
   if (prev.variant !== next.variant) return false;

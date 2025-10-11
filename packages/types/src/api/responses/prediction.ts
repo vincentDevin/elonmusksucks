@@ -63,6 +63,11 @@ export interface PredictionView {
   resolvedAt: string | null; // Date → ISO string
   creatorUserId: number;
   winningOptionId: number | null;
+  creator?: {
+    id: number;
+    name: string;
+    avatarUrl: string | null;
+  };
   options: Array<{
     id: number;
     label: string;
@@ -99,6 +104,11 @@ export interface PredictionFull extends PublicPrediction {
   bets: BetWithUser[];
   parlayLegs?: ParlayLegWithUser[];
   sourceLinks?: any[];
+  creator?: {
+    id: number;
+    name: string;
+    avatarUrl: string | null;
+  };
 }
 
 // ============================================================================

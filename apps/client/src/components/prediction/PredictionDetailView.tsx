@@ -161,7 +161,7 @@ export default function PredictionDetailView({
                 <h1 className="text-xl font-semibold text-content line-clamp-2">
                   {prediction.title}
                 </h1>
-                <div className="flex items-center gap-2 mt-1">
+                <div className="flex items-center gap-2 mt-1 flex-wrap">
                   {prediction.category && (
                     <span className="px-2 py-0.5 bg-primary/10 text-primary rounded text-sm inline-flex items-center gap-1">
                       {prediction.category.icon && <span>{prediction.category.icon}</span>}
@@ -174,6 +174,21 @@ export default function PredictionDetailView({
                     {status.icon}
                     {status.text}
                   </span>
+                  {prediction.creator && (
+                    <div className="flex items-center gap-2 px-2 py-0.5 bg-muted/30 rounded text-sm">
+                      {prediction.creator.avatarUrl && (
+                        <img
+                          src={prediction.creator.avatarUrl}
+                          alt={prediction.creator.name}
+                          className="w-4 h-4 rounded-full object-cover"
+                        />
+                      )}
+                      <span className="text-tertiary">
+                        by{' '}
+                        <span className="text-content font-medium">{prediction.creator.name}</span>
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

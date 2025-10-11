@@ -82,6 +82,11 @@ export class PredictionService {
           publisher: string | null;
           capturedAt: string;
         }>;
+        creator?: {
+          id: number;
+          name: string;
+          avatarUrl: string | null;
+        };
       }
     >
   > {
@@ -456,6 +461,12 @@ export class PredictionService {
         }
       >;
       parlayLegs: ParlayLegWithUser[];
+      creator?: {
+        id: number;
+        name: string;
+        avatarUrl?: string | null;
+        profilePictureKey?: string | null;
+      };
       sourceLinks?: Array<{
         id: number;
         predictionId: number;
@@ -468,11 +479,20 @@ export class PredictionService {
       }>;
     },
   ) {
-    // --- Collect all unique users from bets and parlay legs ----------------
+    // --- Collect all unique users from bets, parlay legs, and creator ------
     const allUsers = new Map<
       number,
       { id: number; avatarUrl?: string | null; profilePictureKey: string | null }
     >();
+
+    // Add creator if exists
+    if (pred.creator) {
+      allUsers.set(pred.creator.id, {
+        id: pred.creator.id,
+        avatarUrl: pred.creator.avatarUrl,
+        profilePictureKey: pred.creator.profilePictureKey ?? null,
+      });
+    }
 
     for (const b of pred.bets) {
       allUsers.set(b.user.id, {
@@ -531,7 +551,16 @@ export class PredictionService {
       capturedAt: link.capturedAt.toISOString(),
     }));
 
-    return { ...pred, options, bets, parlayLegs, sourceLinks };
+    // --- creator (enrich avatar) --------------------------------------------
+    const creator = pred.creator
+      ? {
+          id: pred.creator.id,
+          name: pred.creator.name,
+          avatarUrl: avatarUrlMap.get(pred.creator.id) ?? null,
+        }
+      : undefined;
+
+    return { ...pred, options, bets, parlayLegs, sourceLinks, creator };
   }
 
   async getSourceLinks(predictionId: number): Promise<
