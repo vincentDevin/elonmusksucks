@@ -18,10 +18,37 @@ export interface Category {
 }
 
 /**
- * Fetch all predictions (with their options, bets & parlay legs).
+ * Paginated predictions response
  */
-export async function getPredictions(): Promise<PredictionView[]> {
-  const { data } = await api.get<PredictionView[]>('/api/predictions');
+export interface PaginatedPredictionsResponse {
+  predictions: PredictionView[];
+  pagination: {
+    total: number;
+    limit: number;
+    offset: number;
+    hasMore: boolean;
+  };
+}
+
+/**
+ * Fetch predictions with optional filtering and pagination
+ * @param options - Optional filters (status, limit, offset)
+ * @returns Paginated predictions response
+ */
+export async function getPredictions(options?: {
+  status?: 'open' | 'pending' | 'expired' | 'resolved' | 'all';
+  limit?: number;
+  offset?: number;
+}): Promise<PaginatedPredictionsResponse> {
+  const params = new URLSearchParams();
+  if (options?.status) params.append('status', options.status);
+  if (options?.limit !== undefined) params.append('limit', options.limit.toString());
+  if (options?.offset !== undefined) params.append('offset', options.offset.toString());
+
+  const queryString = params.toString();
+  const { data } = await api.get<PaginatedPredictionsResponse>(
+    `/api/predictions${queryString ? `?${queryString}` : ''}`,
+  );
   return data;
 }
 

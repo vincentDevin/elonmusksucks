@@ -16,21 +16,67 @@ const reactionService = new ReactionService();
 
 /**
  * GET /api/predictions
- * List all predictions, each including:
- *   - options[]
- *   - bets[] (single bets with user info)
- *   - parlayLegs[] (all parlay legs with user & stake)
+ * List predictions with optional filtering and pagination
+ * Query params:
+ *   - status: 'open' | 'pending' | 'expired' | 'resolved' | 'all' (default: 'all')
+ *   - limit: number (1-100, default: 50)
+ *   - offset: number (>=0, default: 0)
+ * Returns:
+ *   - predictions[] (each including options, bets, parlayLegs)
+ *   - pagination metadata (total, limit, offset, hasMore)
  */
 export const getAllPredictions = async (
-  _req: Request,
+  req: Request,
   res: Response,
   next: NextFunction,
 ): Promise<void> => {
   try {
-    const all = await predictionService.listAllPredictions();
+    // Parse query parameters
+    const status = (req.query.status as string) || 'all';
+    const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
+    const offset = req.query.offset ? parseInt(req.query.offset as string) : 0;
 
-    const payload = all.map(toPredictionView) satisfies PredictionView[];
-    res.json(payload);
+    // Validate status
+    const validStatuses = ['open', 'pending', 'expired', 'resolved', 'all'];
+    if (!validStatuses.includes(status)) {
+      res.status(400).json({
+        error: 'Invalid status parameter',
+        validValues: validStatuses,
+      });
+      return;
+    }
+
+    // Validate limit
+    if (isNaN(limit) || limit < 1 || limit > 100) {
+      res.status(400).json({
+        error: 'limit must be a number between 1 and 100',
+      });
+      return;
+    }
+
+    // Validate offset
+    if (isNaN(offset) || offset < 0) {
+      res.status(400).json({
+        error: 'offset must be a non-negative number',
+      });
+      return;
+    }
+
+    // Fetch filtered and paginated predictions
+    const result = await predictionService.listPredictions({
+      status: status as 'open' | 'pending' | 'expired' | 'resolved' | 'all',
+      limit,
+      offset,
+    });
+
+    // Transform predictions to view format
+    const predictions = result.predictions.map(toPredictionView) satisfies PredictionView[];
+
+    // Return with pagination metadata
+    res.json({
+      predictions,
+      pagination: result.pagination,
+    });
   } catch (err) {
     next(err);
   }

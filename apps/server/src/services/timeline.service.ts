@@ -234,9 +234,24 @@ export class TimelineService {
       authorId: params.filters?.authors?.[0] ? parseInt(params.filters.authors[0]) : undefined,
     };
 
+    // Determine which content types to search based on filter
+    const contentTypeFilter = params.filters?.contentType;
+    let shouldSearchArticles = true;
+    let shouldSearchPosts = true;
+
+    // If contentType filter is specified and doesn't include 'all'
+    if (contentTypeFilter && Array.isArray(contentTypeFilter) && contentTypeFilter.length > 0) {
+      const hasAll = contentTypeFilter.includes('all');
+      if (!hasAll) {
+        shouldSearchArticles = contentTypeFilter.includes('article');
+        shouldSearchPosts = contentTypeFilter.includes('post');
+      }
+    }
+
     // If filtering by author, only search posts (articles don't have authors)
-    // Otherwise, fetch both articles and posts
-    const shouldSearchArticles = !mappedFilters.authorId;
+    if (mappedFilters.authorId) {
+      shouldSearchArticles = false;
+    }
 
     const [articleResults, postResults] = await Promise.all([
       shouldSearchArticles
@@ -247,13 +262,15 @@ export class TimelineService {
             cursor: params.cursor,
           })
         : { items: [], nextCursor: undefined, hasMore: false },
-      this.repository.searchPosts({
-        query: params.query,
-        filters: mappedFilters,
-        limit: pageLimit,
-        cursor: params.cursor,
-        viewerId: params.viewerId,
-      }),
+      shouldSearchPosts
+        ? this.repository.searchPosts({
+            query: params.query,
+            filters: mappedFilters,
+            limit: pageLimit,
+            cursor: params.cursor,
+            viewerId: params.viewerId,
+          })
+        : { items: [], nextCursor: undefined, hasMore: false },
     ]);
 
     // Batch enrich post authors with avatar URLs
@@ -261,14 +278,48 @@ export class TimelineService {
     const enrichedPostAuthors = await userService.enrichUsersWithAvatars(postAuthors);
     const postAuthorMap = new Map(enrichedPostAuthors.map((author) => [author.id, author]));
 
+    // Fetch reactions for all articles in bulk
+    const articleIds = articleResults.items.map((a: any) => a.id);
+    const articlesWithReactions = await this.getArticlesWithReactions(articleIds, params.viewerId);
+
     // Merge and sort by timestamp
     const allItems = [
-      ...articleResults.items.map((article: any) => ({
-        ...article,
-        id: `article-${article.id}`, // Prefix with article- for consistency
-        timestamp: article.publishedAt || article.createdAt,
-        type: 'article' as const,
-      })),
+      // Transform articles to proper TimelineItem format with content structure
+      ...articleResults.items.map((article: any) => {
+        const reactionData = articlesWithReactions.get(article.id) || {
+          counts: {},
+          userReaction: undefined,
+          totalCount: 0,
+        };
+
+        return {
+          id: `article-${article.id}`,
+          type: 'article' as const,
+          timestamp:
+            article.publishedAt?.toISOString?.() ||
+            article.publishedAt ||
+            article.createdAt.toISOString?.() ||
+            article.createdAt,
+          content: {
+            title: article.title,
+            excerpt: article.excerpt || undefined,
+            url: article.url,
+            imageUrl: article.leadImageUrl || null,
+            author: article.feed?.name,
+            source: article.feed?.siteUrl || undefined,
+          },
+          engagement: {
+            reactions: reactionData.totalCount,
+            comments: article.commentsCount || 0,
+          },
+          reactionCounts: reactionData.counts,
+          userReaction: reactionData.userReaction,
+          tags: Array.isArray(article.tags)
+            ? article.tags.map((t: any) => t.tag?.name || t.name || t).filter(Boolean)
+            : [],
+        };
+      }),
+      // Transform posts to proper TimelineItem format with content structure
       ...postResults.items.map((post: any) => {
         // Enrich author with avatar URL
         const enrichedAuthor = post.author ? postAuthorMap.get(post.author.id) : null;
@@ -276,15 +327,57 @@ export class TimelineService {
           post.author || { id: post.authorId, name: 'Unknown', avatarUrl: null };
 
         return {
-          ...post,
-          id: `post-${post.id}`, // Prefix with post- for consistency
-          timestamp: post.createdAt,
-          type: 'post' as const,
-          author: finalAuthor,
-          // Add flat fields for ContentModal compatibility
-          authorName: finalAuthor.name,
-          authorAvatar: finalAuthor.avatarUrl,
-          content: post.body, // Map body to content for compatibility
+          id: `post-${post.id}`,
+          type: 'article' as const, // Using 'article' type for posts (timeline only has article/tweet)
+          timestamp: post.createdAt?.toISOString?.() || post.createdAt,
+          content: {
+            title: finalAuthor.name || 'User Post',
+            excerpt: post.body?.substring(0, 200),
+            url: `/posts/${post.id}`,
+            imageUrl: post.mediaUrls?.[0] || null,
+            author: finalAuthor.name,
+            source: 'Community Post',
+          },
+          engagement: {
+            reactions: post.reactionsCount || post._count?.reactions || 0,
+            comments: post.repliesCount || post._count?.children || 0,
+          },
+          reactionCounts: post.reactionCounts || {},
+          userReaction: post.userReaction,
+          tags: [],
+          // Add full post data for PostCard component
+          postData: {
+            id: post.id,
+            authorId: post.authorId,
+            type: post.type || 'POST',
+            content: post.body,
+            body: post.body,
+            contentType: post.contentType,
+            visibility: post.visibility,
+            mediaUrls: post.mediaUrls || [],
+            linkPreview: post.linkPreview,
+            parentId: post.parentId,
+            threadDepth: post.threadDepth,
+            reactionsCount: post.reactionsCount || post._count?.reactions || 0,
+            repliesCount: post.repliesCount || post._count?.children || 0,
+            likesCount: post.reactionsCount || post._count?.reactions || 0,
+            commentsCount: post.repliesCount || post._count?.children || 0,
+            sharesCount: post.sharesCount || 0,
+            viewsCount: post.viewsCount?.toString() || '0',
+            reactionCounts: post.reactionCounts || {},
+            userReaction: post.userReaction,
+            isDeleted: post.isDeleted || false,
+            isFlagged: post.isFlagged || false,
+            createdAt: post.createdAt,
+            updatedAt: post.updatedAt,
+            editedAt: post.editedAt,
+            children: undefined,
+            authorName: finalAuthor.name,
+            authorAvatar: finalAuthor.avatarUrl,
+            author: finalAuthor,
+            canEdit: false,
+            canDelete: false,
+          },
         };
       }),
     ].sort((a, b) => {
@@ -295,7 +388,16 @@ export class TimelineService {
 
     // Take only the requested limit
     const paginatedItems = allItems.slice(0, pageLimit);
-    const hasMore = allItems.length > pageLimit;
+
+    // Calculate hasMore based on individual results, not merged array
+    // If we're searching both, either could have more
+    // If we're searching only one, use its hasMore flag
+    const hasMore =
+      shouldSearchArticles && shouldSearchPosts
+        ? articleResults.hasMore || postResults.hasMore || allItems.length > pageLimit
+        : shouldSearchArticles
+          ? articleResults.hasMore
+          : postResults.hasMore;
 
     // Calculate next cursor from the last item
     // timestamp is already an ISO string from searchPosts/searchContent

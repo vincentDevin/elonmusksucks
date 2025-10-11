@@ -215,9 +215,35 @@ export default function Timeline() {
   );
 
   // Handle filter changes
-  const handleFilterChange = useCallback((newFilters: TimelineFilter) => {
-    setFilters(newFilters);
-  }, []);
+  const handleFilterChange = useCallback(
+    (newFilters: TimelineFilter) => {
+      // Check if filters that require a fresh fetch changed
+      const contentTypeChanged =
+        JSON.stringify(filters.contentType) !== JSON.stringify(newFilters.contentType);
+      const authorsChanged = JSON.stringify(filters.authors) !== JSON.stringify(newFilters.authors);
+      const dateRangeChanged =
+        filters.dateRange.preset !== newFilters.dateRange.preset ||
+        filters.dateRange.start?.getTime() !== newFilters.dateRange.start?.getTime();
+      const mediaFilterChanged = filters.hasMedia !== newFilters.hasMedia;
+      const reactionsFilterChanged = filters.hasReactions !== newFilters.hasReactions;
+      const engagementChanged = filters.engagementLevel !== newFilters.engagementLevel;
+
+      setFilters(newFilters);
+
+      // Force refresh when meaningful filters change
+      if (
+        contentTypeChanged ||
+        authorsChanged ||
+        dateRangeChanged ||
+        mediaFilterChanged ||
+        reactionsFilterChanged ||
+        engagementChanged
+      ) {
+        setRefreshKey((prev) => prev + 1);
+      }
+    },
+    [filters],
+  );
 
   // Reset filters and search completely
   const handleResetFilters = useCallback(() => {
@@ -341,7 +367,7 @@ export default function Timeline() {
                 {/* Timeline Feed */}
                 <div className=" shadow rounded-lg transition-colors duration-300">
                   <TimelineWithPosts
-                    key={`${refreshKey}-${searchQuery}-${JSON.stringify(filters.authors)}-${JSON.stringify(filters.contentType)}`}
+                    key={refreshKey}
                     initialTab="posts"
                     searchQuery={searchQuery}
                     filters={filters}

@@ -24,6 +24,16 @@ export interface IPredictionRepository {
   /** List all predictions, including options, bets, and parlay legs */
   listAllPredictions(): Promise<PredictionWithRelations[]>;
 
+  /** List filtered and paginated predictions with options, bets, and parlay legs */
+  listFilteredPredictions(filters: {
+    status?: 'open' | 'pending' | 'expired' | 'resolved' | 'all';
+    limit?: number;
+    offset?: number;
+  }): Promise<{
+    predictions: PredictionWithRelations[];
+    total: number;
+  }>;
+
   /** Find a single prediction by ID, including options, bets, and parlay legs */
   findPredictionById(id: number): Promise<PredictionWithRelations | null>;
 

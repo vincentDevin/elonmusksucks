@@ -95,6 +95,67 @@ export class PredictionService {
   }
 
   /* ────────────────────────────────────────────────────────────────────────── */
+  /** Fetch filtered and paginated predictions with metadata */
+  async listPredictions(filters: {
+    status?: 'open' | 'pending' | 'expired' | 'resolved' | 'all';
+    limit?: number;
+    offset?: number;
+  }): Promise<{
+    predictions: Array<
+      DbPrediction & {
+        options: DbPredictionOption[];
+        bets: Array<DbBet & { user: { id: number; name: string; avatarUrl: string | null } }>;
+        parlayLegs: ParlayLegWithUser[];
+        sourceLinks: Array<{
+          id: number;
+          predictionId: number;
+          articleId: number | null;
+          tweetId: string | null;
+          url: string;
+          title: string | null;
+          publisher: string | null;
+          capturedAt: string;
+        }>;
+        creator?: {
+          id: number;
+          name: string;
+          avatarUrl: string | null;
+        };
+      }
+    >;
+    pagination: {
+      total: number;
+      limit: number;
+      offset: number;
+      hasMore: boolean;
+    };
+  }> {
+    const { status = 'all', limit = 50, offset = 0 } = filters;
+
+    // Validate limit and offset
+    const validatedLimit = Math.min(Math.max(1, limit), 100); // Between 1 and 100
+    const validatedOffset = Math.max(0, offset); // Non-negative
+
+    const { predictions: raw, total } = await this.repo.listFilteredPredictions({
+      status,
+      limit: validatedLimit,
+      offset: validatedOffset,
+    });
+
+    const predictions = await Promise.all(raw.map((p) => this.enrichAvatars(p)));
+
+    return {
+      predictions,
+      pagination: {
+        total,
+        limit: validatedLimit,
+        offset: validatedOffset,
+        hasMore: validatedOffset + validatedLimit < total,
+      },
+    };
+  }
+
+  /* ────────────────────────────────────────────────────────────────────────── */
   /** Create prediction then broadcast */
   async createPrediction(params: {
     title: string;

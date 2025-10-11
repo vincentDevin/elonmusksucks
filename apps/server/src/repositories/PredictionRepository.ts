@@ -211,6 +211,188 @@ export class PredictionRepository implements IPredictionRepository {
   }
 
   /**
+   * List filtered and paginated predictions with options, bets, and parlay legs
+   * @param filters - Status filter, limit, and offset for pagination
+   * @returns Object containing predictions array and total count
+   * NOTE: Uses manual batch queries instead of nested includes to avoid N+1 issues
+   */
+  async listFilteredPredictions(filters: {
+    status?: 'open' | 'pending' | 'expired' | 'resolved' | 'all';
+    limit?: number;
+    offset?: number;
+  }): Promise<{
+    predictions: PredictionWithRelations[];
+    total: number;
+  }> {
+    const { status = 'all', limit = 50, offset = 0 } = filters;
+    const now = new Date();
+
+    // Build where clause based on status filter
+    let whereClause: any = {};
+
+    switch (status) {
+      case 'open':
+        // Approved predictions that haven't expired and aren't resolved
+        whereClause = {
+          resolved: false,
+          approved: true,
+          expiresAt: { gt: now },
+        };
+        break;
+      case 'pending':
+        // Predictions waiting for approval
+        whereClause = {
+          resolved: false,
+          approved: false,
+        };
+        break;
+      case 'expired':
+        // Predictions that have expired but aren't resolved yet
+        whereClause = {
+          resolved: false,
+          expiresAt: { lte: now },
+        };
+        break;
+      case 'resolved':
+        // Predictions that have been resolved
+        whereClause = {
+          resolved: true,
+        };
+        break;
+      case 'all':
+      default:
+        // No filtering - return all predictions
+        whereClause = {};
+        break;
+    }
+
+    // Step 1: Get total count for pagination metadata
+    const total = await prisma.prediction.count({ where: whereClause });
+
+    // Step 2: Fetch predictions with direct relations only (categories, options, creator)
+    const preds = await prisma.prediction.findMany({
+      where: whereClause,
+      orderBy: { createdAt: 'desc' },
+      skip: offset,
+      take: limit,
+      include: {
+        category: true,
+        creator: {
+          select: {
+            id: true,
+            name: true,
+            avatarUrl: true,
+            profilePictureKey: true,
+          },
+        },
+        options: true, // No nested includes - we'll batch fetch related data
+      },
+    });
+
+    if (preds.length === 0) {
+      return { predictions: [], total };
+    }
+
+    const predictionIds = preds.map((p) => p.id);
+    const optionIds = preds.flatMap((p) => p.options.map((o) => o.id));
+
+    // Step 3: Batch fetch all bets for these predictions
+    const bets = await prisma.bet.findMany({
+      where: { predictionId: { in: predictionIds } },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            avatarUrl: true,
+            profilePictureKey: true,
+          },
+        },
+      },
+    });
+
+    // Step 4: Batch fetch all parlay legs for these options
+    const parlayLegs = await prisma.parlayLeg.findMany({
+      where: { optionId: { in: optionIds } },
+      include: {
+        parlay: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                avatarUrl: true,
+                profilePictureKey: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // Create lookup maps for efficient joins
+    const betsByPrediction = new Map<number, typeof bets>();
+    bets.forEach((bet) => {
+      const existing = betsByPrediction.get(bet.predictionId) || [];
+      existing.push(bet);
+      betsByPrediction.set(bet.predictionId, existing);
+    });
+
+    const legsByOption = new Map<number, typeof parlayLegs>();
+    parlayLegs.forEach((leg) => {
+      const existing = legsByOption.get(leg.optionId) || [];
+      existing.push(leg);
+      legsByOption.set(leg.optionId, existing);
+    });
+
+    // Step 5: Join data client-side using maps
+    const predictions = preds.map((pred) => {
+      // Get bets for this prediction from lookup map
+      const predictionBets = betsByPrediction.get(pred.id) || [];
+
+      // Get parlay legs for all options in this prediction
+      const predParlayLegs: ParlayLegWithUser[] = [];
+      pred.options.forEach((opt) => {
+        const legs = legsByOption.get(opt.id) || [];
+        legs.forEach((leg) => {
+          predParlayLegs.push({
+            parlayId: leg.parlay.id,
+            user: {
+              id: leg.parlay.user.id,
+              name: leg.parlay.user.name,
+              avatarUrl: leg.parlay.user.avatarUrl,
+              ...(leg.parlay.user.profilePictureKey && {
+                profilePictureKey: leg.parlay.user.profilePictureKey,
+              }),
+            },
+            stake: leg.parlay.amount.toString(),
+            optionId: opt.id,
+            createdAt: leg.createdAt,
+          });
+        });
+      });
+
+      // Transform options to match expected interface
+      const cleanOptions: PrismaPredictionOption[] = pred.options.map((opt) => ({
+        id: opt.id,
+        label: opt.label,
+        odds: opt.odds,
+        predictionId: opt.predictionId,
+        createdAt: opt.createdAt,
+      }));
+
+      return {
+        ...pred,
+        options: cleanOptions,
+        bets: predictionBets as BetWithUser[],
+        parlayLegs: predParlayLegs,
+      } as PredictionWithRelations;
+    });
+
+    return { predictions, total };
+  }
+
+  /**
    * Find basic prediction data by ID (minimal fields for validation)
    * @param id - Prediction ID
    * @returns Basic prediction data or null if not found

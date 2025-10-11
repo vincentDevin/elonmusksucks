@@ -49,10 +49,9 @@ export const UseAsSourceModal: React.FC<UseAsSourceModalProps> = ({ item, isOpen
   const loadPredictions = async () => {
     try {
       setLoadingPredictions(true);
-      const data = await getPredictions();
-      // Filter to show only active, unresolved predictions
-      const activePredictions = data.filter((p) => !p.resolvedAt && p.status === 'ACTIVE');
-      setPredictions(activePredictions);
+      // Fetch only open predictions (unresolved, approved, not expired)
+      const response = await getPredictions({ status: 'open', limit: 100 });
+      setPredictions(response.predictions);
     } catch (err) {
       console.error('Failed to load predictions:', err);
       setError('Failed to load predictions');

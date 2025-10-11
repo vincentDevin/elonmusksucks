@@ -193,10 +193,20 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
     }, 10000);
 
     try {
-      const data = await getPredictions();
+      // Fetch only 'open' predictions by default with reasonable limit
+      // This dramatically reduces data transfer compared to fetching all predictions
+      const response = await getPredictions({
+        status: 'open',
+        limit: 50,
+        offset: 0,
+      });
       clearTimeout(timeoutId);
-      console.log('[PredictionContext] Fetched predictions:', data?.length || 0);
-      setBasePredictions(data || []);
+      console.log(
+        `[PredictionContext] Fetched ${response.predictions.length} predictions (${response.pagination.total} total open)`,
+      );
+      setBasePredictions(response.predictions || []);
+      // Could store pagination metadata here if we want "Load More" functionality later
+      // setPaginationMeta(response.pagination);
       setError(null);
     } catch (err: any) {
       clearTimeout(timeoutId);
