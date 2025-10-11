@@ -1,4 +1,5 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
+import { ArrowUpIcon } from '@heroicons/react/24/outline';
 import GenericFeed from '../../GenericFeed';
 import { PostCard } from '../../posts/core/PostCard';
 import { ArticleCard } from '../articles/ArticleCard';
@@ -31,6 +32,26 @@ export const TimelineWithPosts: React.FC<TimelineWithPostsProps> = ({
   const [showUnifiedModal, setShowUnifiedModal] = useState(false);
   const [showUseAsSourceModal, setShowUseAsSourceModal] = useState(false);
   const [sourceItem, setSourceItem] = useState<TimelineItem | null>(null);
+  const [showBackToTop, setShowBackToTop] = useState(false);
+
+  // Track scroll position to show/hide back to top button
+  useEffect(() => {
+    const handleScroll = () => {
+      // Show button when scrolled down more than 300px
+      setShowBackToTop(window.scrollY > 300);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Scroll to top function
+  const scrollToTop = () => {
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth',
+    });
+  };
 
   // Handle content interactions (both articles and posts)
   const handleViewDetails = (item: UnifiedFeedItem) => {
@@ -156,6 +177,18 @@ export const TimelineWithPosts: React.FC<TimelineWithPostsProps> = ({
           isOpen={showUseAsSourceModal}
           onClose={handleCloseSourceModal}
         />
+      )}
+
+      {/* Back to Top Button */}
+      {showBackToTop && (
+        <button
+          onClick={scrollToTop}
+          className="fixed top-20 right-8 z-50 p-3 bg-primary hover:bg-primary-hover text-white rounded-full shadow-lg transition-all duration-300 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+          aria-label="Back to top"
+          title="Back to top"
+        >
+          <ArrowUpIcon className="w-6 h-6" />
+        </button>
       )}
     </div>
   );
