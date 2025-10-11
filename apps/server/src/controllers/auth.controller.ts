@@ -26,7 +26,7 @@ import {
   getUserBalance,
 } from '../services/auth.service';
 import { UserService } from '../services/user.service';
-import { sendEmail } from '../services/email.service';
+import { sendVerificationEmail, sendPasswordResetEmail } from '../services/email.service';
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '../utils/jwtHelpers';
 
 // Standardize error payloads using shared types
@@ -53,12 +53,7 @@ export const registerUser: RequestHandler = async (req, res) => {
       try {
         const host = process.env.SERVER_URL ?? `${req.protocol}://${req.get('host')}`;
         const verifyUrl = `${host}/api/auth/verify-email?token=${verificationToken}`;
-        await sendEmail(
-          user.email,
-          'Please verify your email address',
-          `<p>Hi ${user.name},</p>
-           <p>Click <a href="${verifyUrl}">here</a> to verify your email.</p>`,
-        );
+        await sendVerificationEmail(user.email, user.name, verifyUrl);
       } catch (mailErr) {
         console.error('Verification email error:', mailErr);
       }
@@ -273,12 +268,7 @@ export const requestPasswordReset: RequestHandler = async (req, res) => {
       try {
         const token = await createPasswordReset(user.id);
         const url = `${process.env.CLIENT_URL}/reset-password?token=${token}`;
-        await sendEmail(
-          user.email,
-          'Password Reset',
-          `<p>Hi ${user.name},</p>
-           <p>Click <a href="${url}">here</a> to reset password (1h expiry).</p>`,
-        );
+        await sendPasswordResetEmail(user.email, user.name, url);
       } catch (mailErr) {
         console.error('Reset email error:', mailErr);
       }
