@@ -298,6 +298,18 @@ export const ContentModal: React.FC<ContentModalProps> = ({ isOpen, onClose, con
           <div className="space-y-4">
             <div className="prose max-w-none">
               <h2 className="text-xl font-bold text-content mb-3">{articleData.content?.title}</h2>
+
+              {/* Article Image */}
+              {articleData.content?.imageUrl && (
+                <div className="aspect-video w-full overflow-hidden rounded-lg mb-4">
+                  <img
+                    src={articleData.content?.imageUrl}
+                    alt={articleData.content?.title}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              )}
+
               {articleData.content?.excerpt && (
                 <p className="text-content/80 text-sm leading-relaxed mb-4">
                   {articleData.content?.excerpt}

@@ -74,7 +74,7 @@ export async function getTimeline(req: Request, res: Response) {
         },
         engagement: {
           reactions: reactionData.totalCount,
-          comments: 0, // TODO: Get from article comments
+          comments: article.commentsCount || 0,
         },
         reactionCounts: reactionData.counts,
         userReaction: reactionData.userReaction,
