@@ -5,14 +5,12 @@ import PredictionCard from './PredictionCard';
 
 interface PredictionSectionCardProps {
   section: PredictionSection;
-  onFavoriteToggle: (predictionId: number) => void;
   onMarkViewed: (predictionId: number) => void;
   className?: string;
 }
 
 export default function PredictionSectionCard({
   section,
-  onFavoriteToggle,
   onMarkViewed,
   className = '',
 }: PredictionSectionCardProps) {
@@ -152,16 +150,6 @@ export default function PredictionSectionCard({
 
                   <div className="flex items-center space-x-2">
                     {getUrgencyIndicator(prediction)}
-                    <button
-                      onClick={() => onFavoriteToggle(prediction.id)}
-                      className={`p-1 rounded transition-colors ${
-                        prediction.isFavorited
-                          ? 'text-red-500 hover:text-red-600'
-                          : 'text-tertiary hover:text-red-500'
-                      }`}
-                    >
-                      {prediction.isFavorited ? '❤️' : '🤍'}
-                    </button>
                   </div>
                 </div>
 

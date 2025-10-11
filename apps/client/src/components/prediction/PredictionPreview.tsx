@@ -255,7 +255,7 @@ export default function PredictionPreview({
             <DollarSign className="w-3.5 h-3.5" />
             <span className="text-xs">Total Volume</span>
           </div>
-          <p className="text-lg font-semibold text-content">${formatMuskBucks(totalVolume)}</p>
+          <p className="text-lg font-semibold text-content">{formatMuskBucks(totalVolume)} 🪙</p>
         </div>
         <div>
           <div className="flex items-center gap-1 text-tertiary mb-1">
@@ -307,7 +307,7 @@ export default function PredictionPreview({
                 </div>
                 <div className="ml-3 text-right">
                   <p className="text-xs text-tertiary">{count} bets</p>
-                  <p className="text-xs font-medium text-content">${formatMuskBucks(volume)}</p>
+                  <p className="text-xs font-medium text-content">{formatMuskBucks(volume)} 🪙</p>
                 </div>
               </div>
             );

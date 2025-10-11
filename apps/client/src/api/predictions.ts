@@ -108,3 +108,45 @@ export async function getCategories(): Promise<Category[]> {
   const response = await api.get('/api/predictions/categories');
   return response.data.categories;
 }
+
+/**
+ * Toggle a reaction on a prediction
+ */
+export async function togglePredictionReaction(
+  predictionId: number,
+  reactionType: string,
+): Promise<{
+  action: 'added' | 'removed' | 'changed';
+  reaction?: any;
+  counts: Record<string, number>;
+}> {
+  const { data } = await api.post(`/api/predictions/${predictionId}/reactions`, {
+    type: reactionType,
+  });
+  return data;
+}
+
+/**
+ * Get reactions for a prediction
+ */
+export async function getPredictionReactions(
+  predictionId: number,
+  options: {
+    cursor?: number;
+    limit?: number;
+    type?: string;
+  } = {},
+): Promise<{
+  reactions: any[];
+  counts: Record<string, number>;
+  userReaction?: string;
+  nextCursor?: number;
+}> {
+  const params = new URLSearchParams();
+  if (options.cursor !== undefined) params.append('cursor', options.cursor.toString());
+  if (options.limit) params.append('limit', options.limit.toString());
+  if (options.type) params.append('type', options.type);
+
+  const { data } = await api.get(`/api/predictions/${predictionId}/reactions?${params.toString()}`);
+  return data;
+}

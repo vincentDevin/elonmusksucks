@@ -295,7 +295,8 @@ export default function RelatedPredictions({
                       {totalBets}
                     </div>
                     <div className="flex items-center gap-1">
-                      <DollarSign className="w-3 h-3" />${formatMuskBucks(totalVolume)}
+                      <DollarSign className="w-3 h-3" />
+                      {formatMuskBucks(totalVolume)} 🪙
                     </div>
                   </div>
 

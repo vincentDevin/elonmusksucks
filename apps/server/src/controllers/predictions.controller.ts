@@ -2,13 +2,17 @@
 import type { Request, Response, NextFunction } from 'express';
 import { predictionService } from '../services/predictions.service';
 import { categoryService } from '../services/category.service';
+import { ReactionService } from '../services/reaction.service';
 import {
   PredictionType,
   CreatePredictionPayload,
   InputSizeLimits,
   PredictionView,
+  ReactionType,
 } from '@ems/types';
 import { toPredictionView } from '../view/prediction.view';
+
+const reactionService = new ReactionService();
 
 /**
  * GET /api/predictions
@@ -723,6 +727,135 @@ export const createPredictionComment = async (
       content.trim(),
     );
     res.status(201).json(comment);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Toggle a reaction on a prediction
+ * POST /api/predictions/:id/reactions
+ */
+export const toggleReaction = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const predictionId = parseInt(req.params.id);
+    const userId = (req as any).user?.id;
+
+    if (!userId) {
+      res.status(401).json({ error: 'Not authenticated' });
+      return;
+    }
+
+    if (isNaN(predictionId)) {
+      res.status(400).json({ error: 'Invalid prediction ID' });
+      return;
+    }
+
+    const { type } = req.body;
+
+    if (!type) {
+      res.status(400).json({ error: 'Reaction type is required' });
+      return;
+    }
+
+    const result = await reactionService.togglePredictionReaction(
+      predictionId,
+      userId,
+      type as ReactionType,
+    );
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Get reactions for a prediction
+ * GET /api/predictions/:id/reactions
+ */
+export const getPredictionReactions = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const predictionId = parseInt(req.params.id);
+    const userId = (req as any).user?.id;
+    const cursor = req.query.cursor ? Number(req.query.cursor) : undefined;
+    const limit = req.query.limit ? Number(req.query.limit) : 20;
+    const type = req.query.type as ReactionType | undefined;
+
+    if (isNaN(predictionId)) {
+      res.status(400).json({ error: 'Invalid prediction ID' });
+      return;
+    }
+
+    const result = await reactionService.getPredictionReactions(predictionId, userId, {
+      cursor,
+      limit,
+      type,
+    });
+
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Remove a specific reaction from a prediction
+ * DELETE /api/predictions/:id/reactions/:type
+ */
+export const removeReaction = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const predictionId = parseInt(req.params.id);
+    const type = req.params.type as ReactionType;
+    const userId = (req as any).user?.id;
+
+    if (!userId) {
+      res.status(401).json({ error: 'Not authenticated' });
+      return;
+    }
+
+    if (isNaN(predictionId)) {
+      res.status(400).json({ error: 'Invalid prediction ID' });
+      return;
+    }
+
+    const result = await reactionService.removePredictionReaction(predictionId, userId, type);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Get reaction counts for a prediction (public endpoint)
+ * GET /api/predictions/:id/reactions/counts
+ */
+export const getReactionCounts = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const predictionId = parseInt(req.params.id);
+
+    if (isNaN(predictionId)) {
+      res.status(400).json({ error: 'Invalid prediction ID' });
+      return;
+    }
+
+    const counts = await reactionService.getPredictionReactionCounts(predictionId);
+    res.json(counts);
   } catch (err) {
     next(err);
   }

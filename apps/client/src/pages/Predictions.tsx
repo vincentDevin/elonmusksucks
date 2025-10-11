@@ -49,7 +49,6 @@ export default function Predictions() {
     error,
     updateFilters,
     clearFilters,
-    toggleFavorite,
     markAsViewed,
   } = usePredictionDiscovery();
 
@@ -234,7 +233,6 @@ export default function Predictions() {
               <PredictionSectionCard
                 key={section.id}
                 section={section}
-                onFavoriteToggle={toggleFavorite}
                 onMarkViewed={markAsViewed}
                 className="bg-surface border border-border shadow-sm hover:shadow-md transition-shadow rounded-xl overflow-hidden"
               />
@@ -277,19 +275,6 @@ export default function Predictions() {
                   onAddToParlay={handleAddToParlay}
                   className="hover:shadow-lg transition-shadow"
                 />
-
-                {/* Favorite button */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleFavorite(prediction.id);
-                  }}
-                  className={`absolute top-4 right-4 p-2 rounded-full hover:bg-muted transition-colors ${
-                    prediction.isFavorited ? 'text-error' : 'text-tertiary'
-                  }`}
-                >
-                  {prediction.isFavorited ? '❤️' : '🤍'}
-                </button>
               </div>
             ))}
           </div>
@@ -344,7 +329,6 @@ export default function Predictions() {
     filters,
     parlayState.legs,
     clearFilters,
-    toggleFavorite,
     markAsViewed,
     handlePredictionClick,
     handleQuickBet,

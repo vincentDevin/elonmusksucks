@@ -29,6 +29,7 @@ import { PredictionSourceList } from './PredictionSourceList';
 import { FloatingParlayIndicator } from './ParlaySelectionIndicator';
 import PredictionAnalytics from './PredictionAnalytics';
 import PredictionComments from './PredictionComments';
+import PredictionReactions from './PredictionReactions';
 
 interface PredictionDetailViewProps {
   prediction: PredictionFull;
@@ -189,6 +190,7 @@ export default function PredictionDetailView({
                       </span>
                     </div>
                   )}
+                  <PredictionReactions predictionId={prediction.id} />
                 </div>
               </div>
             </div>
@@ -358,7 +360,7 @@ export default function PredictionDetailView({
                                 </div>
                                 <div className="text-right">
                                   <p className="text-sm font-bold text-content">
-                                    ${formatMuskBucks(asNum(bet.amount))}
+                                    {formatMuskBucks(asNum(bet.amount))} 🪙
                                   </p>
                                   <p className="text-xs text-tertiary">
                                     {option?.odds.toFixed(2)}x odds
@@ -449,7 +451,7 @@ export default function PredictionDetailView({
                     <DollarSign className="w-4 h-4" />
                     <span className="text-sm">Total Volume</span>
                   </div>
-                  <span className="font-bold text-content">${formatMuskBucks(totalVolume)}</span>
+                  <span className="font-bold text-content">{formatMuskBucks(totalVolume)} 🪙</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-tertiary">

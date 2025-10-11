@@ -34,7 +34,6 @@ export interface EnhancedPrediction extends Omit<PredictionView, 'options'> {
   recommendation?: PredictionRecommendation;
   section: 'trending' | 'ending_soon' | 'personalized' | 'hot' | 'all';
   isNew?: boolean;
-  isFavorited?: boolean;
   // Computed properties for compatibility with PredictionFull
   resolved: boolean;
   approved: boolean;
@@ -78,19 +77,12 @@ export function usePredictionDiscovery() {
     sortBy: 'relevance',
   });
 
-  const [favorites, setFavorites] = useState<Set<number>>(new Set());
   const [_viewedPredictions, setViewedPredictions] = useState<Set<number>>(new Set());
   const [userBettingHistory, setUserBettingHistory] = useState<string[]>([]);
 
-  // Load user preferences and favorites
+  // Load user preferences
   useEffect(() => {
     if (user?.id) {
-      // Load favorites from localStorage or API
-      const savedFavorites = localStorage.getItem(`favorites_${user.id}`);
-      if (savedFavorites) {
-        setFavorites(new Set(JSON.parse(savedFavorites)));
-      }
-
       // Load viewed predictions
       const savedViewed = localStorage.getItem(`viewed_${user.id}`);
       if (savedViewed) {
@@ -375,7 +367,6 @@ export function usePredictionDiscovery() {
         recommendation,
         section,
         isNew: createdHoursAgo <= 2,
-        isFavorited: favorites.has(prediction.id),
         // Computed properties for compatibility with PredictionFull
         resolved: prediction.resolvedAt !== null,
         approved: prediction.status === 'APPROVED' || prediction.status === 'RESOLVED',
@@ -387,7 +378,7 @@ export function usePredictionDiscovery() {
         })),
       };
     });
-  }, [filteredPredictions, calculateRecommendationScore, favorites]);
+  }, [filteredPredictions, calculateRecommendationScore]);
 
   // Organize predictions into sections
   const predictionSections = useMemo((): PredictionSection[] => {
@@ -416,8 +407,8 @@ export function usePredictionDiscovery() {
 
     // Sort 'all' by a combination of factors
     sections.all.sort((a, b) => {
-      const scoreA = (a.recommendation?.score || 0) + (a.isNew ? 10 : 0) + (a.isFavorited ? 20 : 0);
-      const scoreB = (b.recommendation?.score || 0) + (b.isNew ? 10 : 0) + (b.isFavorited ? 20 : 0);
+      const scoreA = (a.recommendation?.score || 0) + (a.isNew ? 10 : 0);
+      const scoreB = (b.recommendation?.score || 0) + (b.isNew ? 10 : 0);
       return scoreB - scoreA;
     });
 
@@ -471,27 +462,6 @@ export function usePredictionDiscovery() {
     return Array.from(categoryMap.values()).sort((a, b) => a.sortOrder - b.sortOrder);
   }, [predictions]);
 
-  // Favorite/unfavorite functions
-  const toggleFavorite = useCallback(
-    (predictionId: number) => {
-      setFavorites((prev) => {
-        const newFavorites = new Set(prev);
-        if (newFavorites.has(predictionId)) {
-          newFavorites.delete(predictionId);
-        } else {
-          newFavorites.add(predictionId);
-        }
-
-        if (user?.id) {
-          localStorage.setItem(`favorites_${user.id}`, JSON.stringify(Array.from(newFavorites)));
-        }
-
-        return newFavorites;
-      });
-    },
-    [user?.id],
-  );
-
   // Mark prediction as viewed
   const markAsViewed = useCallback(
     (predictionId: number) => {
@@ -536,8 +506,6 @@ export function usePredictionDiscovery() {
     error,
     updateFilters,
     clearFilters,
-    toggleFavorite,
     markAsViewed,
-    favorites: Array.from(favorites),
   };
 }

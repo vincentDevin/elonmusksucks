@@ -22,6 +22,10 @@ import {
   getMarketTrends,
   getPersonalizedRecommendations,
   getSimilarPredictions,
+  toggleReaction,
+  getPredictionReactions,
+  removeReaction,
+  getReactionCounts,
 } from '../controllers/predictions.controller';
 import { requireAuth } from '../middleware/auth.middleware';
 import type { AuthRequest } from '../middleware/auth.middleware';
@@ -160,6 +164,21 @@ router.post('/recommendations', getPersonalizedRecommendations);
 
 // GET /api/predictions/:id/similar - Get similar predictions based on content and user behavior
 router.get('/:id/similar', getSimilarPredictions);
+
+// ===============================================
+// Prediction Reactions
+// ===============================================
+// GET /api/predictions/:id/reactions - Get reactions for a prediction
+router.get('/:id/reactions', getPredictionReactions);
+
+// GET /api/predictions/:id/reactions/counts - Get reaction counts (public)
+router.get('/:id/reactions/counts', getReactionCounts);
+
+// POST /api/predictions/:id/reactions - Toggle a reaction on a prediction
+router.post('/:id/reactions', requireAuth, toggleReaction);
+
+// DELETE /api/predictions/:id/reactions/:type - Remove a specific reaction
+router.delete('/:id/reactions/:type', requireAuth, removeReaction);
 
 // ===============================================
 // Prediction Comments (unified Content system)

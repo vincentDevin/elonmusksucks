@@ -1,5 +1,5 @@
 // ReactionContext.tsx - React 19 optimized reaction management
-// Handles reactions for both posts and articles with centralized state
+// Handles reactions for posts, articles, and predictions with centralized state
 import React, {
   createContext,
   useContext,
@@ -16,9 +16,10 @@ import { useEventBusCore } from './EventBusCoreContext';
 import type { ReactionType } from '@ems/types';
 import { togglePostReaction, getPostReactions } from '../api/posts';
 import { timelineApi } from '../api/timeline';
+import { togglePredictionReaction, getPredictionReactions } from '../api/predictions';
 import { REDIS_CHANNELS } from '@ems/types';
 
-// Unified reaction state for both posts and articles
+// Unified reaction state for posts, articles, and predictions
 interface ReactionState {
   reactionCounts: Record<ReactionType, number>;
   userReaction?: ReactionType;
@@ -28,18 +29,21 @@ interface ReactionState {
 // Reaction context type
 interface ReactionContextType {
   // Get current reaction state for a content item
-  getReactionState: (contentType: 'post' | 'article', contentId: number) => ReactionState;
+  getReactionState: (
+    contentType: 'post' | 'article' | 'prediction',
+    contentId: number,
+  ) => ReactionState;
 
   // Toggle reaction with optimistic updates
   toggleReaction: (
-    contentType: 'post' | 'article',
+    contentType: 'post' | 'article' | 'prediction',
     contentId: number,
     reactionType: ReactionType,
   ) => Promise<void>;
 
   // Initialize reactions for a content item
   initializeReactions: (
-    contentType: 'post' | 'article',
+    contentType: 'post' | 'article' | 'prediction',
     contentId: number,
     initialCounts?: Record<ReactionType, number>,
     initialUserReaction?: ReactionType,
@@ -81,7 +85,7 @@ export const ReactionProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   // Generate unique key for content
   const getContentKey = useCallback(
-    (contentType: 'post' | 'article', contentId: number): string => {
+    (contentType: 'post' | 'article' | 'prediction', contentId: number): string => {
       return `${contentType}:${contentId}`;
     },
     [],
@@ -89,7 +93,7 @@ export const ReactionProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   // Get reaction state for content
   const getReactionState = useCallback(
-    (contentType: 'post' | 'article', contentId: number): ReactionState => {
+    (contentType: 'post' | 'article' | 'prediction', contentId: number): ReactionState => {
       const key = getContentKey(contentType, contentId);
       return (
         optimisticReactions.get(key) || {
@@ -104,7 +108,7 @@ export const ReactionProvider: React.FC<{ children: ReactNode }> = ({ children }
   // Initialize reactions for content item
   const initializeReactions = useCallback(
     (
-      contentType: 'post' | 'article',
+      contentType: 'post' | 'article' | 'prediction',
       contentId: number,
       initialCounts?: Record<ReactionType, number>,
       initialUserReaction?: ReactionType,
@@ -134,40 +138,82 @@ export const ReactionProvider: React.FC<{ children: ReactNode }> = ({ children }
         return newMap;
       });
 
-      // Fetch fresh reaction data if no initial data provided (articles) OR if explicitly requested
+      // Fetch fresh reaction data if no initial data provided (articles/predictions) OR if explicitly requested
       if (!initialCounts) {
         startTransition(async () => {
           try {
             let reactionData;
+            let detailedCounts: Record<ReactionType, number>;
+            let currentUserReaction: ReactionType | undefined;
+
             if (contentType === 'post') {
               reactionData = await getPostReactions(contentId);
-            } else {
-              reactionData = await timelineApi.getReactions(contentId);
-            }
+              // Posts return reactions as Record<string, Array<reaction>>
+              detailedCounts = {
+                LIKE: reactionData.reactions?.['LIKE']?.length || 0,
+                LOVE: reactionData.reactions?.['LOVE']?.length || 0,
+                LAUGH: reactionData.reactions?.['LAUGH']?.length || 0,
+                WOW: reactionData.reactions?.['WOW']?.length || 0,
+                SAD: reactionData.reactions?.['SAD']?.length || 0,
+                ANGRY: reactionData.reactions?.['ANGRY']?.length || 0,
+              };
 
-            const detailedCounts = {
-              LIKE: reactionData.reactions?.['LIKE']?.length || 0,
-              LOVE: reactionData.reactions?.['LOVE']?.length || 0,
-              LAUGH: reactionData.reactions?.['LAUGH']?.length || 0,
-              WOW: reactionData.reactions?.['WOW']?.length || 0,
-              SAD: reactionData.reactions?.['SAD']?.length || 0,
-              ANGRY: reactionData.reactions?.['ANGRY']?.length || 0,
-            };
-
-            // Detect user's current reaction
-            let currentUserReaction: ReactionType | undefined;
-            if (user?.id) {
-              for (const [reactionType, reactionUsers] of Object.entries(
-                reactionData.reactions || {},
-              )) {
-                if (
-                  Array.isArray(reactionUsers) &&
-                  reactionUsers.some((reaction: any) => reaction.user?.id === user.id)
-                ) {
-                  currentUserReaction = reactionType as ReactionType;
-                  break;
+              // Detect user's current reaction
+              if (user?.id) {
+                for (const [reactionType, reactionUsers] of Object.entries(
+                  reactionData.reactions || {},
+                )) {
+                  if (
+                    Array.isArray(reactionUsers) &&
+                    reactionUsers.some((reaction: any) => reaction.user?.id === user.id)
+                  ) {
+                    currentUserReaction = reactionType as ReactionType;
+                    break;
+                  }
                 }
               }
+            } else if (contentType === 'article') {
+              reactionData = await timelineApi.getReactions(contentId);
+              // Articles return reactions as Record<string, Array<reaction>>
+              detailedCounts = {
+                LIKE: reactionData.reactions?.['LIKE']?.length || 0,
+                LOVE: reactionData.reactions?.['LOVE']?.length || 0,
+                LAUGH: reactionData.reactions?.['LAUGH']?.length || 0,
+                WOW: reactionData.reactions?.['WOW']?.length || 0,
+                SAD: reactionData.reactions?.['SAD']?.length || 0,
+                ANGRY: reactionData.reactions?.['ANGRY']?.length || 0,
+              };
+
+              // Detect user's current reaction
+              if (user?.id) {
+                for (const [reactionType, reactionUsers] of Object.entries(
+                  reactionData.reactions || {},
+                )) {
+                  if (
+                    Array.isArray(reactionUsers) &&
+                    reactionUsers.some((reaction: any) => reaction.user?.id === user.id)
+                  ) {
+                    currentUserReaction = reactionType as ReactionType;
+                    break;
+                  }
+                }
+              }
+            } else {
+              // Predictions return different format: { reactions: array, counts: Record, userReaction?: string }
+              reactionData = await getPredictionReactions(contentId);
+
+              // Use counts directly from the API response
+              detailedCounts = {
+                LIKE: reactionData.counts?.LIKE || 0,
+                LOVE: reactionData.counts?.LOVE || 0,
+                LAUGH: reactionData.counts?.LAUGH || 0,
+                WOW: reactionData.counts?.WOW || 0,
+                SAD: reactionData.counts?.SAD || 0,
+                ANGRY: reactionData.counts?.ANGRY || 0,
+              };
+
+              // Use userReaction directly from the API response
+              currentUserReaction = reactionData.userReaction as ReactionType | undefined;
             }
 
             // Update with fetched data
@@ -203,7 +249,11 @@ export const ReactionProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   // Toggle reaction with optimistic updates
   const toggleReaction = useCallback(
-    async (contentType: 'post' | 'article', contentId: number, reactionType: ReactionType) => {
+    async (
+      contentType: 'post' | 'article' | 'prediction',
+      contentId: number,
+      reactionType: ReactionType,
+    ) => {
       const key = getContentKey(contentType, contentId);
       const currentState = reactions.get(key);
 
@@ -236,12 +286,18 @@ export const ReactionProvider: React.FC<{ children: ReactNode }> = ({ children }
           );
           result = await togglePostReaction(contentId, reactionType);
           console.log(`[ReactionContext] Post reaction result:`, result);
-        } else {
+        } else if (contentType === 'article') {
           console.log(
             `[ReactionContext] Toggling article reaction: ${reactionType} on article ${contentId}`,
           );
           result = await timelineApi.toggleReaction(contentId, reactionType);
           console.log(`[ReactionContext] Article reaction result:`, result);
+        } else {
+          console.log(
+            `[ReactionContext] Toggling prediction reaction: ${reactionType} on prediction ${contentId}`,
+          );
+          result = await togglePredictionReaction(contentId, reactionType);
+          console.log(`[ReactionContext] Prediction reaction result:`, result);
         }
 
         // Apply real result in transition
@@ -318,21 +374,79 @@ export const ReactionProvider: React.FC<{ children: ReactNode }> = ({ children }
   );
 
   // Real-time reaction updates via EventBus
-  // TODO: Add POST_REACTION_UPDATE and ARTICLE_REACTION_UPDATE to REDIS_CHANNELS in packages/types
   useEffect(() => {
     if (!user?.id) return;
 
-    // Real-time updates commented out until backend channels are implemented
-    // const unsubscribePostReactions = subscribe(
-    //   REDIS_CHANNELS.POST_REACTION_UPDATE,
-    //   (payload: any) => { ... }
-    // );
+    // Subscribe to post reaction updates
+    const unsubscribePostReactions = subscribe(
+      REDIS_CHANNELS.POST_REACTION_UPDATE,
+      (payload: any) => {
+        const key = `post:${payload.postId || payload.contentId}`;
+        startTransition(() => {
+          setReactions((prev) => {
+            const newMap = new Map(prev);
+            const existing = newMap.get(key) || {
+              reactionCounts: { ...DEFAULT_COUNTS },
+              isReacting: false,
+            };
+            newMap.set(key, {
+              ...existing,
+              reactionCounts: payload.reactionCounts || existing.reactionCounts,
+            });
+            return newMap;
+          });
+        });
+      },
+    );
 
-    // For now, we rely on optimistic updates only
-    // Real-time sync will be added when the Redis channels are implemented
+    // Subscribe to article reaction updates
+    const unsubscribeArticleReactions = subscribe(
+      REDIS_CHANNELS.ARTICLE_REACTION_UPDATE,
+      (payload: any) => {
+        const key = `article:${payload.articleId || payload.contentId}`;
+        startTransition(() => {
+          setReactions((prev) => {
+            const newMap = new Map(prev);
+            const existing = newMap.get(key) || {
+              reactionCounts: { ...DEFAULT_COUNTS },
+              isReacting: false,
+            };
+            newMap.set(key, {
+              ...existing,
+              reactionCounts: payload.reactionCounts || existing.reactionCounts,
+            });
+            return newMap;
+          });
+        });
+      },
+    );
+
+    // Subscribe to prediction reaction updates
+    const unsubscribePredictionReactions = subscribe(
+      REDIS_CHANNELS.PREDICTION_REACTION_UPDATE,
+      (payload: any) => {
+        const key = `prediction:${payload.predictionId || payload.contentId}`;
+        startTransition(() => {
+          setReactions((prev) => {
+            const newMap = new Map(prev);
+            const existing = newMap.get(key) || {
+              reactionCounts: { ...DEFAULT_COUNTS },
+              isReacting: false,
+            };
+            newMap.set(key, {
+              ...existing,
+              reactionCounts: payload.reactionCounts || existing.reactionCounts,
+            });
+            return newMap;
+          });
+        });
+      },
+    );
 
     return () => {
-      // cleanup when implemented
+      unsubscribePostReactions();
+      unsubscribeArticleReactions();
+      unsubscribePredictionReactions();
     };
   }, [user?.id, subscribe, getContentKey]);
 

@@ -9,6 +9,7 @@ import {
   SignalIcon,
 } from '@heroicons/react/24/outline';
 import { getPredictionAnalytics } from '../../api/predictions';
+import { formatMuskBucks } from '../../utils/formatting';
 
 interface AnalyticsData {
   totalBets: number;
@@ -96,7 +97,7 @@ export default function PredictionAnalytics({ predictionId }: PredictionAnalytic
         <MetricCard
           icon={<CurrencyDollarIcon className="w-6 h-6" />}
           label="Total Volume"
-          value={`$${(analytics.totalVolume / 1000).toFixed(1)}k`}
+          value={`${formatMuskBucks(analytics.totalVolume)}`}
           color="text-green-500"
         />
         <MetricCard

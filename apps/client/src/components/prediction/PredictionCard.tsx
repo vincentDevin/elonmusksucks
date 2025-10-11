@@ -24,6 +24,7 @@ import BetsList from './BetsList';
 import BetModal from './BetModal';
 import { useParlay } from '../../contexts/ParlayContext';
 import { PredictionSourceList } from './PredictionSourceList';
+import PredictionReactions from './PredictionReactions';
 
 interface UnifiedPredictionCardProps {
   prediction: PredictionFull;
@@ -205,13 +206,15 @@ function UnifiedPredictionCard({
             </span>
             {totalVolume > 0 && (
               <span className="flex items-center gap-1">
-                <span className="text-primary">💰</span>${formatMuskBucks(totalVolume)} volume
+                <span className="text-primary">💰</span>
+                {formatMuskBucks(totalVolume)} 🪙 volume
               </span>
             )}
             <span className="flex items-center gap-1">
               <span className="text-primary">📈</span>
               {flatParlays.length} parlays
             </span>
+            <PredictionReactions predictionId={prediction.id} />
           </div>
 
           {/* Source Links */}
@@ -338,7 +341,8 @@ function UnifiedPredictionCard({
             </span>
             {totalVolume > 0 && (
               <span className="flex items-center gap-1">
-                <span className="text-primary">💰</span>${formatMuskBucks(totalVolume)}
+                <span className="text-primary">💰</span>
+                {formatMuskBucks(totalVolume)} 🪙
               </span>
             )}
             {!prediction.resolved && (
@@ -348,6 +352,7 @@ function UnifiedPredictionCard({
                   : `${Math.ceil((expires - now) / (1000 * 60 * 60))}h left`}
               </span>
             )}
+            {!isMini && <PredictionReactions predictionId={prediction.id} compact />}
           </div>
 
           {/* Source Links - Compact */}

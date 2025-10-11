@@ -3,6 +3,7 @@ import { formatMuskBucks } from '../../utils/formatting';
 import type { PredictionFull, BetWithUser } from '@ems/types';
 import BetModal from './BetModal';
 import { useParlay } from '../../contexts/ParlayContext';
+import PredictionReactions from './PredictionReactions';
 import {
   ChevronRightIcon,
   ClockIcon,
@@ -126,79 +127,74 @@ function SimplePredictionCard({
       <div
         className={`
           group relative bg-surface border border-border hover:border-primary/30
-          rounded-xl p-4 transition-all duration-200 hover:shadow-lg cursor-pointer
+          rounded-xl p-6 transition-all duration-200 hover:shadow-lg cursor-pointer
           ${className}
         `}
         onClick={onCardClick}
       >
-        <div className="flex items-start justify-between gap-4">
-          {/* Main Content */}
-          <div className="flex-1 min-w-0">
-            {/* Header */}
-            <div className="flex items-start justify-between mb-2">
-              <h3 className="text-lg font-semibold text-content line-clamp-2 pr-2">
-                {prediction.title}
-              </h3>
-              <ChevronRightIcon className="w-5 h-5 text-tertiary group-hover:text-primary transition-colors flex-shrink-0 mt-0.5" />
-            </div>
-
-            {/* Category & Time */}
-            <div className="flex items-center gap-4 mb-3 text-sm">
+        {/* Main Horizontal Layout */}
+        <div className="flex items-center justify-between gap-8">
+          {/* Left: Title & Metadata */}
+          <div className="flex-1 min-w-0 space-y-3">
+            <h3 className="text-xl font-bold text-content line-clamp-1">{prediction.title}</h3>
+            <div className="flex items-center gap-4 flex-wrap">
               {prediction.category && (
-                <span className="px-2 py-0.5 bg-primary/10 text-primary rounded-full text-xs font-medium inline-flex items-center gap-1">
-                  {prediction.category.icon && <span>{prediction.category.icon}</span>}
+                <span className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm font-medium inline-flex items-center gap-1.5">
+                  {prediction.category.icon && (
+                    <span className="text-base">{prediction.category.icon}</span>
+                  )}
                   <span>{prediction.category.name}</span>
                 </span>
               )}
-              <div className={`flex items-center gap-1 ${getStatusColor()}`}>
-                <ClockIcon className="w-3.5 h-3.5" />
-                <span className="font-medium">{getTimeDisplay()}</span>
-              </div>
+              {prediction.creator && (
+                <div className="flex items-center gap-2 text-sm text-tertiary">
+                  {prediction.creator.avatarUrl && (
+                    <img
+                      src={prediction.creator.avatarUrl}
+                      alt={prediction.creator.name}
+                      className="w-5 h-5 rounded-full object-cover"
+                    />
+                  )}
+                  <span>
+                    by <span className="text-content font-semibold">{prediction.creator.name}</span>
+                  </span>
+                </div>
+              )}
+              <PredictionReactions predictionId={prediction.id} compact />
             </div>
+          </div>
 
-            {/* Creator Info */}
-            {prediction.creator && (
-              <div className="flex items-center gap-2 mb-3 text-sm">
-                {prediction.creator.avatarUrl && (
-                  <img
-                    src={prediction.creator.avatarUrl}
-                    alt={prediction.creator.name}
-                    className="w-5 h-5 rounded-full object-cover"
-                  />
-                )}
-                <span className="text-tertiary">
-                  Created by{' '}
-                  <span className="text-content font-medium">{prediction.creator.name}</span>
+          {/* Center: Stats */}
+          <div className="flex items-center gap-8 text-base">
+            <div className="flex items-center gap-2 text-tertiary">
+              <UsersIcon className="w-5 h-5" />
+              <span className="font-semibold">{totalBets}</span>
+              <span className="text-sm">bets</span>
+            </div>
+            {totalVolume > 0 && (
+              <div className="flex items-center gap-2 text-tertiary">
+                <CurrencyDollarIcon className="w-5 h-5" />
+                <span className="font-semibold text-success">
+                  {formatMuskBucks(totalVolume)} 🪙
                 </span>
               </div>
             )}
-
-            {/* Stats Row */}
-            <div className="flex items-center gap-4 text-sm text-tertiary">
-              <div className="flex items-center gap-1">
-                <UsersIcon className="w-3.5 h-3.5" />
-                <span>{totalBets} bets</span>
+            {prediction.options.length > 0 && (
+              <div className="flex items-center gap-2">
+                <ArrowTrendingUpIcon className="w-5 h-5 text-primary" />
+                <span className="text-primary font-bold">{getOddsDisplay()}</span>
               </div>
-              {totalVolume > 0 && (
-                <div className="flex items-center gap-1">
-                  <CurrencyDollarIcon className="w-3.5 h-3.5" />
-                  <span>${formatMuskBucks(totalVolume)}</span>
-                </div>
-              )}
-              {prediction.options.length > 0 && (
-                <div className="flex items-center gap-1">
-                  <ArrowTrendingUpIcon className="w-3.5 h-3.5" />
-                  <span className="text-primary font-medium">{getOddsDisplay()}</span>
-                </div>
-              )}
-            </div>
+            )}
+          </div>
 
+          {/* Right: Actions & Status (All in one row) */}
+          <div className="flex items-center gap-4 flex-shrink-0">
             {/* Action Buttons */}
             {!isResolved && !isExpired && (
-              <div className="flex items-center gap-2 mt-3">
+              <div className="flex items-center gap-2">
                 <button
                   onClick={handleBetClick}
-                  className="px-4 py-1.5 bg-primary hover:bg-primary-hover text-surface text-sm font-medium rounded-lg transition-colors"
+                  className="px-5 py-2 bg-primary hover:bg-primary-hover text-surface text-sm font-semibold rounded-lg transition-colors"
                 >
                   Quick Bet
                 </button>
@@ -206,7 +202,7 @@ function SimplePredictionCard({
                   onClick={handleQuickParlayAdd}
                   disabled={isInParlay || isAddingToParlay}
                   className={`
-                    px-3 py-1.5 text-sm font-medium rounded-lg transition-all
+                    px-4 py-2 text-sm font-semibold rounded-lg transition-all
                     ${
                       isInParlay
                         ? 'bg-success/20 text-success cursor-not-allowed'
@@ -220,14 +216,26 @@ function SimplePredictionCard({
                 </button>
               </div>
             )}
-          </div>
 
-          {/* Visual Indicator */}
-          {totalBets > 5 && (
-            <div className="absolute top-3 right-3" title="Hot prediction">
-              <BoltIcon className="w-4 h-4 text-warning animate-pulse" />
+            {/* Time Display */}
+            <div
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${getStatusColor()} bg-opacity-10`}
+            >
+              <ClockIcon className="w-4 h-4" />
+              <span className="font-bold text-sm whitespace-nowrap">{getTimeDisplay()}</span>
             </div>
-          )}
+
+            {/* Hot Indicator */}
+            {totalBets > 5 && (
+              <div className="flex items-center gap-1.5 px-2 py-1 bg-warning/10 rounded-lg">
+                <BoltIcon className="w-4 h-4 text-warning animate-pulse" />
+                <span className="font-semibold text-warning text-xs">Hot</span>
+              </div>
+            )}
+
+            {/* Navigate Icon */}
+            <ChevronRightIcon className="w-6 h-6 text-tertiary group-hover:text-primary transition-colors" />
+          </div>
         </div>
 
         {/* Optional: Quick odds preview bar */}

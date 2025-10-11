@@ -82,7 +82,7 @@ function FloatingParlayBuilder({
       });
 
       if (response.data.success) {
-        toast.success(`Parlay placed! Potential win: $${formatMuskBucks(totalPayout)}`);
+        toast.success(`Parlay placed! Potential win: $formatMuskBucks(totalPayout) 🪙`);
         parlayDispatch({ type: 'CLEAR' });
         setStake('10');
         setShowConfirmation(true);
@@ -188,7 +188,7 @@ function FloatingParlayBuilder({
           </div>
           <div className="flex-1">
             <p className="text-sm font-medium text-content">{parlayOdds.toFixed(2)}x odds</p>
-            <p className="text-xs text-tertiary">Win ${formatMuskBucks(totalPayout)}</p>
+            <p className="text-xs text-tertiary">Win formatMuskBucks(totalPayout) 🪙</p>
           </div>
           <Zap className="w-5 h-5 text-warning animate-pulse" />
         </div>
@@ -265,7 +265,9 @@ function FloatingParlayBuilder({
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="text-tertiary">Potential Win</span>
-              <span className="font-medium text-content">${formatMuskBucks(potentialPayout)}</span>
+              <span className="font-medium text-content">
+                {formatMuskBucks(potentialPayout)} 🪙
+              </span>
             </div>
             {bonusPercentage > 0 && (
               <div className="flex items-center justify-between text-sm">
@@ -273,14 +275,14 @@ function FloatingParlayBuilder({
                   <Zap className="w-3 h-3 text-warning" />
                   Parlay Bonus ({bonusPercentage}%)
                 </span>
-                <span className="font-medium text-success">+${formatMuskBucks(bonusAmount)}</span>
+                <span className="font-medium text-success">+{formatMuskBucks(bonusAmount)} 🪙</span>
               </div>
             )}
             <div className="pt-2 border-t border-border">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-semibold text-content">Total Payout</span>
                 <span className="text-lg font-bold text-success">
-                  ${formatMuskBucks(totalPayout)}
+                  formatMuskBucks(totalPayout) 🪙
                 </span>
               </div>
             </div>
@@ -338,7 +340,7 @@ function FloatingParlayBuilder({
                 <CheckCircle className="w-12 h-12 mx-auto mb-3" />
                 <h3 className="text-lg font-bold mb-1">Parlay Placed!</h3>
                 <p className="text-sm opacity-90">
-                  Good luck! Potential win: ${formatMuskBucks(totalPayout)}
+                  Good luck! Potential win: formatMuskBucks(totalPayout) 🪙
                 </p>
               </div>
             </div>

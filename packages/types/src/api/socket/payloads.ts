@@ -1121,7 +1121,7 @@ export interface PongPayoutPayload {
 // ============================================================================
 
 export interface ReactionUpdatePayload {
-  contentType: 'post' | 'article';
+  contentType: 'post' | 'article' | 'prediction';
   contentId: number;
   userId: number;
   userName: string;
@@ -1131,6 +1131,9 @@ export interface ReactionUpdatePayload {
   previousReaction?: string; // Only present when action is 'changed'
   reactionCounts: Record<string, number>;
   timestamp: string;
+  predictionId?: number; // For prediction reactions
+  postId?: number; // For post reactions
+  articleId?: number; // For article reactions
 }
 
 // ============================================================================
@@ -1206,6 +1209,7 @@ export interface EventPayloadMap {
   // Reaction events
   'post:reaction:update': ReactionUpdatePayload;
   'article:reaction:update': ReactionUpdatePayload;
+  'prediction:reaction:update': ReactionUpdatePayload;
 
   // Chat events
   'chat:error': ChatErrorPayload;

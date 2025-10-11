@@ -200,7 +200,7 @@ export default function PredictionStats({ prediction, className = '' }: Predicti
         <YAxis tick={{ fontSize: 12 }} />
         <Tooltip
           formatter={(value: any, name: string) => [
-            name === 'volume' ? `$${formatMuskBucks(value)}` : value,
+            name === 'volume' ? `$formatMuskBucks(value) 🪙` : value,
             name === 'volume' ? 'Volume' : 'Bets',
           ]}
         />
@@ -287,10 +287,11 @@ export default function PredictionStats({ prediction, className = '' }: Predicti
             <span className="text-sm">Total Volume</span>
           </div>
           <div className="text-2xl font-bold text-content">
-            ${formatMuskBucks(activityMetrics.total.volume)}
+            formatMuskBucks(activityMetrics.total.volume) 🪙
           </div>
           <div className="text-xs text-success flex items-center gap-1">
-            <TrendingUp className="w-3 h-3" />${formatMuskBucks(activityMetrics.day.volume)} today
+            <TrendingUp className="w-3 h-3" />
+            {formatMuskBucks(activityMetrics.day.volume)} 🪙 today
           </div>
         </div>
 
@@ -312,7 +313,7 @@ export default function PredictionStats({ prediction, className = '' }: Predicti
             <span className="text-sm">Avg Bet Size</span>
           </div>
           <div className="text-2xl font-bold text-content">
-            ${formatMuskBucks(activityMetrics.total.avgBetSize)}
+            formatMuskBucks(activityMetrics.total.avgBetSize) 🪙
           </div>
           <div className="text-xs text-tertiary flex items-center gap-1">
             <MousePointer className="w-3 h-3" />
@@ -339,7 +340,7 @@ export default function PredictionStats({ prediction, className = '' }: Predicti
                 <div className="flex justify-between text-sm">
                   <span className="text-tertiary">Volume</span>
                   <span className="font-medium text-content">
-                    ${formatMuskBucks(option.volume)}
+                    formatMuskBucks(option.volume) 🪙
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
@@ -440,7 +441,7 @@ export default function PredictionStats({ prediction, className = '' }: Predicti
             <div className="flex justify-between">
               <span className="text-xs text-tertiary">Volume</span>
               <span className="text-sm font-medium text-content">
-                ${formatMuskBucks(activityMetrics.day.volume)}
+                formatMuskBucks(activityMetrics.day.volume) 🪙
               </span>
             </div>
           </div>
@@ -459,7 +460,7 @@ export default function PredictionStats({ prediction, className = '' }: Predicti
             <div className="flex justify-between">
               <span className="text-xs text-tertiary">Volume</span>
               <span className="text-sm font-medium text-content">
-                ${formatMuskBucks(activityMetrics.week.volume)}
+                formatMuskBucks(activityMetrics.week.volume) 🪙
               </span>
             </div>
           </div>

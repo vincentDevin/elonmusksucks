@@ -125,6 +125,8 @@ export const REDIS_CHANNELS = {
   POST_REACTION: 'post:reaction',
   POST_REACTION_UPDATE: 'post:reaction:update',
   ARTICLE_REACTION_UPDATE: 'article:reaction:update',
+  PREDICTION_REACTION: 'prediction:reaction',
+  PREDICTION_REACTION_UPDATE: 'prediction:reaction:update',
   COMMENT_CREATED: 'comment:created',
   COMMENT_DELETED: 'comment:deleted',
 
@@ -373,6 +375,7 @@ export const SOCKET_EVENTS = {
   POST_DELETED_BROADCAST: 'post:deleted',
   POST_SHARED_BROADCAST: 'post:shared',
   POST_REACTION_BROADCAST: 'post:reaction',
+  PREDICTION_REACTION_BROADCAST: 'prediction:reaction',
   COMMENT_NEW: 'comment:new',
   COMMENT_DELETED_BROADCAST: 'comment:deleted',
 

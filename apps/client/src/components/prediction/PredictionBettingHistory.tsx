@@ -219,7 +219,7 @@ export default function PredictionBettingHistory({
         <div className="bg-surface border border-border rounded-lg p-3">
           <div className="text-xs text-tertiary mb-1">Total Volume</div>
           <div className="text-lg font-bold text-content">
-            ${formatMuskBucks(summaryStats.totalVolume)}
+            formatMuskBucks(summaryStats.totalVolume) 🪙
           </div>
         </div>
         <div className="bg-surface border border-border rounded-lg p-3">
@@ -241,7 +241,7 @@ export default function PredictionBettingHistory({
         <div className="bg-surface border border-border rounded-lg p-3">
           <div className="text-xs text-tertiary mb-1">Avg Bet</div>
           <div className="text-lg font-bold text-content">
-            ${formatMuskBucks(summaryStats.avgBetSize)}
+            formatMuskBucks(summaryStats.avgBetSize) 🪙
           </div>
         </div>
       </div>
@@ -421,7 +421,7 @@ export default function PredictionBettingHistory({
                         bet.isHighStakes ? 'text-warning' : 'text-content'
                       }`}
                     >
-                      ${formatMuskBucks(bet.amount)}
+                      formatMuskBucks(bet.amount) 🪙
                     </span>
                   </td>
                   <td className="p-4">
@@ -429,7 +429,7 @@ export default function PredictionBettingHistory({
                   </td>
                   <td className="p-4">
                     <span className="text-sm font-medium text-success">
-                      ${formatMuskBucks(bet.potentialPayout)}
+                      formatMuskBucks(bet.potentialPayout) 🪙
                     </span>
                   </td>
                   <td className="p-4">
@@ -501,7 +501,7 @@ export default function PredictionBettingHistory({
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-medium text-content">
-                    ${formatMuskBucks(optionVolume)}
+                    formatMuskBucks(optionVolume) 🪙
                   </p>
                   <p className="text-xs text-tertiary">{percentage.toFixed(1)}%</p>
                 </div>
