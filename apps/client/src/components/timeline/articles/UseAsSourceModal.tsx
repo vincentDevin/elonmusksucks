@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import type { TimelineItem, PredictionView } from '@ems/types';
 import { getPredictions } from '../../../api/predictions';
 import { useAuth } from '../../../contexts/AuthContext';
+import { usePredictionMarket } from '../../../contexts/PredictionContext';
 import BaseModal from '../../BaseModal';
 
 interface UseAsSourceModalProps {
@@ -21,6 +22,7 @@ interface UseAsSourceModalProps {
 export const UseAsSourceModal: React.FC<UseAsSourceModalProps> = ({ item, isOpen, onClose }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { openCreateModal } = usePredictionMarket();
   const [selectedOption, setSelectedOption] = useState<'new' | 'existing' | null>(null);
   const [predictions, setPredictions] = useState<PredictionView[]>([]);
   const [selectedPrediction, setSelectedPrediction] = useState<number | null>(null);
@@ -62,8 +64,7 @@ export const UseAsSourceModal: React.FC<UseAsSourceModalProps> = ({ item, isOpen
   const handleCreateNewPrediction = () => {
     if (!item) return;
 
-    // Navigate to dashboard and trigger the create prediction modal
-    // This is a temporary solution - ideally we'd have a better state management system
+    // Extract article ID and create source data
     const articleId = item.id.replace('article-', '');
     const sourceData = {
       type: 'article' as const,
@@ -73,10 +74,10 @@ export const UseAsSourceModal: React.FC<UseAsSourceModalProps> = ({ item, isOpen
       publisher: item.content.author || 'Unknown',
     };
 
-    // Store source data in localStorage temporarily to pass to dashboard
-    localStorage.setItem('pendingPredictionSource', JSON.stringify(sourceData));
+    // Open create prediction modal with source data via context
+    openCreateModal(sourceData);
 
-    navigate('/dashboard');
+    // Close this modal
     onClose();
   };
 

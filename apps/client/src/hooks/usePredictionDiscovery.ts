@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import type { PredictionView } from '@ems/types';
 
 export interface PredictionFilter {
-  categories: string[];
+  categories: number[]; // Changed from string[] to number[] (category IDs)
   difficulties: ('easy' | 'medium' | 'hard' | 'expert')[];
   timeRemaining: 'all' | '1h' | '1d' | '1w';
   activity: 'all' | 'high' | 'medium' | 'low';
@@ -130,8 +130,8 @@ export function usePredictionDiscovery() {
       let score = 0;
       const reasons: string[] = [];
 
-      // Category preference scoring (using categoryName if available, otherwise categoryId)
-      const categoryIdentifier = prediction.categoryName || String(prediction.categoryId);
+      // Category preference scoring (using category name if available, otherwise categoryId)
+      const categoryIdentifier = prediction.category?.name || String(prediction.categoryId);
       if (userBettingHistory.includes(categoryIdentifier)) {
         score += 30;
         reasons.push(`You often bet on ${categoryIdentifier}`);
@@ -282,9 +282,10 @@ export function usePredictionDiscovery() {
       }
 
       // Category filter
-      const categoryIdentifier = prediction.categoryName || String(prediction.categoryId);
-      if (filters.categories.length > 0 && !filters.categories.includes(categoryIdentifier)) {
-        return false;
+      if (filters.categories.length > 0 && prediction.categoryId !== null) {
+        if (!filters.categories.includes(prediction.categoryId)) {
+          return false;
+        }
       }
 
       // Difficulty filter
@@ -334,7 +335,7 @@ export function usePredictionDiscovery() {
       if (filters.search) {
         const searchLower = filters.search.toLowerCase();
         const categoryStr = (
-          prediction.categoryName || String(prediction.categoryId)
+          prediction.category?.name || String(prediction.categoryId)
         ).toLowerCase();
         return (
           prediction.title.toLowerCase().includes(searchLower) ||
@@ -461,10 +462,13 @@ export function usePredictionDiscovery() {
 
   // Get available filter options
   const availableCategories = useMemo(() => {
-    const categories = new Set(
-      predictions?.map((p) => p.categoryName || String(p.categoryId)) || [],
-    );
-    return Array.from(categories).sort();
+    const categoryMap = new Map();
+    predictions?.forEach((p) => {
+      if (p.category && !categoryMap.has(p.category.id)) {
+        categoryMap.set(p.category.id, p.category);
+      }
+    });
+    return Array.from(categoryMap.values()).sort((a, b) => a.sortOrder - b.sortOrder);
   }, [predictions]);
 
   // Favorite/unfavorite functions

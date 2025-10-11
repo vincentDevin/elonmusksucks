@@ -23,6 +23,7 @@
     "seed:dev": "tsx prisma/seed.ts",
     "seed:prod": "ts-node --transpile-only scripts/prod-seed.ts",
     "seed:achievements": "node scripts/seed-achievements.cjs",
+    "seed:categories": "tsx prisma/seeds/categories.seed.ts",
     "test": "jest",
     "test:server": "dotenv -e .env.test jest --selectProjects=server",
     "worker": "npm run worker --workspace=apps/server",

@@ -8,6 +8,7 @@ import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import type { CreatePredictionPayload } from '@ems/types';
 import { PredictionType } from '@ems/types';
+import { getCategories, type Category } from '../../api/predictions';
 
 interface CreatePredictionFormProps {
   /** Called with the payload when the user submits. */
@@ -24,6 +25,8 @@ interface CreatePredictionFormProps {
   } | null;
   /** Whether the form is disabled (submitting) */
   disabled?: boolean;
+  /** Default category ID to pre-select */
+  defaultCategoryId?: number;
 }
 
 interface SourceData {
@@ -38,6 +41,7 @@ export default function CreatePredictionForm({
   onCreated,
   onCancel,
   sourceData: propSourceData,
+  defaultCategoryId,
 }: CreatePredictionFormProps) {
   const location = useLocation();
   const [title, setTitle] = useState('');
@@ -48,6 +52,30 @@ export default function CreatePredictionForm({
   const [threshold, setThreshold] = useState<number | ''>('');
   const [options, setOptions] = useState<string[]>(['']);
   const [sourceData, setSourceData] = useState<SourceData | null>(propSourceData || null);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
+
+  // Fetch categories on mount
+  useEffect(() => {
+    async function loadCategories() {
+      try {
+        const cats = await getCategories();
+        setCategories(cats);
+      } catch (error) {
+        console.error('Failed to load categories:', error);
+      } finally {
+        setCategoriesLoading(false);
+      }
+    }
+    loadCategories();
+  }, []);
+
+  // Set default category ID when provided
+  useEffect(() => {
+    if (defaultCategoryId && categoryId === '') {
+      setCategoryId(defaultCategoryId);
+    }
+  }, [defaultCategoryId, categoryId]);
 
   // Parse URL parameters for source data (only if no prop source data)
   useEffect(() => {
@@ -182,16 +210,29 @@ export default function CreatePredictionForm({
 
         <div>
           <label htmlFor="categoryId" className="block mb-1 text-sm">
-            Category ID
+            Category
           </label>
-          <input
+          <select
             id="categoryId"
-            type="number"
             value={categoryId}
             onChange={(e) => setCategoryId(e.target.value === '' ? '' : Number(e.target.value))}
             className={inputBase}
-            placeholder="Enter category ID"
-          />
+            disabled={categoriesLoading}
+          >
+            <option value="">
+              {categoriesLoading ? 'Loading categories...' : 'Select a category'}
+            </option>
+            {categories.map((cat) => (
+              <option key={cat.id} value={cat.id}>
+                {cat.icon} {cat.name}
+              </option>
+            ))}
+          </select>
+          {!categoriesLoading && categories.length === 0 && (
+            <p className="text-xs text-red-500 mt-1">
+              No categories available. Please contact an administrator.
+            </p>
+          )}
         </div>
 
         <div className="md:col-span-2">

@@ -66,7 +66,7 @@ export default function RelatedPredictions({
       if (prediction.categoryId === currentPrediction.categoryId) {
         relationScore += 40;
         relationReason = 'category';
-        relationText = `Same category: ${prediction.categoryId}`;
+        relationText = `Same category: ${prediction.category?.name || prediction.categoryId}`;
       }
 
       // Same creator (medium score)
@@ -300,9 +300,12 @@ export default function RelatedPredictions({
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <span className="px-2 py-0.5 bg-primary/10 text-primary rounded text-xs">
-                      {prediction.categoryId}
-                    </span>
+                    {prediction.category && (
+                      <span className="px-2 py-0.5 bg-primary/10 text-primary rounded text-xs inline-flex items-center gap-1">
+                        {prediction.category.icon && <span>{prediction.category.icon}</span>}
+                        <span>{prediction.category.name}</span>
+                      </span>
+                    )}
                     <ChevronRight className="w-4 h-4 text-tertiary group-hover:text-primary transition-colors" />
                   </div>
                 </div>

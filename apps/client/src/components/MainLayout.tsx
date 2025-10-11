@@ -3,6 +3,8 @@ import NavBar from './NavBar';
 import { ChatBar } from './ChatWidget';
 import ActivityFeed from './ActivityFeed';
 import { QuickThemeSwitcher } from '../theme';
+import { FloatingCreatePredictionWidget } from './prediction/FloatingCreatePredictionWidget';
+import CreatePredictionModal from './prediction/CreatePredictionModal';
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -38,6 +40,12 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
       {/* Quick Theme Switcher - Bottom Right (has its own fixed positioning) */}
       <QuickThemeSwitcher position="bottom-right" hideOnMobile={false} />
+
+      {/* Create Prediction Widget - Above Theme Switcher (admin only) */}
+      <FloatingCreatePredictionWidget position="bottom-right" hideOnMobile={true} />
+
+      {/* Global Create Prediction Modal - Controlled by PredictionContext */}
+      <CreatePredictionModal />
 
       {/* Future widgets can be added here, e.g.:
       <NotificationWidget position="bottom-left" hideOnMobile={false} />

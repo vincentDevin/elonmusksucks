@@ -14,15 +14,17 @@ import {
   CheckIcon as Check,
 } from '@heroicons/react/24/outline';
 import type { PredictionFilter } from '../../hooks/usePredictionDiscovery';
+import type { PrismaCategory } from '@ems/types';
 
 interface EnhancedPredictionFiltersProps {
   filters: PredictionFilter;
-  availableCategories: string[];
+  availableCategories: PrismaCategory[];
   onFiltersChange: (filters: Partial<PredictionFilter>) => void;
   onClearFilters: () => void;
   totalResults?: number;
   className?: string;
   isMobile?: boolean;
+  layout?: 'vertical' | 'horizontal';
 }
 
 function EnhancedPredictionFilters({
@@ -33,6 +35,7 @@ function EnhancedPredictionFilters({
   totalResults,
   className = '',
   isMobile = false,
+  layout = 'vertical',
 }: EnhancedPredictionFiltersProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showMobileSheet, setShowMobileSheet] = useState(false);
@@ -261,25 +264,28 @@ function EnhancedPredictionFilters({
               <div className="space-y-2">
                 {deferredCategories.map((category) => (
                   <button
-                    key={category}
+                    key={category.id}
                     onClick={() => {
-                      const newCats = tempFilters.categories.includes(category)
-                        ? tempFilters.categories.filter((c) => c !== category)
-                        : [...tempFilters.categories, category];
+                      const newCats = tempFilters.categories.includes(category.id)
+                        ? tempFilters.categories.filter((c) => c !== category.id)
+                        : [...tempFilters.categories, category.id];
                       setTempFilters({ ...tempFilters, categories: newCats });
                     }}
                     className={`
                       w-full p-3 rounded-lg border text-left
                       transition-all flex items-center justify-between
                       ${
-                        tempFilters.categories.includes(category)
+                        tempFilters.categories.includes(category.id)
                           ? 'bg-primary/10 text-primary border-primary'
                           : 'bg-surface text-content border-border'
                       }
                     `}
                   >
-                    <span>{category}</span>
-                    {tempFilters.categories.includes(category) && (
+                    <span className="inline-flex items-center gap-2">
+                      {category.icon && <span>{category.icon}</span>}
+                      <span>{category.name}</span>
+                    </span>
+                    {tempFilters.categories.includes(category.id) && (
                       <Check className="w-4 h-4 text-primary" />
                     )}
                   </button>
@@ -365,7 +371,118 @@ function EnhancedPredictionFilters({
     );
   }
 
-  // Desktop/Tablet View
+  // Horizontal Layout (for header)
+  if (layout === 'horizontal') {
+    return (
+      <div className={`flex flex-wrap items-center gap-3 ${className}`}>
+        {/* Search Bar */}
+        <div className="relative flex-1 min-w-[200px] max-w-[300px]">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-tertiary" />
+          <input
+            ref={searchInputRef}
+            type="text"
+            placeholder="Search predictions..."
+            value={filters.search}
+            onChange={(e) => onFiltersChange({ search: e.target.value })}
+            className="w-full pl-10 pr-8 py-2 bg-muted border border-transparent rounded-lg text-sm text-content placeholder-tertiary focus:outline-none focus:border-primary transition-colors"
+          />
+          {filters.search && (
+            <button
+              onClick={() => onFiltersChange({ search: '' })}
+              className="absolute right-2 top-1/2 transform -translate-y-1/2"
+            >
+              <X className="w-4 h-4 text-tertiary hover:text-content" />
+            </button>
+          )}
+        </div>
+
+        {/* Quick Filter Pills */}
+        <div className="flex gap-1.5 flex-wrap">
+          {quickFilters.slice(0, 4).map((filter) => (
+            <button
+              key={filter.id}
+              onClick={() => onFiltersChange(filter.filter)}
+              className="px-3 py-1.5 bg-muted hover:bg-primary/20 text-content text-xs rounded-full whitespace-nowrap transition-colors flex items-center gap-1.5"
+            >
+              <span>{filter.icon}</span>
+              <span>{filter.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Category Dropdown */}
+        <div className="relative">
+          <select
+            value={filters.categories[0] || ''}
+            onChange={(e) =>
+              onFiltersChange({
+                categories: e.target.value ? [Number(e.target.value)] : [],
+              })
+            }
+            className="px-3 py-1.5 pr-8 bg-muted border border-transparent rounded-lg text-sm text-content focus:outline-none focus:border-primary appearance-none cursor-pointer"
+          >
+            <option value="">All Categories</option>
+            {deferredCategories.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.icon ? `${category.icon} ${category.name}` : category.name}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-tertiary pointer-events-none" />
+        </div>
+
+        {/* Status Dropdown */}
+        <div className="relative">
+          <select
+            value={filters.status}
+            onChange={(e) => onFiltersChange({ status: e.target.value as any })}
+            className="px-3 py-1.5 pr-8 bg-muted border border-transparent rounded-lg text-sm text-content focus:outline-none focus:border-primary appearance-none cursor-pointer"
+          >
+            <option value="all">All Status</option>
+            <option value="open">Open</option>
+            <option value="expired">Expired</option>
+            <option value="resolved">Resolved</option>
+          </select>
+          <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-tertiary pointer-events-none" />
+        </div>
+
+        {/* Time Dropdown */}
+        <div className="relative">
+          <select
+            value={filters.timeRemaining}
+            onChange={(e) => onFiltersChange({ timeRemaining: e.target.value as any })}
+            className="px-3 py-1.5 pr-8 bg-muted border border-transparent rounded-lg text-sm text-content focus:outline-none focus:border-primary appearance-none cursor-pointer"
+          >
+            <option value="all">Any Time</option>
+            <option value="1h">1 Hour</option>
+            <option value="1d">1 Day</option>
+            <option value="1w">1 Week</option>
+          </select>
+          <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-tertiary pointer-events-none" />
+        </div>
+
+        {/* Clear Filters */}
+        {hasActiveFilters && (
+          <button
+            onClick={onClearFilters}
+            className="px-3 py-1.5 bg-muted hover:bg-error/20 text-tertiary hover:text-error rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5"
+          >
+            <X className="w-3.5 h-3.5" />
+            Clear
+          </button>
+        )}
+
+        {/* Results Count */}
+        {totalResults !== undefined && (
+          <div className="text-xs text-tertiary ml-auto">
+            <span className="font-medium text-content">{totalResults}</span> results
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Desktop/Tablet View (Vertical)
   return (
     <div className={`bg-surface rounded-xl border border-border ${className}`}>
       {/* Search Bar */}
@@ -462,24 +579,27 @@ function EnhancedPredictionFilters({
               <div className="grid grid-cols-1 gap-1.5">
                 {deferredCategories.map((category) => (
                   <button
-                    key={category}
+                    key={category.id}
                     onClick={() => {
-                      const newCats = filters.categories.includes(category)
-                        ? filters.categories.filter((c) => c !== category)
-                        : [...filters.categories, category];
+                      const newCats = filters.categories.includes(category.id)
+                        ? filters.categories.filter((c) => c !== category.id)
+                        : [...filters.categories, category.id];
                       onFiltersChange({ categories: newCats });
                     }}
                     className={`
                       w-full px-2.5 py-1.5 rounded-lg text-xs border transition-colors text-left flex items-center justify-between
                       ${
-                        filters.categories.includes(category)
+                        filters.categories.includes(category.id)
                           ? 'bg-primary text-surface border-primary'
                           : 'bg-surface text-content border-border hover:border-primary/50 hover:bg-muted'
                       }
                     `}
                   >
-                    <span>{category}</span>
-                    {filters.categories.includes(category) && <Check className="w-4 h-4" />}
+                    <span className="inline-flex items-center gap-1.5">
+                      {category.icon && <span>{category.icon}</span>}
+                      <span>{category.name}</span>
+                    </span>
+                    {filters.categories.includes(category.id) && <Check className="w-4 h-4" />}
                   </button>
                 ))}
               </div>
@@ -600,7 +720,11 @@ function arePropsEqual(
 
   // Check availableCategories array
   if (prev.availableCategories.length !== next.availableCategories.length) return false;
-  if (!prev.availableCategories.every((cat) => next.availableCategories.includes(cat)))
+  if (
+    !prev.availableCategories.every((cat) =>
+      next.availableCategories.some((nextCat) => nextCat.id === cat.id),
+    )
+  )
     return false;
 
   return true;

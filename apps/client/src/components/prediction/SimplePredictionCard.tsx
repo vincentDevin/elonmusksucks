@@ -144,9 +144,12 @@ function SimplePredictionCard({
 
             {/* Category & Time */}
             <div className="flex items-center gap-4 mb-3 text-sm">
-              <span className="px-2 py-0.5 bg-primary/10 text-primary rounded-full text-xs font-medium">
-                {prediction.categoryId}
-              </span>
+              {prediction.category && (
+                <span className="px-2 py-0.5 bg-primary/10 text-primary rounded-full text-xs font-medium inline-flex items-center gap-1">
+                  {prediction.category.icon && <span>{prediction.category.icon}</span>}
+                  <span>{prediction.category.name}</span>
+                </span>
+              )}
               <div className={`flex items-center gap-1 ${getStatusColor()}`}>
                 <ClockIcon className="w-3.5 h-3.5" />
                 <span className="font-medium">{getTimeDisplay()}</span>

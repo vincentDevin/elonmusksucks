@@ -67,7 +67,7 @@ export default function BetModal({
     const filtered = active.filter(
       (pred) =>
         pred.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        pred.categoryId?.toString().toLowerCase().includes(searchTerm.toLowerCase()),
+        pred.category?.name?.toLowerCase().includes(searchTerm.toLowerCase()),
     );
 
     return filtered
@@ -287,7 +287,12 @@ export default function BetModal({
                 className="p-4 bg-background border border-muted rounded-lg hover:bg-surface cursor-pointer transition-colors"
               >
                 <h4 className="font-semibold text-content mb-1">{pred.title}</h4>
-                <p className="text-sm text-tertiary mb-2">Category {pred.categoryId || 'N/A'}</p>
+                {pred.category && (
+                  <p className="text-sm text-tertiary mb-2 inline-flex items-center gap-1">
+                    {pred.category.icon && <span>{pred.category.icon}</span>}
+                    <span>{pred.category.name}</span>
+                  </p>
+                )}
                 <div className="flex flex-wrap gap-2">
                   {pred.options.map((opt, idx) => {
                     const palette = ['bg-success', 'bg-error', 'bg-info', 'bg-warning'];

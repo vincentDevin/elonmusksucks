@@ -5,6 +5,19 @@ import type { PredictionView, PredictionType } from '@ems/types';
 export type { PredictionView } from '@ems/types';
 
 /**
+ * Category interface matching backend response
+ */
+export interface Category {
+  id: number;
+  name: string;
+  slug: string;
+  icon?: string;
+  color?: string;
+  description?: string;
+  sortOrder: number;
+}
+
+/**
  * Fetch all predictions (with their options, bets & parlay legs).
  */
 export async function getPredictions(): Promise<PredictionView[]> {
@@ -86,4 +99,12 @@ export async function getPredictionComments(
 export async function createPredictionComment(predictionId: number, content: string): Promise<any> {
   const { data } = await api.post(`/api/predictions/${predictionId}/comments`, { content });
   return data;
+}
+
+/**
+ * Get all active categories for prediction creation
+ */
+export async function getCategories(): Promise<Category[]> {
+  const response = await api.get('/api/predictions/categories');
+  return response.data.categories;
 }

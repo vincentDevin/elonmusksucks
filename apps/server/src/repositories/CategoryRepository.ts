@@ -2,9 +2,9 @@
 import { PrismaClient, Category } from '@prisma/client';
 import { ICategoryRepository } from './interfaces/ICategoryRepository';
 
-export class CategoryRepository implements ICategoryRepository {
-  constructor(private prisma: PrismaClient = new PrismaClient()) {}
+const prisma = new PrismaClient();
 
+export class CategoryRepository implements ICategoryRepository {
   // ============================================
   // CREATE
   // ============================================
@@ -18,7 +18,7 @@ export class CategoryRepository implements ICategoryRepository {
     sortOrder?: number;
     isActive?: boolean;
   }): Promise<Category> {
-    return this.prisma.category.create({
+    return prisma.category.create({
       data: {
         name: data.name,
         slug: data.slug,
@@ -36,26 +36,26 @@ export class CategoryRepository implements ICategoryRepository {
   // ============================================
 
   async getCategoryById(id: number): Promise<Category | null> {
-    return this.prisma.category.findUnique({
+    return prisma.category.findUnique({
       where: { id },
     });
   }
 
   async getCategoryBySlug(slug: string): Promise<Category | null> {
-    return this.prisma.category.findUnique({
+    return prisma.category.findUnique({
       where: { slug },
     });
   }
 
   async getActiveCategories(): Promise<Category[]> {
-    return this.prisma.category.findMany({
+    return prisma.category.findMany({
       where: { isActive: true },
       orderBy: { sortOrder: 'asc' },
     });
   }
 
   async getAllCategories(): Promise<Category[]> {
-    return this.prisma.category.findMany({
+    return prisma.category.findMany({
       orderBy: { sortOrder: 'asc' },
     });
   }
@@ -69,7 +69,7 @@ export class CategoryRepository implements ICategoryRepository {
       }
     >
   > {
-    return this.prisma.category.findMany({
+    return prisma.category.findMany({
       include: {
         _count: {
           select: {
@@ -98,7 +98,7 @@ export class CategoryRepository implements ICategoryRepository {
     },
   ): Promise<Category | null> {
     try {
-      return await this.prisma.category.update({
+      return await prisma.category.update({
         where: { id },
         data: {
           ...(data.name && { name: data.name }),
@@ -119,7 +119,7 @@ export class CategoryRepository implements ICategoryRepository {
     // Update sort order for each category
     await Promise.all(
       categoryIds.map((id, index) =>
-        this.prisma.category.update({
+        prisma.category.update({
           where: { id },
           data: { sortOrder: index },
         }),
@@ -133,7 +133,7 @@ export class CategoryRepository implements ICategoryRepository {
 
   async deactivateCategory(id: number): Promise<boolean> {
     try {
-      await this.prisma.category.update({
+      await prisma.category.update({
         where: { id },
         data: { isActive: false },
       });
@@ -146,7 +146,7 @@ export class CategoryRepository implements ICategoryRepository {
   async deleteCategory(id: number): Promise<boolean> {
     try {
       // Check if category has predictions
-      const count = await this.prisma.prediction.count({
+      const count = await prisma.prediction.count({
         where: { categoryId: id },
       });
 
@@ -154,7 +154,7 @@ export class CategoryRepository implements ICategoryRepository {
         return false; // Cannot delete category with predictions
       }
 
-      await this.prisma.category.delete({
+      await prisma.category.delete({
         where: { id },
       });
       return true;
@@ -168,7 +168,7 @@ export class CategoryRepository implements ICategoryRepository {
   // ============================================
 
   async isCategoryActive(id: number): Promise<boolean> {
-    const category = await this.prisma.category.findUnique({
+    const category = await prisma.category.findUnique({
       where: { id },
       select: { isActive: true },
     });
@@ -177,7 +177,7 @@ export class CategoryRepository implements ICategoryRepository {
   }
 
   async isSlugAvailable(slug: string, excludeId?: number): Promise<boolean> {
-    const existing = await this.prisma.category.findUnique({
+    const existing = await prisma.category.findUnique({
       where: { slug },
       select: { id: true },
     });
@@ -191,7 +191,7 @@ export class CategoryRepository implements ICategoryRepository {
 
   async getDefaultCategory(): Promise<Category | null> {
     // Return first active category as default
-    return this.prisma.category.findFirst({
+    return prisma.category.findFirst({
       where: { isActive: true },
       orderBy: { sortOrder: 'asc' },
     });

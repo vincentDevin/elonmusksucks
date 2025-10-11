@@ -1,33 +1,25 @@
-// apps/client/src/components/dashboard/CreatePredictionModal.tsx
+// apps/client/src/components/prediction/CreatePredictionModal.tsx
 import { useState, useEffect } from 'react';
 import CreatePredictionForm from './CreatePredictionForm';
-import { createPrediction } from '../../api/predictions';
+import { createPrediction, getCategories, type Category } from '../../api/predictions';
 import { useAuth } from '../../contexts/AuthContext';
+import { usePredictionMarket } from '../../contexts/PredictionContext';
 import api from '../../api/axios';
-// Removed unused import
 
-interface CreatePredictionModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  sourceData?: {
-    type: 'article' | 'tweet';
-    id: string;
-    title: string;
-    url: string;
-    publisher: string;
-  } | null;
-}
-
-export default function CreatePredictionModal({
-  isOpen,
-  onClose,
-  sourceData,
-}: CreatePredictionModalProps) {
+/**
+ * Global Create Prediction Modal
+ * Controlled by PredictionContext state
+ * Accessible from anywhere via FloatingCreatePredictionWidget or UseAsSourceModal
+ */
+export default function CreatePredictionModal() {
   const { user, accessToken } = useAuth();
+  const { createModalOpen, createModalSourceData, closeCreateModal } = usePredictionMarket();
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [categoryMap, setCategoryMap] = useState<Record<string, number>>({});
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | undefined>();
 
   // Prediction templates for quick creation
   const templates = [
@@ -97,8 +89,35 @@ export default function CreatePredictionModal({
     },
   ];
 
+  // Fetch categories on mount and build category map
+  useEffect(() => {
+    async function loadCategories() {
+      try {
+        const categories = await getCategories();
+        // Map template category names to category IDs
+        const map: Record<string, number> = {};
+        categories.forEach((cat: Category) => {
+          // Handle both exact matches and variations
+          const normalizedName = cat.name.toLowerCase().replace(/\s+/g, '');
+          map[normalizedName] = cat.id;
+          // Also store with original name for direct lookup
+          map[cat.name.toLowerCase()] = cat.id;
+        });
+        setCategoryMap(map);
+      } catch (error) {
+        console.error('Failed to load categories:', error);
+      }
+    }
+    loadCategories();
+  }, []);
+
   const handleTemplateSelect = (template: (typeof templates)[0]) => {
     setSelectedTemplate(template.id);
+    // Map template category to category ID
+    const normalizedCategory = template.category.toLowerCase().replace(/\s+/g, '');
+    const categoryId =
+      categoryMap[normalizedCategory] || categoryMap[template.category.toLowerCase()];
+    setSelectedCategoryId(categoryId);
     // Small delay for visual feedback
     setTimeout(() => {
       template.action();
@@ -115,7 +134,7 @@ export default function CreatePredictionModal({
       console.log('Prediction created successfully:', newPrediction);
 
       // If we have source data, link it to the prediction
-      if (sourceData) {
+      if (createModalSourceData) {
         if (!user || !accessToken) {
           console.error('User not authenticated for source linking');
           setError(
@@ -127,11 +146,14 @@ export default function CreatePredictionModal({
         try {
           const linkData = {
             predictionId: newPrediction.id,
-            articleId: sourceData.type === 'article' ? parseInt(sourceData.id) : undefined,
-            tweetId: sourceData.type === 'tweet' ? sourceData.id : undefined,
-            url: sourceData.url,
-            title: sourceData.title,
-            publisher: sourceData.publisher,
+            articleId:
+              createModalSourceData.type === 'article'
+                ? parseInt(createModalSourceData.id)
+                : undefined,
+            tweetId: createModalSourceData.type === 'tweet' ? createModalSourceData.id : undefined,
+            url: createModalSourceData.url,
+            title: createModalSourceData.title,
+            publisher: createModalSourceData.publisher,
           };
 
           console.log('Linking source to prediction:', linkData);
@@ -170,27 +192,27 @@ export default function CreatePredictionModal({
     setSelectedTemplate(null);
     setError(null);
     setCreating(false);
-    onClose();
+    closeCreateModal();
   };
 
   // Reset state when modal closes
   useEffect(() => {
-    if (!isOpen) {
+    if (!createModalOpen) {
       setSelectedTemplate(null);
       setShowForm(false);
       setError(null);
       setCreating(false);
     }
-  }, [isOpen]);
+  }, [createModalOpen]);
 
   // If we have source data, automatically show the form
   useEffect(() => {
-    if (isOpen && sourceData) {
+    if (createModalOpen && createModalSourceData) {
       setShowForm(true);
     }
-  }, [isOpen, sourceData]);
+  }, [createModalOpen, createModalSourceData]);
 
-  if (!isOpen) return null;
+  if (!createModalOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[90]">
@@ -204,14 +226,14 @@ export default function CreatePredictionModal({
                   <h2 className="text-2xl font-bold text-content flex items-center">
                     <span className="mr-2">📊</span>
                     Create Prediction
-                    {sourceData && (
+                    {createModalSourceData && (
                       <span className="ml-2 text-sm bg-primary/10 text-primary px-2 py-1 rounded">
                         With Source
                       </span>
                     )}
                   </h2>
                   <p className="text-sm text-tertiary mt-1">
-                    {sourceData
+                    {createModalSourceData
                       ? 'Creating prediction based on article source'
                       : 'Fill out the details for your prediction'}
                   </p>
@@ -241,8 +263,9 @@ export default function CreatePredictionModal({
               <CreatePredictionForm
                 onCreated={handleCreatePrediction}
                 onCancel={handleClose}
-                sourceData={sourceData}
+                sourceData={createModalSourceData}
                 disabled={creating}
+                defaultCategoryId={selectedCategoryId}
               />
             </div>
           </div>

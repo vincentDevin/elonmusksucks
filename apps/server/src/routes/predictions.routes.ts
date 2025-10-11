@@ -3,6 +3,7 @@ import {
   getAllPredictions,
   getPredictionById,
   createPrediction,
+  getCategories,
   getSourceLinks,
   getActivityLevel,
   getBulkActivityLevels,
@@ -29,6 +30,7 @@ const router = Router();
 
 // Public routes
 router.get('/', getAllPredictions);
+router.get('/categories', getCategories); // MUST be before /:id routes
 router.get('/:id', getPredictionById);
 
 // Authenticated routes

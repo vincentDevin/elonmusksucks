@@ -1,6 +1,7 @@
 // apps/server/src/controllers/predictions.controller.ts
 import type { Request, Response, NextFunction } from 'express';
 import { predictionService } from '../services/predictions.service';
+import { categoryService } from '../services/category.service';
 import {
   PredictionType,
   CreatePredictionPayload,
@@ -154,6 +155,23 @@ export const createPrediction = async (
     });
 
     res.status(201).json(pred);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * GET /api/predictions/categories
+ * Get all active categories for prediction creation
+ */
+export const getCategories = async (
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const categories = await categoryService.getActiveCategories();
+    res.json({ categories });
   } catch (err) {
     next(err);
   }

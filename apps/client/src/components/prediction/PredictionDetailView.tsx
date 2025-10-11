@@ -162,9 +162,12 @@ export default function PredictionDetailView({
                   {prediction.title}
                 </h1>
                 <div className="flex items-center gap-2 mt-1">
-                  <span className="px-2 py-0.5 bg-primary/10 text-primary rounded text-sm">
-                    {prediction.categoryId}
-                  </span>
+                  {prediction.category && (
+                    <span className="px-2 py-0.5 bg-primary/10 text-primary rounded text-sm inline-flex items-center gap-1">
+                      {prediction.category.icon && <span>{prediction.category.icon}</span>}
+                      <span>{prediction.category.name}</span>
+                    </span>
+                  )}
                   <span
                     className={`px-2 py-0.5 rounded text-sm flex items-center gap-1 ${status.color}`}
                   >

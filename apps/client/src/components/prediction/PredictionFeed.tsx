@@ -14,14 +14,21 @@ export default function PredictionFeed() {
   ];
 
   // Create filters for categories
-  const categories = useMemo(
-    () => [...new Set(predictions.map((p) => p.categoryId))],
-    [predictions],
-  );
-  const filters: FeedFilter[] = categories.map((categoryId) => ({
-    id: String(categoryId),
-    label: `Category ${categoryId}`,
-    value: String(categoryId),
+  const categories = useMemo(() => {
+    // Get unique categories (by ID) from predictions
+    const categoryMap = new Map();
+    predictions.forEach((p) => {
+      if (p.category && !categoryMap.has(p.category.id)) {
+        categoryMap.set(p.category.id, p.category);
+      }
+    });
+    return Array.from(categoryMap.values());
+  }, [predictions]);
+
+  const filters: FeedFilter[] = categories.map((category) => ({
+    id: String(category.id),
+    label: `${category.icon || ''} ${category.name}`.trim(),
+    value: String(category.id),
     active: false,
   }));
 

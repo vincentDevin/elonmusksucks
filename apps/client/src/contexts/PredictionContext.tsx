@@ -40,6 +40,15 @@ type ExtendedOption = PublicPredictionOption & {
 };
 import { useAuth } from './AuthContext';
 
+// ---- Source data type for modal ----
+export interface PredictionSourceData {
+  type: 'article' | 'tweet';
+  id: string;
+  title: string;
+  url: string;
+  publisher: string;
+}
+
 // ---- Context shape ----
 interface Ctx {
   predictions: PredictionView[];
@@ -53,6 +62,12 @@ interface Ctx {
   placeParlay: (payload: { legs: { optionId: number }[]; amount: number }) => Promise<void>;
   latestBet: BetWithUser | null;
   latestParlay: ParlayLegWithUser | null;
+
+  /* Create Modal State */
+  createModalOpen: boolean;
+  createModalSourceData: PredictionSourceData | null;
+  openCreateModal: (sourceData?: PredictionSourceData) => void;
+  closeCreateModal: () => void;
 }
 
 const PredictionCtx = createContext<Ctx | undefined>(undefined);
@@ -146,6 +161,22 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
 
   const [latestBet] = useState<BetWithUser | null>(null);
   const [latestParlay, setLatestParlay] = useState<ParlayLegWithUser | null>(null);
+
+  // ── Create Modal State ────────────────────────────────────────────────────
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [createModalSourceData, setCreateModalSourceData] = useState<PredictionSourceData | null>(
+    null,
+  );
+
+  const openCreateModal = useCallback((sourceData?: PredictionSourceData) => {
+    setCreateModalSourceData(sourceData || null);
+    setCreateModalOpen(true);
+  }, []);
+
+  const closeCreateModal = useCallback(() => {
+    setCreateModalOpen(false);
+    setCreateModalSourceData(null);
+  }, []);
 
   // ── Initial fetch ─────────────────────────────────────────────────────────
   const fetchAll = useCallback(async () => {
@@ -487,6 +518,10 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
       placeParlay,
       latestBet,
       latestParlay,
+      createModalOpen,
+      createModalSourceData,
+      openCreateModal,
+      closeCreateModal,
     }),
     [
       predictions,
@@ -498,6 +533,10 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
       placeParlay,
       latestBet,
       latestParlay,
+      createModalOpen,
+      createModalSourceData,
+      openCreateModal,
+      closeCreateModal,
     ],
   );
 

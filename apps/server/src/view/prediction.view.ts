@@ -1,4 +1,4 @@
-import type { PredictionView } from '@ems/types';
+import type { PredictionView, PrismaCategory } from '@ems/types';
 
 /**
  * Maps database prediction result to standardized PredictionView DTO
@@ -9,6 +9,7 @@ export const toPredictionView = (prediction: {
   title: string;
   description: string;
   categoryId: number | null; // UPDATED: Use categoryId instead of category string
+  category?: PrismaCategory | null; // Include full category object
   type: any; // PredictionType enum
   threshold: number | null;
   createdAt: Date;
@@ -54,6 +55,7 @@ export const toPredictionView = (prediction: {
   title: prediction.title,
   description: prediction.description,
   categoryId: prediction.categoryId, // UPDATED: Use categoryId instead of category string
+  category: prediction.category || null, // Include full category object
   status: prediction.resolved ? 'RESOLVED' : prediction.approved ? 'APPROVED' : 'PENDING',
   type: prediction.type,
   threshold: prediction.threshold,

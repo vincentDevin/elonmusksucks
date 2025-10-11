@@ -5,7 +5,7 @@
  */
 
 import type { PublicPrediction, PublicPredictionOption } from '../../database/prediction';
-import type { BetWithUser } from '../../prisma';
+import type { BetWithUser, PrismaCategory } from '../../prisma';
 
 // ============================================================================
 // API-Specific Types
@@ -53,6 +53,7 @@ export interface PredictionView {
   title: string;
   description: string;
   categoryId: number | null; // Nullable as per Prisma schema
+  category?: PrismaCategory | null; // Full category object from relation
   categoryName?: string; // Optional category name if we want to include it
   status: string; // 'PENDING' | 'APPROVED' | 'RESOLVED'
   type: string;
@@ -93,6 +94,7 @@ export interface PredictionView {
 // ============================================================================
 
 export interface PredictionFull extends PublicPrediction {
+  category?: PrismaCategory | null; // Full category object from relation
   options: PublicPredictionOption[];
   bets: BetWithUser[];
   parlayLegs?: ParlayLegWithUser[];

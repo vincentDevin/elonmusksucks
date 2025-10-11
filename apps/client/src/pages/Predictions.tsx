@@ -13,24 +13,19 @@ import PredictionDetailView from '../components/prediction/PredictionDetailView'
 import { FloatingParlayIndicator } from '../components/prediction/ParlaySelectionIndicator';
 
 // Existing components
-import CreatePredictionForm from '../components/prediction/CreatePredictionForm';
 import PredictionCard from '../components/prediction/PredictionCard';
 import PredictionSectionCard from '../components/prediction/PredictionSectionCard';
-import PredictionAnalyticsInsights from '../components/prediction/PredictionAnalyticsInsights';
 
 // Hooks and contexts
 import { usePredictionDiscovery } from '../hooks/usePredictionDiscovery';
-import { usePredictionMarket } from '../contexts/PredictionContext';
 import { useEventBusCore } from '../contexts/EventBusCoreContext';
 import { useParlay } from '../contexts/ParlayContext';
-import { useAuth } from '../contexts/AuthContext';
 
 // Icons
 import {
   Squares2X2Icon as Grid,
   ListBulletIcon as List,
   SquaresPlusIcon as Layers,
-  PlusIcon as Plus,
   ArrowTrendingUpIcon as TrendingUp,
   BellIcon as Bell,
 } from '@heroicons/react/24/outline';
@@ -41,8 +36,6 @@ type ViewMode = 'sections' | 'list' | 'grid';
 export default function Predictions() {
   const navigate = useNavigate();
   const { id: predictionId } = useParams<{ id: string }>();
-  const { user } = useAuth();
-  const { createPrediction } = usePredictionMarket();
   const { state: parlayState, dispatch: parlayDispatch } = useParlay();
   const { subscribe } = useEventBusCore();
 
@@ -61,7 +54,6 @@ export default function Predictions() {
   } = usePredictionDiscovery();
 
   // State management
-  const [creating, setCreating] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [showParlayBuilder, setShowParlayBuilder] = useState(true);
   const [liveNotifications, setLiveNotifications] = useState<any[]>([]);
@@ -222,19 +214,12 @@ export default function Predictions() {
           <p className="text-tertiary mb-6">
             Try adjusting your filters or check back later for new predictions.
           </p>
-          {filters.categories.length > 0 || filters.search ? (
+          {(filters.categories.length > 0 || filters.search) && (
             <button
               onClick={clearFilters}
               className="px-6 py-2 bg-primary text-surface rounded-lg hover:bg-primary-hover"
             >
               Clear All Filters
-            </button>
-          ) : (
-            <button
-              onClick={() => setCreating(true)}
-              className="px-6 py-2 bg-primary text-surface rounded-lg hover:bg-primary-hover"
-            >
-              Create First Prediction
             </button>
           )}
         </div>
@@ -431,7 +416,8 @@ export default function Predictions() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="bg-surface border-b border-border sticky top-0 z-20">
-        <div className="px-6 py-4 max-w-[1800px] mx-auto">
+        <div className="px-6 py-4 max-w-[1800px] mx-auto space-y-4">
+          {/* Title Row */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <h1 className="text-2xl font-bold text-content flex items-center gap-2">
@@ -507,84 +493,23 @@ export default function Predictions() {
                   </div>
                 </div>
               )}
-
-              {/* Create Prediction Button */}
-              {user?.role === 'ADMIN' && (
-                <button
-                  onClick={() => setCreating(!creating)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
-                    creating
-                      ? 'bg-error text-surface hover:bg-error/90'
-                      : 'bg-primary text-surface hover:bg-primary-hover'
-                  }`}
-                >
-                  <Plus className={`w-4 h-4 transition-transform ${creating ? 'rotate-45' : ''}`} />
-                  <span className="hidden sm:inline">
-                    {creating ? 'Cancel' : 'Create Prediction'}
-                  </span>
-                </button>
-              )}
             </div>
           </div>
+
+          {/* Filters Row */}
+          <EnhancedPredictionFilters
+            filters={filters}
+            availableCategories={availableCategories}
+            onFiltersChange={updateFilters}
+            onClearFilters={clearFilters}
+            totalResults={enhancedPredictions.length}
+            layout="horizontal"
+          />
         </div>
       </div>
-
-      {/* Create Form */}
-      {creating && (
-        <div className="bg-surface/50 border-b border-border">
-          <div className="px-6 py-6 max-w-[1400px] mx-auto">
-            <div className="max-w-4xl mx-auto">
-              <CreatePredictionForm
-                onCreated={async (input) => {
-                  // Convert string date to Date object for local API
-                  const payload = {
-                    ...input,
-                    expiresAt: new Date(input.expiresAt),
-                  };
-                  await createPrediction(payload);
-                  setCreating(false);
-                  toast.success('Prediction created successfully!');
-                }}
-                onCancel={() => setCreating(false)}
-              />
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Main Content */}
-      <div className="px-6 py-6 max-w-[1800px] mx-auto">
-        <div
-          className={`${isMobile ? 'space-y-4' : 'grid grid-cols-1 xl:grid-cols-5 2xl:grid-cols-6 gap-8'}`}
-        >
-          {/* Enhanced Filters Sidebar */}
-          <div className={`${isMobile ? 'w-full' : 'xl:col-span-1 2xl:col-span-1'}`}>
-            <div className="sticky top-24 space-y-4">
-              <EnhancedPredictionFilters
-                filters={filters}
-                availableCategories={availableCategories}
-                onFiltersChange={updateFilters}
-                onClearFilters={clearFilters}
-                totalResults={enhancedPredictions.length}
-                isMobile={isMobile}
-              />
-
-              {/* Analytics Insights */}
-              <PredictionAnalyticsInsights
-                compact={isMobile}
-                onCategorySelect={(category) => {
-                  updateFilters({ categories: [category] });
-                }}
-              />
-            </div>
-          </div>
-
-          {/* Predictions List - More space on wide screens */}
-          <div className={`${isMobile ? 'w-full' : 'xl:col-span-4 2xl:col-span-5'}`}>
-            {renderPredictions()}
-          </div>
-        </div>
-      </div>
+      <div className="px-6 py-6 max-w-[1800px] mx-auto">{renderPredictions()}</div>
 
       {/* Floating Parlay Builder */}
       {parlayState.legs.length > 0 && showParlayBuilder && (
