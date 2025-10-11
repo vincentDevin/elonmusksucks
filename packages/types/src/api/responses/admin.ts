@@ -253,9 +253,12 @@ export interface ShameWallEntryView {
   id: number;
   userId: number;
   userName: string;
+  avatarUrl?: string | null;
   reason: string;
   startDate: string; // Date → ISO
   endDate: string | null; // Date → ISO (null for permanent)
+  isActive: boolean;
+  banCount: number;
   moderatorId: number;
   moderatorName: string;
   shameAchievements: Array<{

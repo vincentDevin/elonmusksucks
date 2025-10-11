@@ -4,16 +4,15 @@ import api from './axios';
 export interface ShameWallEntry {
   userId: number;
   userName: string;
-  avatarUrl?: string;
+  avatarUrl?: string | null;
   reason: string;
   startDate: string;
-  endDate?: string;
+  endDate?: string | null;
   isActive: boolean;
   shameAchievements: Array<{
-    slug: string;
     title: string;
     description: string;
-    awardedAt: string;
+    icon: string;
   }>;
   banCount: number;
 }

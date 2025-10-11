@@ -22,14 +22,8 @@ export const QuickThemeSwitcher: React.FC<QuickThemeSwitcherProps> = ({
   hideOnMobile = true,
 }) => {
   const location = useLocation();
-  const {
-    currentTheme,
-    getThemesByCategory,
-    setTheme,
-    setThemeCategory,
-    toggleLightDark,
-    loading,
-  } = useUnifiedTheme();
+  const { currentTheme, getThemesByCategory, setTheme, toggleLightDark, loading } =
+    useUnifiedTheme();
 
   const [isOpen, setIsOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState<ThemeCategory>(currentTheme.category);
@@ -45,8 +39,8 @@ export const QuickThemeSwitcher: React.FC<QuickThemeSwitcherProps> = ({
       return 'bottom-[160px] right-8';
     }
     return {
-      'bottom-right': 'bottom-4 right-4',
-      'bottom-left': 'bottom-4 left-4',
+      'bottom-right': 'bottom-2 right-4',
+      'bottom-left': 'bottom-2 left-4',
       'top-right': 'top-4 right-4',
       'top-left': 'top-4 left-4',
     }[position];
@@ -76,8 +70,8 @@ export const QuickThemeSwitcher: React.FC<QuickThemeSwitcherProps> = ({
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={`
-          ${isOnDashboard ? 'w-12 h-12' : 'w-12 h-12'} rounded-full shadow-lg transition-all duration-200
-          flex items-center justify-center
+          ${isOnDashboard ? 'w-12 h-12' : 'w-12 h-12'} rounded-full transition-all duration-200
+          flex items-center justify-center backdrop-blur-sm
           ${
             isOpen
               ? 'bg-primary text-white rotate-180'
@@ -85,8 +79,13 @@ export const QuickThemeSwitcher: React.FC<QuickThemeSwitcherProps> = ({
                 ? 'bg-accent text-white hover:bg-accent/90'
                 : 'bg-surface text-content hover:bg-muted'
           }
-          ${isOnDashboard ? '' : 'border border-muted'} hover:shadow-xl hover:scale-110
+          border-2 ${isOpen ? 'border-primary/60' : 'border-primary/40'}
+          hover:scale-110
         `}
+        style={{
+          boxShadow:
+            '0 0 20px color-mix(in srgb, var(--color-primary) 30%, transparent), 0 4px 6px rgba(0, 0, 0, 0.1)',
+        }}
         aria-label="Quick theme switcher"
         title="Change theme"
       >
@@ -106,11 +105,15 @@ export const QuickThemeSwitcher: React.FC<QuickThemeSwitcherProps> = ({
           <div
             className={`
             absolute ${getPanelPositionClasses()}
-            bg-surface border border-muted rounded-xl shadow-xl
+            bg-surface border-2 border-primary/40 rounded-xl backdrop-blur-sm
             p-4 w-80 max-h-96 overflow-y-auto
             transform transition-all duration-300
             ${isOpen ? 'scale-100 opacity-100' : 'scale-95 opacity-0 pointer-events-none'}
           `}
+            style={{
+              boxShadow:
+                '0 0 20px color-mix(in srgb, var(--color-primary) 30%, transparent), 0 10px 25px rgba(0, 0, 0, 0.15)',
+            }}
           >
             {/* Header */}
             <div className="flex items-center justify-between mb-4">

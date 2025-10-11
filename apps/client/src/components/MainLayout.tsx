@@ -14,19 +14,35 @@ export default function MainLayout({ children }: MainLayoutProps) {
       <NavBar />
       <ActivityFeed />
 
-      {/* Main content is below NavBar, but above fixed ChatBar */}
+      {/* Main content is below NavBar, but above fixed widgets */}
       <div className="relative flex-1">
         {/* Always full-width - pages control their own layout */}
         <main className="w-full">{children}</main>
       </div>
-      <div className="fixed bottom-0 left-0 right-0 z-50 pointer-events-none">
+
+      {/* ========================================
+          Site-Wide Widget Drawer
+          ========================================
+          Unified area for all floating widgets:
+          - ChatBar (centered, expandable)
+          - QuickThemeSwitcher (bottom-right, circular)
+          - Future widgets can be added here
+      ======================================== */}
+
+      {/* Chat Bar - Centered at bottom */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 pointer-events-none">
         <div className="flex justify-center pointer-events-auto">
           <ChatBar />
         </div>
       </div>
 
-      {/* Quick Theme Switcher - Available on all pages */}
+      {/* Quick Theme Switcher - Bottom Right (has its own fixed positioning) */}
       <QuickThemeSwitcher position="bottom-right" hideOnMobile={false} />
+
+      {/* Future widgets can be added here, e.g.:
+      <NotificationWidget position="bottom-left" hideOnMobile={false} />
+      <HelpWidget position="top-right" hideOnMobile={true} />
+      */}
     </div>
   );
 }

@@ -202,13 +202,15 @@ export function CompactLeaderboardHeader({
       {/* Controls Row */}
       {(visibleGroups.length > 0 || controlBarConfig.actions.length > 0) && (
         <div className="border-t border-muted/50 bg-surface/30 px-4 py-3">
-          <div className="flex items-center justify-between gap-4">
-            {/* Left: Filter Controls */}
+          <div
+            className={`flex items-center gap-4 ${controlBarConfig.actions.length > 0 ? 'justify-between' : 'justify-center'}`}
+          >
+            {/* Filter Controls */}
             {visibleGroups.length > 0 && (
-              <div className="flex items-end space-x-4">
+              <div className="flex items-end flex-wrap gap-4">
                 {visibleGroups.map((group, idx) => (
                   <div key={idx}>
-                    {group.options.length > 4 ? (
+                    {group.options.length > 8 ? (
                       <FilterDropdown group={group} />
                     ) : (
                       <FilterButtonGroup group={group} variant={variant} />

@@ -171,49 +171,7 @@ export default function Leaderboard() {
     const baseConfig: ControlBarConfig = {
       variant,
       filterGroups,
-      actions: [
-        {
-          label: 'Refresh',
-          icon: ArrowPathIcon,
-          onClick: () => {
-            if (activeTab === 'betting') refresh();
-            else if (activeTab === 'pong') {
-              const fetchPong = async () => {
-                setPongLoading(true);
-                try {
-                  const response = await fetch(`/api/leaderboard/pong/${pongMetric}?limit=50`);
-                  const data = await response.json();
-                  setPongLeaderboard(data);
-                } catch (err) {
-                  setPongError(err instanceof Error ? err.message : 'Failed to refresh');
-                } finally {
-                  setPongLoading(false);
-                }
-              };
-              fetchPong();
-            } else if (activeTab === 'shame') {
-              const fetchShame = async () => {
-                setShameWallLoading(true);
-                try {
-                  const [wallData, statsData] = await Promise.all([
-                    getShameWall(),
-                    getShameWallStats(),
-                  ]);
-                  setShameWall(wallData);
-                  setShameWallStats(statsData);
-                } catch (err) {
-                  setShameWallError(err instanceof Error ? err.message : 'Failed to refresh');
-                } finally {
-                  setShameWallLoading(false);
-                }
-              };
-              fetchShame();
-            }
-          },
-          loading: loading || pongLoading || shameWallLoading,
-          variant: 'secondary' as const,
-        },
-      ],
+      actions: [],
     };
 
     // Add tab-specific filters

@@ -267,17 +267,11 @@ export function LeaderboardEntry({
         {entry.variant === 'shame' && entry.rawData && 'reason' in entry.rawData && (
           <div className="mt-6">
             {/* Ban Reason */}
-            <div className="p-4 bg-red-50 rounded-lg border border-red-200 mb-4">
-              <h4 className="text-base font-semibold text-red-800 mb-2">Reason for Ban:</h4>
-              <p className="text-red-700 text-base">{entry.rawData.reason}</p>
-            </div>
-
-            {/* Ban Details */}
-            <div className="text-base text-tertiary space-y-2">
-              <div>Banned: {new Date(entry.rawData.startDate).toLocaleDateString()}</div>
-              {entry.rawData.endDate && (
-                <div>Until: {new Date(entry.rawData.endDate).toLocaleDateString()}</div>
-              )}
+            <div className="p-4 bg-red-500/10 rounded-lg border border-red-500/30">
+              <h4 className="text-base font-semibold text-red-600 dark:text-red-400 mb-2">
+                Reason for Ban:
+              </h4>
+              <p className="text-content text-base">{entry.rawData.reason}</p>
             </div>
           </div>
         )}

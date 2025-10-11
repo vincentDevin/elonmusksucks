@@ -215,6 +215,7 @@ export function transformPongEntry(
  */
 export function transformShameEntry(entry: ShameWallEntry): UnifiedLeaderboardEntry {
   const isPermanent = !entry.endDate;
+  const banCount = entry.banCount ?? 1; // Default to 1 if undefined
 
   return {
     id: entry.userId,
@@ -229,8 +230,8 @@ export function transformShameEntry(entry: ShameWallEntry): UnifiedLeaderboardEn
     secondaryStats: [
       {
         label: 'Ban Count',
-        value: entry.banCount.toString(),
-        highlight: entry.banCount > 1,
+        value: banCount.toString(),
+        highlight: banCount > 1,
       },
       {
         label: 'Banned Since',
@@ -255,10 +256,10 @@ export function transformShameEntry(entry: ShameWallEntry): UnifiedLeaderboardEn
         text: isPermanent ? 'Permanent Ban' : 'Temporary Ban',
         color: isPermanent ? 'bg-red-100 text-red-800' : 'bg-orange-100 text-orange-800',
       },
-      ...(entry.banCount > 1
+      ...(banCount > 1
         ? [
             {
-              text: `${entry.banCount} bans`,
+              text: `${banCount} bans`,
               color: 'bg-gray-100 text-gray-600',
             },
           ]

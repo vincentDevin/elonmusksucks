@@ -8,9 +8,12 @@ export const toShameWallEntryView = (entry: {
   id?: number;
   userId: number;
   userName: string;
+  avatarUrl?: string | null;
   reason: string;
   startDate: Date | string;
   endDate?: Date | string | null;
+  isActive: boolean;
+  banCount: number;
   moderatorId?: number;
   moderatorName?: string;
   shameAchievements?: Array<{
@@ -23,6 +26,7 @@ export const toShameWallEntryView = (entry: {
   id: entry.id || 0,
   userId: entry.userId,
   userName: entry.userName,
+  avatarUrl: entry.avatarUrl ?? null,
   reason: entry.reason,
   startDate: typeof entry.startDate === 'string' ? entry.startDate : entry.startDate.toISOString(),
   endDate: entry.endDate
@@ -30,6 +34,8 @@ export const toShameWallEntryView = (entry: {
       ? entry.endDate
       : entry.endDate.toISOString()
     : null,
+  isActive: entry.isActive,
+  banCount: entry.banCount,
   moderatorId: entry.moderatorId || 0,
   moderatorName: entry.moderatorName || 'System',
   shameAchievements: (entry.shameAchievements || []).map((achievement) => ({

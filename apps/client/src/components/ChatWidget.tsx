@@ -301,7 +301,7 @@ export default function ChatWidget({ mode = 'widget', className }: ChatWidgetPro
       >
         {/* Header Bar */}
         <div
-          className="flex items-center justify-between px-4 sm:px-6 py-2 bg-surface border-t border-muted shadow-md cursor-pointer"
+          className="flex items-center justify-between px-4 sm:px-6 bg-surface shadow-lg cursor-pointer backdrop-blur-sm"
           style={{
             borderTopLeftRadius: 14,
             borderTopRightRadius: 14,
@@ -309,7 +309,10 @@ export default function ChatWidget({ mode = 'widget', className }: ChatWidgetPro
             borderBottomRightRadius: expanded ? 0 : 14,
             marginBottom: expanded ? 0 : 10,
             width: '100%',
-            minHeight: 48,
+            height: 48,
+            border: '2px solid color-mix(in srgb, var(--color-primary) 40%, transparent)',
+            boxShadow:
+              '0 0 20px color-mix(in srgb, var(--color-primary) 30%, transparent), 0 4px 6px rgba(0, 0, 0, 0.1)',
           }}
           onClick={() => setExpanded((v) => !v)}
         >
@@ -354,11 +357,23 @@ export default function ChatWidget({ mode = 'widget', className }: ChatWidgetPro
 
         {/* Chat content */}
         <div
-          className="transition-all duration-200 flex flex-col"
+          className="transition-all duration-200 flex flex-col backdrop-blur-sm"
           style={{
             height: expanded ? 460 : 0,
             background: 'var(--color-surface)',
-            boxShadow: expanded ? '0 -6px 24px 0 rgb(0 0 0 / 0.14)' : undefined,
+            boxShadow: expanded
+              ? '0 0 20px color-mix(in srgb, var(--color-primary) 30%, transparent), 0 -6px 24px 0 rgb(0 0 0 / 0.14)'
+              : undefined,
+            borderLeft: expanded
+              ? '2px solid color-mix(in srgb, var(--color-primary) 40%, transparent)'
+              : undefined,
+            borderRight: expanded
+              ? '2px solid color-mix(in srgb, var(--color-primary) 40%, transparent)'
+              : undefined,
+            borderBottom: expanded
+              ? '2px solid color-mix(in srgb, var(--color-primary) 40%, transparent)'
+              : undefined,
+            borderTop: 'none',
             borderBottomLeftRadius: 14,
             borderBottomRightRadius: 14,
             width: '100%',
