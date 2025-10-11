@@ -2,6 +2,7 @@
 import { MessageRepository } from '../repositories/MessageRepository';
 import type { MessageWithUser } from '../repositories/interfaces/IMessageRepository';
 import { eventBus } from '../lib/EventBus';
+import { sanitizeChatMessage } from '../utils/sanitize';
 
 const repo = new MessageRepository();
 
@@ -122,8 +123,15 @@ function detectThreadParticipation(
  */
 export async function createMessage(userId: number, roomId: number, content: string) {
   try {
-    // Create the message first
-    const message = await repo.createMessage(userId, roomId, content);
+    // Sanitize content first (XSS protection - chat should be plain text only)
+    const sanitizedContent = sanitizeChatMessage(content);
+
+    if (!sanitizedContent || sanitizedContent.trim().length === 0) {
+      throw new Error('Message content cannot be empty');
+    }
+
+    // Create the message with sanitized content
+    const message = await repo.createMessage(userId, roomId, sanitizedContent);
 
     // Get recent messages for thread detection (in background, don't block message creation)
     setImmediate(async () => {
@@ -131,7 +139,7 @@ export async function createMessage(userId: number, roomId: number, content: str
         const recentMessages = await repo.getRecentMessages(roomId, 10);
 
         // 1. Extract and track emoji usage
-        const emojis = extractEmojis(content);
+        const emojis = extractEmojis(sanitizedContent);
         if (emojis.length > 0) {
           // Track each unique emoji used
           for (const emoji of emojis) {
@@ -144,7 +152,7 @@ export async function createMessage(userId: number, roomId: number, content: str
                 messageId: message.id,
                 roomId,
                 emoji,
-                content: content.substring(0, 100), // Truncated for privacy
+                content: sanitizedContent.substring(0, 100), // Truncated for privacy
                 context: 'chat_message',
               },
             });
@@ -157,7 +165,7 @@ export async function createMessage(userId: number, roomId: number, content: str
 
         // 2. Detect thread participation
         const threadInfo = detectThreadParticipation(
-          content,
+          sanitizedContent,
           recentMessages.filter((m) => m.id !== message.id),
         );
         if (threadInfo.isThread) {
@@ -171,7 +179,7 @@ export async function createMessage(userId: number, roomId: number, content: str
               roomId,
               threadType: threadInfo.threadType,
               relatedMessageIds: threadInfo.relatedMessageIds,
-              content: content.substring(0, 100), // Truncated for privacy
+              content: sanitizedContent.substring(0, 100), // Truncated for privacy
               participantCount: threadInfo.relatedMessageIds?.length || 0,
             },
           });
@@ -188,7 +196,7 @@ export async function createMessage(userId: number, roomId: number, content: str
           metadata: {
             messageId: message.id,
             roomId,
-            contentLength: content.length,
+            contentLength: sanitizedContent.length,
             emojiCount: emojis.length,
             isThread: threadInfo.isThread,
             threadType: threadInfo.threadType,
@@ -208,12 +216,12 @@ export async function createMessage(userId: number, roomId: number, content: str
           payload: {
             messageId: message.id,
             roomId,
-            contentLength: content.length,
+            contentLength: sanitizedContent.length,
             emojiCount: emojis.length,
             hasEmojis: emojis.length > 0,
             isThread: threadInfo.isThread,
             threadType: threadInfo.threadType,
-            messageContent: content.substring(0, 50), // Very short snippet for context
+            messageContent: sanitizedContent.substring(0, 50), // Very short snippet for context
           },
         });
       } catch (trackingError) {

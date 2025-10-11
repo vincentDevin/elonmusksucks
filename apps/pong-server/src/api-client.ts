@@ -1,5 +1,6 @@
 import axios, { AxiosError } from 'axios';
 import { MatchResult } from '@ems/types';
+import env from './config/env';
 
 // ============================================================================
 // API Request/Response Types
@@ -55,8 +56,9 @@ export class PongApiClient {
   private gameServerSecret: string;
 
   constructor() {
-    this.baseUrl = process.env.API_BASE_URL || 'http://127.0.0.1:5000/api/pong';
-    this.gameServerSecret = process.env.GAME_SERVER_SECRET || 'pong-internal-secret-2024';
+    // Use validated environment variables (no fallbacks - will crash on startup if missing)
+    this.baseUrl = env.API_BASE_URL;
+    this.gameServerSecret = env.GAME_SERVER_SECRET;
   }
 
   private async request<TResponse, TRequest = unknown>(

@@ -11,6 +11,7 @@ import type {
 } from '@ems/types';
 import { NotFoundError, ForbiddenError, ValidationError } from '../errors';
 import { unifiedActivityService } from './unifiedActivity.service';
+import { sanitizePostContent, sanitizeWithMonitoring } from '../utils/sanitize';
 
 const userService = new UserService();
 
@@ -37,12 +38,15 @@ export class PostService {
       parentId?: number | null;
     },
   ): Promise<DbUserFeedContent> {
+    // Sanitize content first (XSS protection)
+    const sanitizedContent = sanitizeWithMonitoring(data.content, authorId, 'post:create');
+
     // Validate content
-    if (!data.content || data.content.trim().length === 0) {
+    if (!sanitizedContent || sanitizedContent.trim().length === 0) {
       throw new ValidationError('Post content cannot be empty');
     }
 
-    if (data.content.length > 500) {
+    if (sanitizedContent.length > 500) {
       throw new ValidationError('Post content cannot exceed 500 characters');
     }
 
@@ -64,15 +68,15 @@ export class PostService {
       }
     }
 
-    // Extract mentions and hashtags
-    const mentions = this.extractMentions(data.content);
-    const hashtags = this.extractHashtags(data.content);
+    // Extract mentions and hashtags from sanitized content
+    const mentions = this.extractMentions(sanitizedContent);
+    const hashtags = this.extractHashtags(sanitizedContent);
 
-    // Create the post using Content model
+    // Create the post using Content model with sanitized content
     const content = await this.contentRepository.createContent({
       authorId,
       type: 'POST' as PrismaContentType,
-      body: data.content,
+      body: sanitizedContent, // Use sanitized content
       visibility: (data.visibility || 'PUBLIC') as PostVisibility,
       mediaUrls: data.mediaUrls,
       linkPreview: data.linkPreview,
@@ -112,11 +116,14 @@ export class PostService {
    * Update a post (edit)
    */
   async updatePost(postId: number, authorId: number, content: string): Promise<DbUserFeedContent> {
-    if (!content || content.trim().length === 0) {
+    // Sanitize content first (XSS protection)
+    const sanitizedContent = sanitizeWithMonitoring(content, authorId, 'post:update');
+
+    if (!sanitizedContent || sanitizedContent.trim().length === 0) {
       throw new ValidationError('Post content cannot be empty');
     }
 
-    if (content.length > 500) {
+    if (sanitizedContent.length > 500) {
       throw new ValidationError('Post content cannot exceed 500 characters');
     }
 
@@ -129,7 +136,11 @@ export class PostService {
       throw new ForbiddenError('Cannot edit this post');
     }
 
-    const updatedPost = await this.contentRepository.updateContent(postId, authorId, content);
+    const updatedPost = await this.contentRepository.updateContent(
+      postId,
+      authorId,
+      sanitizedContent, // Use sanitized content
+    );
     if (!updatedPost) {
       throw new Error('Failed to update post');
     }

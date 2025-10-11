@@ -3,11 +3,24 @@
 import axios from 'axios';
 import { requestManager } from '../lib/requestManager';
 import { devMetrics } from '../lib/metrics';
+import env from '../config/env';
 // CSRF Note: SPA uses JWT Bearer tokens for authentication, providing equivalent CSRF protection
 
+/**
+ * Axios instance for API requests
+ *
+ * SECURITY: Authentication using JWT Bearer tokens
+ * - Access tokens sent in Authorization header (not cookies)
+ * - Refresh tokens stored in HTTP-only cookies by server
+ * - Bearer tokens provide CSRF protection (cannot be sent by malicious sites)
+ *
+ * ENVIRONMENT CONFIGURATION:
+ * - Development: baseURL = '' (uses Vite proxy at localhost:3000)
+ * - Production: baseURL = VITE_API_BASE_URL (e.g., https://api.elonmusksucks.net)
+ */
 const api = axios.create({
-  baseURL: '', // ← purely relative
-  withCredentials: true, // ← still send cookies along
+  baseURL: env.API_BASE_URL, // Development: '' (Vite proxy), Production: full URL
+  withCredentials: true, // ← still send cookies along (for refresh token)
   headers: { 'Content-Type': 'application/json' },
 });
 

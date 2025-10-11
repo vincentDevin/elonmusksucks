@@ -5,9 +5,13 @@ import path from 'path';
 const envFile = process.env.NODE_ENV === 'test' ? '.env.test' : '.env';
 dotenv.config({ path: path.resolve(__dirname, '../../..', envFile) });
 
+// Validate environment variables immediately (fail fast if misconfigured)
+import env from './config/env';
+
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import helmet from 'helmet';
 import http from 'http';
 import { initSocket } from './socket';
 import authRoutes from './routes/auth.routes';
@@ -29,17 +33,88 @@ import postRoutes from './routes/post.routes';
 
 const app = express();
 
-// Dynamically reflect request origin for development
+// ══════════════════════════════════════════════════════════════════════════════
+// Security Middleware - Configure First
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Helmet - Security headers protection
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"], // Allow inline styles for React
+        scriptSrc: ["'self'"],
+        imgSrc: ["'self'", 'data:', 'https://fly.storage.tigris.dev'],
+        connectSrc: [
+          "'self'",
+          env.BASE_URL_SERVER,
+          env.BASE_URL_CLIENT,
+          env.BASE_URL_PUBLIC,
+          'ws://localhost:*',
+          'wss://*', // WebSocket connections
+        ],
+        fontSrc: ["'self'", 'data:'],
+        objectSrc: ["'none'"],
+        mediaSrc: ["'self'"],
+        frameSrc: ["'none'"],
+      },
+    },
+    hsts: {
+      maxAge: 31536000, // 1 year
+      includeSubDomains: true,
+      preload: env.NODE_ENV === 'production',
+    },
+    frameguard: {
+      action: 'deny', // Prevent clickjacking
+    },
+    noSniff: true, // Prevent MIME sniffing
+    xssFilter: true, // Enable XSS filter
+    referrerPolicy: {
+      policy: 'strict-origin-when-cross-origin',
+    },
+  }),
+);
+
+// HTTPS redirect for production
+if (env.NODE_ENV === 'production') {
+  app.use((req, res, next) => {
+    if (req.header('x-forwarded-proto') !== 'https') {
+      return res.redirect(`https://${req.header('host')}${req.url}`);
+    }
+    next();
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CORS Configuration
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Allowed origins - strict whitelist for production security
+const allowedOrigins = [env.CLIENT_APP_URL, env.BASE_URL_CLIENT, env.BASE_URL_PUBLIC].filter(
+  (url): url is string => Boolean(url),
+);
+
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (
-        !origin ||
-        origin.startsWith('http://localhost') ||
-        origin.startsWith('http://127.0.0.1')
-      ) {
+      // Allow requests with no origin (mobile apps, Postman, curl)
+      if (!origin) return callback(null, true);
+
+      // Check against whitelist
+      if (allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
+
+      // Development: Allow localhost on any port
+      if (env.NODE_ENV === 'development') {
+        if (origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1')) {
+          return callback(null, true);
+        }
+      }
+
+      // Reject all other origins
+      console.warn(`[CORS] Rejected origin: ${origin}`);
       callback(new Error('Not allowed by CORS'));
     },
     credentials: true,
@@ -48,7 +123,11 @@ app.use(
   }),
 );
 
-app.use(express.json());
+// ══════════════════════════════════════════════════════════════════════════════
+// Body Parsing Middleware
+// ══════════════════════════════════════════════════════════════════════════════
+
+app.use(express.json({ limit: '1mb' })); // Prevent large payload attacks
 app.use(cookieParser());
 
 // Health check endpoint (legacy - kept for backwards compatibility)
@@ -84,7 +163,6 @@ app.use((err: any, _req: any, res: any, _next: any) => {
 
 // Start server only if this file is run directly
 if (require.main === module) {
-  const PORT = parseInt(process.env.PORT ?? '5000', 10);
   // Create HTTP server and bind Express app
   const server = http.createServer(app);
 
@@ -93,8 +171,8 @@ if (require.main === module) {
     console.error('[socket] failed to initialize:', err);
   });
 
-  server.listen(PORT, '127.0.0.1', () => {
-    console.log(`Server & socket running on http://127.0.0.1:${PORT}`);
+  server.listen(env.PORT, '127.0.0.1', () => {
+    console.log(`Server & socket running on http://127.0.0.1:${env.PORT}`);
   });
 }
 

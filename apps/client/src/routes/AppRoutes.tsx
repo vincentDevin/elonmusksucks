@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { Suspense, lazy } from 'react';
 import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import env from '../config/env';
 import Login from '../pages/Login';
 import Register from '../pages/Register';
 import ForgotPassword from '../pages/ForgotPassword';
@@ -23,7 +24,8 @@ const Pong = lazy(() => import('../pages/Pong'));
 // Redirect to public site component
 const PublicSiteRedirect = () => {
   React.useEffect(() => {
-    window.location.href = 'http://127.0.0.1:5173';
+    const publicSiteUrl = env.PUBLIC_SITE_URL || 'http://localhost:5173';
+    window.location.href = publicSiteUrl;
   }, []);
 
   return (

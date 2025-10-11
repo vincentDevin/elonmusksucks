@@ -3,6 +3,13 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 import './index.css';
 
+// ══════════════════════════════════════════════════════════════════════════════
+// Environment Validation
+// ══════════════════════════════════════════════════════════════════════════════
+// Import environment configuration to validate on startup
+// This will throw an error if required environment variables are missing
+import './config/env';
+
 // Apply theme immediately from localStorage to prevent flash
 (() => {
   try {

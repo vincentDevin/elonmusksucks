@@ -12,15 +12,15 @@ import {
   getAIPlayerById,
   getAllAIPlayers,
 } from '../controllers/pong.controller';
+import env from '../config/env';
 
 const router = Router();
 
 // Internal auth middleware - verify requests from game servers
 const verifyGameServerAuth = (req: any, res: any, next: any) => {
   const gameServerSecret = req.headers['x-game-server-secret'];
-  const expectedSecret = process.env.GAME_SERVER_SECRET || 'pong-internal-secret-2024';
 
-  if (gameServerSecret !== expectedSecret) {
+  if (gameServerSecret !== env.GAME_SERVER_SECRET) {
     res.status(401).json({ error: 'Unauthorized game server request' });
     return;
   }

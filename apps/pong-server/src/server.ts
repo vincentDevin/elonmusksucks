@@ -1,9 +1,25 @@
 import 'dotenv/config';
+
+// Validate environment variables immediately (fail fast if misconfigured)
+import env from './config/env';
+
 import express from 'express';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import cors from 'cors';
+import helmet from 'helmet';
 import { PongApiClient } from './api-client';
+import { SocketRateLimiter } from './middleware/socketRateLimiter';
+import { validatePayload } from './middleware/payloadValidator';
+import {
+  validateCreateMatch,
+  validateJoinMatch,
+  validatePlayerInput,
+  validatePlayerReady,
+  validateSpectateMatch,
+  validateAuth,
+} from './validation/socketValidation';
+import { securityLogger } from './utils/securityLogger';
 import {
   Player,
   GameState,
@@ -1243,12 +1259,37 @@ class GameManager {
 export class PongGameServer {
   private app = express();
   private server = createServer(this.app);
+
+  // Allowed origins - strict whitelist for production security
+  private allowedOrigins = [env.CLIENT_APP_URL, env.BASE_URL_CLIENT].filter(Boolean);
+
   private io = new SocketIOServer(this.server, {
     cors: {
-      origin:
-        process.env.NODE_ENV === 'production'
-          ? process.env.CLIENT_URL || 'https://elonmusksucks.net'
-          : ['http://localhost:3000', 'http://127.0.0.1:3000'],
+      origin: (origin, callback) => {
+        // Allow requests with no origin (mobile apps, Postman, curl)
+        if (!origin) return callback(null, true);
+
+        // Check against whitelist
+        if (this.allowedOrigins.includes(origin)) {
+          return callback(null, true);
+        }
+
+        // Development: Allow localhost on any port
+        if (env.NODE_ENV === 'development') {
+          if (origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1')) {
+            return callback(null, true);
+          }
+        }
+
+        // Reject all other origins
+        console.warn(`[CORS] Rejected Socket.IO origin: ${origin}`);
+        securityLogger.log({
+          type: 'cors_violation',
+          socketId: 'unknown',
+          details: { origin, protocol: 'socket.io' },
+        });
+        callback(new Error('Not allowed by CORS'));
+      },
       credentials: true,
     },
   });
@@ -1258,6 +1299,7 @@ export class PongGameServer {
   private lobby = new LobbyManager();
   private stats = new StatisticsManager();
   private game = new GameManager(this.io, this.db, this.auth, this.stats);
+  private rateLimiter = new SocketRateLimiter();
   private statsInterval: NodeJS.Timeout | null = null;
 
   constructor() {
@@ -1267,10 +1309,97 @@ export class PongGameServer {
   }
 
   private setupMiddleware(): void {
-    this.app.use(cors());
-    this.app.use(express.json());
+    // ════════════════════════════════════════════════════════════════════════════
+    // Security Middleware - Configure First
+    // ════════════════════════════════════════════════════════════════════════════
 
-    // Health check
+    // Helmet - Security headers protection
+    this.app.use(
+      helmet({
+        contentSecurityPolicy: {
+          directives: {
+            defaultSrc: ["'self'"],
+            styleSrc: ["'self'", "'unsafe-inline'"], // Allow inline styles for React
+            scriptSrc: ["'self'"],
+            imgSrc: ["'self'", 'data:'],
+            connectSrc: ["'self'"],
+            fontSrc: ["'self'"],
+            objectSrc: ["'none'"],
+            mediaSrc: ["'self'"],
+            frameSrc: ["'none'"],
+          },
+        },
+        hsts: {
+          maxAge: 31536000, // 1 year
+          includeSubDomains: true,
+          preload: env.NODE_ENV === 'production',
+        },
+        frameguard: {
+          action: 'deny', // Prevent clickjacking
+        },
+        noSniff: true, // Prevent MIME sniffing
+        xssFilter: true, // Enable XSS filter
+        referrerPolicy: {
+          policy: 'strict-origin-when-cross-origin',
+        },
+      }),
+    );
+
+    // HTTPS redirect for production
+    if (env.NODE_ENV === 'production') {
+      this.app.use((req, res, next) => {
+        if (req.header('x-forwarded-proto') !== 'https') {
+          return res.redirect(`https://${req.header('host')}${req.url}`);
+        }
+        next();
+      });
+    }
+
+    // ════════════════════════════════════════════════════════════════════════════
+    // CORS Configuration
+    // ════════════════════════════════════════════════════════════════════════════
+
+    this.app.use(
+      cors({
+        origin: (origin, callback) => {
+          // Allow requests with no origin (mobile apps, Postman, curl)
+          if (!origin) return callback(null, true);
+
+          // Check against whitelist
+          if (this.allowedOrigins.includes(origin)) {
+            return callback(null, true);
+          }
+
+          // Development: Allow localhost on any port
+          if (env.NODE_ENV === 'development') {
+            if (origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1')) {
+              return callback(null, true);
+            }
+          }
+
+          // Reject all other origins
+          console.warn(`[CORS] Rejected HTTP origin: ${origin}`);
+          securityLogger.log({
+            type: 'cors_violation',
+            socketId: 'unknown',
+            details: { origin, protocol: 'http' },
+          });
+          callback(new Error('Not allowed by CORS'));
+        },
+        credentials: true,
+      }),
+    );
+
+    // ════════════════════════════════════════════════════════════════════════════
+    // Body Parsing Middleware
+    // ════════════════════════════════════════════════════════════════════════════
+
+    this.app.use(express.json({ limit: '100kb' })); // Prevent large payload attacks
+
+    // ════════════════════════════════════════════════════════════════════════════
+    // Health Check Endpoint
+    // ════════════════════════════════════════════════════════════════════════════
+
     this.app.get('/health', (_req, res) => {
       res.json({ status: 'ok', timestamp: new Date().toISOString() });
     });
@@ -1281,7 +1410,40 @@ export class PongGameServer {
       console.log(`🏓 Socket ${socket.id} connected`);
 
       // Authentication
-      socket.on('auth', async (data: ClientEvents['auth']) => {
+      socket.on('auth', async (data: unknown) => {
+        // Rate limiting
+        if (!this.rateLimiter.checkLimit(socket.id, 'auth')) {
+          socket.emit('error', { code: 'RATE_LIMIT', message: 'Too many auth attempts' });
+          securityLogger.log({
+            type: 'rate_limit',
+            socketId: socket.id,
+            details: { event: 'auth' },
+          });
+          return;
+        }
+
+        // Payload validation
+        if (!validatePayload(data, 'auth')) {
+          socket.emit('error', { code: 'INVALID_PAYLOAD', message: 'Invalid auth payload' });
+          securityLogger.log({
+            type: 'invalid_payload',
+            socketId: socket.id,
+            details: { event: 'auth' },
+          });
+          return;
+        }
+
+        // Input validation
+        if (!validateAuth(data)) {
+          socket.emit('error', { code: 'INVALID_INPUT', message: 'Invalid auth data' });
+          securityLogger.log({
+            type: 'invalid_input',
+            socketId: socket.id,
+            details: { event: 'auth' },
+          });
+          return;
+        }
+
         const player = await this.auth.authenticateSocket(socket.id, data.token);
         if (player) {
           console.log(`✅ Player ${player.name} (${player.id}) authenticated`);
@@ -1303,6 +1465,11 @@ export class PongGameServer {
         } else {
           console.log(`❌ Authentication failed for socket ${socket.id}`);
           socket.emit('auth_result', { success: false, error: 'Invalid token' });
+          securityLogger.log({
+            type: 'auth_failed',
+            socketId: socket.id,
+            details: {},
+          });
         }
       });
 
@@ -1317,15 +1484,40 @@ export class PongGameServer {
       });
 
       // Create match
-      socket.on('create_match', async (data: ClientEvents['create_match']) => {
-        const player = this.auth.getPlayer(socket.id);
-        if (!player) return;
-
-        // Validate match type
-        if (data.type !== 'ai' && data.type !== 'pvp') {
-          socket.emit('error', { code: 'INVALID_MATCH_TYPE', message: 'Invalid match type' });
+      socket.on('create_match', async (data: unknown) => {
+        // Rate limiting
+        if (!this.rateLimiter.checkLimit(socket.id, 'create_match')) {
+          socket.emit('error', { code: 'RATE_LIMIT', message: 'Too many match creation attempts' });
           return;
         }
+
+        // Payload validation
+        if (!validatePayload(data, 'create_match')) {
+          socket.emit('error', {
+            code: 'INVALID_PAYLOAD',
+            message: 'Invalid create_match payload',
+          });
+          securityLogger.log({
+            type: 'invalid_payload',
+            socketId: socket.id,
+            details: { event: 'create_match' },
+          });
+          return;
+        }
+
+        // Input validation
+        if (!validateCreateMatch(data)) {
+          socket.emit('error', { code: 'INVALID_INPUT', message: 'Invalid match data' });
+          securityLogger.log({
+            type: 'invalid_input',
+            socketId: socket.id,
+            details: { event: 'create_match' },
+          });
+          return;
+        }
+
+        const player = this.auth.getPlayer(socket.id);
+        if (!player) return;
 
         // Validate AI difficulty for AI matches
         let validatedDifficulty: AIDifficulty = 'MEDIUM'; // default
@@ -1422,7 +1614,25 @@ export class PongGameServer {
       });
 
       // Join match
-      socket.on('join_match', async (data: ClientEvents['join_match']) => {
+      socket.on('join_match', async (data: unknown) => {
+        // Rate limiting
+        if (!this.rateLimiter.checkLimit(socket.id, 'join_match')) {
+          socket.emit('error', { code: 'RATE_LIMIT', message: 'Too many join attempts' });
+          return;
+        }
+
+        // Payload validation
+        if (!validatePayload(data, 'join_match')) {
+          socket.emit('error', { code: 'INVALID_PAYLOAD', message: 'Invalid join_match payload' });
+          return;
+        }
+
+        // Input validation
+        if (!validateJoinMatch(data)) {
+          socket.emit('error', { code: 'INVALID_INPUT', message: 'Invalid match ID' });
+          return;
+        }
+
         const player = this.auth.getPlayer(socket.id);
         if (!player) return;
 
@@ -1496,7 +1706,28 @@ export class PongGameServer {
       });
 
       // Player ready
-      socket.on('player_ready', async (data: ClientEvents['player_ready']) => {
+      socket.on('player_ready', async (data: unknown) => {
+        // Rate limiting
+        if (!this.rateLimiter.checkLimit(socket.id, 'player_ready')) {
+          socket.emit('error', { code: 'RATE_LIMIT', message: 'Too many ready toggles' });
+          return;
+        }
+
+        // Payload validation
+        if (!validatePayload(data, 'player_ready')) {
+          socket.emit('error', {
+            code: 'INVALID_PAYLOAD',
+            message: 'Invalid player_ready payload',
+          });
+          return;
+        }
+
+        // Input validation
+        if (!validatePlayerReady(data)) {
+          socket.emit('error', { code: 'INVALID_INPUT', message: 'Invalid ready state' });
+          return;
+        }
+
         const player = this.auth.getPlayer(socket.id);
         if (!player) return;
 
@@ -1504,7 +1735,24 @@ export class PongGameServer {
       });
 
       // Player input
-      socket.on('player_input', (data: ClientEvents['player_input']) => {
+      socket.on('player_input', (data: unknown) => {
+        // Rate limiting
+        if (!this.rateLimiter.checkLimit(socket.id, 'player_input')) {
+          // Don't emit error for input rate limiting - just drop the input silently
+          // (emitting errors would slow down the game loop)
+          return;
+        }
+
+        // Payload validation (lightweight for performance)
+        if (!validatePayload(data, 'player_input')) {
+          return; // Silently drop invalid payloads for performance
+        }
+
+        // Input validation
+        if (!validatePlayerInput(data)) {
+          return; // Silently drop invalid input for performance
+        }
+
         const player = this.auth.getPlayer(socket.id);
         if (!player) return;
 
@@ -1534,7 +1782,28 @@ export class PongGameServer {
       });
 
       // Spectate match
-      socket.on('spectate_match', (data: ClientEvents['spectate_match']) => {
+      socket.on('spectate_match', (data: unknown) => {
+        // Rate limiting
+        if (!this.rateLimiter.checkLimit(socket.id, 'spectate_match')) {
+          socket.emit('error', { code: 'RATE_LIMIT', message: 'Too many spectate attempts' });
+          return;
+        }
+
+        // Payload validation
+        if (!validatePayload(data, 'spectate_match')) {
+          socket.emit('error', {
+            code: 'INVALID_PAYLOAD',
+            message: 'Invalid spectate_match payload',
+          });
+          return;
+        }
+
+        // Input validation
+        if (!validateSpectateMatch(data)) {
+          socket.emit('error', { code: 'INVALID_INPUT', message: 'Invalid game ID' });
+          return;
+        }
+
         const player = this.auth.getPlayer(socket.id);
         if (!player) return;
 
@@ -1593,6 +1862,9 @@ export class PongGameServer {
 
           // Track disconnected player in statistics
           this.stats.removeConnectedPlayer(player.id);
+
+          // Clean up rate limiting data
+          this.rateLimiter.resetSocket(socket.id);
 
           // Clean up authentication
           this.auth.disconnectSocket(socket.id);

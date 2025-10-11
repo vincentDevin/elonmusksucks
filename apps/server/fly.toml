@@ -1,0 +1,55 @@
+# fly.toml - Main Server (API Backend)
+# Using local build approach (Dockerfile.local)
+app = 'ems-api'
+primary_region = 'iad' # Change to your preferred region
+
+[build]
+  dockerfile = 'apps/server/Dockerfile.local'
+
+[env]
+  NODE_ENV = 'production'
+  PORT = '5000'
+
+[http_service]
+  internal_port = 5000
+  force_https = true
+  auto_stop_machines = false  # Keep at least 1 machine running
+  auto_start_machines = true
+  min_machines_running = 1    # Minimum for production availability
+  processes = ['app']
+
+[[http_service.checks]]
+  grace_period = '10s'
+  interval = '30s'
+  method = 'GET'
+  timeout = '5s'
+  path = '/health'
+
+[[vm]]
+  size = 'shared-cpu-1x'  # 1 shared CPU, 256MB RAM (upgrade for production)
+  memory = '256mb'
+  cpus = 1
+
+# PostgreSQL connection (using Fly.io internal DNS)
+[[services]]
+  protocol = 'tcp'
+  internal_port = 5000
+
+  [[services.ports]]
+    port = 80
+    handlers = ['http']
+    force_https = true
+
+  [[services.ports]]
+    port = 443
+    handlers = ['tls', 'http']
+
+  [[services.tcp_checks]]
+    interval = '15s'
+    timeout = '2s'
+    grace_period = '5s'
+
+# Restart policy
+[restart]
+  policy = 'on-failure'
+  max_retries = 3

@@ -2,6 +2,7 @@
 import { useEffect } from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import env from '../config/env';
 
 type GuardMode = 'route' | 'component' | 'external';
 
@@ -28,11 +29,7 @@ export default function PrivateRoute({
   // External redirect mode (original AuthGuard behavior)
   useEffect(() => {
     if (mode === 'external' && !loading && !accessToken) {
-      const redirectUrl =
-        fallbackUrl ||
-        (process.env.NODE_ENV === 'production'
-          ? 'https://public.elonmusksucks.net'
-          : 'http://127.0.0.1:5173');
+      const redirectUrl = fallbackUrl || env.PUBLIC_SITE_URL || 'http://localhost:5173';
       window.location.href = redirectUrl;
     }
   }, [accessToken, loading, fallbackUrl, mode]);
