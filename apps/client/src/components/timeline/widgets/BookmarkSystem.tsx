@@ -50,6 +50,7 @@ interface BookmarkSystemProps {
   onBookmarkChange?: (isBookmarked: boolean) => void;
   onBookmarkClick?: (articleId: number) => void;
   className?: string;
+  isExpanded?: boolean;
 }
 
 export const BookmarkSystem: React.FC<BookmarkSystemProps> = ({
@@ -60,6 +61,7 @@ export const BookmarkSystem: React.FC<BookmarkSystemProps> = ({
   onBookmarkChange,
   onBookmarkClick,
   className = '',
+  isExpanded = true, // Default to true for backwards compatibility
 }) => {
   const { user } = useAuth();
   const { isBookmarked: checkIsBookmarked, requestBookmarkCheck, setBookmarked } = useBookmarks();
@@ -70,6 +72,7 @@ export const BookmarkSystem: React.FC<BookmarkSystemProps> = ({
   const [showCreateCollection, setShowCreateCollection] = useState(false);
   const [newCollectionName, setNewCollectionName] = useState('');
   const [loading, setLoading] = useState(false);
+  const [hasHydrated, setHasHydrated] = useState(false);
   const [filter, setFilter] = useState<'all' | 'recent' | 'articles' | 'posts'>('all');
 
   // Extract numeric article ID for batched bookmark checking
@@ -100,6 +103,8 @@ export const BookmarkSystem: React.FC<BookmarkSystemProps> = ({
 
   // Fetch bookmarks and collections for manager and widget variants
   useEffect(() => {
+    // Lazy load: Only fetch when expanded and not yet hydrated
+    if (!isExpanded || hasHydrated) return;
     if ((variant !== 'manager' && variant !== 'widget') || !user) return;
 
     const fetchBookmarksAndCollections = async () => {
@@ -187,11 +192,12 @@ export const BookmarkSystem: React.FC<BookmarkSystemProps> = ({
         ]);
       } finally {
         setLoading(false);
+        setHasHydrated(true);
       }
     };
 
     fetchBookmarksAndCollections();
-  }, [variant, user]);
+  }, [variant, user, isExpanded, hasHydrated]);
 
   // Toggle bookmark
   const handleToggleBookmark = async () => {
@@ -440,36 +446,39 @@ export const BookmarkSystem: React.FC<BookmarkSystemProps> = ({
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-semibold text-content flex items-center space-x-2">
             <BookmarkIcon className="w-5 h-5" />
-            <span>Bookmarks</span>
+            <span>Bookmarks {bookmarks.length > 0 && `(${bookmarks.length})`}</span>
           </h3>
-          <span className="text-xs text-tertiary">{bookmarks.length} saved</span>
         </div>
 
-        {bookmarks.length === 0 ? (
-          <p className="text-sm text-tertiary">No bookmarks yet</p>
-        ) : (
-          <div className="space-y-2">
-            {bookmarks.slice(0, 3).map((bookmark) => (
-              <div
-                key={bookmark.id}
-                className="text-sm p-2 rounded hover:bg-hover transition-colors cursor-pointer"
-                onClick={() => {
-                  const articleId = parseInt(bookmark.contentId);
-                  if (!isNaN(articleId) && onBookmarkClick) {
-                    onBookmarkClick(articleId);
-                  }
-                }}
-              >
-                <p className="font-medium text-content truncate">{bookmark.title}</p>
-                <p className="text-xs text-tertiary">{formatTimeAgo(bookmark.createdAt)}</p>
+        {isExpanded && (
+          <>
+            {bookmarks.length === 0 ? (
+              <p className="text-sm text-tertiary">No bookmarks yet</p>
+            ) : (
+              <div className="space-y-2">
+                {bookmarks.slice(0, 3).map((bookmark) => (
+                  <div
+                    key={bookmark.id}
+                    className="text-sm p-2 rounded hover:bg-hover transition-colors cursor-pointer"
+                    onClick={() => {
+                      const articleId = parseInt(bookmark.contentId);
+                      if (!isNaN(articleId) && onBookmarkClick) {
+                        onBookmarkClick(articleId);
+                      }
+                    }}
+                  >
+                    <p className="font-medium text-content truncate">{bookmark.title}</p>
+                    <p className="text-xs text-tertiary">{formatTimeAgo(bookmark.createdAt)}</p>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
+            )}
 
-        <button className="w-full mt-3 text-xs text-primary hover:text-primary/80 transition-colors">
-          View all bookmarks →
-        </button>
+            <button className="w-full mt-3 text-xs text-primary hover:text-primary/80 transition-colors">
+              View all bookmarks →
+            </button>
+          </>
+        )}
       </div>
     );
   }

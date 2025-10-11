@@ -365,6 +365,7 @@ export default function Timeline() {
                       limit={expandedWidgets.trending ? 12 : 3}
                       onItemClick={handleTrendingItemClick}
                       onHashtagClick={handleHashtagClick}
+                      isExpanded={expandedWidgets.trending}
                     />
                     <div className="absolute top-3 right-4 pointer-events-none">
                       {expandedWidgets.trending ? (
@@ -382,7 +383,10 @@ export default function Timeline() {
                       className="absolute inset-x-0 top-0 h-14 cursor-pointer z-10 rounded-t-lg hover:bg-muted/5 transition-colors"
                       title={expandedWidgets.activity ? 'Click to collapse' : 'Click to expand'}
                     />
-                    <ActivitySummary variant={expandedWidgets.activity ? 'full' : 'compact'} />
+                    <ActivitySummary
+                      variant={expandedWidgets.activity ? 'full' : 'compact'}
+                      isExpanded={expandedWidgets.activity}
+                    />
                     <div className="absolute top-4 right-4 pointer-events-none">
                       {expandedWidgets.activity ? (
                         <ChevronUpIcon className="w-5 h-5 text-tertiary group-hover:text-primary transition-colors" />
@@ -402,6 +406,7 @@ export default function Timeline() {
                     <BookmarkSystem
                       variant={expandedWidgets.bookmarks ? 'manager' : 'widget'}
                       onBookmarkClick={handleBookmarkClick}
+                      isExpanded={expandedWidgets.bookmarks}
                     />
                     <div className="absolute top-[1.125rem] right-4 pointer-events-none">
                       {expandedWidgets.bookmarks ? (
