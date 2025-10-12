@@ -4,11 +4,12 @@
 // -----------------------------------------------------------------------------
 
 import DOMPurify from 'isomorphic-dompurify';
+import type { Config } from 'dompurify';
 
 /**
  * Sanitization configuration profiles
  */
-const SANITIZE_CONFIG = {
+const SANITIZE_CONFIG: Record<string, Config> = {
   // Strict: Only plain text, no HTML allowed
   PLAIN_TEXT: {
     ALLOWED_TAGS: [],
@@ -31,7 +32,7 @@ const SANITIZE_CONFIG = {
     // Force safe link handling
     ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto|tel):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
   },
-} as const;
+};
 
 /**
  * Sanitize user input to prevent XSS attacks

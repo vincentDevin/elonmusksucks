@@ -1,12 +1,26 @@
-import type { LandingPageProps } from '../types';
+import type {
+  PredictionView,
+  LeaderboardEntryView,
+  UnifiedActivityEvent,
+  PublicArticle,
+  PublicPostView,
+} from '@ems/types';
 import StatsDisplay from './StatsDisplay';
 import TrendingPreview from './TrendingPreview';
 import LeaderboardPreview from './LeaderboardPreview';
 import ActivityPreview from './ActivityPreview';
 import TimelinePreview from './TimelinePreview';
 
+interface LandingPageProps {
+  trendingData: PredictionView[] | null;
+  leaderboardData: LeaderboardEntryView[] | null;
+  activityData: UnifiedActivityEvent[] | null;
+  articlesData: PublicArticle[] | null;
+  postsData: PublicPostView[] | null;
+  clientAppUrl: string;
+}
+
 export default function LandingPage({
-  marketData,
   trendingData,
   leaderboardData,
   activityData,
@@ -14,20 +28,12 @@ export default function LandingPage({
   postsData,
   clientAppUrl,
 }: LandingPageProps) {
-  // Transform market data for stats display
-  const stats = marketData
-    ? {
-        totalPredictions: marketData.activeMarkets || 0,
-        activeUsers: marketData.totalUsers || 0,
-        muskBucksInCirculation: marketData.totalVolume
-          ? `${(marketData.totalVolume / 1000000).toFixed(1)}M`
-          : '0',
-      }
-    : {
-        totalPredictions: 247,
-        activeUsers: 1423,
-        muskBucksInCirculation: '12.8M',
-      };
+  // Calculate stats from actual data
+  const stats = {
+    totalPredictions: trendingData?.length || 0,
+    activeUsers: leaderboardData?.length || 0,
+    muskBucksInCirculation: '0', // We don't have this data anymore
+  };
 
   return (
     <div className="bg-background text-content min-h-screen">

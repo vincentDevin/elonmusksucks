@@ -1,26 +1,18 @@
-import type { ServerData } from '../types';
+import type { PublicArticle, PublicPostView } from '@ems/types';
+
+interface ServerData {
+  articlesData: PublicArticle[] | null;
+  postsData: PublicPostView[] | null;
+  clientAppUrl: string;
+}
 
 export default function TimelinePage({ articlesData, postsData, clientAppUrl }: ServerData) {
   const articles = Array.isArray(articlesData) ? articlesData : [];
   const posts = Array.isArray(postsData) ? postsData : [];
 
-  // Combine and sort by timestamp
-  const timelineItems = [
-    ...articles.map((article) => ({
-      ...article,
-      itemType: 'article' as const,
-      sortTime: new Date(article.timestamp).getTime(),
-    })),
-    ...posts.map((post) => ({
-      ...post,
-      itemType: 'post' as const,
-      sortTime: new Date(post.createdAt).getTime(),
-    })),
-  ].sort((a, b) => b.sortTime - a.sortTime);
-
-  const getRelativeTime = (timestamp: string) => {
+  const getRelativeTime = (timestamp: string | Date) => {
     const now = new Date();
-    const time = new Date(timestamp);
+    const time = timestamp instanceof Date ? timestamp : new Date(timestamp);
     const diffMs = now.getTime() - time.getTime();
     const diffMins = Math.floor(diffMs / (1000 * 60));
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
@@ -104,64 +96,100 @@ export default function TimelinePage({ articlesData, postsData, clientAppUrl }: 
     </article>
   );
 
-  const renderPost = (post: any) => (
-    <article
-      key={post.id}
-      className="bg-surface rounded-lg p-6 shadow hover:shadow-lg transition-shadow"
-    >
-      <div className="flex items-start space-x-4">
-        <img
-          src={post.authorAvatar}
-          alt={post.authorName}
-          className="w-12 h-12 rounded-full object-cover"
-          onError={(e) => {
-            const target = e.target as HTMLImageElement;
-            target.src = 'https://i.pravatar.cc/150?img=1';
-          }}
-        />
+  const renderPost = (post: PublicPostView) => {
+    const avatarUrl = post.author?.avatarUrl || undefined;
+    const authorName = post.author?.name || 'Unknown';
+    const commentsCount = post.commentsCount || post.repliesCount || 0;
+    const reactionsCount = post.reactionsCount || 0;
+    const viewsCount = typeof post.viewsCount === 'string' ? parseInt(post.viewsCount) || 0 : 0;
+    const sharesCount = post.sharesCount || 0;
 
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center space-x-2 mb-2">
-            <span className="text-xs font-medium text-success bg-success/10 border border-success/20 px-2 py-1 rounded">
-              Community Post
-            </span>
-            <span className="font-medium text-content">{post.authorName}</span>
-            <span className="text-xs text-tertiary">{getRelativeTime(post.createdAt)}</span>
-          </div>
+    return (
+      <article
+        key={post.id}
+        className="bg-surface rounded-lg p-6 shadow hover:shadow-lg transition-shadow"
+      >
+        <div className="flex items-start space-x-4">
+          {avatarUrl ? (
+            <img
+              src={avatarUrl}
+              alt={authorName}
+              className="w-12 h-12 rounded-full object-cover"
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                target.style.display = 'none';
+              }}
+            />
+          ) : (
+            <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
+              {authorName.charAt(0).toUpperCase()}
+            </div>
+          )}
 
-          <div className="text-content mb-4 leading-relaxed">{post.content}</div>
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4 text-sm text-tertiary">
-              <span className="flex items-center space-x-1">
-                <span>❤️</span>
-                <span>{post.likesCount}</span>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center space-x-2 mb-2">
+              <span className="text-xs font-medium text-success bg-success/10 border border-success/20 px-2 py-1 rounded">
+                Community Post
               </span>
-              <span className="flex items-center space-x-1">
-                <span>💬</span>
-                <span>{post.commentsCount}</span>
-              </span>
-              <span className="flex items-center space-x-1">
-                <span>🔄</span>
-                <span>{post.sharesCount}</span>
-              </span>
-              <span className="flex items-center space-x-1">
-                <span>👀</span>
-                <span>{post.viewsCount}</span>
-              </span>
+              <span className="font-medium text-content">{authorName}</span>
+              <span className="text-xs text-tertiary">{getRelativeTime(post.createdAt)}</span>
             </div>
 
-            <a
-              href={`${clientAppUrl}/login`}
-              className="px-3 py-1 text-xs border border-border text-content rounded hover:bg-muted/20 transition-colors"
-            >
-              Join Conversation
-            </a>
+            <div className="text-content mb-4 leading-relaxed whitespace-pre-wrap">{post.body}</div>
+
+            {post.mediaUrls && post.mediaUrls.length > 0 && (
+              <div className="grid grid-cols-2 gap-2 mb-4">
+                {post.mediaUrls.slice(0, 4).map((url, index) => (
+                  <img
+                    key={index}
+                    src={url}
+                    alt={`Post media ${index + 1}`}
+                    className="rounded-lg object-cover w-full h-48"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4 text-sm text-tertiary">
+                <span className="flex items-center space-x-1">
+                  <span>❤️</span>
+                  <span>{reactionsCount}</span>
+                </span>
+                <span className="flex items-center space-x-1">
+                  <span>💬</span>
+                  <span>{commentsCount}</span>
+                </span>
+                {sharesCount > 0 && (
+                  <span className="flex items-center space-x-1">
+                    <span>🔄</span>
+                    <span>{sharesCount}</span>
+                  </span>
+                )}
+                {viewsCount > 0 && (
+                  <span className="flex items-center space-x-1">
+                    <span>👀</span>
+                    <span>{viewsCount}</span>
+                  </span>
+                )}
+              </div>
+
+              <a
+                href={`${clientAppUrl}/login`}
+                className="px-3 py-1 text-xs border border-border text-content rounded hover:bg-muted/20 transition-colors"
+              >
+                Join Conversation
+              </a>
+            </div>
           </div>
         </div>
-      </div>
-    </article>
-  );
+      </article>
+    );
+  };
 
   return (
     <div className="bg-background text-content min-h-screen">
@@ -205,39 +233,74 @@ export default function TimelinePage({ articlesData, postsData, clientAppUrl }: 
             <div className="text-sm text-tertiary">Community Posts</div>
           </div>
           <div className="bg-surface rounded-lg p-4 shadow">
-            <div className="text-3xl font-bold text-secondary">{timelineItems.length}</div>
+            <div className="text-3xl font-bold text-secondary">
+              {articles.length + posts.length}
+            </div>
             <div className="text-sm text-tertiary">Total Updates</div>
           </div>
         </div>
 
-        {/* Timeline Feed */}
-        <div className="max-w-4xl mx-auto">
+        {/* Articles Feed */}
+        <div className="max-w-4xl mx-auto mb-12">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold">Recent Updates</h2>
+            <h2 className="text-2xl font-bold">📰 Latest Articles</h2>
+            <div className="flex items-center space-x-2">
+              <div className="w-2 h-2 bg-info rounded-full animate-pulse"></div>
+              <span className="text-sm text-tertiary">Live Feed</span>
+            </div>
+          </div>
+
+          {articles.length === 0 ? (
+            <div className="bg-surface rounded-lg p-12 text-center">
+              <div className="text-6xl mb-4">📰</div>
+              <h3 className="text-xl font-semibold mb-2">No articles yet</h3>
+              <p className="text-tertiary">Check back soon for the latest Musk news!</p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {articles.slice(0, 10).map((article) => renderArticle(article))}
+
+              {articles.length > 10 && (
+                <div className="bg-surface rounded-lg p-6 text-center">
+                  <p className="text-tertiary mb-4">
+                    Showing latest 10 articles. Join to see more and react!
+                  </p>
+                  <a
+                    href={`${clientAppUrl}/register`}
+                    className="inline-block px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary-hover font-semibold transition-colors"
+                  >
+                    Join the Community
+                  </a>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Community Posts Feed */}
+        <div className="max-w-4xl mx-auto mb-12">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold">💬 Community Posts</h2>
             <div className="flex items-center space-x-2">
               <div className="w-2 h-2 bg-success rounded-full animate-pulse"></div>
               <span className="text-sm text-tertiary">Live Feed</span>
             </div>
           </div>
 
-          {timelineItems.length === 0 ? (
+          {posts.length === 0 ? (
             <div className="bg-surface rounded-lg p-12 text-center">
-              <div className="text-6xl mb-4">📡</div>
-              <h3 className="text-xl font-semibold mb-2">No updates yet</h3>
-              <p className="text-tertiary">Check back soon for the latest Musk chaos!</p>
+              <div className="text-6xl mb-4">💬</div>
+              <h3 className="text-xl font-semibold mb-2">No community posts yet</h3>
+              <p className="text-tertiary">Be the first to share your thoughts!</p>
             </div>
           ) : (
             <div className="space-y-6">
-              {timelineItems
-                .slice(0, 20)
-                .map((item) =>
-                  item.itemType === 'article' ? renderArticle(item) : renderPost(item),
-                )}
+              {posts.slice(0, 10).map((post) => renderPost(post))}
 
-              {timelineItems.length > 20 && (
-                <div className="bg-surface rounded-lg p-8 text-center">
+              {posts.length > 10 && (
+                <div className="bg-surface rounded-lg p-6 text-center">
                   <p className="text-tertiary mb-4">
-                    Showing latest 20 updates. Join to see more and participate!
+                    Showing latest 10 posts. Join to see more and participate!
                   </p>
                   <a
                     href={`${clientAppUrl}/register`}

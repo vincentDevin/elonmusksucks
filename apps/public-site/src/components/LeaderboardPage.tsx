@@ -1,6 +1,16 @@
-import type { ServerData } from '../types';
+import type { LeaderboardEntryView, PongLeaderboardView } from '@ems/types';
 
-export default function LeaderboardPage({ fullLeaderboardData, clientAppUrl }: ServerData) {
+interface ServerData {
+  fullLeaderboardData: LeaderboardEntryView[] | null;
+  pongLeaderboardData: PongLeaderboardView[] | null;
+  clientAppUrl: string;
+}
+
+export default function LeaderboardPage({
+  fullLeaderboardData,
+  pongLeaderboardData,
+  clientAppUrl,
+}: ServerData) {
   const leaderboard = Array.isArray(fullLeaderboardData) ? fullLeaderboardData : [];
 
   const formatMuskBucks = (amount: string | number | bigint | undefined | null) => {
@@ -300,6 +310,100 @@ export default function LeaderboardPage({ fullLeaderboardData, clientAppUrl }: S
                     className="text-primary hover:underline font-medium"
                   >
                     View all {leaderboard.length} players →
+                  </a>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Pong Leaderboard */}
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold mb-6">🏓 Pong Champions</h2>
+
+          {!pongLeaderboardData || pongLeaderboardData.length === 0 ? (
+            <div className="bg-surface rounded-lg p-8 text-center">
+              <div className="text-6xl mb-4">🏓</div>
+              <h3 className="text-xl font-semibold mb-2">No pong rankings yet</h3>
+              <p className="text-tertiary">Be the first to play some pong!</p>
+            </div>
+          ) : (
+            <div className="bg-surface rounded-lg shadow overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-muted/50 border-b border-border">
+                    <tr>
+                      <th className="px-4 py-3 text-left font-semibold">Rank</th>
+                      <th className="px-4 py-3 text-left font-semibold">Player</th>
+                      <th className="px-4 py-3 text-right font-semibold">ELO</th>
+                      <th className="px-4 py-3 text-right font-semibold hidden md:table-cell">
+                        Tier
+                      </th>
+                      <th className="px-4 py-3 text-right font-semibold hidden md:table-cell">
+                        Games
+                      </th>
+                      <th className="px-4 py-3 text-right font-semibold">Win Rate</th>
+                      <th className="px-4 py-3 text-right font-semibold hidden lg:table-cell">
+                        Streak
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pongLeaderboardData.map((entry) => {
+                      const rank = entry.rank || 0;
+                      return (
+                        <tr
+                          key={entry.userId}
+                          className={`border-b border-border hover:bg-muted/20 transition-colors ${getRankStyle(rank)}`}
+                        >
+                          <td className="px-4 py-3">
+                            <div className="font-bold text-lg">{getRankIcon(rank)}</div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="font-medium">{entry.userName}</div>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <div className="font-bold text-primary">{entry.eloRating}</div>
+                          </td>
+                          <td className="px-4 py-3 text-right hidden md:table-cell">
+                            <div className="font-medium text-secondary">{entry.tier}</div>
+                          </td>
+                          <td className="px-4 py-3 text-right hidden md:table-cell">
+                            <div>
+                              {entry.wins}/{entry.gamesPlayed}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <div className="font-medium text-success">
+                              {entry.winRate.toFixed(1)}%
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-right hidden lg:table-cell">
+                            {entry.winStreak && entry.winStreak > 0 ? (
+                              <div className="inline-flex items-center space-x-1">
+                                <span className="text-warning">🔥</span>
+                                <span>{entry.winStreak}</span>
+                              </div>
+                            ) : entry.bestStreak && entry.bestStreak > 0 ? (
+                              <div className="text-xs text-tertiary">Best: {entry.bestStreak}</div>
+                            ) : (
+                              <div className="text-tertiary">-</div>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {pongLeaderboardData.length > 25 && (
+                <div className="p-4 bg-muted/30 text-center">
+                  <a
+                    href={`${clientAppUrl}/pong`}
+                    className="text-primary hover:underline font-medium"
+                  >
+                    View all {pongLeaderboardData.length} pong players →
                   </a>
                 </div>
               )}

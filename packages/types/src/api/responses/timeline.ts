@@ -167,3 +167,36 @@ export interface TrendingItem {
 export interface TrendingContentResponse {
   items: TrendingItem[];
 }
+
+// ============================================================================
+// Public Post View (for SSR / Public Timeline)
+// ============================================================================
+
+/**
+ * Public post view - serialized for public API consumption
+ * Dates are ISO strings, no authentication-specific data
+ */
+export interface PublicPostView {
+  id: number;
+  authorId: number;
+  type: string; // ContentType
+  body: string;
+  parentId: number | null;
+  threadDepth: number;
+  reactionsCount: number;
+  repliesCount: number;
+  commentsCount?: number; // Alias for repliesCount
+  createdAt: string; // ISO string
+  author: {
+    id: number;
+    name: string;
+    avatarUrl: string | null;
+  };
+  // Optional enriched fields
+  visibility?: string;
+  mediaUrls?: string[];
+  viewsCount?: string;
+  sharesCount?: number;
+  reactionCounts?: Record<string, number>;
+  userReaction?: string | null;
+}

@@ -7,17 +7,26 @@
     <title>Elon Musk Sucks - Prediction Market</title>
     <meta name="description" content="The world's most accurate Musk weather report. Predict the chaos, earn MuskBucks." />
     
-    <!-- Theme script to prevent flash -->
+    <!-- Theme script to prevent flash - Default dark theme -->
     <script>
       (function() {
         try {
-          const theme = localStorage.getItem('theme') || 'dark';
-          if (theme === 'dark' || theme.includes('dark')) {
+          // Check localStorage first
+          let theme = localStorage.getItem('theme');
+
+          // If no stored preference, default to dark theme
+          if (!theme) {
+            theme = 'dark';
+          }
+
+          // Apply theme class
+          if (theme === 'dark') {
             document.documentElement.classList.add('dark');
           } else {
             document.documentElement.classList.remove('dark');
           }
         } catch (e) {
+          // Fallback to dark theme on error
           document.documentElement.classList.add('dark');
         }
       })();

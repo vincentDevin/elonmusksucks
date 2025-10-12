@@ -1,4 +1,9 @@
-import type { ServerData } from '../types';
+import type { PredictionView } from '@ems/types';
+
+interface ServerData {
+  predictionsData: PredictionView[] | null;
+  clientAppUrl: string;
+}
 
 export default function PredictionsPage({ predictionsData, clientAppUrl }: ServerData) {
   const predictions = Array.isArray(predictionsData) ? predictionsData : [];
@@ -12,8 +17,8 @@ export default function PredictionsPage({ predictionsData, clientAppUrl }: Serve
     return `${odds.toFixed(1)}x`;
   };
 
-  const getTotalVolume = (prediction: any) => {
-    return prediction.bets.reduce((sum: number, bet: any) => sum + parseInt(bet.amount), 0);
+  const getTotalVolume = (prediction: PredictionView) => {
+    return prediction.bets.reduce((sum: number, bet) => sum + parseInt(bet.amount.toString()), 0);
   };
 
   const getTimeRemaining = (expiresAt: string) => {
@@ -114,9 +119,9 @@ export default function PredictionsPage({ predictionsData, clientAppUrl }: Serve
                       )}
                       <div className="flex items-center space-x-3">
                         <span
-                          className={`text-xs px-2 py-1 rounded-full border ${getCategoryColor(prediction.category)}`}
+                          className={`text-xs px-2 py-1 rounded-full border ${getCategoryColor(prediction.category?.name || 'Unknown')}`}
                         >
-                          {prediction.category}
+                          {prediction.category?.name || 'Unknown'}
                         </span>
                         <span className="text-xs text-tertiary">
                           ⏰ {getTimeRemaining(prediction.expiresAt)}

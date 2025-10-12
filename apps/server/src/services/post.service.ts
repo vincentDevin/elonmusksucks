@@ -11,7 +11,7 @@ import type {
 } from '@ems/types';
 import { NotFoundError, ForbiddenError, ValidationError } from '../errors';
 import { unifiedActivityService } from './unifiedActivity.service';
-import { sanitizePostContent, sanitizeWithMonitoring } from '../utils/sanitize';
+import { sanitizeWithMonitoring } from '../utils/sanitize';
 
 const userService = new UserService();
 
@@ -559,6 +559,54 @@ export class PostService {
 
     return {
       posts: result.content.map((content) => this.toFeedContent(content, options.viewerId)),
+      nextCursor: result.nextCursor,
+    };
+  }
+
+  /**
+   * Get public timeline (simplified for SSR site)
+   * Returns recent public posts without requiring authentication
+   */
+  async getPublicTimeline(
+    options: {
+      cursor?: number;
+      limit?: number;
+      sortBy?: 'recent' | 'trending';
+    } = {},
+  ): Promise<{ posts: DbUserFeedContent[]; nextCursor?: number }> {
+    const result = await this.contentRepository.getPublicTimeline({
+      cursor: options.cursor,
+      limit: options.limit || 20,
+      sortBy: options.sortBy || 'recent',
+    });
+
+    // Batch enrich user avatars
+    const authors = result.content.filter((c: any) => c.author).map((c: any) => c.author);
+    const enrichedAuthors = await userService.enrichUsersWithAvatars(authors);
+    const authorMap = new Map(enrichedAuthors.map((author) => [author.id, author]));
+
+    // Map enriched authors back to posts and convert to feed content
+    const posts = result.content.map((post: any) => {
+      let finalAuthor;
+
+      if (post.author) {
+        const enrichedUser = authorMap.get(post.author.id);
+        if (enrichedUser) {
+          finalAuthor = enrichedUser;
+        } else {
+          finalAuthor = post.author;
+        }
+      } else {
+        // Fallback if no author
+        finalAuthor = { id: post.authorId, name: 'Unknown', avatarUrl: null };
+      }
+
+      // Convert to DbUserFeedContent format with enriched author
+      return this.toFeedContent({ ...post, author: finalAuthor });
+    });
+
+    return {
+      posts,
       nextCursor: result.nextCursor,
     };
   }

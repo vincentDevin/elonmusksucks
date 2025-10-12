@@ -8,9 +8,30 @@ import rateLimit from 'express-rate-limit';
 import cors from 'cors';
 import morgan from 'morgan';
 import env from './src/config/env.js';
-import type { ServerData } from './src/types';
-import type { PredictionView, LeaderboardEntryView } from '@ems/types';
+import type {
+  PredictionView,
+  LeaderboardEntryView,
+  UnifiedActivityEvent,
+  PongLeaderboardView,
+  PublicArticle,
+  PublicPostView,
+} from '@ems/types';
 
+// ServerData interface for public site
+interface ServerData {
+  trendingData: PredictionView[] | null;
+  leaderboardData: LeaderboardEntryView[] | null;
+  pongLeaderboardData: PongLeaderboardView[] | null;
+  activityData: UnifiedActivityEvent[] | null;
+  articlesData: PublicArticle[] | null;
+  postsData: PublicPostView[] | null;
+  predictionsData: PredictionView[] | null;
+  fullLeaderboardData: LeaderboardEntryView[] | null;
+  clientAppUrl: string;
+  currentPath: string;
+}
+
+// ESM equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -68,8 +89,11 @@ async function createServer(): Promise<express.Application> {
           defaultSrc: ["'self'"],
           styleSrc: ["'self'", "'unsafe-inline'"], // Allow inline styles for SSR hydration
           scriptSrc: ["'self'", "'unsafe-inline'"], // Allow inline scripts for __SERVER_DATA__
-          imgSrc: ["'self'", 'data:', 'https://fly.storage.tigris.dev'],
-          connectSrc: ["'self'", env.API_BASE_URL, env.CLIENT_APP_URL],
+          imgSrc: ["'self'", 'data:', 'https:'], // Allow all HTTPS images (articles from external sources)
+          connectSrc:
+            env.NODE_ENV === 'development'
+              ? ["'self'", env.API_BASE_URL, env.CLIENT_APP_URL, 'ws:', 'wss:'] // Allow WebSocket for Vite HMR in dev
+              : ["'self'", env.API_BASE_URL, env.CLIENT_APP_URL],
           fontSrc: ["'self'"],
           objectSrc: ["'none'"],
           mediaSrc: ["'self'"],
@@ -109,8 +133,11 @@ async function createServer(): Promise<express.Application> {
           return callback(null, true);
         }
 
-        // Allow localhost in development
-        if (env.NODE_ENV === 'development' && origin.startsWith('http://localhost')) {
+        // Allow localhost and 127.0.0.1 in development (macOS compatibility)
+        if (
+          env.NODE_ENV === 'development' &&
+          (origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1'))
+        ) {
           return callback(null, true);
         }
 
@@ -133,7 +160,7 @@ async function createServer(): Promise<express.Application> {
     message: 'Too many requests from this IP, please try again later.',
     standardHeaders: true,
     legacyHeaders: false,
-    skip: (req) => {
+    skip: (_req) => {
       // Skip rate limiting in development
       return env.NODE_ENV === 'development';
     },
@@ -148,7 +175,7 @@ async function createServer(): Promise<express.Application> {
     message: 'Too many API requests, please try again later.',
     standardHeaders: true,
     legacyHeaders: false,
-    skip: (req) => env.NODE_ENV === 'development',
+    skip: (_req) => env.NODE_ENV === 'development',
   });
 
   // Create Vite server in middleware mode
@@ -165,9 +192,9 @@ async function createServer(): Promise<express.Application> {
   // ──────────────────────────────────────────────────────────────────────────
 
   app.use(
-    '/api/*',
+    '/api',
     apiProxyLimiter, // Apply stricter rate limit to API proxy
-    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    async (req: express.Request, res: express.Response, _next: express.NextFunction) => {
       try {
         // Construct target API URL using environment variable
         const apiUrl = `${env.API_BASE_URL}${req.originalUrl}`;
@@ -245,10 +272,10 @@ async function createServer(): Promise<express.Application> {
   );
 
   // ──────────────────────────────────────────────────────────────────────────
-  // SSR Handler
+  // SSR Handler (catch-all for SSR routes)
   // ──────────────────────────────────────────────────────────────────────────
 
-  app.use('*', async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  app.use(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const url = req.originalUrl;
 
     try {
@@ -316,12 +343,7 @@ async function createServer(): Promise<express.Application> {
   // ──────────────────────────────────────────────────────────────────────────
 
   app.use(
-    (
-      err: Error,
-      req: express.Request,
-      res: express.Response,
-      next: express.NextFunction, // eslint-disable-line @typescript-eslint/no-unused-vars
-    ) => {
+    (err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
       console.error('[ERROR]', {
         message: err.message,
         stack: err.stack,
@@ -357,9 +379,9 @@ async function fetchServerData(url: string): Promise<ServerData> {
 
   // Base server data structure
   const baseData: ServerData = {
-    marketData: null,
     trendingData: null,
     leaderboardData: null,
+    pongLeaderboardData: null,
     activityData: null,
     articlesData: null,
     postsData: null,
@@ -395,8 +417,12 @@ async function fetchServerData(url: string): Promise<ServerData> {
 
       // Get posts data for timeline preview
       if (postsRes.status === 'fulfilled' && postsRes.value.ok) {
-        const postsResponse = (await postsRes.value.json()) as { posts: unknown[] };
-        baseData.postsData = Array.isArray(postsResponse.posts) ? postsResponse.posts : null;
+        const postsResponse = (await postsRes.value.json()) as {
+          items: PublicPostView[];
+          nextCursor?: number;
+          hasMore: boolean;
+        };
+        baseData.postsData = Array.isArray(postsResponse.items) ? postsResponse.items : null;
       }
 
       // Get leaderboard data for preview
@@ -409,7 +435,7 @@ async function fetchServerData(url: string): Promise<ServerData> {
       if (activityRes.status === 'fulfilled' && activityRes.value.ok) {
         const activityResponse = (await activityRes.value.json()) as {
           success: boolean;
-          activities: unknown[];
+          activities: UnifiedActivityEvent[];
           count: number;
           cached: boolean;
         };
@@ -419,22 +445,13 @@ async function fetchServerData(url: string): Promise<ServerData> {
       // Get articles data for timeline preview - response has { items, pagination }
       if (articlesRes.status === 'fulfilled' && articlesRes.value.ok) {
         const articlesResponse = (await articlesRes.value.json()) as {
-          items: unknown[];
+          items: PublicArticle[];
           pagination: { cursor?: string; hasMore: boolean };
         };
         baseData.articlesData = Array.isArray(articlesResponse.items)
           ? articlesResponse.items
           : null;
       }
-
-      // Create market data from actual data
-      baseData.marketData = {
-        totalVolume: 12345678, // This would need a specific endpoint
-        activeMarkets: baseData.trendingData ? baseData.trendingData.length : 247,
-        totalUsers: baseData.leaderboardData ? baseData.leaderboardData.length * 50 : 1423,
-        volumeChange: 5.2,
-        trending: [],
-      };
     } else if (url === '/predictions') {
       // Predictions page
       const predictionsRes = await fetch(`${apiBaseUrl}/predictions`);
@@ -443,11 +460,20 @@ async function fetchServerData(url: string): Promise<ServerData> {
         baseData.predictionsData = Array.isArray(predictions) ? predictions : null;
       }
     } else if (url === '/leaderboard') {
-      // Leaderboard page
-      const leaderboardRes = await fetch(`${apiBaseUrl}/leaderboard`);
-      if (leaderboardRes.ok) {
-        const leaderboard = (await leaderboardRes.json()) as LeaderboardEntryView[];
+      // Leaderboard page - fetch both main and pong leaderboards
+      const [leaderboardRes, pongLeaderboardRes] = await Promise.allSettled([
+        fetch(`${apiBaseUrl}/leaderboard`),
+        fetch(`${apiBaseUrl}/leaderboard/pong/elo`),
+      ]);
+
+      if (leaderboardRes.status === 'fulfilled' && leaderboardRes.value.ok) {
+        const leaderboard = (await leaderboardRes.value.json()) as LeaderboardEntryView[];
         baseData.fullLeaderboardData = Array.isArray(leaderboard) ? leaderboard : null;
+      }
+
+      if (pongLeaderboardRes.status === 'fulfilled' && pongLeaderboardRes.value.ok) {
+        const pongLeaderboard = (await pongLeaderboardRes.value.json()) as PongLeaderboardView[];
+        baseData.pongLeaderboardData = Array.isArray(pongLeaderboard) ? pongLeaderboard : null;
       }
     } else if (url === '/timeline') {
       // Timeline page
@@ -458,7 +484,7 @@ async function fetchServerData(url: string): Promise<ServerData> {
 
       if (articlesRes.status === 'fulfilled' && articlesRes.value.ok) {
         const articlesResponse = (await articlesRes.value.json()) as {
-          items: unknown[];
+          items: PublicArticle[];
           pagination: { cursor?: string; hasMore: boolean };
         };
         baseData.articlesData = Array.isArray(articlesResponse.items)
@@ -466,8 +492,12 @@ async function fetchServerData(url: string): Promise<ServerData> {
           : null;
       }
       if (postsRes.status === 'fulfilled' && postsRes.value.ok) {
-        const postsResponse = (await postsRes.value.json()) as { posts: unknown[] };
-        baseData.postsData = Array.isArray(postsResponse.posts) ? postsResponse.posts : null;
+        const postsResponse = (await postsRes.value.json()) as {
+          items: PublicPostView[];
+          nextCursor?: number;
+          hasMore: boolean;
+        };
+        baseData.postsData = Array.isArray(postsResponse.items) ? postsResponse.items : null;
       }
     }
   } catch (error) {

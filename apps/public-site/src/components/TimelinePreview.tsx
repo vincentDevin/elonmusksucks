@@ -1,4 +1,11 @@
-import type { TimelinePreviewProps } from '../types';
+import type { PublicArticle, PublicPostView } from '@ems/types';
+
+interface TimelinePreviewProps {
+  articlesData: PublicArticle[] | null;
+  postsData: PublicPostView[] | null;
+  className?: string;
+  clientAppUrl: string;
+}
 
 export default function TimelinePreview({
   articlesData,
@@ -6,16 +13,18 @@ export default function TimelinePreview({
   className = '',
   clientAppUrl,
 }: TimelinePreviewProps) {
-  // Use fallback data if API data is not available
-  const articles = (Array.isArray(articlesData) ? articlesData : null) || [];
-  const posts = (Array.isArray(postsData) ? postsData : null) || [];
+  // No fallback data - show empty state if data is missing
+  const articles = Array.isArray(articlesData) ? articlesData : [];
+  const posts = Array.isArray(postsData) ? postsData : [];
 
   // Combine and sort by timestamp
   const timelineItems = [
     ...articles.map((article) => ({
       ...article,
       itemType: 'article' as const,
-      sortTime: new Date(article.timestamp).getTime(),
+      sortTime: new Date(
+        (article as any).timestamp || article.publishedAt || article.createdAt,
+      ).getTime(),
     })),
     ...posts.map((post) => ({
       ...post,
@@ -39,63 +48,81 @@ export default function TimelinePreview({
     return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(time);
   };
 
-  const renderArticle = (article: any) => (
-    <div
-      key={article.id}
-      className="flex space-x-3 p-4 border border-border rounded-lg hover:bg-muted/5 transition-colors"
-    >
-      <div className="text-2xl">📰</div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center space-x-2 mb-1">
-          <span className="text-xs font-medium text-info bg-info/10 border border-info/20 px-2 py-1 rounded">
-            Article
-          </span>
-          <span className="text-xs text-tertiary">by {article.content.author}</span>
-        </div>
-        <h3 className="font-medium text-content text-sm leading-snug mb-2">
-          {article.content.title}
-        </h3>
-        <p className="text-xs text-tertiary mb-2 line-clamp-2">{article.content.excerpt}</p>
-        <div className="flex items-center space-x-4 text-xs text-tertiary">
-          <span>👍 {article.engagement.reactions}</span>
-          <span>💬 {article.engagement.comments}</span>
-          <span>{getRelativeTime(article.timestamp)}</span>
+  const renderArticle = (article: any) => {
+    const timestamp = article.timestamp || article.publishedAt || article.createdAt;
+    return (
+      <div
+        key={article.id}
+        className="flex space-x-3 p-4 border border-border rounded-lg hover:bg-muted/5 transition-colors"
+      >
+        <div className="text-2xl">📰</div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center space-x-2 mb-1">
+            <span className="text-xs font-medium text-info bg-info/10 border border-info/20 px-2 py-1 rounded">
+              Article
+            </span>
+            <span className="text-xs text-tertiary">by {article.content?.author || 'Unknown'}</span>
+          </div>
+          <h3 className="font-medium text-content text-sm leading-snug mb-2">
+            {article.content?.title || article.title}
+          </h3>
+          <p className="text-xs text-tertiary mb-2 line-clamp-2">
+            {article.content?.excerpt || article.excerpt}
+          </p>
+          <div className="flex items-center space-x-4 text-xs text-tertiary">
+            <span>👍 {article.engagement?.reactions || 0}</span>
+            <span>💬 {article.engagement?.comments || 0}</span>
+            <span>{getRelativeTime(timestamp)}</span>
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
-  const renderPost = (post: any) => (
-    <div
-      key={post.id}
-      className="flex space-x-3 p-4 border border-border rounded-lg hover:bg-muted/5 transition-colors"
-    >
-      <img
-        src={post.authorAvatar}
-        alt={post.authorName}
-        className="w-8 h-8 rounded-full object-cover"
-        onError={(e) => {
-          const target = e.target as HTMLImageElement;
-          target.src = 'https://i.pravatar.cc/150?img=1';
-        }}
-      />
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center space-x-2 mb-1">
-          <span className="text-xs font-medium text-success bg-success/10 border border-success/20 px-2 py-1 rounded">
-            Post
-          </span>
-          <span className="font-medium text-sm text-content">{post.authorName}</span>
-        </div>
-        <p className="text-sm text-content mb-2">{post.content}</p>
-        <div className="flex items-center space-x-4 text-xs text-tertiary">
-          <span>❤️ {post.likesCount || 0}</span>
-          <span>💬 {post.commentsCount || 0}</span>
-          <span>🔄 {post.sharesCount || 0}</span>
-          <span>{getRelativeTime(post.createdAt)}</span>
+  const renderPost = (post: any) => {
+    const avatarUrl = post.author?.avatarUrl || undefined;
+    const authorName = post.author?.name || 'Unknown';
+    const commentsCount = post.commentsCount || post.repliesCount || 0;
+    const reactionsCount = post.reactionsCount || 0;
+
+    return (
+      <div
+        key={post.id}
+        className="flex space-x-3 p-4 border border-border rounded-lg hover:bg-muted/5 transition-colors"
+      >
+        {avatarUrl ? (
+          <img
+            src={avatarUrl}
+            alt={authorName}
+            className="w-8 h-8 rounded-full object-cover"
+            onError={(e) => {
+              const target = e.target as HTMLImageElement;
+              target.style.display = 'none';
+            }}
+          />
+        ) : (
+          <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-xs">
+            {authorName.charAt(0).toUpperCase()}
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center space-x-2 mb-1">
+            <span className="text-xs font-medium text-success bg-success/10 border border-success/20 px-2 py-1 rounded">
+              Post
+            </span>
+            <span className="font-medium text-sm text-content">{authorName}</span>
+          </div>
+          <p className="text-sm text-content mb-2 line-clamp-2 whitespace-pre-wrap">{post.body}</p>
+          <div className="flex items-center space-x-4 text-xs text-tertiary">
+            <span>❤️ {reactionsCount}</span>
+            <span>💬 {commentsCount}</span>
+            {post.sharesCount > 0 && <span>🔄 {post.sharesCount}</span>}
+            <span>{getRelativeTime(post.createdAt)}</span>
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   if (timelineItems.length === 0) {
     return (

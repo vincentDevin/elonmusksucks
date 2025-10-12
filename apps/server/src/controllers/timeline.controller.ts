@@ -15,6 +15,88 @@ const timelineService = new TimelineService();
 const userService = new UserService();
 
 /**
+ * Get articles only (for public site)
+ * GET /api/timeline/articles
+ */
+export async function getArticles(req: Request, res: Response) {
+  try {
+    const { limit = '30', cursor } = req.query;
+    const pageLimit = Math.min(parseInt(limit as string) || 30, 100);
+    const viewerId = (req as any).user?.id;
+
+    const cursorDate = cursor ? new Date(cursor as string) : undefined;
+
+    // Fetch articles only
+    const articles = await timelineService.getArticles({
+      cursor: cursorDate,
+      limit: pageLimit,
+    });
+
+    // Fetch reactions for all articles in bulk
+    const articleIds = articles.map((a: any) => a.id);
+    const articlesWithReactions = await timelineService.getArticlesWithReactions(
+      articleIds,
+      viewerId,
+    );
+
+    // Convert articles to response format with reaction data
+    const items = articles.map((article: any) => {
+      const reactionData = articlesWithReactions.get(article.id) || {
+        counts: {},
+        userReaction: undefined,
+        totalCount: 0,
+      };
+
+      return {
+        id: article.id,
+        feedId: article.feedId,
+        guid: article.guid,
+        url: article.url,
+        title: article.title,
+        excerpt: article.excerpt,
+        leadImageUrl: article.leadImageUrl,
+        publishedAt: article.publishedAt?.toISOString() || null,
+        timestamp: article.publishedAt?.toISOString() || article.createdAt.toISOString(),
+        status: article.status,
+        createdAt: article.createdAt.toISOString(),
+        updatedAt: article.updatedAt.toISOString(),
+        content: {
+          title: article.title,
+          excerpt: article.excerpt || undefined,
+          url: article.url,
+          imageUrl: article.leadImageUrl || null,
+          author: article.feed?.name,
+          source: article.feed?.siteUrl || undefined,
+        },
+        engagement: {
+          reactions: reactionData.totalCount,
+          comments: article.commentsCount || 0,
+        },
+        reactionCounts: reactionData.counts,
+        userReaction: reactionData.userReaction,
+        tags: Array.isArray(article.tags)
+          ? article.tags.map((t: any) => t.tag?.name || t.name || t).filter(Boolean)
+          : [],
+      };
+    });
+
+    const hasMore = articles.length === pageLimit;
+    const nextCursor = items.length > 0 ? items[items.length - 1].timestamp : undefined;
+
+    res.json({
+      items,
+      pagination: {
+        cursor: nextCursor,
+        hasMore,
+      },
+    });
+  } catch (error) {
+    console.error('[timeline] Error fetching articles:', error);
+    res.status(500).json({ error: 'Failed to fetch articles' });
+  }
+}
+
+/**
  * Get unified timeline (posts + articles)
  * GET /api/timeline
  */

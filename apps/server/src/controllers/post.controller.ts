@@ -125,28 +125,31 @@ export async function deletePost(
 }
 
 /**
- * Get public timeline
+ * Get public timeline (simplified for SSR site)
  * GET /api/posts
- * TODO: Re-enable when getPublicTimeline is implemented in PostService
+ * Returns recent public posts without requiring authentication
  */
 export async function getTimeline(
-  _req: ReqWithUser,
+  req: ReqWithUser,
   res: Response,
   next: NextFunction,
 ): Promise<void> {
   try {
-    // const viewerId = req.user?.id;
-    // const cursor = req.query.cursor ? Number(req.query.cursor) : undefined;
-    // const limit = req.query.limit ? Number(req.query.limit) : 20;
-    // const sortBy = req.query.sortBy as 'recent' | 'trending' | undefined;
+    const cursor = req.query.cursor ? Number(req.query.cursor) : undefined;
+    const limit = req.query.limit ? Number(req.query.limit) : 20;
+    const sortBy = (req.query.sortBy as 'recent' | 'trending') || 'recent';
 
-    // const timeline = await postService.getPublicTimeline(viewerId, {
-    //   cursor,
-    //   limit,
-    //   sortBy,
-    // });
+    const result = await postService.getPublicTimeline({
+      cursor,
+      limit,
+      sortBy,
+    });
 
-    res.json({ items: [], hasMore: false }); // Temporary placeholder
+    res.json({
+      items: result.posts,
+      nextCursor: result.nextCursor,
+      hasMore: !!result.nextCursor,
+    });
   } catch (error) {
     next(error);
   }

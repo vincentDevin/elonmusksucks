@@ -78,7 +78,7 @@ function validateEnvironment(): EnvironmentConfig {
   const config: EnvironmentConfig = {
     // Application
     NODE_ENV: getOptional('NODE_ENV', 'development'),
-    PORT: getRequiredInt('PORT', 5173),
+    PORT: getRequiredInt('PUBLIC_SITE_PORT', 5173),
 
     // API Configuration (REQUIRED - NO FALLBACKS)
     API_BASE_URL: getRequired('API_BASE_URL'),

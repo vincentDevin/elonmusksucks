@@ -2,6 +2,7 @@
 import { Router } from 'express';
 import {
   getTimeline,
+  getArticles,
   getArticleDetails,
   toggleArticleReaction,
   getArticleReactions,
@@ -27,7 +28,11 @@ const router = Router();
 // Query params: limit, cursor, type (all/articles/posts)
 router.get('/', getTimeline);
 
-// GET /api/articles/:id
+// GET /api/timeline/articles - Articles only (for public site)
+// Query params: limit, cursor
+router.get('/articles', getArticles);
+
+// GET /api/timeline/articles/:id - Article details
 router.get('/articles/:id', getArticleDetails);
 
 // ===============================================

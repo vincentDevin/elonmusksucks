@@ -1,4 +1,8 @@
-import 'dotenv/config';
+import { config as dotenvConfig } from 'dotenv';
+import { resolve } from 'path';
+
+// Load environment variables from root .env file
+dotenvConfig({ path: resolve(__dirname, '../../../.env') });
 
 // Validate environment variables immediately (fail fast if misconfigured)
 import env from './config/env';
@@ -26,7 +30,6 @@ import {
   LobbyEntry,
   ActiveGameEntry,
   PlayerInput,
-  ClientEvents,
   MatchResult,
   PONG_PHYSICS,
   AI_DIFFICULTIES,
@@ -1756,7 +1759,7 @@ export class PongGameServer {
         const player = this.auth.getPlayer(socket.id);
         if (!player) return;
 
-        this.game.processInput(player.id, data);
+        this.game.processInput(player.id, data as PlayerInput);
       });
 
       // Leave match

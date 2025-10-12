@@ -1,52 +1,18 @@
-import type { LeaderboardPreviewProps } from '../types';
+import type { LeaderboardEntryView } from '@ems/types';
+
+interface LeaderboardPreviewProps {
+  data: LeaderboardEntryView[] | null;
+  className?: string;
+  clientAppUrl: string;
+}
 
 export default function LeaderboardPreview({
   data,
   className = '',
   clientAppUrl,
 }: LeaderboardPreviewProps) {
-  // Use fallback data if API data is not available or not an array
-  const leaders = (Array.isArray(data) ? data : null) || [
-    {
-      userId: 1,
-      userName: 'MuskTracker2024',
-      avatarUrl: 'https://i.pravatar.cc/150?img=1',
-      balance: '45650',
-      totalBets: 156,
-      winRate: 0.72,
-      profitAll: '45650',
-      profitPeriod: '12000',
-      roi: 0.45,
-      longestStreak: 5,
-      rank: 1,
-    },
-    {
-      userId: 2,
-      userName: 'TeslaBear',
-      avatarUrl: 'https://i.pravatar.cc/150?img=2',
-      balance: '38200',
-      totalBets: 142,
-      winRate: 0.68,
-      profitAll: '38200',
-      profitPeriod: '8500',
-      roi: 0.42,
-      longestStreak: 3,
-      rank: 2,
-    },
-    {
-      userId: 3,
-      userName: 'SpaceXFan',
-      avatarUrl: 'https://i.pravatar.cc/150?img=3',
-      balance: '32100',
-      totalBets: 128,
-      winRate: 0.65,
-      profitAll: '32100',
-      profitPeriod: '5200',
-      roi: 0.38,
-      longestStreak: 4,
-      rank: 3,
-    },
-  ];
+  // No fallback data - show empty state if data is missing
+  const leaders = Array.isArray(data) ? data : [];
 
   const formatMuskBucks = (amount: string | number | bigint | undefined | null) => {
     if (amount == null || amount === undefined) {
@@ -101,6 +67,31 @@ export default function LeaderboardPreview({
         return 'text-content';
     }
   };
+
+  if (leaders.length === 0) {
+    return (
+      <div className={`bg-surface rounded-lg p-6 shadow ${className}`}>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-bold text-content">🏆 Top Predictors</h2>
+        </div>
+        <div className="text-center py-8">
+          <div className="text-6xl mb-4">🏆</div>
+          <p className="text-tertiary">No leaderboard data available</p>
+          <p className="text-sm text-tertiary mt-2">
+            Start predicting to appear on the leaderboard!
+          </p>
+        </div>
+        <div className="mt-4 pt-4 border-t border-border">
+          <a
+            href={`${clientAppUrl}/register`}
+            className="block w-full text-center px-4 py-2 bg-primary text-white rounded hover:bg-primary-hover transition-colors text-sm font-medium"
+          >
+            Climb the leaderboard!
+          </a>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`bg-surface rounded-lg p-6 shadow ${className}`}>

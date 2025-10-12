@@ -4,12 +4,18 @@ type Theme = 'light' | 'dark';
 
 export default function ThemeToggle() {
   const [theme, setTheme] = useState<Theme>(() => {
-    // Default to dark theme
+    // Auto-detect system preference if no stored preference exists
     if (typeof window !== 'undefined') {
+      // Check localStorage first
       const stored = localStorage.getItem('theme') as Theme | null;
-      return stored || 'dark';
+      if (stored) {
+        return stored;
+      }
+
+      // Default to dark theme (no longer auto-detect system preference)
+      return 'dark';
     }
-    return 'dark';
+    return 'dark'; // SSR default
   });
 
   useEffect(() => {
@@ -21,6 +27,22 @@ export default function ThemeToggle() {
     }
     localStorage.setItem('theme', theme);
   }, [theme]);
+
+  // Listen for system theme changes (only if user hasn't manually set preference)
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+
+    const handleChange = (e: MediaQueryListEvent) => {
+      // Only auto-switch if user hasn't explicitly set a preference
+      const hasExplicitPreference = localStorage.getItem('theme');
+      if (!hasExplicitPreference) {
+        setTheme(e.matches ? 'dark' : 'light');
+      }
+    };
+
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
 
   const toggleTheme = () => {
     setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));

@@ -11,7 +11,7 @@ import {
   getThemesByCategory,
   getThemeById,
   getDefaultThemeForCategory,
-  DEFAULT_LIGHT_THEME,
+  DEFAULT_DARK_THEME,
 } from './themes';
 import {
   applyThemeToDocument,
@@ -28,8 +28,8 @@ import { useAuth } from '../contexts/AuthContext';
 
 // Default preferences
 const DEFAULT_PREFERENCES: ThemePreferences = {
-  themeId: DEFAULT_LIGHT_THEME.id,
-  preferredCategory: 'light',
+  themeId: DEFAULT_DARK_THEME.id,
+  preferredCategory: 'dark',
   notifications: {
     achievements: true,
     rankChanges: true,
@@ -62,7 +62,7 @@ interface UnifiedThemeProviderProps {
 
 export const UnifiedThemeProvider: React.FC<UnifiedThemeProviderProps> = ({ children, userId }) => {
   const { user } = useAuth(); // Get user from auth context instead of making API calls
-  const [currentTheme, setCurrentTheme] = useState<UnifiedTheme>(DEFAULT_LIGHT_THEME);
+  const [currentTheme, setCurrentTheme] = useState<UnifiedTheme>(DEFAULT_DARK_THEME);
   const [preferences, setPreferences] = useState<ThemePreferences>(DEFAULT_PREFERENCES);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -102,7 +102,7 @@ export const UnifiedThemeProvider: React.FC<UnifiedThemeProviderProps> = ({ chil
         if (storedThemeId) {
           // Use stored theme if available
           const theme = getThemeById(storedThemeId);
-          initialTheme = theme || DEFAULT_LIGHT_THEME;
+          initialTheme = theme || DEFAULT_DARK_THEME;
         } else {
           // No stored theme - detect system preference
           const systemCategory = getPreferredColorScheme();
@@ -131,9 +131,9 @@ export const UnifiedThemeProvider: React.FC<UnifiedThemeProviderProps> = ({ chil
         setError('Failed to load theme preferences');
 
         // Fallback to default theme
-        setCurrentTheme(DEFAULT_LIGHT_THEME);
+        setCurrentTheme(DEFAULT_DARK_THEME);
         setPreferences(DEFAULT_PREFERENCES);
-        applyThemeToDocument(DEFAULT_LIGHT_THEME);
+        applyThemeToDocument(DEFAULT_DARK_THEME);
       } finally {
         setLoading(false);
       }
@@ -261,7 +261,7 @@ export const UnifiedThemeProvider: React.FC<UnifiedThemeProviderProps> = ({ chil
   );
 
   const resetToDefaults = useCallback(() => {
-    const defaultTheme = DEFAULT_LIGHT_THEME;
+    const defaultTheme = DEFAULT_DARK_THEME;
     setCurrentTheme(defaultTheme);
     setPreferences(DEFAULT_PREFERENCES);
     storeThemeId(defaultTheme.id, userId);

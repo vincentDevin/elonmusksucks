@@ -108,7 +108,7 @@ export const toPongLeaderboardView = (
     user?: { name: string; avatarUrl?: string | null; profilePictureKey?: string | null };
     eloRating: number;
     tier: string;
-    gamesPlayed?: number;
+    totalMatches?: number;
     wins?: number;
     winRate: number;
     winStreak?: number;
@@ -128,7 +128,7 @@ export const toPongLeaderboardView = (
   avatarUrl: entry.user?.avatarUrl || undefined,
   eloRating: entry.eloRating,
   tier: entry.tier,
-  gamesPlayed: entry.gamesPlayed || 0,
+  gamesPlayed: entry.totalMatches || 0,
   wins: entry.wins || 0,
   winRate: entry.winRate,
   winStreak: entry.winStreak,

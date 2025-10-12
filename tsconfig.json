@@ -3,7 +3,8 @@
   "references": [
     { "path": "packages/types" },
     { "path": "apps/server" },
-    { "path": "apps/client" }
+    { "path": "apps/client" },
+    { "path": "apps/public-site" }
   ],
   "compilerOptions": {
     "baseUrl": ".",

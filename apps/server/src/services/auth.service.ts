@@ -44,7 +44,7 @@ export async function createUser(name: string, email: string, password: string):
     name,
     email: normalized,
     passwordHash,
-    emailVerified: skipEmailFlow,
+    emailVerified: skipEmailFlow ?? false,
   });
 }
 

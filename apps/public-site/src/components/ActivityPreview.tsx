@@ -1,62 +1,22 @@
-import type { ActivityPreviewProps } from '../types';
+import type { UnifiedActivityEvent } from '@ems/types';
+
+interface ActivityPreviewProps {
+  data: UnifiedActivityEvent[] | null;
+  className?: string;
+  clientAppUrl: string;
+}
 
 export default function ActivityPreview({
   data,
   className = '',
   clientAppUrl,
 }: ActivityPreviewProps) {
-  // Use fallback data if API data is not available or not an array
-  const activities = (Array.isArray(data) ? data : null) || [
-    {
-      id: '1',
-      type: 'post_created',
-      userId: 1,
-      userName: 'MuskTracker',
-      userAvatar: 'https://i.pravatar.cc/150?img=1',
-      title: 'MuskTracker posted',
-      description: 'Just saw another Tesla price drop prediction!',
-      icon: '📝',
-      timestamp: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
-      amount: 500,
-      isPersonal: false,
-      isHighValue: false,
-      priority: 'low',
-    },
-    {
-      id: '2',
-      type: 'parlay_started',
-      userId: 2,
-      userName: 'TeslaBear',
-      userAvatar: 'https://i.pravatar.cc/150?img=2',
-      title: 'TeslaBear started a 3-leg parlay',
-      description: '12500🪙 @15.2x combined odds',
-      icon: '🎯',
-      timestamp: new Date(Date.now() - 12 * 60 * 1000).toISOString(),
-      amount: 12500,
-      odds: 15.2,
-      isPersonal: false,
-      isHighValue: true,
-      priority: 'medium',
-    },
-    {
-      id: '3',
-      type: 'achievement_unlocked',
-      userId: 3,
-      userName: 'SpaceXFan',
-      userAvatar: 'https://i.pravatar.cc/150?img=3',
-      title: 'SpaceXFan unlocked an achievement',
-      description: 'Big Spender',
-      icon: '🏅',
-      timestamp: new Date(Date.now() - 18 * 60 * 1000).toISOString(),
-      isPersonal: false,
-      isHighValue: true,
-      priority: 'medium',
-    },
-  ];
+  // No fallback data - show empty state if data is missing
+  const activities = Array.isArray(data) ? data : [];
 
-  const getRelativeTime = (timestamp: string) => {
+  const getRelativeTime = (timestamp: string | Date) => {
     const now = new Date();
-    const time = new Date(timestamp);
+    const time = timestamp instanceof Date ? timestamp : new Date(timestamp);
     const diffMs = now.getTime() - time.getTime();
     const diffMins = Math.floor(diffMs / (1000 * 60));
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
@@ -73,6 +33,33 @@ export default function ActivityPreview({
     }
     return amount.toString();
   };
+
+  if (activities.length === 0) {
+    return (
+      <div className={`bg-surface rounded-lg p-6 shadow ${className}`}>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-bold text-content">⚡ Live Activity</h2>
+          <div className="flex items-center space-x-2">
+            <div className="w-2 h-2 bg-muted rounded-full"></div>
+            <span className="text-xs text-tertiary">No Activity</span>
+          </div>
+        </div>
+        <div className="text-center py-8">
+          <div className="text-6xl mb-4">⚡</div>
+          <p className="text-tertiary">No recent activity</p>
+          <p className="text-sm text-tertiary mt-2">Be the first to place a bet or post!</p>
+        </div>
+        <div className="mt-4 pt-4 border-t border-border">
+          <a
+            href={`${clientAppUrl}/register`}
+            className="block w-full text-center px-4 py-2 bg-primary text-white rounded hover:bg-primary-hover transition-colors text-sm font-medium"
+          >
+            Join the action!
+          </a>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`bg-surface rounded-lg p-6 shadow ${className}`}>

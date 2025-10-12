@@ -1,4 +1,10 @@
-import type { StatsDisplayProps } from '../types';
+interface StatsDisplayProps {
+  totalPredictions: number;
+  activeUsers: number;
+  muskBucksInCirculation: string | number;
+  loading?: boolean;
+  className?: string;
+}
 
 export default function StatsDisplay({
   totalPredictions,

@@ -3,26 +3,41 @@ import LandingPage from './components/LandingPage';
 import PredictionsPage from './components/PredictionsPage';
 import LeaderboardPage from './components/LeaderboardPage';
 import TimelinePage from './components/TimelinePage';
-import type { ServerData } from './types';
+import type {
+  PredictionView,
+  LeaderboardEntryView,
+  UnifiedActivityEvent,
+  PongLeaderboardView,
+  PublicArticle,
+  PublicPostView,
+} from '@ems/types';
+
+// ServerData interface - matches server.ts
+interface ServerData {
+  trendingData: PredictionView[] | null;
+  leaderboardData: LeaderboardEntryView[] | null;
+  pongLeaderboardData: PongLeaderboardView[] | null;
+  activityData: UnifiedActivityEvent[] | null;
+  articlesData: PublicArticle[] | null;
+  postsData: PublicPostView[] | null;
+  predictionsData: PredictionView[] | null;
+  fullLeaderboardData: LeaderboardEntryView[] | null;
+  clientAppUrl: string;
+  currentPath: string;
+}
 
 interface AppProps {
   serverData?: ServerData;
 }
 
 function App({ serverData: propServerData }: AppProps) {
-  // Get server data - prioritize server data, then window data, then fallback
+  // Get server data - prioritize server data, then window data, then minimal fallback
   const serverData: ServerData = propServerData ||
     (typeof window !== 'undefined' && (window as any).__SERVER_DATA__) || {
-      // Fallback mock data (should rarely be used)
-      marketData: {
-        totalVolume: 12345678,
-        activeMarkets: 8934,
-        totalUsers: 15420,
-        volumeChange: 5.2,
-        trending: [],
-      },
+      // Minimal fallback (only if SSR completely fails)
       trendingData: null,
       leaderboardData: null,
+      pongLeaderboardData: null,
       activityData: null,
       articlesData: null,
       postsData: null,

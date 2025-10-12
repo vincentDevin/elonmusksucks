@@ -1,17 +1,23 @@
-import type { TrendingPreviewProps } from '../types';
+import type { PredictionView } from '@ems/types';
+
+interface TrendingPreviewProps {
+  data: PredictionView[] | null;
+  className?: string;
+  clientAppUrl: string;
+}
 
 export default function TrendingPreview({
   data,
   className = '',
   clientAppUrl,
 }: TrendingPreviewProps) {
-  // Use API data if available, otherwise empty array (no fallback data to avoid type conflicts)
+  // No fallback data - show empty state if data is missing
   const predictions = Array.isArray(data) ? data : [];
 
-  const calculateVolume = (prediction: any) => {
+  const calculateVolume = (prediction: PredictionView) => {
     if (!prediction.bets || !Array.isArray(prediction.bets)) return 0;
-    return prediction.bets.reduce((total: number, bet: any) => {
-      const amount = parseInt(bet.amount) || 0;
+    return prediction.bets.reduce((total: number, bet) => {
+      const amount = parseInt(bet.amount.toString()) || 0;
       return total + amount;
     }, 0);
   };
@@ -64,9 +70,9 @@ export default function TrendingPreview({
                   <div className="flex items-center space-x-2 mb-2">
                     <span className="text-tertiary text-sm">#{index + 1}</span>
                     <span
-                      className={`text-xs px-2 py-1 rounded-full border ${getCategoryColor(prediction.category)}`}
+                      className={`text-xs px-2 py-1 rounded-full border ${getCategoryColor(prediction.category?.name || 'Unknown')}`}
                     >
-                      {prediction.category}
+                      {prediction.category?.name || 'Unknown'}
                     </span>
                   </div>
                   <h3 className="font-medium text-content text-sm leading-snug mb-2">

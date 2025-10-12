@@ -7,13 +7,19 @@ module.exports = {
     extend: {
       colors: {
         primary: 'var(--color-primary)',
-        muted: 'var(--color-muted)',
-        tertiary: 'var(--color-tertiary)',
-        surface: 'var(--color-surface)',
-        accent: 'var(--color-accent)',
+        'primary-hover': 'var(--color-primary-hover)',
         secondary: 'var(--color-secondary)',
-        content: 'var(--color-content)',
+        accent: 'var(--color-accent)',
         background: 'var(--color-background)',
+        surface: 'var(--color-surface)',
+        content: 'var(--color-content)',
+        tertiary: 'var(--color-tertiary)',
+        muted: 'var(--color-muted)',
+        border: 'var(--color-border)',
+        success: 'var(--color-success)',
+        warning: 'var(--color-warning)',
+        error: 'var(--color-error)',
+        info: 'var(--color-info)',
       },
       keyframes: {
         marquee: {
