@@ -6,7 +6,8 @@ import type { IReactionRepository } from '../repositories/interfaces/IReactionRe
 import { ContentRepository } from '../repositories/ContentRepository';
 import type { IContentRepository } from '../repositories/interfaces/IContentRepository';
 import { UserService } from './user.service';
-import type { PrismaReactionType } from '@ems/types';
+import type { PrismaReactionType, DbArticleWithTags, DbTrendingContent } from '@ems/types';
+import { withCache, CacheKeys, CACHE_TTL } from '../utils/analyticsCache';
 
 const prisma = new PrismaClient();
 const userService = new UserService();
@@ -23,7 +24,10 @@ export class TimelineService {
   }
 
   async getArticles(params: { cursor?: Date; limit: number }) {
-    return this.repository.getApprovedArticles(params);
+    const cacheKey = CacheKeys.TIMELINE_ARTICLES(params.limit, params.cursor?.toISOString());
+    return withCache(cacheKey, CACHE_TTL.TIMELINE_ARTICLES, async () => {
+      return this.repository.getApprovedArticles(params);
+    });
   }
 
   async getArticlesWithReactions(
@@ -227,6 +231,25 @@ export class TimelineService {
   }) {
     const pageLimit = Math.min(params.limit || 30, 100);
 
+    // Create cache key from search parameters
+    const filtersStr = JSON.stringify(params.filters || {});
+    const cacheKey = CacheKeys.TIMELINE_SEARCH(params.query, filtersStr, pageLimit, params.cursor);
+
+    return withCache(cacheKey, CACHE_TTL.TIMELINE_SEARCH, async () => {
+      return this.executeSearchTimeline(params, pageLimit);
+    });
+  }
+
+  private async executeSearchTimeline(
+    params: {
+      query: string;
+      filters?: any;
+      limit: number;
+      cursor?: string;
+      viewerId?: number;
+    },
+    pageLimit: number,
+  ) {
     // Map frontend filters to backend format
     const mappedFilters = {
       ...params.filters,
@@ -435,12 +458,20 @@ export class TimelineService {
     limit: number;
     type: 'articles' | 'posts' | 'all';
   }) {
-    const trendingData = await this.repository.getTrendingContent({
-      timeRange: params.timeRange,
-      limit: params.limit,
-      contentType: params.type,
-    });
+    const cacheKey = CacheKeys.TIMELINE_TRENDING(params.timeRange, params.type, params.limit);
 
+    return withCache(cacheKey, CACHE_TTL.TIMELINE_TRENDING, async () => {
+      const trendingData = await this.repository.getTrendingContent({
+        timeRange: params.timeRange,
+        limit: params.limit,
+        contentType: params.type,
+      });
+
+      return this.processTrendingContent(trendingData, params.limit);
+    });
+  }
+
+  private processTrendingContent(trendingData: DbTrendingContent, limit: number) {
     // Helper function to calculate trending score
     // Formula: reactions × 2 + comments × 3 + views × 0.0001 + shares × 5
     const calculateScore = (reactions: number, comments: number, views: number, shares = 0) => {
@@ -448,7 +479,7 @@ export class TimelineService {
     };
 
     // Transform articles to TrendingItem
-    const articleItems = trendingData.articles.map((article) => ({
+    const articleItems = trendingData.articles.map((article: DbArticleWithTags) => ({
       id: `article-${article.id}`,
       type: 'article' as const,
       title: article.title,
@@ -473,7 +504,7 @@ export class TimelineService {
     }));
 
     // Transform posts to TrendingItem
-    const postItems = trendingData.posts.map((post) => ({
+    const postItems = trendingData.posts.map((post: DbTrendingContent['posts'][number]) => ({
       id: `post-${post.id}`,
       type: 'post' as const,
       title: post.content.length > 100 ? post.content.substring(0, 97) + '...' : post.content,
@@ -508,7 +539,7 @@ export class TimelineService {
     );
 
     // Assign trending ranks
-    const itemsWithRanks = allItems.slice(0, params.limit).map((item, index) => ({
+    const itemsWithRanks = allItems.slice(0, limit).map((item, index) => ({
       ...item,
       trendingRank: index + 1,
     }));

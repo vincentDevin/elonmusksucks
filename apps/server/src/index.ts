@@ -8,10 +8,11 @@ dotenv.config({ path: path.resolve(__dirname, '../../..', envFile) });
 // Validate environment variables immediately (fail fast if misconfigured)
 import env from './config/env';
 
-import express from 'express';
+import express, { Request, Response } from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
+import compression from 'compression';
 import http from 'http';
 import { initSocket } from './socket';
 import authRoutes from './routes/auth.routes';
@@ -134,6 +135,25 @@ app.use(
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization'],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  }),
+);
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Compression Middleware - gzip responses for better performance
+// ══════════════════════════════════════════════════════════════════════════════
+app.use(
+  compression({
+    // Only compress responses larger than 1KB
+    threshold: 1024,
+    // Compression level (1-9, where 6 is default balance between speed and compression)
+    level: 6,
+    // Don't compress responses that are already compressed
+    filter: (req: Request, res: Response) => {
+      if (req.headers['x-no-compression']) {
+        return false;
+      }
+      return compression.filter(req, res);
+    },
   }),
 );
 

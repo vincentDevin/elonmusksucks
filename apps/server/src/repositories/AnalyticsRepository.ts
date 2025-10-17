@@ -181,12 +181,39 @@ export class AnalyticsRepository implements IAnalyticsRepository {
       cumulativeCount: number;
     }>
   > {
-    const users = await this.prisma.user.findMany({
-      select: { createdAt: true },
-      orderBy: { createdAt: 'asc' },
+    // Use raw SQL for efficient aggregation instead of loading all users into memory
+    const startDate = dateRange[0];
+    const endDate = dateRange[dateRange.length - 1];
+
+    const dailyCounts = await this.prisma.$queryRaw<Array<{ date: string; count: bigint }>>`
+      SELECT
+        DATE("createdAt") as date,
+        COUNT(*)::bigint as count
+      FROM "User"
+      WHERE DATE("createdAt") >= DATE(${startDate})
+        AND DATE("createdAt") <= DATE(${endDate})
+      GROUP BY DATE("createdAt")
+      ORDER BY date ASC
+    `;
+
+    // Convert BigInt to number and build result map
+    const countsByDate = new Map(
+      dailyCounts.map((row) => [row.date.toString(), Number(row.count)]),
+    );
+
+    // Build cumulative counts
+    let cumulative = 0;
+    const result = dateRange.map((date) => {
+      const count = countsByDate.get(date) || 0;
+      cumulative += count;
+      return {
+        date,
+        count,
+        cumulativeCount: cumulative,
+      };
     });
 
-    return this.processTimeSeriesData(dateRange, users);
+    return result;
   }
 
   async getPredictionCreations(dateRange: string[]): Promise<
@@ -196,12 +223,39 @@ export class AnalyticsRepository implements IAnalyticsRepository {
       cumulativeCount: number;
     }>
   > {
-    const predictions = await this.prisma.prediction.findMany({
-      select: { createdAt: true },
-      orderBy: { createdAt: 'asc' },
+    // Use raw SQL for efficient aggregation instead of loading all predictions into memory
+    const startDate = dateRange[0];
+    const endDate = dateRange[dateRange.length - 1];
+
+    const dailyCounts = await this.prisma.$queryRaw<Array<{ date: string; count: bigint }>>`
+      SELECT
+        DATE("createdAt") as date,
+        COUNT(*)::bigint as count
+      FROM "Prediction"
+      WHERE DATE("createdAt") >= DATE(${startDate})
+        AND DATE("createdAt") <= DATE(${endDate})
+      GROUP BY DATE("createdAt")
+      ORDER BY date ASC
+    `;
+
+    // Convert BigInt to number and build result map
+    const countsByDate = new Map(
+      dailyCounts.map((row) => [row.date.toString(), Number(row.count)]),
+    );
+
+    // Build cumulative counts
+    let cumulative = 0;
+    const result = dateRange.map((date) => {
+      const count = countsByDate.get(date) || 0;
+      cumulative += count;
+      return {
+        date,
+        count,
+        cumulativeCount: cumulative,
+      };
     });
 
-    return this.processTimeSeriesData(dateRange, predictions);
+    return result;
   }
 
   async getBettingVolume(dateRange: string[]): Promise<
@@ -211,24 +265,37 @@ export class AnalyticsRepository implements IAnalyticsRepository {
       cumulativeVolume: string;
     }>
   > {
-    const bets = await this.prisma.bet.findMany({
-      select: { createdAt: true, amount: true },
-      orderBy: { createdAt: 'asc' },
-    });
+    // Use raw SQL for efficient aggregation instead of loading all bets into memory
+    const startDate = dateRange[0];
+    const endDate = dateRange[dateRange.length - 1];
 
-    return dateRange.map((date) => {
-      const dayBets = bets.filter((bet) => bet.createdAt.toISOString().startsWith(date));
-      const cumulativeBets = bets.filter((bet) => bet.createdAt <= new Date(date));
+    const dailyVolumes = await this.prisma.$queryRaw<Array<{ date: string; volume: bigint }>>`
+      SELECT
+        DATE("createdAt") as date,
+        COALESCE(SUM(amount), 0)::bigint as volume
+      FROM "Bet"
+      WHERE DATE("createdAt") >= DATE(${startDate})
+        AND DATE("createdAt") <= DATE(${endDate})
+      GROUP BY DATE("createdAt")
+      ORDER BY date ASC
+    `;
 
-      const dayVolume = dayBets.reduce((sum, bet) => sum + bet.amount, BigInt(0));
-      const cumulativeVolume = cumulativeBets.reduce((sum, bet) => sum + bet.amount, BigInt(0));
+    // Build volume map
+    const volumesByDate = new Map(dailyVolumes.map((row) => [row.date.toString(), row.volume]));
 
+    // Build cumulative volumes
+    let cumulative = BigInt(0);
+    const result = dateRange.map((date) => {
+      const volume = volumesByDate.get(date) || BigInt(0);
+      cumulative += volume;
       return {
         date,
-        volume: dayVolume.toString(),
-        cumulativeVolume: cumulativeVolume.toString(),
+        volume: volume.toString(),
+        cumulativeVolume: cumulative.toString(),
       };
     });
+
+    return result;
   }
 
   async getEngagementData(dateRange: string[]): Promise<
@@ -240,28 +307,51 @@ export class AnalyticsRepository implements IAnalyticsRepository {
       pongMatches: number;
     }>
   > {
-    const [comments, pongMatches] = await Promise.all([
-      this.prisma.content.findMany({
-        where: {
-          type: 'COMMENT',
-          isDeleted: false,
-        },
-        select: { createdAt: true },
-        orderBy: { createdAt: 'asc' },
-      }),
-      this.prisma.pongMatch.findMany({
-        select: { createdAt: true },
-        orderBy: { createdAt: 'asc' },
-      }),
+    // Use raw SQL for efficient aggregation
+    const startDate = dateRange[0];
+    const endDate = dateRange[dateRange.length - 1];
+
+    const [commentCounts, pongMatchCounts] = await Promise.all([
+      // Comments aggregation
+      this.prisma.$queryRaw<Array<{ date: string; count: bigint }>>`
+        SELECT
+          DATE("createdAt") as date,
+          COUNT(*)::bigint as count
+        FROM "Content"
+        WHERE type = 'COMMENT'
+          AND "isDeleted" = false
+          AND DATE("createdAt") >= DATE(${startDate})
+          AND DATE("createdAt") <= DATE(${endDate})
+        GROUP BY DATE("createdAt")
+        ORDER BY date ASC
+      `,
+      // Pong matches aggregation
+      this.prisma.$queryRaw<Array<{ date: string; count: bigint }>>`
+        SELECT
+          DATE("createdAt") as date,
+          COUNT(*)::bigint as count
+        FROM "PongMatch"
+        WHERE DATE("createdAt") >= DATE(${startDate})
+          AND DATE("createdAt") <= DATE(${endDate})
+        GROUP BY DATE("createdAt")
+        ORDER BY date ASC
+      `,
     ]);
+
+    // Build maps for quick lookup
+    const commentsByDate = new Map(
+      commentCounts.map((row) => [row.date.toString(), Number(row.count)]),
+    );
+    const pongMatchesByDate = new Map(
+      pongMatchCounts.map((row) => [row.date.toString(), Number(row.count)]),
+    );
 
     return dateRange.map((date) => ({
       date,
-      comments: comments.filter((d: any) => d.createdAt.toISOString().startsWith(date)).length,
+      comments: commentsByDate.get(date) || 0,
       likes: 0, // Would implement when likes system exists
       views: 0, // Would calculate from view tracking
-      pongMatches: pongMatches.filter((d: any) => d.createdAt.toISOString().startsWith(date))
-        .length,
+      pongMatches: pongMatchesByDate.get(date) || 0,
     }));
   }
 
@@ -491,35 +581,43 @@ export class AnalyticsRepository implements IAnalyticsRepository {
     day7: number;
     day30: number;
   }> {
-    const users = await this.prisma.user.findMany({
-      where: { createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } },
-      include: {
-        _count: {
-          select: {
-            activityLogs: true,
-          },
-        },
-      },
-    });
+    // Use raw SQL for efficient aggregation instead of loading all users with activity logs
+    const last30Days = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
-    const totalUsers = users.length;
+    const results = await this.prisma.$queryRaw<
+      Array<{
+        total_users: bigint;
+        day1_retained: bigint;
+        day7_retained: bigint;
+        day30_retained: bigint;
+      }>
+    >`
+      WITH user_activity_counts AS (
+        SELECT
+          u.id,
+          COUNT(al.id) as activity_count
+        FROM "User" u
+        LEFT JOIN "UserActivityLog" al ON al."userId" = u.id
+        WHERE u."createdAt" >= ${last30Days}
+        GROUP BY u.id
+      )
+      SELECT
+        COUNT(*)::bigint as total_users,
+        COUNT(CASE WHEN activity_count > 1 THEN 1 END)::bigint as day1_retained,
+        COUNT(CASE WHEN activity_count > 5 THEN 1 END)::bigint as day7_retained,
+        COUNT(CASE WHEN activity_count > 10 THEN 1 END)::bigint as day30_retained
+      FROM user_activity_counts
+    `;
+
+    const result = results[0];
+    const totalUsers = Number(result.total_users);
+
     if (totalUsers === 0) return { day1: 0, day7: 0, day30: 0 };
 
     return {
-      day1: Math.round((users.filter((u) => u._count.activityLogs > 1).length / totalUsers) * 100),
-      day7: Math.round((users.filter((u) => u._count.activityLogs > 5).length / totalUsers) * 100),
-      day30: Math.round(
-        (users.filter((u) => u._count.activityLogs > 10).length / totalUsers) * 100,
-      ),
+      day1: Math.round((Number(result.day1_retained) / totalUsers) * 100),
+      day7: Math.round((Number(result.day7_retained) / totalUsers) * 100),
+      day30: Math.round((Number(result.day30_retained) / totalUsers) * 100),
     };
-  }
-
-  // Helper methods
-  private processTimeSeriesData(dateRange: string[], data: any[]): any[] {
-    return dateRange.map((date, _index) => ({
-      date,
-      count: data.filter((d) => d.createdAt.toISOString().startsWith(date)).length,
-      cumulativeCount: data.filter((d) => d.createdAt <= new Date(date)).length,
-    }));
   }
 }

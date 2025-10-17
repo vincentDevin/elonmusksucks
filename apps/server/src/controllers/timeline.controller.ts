@@ -15,6 +15,16 @@ const timelineService = new TimelineService();
 const userService = new UserService();
 
 /**
+ * Safely convert Date objects or ISO strings to ISO string format
+ * Handles cached data where dates are already strings
+ */
+function toISOStringSafe(date: Date | string | null | undefined): string | null {
+  if (!date) return null;
+  if (typeof date === 'string') return date;
+  return date.toISOString();
+}
+
+/**
  * Get articles only (for public site)
  * GET /api/timeline/articles
  */
@@ -55,11 +65,11 @@ export async function getArticles(req: Request, res: Response) {
         title: article.title,
         excerpt: article.excerpt,
         leadImageUrl: article.leadImageUrl,
-        publishedAt: article.publishedAt?.toISOString() || null,
-        timestamp: article.publishedAt?.toISOString() || article.createdAt.toISOString(),
+        publishedAt: toISOStringSafe(article.publishedAt),
+        timestamp: toISOStringSafe(article.publishedAt) || toISOStringSafe(article.createdAt)!,
         status: article.status,
-        createdAt: article.createdAt.toISOString(),
-        updatedAt: article.updatedAt.toISOString(),
+        createdAt: toISOStringSafe(article.createdAt)!,
+        updatedAt: toISOStringSafe(article.updatedAt)!,
         content: {
           title: article.title,
           excerpt: article.excerpt || undefined,
@@ -110,15 +120,15 @@ export async function getTimeline(req: Request, res: Response) {
     const cursorDate = cursor ? new Date(cursor as string) : undefined;
 
     // Get both articles and posts, then merge and sort
-    // Fetch more items than requested to ensure we have enough after merging and sorting
+    // Fetch pageLimit from each source for efficient merging (2x total instead of 4x)
     const articlesPromise = timelineService.getArticles({
       cursor: cursorDate,
-      limit: pageLimit * 2,
+      limit: pageLimit,
     });
 
     const postsPromise = timelineService.getPublicPosts({
       cursor: undefined, // Posts use numeric cursor, skip for now - will filter in memory
-      limit: pageLimit * 2,
+      limit: pageLimit,
       viewerId,
     });
 
@@ -145,7 +155,7 @@ export async function getTimeline(req: Request, res: Response) {
       return {
         id: `article-${article.id}`,
         type: 'article' as const,
-        timestamp: article.publishedAt?.toISOString() || article.createdAt.toISOString(),
+        timestamp: toISOStringSafe(article.publishedAt) || toISOStringSafe(article.createdAt)!,
         content: {
           title: article.title,
           excerpt: article.excerpt || undefined,
@@ -176,7 +186,7 @@ export async function getTimeline(req: Request, res: Response) {
       .map((post: any) => ({
         id: `post-${post.id}`,
         type: 'article' as const, // Using 'article' type for posts too (timeline only has article/tweet)
-        timestamp: post.createdAt.toISOString(),
+        timestamp: toISOStringSafe(post.createdAt)!,
         content: {
           title: post.author?.name || 'User Post',
           excerpt: post.body.substring(0, 200),
@@ -239,8 +249,8 @@ export async function getTimeline(req: Request, res: Response) {
     const items = allItems.slice(0, pageLimit);
 
     // Check if there are more items
-    // We fetched pageLimit * 2 of each type, so if we have more than pageLimit after merging, there's more
-    const hasMore = allItems.length > pageLimit;
+    // We fetched pageLimit from each source, so hasMore is true if either source returned full page
+    const hasMore = articles.length === pageLimit || posts.length === pageLimit;
 
     // Next cursor is the timestamp of the last item in this page
     const nextCursor = items.length > 0 ? items[items.length - 1].timestamp : undefined;
@@ -286,16 +296,16 @@ export const getArticleDetails = async (req: Request, res: Response) => {
       title: article.title,
       excerpt: article.excerpt,
       leadImageUrl: article.leadImageUrl,
-      publishedAt: article.publishedAt?.toISOString() || null,
-      fetchedAt: article.fetchedAt.toISOString(),
+      publishedAt: toISOStringSafe(article.publishedAt),
+      fetchedAt: toISOStringSafe(article.fetchedAt)!,
       hash: article.hash,
       status: article.status,
       tags: article.tags,
       modNotes: article.modNotes,
       reactions: article.reactions,
       comments: article.comments,
-      createdAt: article.createdAt.toISOString(),
-      updatedAt: article.updatedAt.toISOString(),
+      createdAt: toISOStringSafe(article.createdAt)!,
+      updatedAt: toISOStringSafe(article.updatedAt)!,
       feed: article.feed
         ? {
             id: article.feed.id,
@@ -387,7 +397,7 @@ export const getArticleReactions = async (req: Request, res: Response) => {
         acc[reaction.type].push({
           id: reaction.id,
           user: reaction.user,
-          createdAt: reaction.createdAt.toISOString(),
+          createdAt: toISOStringSafe(reaction.createdAt)!,
         });
         return acc;
       },
@@ -445,7 +455,7 @@ export const createArticleComment = async (req: AuthRequest, res: Response) => {
       authorId: newComment.authorId,
       authorName: enrichedAuthor?.name || 'Unknown',
       articleId,
-      createdAt: newComment.createdAt.toISOString(),
+      createdAt: toISOStringSafe(newComment.createdAt)!,
       author: enrichedAuthor,
       user: enrichedAuthor,
     };
