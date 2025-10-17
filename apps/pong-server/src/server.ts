@@ -1710,8 +1710,8 @@ export class PongGameServer {
           pot,
         });
 
-        // Notify creator that opponent joined
-        this.io.to(`game:${existingGameId}`).emit('opponent_joined', { opponent: player });
+        // Notify creator that opponent joined (but NOT the joiner themselves!)
+        socket.to(`game:${existingGameId}`).emit('opponent_joined', { opponent: player });
 
         // Remove lobby and update lobby list
         this.lobby.deleteLobby(data.matchId);
