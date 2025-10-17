@@ -67,9 +67,13 @@ async function createServer(): Promise<express.Application> {
     app.use(morgan('dev'));
   }
 
-  // HTTPS redirect for production
+  // HTTPS redirect for production (exclude health check)
   if (env.NODE_ENV === 'production') {
     app.use((req, res, next) => {
+      // Allow health check to work over HTTP (internal Fly proxy check)
+      if (req.path === '/health') {
+        return next();
+      }
       if (req.header('x-forwarded-proto') !== 'https') {
         console.warn('[SECURITY] HTTP request redirected to HTTPS', {
           url: req.url,
@@ -168,6 +172,11 @@ async function createServer(): Promise<express.Application> {
 
   app.use(generalLimiter);
 
+  // Health check endpoint (before Vite middleware)
+  app.get('/health', (_req, res) => {
+    res.status(200).json({ ok: true });
+  });
+
   // API proxy rate limiter (stricter - 30 requests per minute)
   const apiProxyLimiter = rateLimit({
     windowMs: 60 * 1000, // 1 minute
@@ -178,14 +187,29 @@ async function createServer(): Promise<express.Application> {
     skip: (_req) => env.NODE_ENV === 'development',
   });
 
-  // Create Vite server in middleware mode
-  const vite: ViteDevServer = await createViteServer({
-    server: { middlewareMode: true },
-    appType: 'custom',
-  });
+  // Vite setup - dev server in development, static files in production
+  let vite: ViteDevServer | undefined;
 
-  // Use vite's connect instance as middleware
-  app.use(vite.middlewares);
+  if (env.NODE_ENV === 'production') {
+    // Production: Serve pre-built static assets
+    const sirv = (await import('sirv')).default;
+    app.use(
+      '/assets',
+      sirv(path.resolve(__dirname, 'dist/client/assets'), {
+        maxAge: 31536000, // 1 year cache for hashed assets
+        immutable: true,
+      }),
+    );
+  } else {
+    // Development: Use Vite dev server
+    vite = await createViteServer({
+      server: {
+        middlewareMode: true,
+      },
+      appType: 'custom',
+    });
+    app.use(vite.middlewares);
+  }
 
   // ──────────────────────────────────────────────────────────────────────────
   // API Proxy Middleware (with security enhancements)
@@ -282,19 +306,37 @@ async function createServer(): Promise<express.Application> {
       // Fetch data based on the route
       const serverData = await fetchServerData(url);
 
-      // Load the server entry
-      const { render } = (await vite.ssrLoadModule('/src/entry-server.tsx')) as {
-        render: (serverData: ServerData) => string;
-      };
+      let render: (serverData: ServerData) => string;
+      let template: string;
+
+      if (env.NODE_ENV === 'production') {
+        // Production: Load pre-built SSR bundle
+        const module = await import('./dist/server/entry-server.js');
+        // Handle both default and named exports
+        render = (module.default as any)?.render || module.render || module.default;
+
+        if (typeof render !== 'function') {
+          throw new Error(
+            `Invalid render function: ${typeof render}. Module keys: ${Object.keys(module)}`,
+          );
+        }
+
+        // Load pre-built HTML template
+        template = await fs.readFile(path.resolve(__dirname, 'dist/client/index.html'), 'utf-8');
+      } else {
+        // Development: Use Vite dev server
+        const { render: renderFn } = (await vite!.ssrLoadModule('/src/entry-server.tsx')) as {
+          render: (serverData: ServerData) => string;
+        };
+        render = renderFn;
+
+        // Load and transform template with Vite
+        template = await fs.readFile(path.resolve(__dirname, 'index.html'), 'utf-8');
+        template = await vite!.transformIndexHtml(url, template);
+      }
 
       // Render the app HTML
       const appHtml = render(serverData);
-
-      // Read the index.html template
-      let template = await fs.readFile(path.resolve(__dirname, 'index.html'), 'utf-8');
-
-      // Transform the template with Vite
-      template = await vite.transformIndexHtml(url, template);
 
       // Inject the app HTML and server data with XSS-safe serialization
       const html = template
@@ -306,7 +348,9 @@ async function createServer(): Promise<express.Application> {
 
       res.status(200).set({ 'Content-Type': 'text/html' }).end(html);
     } catch (e) {
-      vite.ssrFixStacktrace(e as Error);
+      if (vite) {
+        vite.ssrFixStacktrace(e as Error);
+      }
       console.error('[SSR] Rendering error:', {
         url,
         error: e instanceof Error ? e.message : 'Unknown error',
@@ -391,121 +435,126 @@ async function fetchServerData(url: string): Promise<ServerData> {
     currentPath: url,
   };
 
-  try {
-    const fetch = (await import('node-fetch')).default;
-
-    // Fetch different data based on the route
-    if (url === '/' || url === '') {
-      // Landing page - fetch overview data
-      const [predictionsRes, leaderboardRes, activityRes, articlesRes, postsRes] =
-        await Promise.allSettled([
-          fetch(`${apiBaseUrl}/predictions`),
-          fetch(`${apiBaseUrl}/leaderboard`),
-          fetch(`${apiBaseUrl}/activity/recent?limit=10`),
-          fetch(`${apiBaseUrl}/timeline/articles?limit=5`),
-          fetch(`${apiBaseUrl}/posts?limit=5`),
-        ]);
-
-      // Get predictions data for trending - filter for APPROVED status only
-      if (predictionsRes.status === 'fulfilled' && predictionsRes.value.ok) {
-        const predictions = (await predictionsRes.value.json()) as PredictionView[];
-        if (Array.isArray(predictions)) {
-          const approvedPredictions = predictions.filter((p) => p.status === 'APPROVED');
-          baseData.trendingData = approvedPredictions.slice(0, 5);
-        }
-      }
-
-      // Get posts data for timeline preview
-      if (postsRes.status === 'fulfilled' && postsRes.value.ok) {
-        const postsResponse = (await postsRes.value.json()) as {
-          items: PublicPostView[];
-          nextCursor?: number;
-          hasMore: boolean;
-        };
-        baseData.postsData = Array.isArray(postsResponse.items) ? postsResponse.items : null;
-      }
-
-      // Get leaderboard data for preview
-      if (leaderboardRes.status === 'fulfilled' && leaderboardRes.value.ok) {
-        const leaderboard = (await leaderboardRes.value.json()) as LeaderboardEntryView[];
-        baseData.leaderboardData = Array.isArray(leaderboard) ? leaderboard.slice(0, 5) : null;
-      }
-
-      // Get activity data - response has { success, activities, count, cached }
-      if (activityRes.status === 'fulfilled' && activityRes.value.ok) {
-        const activityResponse = (await activityRes.value.json()) as {
-          success: boolean;
-          activities: UnifiedActivityEvent[];
-          count: number;
-          cached: boolean;
-        };
-        baseData.activityData = activityResponse.success ? activityResponse.activities : null;
-      }
-
-      // Get articles data for timeline preview - response has { items, pagination }
-      if (articlesRes.status === 'fulfilled' && articlesRes.value.ok) {
-        const articlesResponse = (await articlesRes.value.json()) as {
-          items: PublicArticle[];
-          pagination: { cursor?: string; hasMore: boolean };
-        };
-        baseData.articlesData = Array.isArray(articlesResponse.items)
-          ? articlesResponse.items
-          : null;
-      }
-    } else if (url === '/predictions') {
-      // Predictions page
-      const predictionsRes = await fetch(`${apiBaseUrl}/predictions`);
-      if (predictionsRes.ok) {
-        const predictions = (await predictionsRes.json()) as PredictionView[];
-        baseData.predictionsData = Array.isArray(predictions) ? predictions : null;
-      }
-    } else if (url === '/leaderboard') {
-      // Leaderboard page - fetch both main and pong leaderboards
-      const [leaderboardRes, pongLeaderboardRes] = await Promise.allSettled([
-        fetch(`${apiBaseUrl}/leaderboard`),
-        fetch(`${apiBaseUrl}/leaderboard/pong/elo`),
-      ]);
-
-      if (leaderboardRes.status === 'fulfilled' && leaderboardRes.value.ok) {
-        const leaderboard = (await leaderboardRes.value.json()) as LeaderboardEntryView[];
-        baseData.fullLeaderboardData = Array.isArray(leaderboard) ? leaderboard : null;
-      }
-
-      if (pongLeaderboardRes.status === 'fulfilled' && pongLeaderboardRes.value.ok) {
-        const pongLeaderboard = (await pongLeaderboardRes.value.json()) as PongLeaderboardView[];
-        baseData.pongLeaderboardData = Array.isArray(pongLeaderboard) ? pongLeaderboard : null;
-      }
-    } else if (url === '/timeline') {
-      // Timeline page
-      const [articlesRes, postsRes] = await Promise.allSettled([
-        fetch(`${apiBaseUrl}/timeline/articles`),
-        fetch(`${apiBaseUrl}/posts`),
-      ]);
-
-      if (articlesRes.status === 'fulfilled' && articlesRes.value.ok) {
-        const articlesResponse = (await articlesRes.value.json()) as {
-          items: PublicArticle[];
-          pagination: { cursor?: string; hasMore: boolean };
-        };
-        baseData.articlesData = Array.isArray(articlesResponse.items)
-          ? articlesResponse.items
-          : null;
-      }
-      if (postsRes.status === 'fulfilled' && postsRes.value.ok) {
-        const postsResponse = (await postsRes.value.json()) as {
-          items: PublicPostView[];
-          nextCursor?: number;
-          hasMore: boolean;
-        };
-        baseData.postsData = Array.isArray(postsResponse.items) ? postsResponse.items : null;
-      }
-    }
-  } catch (error) {
-    console.error('Error fetching server data:', error);
-    // Return base data with nulls if API calls fail
-  }
-
+  // TEMPORARY: Skip all SSR data fetching during maintenance mode
+  // React components will handle client-side fetching if needed
+  // TODO: Remove this return statement and uncomment code below after maintenance
   return baseData;
+
+  // try {
+  //   const fetch = (await import('node-fetch')).default;
+
+  //   // Fetch different data based on the route
+  //   if (url === '/' || url === '') {
+  //     // Landing page - fetch overview data
+  //     const [predictionsRes, leaderboardRes, activityRes, articlesRes, postsRes] =
+  //       await Promise.allSettled([
+  //         fetch(`${apiBaseUrl}/predictions`),
+  //         fetch(`${apiBaseUrl}/leaderboard`),
+  //         fetch(`${apiBaseUrl}/activity/recent?limit=10`),
+  //         fetch(`${apiBaseUrl}/timeline/articles?limit=5`),
+  //         fetch(`${apiBaseUrl}/posts?limit=5`),
+  //       ]);
+
+  //     // Get predictions data for trending - filter for APPROVED status only
+  //     if (predictionsRes.status === 'fulfilled' && predictionsRes.value.ok) {
+  //       const predictions = (await predictionsRes.value.json()) as PredictionView[];
+  //       if (Array.isArray(predictions)) {
+  //         const approvedPredictions = predictions.filter((p) => p.status === 'APPROVED');
+  //         baseData.trendingData = approvedPredictions.slice(0, 5);
+  //       }
+  //     }
+
+  //     // Get posts data for timeline preview
+  //     if (postsRes.status === 'fulfilled' && postsRes.value.ok) {
+  //       const postsResponse = (await postsRes.value.json()) as {
+  //         items: PublicPostView[];
+  //         nextCursor?: number;
+  //         hasMore: boolean;
+  //       };
+  //       baseData.postsData = Array.isArray(postsResponse.items) ? postsResponse.items : null;
+  //     }
+
+  //     // Get leaderboard data for preview
+  //     if (leaderboardRes.status === 'fulfilled' && leaderboardRes.value.ok) {
+  //       const leaderboard = (await leaderboardRes.value.json()) as LeaderboardEntryView[];
+  //       baseData.leaderboardData = Array.isArray(leaderboard) ? leaderboard.slice(0, 5) : null;
+  //     }
+
+  //     // Get activity data - response has { success, activities, count, cached }
+  //     if (activityRes.status === 'fulfilled' && activityRes.value.ok) {
+  //       const activityResponse = (await activityRes.value.json()) as {
+  //         success: boolean;
+  //         activities: UnifiedActivityEvent[];
+  //         count: number;
+  //         cached: boolean;
+  //       };
+  //       baseData.activityData = activityResponse.success ? activityResponse.activities : null;
+  //     }
+
+  //     // Get articles data for timeline preview - response has { items, pagination }
+  //     if (articlesRes.status === 'fulfilled' && articlesRes.value.ok) {
+  //       const articlesResponse = (await articlesRes.value.json()) as {
+  //         items: PublicArticle[];
+  //         pagination: { cursor?: string; hasMore: boolean };
+  //       };
+  //       baseData.articlesData = Array.isArray(articlesResponse.items)
+  //         ? articlesResponse.items
+  //         : null;
+  //     }
+  //   } else if (url === '/predictions') {
+  //     // Predictions page
+  //     const predictionsRes = await fetch(`${apiBaseUrl}/predictions`);
+  //     if (predictionsRes.ok) {
+  //       const predictions = (await predictionsRes.json()) as PredictionView[];
+  //       baseData.predictionsData = Array.isArray(predictions) ? predictions : null;
+  //     }
+  //   } else if (url === '/leaderboard') {
+  //     // Leaderboard page - fetch both main and pong leaderboards
+  //     const [leaderboardRes, pongLeaderboardRes] = await Promise.allSettled([
+  //       fetch(`${apiBaseUrl}/leaderboard`),
+  //       fetch(`${apiBaseUrl}/leaderboard/pong/elo`),
+  //     ]);
+
+  //     if (leaderboardRes.status === 'fulfilled' && leaderboardRes.value.ok) {
+  //       const leaderboard = (await leaderboardRes.value.json()) as LeaderboardEntryView[];
+  //       baseData.fullLeaderboardData = Array.isArray(leaderboard) ? leaderboard : null;
+  //     }
+
+  //     if (pongLeaderboardRes.status === 'fulfilled' && pongLeaderboardRes.value.ok) {
+  //       const pongLeaderboard = (await pongLeaderboardRes.value.json()) as PongLeaderboardView[];
+  //       baseData.pongLeaderboardData = Array.isArray(pongLeaderboard) ? pongLeaderboard : null;
+  //     }
+  //   } else if (url === '/timeline') {
+  //     // Timeline page
+  //     const [articlesRes, postsRes] = await Promise.allSettled([
+  //       fetch(`${apiBaseUrl}/timeline/articles`),
+  //       fetch(`${apiBaseUrl}/posts`),
+  //     ]);
+
+  //     if (articlesRes.status === 'fulfilled' && articlesRes.value.ok) {
+  //       const articlesResponse = (await articlesRes.value.json()) as {
+  //         items: PublicArticle[];
+  //         pagination: { cursor?: string; hasMore: boolean };
+  //       };
+  //       baseData.articlesData = Array.isArray(articlesResponse.items)
+  //         ? articlesResponse.items
+  //         : null;
+  //     }
+  //     if (postsRes.status === 'fulfilled' && postsRes.value.ok) {
+  //       const postsResponse = (await postsRes.value.json()) as {
+  //         items: PublicPostView[];
+  //         nextCursor?: number;
+  //         hasMore: boolean;
+  //       };
+  //       baseData.postsData = Array.isArray(postsResponse.items) ? postsResponse.items : null;
+  //     }
+  //   }
+  // } catch (error) {
+  //   console.error('Error fetching server data:', error);
+  //   // Return base data with nulls if API calls fail
+  // }
+
+  // return baseData;
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -516,11 +565,29 @@ createServer()
   .then((app) => {
     const host = env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1';
 
-    app.listen(env.PORT, host, () => {
+    const server = app.listen(env.PORT, host, () => {
       console.log(`\n✅ Public site SSR server running (${env.NODE_ENV} mode)`);
       console.log(`   🌐 Server: http://${host}:${env.PORT}`);
       console.log(`   📡 API Base: ${env.API_BASE_URL}`);
       console.log(`   🔗 Client App: ${env.CLIENT_APP_URL}\n`);
+    });
+
+    // Enhanced error handling for port conflicts
+    server.on('error', (error: NodeJS.ErrnoException) => {
+      if (error.code === 'EADDRINUSE') {
+        console.error('\n❌ ERROR: Port already in use!');
+        console.error(`   Port ${env.PORT} is already being used by another process.`);
+        console.error('\n💡 Solutions:');
+        console.error('   1. Run cleanup script: npm run cleanup');
+        console.error(`   2. Kill the process manually: lsof -ti:${env.PORT} | xargs kill -9`);
+        console.error(
+          `   3. Find what's using the port: lsof -i :${env.PORT} -sTCP:LISTEN -P -n -F pn | head -2\n`,
+        );
+        process.exit(1);
+      } else {
+        console.error('\n❌ Server error:', error);
+        process.exit(1);
+      }
     });
   })
   .catch((error) => {

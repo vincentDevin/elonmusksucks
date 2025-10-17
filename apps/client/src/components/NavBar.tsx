@@ -116,25 +116,25 @@ export default function NavBar() {
           ) : (
             <>
               <a
-                href="http://127.0.0.1:5173"
+                href={import.meta.env.VITE_PUBLIC_SITE_URL}
                 className="px-3 py-2 rounded hover:bg-muted transition-colors"
               >
                 Home
               </a>
               <a
-                href="http://127.0.0.1:5173/predictions"
+                href={`${import.meta.env.VITE_PUBLIC_SITE_URL}/predictions`}
                 className="px-3 py-2 rounded hover:bg-muted transition-colors"
               >
                 Predictions
               </a>
               <a
-                href="http://127.0.0.1:5173/leaderboard"
+                href={`${import.meta.env.VITE_PUBLIC_SITE_URL}/leaderboard`}
                 className="px-3 py-2 rounded hover:bg-muted transition-colors"
               >
                 Leaderboard
               </a>
               <a
-                href="http://127.0.0.1:5173/timeline"
+                href={`${import.meta.env.VITE_PUBLIC_SITE_URL}/timeline`}
                 className="px-3 py-2 rounded hover:bg-muted transition-colors"
               >
                 Timeline
@@ -251,28 +251,28 @@ export default function NavBar() {
             ) : (
               <>
                 <a
-                  href="http://127.0.0.1:5173"
+                  href={import.meta.env.VITE_PUBLIC_SITE_URL}
                   className="block px-4 py-3 rounded-lg hover:bg-muted transition-colors"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Home
                 </a>
                 <a
-                  href="http://127.0.0.1:5173/predictions"
+                  href={`${import.meta.env.VITE_PUBLIC_SITE_URL}/predictions`}
                   className="block px-4 py-3 rounded-lg hover:bg-muted transition-colors"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Predictions
                 </a>
                 <a
-                  href="http://127.0.0.1:5173/leaderboard"
+                  href={`${import.meta.env.VITE_PUBLIC_SITE_URL}/leaderboard`}
                   className="block px-4 py-3 rounded-lg hover:bg-muted transition-colors"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Leaderboard
                 </a>
                 <a
-                  href="http://127.0.0.1:5173/timeline"
+                  href={`${import.meta.env.VITE_PUBLIC_SITE_URL}/timeline`}
                   className="block px-4 py-3 rounded-lg hover:bg-muted transition-colors"
                   onClick={() => setMobileMenuOpen(false)}
                 >

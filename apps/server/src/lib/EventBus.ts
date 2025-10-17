@@ -27,6 +27,8 @@ export class EventBus implements IEventBus {
         keepAlive: 30000, // 30 seconds
         connectTimeout: 10000, // 10 seconds
         lazyConnect: true, // Connect when first command is issued
+        // Copy TLS settings if present (for rediss:// URLs)
+        tls: redisClient.options.tls,
       };
       this.redisPool = new RedisPool(options, {
         maxConnections: 8, // Optimized for Upstash connection limits

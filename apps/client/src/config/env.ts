@@ -30,6 +30,11 @@ interface EnvironmentConfig {
   // In production: Full API URL (e.g., https://api.elonmusksucks.net)
   SOCKET_URL: string;
 
+  // Pong Server URL
+  // In development: Can be empty (defaults to localhost:5001)
+  // In production: Full Pong server URL (e.g., https://pong.elonmusksucks.net)
+  PONG_SERVER_URL: string;
+
   // Optional: Feature Flags
   FEATURE_FLAGS: {
     pong_beta: boolean;
@@ -104,6 +109,7 @@ function validateEnvironment(): EnvironmentConfig {
     API_BASE_URL: getRequired('VITE_API_BASE_URL', true),
     PUBLIC_SITE_URL: getRequired('VITE_PUBLIC_SITE_URL', true),
     SOCKET_URL: getRequired('VITE_SOCKET_URL', true),
+    PONG_SERVER_URL: getOptional('VITE_PONG_SERVER_URL', 'http://localhost:5001'),
 
     // Feature Flags (optional)
     FEATURE_FLAGS: {

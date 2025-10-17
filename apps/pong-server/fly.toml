@@ -1,10 +1,11 @@
 # fly.toml - Pong Server
-# Using local build approach (Dockerfile.local)
 app = 'ems-pong'
-primary_region = 'iad' # Same region as main server for low latency
+primary_region = 'ord'
 
 [build]
-  dockerfile = 'apps/pong-server/Dockerfile.local'
+  dockerfile = 'apps/pong-server/Dockerfile'
+  build-target = 'runner'
+  [build.args]
 
 [env]
   NODE_ENV = 'production'
@@ -16,7 +17,6 @@ primary_region = 'iad' # Same region as main server for low latency
   auto_stop_machines = false
   auto_start_machines = true
   min_machines_running = 1
-  processes = ['app']
 
 [[http_service.checks]]
   grace_period = '10s'
@@ -26,28 +26,6 @@ primary_region = 'iad' # Same region as main server for low latency
   path = '/health'
 
 [[vm]]
-  size = 'shared-cpu-1x'  # Upgrade for production load
+  size = 'shared-cpu-1x'
   memory = '256mb'
   cpus = 1
-
-[[services]]
-  protocol = 'tcp'
-  internal_port = 5001
-
-  [[services.ports]]
-    port = 80
-    handlers = ['http']
-    force_https = true
-
-  [[services.ports]]
-    port = 443
-    handlers = ['tls', 'http']
-
-  [[services.tcp_checks]]
-    interval = '15s'
-    timeout = '2s'
-    grace_period = '5s'
-
-[restart]
-  policy = 'on-failure'
-  max_retries = 3

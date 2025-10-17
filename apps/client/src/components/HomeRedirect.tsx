@@ -17,7 +17,7 @@ export default function HomeRedirect() {
       navigate('/timeline', { replace: true });
     } else {
       // Redirect non-authenticated users to SSR public site
-      window.location.href = 'http://127.0.0.1:5173';
+      window.location.href = import.meta.env.VITE_PUBLIC_SITE_URL;
     }
   }, [accessToken, user, navigate]);
 

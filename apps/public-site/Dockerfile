@@ -5,22 +5,28 @@ FROM node:24-alpine AS base
 FROM base AS deps
 WORKDIR /app
 
+# Install git (needed for git-based npm dependencies)
+RUN apk add --no-cache git
+
 # Copy root package files
 COPY package*.json ./
 COPY packages/types/package.json ./packages/types/
 COPY apps/public-site/package.json ./apps/public-site/
+COPY apps/server/package.json ./apps/server/
 
-# Install dependencies
-RUN npm ci --workspace=apps/public-site
+# Install dependencies (using npm install for cross-platform compatibility)
+# Include server workspace to get ioredis and other types dependencies
+RUN npm install --workspace=packages/types --workspace=apps/public-site --workspace=apps/server
 
 # Build stage
 FROM base AS builder
 WORKDIR /app
 
-# Copy dependencies from deps stage
+# Copy dependencies from deps stage (workspace dependencies are hoisted to root node_modules)
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/packages/types/node_modules ./packages/types/node_modules
-COPY --from=deps /app/apps/public-site/node_modules ./apps/public-site/node_modules
+
+# Copy root package files for npm scripts
+COPY package*.json ./
 
 # Copy source code
 COPY packages/types ./packages/types
@@ -29,12 +35,11 @@ COPY prisma ./prisma
 COPY tsconfig.json ./
 
 # Build shared types
-RUN npm run prisma:generate
+RUN npx prisma generate --schema prisma/schema.prisma
 RUN cd packages/types && npm run build
 
 # Build public site (SSR)
-WORKDIR /app/apps/public-site
-RUN npm run build
+RUN cd apps/public-site && npm run build
 
 # Production stage (SSR server)
 FROM base AS runner
@@ -46,11 +51,12 @@ ENV NODE_ENV=production
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 publicuser
 
-# Copy built application
+# Copy built application (workspace dependencies are in root node_modules)
 COPY --from=builder --chown=publicuser:nodejs /app/apps/public-site/dist ./apps/public-site/dist
 COPY --from=builder --chown=publicuser:nodejs /app/packages/types/dist ./packages/types/dist
+COPY --from=builder --chown=publicuser:nodejs /app/packages/types/package.json ./packages/types/package.json
+COPY --from=builder --chown=publicuser:nodejs /app/package.json ./package.json
 COPY --from=builder --chown=publicuser:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=publicuser:nodejs /app/apps/public-site/node_modules ./apps/public-site/node_modules
 COPY --from=builder --chown=publicuser:nodejs /app/apps/public-site/server.ts ./apps/public-site/server.ts
 COPY --from=builder --chown=publicuser:nodejs /app/apps/public-site/index.html ./apps/public-site/index.html
 COPY --from=builder --chown=publicuser:nodejs /app/apps/public-site/src ./apps/public-site/src

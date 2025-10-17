@@ -3,6 +3,7 @@ import { io, Socket } from 'socket.io-client';
 import type { ServerEvents, ClientEvents } from '@ems/types';
 import { PONG_PHYSICS } from '@ems/types';
 import { useAuth } from '../contexts/AuthContext';
+import env from '../config/env';
 
 // Spectator-only game state (no player slot, no input)
 interface SpectatorGameState {
@@ -68,7 +69,7 @@ export function usePongSpectator(): SpectatorHook {
 
     console.log('👁️ Connecting spectator to Pong server...');
 
-    const spectatorSocket = io('http://127.0.0.1:5001', {
+    const spectatorSocket = io(env.PONG_SERVER_URL, {
       transports: ['websocket', 'polling'],
       timeout: 5000,
       autoConnect: true,

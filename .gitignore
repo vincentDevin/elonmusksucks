@@ -108,6 +108,17 @@ fly-secrets.txt         # Never commit secrets!
 # Note: fly.toml files ARE committed (infrastructure-as-code, no secrets)
 # Secrets are managed via: flyctl secrets set
 
+# ─── Production Infrastructure (CRITICAL - Never Commit) ──────────────────────
+# These files contain production app names and deployment details that could
+# help attackers target your production environment
+
+# Production environment configs with deployment details
+apps/client/.env.production
+apps/*/fly.local.toml
+
+# Redis deployment infrastructure
+fly-redis/
+
 # ─── Docker ───────────────────────────────────────────────────────────────────
 # Docker override files (may contain local credentials)
 docker-compose.override.yml
@@ -133,6 +144,7 @@ gcp-key.json
 aws-credentials
 .aws/
 .gcp/
+.secrets.production.txt
 
 # ─── Backup & Temporary Files ─────────────────────────────────────────────────
 *.bak

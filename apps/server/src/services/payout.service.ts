@@ -17,14 +17,23 @@ import { unifiedActivityService } from './unifiedActivity.service';
 import { eventBus } from '../lib/EventBus';
 
 // Create a separate Redis client for subscriptions to avoid conflicts
-const subscriptionRedis = new IORedis({
-  host: process.env.REDIS_HOST || '127.0.0.1',
-  port: Number.parseInt(process.env.REDIS_PORT || '6379', 10),
-  password: process.env.REDIS_PASSWORD,
-  maxRetriesPerRequest: null,
-  enableOfflineQueue: true,
-  retryStrategy: (times: number) => Math.min(times * 50, 2000),
-});
+const subscriptionRedis = process.env.REDIS_URL
+  ? new IORedis(process.env.REDIS_URL, {
+      maxRetriesPerRequest: null,
+      enableOfflineQueue: true,
+      retryStrategy: (times: number) => Math.min(times * 50, 2000),
+      tls: process.env.REDIS_URL.startsWith('rediss://')
+        ? { rejectUnauthorized: false }
+        : undefined,
+    })
+  : new IORedis({
+      host: process.env.REDIS_HOST || '127.0.0.1',
+      port: Number.parseInt(process.env.REDIS_PORT || '6379', 10),
+      password: process.env.REDIS_PASSWORD,
+      maxRetriesPerRequest: null,
+      enableOfflineQueue: true,
+      retryStrategy: (times: number) => Math.min(times * 50, 2000),
+    });
 
 subscriptionRedis.on('error', (err: Error) => {
   console.error('[leaderboard] Subscription Redis client error:', err);

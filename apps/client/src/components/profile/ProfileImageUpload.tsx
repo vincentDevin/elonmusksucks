@@ -1,6 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { ImageCropper } from './ImageCropper';
+import { uploadProfileImage } from '../../api/users';
+import api from '../../api/axios';
 
 interface ProfileImageUploadProps {
   userId: number;
@@ -92,8 +94,8 @@ export function ProfileImageUpload({
   };
 
   const uploadCroppedImage = async (blob: Blob) => {
-    if (!selectedFile || !accessToken) {
-      onUploadError('Authentication required');
+    if (!selectedFile) {
+      onUploadError('No file selected');
       return;
     }
 
@@ -101,26 +103,21 @@ export function ProfileImageUpload({
     setUploadProgress(0);
 
     try {
-      // Create FormData with the cropped image
-      const formData = new FormData();
-      formData.append('image', blob, selectedFile.name);
+      // Create a File object from the blob
+      const file = new File([blob], selectedFile.name, { type: blob.type });
 
-      // Upload with progress tracking
-      const response = await fetch(`/api/users/${userId}/profile-picture`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
+      // Use the API function which has the correct baseURL configured
+      const imageUrl = await uploadProfileImage(userId, file);
+
+      // Format the response to match expected structure
+      onUploadSuccess({
+        avatarUrl: imageUrl,
+        sizes: {
+          thumbnail: imageUrl,
+          profile: imageUrl,
+          full: imageUrl,
         },
-        body: formData,
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Upload failed');
-      }
-
-      const result = await response.json();
-      onUploadSuccess(result);
 
       // Cleanup
       if (previewUrl) {
@@ -148,11 +145,6 @@ export function ProfileImageUpload({
   };
 
   const handleUseDefault = async () => {
-    if (!accessToken) {
-      onUploadError('Authentication required');
-      return;
-    }
-
     if (!confirm('Use the site default avatar? This will remove your custom profile picture.')) {
       return;
     }
@@ -160,17 +152,8 @@ export function ProfileImageUpload({
     setIsDeleting(true);
 
     try {
-      const response = await fetch(`/api/users/${userId}/profile-picture`, {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to reset avatar');
-      }
+      // Use the axios instance which has the correct baseURL configured
+      await api.delete(`/api/users/${userId}/profile-picture`);
 
       // Notify parent of success - need to refresh to get the new default avatar URL
       window.location.reload();

@@ -8,6 +8,7 @@ import {
   useOptimistic,
   startTransition,
   useMemo,
+  useRef,
   type ReactNode,
 } from 'react';
 import {
@@ -93,6 +94,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   );
   const [loading, setLoading] = useState(true);
   const [onUserDataRefresh] = useState<(() => Promise<void>) | undefined>();
+
+  // Socket connection state tracking to prevent duplicate connections
+  const socketConnectionRef = useRef({
+    isConnected: false,
+    lastUserId: null as number | null,
+    isConnecting: false,
+  });
 
   // Refresh token and load current user on mount
   useEffect(() => {
@@ -198,17 +206,72 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
   }, [clearAuth, handleTokenRefresh]);
 
-  // Handle socket authentication when token changes
+  // Handle socket authentication and connection lifecycle
   useEffect(() => {
-    if (socket) {
-      socket.auth = accessToken ? { token: accessToken } : {};
-      // Reconnect with new auth if socket is already connected
+    if (!socket) return;
+
+    const currentUserId = user?.id || null;
+    const connectionState = socketConnectionRef.current;
+
+    // Update socket auth with latest token (doesn't require reconnection)
+    socket.auth = accessToken ? { token: accessToken } : {};
+
+    // Case 1: User logged in or switched users - need to connect/reconnect
+    if (currentUserId && currentUserId !== connectionState.lastUserId) {
+      console.log('[AuthContext] User authenticated, establishing socket connection');
+
+      // Prevent concurrent connection attempts
+      if (connectionState.isConnecting) {
+        console.log('[AuthContext] Connection attempt already in progress, skipping');
+        return;
+      }
+
+      connectionState.isConnecting = true;
+
+      // Disconnect existing connection if user changed
+      if (socket.connected && connectionState.lastUserId !== null) {
+        console.log('[AuthContext] User changed, reconnecting socket');
+        socket.disconnect();
+      }
+
+      // Connect with new user credentials
+      socket.connect();
+      connectionState.lastUserId = currentUserId;
+      connectionState.isConnected = true;
+      connectionState.isConnecting = false;
+
+      return;
+    }
+
+    // Case 2: User logged out - disconnect socket
+    if (!currentUserId && connectionState.lastUserId !== null) {
+      console.log('[AuthContext] User logged out, disconnecting socket');
       if (socket.connected) {
         socket.disconnect();
-        socket.connect();
       }
+      connectionState.isConnected = false;
+      connectionState.lastUserId = null;
+      return;
     }
-  }, [socket, accessToken]);
+
+    // Case 3: Token refresh (same user, new token) - just update auth, no reconnect
+    if (currentUserId && accessToken && socket.connected) {
+      // Socket.auth already updated above, no need to reconnect
+      // This prevents duplicate connections during token refresh cycles
+      console.log('[AuthContext] Token refreshed, auth updated without reconnection');
+      return;
+    }
+
+    // Case 4: Initial connection after refresh on mount
+    if (currentUserId && !connectionState.isConnected && !connectionState.isConnecting) {
+      console.log('[AuthContext] Initial connection after page load');
+      connectionState.isConnecting = true;
+      socket.connect();
+      connectionState.lastUserId = currentUserId;
+      connectionState.isConnected = true;
+      connectionState.isConnecting = false;
+    }
+  }, [socket, accessToken, user?.id]);
 
   // Listen for balance-affecting events to update user balance in real-time using EventBusCore
   useEffect(() => {

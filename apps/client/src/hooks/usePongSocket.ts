@@ -11,6 +11,7 @@ import type {
 import { PONG_PHYSICS } from '@ems/types';
 import { useAuth } from '../contexts/AuthContext';
 import { GameStateBuffer, type GameStateSnapshot } from '../types/pongInterpolation';
+import env from '../config/env';
 
 // Per-user socket management to prevent duplicate connections within same user session
 const userSockets = new Map<number, Socket>(); // userId -> Socket
@@ -132,7 +133,7 @@ export function usePongSocket(): PongSocketHook {
 
     console.log(`🏓 Connecting to Pong server for user ${user.id}...`);
 
-    const newSocket = io('http://127.0.0.1:5001', {
+    const newSocket = io(env.PONG_SERVER_URL, {
       transports: ['websocket', 'polling'],
       timeout: 5000,
       autoConnect: true,

@@ -30,8 +30,18 @@ import monitoringRoutes from './routes/monitoring.routes';
 import timelineRoutes from './routes/timeline.routes';
 import pongRoutes from './routes/pong.routes';
 import postRoutes from './routes/post.routes';
+import prometheusRoutes from './routes/prometheus.routes';
+import { prometheusMiddleware } from './middleware/prometheusMiddleware';
 
 const app = express();
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Trust Proxy - Required for Fly.io deployment
+// ══════════════════════════════════════════════════════════════════════════════
+// Enable trust proxy to handle X-Forwarded-* headers from Fly.io's reverse proxy
+// Set to 1 to trust only the first proxy (Fly.io's proxy) for security
+// This is critical for rate limiting, HTTPS redirect, and IP detection
+app.set('trust proxy', 1);
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Security Middleware - Configure First
@@ -76,9 +86,13 @@ app.use(
   }),
 );
 
-// HTTPS redirect for production
+// HTTPS redirect for production (exclude health check)
 if (env.NODE_ENV === 'production') {
   app.use((req, res, next) => {
+    // Allow health check to work over HTTP (internal Fly proxy check)
+    if (req.path === '/health') {
+      return next();
+    }
     if (req.header('x-forwarded-proto') !== 'https') {
       return res.redirect(`https://${req.header('host')}${req.url}`);
     }
@@ -130,10 +144,23 @@ app.use(
 app.use(express.json({ limit: '1mb' })); // Prevent large payload attacks
 app.use(cookieParser());
 
+// ══════════════════════════════════════════════════════════════════════════════
+// Prometheus Metrics Middleware - Track all HTTP requests
+// ══════════════════════════════════════════════════════════════════════════════
+// Add early in the middleware chain to capture all requests
+app.use(prometheusMiddleware);
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Health and Metrics Endpoints
+// ══════════════════════════════════════════════════════════════════════════════
+
 // Health check endpoint (legacy - kept for backwards compatibility)
 app.get('/health', (_req, res) => {
   res.status(200).json({ ok: true });
 });
+
+// Prometheus metrics endpoint - scraped by Fly.io every 15 seconds
+app.use('/', prometheusRoutes);
 
 // API routes
 app.use('/api/auth', authRoutes);
@@ -171,8 +198,29 @@ if (require.main === module) {
     console.error('[socket] failed to initialize:', err);
   });
 
-  server.listen(env.PORT, '127.0.0.1', () => {
-    console.log(`Server & socket running on http://127.0.0.1:${env.PORT}`);
+  // Enhanced error handling for port conflicts
+  server.on('error', (error: NodeJS.ErrnoException) => {
+    if (error.code === 'EADDRINUSE') {
+      console.error('\n❌ ERROR: Port already in use!');
+      console.error(`   Port ${env.PORT} is already being used by another process.`);
+      console.error('\n💡 Solutions:');
+      console.error('   1. Run cleanup script: npm run cleanup');
+      console.error(`   2. Kill the process manually: lsof -ti:${env.PORT} | xargs kill -9`);
+      console.error(
+        `   3. Find what's using the port: lsof -i :${env.PORT} -sTCP:LISTEN -P -n -F pn | head -2\n`,
+      );
+      process.exit(1);
+    } else {
+      console.error('Server error:', error);
+      process.exit(1);
+    }
+  });
+
+  server.listen(env.PORT, '0.0.0.0', () => {
+    console.log(`✅ Server & socket running on http://0.0.0.0:${env.PORT}`);
+    console.log(`   Environment: ${env.NODE_ENV}`);
+    console.log(`   Client URL: ${env.CLIENT_APP_URL || 'Not set'}`);
+    console.log(`   Public URL: ${env.BASE_URL_PUBLIC || 'Not set'}\n`);
   });
 }
 

@@ -29,15 +29,37 @@ import { setupAchievementRedisHandlers } from './handlers/achievementEventHandle
 import { registerRoomHandlers } from './handlers/roomHandlers';
 import { eventSystemMetricsService } from './services/eventSystemMetrics.service';
 import { REDIS_CHANNELS } from '@ems/types';
+import env from './config/env';
+import {
+  socketConnectionsActive,
+  socketConnectionsTotal,
+  socketRoomsActive,
+  safeIncCounter,
+  safeSetGauge,
+} from './lib/prometheusMetrics';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ──────────────────────────────────────────────────────────────────────────────
 function getAllowedOrigins(): string[] {
-  const env = process.env.CLIENT_URL;
-  const dev = ['http://localhost:3000', 'http://127.0.0.1:3000'];
-  return env && !dev.includes(env) ? [env, ...dev] : dev;
+  // Use same origins as Express CORS config
+  const origins = [env.CLIENT_APP_URL, env.BASE_URL_CLIENT, env.BASE_URL_PUBLIC].filter(
+    (url): url is string => Boolean(url),
+  );
+
+  // Allow localhost in development
+  const dev = [
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+  ];
+  return env.NODE_ENV === 'development' ? [...origins, ...dev] : origins;
 }
+
+// Connection deduplication: Track active connections per user
+// Prevents duplicate connections from same user across reconnects/multiple tabs
+const activeUserConnections = new Map<number, string>(); // userId -> socketId
 
 export async function initSocket(httpServer: HTTPServer) {
   // Optimized heartbeat configuration to reduce disconnects
@@ -178,8 +200,33 @@ export async function initSocket(httpServer: HTTPServer) {
   // ── Connection handler ────────────────────────────────────────────────────
   io.on('connection', (socket) => {
     console.log('[socket] client connected:', socket.id);
+
+    // ── PROMETHEUS METRICS: Track connection ────────────────────────────────
+    socketConnectionsActive.inc();
+    safeIncCounter(socketConnectionsTotal, 1, { event: 'connect' });
+
     try {
       const user = (socket as any).user;
+
+      // Connection deduplication: Disconnect old connection from same user
+      if (user?.id) {
+        const existingSocketId = activeUserConnections.get(user.id);
+        if (existingSocketId && existingSocketId !== socket.id) {
+          const existingSocket = io.sockets.sockets.get(existingSocketId);
+          if (existingSocket) {
+            console.log(
+              `[socket] User ${user.id} reconnecting - disconnecting old connection ${existingSocketId}`,
+            );
+            existingSocket.emit('duplicate-connection', {
+              message: 'New connection detected, closing this connection',
+            });
+            existingSocket.disconnect(true);
+          }
+        }
+        // Track this user's new connection
+        activeUserConnections.set(user.id, socket.id);
+        console.log(`[socket] User ${user.id} connection registered: ${socket.id}`);
+      }
 
       // Join user-specific room for personal events
       if (user?.id) {
@@ -193,6 +240,10 @@ export async function initSocket(httpServer: HTTPServer) {
         console.log(`[socket] Admin user ${user.id} joined admin room`);
       }
 
+      // ── PROMETHEUS METRICS: Update room count ────────────────────────────
+      const roomCount = io.sockets.adapter.rooms.size;
+      safeSetGauge(socketRoomsActive, roomCount);
+
       // Register event handlers (tracked for cleanup)
       registerRoomHandlers(io, socket);
       registerChatHandlers(socket);
@@ -205,8 +256,26 @@ export async function initSocket(httpServer: HTTPServer) {
       // Setup disconnect handler for cleanup
       socket.on('disconnect', async (reason) => {
         console.log(`[socket] client disconnected: ${socket.id}, reason: ${reason}`);
+
+        // ── PROMETHEUS METRICS: Track disconnection ─────────────────────────
+        socketConnectionsActive.dec();
+        safeIncCounter(socketConnectionsTotal, 1, { event: 'disconnect' });
+
         try {
+          // Clean up user connection tracking
+          if (user?.id) {
+            const trackedSocketId = activeUserConnections.get(user.id);
+            if (trackedSocketId === socket.id) {
+              activeUserConnections.delete(user.id);
+              console.log(`[socket] User ${user.id} connection removed from tracking`);
+            }
+          }
+
           await socketCleanupManager.cleanupSocket(socket.id);
+
+          // ── PROMETHEUS METRICS: Update room count after cleanup ────────────
+          const roomCount = io.sockets.adapter.rooms.size;
+          safeSetGauge(socketRoomsActive, roomCount);
 
           // Log cleanup stats periodically
           const stats = socketCleanupManager.getStats();

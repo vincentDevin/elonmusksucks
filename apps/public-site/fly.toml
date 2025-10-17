@@ -1,23 +1,23 @@
-# fly.toml - Public Site (SSR with Nginx)
-# Using local build approach (Dockerfile.local)
-# Runs Nginx (port 5173) + Node.js SSR server (port 3001)
+# fly.toml - Public Site (SSR)
 app = 'ems-public'
-primary_region = 'iad'
+primary_region = 'ord'
 
 [build]
-  dockerfile = 'apps/public-site/Dockerfile.local'
+  dockerfile = 'apps/public-site/Dockerfile'
+  build-target = 'runner'
+  [build.args]
 
 [env]
   NODE_ENV = 'production'
-  PORT = '3001'  # Internal SSR server port (Nginx listens on 5173)
+  PORT = '5173'
+  VITE_MAINTENANCE_MODE = 'true'
 
 [http_service]
-  internal_port = 5173  # Nginx port (public-facing)
+  internal_port = 5173
   force_https = true
   auto_stop_machines = false
   auto_start_machines = true
   min_machines_running = 1
-  processes = ['app']
 
 [[http_service.checks]]
   grace_period = '10s'
@@ -28,27 +28,5 @@ primary_region = 'iad'
 
 [[vm]]
   size = 'shared-cpu-1x'
-  memory = '256mb'
+  memory = '512mb'
   cpus = 1
-
-[[services]]
-  protocol = 'tcp'
-  internal_port = 5173
-
-  [[services.ports]]
-    port = 80
-    handlers = ['http']
-    force_https = true
-
-  [[services.ports]]
-    port = 443
-    handlers = ['tls', 'http']
-
-  [[services.tcp_checks]]
-    interval = '15s'
-    timeout = '2s'
-    grace_period = '5s'
-
-[restart]
-  policy = 'on-failure'
-  max_retries = 3

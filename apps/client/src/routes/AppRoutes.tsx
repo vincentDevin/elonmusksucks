@@ -24,8 +24,7 @@ const Pong = lazy(() => import('../pages/Pong'));
 // Redirect to public site component
 const PublicSiteRedirect = () => {
   React.useEffect(() => {
-    const publicSiteUrl = env.PUBLIC_SITE_URL || 'http://localhost:5173';
-    window.location.href = publicSiteUrl;
+    window.location.href = env.PUBLIC_SITE_URL || '/';
   }, []);
 
   return (

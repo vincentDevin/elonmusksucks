@@ -13,7 +13,7 @@ sgMail.setApiKey(process.env.SENDGRID_API_KEY!);
 export async function sendEmail(to: string, subject: string, html: string) {
   const msg = {
     to,
-    from: { email: process.env.EMAIL_FROM! }, // now an object
+    from: { email: process.env.FROM_EMAIL! }, // Fixed: was EMAIL_FROM, should be FROM_EMAIL
     subject,
     text: html.replace(/<[^>]+>/g, ''),
     html,

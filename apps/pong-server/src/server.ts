@@ -1313,6 +1313,12 @@ export class PongGameServer {
 
   private setupMiddleware(): void {
     // ════════════════════════════════════════════════════════════════════════════
+    // Trust Proxy - Required for Fly.io deployment
+    // ════════════════════════════════════════════════════════════════════════════
+    // Set to 1 to trust only the first proxy (Fly.io's proxy) for security
+    this.app.set('trust proxy', 1);
+
+    // ════════════════════════════════════════════════════════════════════════════
     // Security Middleware - Configure First
     // ════════════════════════════════════════════════════════════════════════════
 
@@ -1348,9 +1354,13 @@ export class PongGameServer {
       }),
     );
 
-    // HTTPS redirect for production
+    // HTTPS redirect for production (exclude health check)
     if (env.NODE_ENV === 'production') {
       this.app.use((req, res, next) => {
+        // Allow health check to work over HTTP (internal Fly proxy check)
+        if (req.path === '/health') {
+          return next();
+        }
         if (req.header('x-forwarded-proto') !== 'https') {
           return res.redirect(`https://${req.header('host')}${req.url}`);
         }
@@ -1896,11 +1906,29 @@ export class PongGameServer {
   }
 
   start(port: number = 5001): void {
+    // Enhanced error handling for port conflicts
+    this.server.on('error', (error: NodeJS.ErrnoException) => {
+      if (error.code === 'EADDRINUSE') {
+        console.error('\n❌ ERROR: Port already in use!');
+        console.error(`   Port ${port} is already being used by another process.`);
+        console.error('\n💡 Solutions:');
+        console.error('   1. Run cleanup script: npm run cleanup');
+        console.error(`   2. Kill the process manually: lsof -ti:${port} | xargs kill -9`);
+        console.error(
+          `   3. Find what's using the port: lsof -i :${port} -sTCP:LISTEN -P -n -F pn | head -2\n`,
+        );
+        process.exit(1);
+      } else {
+        console.error('Server error:', error);
+        process.exit(1);
+      }
+    });
+
     this.server.listen(port, () => {
-      console.log(`🏓 Optimized Pong Game Server running on port ${port}`);
-      console.log(`📡 Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`✅ Optimized Pong Game Server running on port ${port}`);
+      console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(
-        `🎯 Performance: ${PONG_PHYSICS.TICK_RATE}fps game loop, ${PONG_PHYSICS.NETWORK_UPDATE_RATE}fps network`,
+        `   Performance: ${PONG_PHYSICS.TICK_RATE}fps game loop, ${PONG_PHYSICS.NETWORK_UPDATE_RATE}fps network\n`,
       );
     });
   }

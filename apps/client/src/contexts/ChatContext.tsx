@@ -104,7 +104,14 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   /* 2. Live message stream                                                 */
   /* ---------------------------------------------------------------------- */
   const handleMessage = useCallback((m: ChatMessage) => {
-    setMessages((prev) => [...prev, m]);
+    setMessages((prev) => {
+      // Prevent duplicate messages (deduplicate by message ID)
+      if (m.id && prev.some((msg) => msg.id === m.id)) {
+        console.warn('[ChatContext] Duplicate message detected, skipping:', m.id);
+        return prev;
+      }
+      return [...prev, m];
+    });
   }, []);
 
   const handleChatError = useCallback((e: ChatErrorPayload) => {

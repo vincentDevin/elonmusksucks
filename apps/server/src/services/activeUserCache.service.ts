@@ -52,6 +52,8 @@ export class ActiveUserCacheService {
       keepAlive: 30000,
       connectTimeout: 10000,
       lazyConnect: true,
+      // Copy TLS settings if present (for rediss:// URLs)
+      tls: redisClient.options.tls,
     };
 
     return new RedisPool(options, {

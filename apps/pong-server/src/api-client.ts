@@ -90,12 +90,12 @@ export class PongApiClient {
 
   async authenticateUser(token: string): Promise<AuthResponse | null> {
     try {
-      console.log(`🔐 Authenticating user via API: ${this.baseUrl}/auth`);
+      console.log(`🔐 Authenticating user via API: ${this.baseUrl}/api/pong/auth`);
       console.log(`🔑 Token preview: ${token.substring(0, 20)}...`);
 
       const response = await axios<AuthResponse>({
         method: 'POST',
-        url: `${this.baseUrl}/auth`,
+        url: `${this.baseUrl}/api/pong/auth`,
         headers: {
           'Content-Type': 'application/json',
           'x-game-server-secret': this.gameServerSecret,
@@ -116,7 +116,7 @@ export class PongApiClient {
   async validateWager(playerId: number, amount: number): Promise<boolean> {
     try {
       const result = await this.request<ValidateWagerResponse, ValidateWagerRequest>(
-        '/validate-wager',
+        '/api/pong/validate-wager',
         'POST',
         {
           userId: playerId,
@@ -134,7 +134,7 @@ export class PongApiClient {
   ): Promise<{ id: number; name: string; avatarUrl?: string | null } | null> {
     try {
       const result = await this.request<{ id: number; name: string; avatarUrl?: string | null }>(
-        `/ai-players/${userId}`,
+        `/api/pong/ai-players/${userId}`,
       );
       return result;
     } catch (error) {
@@ -151,7 +151,7 @@ export class PongApiClient {
   ): Promise<ProcessWagerResponse | null> {
     try {
       return await this.request<ProcessWagerResponse, ProcessWagerRequest>(
-        '/process-wager',
+        '/api/pong/process-wager',
         'POST',
         {
           playerOneId,
@@ -181,7 +181,7 @@ export class PongApiClient {
         isAI: result.isAI,
       };
 
-      await this.request<void, RecordMatchRequest>('/record-match', 'POST', requestData);
+      await this.request<void, RecordMatchRequest>('/api/pong/record-match', 'POST', requestData);
     } catch (error) {
       const axiosError = error as AxiosError;
       console.error('Failed to record match result:', axiosError.message);

@@ -7,6 +7,7 @@ import type {
   UserRankResponse,
   LeaderboardStatsResponse,
   LeaderboardQueryParams,
+  PongLeaderboardView,
 } from '@ems/types';
 
 /**
@@ -93,5 +94,20 @@ export async function getLeaderboardStats(): Promise<LeaderboardStatsResponse> {
  */
 export async function refreshLeaderboard(): Promise<{ message: string }> {
   const { data } = await api.post<{ message: string }>('/api/leaderboard/refresh');
+  return data;
+}
+
+/**
+ * Fetch Pong leaderboard by metric.
+ * @param metric The metric to sort by (elo, wins, winStreak, totalWon, totalWagered, perfectGames)
+ * @param limit Number of entries to return (default: 50)
+ */
+export async function getPongLeaderboard(
+  metric: string = 'elo',
+  limit: number = 50,
+): Promise<PongLeaderboardView[]> {
+  const { data } = await api.get<PongLeaderboardView[]>(
+    `/api/leaderboard/pong/${metric}?limit=${limit}`,
+  );
   return data;
 }

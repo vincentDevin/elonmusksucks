@@ -18,6 +18,7 @@ import {
 import type { PongLeaderboardView } from '@ems/types';
 import { getShameWall, getShameWallStats } from '../api/shameWall';
 import type { ShameWallEntry, ShameWallStats } from '../api/shameWall';
+import { getPongLeaderboard } from '../api/leaderboard';
 import PageContainer from '../components/PageContainer';
 
 // New unified components
@@ -108,14 +109,11 @@ export default function Leaderboard() {
         setPongLoading(true);
         setPongError(null);
         try {
-          const response = await fetch(`/api/leaderboard/pong/${pongMetric}?limit=50`);
-          if (!response.ok) {
-            throw new Error('Failed to fetch Pong leaderboard');
-          }
-          const data = await response.json();
+          const data = await getPongLeaderboard(pongMetric, 50);
           setPongLeaderboard(data);
         } catch (err) {
           setPongError(err instanceof Error ? err.message : 'Failed to load Pong leaderboard');
+          console.error('[Pong Leaderboard] Fetch error:', err);
         } finally {
           setPongLoading(false);
         }
@@ -256,6 +254,44 @@ export default function Leaderboard() {
   }
 
   if (hasError) {
+    // Determine the retry function based on active tab
+    const handleRetry = () => {
+      if (activeTab === 'betting') {
+        refresh();
+      } else if (activeTab === 'pong') {
+        // Retry pong leaderboard fetch
+        const fetchPongLeaderboard = async () => {
+          setPongLoading(true);
+          setPongError(null);
+          try {
+            const data = await getPongLeaderboard(pongMetric, 50);
+            setPongLeaderboard(data);
+          } catch (err) {
+            setPongError(err instanceof Error ? err.message : 'Failed to load Pong leaderboard');
+          } finally {
+            setPongLoading(false);
+          }
+        };
+        fetchPongLeaderboard();
+      } else if (activeTab === 'shame') {
+        // Retry shame wall fetch
+        const fetchShameWall = async () => {
+          setShameWallLoading(true);
+          setShameWallError(null);
+          try {
+            const [wallData, statsData] = await Promise.all([getShameWall(), getShameWallStats()]);
+            setShameWall(wallData);
+            setShameWallStats(statsData);
+          } catch (err) {
+            setShameWallError(err instanceof Error ? err.message : 'Failed to load shame wall');
+          } finally {
+            setShameWallLoading(false);
+          }
+        };
+        fetchShameWall();
+      }
+    };
+
     return (
       <PageContainer>
         <div className="text-center py-12">
@@ -263,7 +299,7 @@ export default function Leaderboard() {
             Error: {hasError instanceof Error ? hasError.message : hasError}
           </p>
           <button
-            onClick={() => controlBarConfig.actions[0].onClick()}
+            onClick={handleRetry}
             className="bg-primary text-surface px-4 py-2 rounded-lg hover:bg-primary/80 transition-colors"
           >
             Try Again
