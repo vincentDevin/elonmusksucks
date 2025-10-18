@@ -1,6 +1,5 @@
 // apps/client/src/components/prediction/FloatingCreatePredictionWidget.tsx
 import React from 'react';
-import { useLocation } from 'react-router-dom';
 import { usePredictionMarket } from '../../contexts/PredictionContext';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -20,7 +19,6 @@ export const FloatingCreatePredictionWidget: React.FC<FloatingCreatePredictionWi
   position = 'bottom-right',
   hideOnMobile = true,
 }) => {
-  const location = useLocation();
   const { user } = useAuth();
   const { openCreateModal } = usePredictionMarket();
 
@@ -29,17 +27,8 @@ export const FloatingCreatePredictionWidget: React.FC<FloatingCreatePredictionWi
     return null;
   }
 
-  // Detect if we're on the dashboard to adjust positioning
-  const isOnDashboard = location.pathname === '/dashboard';
-
-  // Adjust position based on dashboard context
+  // Position classes: 70px from bottom (above QuickThemeSwitcher at bottom-2 = 8px)
   const getPositionClasses = () => {
-    if (isOnDashboard && position === 'bottom-right') {
-      // Position as part of the dashboard FAB group
-      // Above QuickThemeSwitcher which adjusts to bottom-[160px] on dashboard
-      return 'bottom-[220px] right-8';
-    }
-    // Default positioning: 70px from bottom (above QuickThemeSwitcher at bottom-2 = 8px)
     return {
       'bottom-right': 'bottom-[70px] right-4',
       'bottom-left': 'bottom-[70px] left-4',
@@ -55,17 +44,13 @@ export const FloatingCreatePredictionWidget: React.FC<FloatingCreatePredictionWi
       {/* Main Toggle Button - Matches QuickThemeSwitcher style exactly */}
       <button
         onClick={() => openCreateModal()}
-        className={`
-          ${isOnDashboard ? 'w-12 h-12' : 'w-12 h-12'} rounded-full transition-all duration-200
+        className="
+          w-12 h-12 rounded-full transition-all duration-200
           flex items-center justify-center backdrop-blur-sm
-          ${
-            isOnDashboard
-              ? 'bg-accent text-white hover:bg-accent/90'
-              : 'bg-accent text-white hover:bg-accent/90'
-          }
+          bg-accent text-white hover:bg-accent/90
           border-2 border-primary/40
           hover:scale-110
-        `}
+        "
         style={{
           boxShadow:
             '0 0 20px color-mix(in srgb, var(--color-primary) 30%, transparent), 0 4px 6px rgba(0, 0, 0, 0.1)',

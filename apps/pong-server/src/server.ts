@@ -394,6 +394,8 @@ class GameManager {
   private spectatorGames = new Map<string, string>(); // socketId -> gameId
   private lastEmitTime = new Map<string, number>(); // Track last emit time per game
   private droppedFrames = new Map<string, number>(); // Track dropped frames per game
+  private countdownInProgress = new Map<string, boolean>(); // Track active countdowns to prevent duplicates
+  private lastScoreTime = new Map<string, number>(); // Track last score time to prevent rapid scoring
 
   constructor(
     private io: SocketIOServer,
@@ -478,6 +480,16 @@ class GameManager {
   }
 
   private startCountdown(game: GameState): void {
+    // Guard: Prevent duplicate countdowns
+    if (this.countdownInProgress.get(game.id)) {
+      console.warn(
+        `⚠️ Countdown already in progress for game ${game.id}, ignoring duplicate request`,
+      );
+      return;
+    }
+
+    // Mark countdown as in progress
+    this.countdownInProgress.set(game.id, true);
     let countdown = 3;
 
     const countdownInterval = setInterval(() => {
@@ -491,17 +503,44 @@ class GameManager {
         game.status = 'active';
         this.serveBall(game);
         this.startGameLoop(game);
+        // Clear countdown guard when countdown completes
+        this.countdownInProgress.delete(game.id);
       }
       countdown--;
     }, 1000);
   }
 
   private serveBall(game: GameState): void {
+    // Validation: Ensure game is in valid state before serving
+    if (!game.players[0] || !game.players[1]) {
+      console.error(`❌ Cannot serve ball in game ${game.id}: missing players`);
+      return;
+    }
+
+    // Check if ball is already moving (prevent double-serve)
+    const ballSpeed = Math.sqrt(game.ball.vx ** 2 + game.ball.vy ** 2);
+    if (ballSpeed > 0) {
+      console.warn(
+        `⚠️ Cannot serve ball in game ${game.id}: ball already moving (speed: ${ballSpeed})`,
+      );
+      return;
+    }
+
+    // Only serve if game is active (called from countdown or after score)
+    if (game.status !== 'active') {
+      console.warn(`⚠️ Cannot serve ball in game ${game.id}: invalid status (${game.status})`);
+      return;
+    }
+
     const angle = ((Math.random() - 0.5) * Math.PI) / 3; // -30 to 30 degrees
     const direction = Math.random() > 0.5 ? 1 : -1;
 
     game.ball.vx = Math.cos(angle) * PONG_PHYSICS.BALL_SPEED_INITIAL * direction;
     game.ball.vy = Math.sin(angle) * PONG_PHYSICS.BALL_SPEED_INITIAL;
+
+    console.log(
+      `🏓 Ball served in game ${game.id} (angle: ${((angle * 180) / Math.PI).toFixed(1)}°, direction: ${direction > 0 ? 'right' : 'left'})`,
+    );
   }
 
   private startGameLoop(game: GameState): void {
@@ -518,11 +557,17 @@ class GameManager {
 
       this.updateGame(game);
 
-      // Frequency governor: Emit at max 60 Hz (16.67ms intervals)
+      // Adaptive frequency governor: 120Hz during active gameplay, 60Hz otherwise
       const now = Date.now();
       const lastEmit = this.lastEmitTime.get(game.id) || 0;
       const timeSinceLastEmit = now - lastEmit;
-      const minEmitInterval = 1000 / PONG_PHYSICS.NETWORK_UPDATE_RATE; // ~16.67ms for 60 Hz
+
+      // Use higher update rate during active gameplay for smoother experience
+      const updateRate =
+        game.status === 'active'
+          ? PONG_PHYSICS.ACTIVE_NETWORK_UPDATE_RATE // 120 Hz during active play
+          : PONG_PHYSICS.NETWORK_UPDATE_RATE; // 60 Hz during waiting/countdown
+      const minEmitInterval = 1000 / updateRate;
 
       if (timeSinceLastEmit >= minEmitInterval) {
         this.broadcastGameState(game);
@@ -537,8 +582,12 @@ class GameManager {
       if (game.tick % (PONG_PHYSICS.TICK_RATE * 5) === 0) {
         const dropped = this.droppedFrames.get(game.id) || 0;
         if (dropped > 0) {
+          const currentRate =
+            game.status === 'active'
+              ? PONG_PHYSICS.ACTIVE_NETWORK_UPDATE_RATE
+              : PONG_PHYSICS.NETWORK_UPDATE_RATE;
           console.log(
-            `[pong-freq] Game ${game.id}: ${dropped} frames dropped in 5s (${PONG_PHYSICS.NETWORK_UPDATE_RATE}Hz governor)`,
+            `[pong-freq] Game ${game.id}: ${dropped} frames dropped in 5s (${currentRate}Hz ${game.status} governor)`,
           );
           this.droppedFrames.set(game.id, 0); // Reset counter
         }
@@ -785,13 +834,26 @@ class GameManager {
   }
 
   private checkGoals(game: GameState): void {
+    // Score cooldown guard: Prevent rapid scoring (500ms minimum between scores)
+    const now = Date.now();
+    const lastScore = this.lastScoreTime.get(game.id) || 0;
+    const timeSinceLastScore = now - lastScore;
+    const SCORE_COOLDOWN_MS = 500;
+
+    if (timeSinceLastScore < SCORE_COOLDOWN_MS) {
+      // Too soon since last score, ignore to prevent rapid scoring
+      return;
+    }
+
     if (game.ball.x <= 0) {
       // Player 1 scored
       game.players[1]!.score++;
+      this.lastScoreTime.set(game.id, now);
       this.onScore(game, 1);
     } else if (game.ball.x >= PONG_PHYSICS.FIELD_WIDTH) {
       // Player 0 scored
       game.players[0].score++;
+      this.lastScoreTime.set(game.id, now);
       this.onScore(game, 0);
     }
   }
@@ -875,6 +937,9 @@ class GameManager {
       this.gameIntervals.delete(game.id);
     }
     this.cleanupGameTracking(game.id);
+
+    // Clear countdown guard if game ends during countdown
+    this.countdownInProgress.delete(game.id);
 
     const duration = Math.floor((Date.now() - game.startTime) / 1000);
     const winnerPlayer = winnerSlot !== undefined ? game.players[winnerSlot] : null;
@@ -1090,6 +1155,19 @@ class GameManager {
     return this.games.get(gameId) || null;
   }
 
+  /**
+   * Check if a player is currently in an active game (not ended)
+   * Used to prevent players from joining multiple games simultaneously
+   */
+  isPlayerInGame(playerId: number): boolean {
+    const gameId = this.playerGames.get(playerId);
+    if (!gameId) return false;
+
+    const game = this.games.get(gameId);
+    // Player is considered "in game" if game exists and hasn't ended
+    return game !== undefined && game.status !== 'ended';
+  }
+
   // ——————————————————————————————————————————————————————————————————————————————————
   // SPECTATOR FUNCTIONALITY
   // ——————————————————————————————————————————————————————————————————————————————————
@@ -1250,6 +1328,8 @@ class GameManager {
     this.playerGames.clear();
     this.gameSpectators.clear();
     this.spectatorGames.clear();
+    this.countdownInProgress.clear();
+    this.lastScoreTime.clear();
 
     console.log('🧹 Game manager cleanup complete');
   }
@@ -1532,6 +1612,19 @@ export class PongGameServer {
         const player = this.auth.getPlayer(socket.id);
         if (!player) return;
 
+        // Game membership validation: Prevent player from creating multiple games
+        if (this.game.isPlayerInGame(player.id)) {
+          socket.emit('error', {
+            code: 'ALREADY_IN_GAME',
+            message:
+              'You are already in an active game. Please finish or leave your current game first.',
+          });
+          console.warn(
+            `⚠️ Player ${player.name} (${player.id}) attempted to create a game while already in one`,
+          );
+          return;
+        }
+
         // Validate AI difficulty for AI matches
         let validatedDifficulty: AIDifficulty = 'MEDIUM'; // default
         if (data.type === 'ai') {
@@ -1565,36 +1658,51 @@ export class PongGameServer {
         );
 
         if (data.type === 'ai') {
-          // Start AI game immediately
-          const difficulty = validatedDifficulty;
-          const aiPlayer = await this.db.createAIPlayer(difficulty);
+          // Start AI game immediately with comprehensive error handling
+          try {
+            const difficulty = validatedDifficulty;
+            const aiPlayer = await this.db.createAIPlayer(difficulty);
 
-          const gameId = `game-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-          socket.join(`game:${gameId}`);
+            const gameId = `game-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+            socket.join(`game:${gameId}`);
 
-          socket.emit('match_joined', {
-            gameId,
-            playerSlot: 0,
-            opponent: aiPlayer,
-            wager: data.wager,
-            pot: data.wager,
-          });
-
-          const gameResult = await this.game.startGame(
-            gameId,
-            [player, aiPlayer],
-            data.wager,
-            true,
-            validatedDifficulty,
-          );
-          if (!gameResult.success) {
-            socket.emit('error', {
-              code: 'GAME_START_FAILED',
-              message: gameResult.error || 'Failed to start game',
+            socket.emit('match_joined', {
+              gameId,
+              playerSlot: 0,
+              opponent: aiPlayer,
+              wager: data.wager,
+              pot: data.wager,
             });
+
+            const gameResult = await this.game.startGame(
+              gameId,
+              [player, aiPlayer],
+              data.wager,
+              true,
+              validatedDifficulty,
+            );
+            if (!gameResult.success) {
+              socket.emit('error', {
+                code: 'GAME_START_FAILED',
+                message: gameResult.error || 'Failed to start game',
+              });
+              // Cleanup lobby on game start failure
+              this.lobby.deleteLobby(lobbyId);
+              return;
+            }
+            this.lobby.deleteLobby(lobbyId);
+          } catch (error) {
+            // Comprehensive error handling for AI player creation/game start
+            console.error(`❌ AI game creation failed for player ${player.name}:`, error);
+            socket.emit('error', {
+              code: 'AI_GAME_CREATION_FAILED',
+              message: 'Failed to create AI game. Please try again.',
+            });
+            // Cleanup lobby on error
+            this.lobby.deleteLobby(lobbyId);
+            // Note: Not a security event, just operational error (already logged via console.error)
             return;
           }
-          this.lobby.deleteLobby(lobbyId);
         } else {
           // PvP: Create game immediately and put creator in waiting state
           const gameId = `game-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -1648,6 +1756,19 @@ export class PongGameServer {
 
         const player = this.auth.getPlayer(socket.id);
         if (!player) return;
+
+        // Game membership validation: Prevent player from joining multiple games
+        if (this.game.isPlayerInGame(player.id)) {
+          socket.emit('error', {
+            code: 'ALREADY_IN_GAME',
+            message:
+              'You are already in an active game. Please finish or leave your current game first.',
+          });
+          console.warn(
+            `⚠️ Player ${player.name} (${player.id}) attempted to join a game while already in one`,
+          );
+          return;
+        }
 
         const lobby = this.lobby.getLobby(data.matchId);
         if (!lobby) {
@@ -1770,6 +1891,33 @@ export class PongGameServer {
         if (!player) return;
 
         this.game.processInput(player.id, data as PlayerInput);
+      });
+
+      // Ping request (for accurate ping measurement)
+      socket.on('ping_request', (data: unknown) => {
+        // Rate limiting (allow frequent ping requests)
+        if (!this.rateLimiter.checkLimit(socket.id, 'ping_request')) {
+          return; // Silently drop excessive ping requests
+        }
+
+        const player = this.auth.getPlayer(socket.id);
+        if (!player) return;
+
+        // Type guard
+        if (
+          !data ||
+          typeof data !== 'object' ||
+          !('clientTimestamp' in data) ||
+          typeof data.clientTimestamp !== 'number'
+        ) {
+          return; // Silently drop invalid ping requests
+        }
+
+        // Send back the client timestamp and server timestamp
+        socket.emit('ping_response', {
+          clientTimestamp: data.clientTimestamp,
+          serverTimestamp: Date.now(),
+        });
       });
 
       // Leave match
@@ -1928,7 +2076,7 @@ export class PongGameServer {
       console.log(`✅ Optimized Pong Game Server running on port ${port}`);
       console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(
-        `   Performance: ${PONG_PHYSICS.TICK_RATE}fps game loop, ${PONG_PHYSICS.NETWORK_UPDATE_RATE}fps network\n`,
+        `   Performance: ${PONG_PHYSICS.TICK_RATE}fps game loop, ${PONG_PHYSICS.ACTIVE_NETWORK_UPDATE_RATE}fps active/${PONG_PHYSICS.NETWORK_UPDATE_RATE}fps idle network\n`,
       );
     });
   }
