@@ -9,9 +9,9 @@ const autocannon = require('autocannon');
 const API_URL = process.env.API_BASE_URL || 'http://127.0.0.1:5000';
 const TOKEN = process.env.TEST_AUTH_TOKEN || '';
 
+// Note: Leaderboard endpoints are public, auth token is optional
 if (!TOKEN) {
-  console.error('❌ ERROR: Set TEST_AUTH_TOKEN environment variable first');
-  process.exit(1);
+  console.log('ℹ️  No auth token provided (leaderboard endpoints are public)');
 }
 
 const tests = [
@@ -46,14 +46,20 @@ async function runTest(test) {
   console.log(`🧪 Testing: ${test.title}`);
   console.log(`${'='.repeat(60)}\n`);
 
+  const headers = {
+    'Content-Type': 'application/json',
+  };
+
+  // Only add Authorization header if token is provided
+  if (TOKEN) {
+    headers.Authorization = `Bearer ${TOKEN}`;
+  }
+
   const result = await autocannon({
     url: test.url,
     connections: test.connections,
     duration: test.duration,
-    headers: {
-      Authorization: `Bearer ${TOKEN}`,
-      'Content-Type': 'application/json',
-    },
+    headers,
   });
 
   console.log(`\n📊 Results for ${test.title}:`);

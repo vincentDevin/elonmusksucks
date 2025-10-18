@@ -191,6 +191,94 @@ export class LeaderboardRepository implements ILeaderboardRepository {
   }
 
   /**
+   * Get combined user ranking data in a single query (optimized for enhanced stats)
+   * Combines all-time rank, daily rank, and leaderboard stats in one CTE query
+   */
+  async getUserRankingCombined(userId: number): Promise<{
+    allTimeRank: number | null;
+    dailyRank: number | null;
+    totalUsers: number;
+  }> {
+    const cacheKey = `user_rank_combined:${userId}`;
+
+    // Try cache first
+    try {
+      const cached = await redisClient.get(cacheKey);
+      if (cached) {
+        return JSON.parse(cached);
+      }
+    } catch (error) {
+      console.warn('[leaderboard] Cache read failed:', error);
+    }
+
+    // Single CTE query to get all ranking data at once
+    const result = await prisma.$queryRaw<
+      Array<{
+        all_time_rank: bigint | null;
+        daily_rank: bigint | null;
+        total_users: bigint;
+      }>
+    >`
+      WITH all_time_ranks AS (
+        SELECT
+          "userId",
+          ROW_NUMBER() OVER (ORDER BY profit DESC) as rank
+        FROM "UserStats"
+      ),
+      daily_profits AS (
+        SELECT
+          us."userId",
+          COALESCE(
+            (SELECT SUM(CASE WHEN b.won = true THEN b.payout - b.amount ELSE -b.amount END)
+             FROM "Bet" b
+             WHERE b."userId" = us."userId" AND b."createdAt" >= CURRENT_DATE - INTERVAL '1 day'
+            ), 0
+          ) + COALESCE(
+            (SELECT SUM(CASE WHEN p.status = 'WON' THEN p."potentialPayout" - p.amount ELSE -p.amount END)
+             FROM "Parlay" p
+             WHERE p."userId" = us."userId" AND p."createdAt" >= CURRENT_DATE - INTERVAL '1 day'
+            ), 0
+          ) as daily_profit
+        FROM "UserStats" us
+      ),
+      daily_ranks AS (
+        SELECT
+          "userId",
+          ROW_NUMBER() OVER (ORDER BY daily_profit DESC) as rank
+        FROM daily_profits
+      ),
+      user_stats AS (
+        SELECT COUNT(*)::bigint as total_users
+        FROM "UserStats"
+      )
+      SELECT
+        atr.rank as all_time_rank,
+        dr.rank as daily_rank,
+        us.total_users
+      FROM user_stats us
+      LEFT JOIN all_time_ranks atr ON atr."userId" = ${userId}
+      LEFT JOIN daily_ranks dr ON dr."userId" = ${userId}
+    `;
+
+    const [row] = result;
+
+    const ranking = {
+      allTimeRank: row?.all_time_rank ? Number(row.all_time_rank) : null,
+      dailyRank: row?.daily_rank ? Number(row.daily_rank) : null,
+      totalUsers: row?.total_users ? Number(row.total_users) : 0,
+    };
+
+    // Cache the result
+    try {
+      await redisClient.setex(cacheKey, CACHE_TTL.USER_RANK, JSON.stringify(ranking));
+    } catch (error) {
+      console.warn('[leaderboard] Cache write failed:', error);
+    }
+
+    return ranking;
+  }
+
+  /**
    * Get specific user's rank across different time periods - now queries UserStats directly
    */
   async getUserRank(userId: number, period: 'allTime' | 'daily'): Promise<UserRank> {

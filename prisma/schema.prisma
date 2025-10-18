@@ -281,6 +281,7 @@ model Prediction {
   @@index([firstCorrectBetUserId], name: "idx_prediction_first_correct")
   @@index([resolvedWithinHour, resolvedAt], name: "idx_prediction_speed")
   @@index([categoryId, approved])
+  @@index([categoryId, resolved, createdAt(sort: Desc)], name: "idx_prediction_category_status")
 }
 
 model PredictionOption {
@@ -394,6 +395,7 @@ model UserAchievement {
   @@unique([userId, achievementId])
   @@index([userId, progress])
   @@index([achievementId, completedAt])
+  @@index([userId, completedAt], name: "idx_user_achievement_completion")
 }
 
 model AchievementEventLog {
