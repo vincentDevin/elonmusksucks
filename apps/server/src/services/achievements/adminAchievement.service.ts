@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import { unifiedActivityService } from '../unifiedActivity.service';
 import { AchievementRepository } from '../../repositories/AchievementRepository';
 import type { IAchievementRepository } from '../../repositories/interfaces/IAchievementRepository';
+import { withCache, CacheKeys, CACHE_TTL } from '../../utils/analyticsCache';
 
 const prisma = new PrismaClient();
 const achievementRepository = new AchievementRepository(prisma);
@@ -491,6 +492,7 @@ class AdminAchievementService {
   /**
    * Get user's achievement progress
    * Returns all achievements with user's current progress
+   * Issue #3: Two-level caching (global achievements + user progress)
    */
   async getUserAchievementProgress(userId: number): Promise<
     {
@@ -507,13 +509,25 @@ class AdminAchievementService {
       completedAt?: string;
     }[]
   > {
-    // Get all achievements and user's progress
-    const [allAchievements, userAchievements] = await Promise.all([
-      achievementRepository.findAllAchievements(),
-      achievementRepository.findUserAchievements(userId),
-    ]);
+    // Level 1 Cache: All achievements (global, shared across users, 1 hour TTL)
+    const allAchievements = await withCache(
+      CacheKeys.ACHIEVEMENTS_ALL(),
+      CACHE_TTL.ACHIEVEMENTS_GLOBAL,
+      async () => {
+        return achievementRepository.findAllAchievements();
+      },
+    );
 
-    // Create a map of user achievements for quick lookup
+    // Level 2 Cache: User-specific progress (30 second TTL)
+    const userAchievements = await withCache(
+      CacheKeys.USER_ACHIEVEMENTS_PROGRESS(userId),
+      CACHE_TTL.ACHIEVEMENTS_USER,
+      async () => {
+        return achievementRepository.findUserAchievements(userId);
+      },
+    );
+
+    // Create a map of user achievements for quick lookup (fast in-memory operation)
     const userAchievementMap = new Map(userAchievements.map((ua) => [ua.achievementId, ua]));
 
     // Return all achievements with user progress (0 if not started)

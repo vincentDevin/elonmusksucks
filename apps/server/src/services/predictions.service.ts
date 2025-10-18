@@ -27,6 +27,8 @@ import { eventBus } from '../lib/EventBus';
 import { serializeBigInt } from '../utils/bigintSerializer';
 import { ContentRepository } from '../repositories/ContentRepository';
 import type { IContentRepository } from '../repositories/interfaces/IContentRepository';
+import { withCache, CacheKeys, CACHE_TTL } from '../utils/analyticsCache';
+import { CacheInvalidation } from '../utils/cacheInvalidation';
 
 // Using the global ParlayLegWithUser type from @ems/types
 
@@ -136,23 +138,28 @@ export class PredictionService {
     const validatedLimit = Math.min(Math.max(1, limit), 100); // Between 1 and 100
     const validatedOffset = Math.max(0, offset); // Non-negative
 
-    const { predictions: raw, total } = await this.repo.listFilteredPredictions({
-      status,
-      limit: validatedLimit,
-      offset: validatedOffset,
-    });
+    // Issue #3: Cache prediction lists with filter parameters
+    const cacheKey = CacheKeys.PREDICTIONS_ACTIVE(validatedLimit, validatedOffset, status);
 
-    const predictions = await Promise.all(raw.map((p) => this.enrichAvatars(p)));
-
-    return {
-      predictions,
-      pagination: {
-        total,
+    return withCache(cacheKey, CACHE_TTL.PREDICTIONS_ACTIVE, async () => {
+      const { predictions: raw, total } = await this.repo.listFilteredPredictions({
+        status,
         limit: validatedLimit,
         offset: validatedOffset,
-        hasMore: validatedOffset + validatedLimit < total,
-      },
-    };
+      });
+
+      const predictions = await Promise.all(raw.map((p) => this.enrichAvatars(p)));
+
+      return {
+        predictions,
+        pagination: {
+          total,
+          limit: validatedLimit,
+          offset: validatedOffset,
+          hasMore: validatedOffset + validatedLimit < total,
+        },
+      };
+    });
   }
 
   /* ────────────────────────────────────────────────────────────────────────── */
@@ -257,17 +264,31 @@ export class PredictionService {
       }
     }
 
+    // Issue #3: Invalidate prediction list caches after new prediction created
+    await CacheInvalidation.invalidatePredictionLists();
+
     return dto;
   }
 
   /* ────────────────────────────────────────────────────────────────────────── */
   /** Fetch ONE prediction (public safe shape) with view tracking */
   async getPrediction(id: number, userId?: number) {
-    const pred = await this.repo.findPredictionById(id);
-    if (!pred) return null;
+    // Issue #3: Cache prediction data with dynamic TTL (resolved = long, active = short)
+    const cacheKey = CacheKeys.PREDICTION_SINGLE(id);
 
-    // Track prediction view in background (don't block response)
-    if (userId) {
+    // Fetch prediction data (cached)
+    const enrichedPrediction = await withCache(
+      cacheKey,
+      CACHE_TTL.PREDICTIONS_ACTIVE, // Will use 60s for now, can be optimized later
+      async () => {
+        const pred = await this.repo.findPredictionById(id);
+        if (!pred) return null;
+        return this.enrichAvatars(pred);
+      },
+    );
+
+    // Track prediction view in background (don't block response, happens regardless of cache)
+    if (userId && enrichedPrediction) {
       setImmediate(async () => {
         try {
           await this.trackPredictionView(id, userId);
@@ -280,7 +301,7 @@ export class PredictionService {
       });
     }
 
-    return this.enrichAvatars(pred);
+    return enrichedPrediction;
   }
 
   /**

@@ -19,6 +19,7 @@ import { broadcastRealtimeMetrics } from './admin.service';
 import { tracingCollector } from '../lib/tracing';
 import { streakManager } from './StreakManager.service';
 import { financialTracker } from './FinancialTracker.service';
+import { CacheInvalidation } from '../utils/cacheInvalidation';
 
 export class BettingService {
   private userService = new UserService();
@@ -230,6 +231,10 @@ export class BettingService {
 
             // Broadcast real-time metrics
             broadcastRealtimeMetrics(),
+
+            // Issue #3: Invalidate caches after bet placement
+            CacheInvalidation.invalidateUser(userId),
+            CacheInvalidation.invalidatePrediction(opt.prediction.id),
           ]);
         } catch (error) {
           console.error('[betting] Error in post-transaction operations for bet:', bet.id, error);
@@ -390,6 +395,11 @@ export class BettingService {
 
         // Broadcast real-time metrics
         broadcastRealtimeMetrics(),
+
+        // Issue #3: Invalidate caches after parlay placement
+        CacheInvalidation.invalidateUser(userId),
+        // Invalidate all predictions in the parlay
+        ...affectedPredictions.map((predId) => CacheInvalidation.invalidatePrediction(predId)),
       ]);
     } catch (error) {
       console.error('[betting] Error in post-transaction operations for parlay:', parlay.id, error);

@@ -70,6 +70,7 @@ import type {
 import type { LeaderboardTrigger, LeaderboardMetrics, ScheduleConfig } from '@ems/types';
 import { QUEUE_NAMES } from '@ems/types';
 import { LeaderboardRepository } from '../repositories/LeaderboardRepository';
+import { withCache, CACHE_TTL } from '../utils/analyticsCache';
 
 // TEMP: Re-export for backwards compatibility during migration
 export type { LeaderboardTrigger, LeaderboardMetrics, ScheduleConfig } from '@ems/types';
@@ -248,13 +249,18 @@ export class LeaderboardService {
   /**
    * Get combined user ranking data in a single optimized query
    * Replaces multiple getUserRank + getLeaderboardStats calls
+   * Issue #3: Cache user rankings to reduce database load
    */
   async getUserRankingCombined(userId: number): Promise<{
     allTimeRank: number | null;
     dailyRank: number | null;
     totalUsers: number;
   }> {
-    return this.repo.getUserRankingCombined(userId);
+    // Cache combined ranking data (already optimized to single query)
+    const cacheKey = `leaderboard:rank:${userId}:combined`;
+    return withCache(cacheKey, CACHE_TTL.LEADERBOARD_RANK, async () => {
+      return this.repo.getUserRankingCombined(userId);
+    });
   }
 
   /**

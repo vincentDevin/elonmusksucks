@@ -11,6 +11,7 @@ import { PayoutJobData, REDIS_CHANNELS } from '@ems/types';
 // TODO: Use QUEUE_NAMES and QueueOptions from @ems/types once imports resolve
 import { createWorkerOptions } from '../lib/bullmqConfig';
 import { eventBus } from '../lib/EventBus';
+import { CacheInvalidation } from '../utils/cacheInvalidation';
 
 // Configurable concurrency to keep CPU saturation <70%
 const PAYOUT_CONCURRENCY = parseInt(process.env.WORKER_PAYOUT_CONCURRENCY || '2');
@@ -65,8 +66,14 @@ const payoutWorker = new Worker<PayoutJobData>(
 
       await eventBus.publish(REDIS_CHANNELS.PAYOUT_COMPLETED, payoutData);
 
+      // Issue #3: Invalidate caches after payout processing
+      await Promise.allSettled([
+        CacheInvalidation.invalidatePrediction(predictionId),
+        CacheInvalidation.invalidateLeaderboard(), // Leaderboard rankings changed
+      ]);
+
       console.log(
-        `[worker] Prediction ${predictionId} resolved, events published, leaderboard triggered`,
+        `[worker] Prediction ${predictionId} resolved, events published, leaderboard triggered, caches invalidated`,
       );
     } catch (error) {
       console.error(`[worker] Failed to process payout for prediction ${predictionId}:`, error);

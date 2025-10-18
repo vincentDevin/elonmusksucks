@@ -13,6 +13,7 @@ import { ImageProcessingService, ProcessedImageSizes } from './imageProcessing.s
 import { DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { eventBus } from '../lib/EventBus';
 import { activeUserCacheService } from './activeUserCache.service';
+import { withCache, CacheKeys, CACHE_TTL } from '../utils/analyticsCache';
 
 // Define a minimal file interface matching Multer's in-memory buffer
 export type UploadedFile = {
@@ -775,28 +776,34 @@ export class UserService {
   // --- STATS ---
 
   async getUserStats(userId: number): Promise<UserStatsView | null> {
-    const stats = await this.repo.getUserStats(userId);
-    if (!stats) return null;
-    return {
-      totalBets: stats.totalBets,
-      betsWon: stats.betsWon,
-      betsLost: stats.betsLost,
-      totalParlays: stats.totalParlays,
-      parlaysWon: stats.parlaysWon,
-      parlaysLost: stats.parlaysLost,
-      totalParlayLegs: stats.totalParlayLegs,
-      parlayLegsWon: stats.parlayLegsWon,
-      parlayLegsLost: stats.parlayLegsLost,
-      totalWagered: stats.totalWagered.toString(),
-      totalWon: stats.totalWon.toString(),
-      profit: stats.profit.toString(),
-      roi: stats.roi,
-      currentStreak: stats.currentStreak,
-      longestStreak: stats.longestStreak,
-      mostCommonBet: stats.mostCommonBet ?? null,
-      biggestWin: stats.biggestWin.toString(),
-      updatedAt: stats.updatedAt instanceof Date ? stats.updatedAt.toISOString() : stats.updatedAt,
-    };
+    // Issue #3: Cache basic user stats for 30 seconds to reduce database load
+    const cacheKey = CacheKeys.USER_STATS_BASIC(userId);
+
+    return withCache(cacheKey, CACHE_TTL.USER_STATS, async () => {
+      const stats = await this.repo.getUserStats(userId);
+      if (!stats) return null;
+      return {
+        totalBets: stats.totalBets,
+        betsWon: stats.betsWon,
+        betsLost: stats.betsLost,
+        totalParlays: stats.totalParlays,
+        parlaysWon: stats.parlaysWon,
+        parlaysLost: stats.parlaysLost,
+        totalParlayLegs: stats.totalParlayLegs,
+        parlayLegsWon: stats.parlayLegsWon,
+        parlayLegsLost: stats.parlayLegsLost,
+        totalWagered: stats.totalWagered.toString(),
+        totalWon: stats.totalWon.toString(),
+        profit: stats.profit.toString(),
+        roi: stats.roi,
+        currentStreak: stats.currentStreak,
+        longestStreak: stats.longestStreak,
+        mostCommonBet: stats.mostCommonBet ?? null,
+        biggestWin: stats.biggestWin.toString(),
+        updatedAt:
+          stats.updatedAt instanceof Date ? stats.updatedAt.toISOString() : stats.updatedAt,
+      };
+    });
   }
 
   async updateUserStats(
