@@ -53,64 +53,64 @@ export function usePongInput(): PongInputHook {
     setIsInputActive(hasInput);
   }, []);
 
-  // Continuous input sending for held keys
+  // ✅ Store updateInput in ref for stable event listeners
+  const updateInputRef = useRef(updateInput);
+  useEffect(() => {
+    updateInputRef.current = updateInput;
+  }, [updateInput]);
+
+  // ✅ Continuous input sending for held keys (throttled for performance)
   useEffect(() => {
     const interval = setInterval(() => {
       const currentState = inputBufferRef.current;
       if ((currentState.up || currentState.down) && sendInputRef.current) {
         sendInputRef.current(currentState);
       }
-    }, 8); // Send input at ~120fps when keys are held (1000/8 = 125fps)
+    }, 10); // ✅ Send input at ~100fps (1000/10 = 100fps) - Good balance of responsiveness and performance
 
     return () => clearInterval(interval);
   }, []);
 
-  // Keyboard event handlers
-  const handleKeyDown = useCallback(
-    (event: KeyboardEvent) => {
-      // Prevent default for game keys to avoid page scrolling
-      if (['ArrowUp', 'ArrowDown', 'w', 'W', 's', 'S'].includes(event.key)) {
-        event.preventDefault();
-      }
+  // ✅ Stable keyboard event handlers (use ref to avoid recreating)
+  const handleKeyDown = useCallback((event: KeyboardEvent) => {
+    // Prevent default for game keys to avoid page scrolling
+    if (['ArrowUp', 'ArrowDown', 'w', 'W', 's', 'S'].includes(event.key)) {
+      event.preventDefault();
+    }
 
-      // Ignore repeated keydown events when key is held
-      if (event.repeat) return;
+    // Ignore repeated keydown events when key is held
+    if (event.repeat) return;
 
-      switch (event.key) {
-        case 'ArrowUp':
-        case 'w':
-        case 'W':
-          updateInput({ up: true });
-          break;
-        case 'ArrowDown':
-        case 's':
-        case 'S':
-          updateInput({ down: true });
-          break;
-      }
-    },
-    [updateInput],
-  );
+    switch (event.key) {
+      case 'ArrowUp':
+      case 'w':
+      case 'W':
+        updateInputRef.current({ up: true });
+        break;
+      case 'ArrowDown':
+      case 's':
+      case 'S':
+        updateInputRef.current({ down: true });
+        break;
+    }
+  }, []); // ✅ No dependencies - stable callback
 
-  const handleKeyUp = useCallback(
-    (event: KeyboardEvent) => {
-      switch (event.key) {
-        case 'ArrowUp':
-        case 'w':
-        case 'W':
-          updateInput({ up: false });
-          break;
-        case 'ArrowDown':
-        case 's':
-        case 'S':
-          updateInput({ down: false });
-          break;
-      }
-    },
-    [updateInput],
-  );
+  const handleKeyUp = useCallback((event: KeyboardEvent) => {
+    switch (event.key) {
+      case 'ArrowUp':
+      case 'w':
+      case 'W':
+        updateInputRef.current({ up: false });
+        break;
+      case 'ArrowDown':
+      case 's':
+      case 'S':
+        updateInputRef.current({ down: false });
+        break;
+    }
+  }, []); // ✅ No dependencies - stable callback
 
-  // Touch event handlers for mobile
+  // ✅ Stable touch event handlers for mobile
   const handleTouchStart = useCallback((event: TouchEvent) => {
     event.preventDefault();
 
@@ -122,62 +122,53 @@ export function usePongInput(): PongInputHook {
       currentY: touch.clientY,
       isActive: true,
     };
-  }, []);
+  }, []); // ✅ No dependencies - stable callback
 
-  const handleTouchMove = useCallback(
-    (event: TouchEvent) => {
-      event.preventDefault();
+  const handleTouchMove = useCallback((event: TouchEvent) => {
+    event.preventDefault();
 
-      if (!touchPositionRef.current.isActive) return;
+    if (!touchPositionRef.current.isActive) return;
 
-      const touch = event.touches[0];
-      if (!touch) return;
+    const touch = event.touches[0];
+    if (!touch) return;
 
-      touchPositionRef.current.currentY = touch.clientY;
+    touchPositionRef.current.currentY = touch.clientY;
 
-      const deltaY = touchPositionRef.current.currentY - touchPositionRef.current.startY;
-      const threshold = 10; // Minimum movement threshold
+    const deltaY = touchPositionRef.current.currentY - touchPositionRef.current.startY;
+    const threshold = 10; // Minimum movement threshold
 
-      if (Math.abs(deltaY) > threshold) {
-        const up = deltaY < -threshold;
-        const down = deltaY > threshold;
+    if (Math.abs(deltaY) > threshold) {
+      const up = deltaY < -threshold;
+      const down = deltaY > threshold;
 
-        updateInput({ up, down });
-      } else {
-        updateInput({ up: false, down: false });
-      }
-    },
-    [updateInput],
-  );
+      updateInputRef.current({ up, down });
+    } else {
+      updateInputRef.current({ up: false, down: false });
+    }
+  }, []); // ✅ No dependencies - stable callback
 
-  const handleTouchEnd = useCallback(
-    (event: TouchEvent) => {
-      event.preventDefault();
+  const handleTouchEnd = useCallback((event: TouchEvent) => {
+    event.preventDefault();
 
-      touchPositionRef.current.isActive = false;
-      updateInput({ up: false, down: false });
-    },
-    [updateInput],
-  );
+    touchPositionRef.current.isActive = false;
+    updateInputRef.current({ up: false, down: false });
+  }, []); // ✅ No dependencies - stable callback
 
-  // Mouse movement handler for precise control
-  const handleMouseMove = useCallback(
-    (event: MouseEvent) => {
-      if (!touchPositionRef.current.isActive) return;
+  // ✅ Stable mouse movement handler for precise control
+  const handleMouseMove = useCallback((event: MouseEvent) => {
+    if (!touchPositionRef.current.isActive) return;
 
-      const deltaY = event.clientY - touchPositionRef.current.startY;
-      const threshold = 5; // Smaller threshold for mouse precision
+    const deltaY = event.clientY - touchPositionRef.current.startY;
+    const threshold = 5; // Smaller threshold for mouse precision
 
-      if (Math.abs(deltaY) > threshold) {
-        const up = deltaY < -threshold;
-        const down = deltaY > threshold;
-        updateInput({ up, down });
-      } else {
-        updateInput({ up: false, down: false });
-      }
-    },
-    [updateInput],
-  );
+    if (Math.abs(deltaY) > threshold) {
+      const up = deltaY < -threshold;
+      const down = deltaY > threshold;
+      updateInputRef.current({ up, down });
+    } else {
+      updateInputRef.current({ up: false, down: false });
+    }
+  }, []); // ✅ No dependencies - stable callback
 
   const handleMouseDown = useCallback((event: MouseEvent) => {
     if (event.button === 0) {
@@ -188,14 +179,14 @@ export function usePongInput(): PongInputHook {
         isActive: true,
       };
     }
-  }, []);
+  }, []); // ✅ No dependencies - stable callback
 
   const handleMouseUp = useCallback(() => {
     touchPositionRef.current.isActive = false;
-    updateInput({ up: false, down: false });
-  }, [updateInput]);
+    updateInputRef.current({ up: false, down: false });
+  }, []); // ✅ No dependencies - stable callback
 
-  // Auto-bind keyboard and mouse events
+  // ✅ Auto-bind keyboard and mouse events (runs once, stable callbacks)
   useEffect(() => {
     document.addEventListener('keydown', handleKeyDown);
     document.addEventListener('keyup', handleKeyUp);
@@ -210,9 +201,9 @@ export function usePongInput(): PongInputHook {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [handleKeyDown, handleKeyUp, handleMouseDown, handleMouseMove, handleMouseUp]);
+  }, []); // ✅ Empty deps - callbacks never change, runs once
 
-  // Bind touch events to document for mobile
+  // ✅ Bind touch events to document for mobile (runs once, stable callbacks)
   useEffect(() => {
     document.addEventListener('touchstart', handleTouchStart, { passive: false });
     document.addEventListener('touchmove', handleTouchMove, { passive: false });
@@ -225,7 +216,7 @@ export function usePongInput(): PongInputHook {
       document.removeEventListener('touchend', handleTouchEnd);
       document.removeEventListener('touchcancel', handleTouchEnd);
     };
-  }, [handleTouchStart, handleTouchMove, handleTouchEnd]);
+  }, []); // ✅ Empty deps - callbacks never change, runs once
 
   // Direct sendInput function for manual calls
   const sendInput = useCallback((input: InputState) => {

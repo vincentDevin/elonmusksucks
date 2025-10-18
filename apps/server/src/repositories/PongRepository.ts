@@ -9,6 +9,8 @@ import type {
   PongStatsWithUser,
   PongMatchWithPlayers,
 } from '@ems/types';
+import { REDIS_CHANNELS } from '@ems/types';
+import { eventBus } from '../lib/EventBus';
 
 const prisma = new PrismaClient();
 
@@ -752,6 +754,12 @@ export class PongRepository implements IPongRepository {
     isAI: boolean,
   ): Promise<{ transactionId: string }> {
     return await this.executeInTransaction(async (tx) => {
+      // Get player one's balance before deduction
+      const playerOneBefore = await tx.user.findUnique({
+        where: { id: playerOneId },
+        select: { muskBucks: true },
+      });
+
       // Deduct from player one
       const playerOneUpdate = await tx.user.update({
         where: { id: playerOneId },
@@ -763,8 +771,24 @@ export class PongRepository implements IPongRepository {
         throw new Error('Insufficient funds for player one');
       }
 
+      // ✅ Emit balance update event for player one (wager deduction)
+      await eventBus.publish(REDIS_CHANNELS.BALANCE_UPDATE, {
+        userId: playerOneId,
+        newBalance: Number(playerOneUpdate.muskBucks),
+        previousBalance: Number(playerOneBefore?.muskBucks || 0),
+        change: -wagerAmount,
+        reason: `Pong match wager${isAI ? ' vs AI' : ' vs player'}`,
+        timestamp: new Date().toISOString(),
+      });
+
       // Deduct from player two if not AI
       if (!isAI && playerTwoId) {
+        // Get player two's balance before deduction
+        const playerTwoBefore = await tx.user.findUnique({
+          where: { id: playerTwoId },
+          select: { muskBucks: true },
+        });
+
         const playerTwoUpdate = await tx.user.update({
           where: { id: playerTwoId },
           data: { muskBucks: { decrement: BigInt(wagerAmount) } },
@@ -774,6 +798,16 @@ export class PongRepository implements IPongRepository {
         if (playerTwoUpdate.muskBucks < 0) {
           throw new Error('Insufficient funds for player two');
         }
+
+        // ✅ Emit balance update event for player two (wager deduction)
+        await eventBus.publish(REDIS_CHANNELS.BALANCE_UPDATE, {
+          userId: playerTwoId,
+          newBalance: Number(playerTwoUpdate.muskBucks),
+          previousBalance: Number(playerTwoBefore?.muskBucks || 0),
+          change: -wagerAmount,
+          reason: 'Pong match wager vs player',
+          timestamp: new Date().toISOString(),
+        });
       }
 
       // Create transaction record

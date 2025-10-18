@@ -152,10 +152,25 @@ export function PongHeader({
         <div className="flex items-center justify-between p-4 bg-surface border border-muted rounded-lg">
           <div className="flex items-center space-x-6">
             <div>
-              <h2 className="text-xl font-semibold text-content">
-                {mode === 'spectator'
-                  ? `Spectating: ${currentGame?.players[0]?.name || 'Player 1'} vs ${currentGame?.players[1]?.name || 'Player 2'}`
-                  : `${currentGame?.players[0]?.name} vs ${currentGame?.players[1]?.name || 'AI'}`}
+              <h2 className="text-xl font-semibold">
+                {mode === 'spectator' ? (
+                  // Spectator mode - both players white
+                  <span className="text-content">
+                    Spectating: {currentGame?.players[0]?.name || 'Player 1'} vs{' '}
+                    {currentGame?.players[1]?.name || 'Player 2'}
+                  </span>
+                ) : (
+                  // Player mode - user green, opponent red
+                  <span>
+                    <span className={currentGame?.playerSlot === 0 ? 'text-success' : 'text-error'}>
+                      {currentGame?.players[0]?.name}
+                    </span>
+                    <span className="text-content"> vs </span>
+                    <span className={currentGame?.playerSlot === 1 ? 'text-success' : 'text-error'}>
+                      {currentGame?.players[1]?.name || 'AI'}
+                    </span>
+                  </span>
+                )}
               </h2>
               <div className="flex items-center space-x-4 mt-1 text-sm text-tertiary">
                 <span>Game: {currentGame?.gameId?.slice(-8)}</span>

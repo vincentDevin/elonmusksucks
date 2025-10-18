@@ -289,7 +289,7 @@ export function usePongSocket(): PongSocketHook {
     });
 
     newSocket.on('game_state', (data: ServerEvents['game_state']) => {
-      // Handle player mode only
+      // ✅ Consolidate all updates into single setState
       setCurrentGame((prev) => {
         if (!prev) return null;
 
@@ -300,6 +300,42 @@ export function usePongSocket(): PongSocketHook {
           return prev; // Don't update anything
         }
 
+        // Create updated player data with server paddle positions
+        const updatedPlayers: [any, any] = [
+          prev.players[0]
+            ? {
+                ...prev.players[0],
+                paddleY:
+                  prev.playerSlot === 0
+                    ? prev.players[0].paddleY // Keep our own paddle unchanged
+                    : (data.opponentPaddleY ?? prev.players[0].paddleY), // Use server data for opponent
+              }
+            : null,
+          prev.players[1]
+            ? {
+                ...prev.players[1],
+                paddleY:
+                  prev.playerSlot === 1
+                    ? prev.players[1].paddleY // Keep our own paddle unchanged
+                    : (data.opponentPaddleY ?? prev.players[1].paddleY), // Use server data for opponent
+              }
+            : null,
+        ];
+
+        // ✅ Side effect: Update buffer directly (not through setState)
+        // Note: Buffer is populated even during early game states for smooth interpolation
+        const bufferSnapshot: GameStateSnapshot = {
+          ball: data.ball,
+          players: updatedPlayers,
+          scores: data.scores,
+          tick: data.tick,
+          timestamp: data.timestamp,
+          serverTime: data.timestamp,
+          status: 'active',
+        };
+        gameStateBuffer.addState(bufferSnapshot);
+
+        // Return updated state (single state update)
         return {
           ...prev,
           ball: data.ball,
@@ -310,66 +346,13 @@ export function usePongSocket(): PongSocketHook {
           serverTick: data.tick, // Add for compatibility
           wager: data.wager || prev.wager,
           pot: data.pot || prev.pot,
-          players:
-            prev.playerSlot === 0
-              ? ([
-                  prev.players[0], // Keep our own paddle position unchanged
-                  prev.players[1] && data.opponentPaddleY !== undefined
-                    ? { ...prev.players[1], paddleY: data.opponentPaddleY }
-                    : prev.players[1],
-                ] as [any, any])
-              : ([
-                  prev.players[0] && data.opponentPaddleY !== undefined
-                    ? { ...prev.players[0], paddleY: data.opponentPaddleY }
-                    : prev.players[0],
-                  prev.players[1], // Keep our own paddle position unchanged
-                ] as [any, any]),
+          players: updatedPlayers,
         };
       });
 
-      // Update ping and network health
+      // Update ping (separate state, can't avoid this)
       const ping = Date.now() - data.timestamp;
       setLastPing(ping);
-
-      // Store game state in buffer for interpolation
-      setCurrentGame((currentGameState) => {
-        if (currentGameState && currentGameState.status === 'active') {
-          // Create updated player data with server paddle positions
-          const updatedPlayers: [any, any] = [
-            currentGameState.players[0]
-              ? {
-                  ...currentGameState.players[0],
-                  paddleY:
-                    currentGameState.playerSlot === 0
-                      ? currentGameState.players[0].paddleY // Keep our own paddle unchanged
-                      : (data.opponentPaddleY ?? currentGameState.players[0].paddleY), // Use server data for opponent
-                }
-              : null,
-            currentGameState.players[1]
-              ? {
-                  ...currentGameState.players[1],
-                  paddleY:
-                    currentGameState.playerSlot === 1
-                      ? currentGameState.players[1].paddleY // Keep our own paddle unchanged
-                      : (data.opponentPaddleY ?? currentGameState.players[1].paddleY), // Use server data for opponent
-                }
-              : null,
-          ];
-
-          const bufferSnapshot: GameStateSnapshot = {
-            ball: data.ball,
-            players: updatedPlayers,
-            scores: data.scores,
-            tick: data.tick,
-            timestamp: data.timestamp,
-            serverTime: data.timestamp,
-            status: 'active',
-          };
-
-          gameStateBuffer.addState(bufferSnapshot);
-        }
-        return currentGameState; // Don't modify the current game state
-      });
     });
 
     newSocket.on('score_update', (data: ServerEvents['score_update']) => {

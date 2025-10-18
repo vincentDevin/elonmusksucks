@@ -1,10 +1,11 @@
-import { useRef, useEffect, useCallback, useState } from 'react';
+import { useRef, useEffect, useCallback } from 'react';
 import { PONG_PHYSICS } from '@ems/types';
 import {
   GameStateBuffer,
   LinearInterpolation,
   type GameStateSnapshot,
 } from '../../types/pongInterpolation';
+import { usePongPerformanceMonitor } from '../../hooks/usePongPerformanceMonitor';
 
 // Match the same interface from usePongSocketOptimized
 interface GameState {
@@ -101,10 +102,25 @@ export function PongCanvas({
 }: PongCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>(0);
-  const [particles, setParticles] = useState<Particle[]>([]);
+  const particlesRef = useRef<Particle[]>([]); // ✅ Use ref instead of state
   const lastBallPos = useRef({ x: 0, y: 0 });
+  const backgroundCanvasRef = useRef<HTMLCanvasElement | null>(null); // ✅ Cache background
 
-  // Simple ball interpolation using gameStateBuffer
+  // ✅ Smooth paddle positions (lerp for fluid movement)
+  const smoothPaddlePositions = useRef<[number | null, number | null]>([null, null]);
+
+  // ✅ Performance monitoring (only in development)
+  const { measureFrame } = usePongPerformanceMonitor(
+    process.env.NODE_ENV === 'development' && gameState?.status === 'active',
+  );
+
+  // Store measureFrame in ref for stable access in animation loop
+  const measureFrameRef = useRef(measureFrame);
+  useEffect(() => {
+    measureFrameRef.current = measureFrame;
+  }, [measureFrame]);
+
+  // ✅ Improved ball interpolation with binary search and prediction fallback
   const getInterpolatedBallPosition = useCallback(
     (currentTime: number = Date.now()) => {
       if (!gameStateBuffer || !gameState || gameState.status !== 'active') {
@@ -112,26 +128,55 @@ export function PongCanvas({
       }
 
       const states = gameStateBuffer.getStates();
-      if (states.length < 2) {
-        return null; // Need at least 2 states to interpolate
+      if (states.length === 0) {
+        return null;
       }
 
-      // Find the two states to interpolate between
+      if (states.length === 1) {
+        // Only one state available, use prediction
+        const state = states[0];
+        const dt = (currentTime - state.timestamp) / 1000;
+        return {
+          x: state.ball.x + state.ball.vx * dt,
+          y: state.ball.y + state.ball.vy * dt,
+          vx: state.ball.vx,
+          vy: state.ball.vy,
+        };
+      }
+
+      // ✅ Binary search instead of linear (O(log n) instead of O(n))
+      let left = 0;
+      let right = states.length - 1;
       let beforeState: GameStateSnapshot | null = null;
       let afterState: GameStateSnapshot | null = null;
 
-      for (let i = 0; i < states.length - 1; i++) {
-        if (states[i].timestamp <= currentTime && states[i + 1].timestamp >= currentTime) {
-          beforeState = states[i];
-          afterState = states[i + 1];
-          break;
+      while (left < right - 1) {
+        const mid = Math.floor((left + right) / 2);
+        if (states[mid].timestamp < currentTime) {
+          left = mid;
+        } else {
+          right = mid;
         }
       }
 
-      // If we couldn't find a good interval, use the latest state
+      if (states[left].timestamp <= currentTime && states[right].timestamp >= currentTime) {
+        beforeState = states[left];
+        afterState = states[right];
+      }
+
+      // ✅ Prediction fallback if interpolation not possible
       if (!beforeState || !afterState) {
         const latestState = gameStateBuffer.getLatestState();
-        return latestState ? latestState.ball : null;
+        if (!latestState) return null;
+
+        // Predict based on velocity
+        const dt = (currentTime - latestState.timestamp) / 1000;
+        return {
+          x: latestState.ball.x + latestState.ball.vx * dt,
+          y: latestState.ball.y + latestState.ball.vy * dt,
+          vx: latestState.ball.vx,
+          vy: latestState.ball.vy,
+        };
       }
 
       // Interpolate between the two states
@@ -157,7 +202,7 @@ export function PongCanvas({
     [gameStateBuffer, gameState],
   );
 
-  // Simple paddle interpolation using gameStateBuffer
+  // ✅ Improved paddle interpolation with binary search
   const getInterpolatedPaddlePosition = useCallback(
     (playerIndex: 0 | 1, currentTime: number = Date.now()) => {
       if (!gameStateBuffer || !gameState || gameState.status !== 'active') {
@@ -165,20 +210,32 @@ export function PongCanvas({
       }
 
       const states = gameStateBuffer.getStates();
-      if (states.length < 2) {
+      if (states.length === 0) {
         return null;
       }
 
-      // Find the two states to interpolate between
+      if (states.length === 1) {
+        return states[0].players[playerIndex]?.paddleY || null;
+      }
+
+      // ✅ Binary search instead of linear (O(log n) instead of O(n))
+      let left = 0;
+      let right = states.length - 1;
       let beforeState: GameStateSnapshot | null = null;
       let afterState: GameStateSnapshot | null = null;
 
-      for (let i = 0; i < states.length - 1; i++) {
-        if (states[i].timestamp <= currentTime && states[i + 1].timestamp >= currentTime) {
-          beforeState = states[i];
-          afterState = states[i + 1];
-          break;
+      while (left < right - 1) {
+        const mid = Math.floor((left + right) / 2);
+        if (states[mid].timestamp < currentTime) {
+          left = mid;
+        } else {
+          right = mid;
         }
+      }
+
+      if (states[left].timestamp <= currentTime && states[right].timestamp >= currentTime) {
+        beforeState = states[left];
+        afterState = states[right];
       }
 
       if (!beforeState || !afterState) {
@@ -259,24 +316,24 @@ export function PongCanvas({
         }
       }
 
-      setParticles((prev) => [...prev.slice(-50), ...newParticles]); // Keep more particles for goals
+      // ✅ Update ref directly, no React state update
+      particlesRef.current = [...particlesRef.current.slice(-50), ...newParticles]; // Keep more particles for goals
     },
     [],
   );
 
   const updateParticles = useCallback(() => {
-    setParticles((prev) =>
-      prev
-        .map((particle) => ({
-          ...particle,
-          x: particle.x + particle.vx,
-          y: particle.y + particle.vy,
-          life: particle.life - 0.015, // Slower decay for goal particles
-          vx: particle.vx * 0.98,
-          vy: particle.vy * 0.98,
-        }))
-        .filter((particle) => particle.life > 0),
-    );
+    // ✅ Update ref directly, no React state update (eliminates 60 setState/sec)
+    particlesRef.current = particlesRef.current
+      .map((particle) => ({
+        ...particle,
+        x: particle.x + particle.vx,
+        y: particle.y + particle.vy,
+        life: particle.life - 0.015, // Slower decay for goal particles
+        vx: particle.vx * 0.98,
+        vy: particle.vy * 0.98,
+      }))
+      .filter((particle) => particle.life > 0);
   }, []);
 
   // Detect goals and trigger particle explosions
@@ -326,40 +383,56 @@ export function PongCanvas({
 
   const drawEnhancedBackground = useCallback(
     (ctx: CanvasRenderingContext2D, width: number, height: number) => {
-      // Animated gradient background
-      const gradient = ctx.createRadialGradient(
-        width / 2,
-        height / 2,
-        0,
-        width / 2,
-        height / 2,
-        Math.max(width, height) / 2,
-      );
-      gradient.addColorStop(0, VISUAL_CONFIG.BACKGROUND.PRIMARY);
-      gradient.addColorStop(0.6, VISUAL_CONFIG.BACKGROUND.SECONDARY);
-      gradient.addColorStop(1, VISUAL_CONFIG.BACKGROUND.ACCENT);
+      // ✅ Cache background to offscreen canvas (draw once, reuse forever)
+      if (
+        !backgroundCanvasRef.current ||
+        backgroundCanvasRef.current.width !== width ||
+        backgroundCanvasRef.current.height !== height
+      ) {
+        // Create or recreate offscreen canvas
+        backgroundCanvasRef.current = document.createElement('canvas');
+        backgroundCanvasRef.current.width = width;
+        backgroundCanvasRef.current.height = height;
+        const bgCtx = backgroundCanvasRef.current.getContext('2d')!;
 
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, width, height);
+        // Draw expensive gradient ONCE
+        const gradient = bgCtx.createRadialGradient(
+          width / 2,
+          height / 2,
+          0,
+          width / 2,
+          height / 2,
+          Math.max(width, height) / 2,
+        );
+        gradient.addColorStop(0, VISUAL_CONFIG.BACKGROUND.PRIMARY);
+        gradient.addColorStop(0.6, VISUAL_CONFIG.BACKGROUND.SECONDARY);
+        gradient.addColorStop(1, VISUAL_CONFIG.BACKGROUND.ACCENT);
 
-      // Add subtle grid pattern
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-      ctx.lineWidth = 1;
-      const gridSize = 40;
+        bgCtx.fillStyle = gradient;
+        bgCtx.fillRect(0, 0, width, height);
 
-      for (let x = 0; x < width; x += gridSize) {
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, height);
-        ctx.stroke();
+        // Add subtle grid pattern ONCE
+        bgCtx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+        bgCtx.lineWidth = 1;
+        const gridSize = 40;
+
+        for (let x = 0; x < width; x += gridSize) {
+          bgCtx.beginPath();
+          bgCtx.moveTo(x, 0);
+          bgCtx.lineTo(x, height);
+          bgCtx.stroke();
+        }
+
+        for (let y = 0; y < height; y += gridSize) {
+          bgCtx.beginPath();
+          bgCtx.moveTo(0, y);
+          bgCtx.lineTo(width, y);
+          bgCtx.stroke();
+        }
       }
 
-      for (let y = 0; y < height; y += gridSize) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(width, y);
-        ctx.stroke();
-      }
+      // ✅ Fast copy from cached canvas (no expensive operations)
+      ctx.drawImage(backgroundCanvasRef.current, 0, 0);
     },
     [],
   );
@@ -421,8 +494,8 @@ export function PongCanvas({
         ctx.restore();
       }
 
-      // Glow effect
-      drawGlow(ctx, x + width / 2, y + height / 2, VISUAL_CONFIG.GLOW_RADIUS, color, 0.3);
+      // ✅ Simplified glow (less expensive)
+      drawGlow(ctx, x + width / 2, y + height / 2, VISUAL_CONFIG.GLOW_RADIUS, color, 0.2);
 
       // Main paddle with gradient
       const gradient = ctx.createLinearGradient(x, y, x + width, y + height);
@@ -431,8 +504,7 @@ export function PongCanvas({
       gradient.addColorStop(1, color);
 
       ctx.fillStyle = gradient;
-      ctx.shadowColor = color;
-      ctx.shadowBlur = 10;
+      // ✅ Remove expensive shadowBlur
       ctx.fillRect(x, y, width, height);
 
       // Border highlight
@@ -447,8 +519,6 @@ export function PongCanvas({
       ctx.moveTo(x, y + height / 2);
       ctx.lineTo(x + width, y + height / 2);
       ctx.stroke();
-
-      ctx.shadowBlur = 0;
     },
     [drawGlow],
   );
@@ -464,8 +534,8 @@ export function PongCanvas({
       if (distance > 100) {
         // Ball teleported, clear all painted lines
         paintedLines.current = [];
-      } else if (distance > 1 && lastPos.x !== 0 && lastPos.y !== 0) {
-        // Ball moved normally, paint a line
+      } else if (distance > 0.5 && lastPos.x !== 0 && lastPos.y !== 0) {
+        // ✅ Add trail point every frame for smooth continuous snake trail
         paintedLines.current.push({
           x1: lastPos.x,
           y1: lastPos.y,
@@ -479,31 +549,45 @@ export function PongCanvas({
       // Update last position
       lastBallPos.current = { x, y };
 
-      // Remove old painted lines (older than 1000ms) and fade existing ones
+      // ✅ Keep trail for 1200ms (much longer for better tracking)
       paintedLines.current = paintedLines.current.filter((line) => {
         const age = currentTime - line.timestamp;
-        if (age > 1000) return false; // Remove lines older than 1000ms (1 second)
+        if (age > 1200) return false; // Keep for 1200ms (3x longer)
 
-        // Fade lines based on age
-        line.alpha = Math.max(0, 1 - age / 1000);
+        // Smooth fade curve
+        line.alpha = Math.max(0, 1 - age / 1200);
         return true;
       });
 
-      // Draw all painted lines
-      paintedLines.current.forEach((line) => {
+      // ✅ Draw smooth snake-like trail with minimal tapering (more line-like)
+      if (paintedLines.current.length > 1) {
         ctx.save();
-        ctx.globalAlpha = line.alpha;
-        ctx.strokeStyle = VISUAL_CONFIG.BALL.CORE;
-        ctx.lineWidth = radius * 1.5; // Thick paint brush effect
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
 
-        ctx.beginPath();
-        ctx.moveTo(line.x1, line.y1);
-        ctx.lineTo(line.x2, line.y2);
-        ctx.stroke();
+        // Draw as a continuous path with minimal width variation
+        paintedLines.current.forEach((line, _idx) => {
+          const age = currentTime - line.timestamp;
+          const fadeProgress = age / 1200;
+
+          // Very subtle taper - stays thick throughout (1.8x to 1.2x radius)
+          const widthMultiplier = 1.8 - fadeProgress * 0.6; // Starts at 1.8x, ends at 1.2x radius
+          const lineWidth = radius * widthMultiplier;
+
+          if (lineWidth > 0.5) {
+            ctx.strokeStyle = VISUAL_CONFIG.BALL.CORE;
+            ctx.globalAlpha = line.alpha * 0.7; // 70% opacity max
+            ctx.lineWidth = lineWidth;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            ctx.beginPath();
+            ctx.moveTo(line.x1, line.y1);
+            ctx.lineTo(line.x2, line.y2);
+            ctx.stroke();
+          }
+        });
+
         ctx.restore();
-      });
+      }
 
       // Draw subtle collision area indicator
       ctx.save();
@@ -539,32 +623,26 @@ export function PongCanvas({
     [],
   );
 
-  const drawParticles = useCallback(
-    (ctx: CanvasRenderingContext2D) => {
-      particles.forEach((particle) => {
-        ctx.save();
-        ctx.globalAlpha = particle.life;
-        ctx.fillStyle = particle.color;
-        ctx.beginPath();
-        ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-      });
-    },
-    [particles],
-  );
+  const drawParticles = useCallback((ctx: CanvasRenderingContext2D) => {
+    // ✅ Read from ref instead of state
+    particlesRef.current.forEach((particle) => {
+      ctx.save();
+      ctx.globalAlpha = particle.life;
+      ctx.fillStyle = particle.color;
+      ctx.beginPath();
+      ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    });
+  }, []); // ✅ No dependencies - stable callback
 
   const drawGameField = useCallback(
     (ctx: CanvasRenderingContext2D, width: number, height: number) => {
-      // Center line with glow
+      // Center line (no glow for performance)
       const centerX = width / 2;
       ctx.strokeStyle = VISUAL_CONFIG.FIELD.LINE;
       ctx.lineWidth = 3;
       ctx.setLineDash([10, 10]);
-
-      // Glow for center line
-      ctx.shadowColor = VISUAL_CONFIG.FIELD.LINE;
-      ctx.shadowBlur = 8;
 
       ctx.beginPath();
       ctx.moveTo(centerX, 20);
@@ -572,16 +650,12 @@ export function PongCanvas({
       ctx.stroke();
 
       ctx.setLineDash([]);
-      ctx.shadowBlur = 0;
 
-      // Field boundaries with subtle glow
+      // Field boundaries (no glow for performance)
       ctx.strokeStyle = VISUAL_CONFIG.FIELD.WALL;
       ctx.lineWidth = 2;
-      ctx.shadowColor = VISUAL_CONFIG.FIELD.WALL;
-      ctx.shadowBlur = 5;
 
       ctx.strokeRect(10, 10, width - 20, height - 20);
-      ctx.shadowBlur = 0;
     },
     [],
   );
@@ -605,7 +679,7 @@ export function PongCanvas({
     const scaleX = (width - 40) / PONG_PHYSICS.FIELD_WIDTH;
     const scaleY = (height - 40) / PONG_PHYSICS.FIELD_HEIGHT;
 
-    // Draw paddles with enhanced graphics (with interpolation)
+    // Draw paddles with enhanced graphics (with smooth interpolation)
     if (gameState.players) {
       gameState.players.forEach((player, index) => {
         if (player) {
@@ -646,6 +720,25 @@ export function PongCanvas({
             }
           }
 
+          // ✅ Determine if this is the player's own paddle (for both smoothing and visuals)
+          const isPlayerPaddle = !isSpectating && index === gameState.playerSlot;
+
+          // ✅ Smooth paddle movement with lerp (fluid animation)
+          // Use different smoothing for player vs opponent to fix collision desync
+          const smoothingFactor = isPlayerPaddle
+            ? 0.85 // Player paddle: highly responsive (85% per frame ≈ 20ms lag) - matches server collision
+            : 0.3; // Opponent paddle: smooth animation (30% per frame) - visual only, no gameplay impact
+
+          if (smoothPaddlePositions.current[index] === null) {
+            smoothPaddlePositions.current[index] = paddleY;
+          } else {
+            // Lerp towards target position
+            const currentSmooth = smoothPaddlePositions.current[index]!;
+            smoothPaddlePositions.current[index] =
+              currentSmooth + (paddleY - currentSmooth) * smoothingFactor;
+            paddleY = smoothPaddlePositions.current[index]!;
+          }
+
           const y = 20 + paddleY * scaleY; // paddleY is the TOP of the paddle (server treats it this way)
 
           // For spectators, use different colors for each player
@@ -657,8 +750,6 @@ export function PongCanvas({
             : index === gameState.playerSlot
               ? VISUAL_CONFIG.PADDLE.PLAYER
               : VISUAL_CONFIG.PADDLE.OPPONENT;
-
-          const isPlayerPaddle = isSpectating ? false : index === gameState.playerSlot;
 
           drawEnhancedPaddle(
             ctx,
@@ -710,11 +801,18 @@ export function PongCanvas({
     drawParticles,
   ]);
 
-  const animate = useCallback(() => {
-    updateParticles(); // Update particle physics
-    draw();
-    animationRef.current = requestAnimationFrame(animate);
-  }, [draw, updateParticles]);
+  // Store latest versions of draw and updateParticles in refs to avoid recreating animate
+  const drawRef = useRef(draw);
+  const updateParticlesRef = useRef(updateParticles);
+
+  // Update refs when callbacks change
+  useEffect(() => {
+    drawRef.current = draw;
+  }, [draw]);
+
+  useEffect(() => {
+    updateParticlesRef.current = updateParticles;
+  }, [updateParticles]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -731,6 +829,16 @@ export function PongCanvas({
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
 
+    // Create stable animation function that uses refs
+    const animate = () => {
+      if (measureFrameRef.current) {
+        measureFrameRef.current(); // ✅ Track performance
+      }
+      updateParticlesRef.current(); // Use ref to get latest function
+      drawRef.current(); // Use ref to get latest function
+      animationRef.current = requestAnimationFrame(animate);
+    };
+
     // Start animation loop
     animationRef.current = requestAnimationFrame(animate);
 
@@ -738,9 +846,10 @@ export function PongCanvas({
       window.removeEventListener('resize', resizeCanvas);
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
+        animationRef.current = 0; // Clear the ref
       }
     };
-  }, [animate]);
+  }, []); // ✅ Empty deps - runs once, no duplicate loops
 
   return (
     <div className={`pong-canvas-enhanced-container relative ${className}`}>
