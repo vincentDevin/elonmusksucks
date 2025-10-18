@@ -191,6 +191,7 @@ export const PONG_PHYSICS = {
   WINNING_SCORE: 5,
   TICK_RATE: 128,
   NETWORK_UPDATE_RATE: 60,
+  ACTIVE_NETWORK_UPDATE_RATE: 120, // Higher update rate during active gameplay for smoother experience
 } as const;
 
 // ============================================================================
