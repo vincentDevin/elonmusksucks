@@ -1,0 +1,6 @@
+# Build artifacts should NEVER be in src/
+# All compiled output belongs in dist/
+*.js
+*.js.map
+*.d.ts
+*.d.ts.map

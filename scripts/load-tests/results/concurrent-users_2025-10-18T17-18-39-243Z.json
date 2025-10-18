@@ -1,0 +1,154 @@
+{
+  "testName": "Concurrent Users Stress Test",
+  "totalRequests": 45,
+  "successfulRequests": 14,
+  "failedRequests": 31,
+  "requestDurations": [
+    192,
+    289,
+    291,
+    293,
+    351,
+    364,
+    367,
+    425,
+    440,
+    452,
+    509,
+    523,
+    541,
+    558
+  ],
+  "errors": [
+    {
+      "user": "loadtest_user_1_1760807902565",
+      "error": "INSUFFICIENT_FUNDS"
+    },
+    {
+      "user": "loadtest_user_0_1760807902065",
+      "error": "Bet placement timeout"
+    },
+    {
+      "user": "loadtest_user_0_1760807902065",
+      "error": "Bet placement timeout"
+    },
+    {
+      "user": "loadtest_user_1_1760807902565",
+      "error": "Bet placement timeout"
+    },
+    {
+      "user": "loadtest_user_1_1760807902565",
+      "error": "Bet placement timeout"
+    },
+    {
+      "user": "loadtest_user_2_1760807903031",
+      "error": "Bet placement timeout"
+    },
+    {
+      "user": "loadtest_user_2_1760807903031",
+      "error": "Bet placement timeout"
+    },
+    {
+      "user": "loadtest_user_3_1760807903487",
+      "error": "Bet placement timeout"
+    },
+    {
+      "user": "loadtest_user_3_1760807903487",
+      "error": "Bet placement timeout"
+    },
+    {
+      "user": "loadtest_user_4_1760807903961",
+      "error": "Bet placement timeout"
+    },
+    {
+      "user": "loadtest_user_4_1760807903961",
+      "error": "Bet placement timeout"
+    },
+    {
+      "user": "loadtest_user_5_1760807904420",
+      "error": "Bet placement timeout"
+    },
+    {
+      "user": "loadtest_user_5_1760807904420",
+      "error": "Bet placement timeout"
+    },
+    {
+      "user": "loadtest_user_6_1760807904870",
+      "error": "Bet placement timeout"
+    },
+    {
+      "user": "loadtest_user_6_1760807904870",
+      "error": "Bet placement timeout"
+    },
+    {
+      "user": "loadtest_user_7_1760807905327",
+      "error": "Bet placement timeout"
+    },
+    {
+      "user": "loadtest_user_7_1760807905327",
+      "error": "Bet placement timeout"
+    },
+    {
+      "user": "loadtest_user_8_1760807905840",
+      "error": "Bet placement timeout"
+    },
+    {
+      "user": "loadtest_user_8_1760807905840",
+      "error": "Bet placement timeout"
+    },
+    {
+      "user": "loadtest_user_9_1760807906328",
+      "error": "Bet placement timeout"
+    },
+    {
+      "user": "loadtest_user_9_1760807906328",
+      "error": "Bet placement timeout"
+    },
+    {
+      "user": "loadtest_user_10_1760807906799",
+      "error": "Bet placement timeout"
+    },
+    {
+      "user": "loadtest_user_10_1760807906799",
+      "error": "Bet placement timeout"
+    },
+    {
+      "user": "loadtest_user_11_1760807907260",
+      "error": "Bet placement timeout"
+    },
+    {
+      "user": "loadtest_user_11_1760807907260",
+      "error": "Bet placement timeout"
+    },
+    {
+      "user": "loadtest_user_12_1760807907721",
+      "error": "Bet placement timeout"
+    },
+    {
+      "user": "loadtest_user_12_1760807907721",
+      "error": "Bet placement timeout"
+    },
+    {
+      "user": "loadtest_user_13_1760807908177",
+      "error": "Bet placement timeout"
+    },
+    {
+      "user": "loadtest_user_13_1760807908177",
+      "error": "Bet placement timeout"
+    },
+    {
+      "user": "loadtest_user_14_1760807908656",
+      "error": "Bet placement timeout"
+    },
+    {
+      "user": "loadtest_user_14_1760807908656",
+      "error": "Bet placement timeout"
+    }
+  ],
+  "metadata": {
+    "numUsers": 15,
+    "betsPerUser": 3,
+    "totalBets": 45
+  },
+  "duration": 17177
+}

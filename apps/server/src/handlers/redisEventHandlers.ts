@@ -233,8 +233,8 @@ export function registerRedisEventHandlers(io: Server, eventSub: Redis) {
         }
         break;
 
-      // NOTE: Pong achievement events (pong:match:completed, pong:match:lost, pong:elo:milestone)
-      // are handled exclusively by achievementEventHandler.ts and are not subscribed to by this handler
+      // NOTE: Achievement events are handled by the dedicated achievement-server microservice
+      // (apps/achievement-server) and are not subscribed to by this handler
 
       // Chat events - emit using Redis channel names for EventBus compatibility
       case REDIS_CHANNELS.CHAT_MESSAGE:

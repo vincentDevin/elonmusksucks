@@ -1,5 +1,5 @@
-// apps/server/src/handlers/achievementEventHandler.ts
-import redis from '../lib/redis';
+// apps/achievement-server/src/handlers/achievementEventHandler.ts
+import redis from '../config/redis';
 import { getAchievementEngine } from '../services/achievements/achievementEngineFactory.service';
 import { REDIS_CHANNELS } from '@ems/types';
 import type { AchievementEvent } from '@ems/types';
@@ -78,14 +78,14 @@ const ACHIEVEMENT_CHANNELS = [
 
 export function setupAchievementRedisHandlers() {
   const sub = redis.duplicate();
-  sub.on('error', (e) => console.error('[AchievementEventHandler] Redis error', e));
+  sub.on('error', (e) => console.error('[AchievementServer] Redis error', e));
 
   // Subscribe to all achievement-relevant channels
   sub.subscribe(...ACHIEVEMENT_CHANNELS, (err, count) => {
     if (err) {
-      console.error('[AchievementEventHandler] Subscribe error', err);
+      console.error('[AchievementServer] Subscribe error', err);
     } else {
-      console.log(`[AchievementEventHandler] ✅ Subscribed to ${count} achievement channels`);
+      console.log(`[AchievementServer] ✅ Subscribed to ${count} achievement channels`);
     }
   });
 
@@ -104,7 +104,7 @@ export function setupAchievementRedisHandlers() {
       };
 
       console.log(
-        `[AchievementEventHandler] 📥 Processing ${achievementEvent.key} for user ${achievementEvent.userId}`,
+        `[AchievementServer] 📥 Processing ${achievementEvent.key} for user ${achievementEvent.userId}`,
       );
 
       // Process through achievement engine
@@ -113,24 +113,24 @@ export function setupAchievementRedisHandlers() {
 
       if (result.achievementsUnlocked > 0) {
         console.log(
-          `[AchievementEventHandler] 🎉 ${result.achievementsUnlocked} achievement(s) unlocked for user ${achievementEvent.userId}`,
+          `[AchievementServer] 🎉 ${result.achievementsUnlocked} achievement(s) unlocked for user ${achievementEvent.userId}`,
         );
       }
 
       if (result.errors.length > 0) {
         console.warn(
-          `[AchievementEventHandler] ⚠️ ${result.errors.length} errors processing ${channel}:`,
+          `[AchievementServer] ⚠️ ${result.errors.length} errors processing ${channel}:`,
           result.errors,
         );
       }
     } catch (err) {
-      console.error(`[AchievementEventHandler] ❌ Error handling ${channel}:`, err);
+      console.error(`[AchievementServer] ❌ Error handling ${channel}:`, err);
     }
   });
 
   // Graceful shutdown
   process.on('SIGTERM', () => {
-    console.log('[AchievementEventHandler] Shutting down Redis subscriber...');
+    console.log('[AchievementServer] Shutting down Redis subscriber...');
     sub.disconnect();
   });
 

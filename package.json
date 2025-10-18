@@ -13,9 +13,10 @@
   ],
   "scripts": {
     "predev": "bash scripts/cleanup-ports.sh",
-    "dev": "concurrently \"npm run dev --workspace=apps/client\" \"npm run dev --workspace=apps/public-site\" \"npm run dev --workspace=apps/server\" \"npm run worker\" \"npm run dev --workspace=apps/pong-server\"",
-    "dev:with-pong": "concurrently \"npm run dev --workspace=apps/client\" \"npm run dev --workspace=apps/server\" \"npm run worker\" \"npm run dev --workspace=apps/pong-server\" \"npm run pong:worker\"",
+    "dev": "concurrently \"npm run dev --workspace=apps/client\" \"npm run dev --workspace=apps/public-site\" \"npm run dev --workspace=apps/server\" \"npm run worker\" \"npm run dev --workspace=apps/pong-server\" \"npm run dev --workspace=apps/achievement-server\"",
+    "dev:with-pong": "concurrently \"npm run dev --workspace=apps/client\" \"npm run dev --workspace=apps/server\" \"npm run worker\" \"npm run dev --workspace=apps/pong-server\" \"npm run pong:worker\" \"npm run dev --workspace=apps/achievement-server\"",
     "cleanup": "bash scripts/cleanup-ports.sh",
+    "achievement-server": "npm run dev --workspace=apps/achievement-server",
     "build": "npm run prisma:generate && cd packages/types && npm run build && cd ../../ && npm run build --workspace=apps/client && npm run build --workspace=apps/server",
     "lint": "eslint apps/**/*.{ts,tsx} --max-warnings=0",
     "format": "prettier --write \"apps/**/*.{ts,tsx,js,jsx,json,css,md}\"",

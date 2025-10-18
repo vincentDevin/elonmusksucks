@@ -25,7 +25,6 @@ import { registerPongHandlers, registerPongRedisHandlers } from './handlers/pong
 import { registerPostHandlers } from './handlers/postHandlers';
 import { registerPostRedisHandlers } from './handlers/postRedisEventHandlers';
 import { socketCleanupManager } from './lib/SocketCleanupManager';
-import { setupAchievementRedisHandlers } from './handlers/achievementEventHandler';
 import { registerRoomHandlers } from './handlers/roomHandlers';
 import { eventSystemMetricsService } from './services/eventSystemMetrics.service';
 import { REDIS_CHANNELS } from '@ems/types';
@@ -147,8 +146,8 @@ export async function initSocket(httpServer: HTTPServer) {
     REDIS_CHANNELS.PONG_TIER_CHANGE,
     REDIS_CHANNELS.PONG_STATS_UPDATE,
     REDIS_CHANNELS.PONG_LEADERBOARD_UPDATE,
-    // NOTE: Pong achievement events (pong:match:completed, pong:match:lost, pong:elo:milestone)
-    // are handled exclusively by achievementEventHandler.ts to avoid duplicate subscriptions
+    // NOTE: Achievement events are handled by the dedicated achievement-server microservice
+    // (apps/achievement-server) to avoid blocking the main API event loop
   );
   registerRedisEventHandlers(io, eventSub);
   registerPongRedisHandlers(io, eventSub);
@@ -181,9 +180,8 @@ export async function initSocket(httpServer: HTTPServer) {
     console.error('[EventSystemMetrics] Failed to start monitoring:', error);
   }
 
-  // ── Achievement Redis subscriber ──────────────────────────────────────────
-  const achievementSub = setupAchievementRedisHandlers();
-  redisClients.push(achievementSub);
+  // NOTE: Achievement processing now handled by dedicated achievement-server
+  // See apps/achievement-server/ - subscribes to Redis events independently
 
   // ── Timeline event handlers ───────────────────────────────────────────────
   registerTimelineHandlers(io);
