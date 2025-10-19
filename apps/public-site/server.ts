@@ -217,7 +217,7 @@ async function createServer(): Promise<express.Application> {
 
   app.use(
     '/api',
-    apiProxyLimiter, // Apply stricter rate limit to API proxy
+    apiProxyLimiter,
     async (req: express.Request, res: express.Response, _next: express.NextFunction) => {
       try {
         // Construct target API URL using environment variable
@@ -240,13 +240,12 @@ async function createServer(): Promise<express.Application> {
           }
         }
 
-        const fetch = (await import('node-fetch')).default;
-
         // Set timeout for API requests (10 seconds)
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 10000);
 
         try {
+          // Use native fetch (Node.js 18+)
           const response = await fetch(apiUrl, {
             method: req.method,
             headers: filteredHeaders,
@@ -311,6 +310,7 @@ async function createServer(): Promise<express.Application> {
 
       if (env.NODE_ENV === 'production') {
         // Production: Load pre-built SSR bundle
+        // @ts-expect-error - Build artifact, type definitions not available at compile time
         const module = await import('./dist/server/entry-server.js');
         // Handle both default and named exports
         render = (module.default as any)?.render || module.render || module.default;
@@ -346,7 +346,26 @@ async function createServer(): Promise<express.Application> {
           `<script>window.__SERVER_DATA__ = ${serializeForHTML(serverData)}</script>`,
         );
 
-      res.status(200).set({ 'Content-Type': 'text/html' }).end(html);
+      // Set Cache-Control headers based on route
+      let cacheControlValue = 'public, max-age=60, stale-while-revalidate=120'; // Default: 1 min cache, 2 min stale
+      if (url === '/' || url === '') {
+        cacheControlValue = 'public, max-age=60, stale-while-revalidate=180'; // Landing: 1 min cache, 3 min stale
+      } else if (url === '/predictions') {
+        cacheControlValue = 'public, max-age=30, stale-while-revalidate=60'; // Predictions: 30s cache, 1 min stale
+      } else if (url === '/leaderboard') {
+        cacheControlValue = 'public, max-age=120, stale-while-revalidate=300'; // Leaderboard: 2 min cache, 5 min stale
+      } else if (url === '/timeline') {
+        cacheControlValue = 'public, max-age=60, stale-while-revalidate=120'; // Timeline: 1 min cache, 2 min stale
+      }
+
+      res
+        .status(200)
+        .set({
+          'Content-Type': 'text/html',
+          'Cache-Control': cacheControlValue,
+          'X-Cache-Status': serverData ? 'HIT' : 'MISS', // Indicate if data was cached
+        })
+        .end(html);
     } catch (e) {
       if (vite) {
         vite.ssrFixStacktrace(e as Error);
@@ -410,16 +429,95 @@ async function createServer(): Promise<express.Application> {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// In-Memory Cache (Edge-like Caching)
+// ══════════════════════════════════════════════════════════════════════════════
+
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+  ttl: number;
+}
+
+class SimpleCache {
+  private cache = new Map<string, CacheEntry<unknown>>();
+
+  set<T>(key: string, data: T, ttlSeconds: number): void {
+    this.cache.set(key, {
+      data,
+      timestamp: Date.now(),
+      ttl: ttlSeconds * 1000, // Convert to milliseconds
+    });
+  }
+
+  get<T>(key: string): T | null {
+    const entry = this.cache.get(key) as CacheEntry<T> | undefined;
+    if (!entry) return null;
+
+    const now = Date.now();
+    const age = now - entry.timestamp;
+
+    // Check if expired
+    if (age > entry.ttl) {
+      this.cache.delete(key);
+      return null;
+    }
+
+    return entry.data;
+  }
+
+  // Clean up expired entries periodically
+  cleanup(): void {
+    const now = Date.now();
+    for (const [key, entry] of this.cache.entries()) {
+      const age = now - entry.timestamp;
+      if (age > entry.ttl) {
+        this.cache.delete(key);
+      }
+    }
+  }
+}
+
+// Global cache instance
+const serverDataCache = new SimpleCache();
+
+// Run cleanup every 5 minutes
+setInterval(() => {
+  serverDataCache.cleanup();
+  console.log('[CACHE] Cleanup completed');
+}, 5 * 60 * 1000);
+
+// Cache TTLs (in seconds) - tuned for different data freshness requirements
+const CACHE_TTL = {
+  LANDING_PAGE: 60, // 1 minute - high traffic page
+  PREDICTIONS: 30, // 30 seconds - frequently updated
+  LEADERBOARD: 120, // 2 minutes - less frequently updated
+  TIMELINE: 60, // 1 minute - moderate update frequency
+} as const;
+
+// ══════════════════════════════════════════════════════════════════════════════
 // Server Data Fetching
 // ══════════════════════════════════════════════════════════════════════════════
 
 /**
  * Fetch server-side data based on the current route
  * Uses environment variables for API endpoints
+ * Implements caching to reduce load on API server
  */
 async function fetchServerData(url: string): Promise<ServerData> {
   const clientAppUrl = env.CLIENT_APP_URL;
   const apiBaseUrl = `${env.API_BASE_URL}/api`;
+
+  // Generate cache key based on URL
+  const cacheKey = `server-data:${url}`;
+
+  // Check cache first
+  const cachedData = serverDataCache.get<ServerData>(cacheKey);
+  if (cachedData) {
+    console.log(`[CACHE] HIT for ${url}`);
+    return cachedData;
+  }
+
+  console.log(`[CACHE] MISS for ${url} - fetching from API`);
 
   // Base server data structure
   const baseData: ServerData = {
@@ -435,126 +533,131 @@ async function fetchServerData(url: string): Promise<ServerData> {
     currentPath: url,
   };
 
-  // TEMPORARY: Skip all SSR data fetching during maintenance mode
-  // React components will handle client-side fetching if needed
-  // TODO: Remove this return statement and uncomment code below after maintenance
+  try {
+    // Use native fetch API (Node.js 18+)
+    // Fetch different data based on the route
+    if (url === '/' || url === '') {
+      // Landing page - fetch overview data
+      const [predictionsRes, leaderboardRes, activityRes, articlesRes, postsRes] =
+        await Promise.allSettled([
+          fetch(`${apiBaseUrl}/predictions`),
+          fetch(`${apiBaseUrl}/leaderboard`),
+          fetch(`${apiBaseUrl}/activity/recent?limit=10`),
+          fetch(`${apiBaseUrl}/timeline/articles?limit=5`),
+          fetch(`${apiBaseUrl}/posts?limit=5`),
+        ]);
+
+      // Get predictions data for trending - filter for APPROVED status only
+      if (predictionsRes.status === 'fulfilled' && predictionsRes.value.ok) {
+        const response = (await predictionsRes.value.json()) as { predictions: PredictionView[] };
+        const predictions = response.predictions;
+        if (Array.isArray(predictions)) {
+          const approvedPredictions = predictions.filter((p) => p.status === 'APPROVED');
+          baseData.trendingData = approvedPredictions.slice(0, 5);
+        }
+      }
+
+      // Get posts data for timeline preview
+      if (postsRes.status === 'fulfilled' && postsRes.value.ok) {
+        const postsResponse = (await postsRes.value.json()) as {
+          items: PublicPostView[];
+          nextCursor?: number;
+          hasMore: boolean;
+        };
+        baseData.postsData = Array.isArray(postsResponse.items) ? postsResponse.items : null;
+      }
+
+      // Get leaderboard data for preview
+      if (leaderboardRes.status === 'fulfilled' && leaderboardRes.value.ok) {
+        const leaderboard = (await leaderboardRes.value.json()) as LeaderboardEntryView[];
+        baseData.leaderboardData = Array.isArray(leaderboard) ? leaderboard.slice(0, 5) : null;
+      }
+
+      // Get activity data - response has { success, activities, count, cached }
+      if (activityRes.status === 'fulfilled' && activityRes.value.ok) {
+        const activityResponse = (await activityRes.value.json()) as {
+          success: boolean;
+          activities: UnifiedActivityEvent[];
+          count: number;
+          cached: boolean;
+        };
+        baseData.activityData = activityResponse.success ? activityResponse.activities : null;
+      }
+
+      // Get articles data for timeline preview - response has { items, pagination }
+      if (articlesRes.status === 'fulfilled' && articlesRes.value.ok) {
+        const articlesResponse = (await articlesRes.value.json()) as {
+          items: PublicArticle[];
+          pagination: { cursor?: string; hasMore: boolean };
+        };
+        baseData.articlesData = Array.isArray(articlesResponse.items)
+          ? articlesResponse.items
+          : null;
+      }
+      // Cache landing page data
+      serverDataCache.set(cacheKey, baseData, CACHE_TTL.LANDING_PAGE);
+    } else if (url === '/predictions') {
+      // Predictions page
+      const predictionsRes = await fetch(`${apiBaseUrl}/predictions`);
+      if (predictionsRes.ok) {
+        const response = (await predictionsRes.json()) as { predictions: PredictionView[] };
+        const predictions = response.predictions;
+        baseData.predictionsData = Array.isArray(predictions) ? predictions : null;
+      }
+      // Cache predictions data
+      serverDataCache.set(cacheKey, baseData, CACHE_TTL.PREDICTIONS);
+    } else if (url === '/leaderboard') {
+      // Leaderboard page - fetch both main and pong leaderboards
+      const [leaderboardRes, pongLeaderboardRes] = await Promise.allSettled([
+        fetch(`${apiBaseUrl}/leaderboard`),
+        fetch(`${apiBaseUrl}/leaderboard/pong/elo`),
+      ]);
+
+      if (leaderboardRes.status === 'fulfilled' && leaderboardRes.value.ok) {
+        const leaderboard = (await leaderboardRes.value.json()) as LeaderboardEntryView[];
+        baseData.fullLeaderboardData = Array.isArray(leaderboard) ? leaderboard : null;
+      }
+
+      if (pongLeaderboardRes.status === 'fulfilled' && pongLeaderboardRes.value.ok) {
+        const pongLeaderboard = (await pongLeaderboardRes.value.json()) as PongLeaderboardView[];
+        baseData.pongLeaderboardData = Array.isArray(pongLeaderboard) ? pongLeaderboard : null;
+      }
+      // Cache leaderboard data
+      serverDataCache.set(cacheKey, baseData, CACHE_TTL.LEADERBOARD);
+    } else if (url === '/timeline') {
+      // Timeline page
+      const [articlesRes, postsRes] = await Promise.allSettled([
+        fetch(`${apiBaseUrl}/timeline/articles`),
+        fetch(`${apiBaseUrl}/posts`),
+      ]);
+
+      if (articlesRes.status === 'fulfilled' && articlesRes.value.ok) {
+        const articlesResponse = (await articlesRes.value.json()) as {
+          items: PublicArticle[];
+          pagination: { cursor?: string; hasMore: boolean };
+        };
+        baseData.articlesData = Array.isArray(articlesResponse.items)
+          ? articlesResponse.items
+          : null;
+      }
+      if (postsRes.status === 'fulfilled' && postsRes.value.ok) {
+        const postsResponse = (await postsRes.value.json()) as {
+          items: PublicPostView[];
+          nextCursor?: number;
+          hasMore: boolean;
+        };
+        baseData.postsData = Array.isArray(postsResponse.items) ? postsResponse.items : null;
+      }
+      // Cache timeline data
+      serverDataCache.set(cacheKey, baseData, CACHE_TTL.TIMELINE);
+    }
+  } catch (error) {
+    console.error('Error fetching server data:', error);
+    // Return base data with nulls if API calls fail
+    // Don't cache errors - let it retry on next request
+  }
+
   return baseData;
-
-  // try {
-  //   const fetch = (await import('node-fetch')).default;
-
-  //   // Fetch different data based on the route
-  //   if (url === '/' || url === '') {
-  //     // Landing page - fetch overview data
-  //     const [predictionsRes, leaderboardRes, activityRes, articlesRes, postsRes] =
-  //       await Promise.allSettled([
-  //         fetch(`${apiBaseUrl}/predictions`),
-  //         fetch(`${apiBaseUrl}/leaderboard`),
-  //         fetch(`${apiBaseUrl}/activity/recent?limit=10`),
-  //         fetch(`${apiBaseUrl}/timeline/articles?limit=5`),
-  //         fetch(`${apiBaseUrl}/posts?limit=5`),
-  //       ]);
-
-  //     // Get predictions data for trending - filter for APPROVED status only
-  //     if (predictionsRes.status === 'fulfilled' && predictionsRes.value.ok) {
-  //       const predictions = (await predictionsRes.value.json()) as PredictionView[];
-  //       if (Array.isArray(predictions)) {
-  //         const approvedPredictions = predictions.filter((p) => p.status === 'APPROVED');
-  //         baseData.trendingData = approvedPredictions.slice(0, 5);
-  //       }
-  //     }
-
-  //     // Get posts data for timeline preview
-  //     if (postsRes.status === 'fulfilled' && postsRes.value.ok) {
-  //       const postsResponse = (await postsRes.value.json()) as {
-  //         items: PublicPostView[];
-  //         nextCursor?: number;
-  //         hasMore: boolean;
-  //       };
-  //       baseData.postsData = Array.isArray(postsResponse.items) ? postsResponse.items : null;
-  //     }
-
-  //     // Get leaderboard data for preview
-  //     if (leaderboardRes.status === 'fulfilled' && leaderboardRes.value.ok) {
-  //       const leaderboard = (await leaderboardRes.value.json()) as LeaderboardEntryView[];
-  //       baseData.leaderboardData = Array.isArray(leaderboard) ? leaderboard.slice(0, 5) : null;
-  //     }
-
-  //     // Get activity data - response has { success, activities, count, cached }
-  //     if (activityRes.status === 'fulfilled' && activityRes.value.ok) {
-  //       const activityResponse = (await activityRes.value.json()) as {
-  //         success: boolean;
-  //         activities: UnifiedActivityEvent[];
-  //         count: number;
-  //         cached: boolean;
-  //       };
-  //       baseData.activityData = activityResponse.success ? activityResponse.activities : null;
-  //     }
-
-  //     // Get articles data for timeline preview - response has { items, pagination }
-  //     if (articlesRes.status === 'fulfilled' && articlesRes.value.ok) {
-  //       const articlesResponse = (await articlesRes.value.json()) as {
-  //         items: PublicArticle[];
-  //         pagination: { cursor?: string; hasMore: boolean };
-  //       };
-  //       baseData.articlesData = Array.isArray(articlesResponse.items)
-  //         ? articlesResponse.items
-  //         : null;
-  //     }
-  //   } else if (url === '/predictions') {
-  //     // Predictions page
-  //     const predictionsRes = await fetch(`${apiBaseUrl}/predictions`);
-  //     if (predictionsRes.ok) {
-  //       const predictions = (await predictionsRes.json()) as PredictionView[];
-  //       baseData.predictionsData = Array.isArray(predictions) ? predictions : null;
-  //     }
-  //   } else if (url === '/leaderboard') {
-  //     // Leaderboard page - fetch both main and pong leaderboards
-  //     const [leaderboardRes, pongLeaderboardRes] = await Promise.allSettled([
-  //       fetch(`${apiBaseUrl}/leaderboard`),
-  //       fetch(`${apiBaseUrl}/leaderboard/pong/elo`),
-  //     ]);
-
-  //     if (leaderboardRes.status === 'fulfilled' && leaderboardRes.value.ok) {
-  //       const leaderboard = (await leaderboardRes.value.json()) as LeaderboardEntryView[];
-  //       baseData.fullLeaderboardData = Array.isArray(leaderboard) ? leaderboard : null;
-  //     }
-
-  //     if (pongLeaderboardRes.status === 'fulfilled' && pongLeaderboardRes.value.ok) {
-  //       const pongLeaderboard = (await pongLeaderboardRes.value.json()) as PongLeaderboardView[];
-  //       baseData.pongLeaderboardData = Array.isArray(pongLeaderboard) ? pongLeaderboard : null;
-  //     }
-  //   } else if (url === '/timeline') {
-  //     // Timeline page
-  //     const [articlesRes, postsRes] = await Promise.allSettled([
-  //       fetch(`${apiBaseUrl}/timeline/articles`),
-  //       fetch(`${apiBaseUrl}/posts`),
-  //     ]);
-
-  //     if (articlesRes.status === 'fulfilled' && articlesRes.value.ok) {
-  //       const articlesResponse = (await articlesRes.value.json()) as {
-  //         items: PublicArticle[];
-  //         pagination: { cursor?: string; hasMore: boolean };
-  //       };
-  //       baseData.articlesData = Array.isArray(articlesResponse.items)
-  //         ? articlesResponse.items
-  //         : null;
-  //     }
-  //     if (postsRes.status === 'fulfilled' && postsRes.value.ok) {
-  //       const postsResponse = (await postsRes.value.json()) as {
-  //         items: PublicPostView[];
-  //         nextCursor?: number;
-  //         hasMore: boolean;
-  //       };
-  //       baseData.postsData = Array.isArray(postsResponse.items) ? postsResponse.items : null;
-  //     }
-  //   }
-  // } catch (error) {
-  //   console.error('Error fetching server data:', error);
-  //   // Return base data with nulls if API calls fail
-  // }
-
-  // return baseData;
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -569,7 +672,9 @@ createServer()
       console.log(`\n✅ Public site SSR server running (${env.NODE_ENV} mode)`);
       console.log(`   🌐 Server: http://${host}:${env.PORT}`);
       console.log(`   📡 API Base: ${env.API_BASE_URL}`);
-      console.log(`   🔗 Client App: ${env.CLIENT_APP_URL}\n`);
+      console.log(`   🔗 Client App: ${env.CLIENT_APP_URL}`);
+      console.log(`   💾 Cache: Enabled (TTL: 30-120s, cleanup: 5min)`);
+      console.log(`   🚀 CDN-ready with stale-while-revalidate\n`);
     });
 
     // Enhanced error handling for port conflicts
