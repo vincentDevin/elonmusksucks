@@ -43,6 +43,7 @@ export class ModerationRepository implements IModerationRepository {
             name: true,
             email: true,
             avatarUrl: true,
+            profilePictureKey: true, // Needed for generating signed Tigris URLs
           },
         },
       },
@@ -62,6 +63,7 @@ export class ModerationRepository implements IModerationRepository {
             name: true,
             email: true,
             avatarUrl: true,
+            profilePictureKey: true,
           },
         },
       },
@@ -123,10 +125,11 @@ export class ModerationRepository implements IModerationRepository {
     }
   }
 
-  async getMessage(messageId: number): Promise<Message | null> {
+  async getMessage(messageId: number): Promise<(Message & { user: User | null }) | null> {
     return this.prisma.message.findUnique({
       where: { id: messageId },
-    });
+      include: { user: true },
+    }) as Promise<(Message & { user: User | null }) | null>;
   }
 
   async deletePost(postId: number): Promise<boolean> {

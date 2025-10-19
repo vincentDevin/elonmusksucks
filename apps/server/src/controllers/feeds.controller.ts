@@ -112,21 +112,24 @@ export const bulkModerate = async (req: Request, res: Response) => {
       notes,
     );
 
-    // Publish real-time updates
+    // Publish real-time updates (optimized with parallel publishing)
     try {
-      // Notify admin room of bulk moderation
-      await eventBus.publish(REDIS_CHANNELS.ADMIN_MODERATION_BULK, {
-        ids,
-        action,
-        processed: updateResult.count,
-        timestamp: new Date().toISOString(),
-      });
+      // Prepare all publish operations
+      const publishPromises: Promise<any>[] = [
+        // Notify admin room of bulk moderation
+        eventBus.publish(REDIS_CHANNELS.ADMIN_MODERATION_BULK, {
+          ids,
+          action,
+          processed: updateResult.count,
+          timestamp: new Date().toISOString(),
+        }),
+      ];
 
-      // If articles were approved, notify public timeline
+      // If articles were approved, add timeline publish promises for all articles
       if (action === 'APPROVED' && updateResult.count > 0) {
-        // Publish each approved article to timeline
-        for (const article of approvedArticles) {
-          await eventBus.publish(REDIS_CHANNELS.TIMELINE_ARTICLES_NEW, {
+        // Batch all article publishes in parallel instead of sequential loop
+        const timelinePublishes = approvedArticles.map((article) =>
+          eventBus.publish(REDIS_CHANNELS.TIMELINE_ARTICLES_NEW, {
             id: article.id,
             feedId: article.feedId,
             title: article.title,
@@ -140,9 +143,13 @@ export const bulkModerate = async (req: Request, res: Response) => {
               name: article.feed.name,
               siteUrl: article.feed.siteUrl,
             },
-          });
-        }
+          }),
+        );
+        publishPromises.push(...timelinePublishes);
       }
+
+      // Execute all publishes in parallel
+      await Promise.all(publishPromises);
     } catch (publishError) {
       console.error('Error publishing real-time updates:', publishError);
       // Continue execution - don't fail the request for publishing errors
@@ -217,6 +224,18 @@ export const updateArticleTags = async (articleId: number, tagIds: number[]) => 
     return result;
   } catch (error) {
     console.error('Error updating article tags:', error);
+    throw error;
+  }
+};
+
+export const bulkUpdateArticleTags = async (
+  updates: Array<{ articleId: number; tagIds: number[] }>,
+) => {
+  try {
+    const result = await feedService.bulkUpdateArticleTags(updates);
+    return result;
+  } catch (error) {
+    console.error('Error bulk updating article tags:', error);
     throw error;
   }
 };

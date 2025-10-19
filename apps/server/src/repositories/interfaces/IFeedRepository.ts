@@ -32,6 +32,9 @@ export interface IFeedRepository {
     id: number,
   ): Promise<{ id: number; tags: { id: number; articleId: number; tagId: number }[] } | null>;
   updateArticleTags(id: number, tagIds: number[]): Promise<Article | null>;
+  bulkUpdateArticleTags(
+    updates: Array<{ articleId: number; tagIds: number[] }>,
+  ): Promise<{ updated: number }>;
   getArticleCountWithFilters(where: any): Promise<number>;
   getArticlesWithFilters(where: any, orderBy: any, take: number, skip: number): Promise<Article[]>;
 

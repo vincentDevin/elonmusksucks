@@ -20,8 +20,9 @@ const userService = new UserService();
  */
 function toISOStringSafe(date: Date | string | null | undefined): string | null {
   if (!date) return null;
-  if (typeof date === 'string') return date;
-  return date.toISOString();
+  if (typeof date === 'string') return date; // Already a string, return as-is
+  if (date instanceof Date) return date.toISOString(); // Date object, convert
+  return null; // Fallback for unexpected types
 }
 
 /**
@@ -90,7 +91,7 @@ export async function getArticles(req: Request, res: Response) {
       };
     });
 
-    const hasMore = articles.length === pageLimit;
+    const hasMore = articles.length > pageLimit;
     const nextCursor = items.length > 0 ? items[items.length - 1].timestamp : undefined;
 
     res.json({
@@ -249,8 +250,8 @@ export async function getTimeline(req: Request, res: Response) {
     const items = allItems.slice(0, pageLimit);
 
     // Check if there are more items
-    // We fetched pageLimit from each source, so hasMore is true if either source returned full page
-    const hasMore = articles.length === pageLimit || posts.length === pageLimit;
+    // Repositories fetch limit + 1, so hasMore is true if either source returned more than pageLimit
+    const hasMore = articles.length > pageLimit || posts.length > pageLimit;
 
     // Next cursor is the timestamp of the last item in this page
     const nextCursor = items.length > 0 ? items[items.length - 1].timestamp : undefined;

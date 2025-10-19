@@ -1,7 +1,6 @@
 // apps/client/src/api/axios.ts
 // Rollback: Remove metrics imports and interceptors, restore original axios config
 import axios from 'axios';
-import { requestManager } from '../lib/requestManager';
 import { devMetrics } from '../lib/metrics';
 import env from '../config/env';
 // CSRF Note: SPA uses JWT Bearer tokens for authentication, providing equivalent CSRF protection
@@ -77,28 +76,6 @@ api.interceptors.request.use((config) => {
   // as they cannot be sent by malicious sites via simple form submissions
   return config;
 });
-
-// Add request deduplication interceptor (before response interceptor)
-api.interceptors.request.use(
-  (config) => {
-    // Skip deduplication for non-GET requests to avoid side effects
-    if (config.method?.toLowerCase() !== 'get') {
-      return config;
-    }
-
-    // Mark this request for potential deduplication
-    (config as any).metadata = { ...(config as any).metadata, shouldDedupe: true };
-    return config;
-  },
-  (error) => Promise.reject(error),
-);
-
-// Create deduplicated version of axios instance with AbortController support
-// Rollback: Remove AbortController integration and revert to original axios methods
-const originalGet = api.get.bind(api);
-api.get = function (url, config = {}) {
-  return requestManager.dedupe('get', url, () => originalGet(url, config), config.params);
-};
 
 // Helper to create requests with AbortController support
 export const createAbortableRequest = () => {

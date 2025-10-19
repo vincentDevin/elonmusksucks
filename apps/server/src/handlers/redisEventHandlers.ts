@@ -178,8 +178,14 @@ export function registerRedisEventHandlers(io: Server, eventSub: Redis) {
         io.to(ADMIN_ROOM).emit(SOCKET_EVENTS.ADMIN_MODERATION_USER_KICK, payload);
         break;
       case REDIS_CHANNELS.MODERATION_MESSAGE_DELETE:
-        io.emit(SOCKET_EVENTS.MODERATION_MESSAGE_DELETE, payload);
+        // Broadcast to all clients (chat widgets need to remove the message)
+        io.emit(REDIS_CHANNELS.MODERATION_MESSAGE_DELETE, payload);
+        // Also notify admin room with admin-specific event
         io.to(ADMIN_ROOM).emit(SOCKET_EVENTS.ADMIN_MODERATION_MESSAGE_DELETE, payload);
+        break;
+      case REDIS_CHANNELS.MODERATION_POST_DELETE:
+        // Broadcast to all clients (post feeds need to remove the post)
+        io.emit(REDIS_CHANNELS.MODERATION_POST_DELETE, payload);
         break;
       case REDIS_CHANNELS.USER_ACTIVITY_LOG:
         io.emit(SOCKET_EVENTS.USER_ACTIVITY, payload);

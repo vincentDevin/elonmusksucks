@@ -6,6 +6,7 @@ import { adminAchievementService } from './achievements/adminAchievement.service
 import { UserRepository } from '../repositories/UserRepository';
 import { ModerationRepository } from '../repositories/ModerationRepository';
 import { AchievementRepository } from '../repositories/AchievementRepository';
+import { UserService } from './user.service';
 import type { IAchievementRepository } from '../repositories/interfaces/IAchievementRepository';
 import type { BanUserRequest, BanType } from '@ems/types';
 
@@ -13,6 +14,7 @@ const prisma = new PrismaClient();
 const userRepository = new UserRepository();
 const moderationRepository = new ModerationRepository(prisma);
 const achievementRepository = new AchievementRepository(prisma);
+const userService = new UserService();
 
 export interface ShameWallEntry {
   userId: number;
@@ -185,6 +187,14 @@ class ShameWallService {
     );
     const banCountMap = Object.fromEntries(banCounts.map((bc) => [bc.userId, bc.count]));
 
+    // Batch fetch signed avatar URLs (same pattern as leaderboard)
+    const usersForAvatars = activeBans.map((ban) => ({
+      id: ban.user.id,
+      profilePictureKey: ban.user.profilePictureKey,
+      avatarUrl: ban.user.avatarUrl,
+    }));
+    const avatarUrlMap = await userService.getBatchedAvatarUrls(usersForAvatars);
+
     // Get shame achievements for each banned user
     const shameWallEntries = await Promise.all(
       activeBans.map(async (ban) => {
@@ -194,7 +204,7 @@ class ShameWallService {
         return {
           userId: ban.user.id,
           userName: ban.user.name,
-          avatarUrl: ban.user.avatarUrl || undefined,
+          avatarUrl: avatarUrlMap.get(ban.user.id) || undefined, // Use signed Tigris URL
           reason: ban.reason,
           startDate: ban.createdAt.toISOString(),
           endDate: ban.expiresAt?.toISOString(),

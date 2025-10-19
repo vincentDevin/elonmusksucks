@@ -485,7 +485,8 @@ class AdminAchievementService {
       category: ua.achievement.category,
       rarity: ua.achievement.rarity || 'common',
       iconUrl: ua.achievement.iconUrl,
-      completedAt: ua.completedAt!.toISOString(),
+      completedAt:
+        typeof ua.completedAt === 'string' ? ua.completedAt : ua.completedAt!.toISOString(),
     }));
   }
 
@@ -545,7 +546,11 @@ class AdminAchievementService {
         progress: userAchievement?.progress || 0,
         targetValue: achievement.targetValue,
         isCompleted: !!userAchievement?.completedAt,
-        completedAt: userAchievement?.completedAt?.toISOString(),
+        completedAt: userAchievement?.completedAt
+          ? userAchievement.completedAt instanceof Date
+            ? userAchievement.completedAt.toISOString()
+            : userAchievement.completedAt
+          : undefined,
       };
     });
   }

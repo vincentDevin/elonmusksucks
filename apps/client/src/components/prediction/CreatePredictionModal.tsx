@@ -20,6 +20,7 @@ export default function CreatePredictionModal() {
   const [error, setError] = useState<string | null>(null);
   const [categoryMap, setCategoryMap] = useState<Record<string, number>>({});
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | undefined>();
+  const [categoriesLoaded, setCategoriesLoaded] = useState(false);
 
   // Prediction templates for quick creation
   const templates = [
@@ -104,8 +105,10 @@ export default function CreatePredictionModal() {
           map[cat.name.toLowerCase()] = cat.id;
         });
         setCategoryMap(map);
+        setCategoriesLoaded(true);
       } catch (error) {
         console.error('Failed to load categories:', error);
+        setCategoriesLoaded(true); // Set to true even on error to unblock UI
       }
     }
     loadCategories();
@@ -205,14 +208,29 @@ export default function CreatePredictionModal() {
     }
   }, [createModalOpen]);
 
-  // If we have source data, automatically show the form
+  // If we have source data, automatically show the form (wait for categories to load)
   useEffect(() => {
-    if (createModalOpen && createModalSourceData) {
+    if (createModalOpen && createModalSourceData && categoriesLoaded) {
       setShowForm(true);
     }
-  }, [createModalOpen, createModalSourceData]);
+  }, [createModalOpen, createModalSourceData, categoriesLoaded]);
 
   if (!createModalOpen) return null;
+
+  // Show loading state while categories are loading (when opening with source data)
+  if (createModalSourceData && !categoriesLoaded) {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[90]">
+        <div className="bg-surface border border-muted rounded-2xl shadow-2xl max-w-md w-full p-8">
+          <div className="text-center">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-4"></div>
+            <p className="text-content font-medium">Loading prediction categories...</p>
+            <p className="text-tertiary text-sm mt-2">Preparing form with source data</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[90]">

@@ -78,7 +78,8 @@ export interface CreatePredictionPayload {
 export async function createPrediction(payload: CreatePredictionPayload): Promise<PredictionView> {
   const { data } = await api.post<PredictionView>('/api/predictions', {
     ...payload,
-    expiresAt: payload.expiresAt.toISOString(),
+    expiresAt:
+      payload.expiresAt instanceof Date ? payload.expiresAt.toISOString() : payload.expiresAt,
     options: payload.options,
   });
   return data;

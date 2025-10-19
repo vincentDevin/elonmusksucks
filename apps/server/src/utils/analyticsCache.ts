@@ -13,8 +13,8 @@ const CACHE_TTL = {
   CONTENT: 300, // 5 minutes
   DASHBOARD: 300, // 5 minutes
   LEADERBOARD: 60, // 1 minute
-  TIMELINE_UNIFIED: 60, // 1 minute - articles + posts unified timeline
-  TIMELINE_ARTICLES: 120, // 2 minutes - articles only (more stable)
+  TIMELINE_UNIFIED: 30, // 30 seconds - articles + posts unified timeline
+  TIMELINE_ARTICLES: 30, // 30 seconds - articles only (reduced for fresh content)
   TIMELINE_SEARCH: 180, // 3 minutes - search results
   TIMELINE_TRENDING: 300, // 5 minutes - trending content
   // User stats (Issue #3 - high traffic, frequently updated)

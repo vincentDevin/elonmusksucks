@@ -169,10 +169,11 @@ export default function ChatWidget({ mode = 'widget', className }: ChatWidgetPro
           };
           break;
         case 'messageDeleted':
+          // Use the new payload structure with message author info
           moderationEvent = {
             type: 'messageDeleted',
-            targetUser: event.targetUser || 'Unknown User',
-            moderator: event.moderator || 'System',
+            targetUser: event.messageAuthorName || 'Unknown User',
+            moderator: event.deletedByName || 'System',
             timestamp: Date.now(),
           };
           break;
@@ -184,6 +185,8 @@ export default function ChatWidget({ mode = 'widget', className }: ChatWidgetPro
     };
 
     // Subscribe to moderation events via EventBusCore
+    // Note: MODERATION_MESSAGE_DELETE is handled by ChatContext for message removal
+    // Here we only listen for showing toast notifications
     const unsubscribers = [
       subscribe(REDIS_CHANNELS.MODERATION_USER_BAN, (data) =>
         handleModerationEvent({ ...data, type: 'userBan' }),
@@ -475,8 +478,9 @@ export default function ChatWidget({ mode = 'widget', className }: ChatWidgetPro
                   'bg-orange-100 text-orange-800 dark:bg-orange-900/70 dark:text-orange-200';
                 break;
               case 'messageDeleted':
-                message = `Message from ${ev.targetUser} was deleted by ${ev.moderator}`;
-                bgColor = 'bg-surface text-tertiary border border-muted';
+                message = `Message from ${ev.targetUser} deleted by ${ev.moderator}`;
+                bgColor =
+                  'bg-purple-100 text-purple-800 dark:bg-purple-900/70 dark:text-purple-200';
                 break;
             }
 

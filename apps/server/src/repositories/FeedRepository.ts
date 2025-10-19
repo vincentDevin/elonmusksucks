@@ -133,6 +133,48 @@ export class FeedRepository implements IFeedRepository {
     });
   }
 
+  /**
+   * Bulk update article tags - optimized for performance
+   * Updates tags for multiple articles in batched operations
+   */
+  async bulkUpdateArticleTags(
+    updates: Array<{ articleId: number; tagIds: number[] }>,
+  ): Promise<{ updated: number }> {
+    if (updates.length === 0) {
+      return { updated: 0 };
+    }
+
+    const articleIds = updates.map((u) => u.articleId);
+
+    // Step 1: Delete all existing tags for these articles (single query)
+    await this.prisma.articleTag.deleteMany({
+      where: {
+        articleId: { in: articleIds },
+      },
+    });
+
+    // Step 2: Prepare all new tag associations
+    const allTagAssociations: Array<{ articleId: number; tagId: number }> = [];
+    for (const update of updates) {
+      for (const tagId of update.tagIds) {
+        allTagAssociations.push({
+          articleId: update.articleId,
+          tagId,
+        });
+      }
+    }
+
+    // Step 3: Create all new tag associations (single query)
+    if (allTagAssociations.length > 0) {
+      await this.prisma.articleTag.createMany({
+        data: allTagAssociations,
+        skipDuplicates: true, // Prevent errors if duplicate associations exist
+      });
+    }
+
+    return { updated: updates.length };
+  }
+
   async getArticleCountWithFilters(where: any) {
     return this.prisma.article.count({ where });
   }

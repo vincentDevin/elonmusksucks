@@ -78,10 +78,18 @@ export class UnifiedContentRepository implements IUnifiedContentRepository {
       ...(createdBefore && { lte: new Date(createdBefore) }),
     };
 
+    console.log(
+      '[UnifiedContent] Filters:',
+      JSON.stringify({ types, statuses, search, limit, offset }),
+    );
+
     // ARTICLES
     if (fetchTypes.includes('article')) {
       const articleStatusFilter = this.mapStatusesToArticleFilter(statuses);
 
+      console.log('[UnifiedContent] Fetching articles with status filter:', articleStatusFilter);
+
+      // IMPORTANT: Fetch ALL matching articles (no limit) for proper pagination after merging
       results.articles = await this.prisma.article.findMany({
         where: {
           ...(articleStatusFilter && { status: { in: articleStatusFilter } }),
@@ -97,9 +105,17 @@ export class UnifiedContentRepository implements IUnifiedContentRepository {
         },
         include: {
           feed: true,
+          tags: {
+            include: {
+              tag: true,
+            },
+          },
         },
-        take: limit * 2, // Get extra to handle post-filter limit
+        // No take limit - fetch all matching records for proper unified pagination
+        orderBy: { createdAt: 'desc' }, // Pre-sort for better performance
       });
+
+      console.log('[UnifiedContent] Found', results.articles?.length || 0, 'articles');
     }
 
     // USER POSTS
@@ -126,7 +142,8 @@ export class UnifiedContentRepository implements IUnifiedContentRepository {
         include: {
           author: true,
         },
-        take: limit * 2,
+        // No take limit - fetch all for unified pagination
+        orderBy: { createdAt: 'desc' },
       });
     }
 
@@ -149,7 +166,8 @@ export class UnifiedContentRepository implements IUnifiedContentRepository {
         include: {
           author: true,
         },
-        take: limit * 2,
+        // No take limit - fetch all for unified pagination
+        orderBy: { createdAt: 'desc' },
       });
     }
 
@@ -179,7 +197,8 @@ export class UnifiedContentRepository implements IUnifiedContentRepository {
             },
           },
         },
-        take: limit * 2,
+        // No take limit - fetch all for unified pagination
+        orderBy: { createdAt: 'desc' },
       });
     }
 
@@ -189,9 +208,22 @@ export class UnifiedContentRepository implements IUnifiedContentRepository {
       sortBy === 'updatedAt' || sortBy === 'views' ? sortBy : 'createdAt';
     const unified = transformAndSortUnifiedContent(results, validSortBy, sortOrder);
 
+    console.log('[UnifiedContent] Transformed and sorted', unified.length, 'total items');
+    console.log(
+      '[UnifiedContent] Content breakdown:',
+      JSON.stringify({
+        articles: results.articles?.length || 0,
+        posts: results.posts?.length || 0,
+        comments: results.comments?.length || 0,
+        predictions: results.predictions?.length || 0,
+      }),
+    );
+
     // Apply pagination
     const paginated = unified.slice(offset, offset + limit);
     const total = unified.length;
+
+    console.log('[UnifiedContent] Returning', paginated.length, 'items after pagination');
 
     return { items: paginated, total };
   }

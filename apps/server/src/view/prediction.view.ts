@@ -1,6 +1,17 @@
 import type { PredictionView, PrismaCategory } from '@ems/types';
 
 /**
+ * Safely converts Date objects or ISO strings to ISO string format
+ * Handles cached data where dates are already strings
+ */
+function toISOStringSafe(date: Date | string | null | undefined): string | null {
+  if (!date) return null;
+  if (typeof date === 'string') return date; // Already a string, return as-is
+  if (date instanceof Date) return date.toISOString(); // Date object, convert
+  return null; // Fallback for unexpected types
+}
+
+/**
  * Maps database prediction result to standardized PredictionView DTO
  * Handles BigInt → string conversion for bet amounts and Date → ISO string
  */
@@ -12,11 +23,11 @@ export const toPredictionView = (prediction: {
   category?: PrismaCategory | null; // Include full category object
   type: any; // PredictionType enum
   threshold: number | null;
-  createdAt: Date;
-  expiresAt: Date;
+  createdAt: Date | string;
+  expiresAt: Date | string;
   resolved: boolean;
   approved: boolean;
-  resolvedAt: Date | null;
+  resolvedAt: Date | string | null;
   creatorId: number;
   winningOptionId: number | null;
   creator?: {
@@ -38,7 +49,7 @@ export const toPredictionView = (prediction: {
     potentialPayout: bigint | null;
     payout: bigint | null;
     status: string;
-    createdAt: Date;
+    createdAt: Date | string;
     user: {
       id: number;
       name: string;
@@ -64,9 +75,9 @@ export const toPredictionView = (prediction: {
   status: prediction.resolved ? 'RESOLVED' : prediction.approved ? 'APPROVED' : 'PENDING',
   type: prediction.type,
   threshold: prediction.threshold,
-  createdAt: prediction.createdAt.toISOString(),
-  expiresAt: prediction.expiresAt.toISOString(),
-  resolvedAt: prediction.resolvedAt ? prediction.resolvedAt.toISOString() : null,
+  createdAt: toISOStringSafe(prediction.createdAt)!,
+  expiresAt: toISOStringSafe(prediction.expiresAt)!,
+  resolvedAt: toISOStringSafe(prediction.resolvedAt),
   creatorUserId: prediction.creatorId,
   winningOptionId: prediction.winningOptionId,
   creator: prediction.creator,
@@ -81,7 +92,7 @@ export const toPredictionView = (prediction: {
     potentialPayout: bet.potentialPayout ? bet.potentialPayout.toString() : null,
     payout: bet.payout ? bet.payout.toString() : null,
     status: bet.status,
-    createdAt: bet.createdAt.toISOString(),
+    createdAt: toISOStringSafe(bet.createdAt)!,
   })),
   sourceLinks: prediction.sourceLinks?.map((link) => ({
     id: link.id,

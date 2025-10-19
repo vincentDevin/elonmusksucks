@@ -56,7 +56,14 @@ app.use(
         defaultSrc: ["'self'"],
         styleSrc: ["'self'", "'unsafe-inline'"], // Allow inline styles for React
         scriptSrc: ["'self'"],
-        imgSrc: ["'self'", 'data:', 'https://fly.storage.tigris.dev'],
+        imgSrc: [
+          "'self'",
+          'data:',
+          'blob:',
+          'https:', // Allow all HTTPS images (for RSS feed article images from news sites)
+          'https://*.fly.storage.tigris.dev',
+          'https://ui-avatars.com',
+        ],
         connectSrc: [
           "'self'",
           env.BASE_URL_SERVER,

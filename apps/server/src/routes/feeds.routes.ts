@@ -11,8 +11,6 @@ import {
   updateFeed,
   bulkModerate,
   refreshFeed,
-  findArticleById,
-  updateArticleTags,
   getArticleCount,
   getArticles,
 } from '../controllers/feeds.controller';
@@ -40,7 +38,7 @@ router.delete('/:id', deleteFeed);
 // POST /api/admin/moderate - Bulk moderation (basic implementation)
 router.post('/moderate', bulkModerate);
 
-// POST /api/admin/retag - Bulk retagging (basic implementation)
+// POST /api/admin/retag - Bulk retagging (optimized with batch operations)
 router.post('/retag', async (req: any, res: any) => {
   try {
     const { ids, add = [], remove = [] } = req.body;
@@ -50,40 +48,59 @@ router.post('/retag', async (req: any, res: any) => {
       return;
     }
 
-    let processed = 0;
+    // Step 1: Get all articles in a single query (instead of looping)
+    // getArticles signature: (where, pageLimit, pageOffset)
+    const articles = await getArticles({ id: { in: ids } }, ids.length, 0);
+
+    // Step 2: Calculate new tag sets for each article
+    const updates: Array<{ articleId: number; tagIds: number[] }> = [];
     let tagged = 0;
 
-    // Process in small batches
-    for (const articleId of ids) {
-      const article = await findArticleById(articleId);
-      if (article) {
-        // Extract tag IDs from article.tags (which are objects like { id, articleId, tagId })
-        const currentTagIds = new Set(article.tags.map((t: any) => t.tagId || t.id || t));
-        let hasChanges = false;
+    for (const article of articles) {
+      // Extract tag IDs from article.tags - handle ArticleTag relation properly
+      const currentTagIds = new Set<number>(
+        article.tags.map((t: any) => {
+          // ArticleTag has structure { id, articleId, tagId, tag }
+          const tagId = typeof t === 'object' ? (t.tagId ?? t.id) : t;
+          return Number(tagId);
+        }),
+      );
+      let hasChanges = false;
 
-        // Remove tags (expecting tag IDs)
-        for (const tagId of remove) {
-          if (currentTagIds.has(tagId)) {
-            currentTagIds.delete(tagId);
-            hasChanges = true;
-          }
+      // Remove tags
+      for (const tagId of remove) {
+        const numTagId = Number(tagId);
+        if (currentTagIds.has(numTagId)) {
+          currentTagIds.delete(numTagId);
+          hasChanges = true;
         }
+      }
 
-        // Add tags (expecting tag IDs)
-        for (const tagId of add) {
-          if (!currentTagIds.has(tagId)) {
-            currentTagIds.add(tagId);
-            hasChanges = true;
-          }
+      // Add tags
+      for (const tagId of add) {
+        const numTagId = Number(tagId);
+        if (!currentTagIds.has(numTagId)) {
+          currentTagIds.add(numTagId);
+          hasChanges = true;
         }
+      }
 
-        if (hasChanges) {
-          await updateArticleTags(articleId, Array.from(currentTagIds));
-          tagged++;
-        }
-        processed++;
+      if (hasChanges) {
+        updates.push({
+          articleId: article.id,
+          tagIds: Array.from(currentTagIds),
+        });
+        tagged++;
       }
     }
+
+    // Step 3: Bulk update all articles in batched operations (instead of looping)
+    const { bulkUpdateArticleTags } = await import('../controllers/feeds.controller');
+    if (updates.length > 0) {
+      await bulkUpdateArticleTags(updates);
+    }
+
+    const processed = articles.length;
 
     // Publish real-time updates to admin room
     try {

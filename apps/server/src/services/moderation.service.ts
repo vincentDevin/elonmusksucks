@@ -199,6 +199,18 @@ export const moderationService = {
     return true;
   },
 
+  // Get message info (for including in deletion events)
+  async getMessageInfo(messageId: number): Promise<{ userId: number; userName: string }> {
+    const message = await moderationRepo.getMessage(messageId);
+    if (!message) {
+      throw new Error('Message not found');
+    }
+    return {
+      userId: message.userId,
+      userName: message.user?.name || `User ${message.userId}`,
+    };
+  },
+
   // Delete message
   async deleteMessage(
     messageId: number,
@@ -217,16 +229,16 @@ export const moderationService = {
       throw new Error('Failed to delete message');
     }
 
-    // Log and publish
-    await logAndPublishAction(
-      'MESSAGE_DELETE',
+    // Log moderation action (don't publish here - controller/handler will publish with full user details)
+    await moderationRepo.createModerationLog({
+      action: 'MESSAGE_DELETE',
       moderatorId,
-      REDIS_CHANNELS.MODERATION_MESSAGE_DELETE,
-      message.userId,
-      { messageId, reason, content: message.content },
+      targetUserId: message.userId,
+      reason,
+      details: { messageId, content: message.content },
       ipAddress,
       userAgent,
-    );
+    });
 
     return true;
   },

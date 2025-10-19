@@ -25,6 +25,7 @@ import type {
   ChatUsersOnlinePayload,
   ChatJoinPayload,
   ChatLeavePayload,
+  ModerationMessageDeletePayload,
 } from '@ems/types';
 
 /* ---------- Types ---------- */
@@ -192,7 +193,16 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   useSocketEvent(REDIS_CHANNELS.CHAT_LEAVE, handleUserLeft);
 
   /* ---------------------------------------------------------------------- */
-  /* 6. Emit helpers                                                        */
+  /* 6. Message deletion (moderation)                                       */
+  /* ---------------------------------------------------------------------- */
+  const handleMessageDelete = useCallback((payload: ModerationMessageDeletePayload) => {
+    setMessages((prev) => prev.filter((msg) => msg.id !== payload.messageId));
+  }, []);
+
+  useSocketEvent(REDIS_CHANNELS.MODERATION_MESSAGE_DELETE, handleMessageDelete);
+
+  /* ---------------------------------------------------------------------- */
+  /* 7. Emit helpers                                                        */
   /* ---------------------------------------------------------------------- */
   const sendTyping = useCallback(() => {
     if (!socket) return;
@@ -217,7 +227,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   );
 
   /* ---------------------------------------------------------------------- */
-  /* 7. Context value                                                       */
+  /* 8. Context value                                                       */
   /* ---------------------------------------------------------------------- */
   const value = useMemo<ChatCtx>(
     () => ({

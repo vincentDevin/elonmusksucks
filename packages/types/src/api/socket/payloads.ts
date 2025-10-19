@@ -462,6 +462,24 @@ export interface UserKickedNotification {
   reason: string;
 }
 
+// Server-to-Client Broadcast Payloads (message deletion notifications)
+export interface ModerationMessageDeletePayload {
+  messageId: number;
+  deletedBy: number;
+  deletedByName: string;
+  messageAuthorId: number;
+  messageAuthorName: string;
+  reason: string;
+  timestamp: string;
+}
+
+export interface ModerationPostDeletePayload {
+  postId: number;
+  deletedBy: number;
+  reason: string;
+  timestamp: string;
+}
+
 // ============================================================================
 // Betting Event Payloads
 // ============================================================================

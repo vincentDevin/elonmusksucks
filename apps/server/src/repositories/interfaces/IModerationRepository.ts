@@ -20,7 +20,7 @@ export type { CreateBanData, CreateModerationLogData };
 // to avoid Prisma imports in @ems/types, but they're compatible at runtime
 
 export interface BanWithUser extends PrismaUserBan {
-  user: Pick<PrismaUser, 'id' | 'name' | 'email' | 'avatarUrl'>;
+  user: Pick<PrismaUser, 'id' | 'name' | 'email' | 'avatarUrl' | 'profilePictureKey'>;
 }
 
 export interface ModerationLogWithUsers extends PrismaModerationLog {
@@ -53,7 +53,7 @@ export interface IModerationRepository {
 
   // Message moderation
   deleteMessage(messageId: number): Promise<boolean>;
-  getMessage(messageId: number): Promise<PrismaMessage | null>;
+  getMessage(messageId: number): Promise<(PrismaMessage & { user: PrismaUser | null }) | null>;
 
   // Post moderation (now using Content model)
   deletePost(postId: number): Promise<boolean>;

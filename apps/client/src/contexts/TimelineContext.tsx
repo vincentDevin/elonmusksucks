@@ -14,8 +14,6 @@ import type { TimelineItem, TimelineResponse } from '@ems/types';
 import { useSocket } from './SocketContext';
 import { useEventBusCore } from './EventBusCoreContext';
 import { REDIS_CHANNELS } from '@ems/types';
-import { sessionCache } from '../lib/sessionCache';
-
 // State interface
 interface TimelineState {
   // Articles
@@ -189,16 +187,6 @@ export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const socket = useSocket();
   const { subscribe } = useEventBusCore();
 
-  // Cache keys for timeline data
-  const getCacheKey = (type: 'articles' | 'tweets', filters: any) => {
-    const filterStr = JSON.stringify({
-      tags: filters.tags?.sort() || [],
-      sort: filters.sort || 'newest',
-      search: filters.search || '',
-    });
-    return `timeline_${type}_${filterStr}`;
-  };
-
   // AbortController refs for cancelling requests
   const articlesAbortController = useRef<AbortController | null>(null);
   const tweetsAbortController = useRef<AbortController | null>(null);
@@ -206,20 +194,6 @@ export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   // Actions
   const loadArticles = async (reset = false) => {
     if (state.articlesLoading) return;
-
-    // Try to load from cache first (only on reset/initial load)
-    if (reset) {
-      const cacheKey = getCacheKey('articles', state.filters);
-      const cachedData = sessionCache.get<{
-        items: TimelineItem[];
-        cursor?: string;
-        hasMore: boolean;
-      }>(cacheKey);
-      if (cachedData) {
-        dispatch({ type: 'LOAD_ARTICLES_SUCCESS', payload: { ...cachedData, reset: true } });
-        return;
-      }
-    }
 
     // Abort any pending articles request
     if (articlesAbortController.current) {
@@ -252,16 +226,6 @@ export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       }
 
       const data: TimelineResponse = await response.json();
-
-      // Cache the successful response (only for reset loads)
-      if (reset) {
-        const cacheKey = getCacheKey('articles', state.filters);
-        sessionCache.set(
-          cacheKey,
-          { items: data.items, cursor: data.pagination.cursor, hasMore: data.pagination.hasMore },
-          300000,
-        );
-      }
 
       // Use startTransition for non-urgent list updates (React 19 optimization)
       startTransition(() => {
@@ -296,20 +260,6 @@ export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const loadTweets = async (reset = false) => {
     if (state.tweetsLoading) return;
 
-    // Try to load from cache first (only on reset/initial load)
-    if (reset) {
-      const cacheKey = getCacheKey('tweets', {});
-      const cachedData = sessionCache.get<{
-        items: TimelineItem[];
-        cursor?: string;
-        hasMore: boolean;
-      }>(cacheKey);
-      if (cachedData) {
-        dispatch({ type: 'LOAD_TWEETS_SUCCESS', payload: { ...cachedData, reset: true } });
-        return;
-      }
-    }
-
     // Abort any pending tweets request
     if (tweetsAbortController.current) {
       tweetsAbortController.current.abort();
@@ -337,16 +287,6 @@ export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       }
 
       const data: TimelineResponse = await response.json();
-
-      // Cache the successful response (only for reset loads)
-      if (reset) {
-        const cacheKey = getCacheKey('tweets', {});
-        sessionCache.set(
-          cacheKey,
-          { items: data.items, cursor: data.pagination.cursor, hasMore: data.pagination.hasMore },
-          300000,
-        );
-      }
 
       // Use startTransition for non-urgent list updates (React 19 optimization)
       startTransition(() => {
@@ -389,10 +329,6 @@ export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const updateFilters = (filters: Partial<TimelineState['filters']>) => {
     dispatch({ type: 'UPDATE_FILTERS', payload: filters });
-
-    // Clear cache when filters change
-    const oldCacheKey = getCacheKey('articles', state.filters);
-    sessionCache.delete(oldCacheKey);
 
     // Reload current tab with new filters
     if (state.activeTab === 'articles') {

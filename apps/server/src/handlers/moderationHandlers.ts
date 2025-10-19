@@ -5,6 +5,7 @@ import type { BanType as PrismaBanType } from '@prisma/client';
 import type { BanType } from '@ems/types';
 import {
   SOCKET_EVENTS,
+  REDIS_CHANNELS,
   type AdminBanUserRequest,
   type AdminBanUserResponse,
   type AdminUnbanUserRequest,
@@ -25,7 +26,10 @@ import {
   type UserBannedNotification,
   type UserMutedNotification,
   type UserKickedNotification,
+  type ModerationMessageDeletePayload,
+  type ModerationPostDeletePayload,
 } from '@ems/types';
+import { eventBus } from '../lib/EventBus';
 
 // Convert Prisma BanType (UPPERCASE) to domain BanType (lowercase)
 function convertBanType(prismaBanType: PrismaBanType): BanType {
@@ -193,6 +197,9 @@ export function registerModerationHandlers(socket: AuthenticatedSocket): void {
       callback: (response: AdminDeleteMessageResponse) => void,
     ) => {
       try {
+        // Fetch message info before deletion to include author details in event
+        const messageInfo = await moderationService.getMessageInfo(data.messageId);
+
         await moderationService.deleteMessage(
           data.messageId,
           socket.user!.id,
@@ -200,6 +207,18 @@ export function registerModerationHandlers(socket: AuthenticatedSocket): void {
           socket.handshake.address,
           socket.handshake.headers['user-agent'],
         );
+
+        // Publish Redis event for real-time message deletion across all clients
+        const deletePayload: ModerationMessageDeletePayload = {
+          messageId: data.messageId,
+          deletedBy: socket.user!.id,
+          deletedByName: socket.user!.name || 'Admin',
+          messageAuthorId: messageInfo.userId,
+          messageAuthorName: messageInfo.userName,
+          reason: data.reason,
+          timestamp: new Date().toISOString(),
+        };
+        await eventBus.publish(REDIS_CHANNELS.MODERATION_MESSAGE_DELETE, deletePayload);
 
         const response: AdminDeleteMessageResponse = { success: true };
         callback(response);
@@ -226,6 +245,15 @@ export function registerModerationHandlers(socket: AuthenticatedSocket): void {
           socket.handshake.address,
           socket.handshake.headers['user-agent'],
         );
+
+        // Publish Redis event for real-time post deletion across all clients
+        const deletePayload: ModerationPostDeletePayload = {
+          postId: data.postId,
+          deletedBy: socket.user!.id,
+          reason: data.reason,
+          timestamp: new Date().toISOString(),
+        };
+        await eventBus.publish(REDIS_CHANNELS.MODERATION_POST_DELETE, deletePayload);
 
         const response: AdminDeletePostResponse = { success: true };
         callback(response);

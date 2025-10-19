@@ -16,25 +16,46 @@ export class FeedService {
 
   async getFeedStats() {
     const feeds = await this.repository.findManyWithStats();
-    const stats = [];
 
-    for (const feed of feeds) {
-      // Calculate stats for each feed
-      const totalArticles = await this.repository.getArticleCount(feed.id);
+    // Optimize: Get all article counts in a single aggregation query instead of looping
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-      // Recent articles (last 7 days)
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    // Get all counts in parallel using Promise.all
+    const [totalCounts, recentCounts] = await Promise.all([
+      // Aggregate total articles per feed
+      this.repository['prisma'].article.groupBy({
+        by: ['feedId'],
+        _count: {
+          id: true,
+        },
+      }),
+      // Aggregate recent articles per feed
+      this.repository['prisma'].article.groupBy({
+        by: ['feedId'],
+        where: {
+          createdAt: { gte: sevenDaysAgo },
+        },
+        _count: {
+          id: true,
+        },
+      }),
+    ]);
 
-      const recentArticles = await this.repository.getRecentArticleCount(feed.id, sevenDaysAgo);
+    // Create lookup maps for O(1) access
+    const totalCountMap = new Map(totalCounts.map((c) => [c.feedId, c._count.id]));
+    const recentCountMap = new Map(recentCounts.map((c) => [c.feedId, c._count.id]));
 
-      // Error rate calculation
+    // Build stats array with O(n) complexity instead of O(n * 2) with queries
+    const stats = feeds.map((feed) => {
+      const totalArticles = totalCountMap.get(feed.id) || 0;
+      const recentArticles = recentCountMap.get(feed.id) || 0;
       const errorRate = feed.fetchCount > 0 ? (feed.errorCount / feed.fetchCount) * 100 : 0;
 
       // Average fetch time (mock for now - would need to track actual fetch times)
       const avgFetchTime = Math.random() * 2000 + 500; // 500-2500ms
 
-      const feedStats = {
+      return {
         feedId: feed.id,
         totalArticles,
         recentArticles,
@@ -43,9 +64,7 @@ export class FeedService {
         lastSuccess: feed.lastSuccessAt?.toISOString() || null,
         lastError: feed.lastErrorAt?.toISOString() || null,
       };
-
-      stats.push(feedStats);
-    }
+    });
 
     return stats;
   }
@@ -83,6 +102,10 @@ export class FeedService {
 
   async updateArticleTags(articleId: number, tagIds: number[]) {
     return this.repository.updateArticleTags(articleId, tagIds);
+  }
+
+  async bulkUpdateArticleTags(updates: Array<{ articleId: number; tagIds: number[] }>) {
+    return this.repository.bulkUpdateArticleTags(updates);
   }
 
   async getArticleCountWithFilters(where: any) {
