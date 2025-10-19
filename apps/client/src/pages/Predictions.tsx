@@ -20,6 +20,7 @@ import PredictionSectionCard from '../components/prediction/PredictionSectionCar
 import { usePredictionDiscovery } from '../hooks/usePredictionDiscovery';
 import { useEventBusCore } from '../contexts/EventBusCoreContext';
 import { useParlay } from '../contexts/ParlayContext';
+import { usePredictionMarket } from '../contexts/PredictionContext';
 
 // Icons
 import {
@@ -28,6 +29,7 @@ import {
   SquaresPlusIcon as Layers,
   ArrowTrendingUpIcon as TrendingUp,
   BellIcon as Bell,
+  PlusIcon,
 } from '@heroicons/react/24/outline';
 import { toast } from 'react-hot-toast';
 
@@ -38,6 +40,7 @@ export default function Predictions() {
   const { id: predictionId } = useParams<{ id: string }>();
   const { state: parlayState, dispatch: parlayDispatch } = useParlay();
   const { subscribe } = useEventBusCore();
+  const { openCreateModal } = usePredictionMarket();
 
   // AI-powered discovery system
   const {
@@ -448,6 +451,15 @@ export default function Predictions() {
             </div>
 
             <div className="flex items-center gap-3">
+              {/* Create Prediction Button */}
+              <button
+                onClick={() => openCreateModal()}
+                className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-all cursor-pointer font-medium"
+              >
+                <PlusIcon className="w-5 h-5" />
+                <span className="hidden sm:inline">Create Prediction</span>
+              </button>
+
               {/* Live Notifications */}
               {liveNotifications.length > 0 && (
                 <div className="relative">

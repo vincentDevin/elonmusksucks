@@ -149,7 +149,7 @@ export default function CreatePredictionForm({
 
   const inputBase =
     'w-full border rounded-lg px-3 py-2 bg-surface text-content placeholder:text-tertiary ' +
-    'focus:outline-none focus:ring-2 focus:ring-primary border-muted';
+    'focus:outline-none focus:ring-2 focus:ring-primary border-muted cursor-pointer';
 
   return (
     <form onSubmit={submit} className="bg-surface shadow-lg rounded-lg p-6 space-y-6">
@@ -166,7 +166,7 @@ export default function CreatePredictionForm({
             <button
               type="button"
               onClick={() => setSourceData(null)}
-              className="text-content/60 hover:text-content text-sm"
+              className="text-content/60 hover:text-content text-sm cursor-pointer"
             >
               Remove
             </button>
@@ -181,7 +181,7 @@ export default function CreatePredictionForm({
                 href={sourceData.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs text-primary hover:text-primary/80 mt-1 inline-block"
+                className="text-xs text-primary hover:text-primary/80 mt-1 inline-block cursor-pointer"
               >
                 View Original →
               </a>
@@ -313,14 +313,18 @@ export default function CreatePredictionForm({
                 <button
                   type="button"
                   onClick={() => removeOption(i)}
-                  className="text-red-500 hover:text-red-700"
+                  className="text-red-500 hover:text-red-700 cursor-pointer"
                 >
                   ✕
                 </button>
               )}
             </div>
           ))}
-          <button type="button" onClick={addOption} className="text-primary text-sm font-medium">
+          <button
+            type="button"
+            onClick={addOption}
+            className="text-primary text-sm font-medium cursor-pointer"
+          >
             + Add another option
           </button>
         </div>
@@ -330,14 +334,14 @@ export default function CreatePredictionForm({
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2 rounded-lg bg-muted hover:bg-tertiary"
+          className="px-4 py-2 rounded-lg bg-muted hover:bg-tertiary cursor-pointer"
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={!canSubmit}
-          className={`px-6 py-2 rounded-lg font-medium transition ${canSubmit ? 'bg-primary text-white hover:bg-secondary' : 'bg-muted text-tertiary cursor-not-allowed'}`}
+          className={`px-6 py-2 rounded-lg font-medium transition ${canSubmit ? 'bg-primary text-white hover:bg-secondary cursor-pointer' : 'bg-muted text-tertiary cursor-not-allowed'}`}
         >
           Create Prediction
         </button>

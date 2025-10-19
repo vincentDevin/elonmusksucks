@@ -216,10 +216,10 @@ export default function CreatePredictionModal() {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[90]">
-      <div className="bg-surface border border-muted rounded-2xl shadow-2xl max-w-4xl w-full max-h-[80vh] overflow-hidden">
+      <div className="bg-surface border border-muted rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
         {showForm ? (
           // Show the prediction creation form
-          <div className="max-h-[80vh] overflow-y-auto">
+          <div className="max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-muted">
               <div className="flex items-center justify-between">
                 <div>
@@ -241,13 +241,13 @@ export default function CreatePredictionModal() {
                 <div className="flex items-center space-x-2">
                   <button
                     onClick={() => setShowForm(false)}
-                    className="text-tertiary hover:text-content transition-colors text-sm"
+                    className="text-tertiary hover:text-content transition-colors text-sm cursor-pointer"
                   >
                     ← Back
                   </button>
                   <button
                     onClick={handleClose}
-                    className="text-tertiary hover:text-content transition-colors text-2xl"
+                    className="text-tertiary hover:text-content transition-colors text-2xl cursor-pointer"
                   >
                     ×
                   </button>
@@ -285,7 +285,7 @@ export default function CreatePredictionModal() {
                 </div>
                 <button
                   onClick={handleClose}
-                  className="text-tertiary hover:text-content transition-colors text-2xl"
+                  className="text-tertiary hover:text-content transition-colors text-2xl cursor-pointer"
                 >
                   ×
                 </button>
@@ -293,14 +293,14 @@ export default function CreatePredictionModal() {
             </div>
 
             {/* Content */}
-            <div className="p-6 overflow-y-auto max-h-96">
+            <div className="p-6 overflow-y-auto max-h-[60vh]">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {templates.map((template) => (
                   <button
                     key={template.id}
                     onClick={() => handleTemplateSelect(template)}
                     disabled={selectedTemplate === template.id}
-                    className={`p-4 border rounded-xl transition-all duration-200 text-left hover:scale-[1.02] ${
+                    className={`p-4 border rounded-xl transition-all duration-200 text-left hover:scale-[1.02] cursor-pointer ${
                       selectedTemplate === template.id
                         ? 'border-primary bg-primary/10 scale-[1.02]'
                         : 'border-muted bg-background/50 hover:border-primary/50 hover:bg-background'
@@ -353,13 +353,13 @@ export default function CreatePredictionModal() {
                 <div className="flex gap-3">
                   <button
                     onClick={handleClose}
-                    className="px-4 py-2 bg-muted text-content rounded-lg hover:bg-tertiary transition-colors"
+                    className="px-4 py-2 bg-muted text-content rounded-lg hover:bg-tertiary transition-colors cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={() => setShowForm(true)}
-                    className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+                    className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors cursor-pointer"
                   >
                     Custom Prediction
                   </button>

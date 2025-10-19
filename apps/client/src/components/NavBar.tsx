@@ -59,7 +59,7 @@ export default function NavBar() {
                 <div className="relative">
                   <button
                     onClick={() => setDropdownOpen(!dropdownOpen)}
-                    className="flex items-center space-x-3 px-3 py-2 rounded hover:bg-muted transition-colors"
+                    className="flex items-center space-x-3 px-3 py-2 rounded hover:bg-muted transition-colors cursor-pointer"
                   >
                     <span className="font-medium">{user.name}</span>
                     <UserBalance />
@@ -78,7 +78,7 @@ export default function NavBar() {
                         <li>
                           <Link
                             to="/admin"
-                            className="block px-3 py-2 rounded hover:bg-muted transition-colors"
+                            className="block px-3 py-2 rounded hover:bg-muted transition-colors cursor-pointer"
                             onClick={() => setDropdownOpen(false)}
                           >
                             Admin
@@ -88,7 +88,7 @@ export default function NavBar() {
                       <li>
                         <Link
                           to={`/profile/${user.id}`}
-                          className="block px-3 py-2 rounded hover:bg-muted transition-colors"
+                          className="block px-3 py-2 rounded hover:bg-muted transition-colors cursor-pointer"
                           onClick={() => setDropdownOpen(false)}
                         >
                           Profile
@@ -100,7 +100,7 @@ export default function NavBar() {
                           className="
                             w-full text-left px-3 py-2 rounded
                             hover:bg-error hover:text-white
-                            transition-colors
+                            transition-colors cursor-pointer
                           "
                         >
                           Logout
@@ -160,7 +160,7 @@ export default function NavBar() {
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-label="Toggle mobile menu"
-            className="p-2 rounded hover:bg-muted transition-colors"
+            className="p-2 rounded hover:bg-muted transition-colors cursor-pointer"
           >
             {mobileMenuOpen ? <FaTimes className="text-lg" /> : <FaBars className="text-lg" />}
           </button>
@@ -239,7 +239,7 @@ export default function NavBar() {
                         handleLogout();
                         setMobileMenuOpen(false);
                       }}
-                      className="w-full text-left px-4 py-3 rounded-lg hover:bg-error hover:text-white transition-colors"
+                      className="w-full text-left px-4 py-3 rounded-lg hover:bg-error hover:text-white transition-colors cursor-pointer"
                     >
                       Logout
                     </button>

@@ -59,15 +59,27 @@ export function transformBettingEntry(
         color: entry.currentStreak >= 5 ? 'text-orange-400' : undefined,
       },
     ],
-    badges:
-      entry.currentStreak >= 5
-        ? [
-            {
-              text: `🔥 ${entry.currentStreak} streak`,
-              color: 'bg-warning/20 text-warning dark:bg-warning/30',
-            },
-          ]
-        : undefined,
+    badges: (() => {
+      const badges = [];
+
+      // Add BOT badge for AI players (negative userId)
+      if (entry.userId < 0) {
+        badges.push({
+          text: '🤖 BOT',
+          color: 'bg-info/20 text-info dark:bg-info/30',
+        });
+      }
+
+      // Add streak badge for high performers
+      if (entry.currentStreak >= 5) {
+        badges.push({
+          text: `🔥 ${entry.currentStreak} streak`,
+          color: 'bg-warning/20 text-warning dark:bg-warning/30',
+        });
+      }
+
+      return badges.length > 0 ? badges : undefined;
+    })(),
     rawData: entry,
   };
 }
@@ -133,6 +145,15 @@ export function transformPongEntry(
 
   // Generate badges
   const badges = [];
+
+  // Add BOT badge for AI players (negative userId)
+  if (entry.userId < 0) {
+    badges.push({
+      text: '🤖 BOT',
+      color: 'bg-info/20 text-info dark:bg-info/30',
+    });
+  }
+
   if (entry.tier) {
     const tierColors = {
       GRANDMASTER: 'bg-primary/20 text-primary dark:bg-primary/30',
