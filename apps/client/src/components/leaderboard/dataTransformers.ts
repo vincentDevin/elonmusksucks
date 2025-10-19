@@ -64,7 +64,7 @@ export function transformBettingEntry(
         ? [
             {
               text: `🔥 ${entry.currentStreak} streak`,
-              color: 'bg-orange-500/20 text-orange-400',
+              color: 'bg-warning/20 text-warning dark:bg-warning/30',
             },
           ]
         : undefined,
@@ -135,24 +135,24 @@ export function transformPongEntry(
   const badges = [];
   if (entry.tier) {
     const tierColors = {
-      GRANDMASTER: 'bg-purple-100 text-purple-800',
-      MASTER: 'bg-red-100 text-red-800',
-      DIAMOND: 'bg-blue-100 text-blue-800',
-      PLATINUM: 'bg-green-100 text-green-800',
-      GOLD: 'bg-yellow-100 text-yellow-800',
-      SILVER: 'bg-gray-100 text-gray-800',
-      BRONZE: 'bg-orange-100 text-orange-800',
+      GRANDMASTER: 'bg-primary/20 text-primary dark:bg-primary/30',
+      MASTER: 'bg-error/20 text-error dark:bg-error/30',
+      DIAMOND: 'bg-info/20 text-info dark:bg-info/30',
+      PLATINUM: 'bg-success/20 text-success dark:bg-success/30',
+      GOLD: 'bg-warning/20 text-warning dark:bg-warning/30',
+      SILVER: 'bg-muted/50 text-tertiary dark:bg-muted/70',
+      BRONZE: 'bg-warning/15 text-warning dark:bg-warning/25',
     };
     badges.push({
       text: entry.tier,
-      color: tierColors[entry.tier as keyof typeof tierColors] || 'bg-gray-100 text-gray-800',
+      color: tierColors[entry.tier as keyof typeof tierColors] || 'bg-muted/50 text-tertiary',
     });
   }
 
   if (entry.riskTaker) {
     badges.push({
       text: '🎲 High Roller',
-      color: 'bg-red-100 text-red-600',
+      color: 'bg-error/20 text-error dark:bg-error/30',
     });
   }
 
@@ -254,13 +254,15 @@ export function transformShameEntry(entry: ShameWallEntry): UnifiedLeaderboardEn
     badges: [
       {
         text: isPermanent ? 'Permanent Ban' : 'Temporary Ban',
-        color: isPermanent ? 'bg-red-100 text-red-800' : 'bg-orange-100 text-orange-800',
+        color: isPermanent
+          ? 'bg-error/20 text-error dark:bg-error/30'
+          : 'bg-warning/20 text-warning dark:bg-warning/30',
       },
       ...(banCount > 1
         ? [
             {
               text: `${banCount} bans`,
-              color: 'bg-gray-100 text-gray-600',
+              color: 'bg-muted/50 text-tertiary dark:bg-muted/70',
             },
           ]
         : []),
