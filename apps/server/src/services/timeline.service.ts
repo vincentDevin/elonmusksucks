@@ -1,4 +1,3 @@
-import { PrismaClient } from '@prisma/client';
 import { TimelineRepository } from '../repositories/TimelineRepository';
 import type { ITimelineRepository } from '../repositories/interfaces/ITimelineRepository';
 import { ReactionRepository } from '../repositories/ReactionRepository';
@@ -9,7 +8,7 @@ import { UserService } from './user.service';
 import type { PrismaReactionType, DbArticleWithTags, DbTrendingContent } from '@ems/types';
 import { withCache, CacheKeys, CACHE_TTL } from '../utils/analyticsCache';
 
-const prisma = new PrismaClient();
+// Using shared prisma from db.ts
 const userService = new UserService();
 
 export class TimelineService {
@@ -18,8 +17,8 @@ export class TimelineService {
   private contentRepository: IContentRepository;
 
   constructor() {
-    this.repository = new TimelineRepository(prisma);
-    this.reactionRepository = new ReactionRepository(prisma);
+    this.repository = new TimelineRepository();
+    this.reactionRepository = new ReactionRepository();
     this.contentRepository = new ContentRepository();
   }
 

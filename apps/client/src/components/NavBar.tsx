@@ -23,7 +23,7 @@ export default function NavBar() {
   };
 
   const linkClasses = (path: string) =>
-    `px-3 py-2 rounded ${
+    `px-2.5 py-1.5 rounded text-sm ${
       loc.pathname === path ? 'bg-primary text-white' : 'hover:bg-muted transition-colors'
     }`;
 
@@ -34,8 +34,8 @@ export default function NavBar() {
 
   return (
     <header className="relative z-60 border-b border-muted bg-surface text-content">
-      <div className="container mx-auto flex items-center justify-between p-4">
-        <Link to="/" className="text-xl font-bold">
+      <div className="container mx-auto flex items-center justify-between px-4 py-2.5">
+        <Link to="/" className="text-lg font-bold">
           🚀 ElonMuskSucks
         </Link>
 
@@ -59,7 +59,7 @@ export default function NavBar() {
                 <div className="relative">
                   <button
                     onClick={() => setDropdownOpen(!dropdownOpen)}
-                    className="flex items-center space-x-3 px-3 py-2 rounded hover:bg-muted transition-colors cursor-pointer"
+                    className="flex items-center space-x-2 px-2.5 py-1.5 rounded hover:bg-muted transition-colors cursor-pointer text-sm"
                   >
                     <span className="font-medium">{user.name}</span>
                     <UserBalance />
@@ -78,7 +78,7 @@ export default function NavBar() {
                         <li>
                           <Link
                             to="/admin"
-                            className="block px-3 py-2 rounded hover:bg-muted transition-colors cursor-pointer"
+                            className="block px-2.5 py-1.5 rounded hover:bg-muted transition-colors cursor-pointer text-sm"
                             onClick={() => setDropdownOpen(false)}
                           >
                             Admin
@@ -88,7 +88,7 @@ export default function NavBar() {
                       <li>
                         <Link
                           to={`/profile/${user.id}`}
-                          className="block px-3 py-2 rounded hover:bg-muted transition-colors cursor-pointer"
+                          className="block px-2.5 py-1.5 rounded hover:bg-muted transition-colors cursor-pointer text-sm"
                           onClick={() => setDropdownOpen(false)}
                         >
                           Profile
@@ -98,7 +98,7 @@ export default function NavBar() {
                         <button
                           onClick={handleLogout}
                           className="
-                            w-full text-left px-3 py-2 rounded
+                            w-full text-left px-2.5 py-1.5 rounded text-sm
                             hover:bg-error hover:text-white
                             transition-colors cursor-pointer
                           "
@@ -111,31 +111,31 @@ export default function NavBar() {
                 </div>
               </>
             ) : (
-              <div className="px-3 py-2">Loading...</div>
+              <div className="px-2.5 py-1.5 text-sm">Loading...</div>
             )
           ) : (
             <>
               <a
                 href={import.meta.env.VITE_PUBLIC_SITE_URL}
-                className="px-3 py-2 rounded hover:bg-muted transition-colors"
+                className="px-2.5 py-1.5 rounded hover:bg-muted transition-colors text-sm"
               >
                 Home
               </a>
               <a
                 href={`${import.meta.env.VITE_PUBLIC_SITE_URL}/predictions`}
-                className="px-3 py-2 rounded hover:bg-muted transition-colors"
+                className="px-2.5 py-1.5 rounded hover:bg-muted transition-colors text-sm"
               >
                 Predictions
               </a>
               <a
                 href={`${import.meta.env.VITE_PUBLIC_SITE_URL}/leaderboard`}
-                className="px-3 py-2 rounded hover:bg-muted transition-colors"
+                className="px-2.5 py-1.5 rounded hover:bg-muted transition-colors text-sm"
               >
                 Leaderboard
               </a>
               <a
                 href={`${import.meta.env.VITE_PUBLIC_SITE_URL}/timeline`}
-                className="px-3 py-2 rounded hover:bg-muted transition-colors"
+                className="px-2.5 py-1.5 rounded hover:bg-muted transition-colors text-sm"
               >
                 Timeline
               </a>
@@ -160,9 +160,9 @@ export default function NavBar() {
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-label="Toggle mobile menu"
-            className="p-2 rounded hover:bg-muted transition-colors cursor-pointer"
+            className="p-1.5 rounded hover:bg-muted transition-colors cursor-pointer"
           >
-            {mobileMenuOpen ? <FaTimes className="text-lg" /> : <FaBars className="text-lg" />}
+            {mobileMenuOpen ? <FaTimes className="text-base" /> : <FaBars className="text-base" />}
           </button>
         </div>
       </div>

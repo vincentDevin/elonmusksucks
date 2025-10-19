@@ -4,6 +4,7 @@
  */
 
 import redisClient from '../lib/redis';
+import { serializeBigInt } from './bigintSerializer';
 
 // Cache TTLs (in seconds)
 const CACHE_TTL = {
@@ -60,7 +61,7 @@ export async function withCache<T>(
 
     // Store in cache (fire and forget to not block response)
     redisClient
-      .setex(key, ttl, JSON.stringify(data))
+      .setex(key, ttl, JSON.stringify(serializeBigInt(data)))
       .catch((err: Error) => console.error('[analyticsCache] Failed to set cache:', err));
 
     return data;

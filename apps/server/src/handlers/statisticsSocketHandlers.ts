@@ -21,13 +21,12 @@ import { EnhancedUserStatsService } from '../services/enhancedUserStats.service'
 import { UserRepository } from '../repositories/UserRepository';
 import { BettingRepository } from '../repositories/BettingRepository';
 import { StatsRepository } from '../repositories/StatsRepository';
-import { PrismaClient } from '@prisma/client';
 import { eventBus } from '../lib/EventBus';
 
 const userRepository = new UserRepository();
 const bettingRepository = new BettingRepository();
-const prisma = new PrismaClient();
-const statsRepository = new StatsRepository(prisma);
+// Using shared prisma from db.ts
+const statsRepository = new StatsRepository();
 const enhancedUserStatsService = new EnhancedUserStatsService(
   userRepository,
   bettingRepository,

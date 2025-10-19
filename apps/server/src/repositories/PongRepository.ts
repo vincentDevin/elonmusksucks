@@ -1,6 +1,6 @@
 // apps/server/src/repositories/PongRepository.ts
 
-import { PrismaClient } from '@prisma/client';
+import prisma from '../db';
 import type { IPongRepository } from './interfaces/IPongRepository';
 import type {
   PongStatsData,
@@ -11,8 +11,6 @@ import type {
 } from '@ems/types';
 import { REDIS_CHANNELS } from '@ems/types';
 import { eventBus } from '../lib/EventBus';
-
-const prisma = new PrismaClient();
 
 export class PongRepository implements IPongRepository {
   // PongStats operations

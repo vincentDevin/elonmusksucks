@@ -9,7 +9,6 @@ import type {
 } from '@ems/types';
 import type { AuthRequest } from '../middleware/auth.middleware';
 import { UnifiedContentService } from '../services/unified-content.service';
-import { PrismaClient } from '@prisma/client';
 
 /**
  * Unified Content Controller
@@ -20,8 +19,8 @@ import { PrismaClient } from '@prisma/client';
 export class UnifiedContentController {
   private service: UnifiedContentService;
 
-  constructor(eventBus: IEventBus, prisma: PrismaClient = new PrismaClient()) {
-    this.service = new UnifiedContentService(eventBus, prisma);
+  constructor(eventBus: IEventBus) {
+    this.service = new UnifiedContentService(eventBus);
   }
 
   /**

@@ -1,8 +1,7 @@
 // apps/server/src/repositories/CategoryRepository.ts
-import { PrismaClient, Category } from '@prisma/client';
+import prisma from '../db';
+import { Category } from '@prisma/client';
 import { ICategoryRepository } from './interfaces/ICategoryRepository';
-
-const prisma = new PrismaClient();
 
 export class CategoryRepository implements ICategoryRepository {
   // ============================================

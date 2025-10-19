@@ -4,7 +4,6 @@ import { useState, useEffect, useMemo } from 'react';
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
-  ArrowPathIcon,
   TrophyIcon,
   ExclamationTriangleIcon,
   PuzzlePieceIcon,
@@ -320,7 +319,7 @@ export default function Leaderboard() {
           variant={activeTab as LeaderboardVariant}
           title={
             activeTab === 'betting'
-              ? 'Live Leaderboard'
+              ? 'Market Leaderboard'
               : activeTab === 'pong'
                 ? 'Pong Champions'
                 : 'Wall of Shame'

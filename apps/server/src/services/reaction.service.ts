@@ -11,7 +11,7 @@ export class ReactionService {
   private contentRepository: IContentRepository;
 
   constructor() {
-    this.reactionRepository = new ReactionRepository(prisma);
+    this.reactionRepository = new ReactionRepository();
     this.contentRepository = new ContentRepository();
   }
 

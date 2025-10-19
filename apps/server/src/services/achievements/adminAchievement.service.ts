@@ -1,11 +1,10 @@
-import { PrismaClient } from '@prisma/client';
 import { unifiedActivityService } from '../unifiedActivity.service';
 import { AchievementRepository } from '../../repositories/AchievementRepository';
 import type { IAchievementRepository } from '../../repositories/interfaces/IAchievementRepository';
 import { withCache, CacheKeys, CACHE_TTL } from '../../utils/analyticsCache';
 
-const prisma = new PrismaClient();
-const achievementRepository = new AchievementRepository(prisma);
+// Using shared prisma from db.ts
+const achievementRepository = new AchievementRepository();
 
 export interface CreateAchievementData {
   name: string;
@@ -85,7 +84,7 @@ class AdminAchievementService {
   private achievementRepository: IAchievementRepository;
 
   constructor(achievementRepository?: IAchievementRepository) {
-    this.achievementRepository = achievementRepository || new AchievementRepository(prisma);
+    this.achievementRepository = achievementRepository || new AchievementRepository();
   }
 
   /**

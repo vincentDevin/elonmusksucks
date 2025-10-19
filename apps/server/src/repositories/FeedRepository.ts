@@ -1,11 +1,12 @@
-import { PrismaClient, FeedStatus, ArticleStatus } from '@prisma/client';
+import prisma from '../db';
+import { FeedStatus, ArticleStatus } from '@prisma/client';
 import type { IFeedRepository } from './interfaces/IFeedRepository';
 
 // TEMP: Re-export shared types for backwards compatibility during migration
 export type { PageQuery, CursorPage, SortOrder, DateRange } from '@ems/types';
 
 export class FeedRepository implements IFeedRepository {
-  constructor(private prisma: PrismaClient) {}
+  private prisma = prisma;
 
   async findMany() {
     return this.prisma.feedSource.findMany({
@@ -278,5 +279,59 @@ export class FeedRepository implements IFeedRepository {
         },
       },
     });
+  }
+
+  // ============================================
+  // ARTICLE MODERATION
+  // ============================================
+
+  /**
+   * Get count of pending articles
+   */
+  async getPendingArticlesCount(): Promise<number> {
+    return this.prisma.article.count({
+      where: { status: 'PENDING' },
+    });
+  }
+
+  /**
+   * Get count of rejected articles
+   */
+  async getRejectedArticlesCount(): Promise<number> {
+    return this.prisma.article.count({
+      where: { status: 'REJECTED' },
+    });
+  }
+
+  /**
+   * Update article status and moderation notes
+   */
+  async updateArticleStatus(
+    articleId: number,
+    status: 'PENDING' | 'APPROVED' | 'REJECTED',
+    modNotes?: string | null,
+  ) {
+    return this.prisma.article.update({
+      where: { id: articleId },
+      data: {
+        status,
+        modNotes: modNotes || undefined,
+      },
+    });
+  }
+
+  /**
+   * Delete article
+   */
+  async deleteArticle(articleId: number): Promise<boolean> {
+    try {
+      await this.prisma.article.delete({
+        where: { id: articleId },
+      });
+      return true;
+    } catch (error) {
+      console.error('[FeedRepository] Error deleting article:', error);
+      return false;
+    }
   }
 }

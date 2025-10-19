@@ -1,3 +1,4 @@
+import prisma from '../db';
 // apps/server/src/workers/pong-payout.worker.ts
 // -----------------------------------------------------------------------------
 // BullMQ worker that processes Pong match payouts with idempotency protection
@@ -10,12 +11,11 @@ import 'dotenv/config';
 import { Worker, Job } from 'bullmq';
 import { PongPayoutJobData, PongPayoutResult, QUEUE_NAMES, REDIS_CHANNELS } from '@ems/types';
 import redisClient from '../lib/redis';
-import { PrismaClient } from '@prisma/client';
 import { serializeBigInt, toBigInt } from '../utils/bigintSerializer';
 import { PongRepository } from '../repositories/PongRepository';
 import { eventBus } from '../lib/EventBus';
 
-const prisma = new PrismaClient();
+// Using shared prisma from db.ts
 const pongRepo = new PongRepository();
 
 // Configurable concurrency

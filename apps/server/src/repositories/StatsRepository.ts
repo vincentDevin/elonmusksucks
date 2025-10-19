@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import prisma from '../db';
 import type { IStatsRepository } from './interfaces/IStatsRepository';
 import { serializeBigInt } from '../utils/bigintSerializer';
 
@@ -7,7 +7,7 @@ import { serializeBigInt } from '../utils/bigintSerializer';
  * Manages materialized user stats for fast achievement rule evaluation
  */
 export class StatsRepository implements IStatsRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+  private readonly prisma = prisma;
 
   /**
    * Get all user counters for achievement evaluation

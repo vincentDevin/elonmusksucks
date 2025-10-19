@@ -1,5 +1,5 @@
 // apps/server/src/repositories/ContentRepository.ts
-import { PrismaClient } from '@prisma/client';
+import prisma from '../db';
 import type {
   PrismaContent,
   PrismaContentType,
@@ -18,7 +18,7 @@ import { IContentRepository } from './interfaces/IContentRepository';
  * Unified repository replacing separate post and comment repositories
  */
 export class ContentRepository implements IContentRepository {
-  constructor(private prisma: PrismaClient = new PrismaClient()) {}
+  private prisma = prisma;
 
   // ============================================
   // CREATE
@@ -1115,5 +1115,61 @@ export class ContentRepository implements IContentRepository {
     });
 
     return { id: report.id };
+  }
+
+  // ============================================
+  // STATS & ANALYTICS (Admin/Moderation)
+  // ============================================
+
+  /**
+   * Get total engagement metrics across all content
+   */
+  async getEngagementTotals(): Promise<{
+    totalViews: number;
+    totalReactions: number;
+    totalComments: number;
+  }> {
+    const [viewsResult, reactionsResult, commentsResult] = await Promise.all([
+      this.prisma.content.aggregate({
+        _sum: { viewsCount: true },
+      }),
+      this.prisma.content.aggregate({
+        _sum: { reactionsCount: true },
+      }),
+      this.prisma.content.aggregate({
+        _sum: { repliesCount: true },
+      }),
+    ]);
+
+    return {
+      totalViews: Number(viewsResult._sum.viewsCount || 0),
+      totalReactions: Number(reactionsResult._sum.reactionsCount || 0),
+      totalComments: Number(commentsResult._sum.repliesCount || 0),
+    };
+  }
+
+  /**
+   * Get count of flagged content
+   */
+  async getFlaggedContentCount(): Promise<number> {
+    return this.prisma.content.count({
+      where: { isFlagged: true },
+    });
+  }
+
+  /**
+   * Update content moderation status
+   */
+  async updateContentModeration(
+    contentId: number,
+    data: { isFlagged: boolean; moderationNote?: string | null },
+  ): Promise<PrismaContent | null> {
+    return this.prisma.content.update({
+      where: { id: contentId },
+      data: {
+        isFlagged: data.isFlagged,
+        moderationNote: data.moderationNote,
+      },
+    });
   }
 }

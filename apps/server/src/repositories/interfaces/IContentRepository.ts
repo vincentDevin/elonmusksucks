@@ -218,4 +218,20 @@ export interface IContentRepository {
 
   /** Get recent activity for user */
   getUserRecentActivity(userId: number, limit?: number): Promise<PrismaContent[]>;
+
+  /** Get total engagement metrics across all content */
+  getEngagementTotals(): Promise<{
+    totalViews: number;
+    totalReactions: number;
+    totalComments: number;
+  }>;
+
+  /** Get count of flagged content */
+  getFlaggedContentCount(): Promise<number>;
+
+  /** Update content moderation status */
+  updateContentModeration(
+    contentId: number,
+    data: { isFlagged: boolean; moderationNote?: string | null },
+  ): Promise<PrismaContent | null>;
 }

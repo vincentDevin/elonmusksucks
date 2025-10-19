@@ -1,6 +1,6 @@
 // apps/server/src/repositories/PrismaAdminRepository.ts
+import prisma from '../db';
 import {
-  PrismaClient,
   Role,
   User,
   Prediction,
@@ -52,7 +52,7 @@ import type {
 } from './interfaces/IAdminRepository';
 
 export class PrismaAdminRepository implements IAdminRepository {
-  private prisma = new PrismaClient();
+  private prisma = prisma;
 
   // -- Enhanced User Management --
   async findAllUsers(): Promise<User[]> {

@@ -1,5 +1,4 @@
 // apps/server/src/services/moderation.service.ts
-import { PrismaClient } from '@prisma/client';
 import { ModerationRepository } from '../repositories/ModerationRepository';
 import type { IModerationRepository } from '../repositories/interfaces/IModerationRepository';
 import type { ModerationAction } from '@prisma/client';
@@ -7,8 +6,8 @@ import { REDIS_CHANNELS } from '@ems/types';
 import type { BanType, RedisChannel } from '@ems/types';
 import { eventBus } from '../lib/EventBus';
 
-const prisma = new PrismaClient();
-const moderationRepo: IModerationRepository = new ModerationRepository(prisma);
+// Using shared prisma from db.ts
+const moderationRepo: IModerationRepository = new ModerationRepository();
 
 interface BanUserParams {
   userId: number;

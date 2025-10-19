@@ -4,7 +4,6 @@ import { EnhancedUserStatsService } from '../services/enhancedUserStats.service'
 import { UserRepository } from '../repositories/UserRepository';
 import { BettingRepository } from '../repositories/BettingRepository';
 import { StatsRepository } from '../repositories/StatsRepository';
-import { PrismaClient } from '@prisma/client';
 import { unifiedActivityService } from '../services/unifiedActivity.service';
 import { adminAchievementService } from '../services/achievements/adminAchievement.service';
 import type {
@@ -47,8 +46,8 @@ export type ReqWithUser = Request & {
 const userService = new UserService();
 const userRepository = new UserRepository();
 const bettingRepository = new BettingRepository();
-const prisma = new PrismaClient();
-const statsRepository = new StatsRepository(prisma);
+// Using shared prisma from db.ts
+const statsRepository = new StatsRepository();
 const enhancedUserStatsService = new EnhancedUserStatsService(
   userRepository,
   bettingRepository,

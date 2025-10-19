@@ -3,7 +3,6 @@ import { Router } from 'express';
 import { UnifiedContentController } from '../controllers/unified-content.controller';
 import { requireAuth, requireAdmin } from '../middleware/auth.middleware';
 import { eventBus } from '../lib/EventBus';
-import { PrismaClient } from '@prisma/client';
 
 /**
  * Unified Content Routes
@@ -11,9 +10,9 @@ import { PrismaClient } from '@prisma/client';
  * Admin-only routes for unified content management.
  * All routes require authentication and admin role.
  */
-const prisma = new PrismaClient();
+// Using shared prisma from db.ts
 const router = Router();
-const controller = new UnifiedContentController(eventBus, prisma);
+const controller = new UnifiedContentController(eventBus);
 
 // All routes require authentication and admin role
 router.use(requireAuth, requireAdmin);

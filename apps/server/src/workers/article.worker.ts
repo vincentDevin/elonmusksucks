@@ -1,7 +1,6 @@
 // apps/server/src/workers/article.worker.ts
 import 'dotenv/config';
 import { Worker } from 'bullmq';
-import { PrismaClient } from '@prisma/client';
 import redisClient from '../lib/redis';
 
 // Configurable concurrency to keep CPU saturation <70%
@@ -11,8 +10,8 @@ import type { ArticleProcessingJobData } from '@ems/types';
 import ogs from 'open-graph-scraper';
 import { FeedRepository } from '../repositories/FeedRepository';
 
-const prisma = new PrismaClient();
-const feedRepo = new FeedRepository(prisma);
+// Using shared prisma from db.ts
+const feedRepo = new FeedRepository();
 
 // Job data interfaces
 interface ArticleEnrichmentData extends ArticleProcessingJobData {

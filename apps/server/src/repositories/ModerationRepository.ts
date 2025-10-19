@@ -1,5 +1,6 @@
 // apps/server/src/repositories/ModerationRepository.ts
-import { PrismaClient, BanType as PrismaBanType } from '@prisma/client';
+import prisma from '../db';
+import { BanType as PrismaBanType } from '@prisma/client';
 import type {
   IModerationRepository,
   CreateBanData,
@@ -10,7 +11,7 @@ import type {
 import type { UserBan, ModerationLog, User, Message, Content } from '@prisma/client';
 
 export class ModerationRepository implements IModerationRepository {
-  constructor(private prisma: PrismaClient) {}
+  private prisma = prisma;
 
   async createBan(data: CreateBanData): Promise<UserBan> {
     // Convert lowercase banType to uppercase for Prisma enum

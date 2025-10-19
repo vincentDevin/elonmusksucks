@@ -391,12 +391,14 @@ const FinancialDashboard: React.FC<FinancialDashboardProps> = ({ className = '' 
 
       {/* Error Display */}
       {error && (
-        <div className="bg-red-50 border-l-4 border-red-400 text-red-700 px-4 py-3 rounded-lg">
+        <div className="bg-red-500/10 dark:bg-red-500/20 border-l-4 border-red-400 dark:border-red-500 px-4 py-3 rounded-lg">
           <div className="flex items-center gap-2">
-            <span className="text-red-500">⚠️</span>
+            <span className="text-red-500 dark:text-red-400">⚠️</span>
             <div>
-              <h4 className="font-semibold text-sm">Error Loading Financial Data</h4>
-              <p className="text-xs mt-1">{error}</p>
+              <h4 className="font-semibold text-sm text-red-700 dark:text-red-400">
+                Error Loading Financial Data
+              </h4>
+              <p className="text-xs mt-1 text-red-600 dark:text-red-400">{error}</p>
             </div>
           </div>
         </div>
@@ -435,7 +437,9 @@ const FinancialDashboard: React.FC<FinancialDashboardProps> = ({ className = '' 
                 <div className="text-center p-3 bg-background rounded border border-muted">
                   <div
                     className={`text-lg font-bold ${
-                      Number(analytics.netRevenue) >= 0 ? 'text-green-600' : 'text-red-600'
+                      Number(analytics.netRevenue) >= 0
+                        ? 'text-green-700 dark:text-green-400'
+                        : 'text-red-700 dark:text-red-400'
                     }`}
                   >
                     ${formatMuskBucks(analytics.netRevenue)}
@@ -573,7 +577,7 @@ const FinancialDashboard: React.FC<FinancialDashboardProps> = ({ className = '' 
         <div className="space-y-4">
           {/* Compact Bulk Actions */}
           {selectedBets.size > 0 && (
-            <div className="bg-yellow-50 border-l-4 border-yellow-500 p-3 rounded">
+            <div className="bg-yellow-500/10 dark:bg-yellow-500/20 border-l-4 border-yellow-500 p-3 rounded">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-content">
                   {selectedBets.size} bet{selectedBets.size !== 1 ? 's' : ''} selected
@@ -703,12 +707,12 @@ const FinancialDashboard: React.FC<FinancialDashboardProps> = ({ className = '' 
                         <span
                           className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
                             bet.status === 'WON'
-                              ? 'bg-green-100 text-green-800'
+                              ? 'bg-green-500/20 text-green-700 dark:bg-green-500/30 dark:text-green-400'
                               : bet.status === 'LOST'
-                                ? 'bg-red-100 text-red-800'
+                                ? 'bg-red-500/20 text-red-700 dark:bg-red-500/30 dark:text-red-400'
                                 : bet.status === 'REFUNDED'
-                                  ? 'bg-yellow-100 text-yellow-800'
-                                  : 'bg-gray-100 text-gray-800'
+                                  ? 'bg-yellow-500/20 text-yellow-700 dark:bg-yellow-500/30 dark:text-yellow-400'
+                                  : 'bg-muted/50 text-content dark:bg-muted/30'
                           }`}
                         >
                           {bet.status}

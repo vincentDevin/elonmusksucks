@@ -282,7 +282,5 @@ export class DashboardAnalyticsService {
 
 // Export a singleton instance with the repository dependency
 import { AnalyticsRepository } from '../repositories/AnalyticsRepository';
-import prisma from '../db';
-
-const analyticsRepository = new AnalyticsRepository(prisma);
+const analyticsRepository = new AnalyticsRepository();
 export const dashboardAnalyticsService = new DashboardAnalyticsService(analyticsRepository);

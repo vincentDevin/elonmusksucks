@@ -10,7 +10,11 @@ import type {
 } from '@ems/types';
 import type { IUnifiedContentRepository } from '../repositories/interfaces/IUnifiedContentRepository';
 import { UnifiedContentRepository } from '../repositories/UnifiedContentRepository';
-import { PrismaClient } from '@prisma/client';
+import { PrismaAdminRepository } from '../repositories/AdminRepository';
+import { AnalyticsRepository } from '../repositories/AnalyticsRepository';
+import { TagRepository } from '../repositories/TagRepository';
+import { ContentRepository } from '../repositories/ContentRepository';
+import { FeedRepository } from '../repositories/FeedRepository';
 import { UserService } from './user.service';
 
 /**
@@ -21,13 +25,20 @@ import { UserService } from './user.service';
  */
 export class UnifiedContentService {
   private repo: IUnifiedContentRepository;
+  private adminRepo: PrismaAdminRepository;
+  private analyticsRepo: AnalyticsRepository;
+  private tagRepo: TagRepository;
+  private contentRepo: ContentRepository;
+  private feedRepo: FeedRepository;
   private userService: UserService;
 
-  constructor(
-    private eventBus: IEventBus,
-    private prisma: PrismaClient = new PrismaClient(),
-  ) {
-    this.repo = new UnifiedContentRepository(prisma);
+  constructor(private eventBus: IEventBus) {
+    this.repo = new UnifiedContentRepository();
+    this.adminRepo = new PrismaAdminRepository();
+    this.analyticsRepo = new AnalyticsRepository();
+    this.tagRepo = new TagRepository();
+    this.contentRepo = new ContentRepository();
+    this.feedRepo = new FeedRepository();
     this.userService = new UserService();
   }
 
@@ -176,24 +187,14 @@ export class UnifiedContentService {
     // Get content counts
     const counts = await this.repo.getContentCounts();
 
-    // Get engagement metrics (simplified - would need more complex aggregation)
-    const [totalViews, totalReactions, totalComments] = await Promise.all([
-      this.prisma.content.aggregate({
-        _sum: { viewsCount: true },
-      }),
-      this.prisma.content.aggregate({
-        _sum: { reactionsCount: true },
-      }),
-      this.prisma.content.aggregate({
-        _sum: { repliesCount: true },
-      }),
-    ]);
+    // Get engagement metrics from repository
+    const engagement = await this.contentRepo.getEngagementTotals();
 
-    // Get moderation stats
+    // Get moderation stats from repositories
     const [pendingArticles, flaggedContent, rejectedArticles] = await Promise.all([
-      this.prisma.article.count({ where: { status: 'PENDING' } }),
-      this.prisma.content.count({ where: { isFlagged: true } }),
-      this.prisma.article.count({ where: { status: 'REJECTED' } }),
+      this.feedRepo.getPendingArticlesCount(),
+      this.contentRepo.getFlaggedContentCount(),
+      this.feedRepo.getRejectedArticlesCount(),
     ]);
 
     // Get daily creation trends (last 7 days)
@@ -211,9 +212,9 @@ export class UnifiedContentService {
         itemsByType: counts.byType,
         itemsByStatus: counts.byStatus,
         averageQualityScore: 0, // Would need quality score implementation
-        totalViews: Number(totalViews._sum.viewsCount || 0),
-        totalReactions: totalReactions._sum.reactionsCount || 0,
-        totalComments: totalComments._sum.repliesCount || 0,
+        totalViews: engagement.totalViews,
+        totalReactions: engagement.totalReactions,
+        totalComments: engagement.totalComments,
       },
 
       moderation: {
@@ -362,27 +363,15 @@ export class UnifiedContentService {
   private async moderateArticle(id: number, action: string, parameters: any): Promise<void> {
     switch (action) {
       case 'approve':
-        await this.prisma.article.update({
-          where: { id },
-          data: {
-            status: 'APPROVED',
-            modNotes: parameters.reason,
-          },
-        });
+        await this.feedRepo.updateArticleStatus(id, 'APPROVED', parameters.reason);
         break;
 
       case 'reject':
-        await this.prisma.article.update({
-          where: { id },
-          data: {
-            status: 'REJECTED',
-            modNotes: parameters.reason,
-          },
-        });
+        await this.feedRepo.updateArticleStatus(id, 'REJECTED', parameters.reason);
         break;
 
       case 'delete':
-        await this.prisma.article.delete({ where: { id } });
+        await this.feedRepo.deleteArticle(id);
         break;
     }
   }
@@ -393,34 +382,24 @@ export class UnifiedContentService {
   private async moderateContent(id: number, action: string, parameters: any): Promise<void> {
     switch (action) {
       case 'approve':
-        await this.prisma.content.update({
-          where: { id },
-          data: {
-            isFlagged: false,
-            moderationNote: parameters.reason,
-          },
+        await this.contentRepo.updateContentModeration(id, {
+          isFlagged: false,
+          moderationNote: parameters.reason,
         });
         break;
 
       case 'reject':
       case 'flag':
-        await this.prisma.content.update({
-          where: { id },
-          data: {
-            isFlagged: true,
-            moderationNote: parameters.reason,
-          },
+        await this.contentRepo.updateContentModeration(id, {
+          isFlagged: true,
+          moderationNote: parameters.reason,
         });
         break;
 
       case 'delete':
-        await this.prisma.content.update({
-          where: { id },
-          data: {
-            isDeleted: true,
-            deletedAt: new Date(),
-          },
-        });
+        // Use soft delete (sets isDeleted = true)
+        // Pass 0 as moderatorId since we don't have it in this context
+        await this.contentRepo.deleteContent(id, 0, true);
         break;
     }
   }
@@ -431,25 +410,16 @@ export class UnifiedContentService {
   private async moderatePrediction(id: number, action: string, _parameters: any): Promise<void> {
     switch (action) {
       case 'approve':
-        await this.prisma.prediction.update({
-          where: { id },
-          data: { approved: true },
-        });
+        await this.adminRepo.updatePredictionStatus(id, 'approved');
         break;
 
       case 'reject':
-        await this.prisma.prediction.update({
-          where: { id },
-          data: { approved: false },
-        });
+        await this.adminRepo.updatePredictionStatus(id, 'rejected');
         break;
 
       case 'delete':
         // Predictions shouldn't be deleted, mark as rejected instead
-        await this.prisma.prediction.update({
-          where: { id },
-          data: { approved: false },
-        });
+        await this.adminRepo.updatePredictionStatus(id, 'rejected');
         break;
     }
   }
@@ -503,63 +473,29 @@ export class UnifiedContentService {
    * Get daily creation trends
    */
   private async getDailyCreationTrends(startDate: Date): Promise<any[]> {
-    // Simplified implementation - would need proper date aggregation
-    const days = [];
-    const current = new Date(startDate);
-    const now = new Date();
+    const endDate = new Date();
+    const dailyData = await this.analyticsRepo.getDailyCreationCounts(startDate, endDate);
 
-    while (current <= now) {
-      const dayStart = new Date(current);
-      dayStart.setHours(0, 0, 0, 0);
-      const dayEnd = new Date(current);
-      dayEnd.setHours(23, 59, 59, 999);
-
-      const [articleCount, contentCount, predictionCount] = await Promise.all([
-        this.prisma.article.count({
-          where: {
-            createdAt: { gte: dayStart, lte: dayEnd },
-          },
-        }),
-        this.prisma.content.count({
-          where: {
-            createdAt: { gte: dayStart, lte: dayEnd },
-          },
-        }),
-        this.prisma.prediction.count({
-          where: {
-            createdAt: { gte: dayStart, lte: dayEnd },
-          },
-        }),
-      ]);
-
-      days.push({
-        date: current.toISOString().split('T')[0],
-        count: articleCount + contentCount + predictionCount,
-        byType: {
-          article: articleCount,
-          user_post: contentCount,
-          comment: 0, // Included in contentCount
-          prediction: predictionCount,
-        },
-      });
-
-      current.setDate(current.getDate() + 1);
-    }
-
-    return days;
+    return dailyData.map((day) => ({
+      date: day.date,
+      count: day.total,
+      byType: {
+        article: day.articles,
+        user_post: day.posts,
+        comment: 0, // Posts include comments in the count
+        prediction: day.predictions,
+      },
+    }));
   }
 
   /**
    * Get top tags by usage
    */
   private async getTopTags(limit: number): Promise<any[]> {
-    const hashtags = await this.prisma.hashtag.findMany({
-      orderBy: { usageCount: 'desc' },
-      take: limit,
-    });
+    const tags = await this.tagRepo.getPopularTags(limit);
 
-    return hashtags.map((tag) => ({
-      tag: tag.tag,
+    return tags.map((tag) => ({
+      tag: tag.name,
       count: tag.usageCount,
       engagement: 0, // Would need to aggregate engagement per tag
     }));
@@ -569,30 +505,14 @@ export class UnifiedContentService {
    * Get top authors by content count
    */
   private async getTopAuthors(limit: number): Promise<any[]> {
-    // Group by author and count
-    const authors = await this.prisma.content.groupBy({
-      by: ['authorId'],
-      _count: { id: true },
-      orderBy: { _count: { id: 'desc' } },
-      take: limit,
-    });
+    const authors = await this.analyticsRepo.getTopAuthors(limit);
 
-    const authorsWithDetails = await Promise.all(
-      authors.map(async (author) => {
-        const user = await this.prisma.user.findUnique({
-          where: { id: author.authorId },
-        });
-
-        return {
-          id: author.authorId,
-          name: user?.name || 'Unknown',
-          type: 'user' as const,
-          itemCount: author._count.id,
-          totalEngagement: 0, // Would need to sum engagement metrics
-        };
-      }),
-    );
-
-    return authorsWithDetails;
+    return authors.map((author) => ({
+      id: author.userId,
+      name: author.username,
+      type: 'user' as const,
+      itemCount: author.contentCount,
+      totalEngagement: 0, // Would need to sum engagement metrics
+    }));
   }
 }

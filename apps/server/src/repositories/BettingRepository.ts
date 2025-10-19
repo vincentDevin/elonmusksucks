@@ -1,10 +1,8 @@
 // apps/server/src/repositories/BettingRepository.ts
-import { PrismaClient } from '@prisma/client';
+import prisma from '../db';
 import type { IBettingRepository, OptionWithPrediction } from './interfaces/IBettingRepository';
 import type { DbBet, DbParlay } from '@ems/types';
 import { eventBus } from '../lib/EventBus';
-
-const prisma = new PrismaClient();
 
 export class BettingRepository implements IBettingRepository {
   async findOptionWithPrediction(optionId: number): Promise<OptionWithPrediction | null> {

@@ -12,46 +12,59 @@ const asNum = (v: string | number | bigint | undefined | null) => Number(v ?? 0)
 
 const TransactionsTable: React.FC<TransactionsTableProps> = ({ transactions, className = '' }) => {
   const getCategoryBadge = (subtype?: string | null) => {
-    if (!subtype) return { color: 'bg-gray-100 text-gray-800', icon: '💳', label: 'Other' };
+    if (!subtype)
+      return {
+        color: 'bg-muted/50 text-content dark:bg-muted/30',
+        icon: '💳',
+        label: 'Other',
+      };
 
     if (subtype.includes('PONG')) {
       return {
-        color: 'bg-purple-100 text-purple-800',
+        color: 'bg-purple-500/20 text-purple-700 dark:bg-purple-500/30 dark:text-purple-400',
         icon: '🏓',
         label: subtype.replace('_', ' '),
       };
     }
     if (subtype.includes('PARLAY')) {
-      return { color: 'bg-blue-100 text-blue-800', icon: '🔗', label: subtype.replace('_', ' ') };
+      return {
+        color: 'bg-blue-500/20 text-blue-700 dark:bg-blue-500/30 dark:text-blue-400',
+        icon: '🔗',
+        label: subtype.replace('_', ' '),
+      };
     }
     if (subtype.includes('BET')) {
       return {
-        color: 'bg-orange-100 text-orange-800',
+        color: 'bg-orange-500/20 text-orange-700 dark:bg-orange-500/30 dark:text-orange-400',
         icon: '🎯',
         label: subtype.replace('_', ' '),
       };
     }
-    return { color: 'bg-gray-100 text-gray-800', icon: '💳', label: subtype.replace('_', ' ') };
+    return {
+      color: 'bg-muted/50 text-content dark:bg-muted/30',
+      icon: '💳',
+      label: subtype.replace('_', ' '),
+    };
   };
 
   const getRelatedBadge = (tx: AdminTransactionView) => {
     if (tx.relatedBetId) {
       return {
-        color: 'bg-orange-50 text-orange-700',
+        color: 'bg-orange-500/15 text-orange-700 dark:bg-orange-500/25 dark:text-orange-400',
         icon: '🎯',
         label: `Bet #${tx.relatedBetId}`,
       };
     }
     if (tx.relatedParlayId) {
       return {
-        color: 'bg-blue-50 text-blue-700',
+        color: 'bg-blue-500/15 text-blue-700 dark:bg-blue-500/25 dark:text-blue-400',
         icon: '🔗',
         label: `Parlay #${tx.relatedParlayId}`,
       };
     }
     if (tx.relatedPongMatchId) {
       return {
-        color: 'bg-purple-50 text-purple-700',
+        color: 'bg-purple-500/15 text-purple-700 dark:bg-purple-500/25 dark:text-purple-400',
         icon: '🏓',
         label: `Pong #${tx.relatedPongMatchId}`,
       };
@@ -135,8 +148,8 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({ transactions, cla
                     <span
                       className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${
                         tx.type === 'CREDIT'
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
+                          ? 'bg-green-500/20 text-green-700 dark:bg-green-500/30 dark:text-green-400'
+                          : 'bg-red-500/20 text-red-700 dark:bg-red-500/30 dark:text-red-400'
                       }`}
                     >
                       {tx.type === 'CREDIT' ? '⬆️' : '⬇️'}
@@ -144,7 +157,13 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({ transactions, cla
                     </span>
                   </td>
                   <td className="px-3 py-2 text-xs font-semibold">
-                    <span className={tx.type === 'CREDIT' ? 'text-green-600' : 'text-red-600'}>
+                    <span
+                      className={
+                        tx.type === 'CREDIT'
+                          ? 'text-green-700 dark:text-green-400'
+                          : 'text-red-700 dark:text-red-400'
+                      }
+                    >
                       {tx.type === 'CREDIT' ? '+' : '-'}$
                       {formatMuskBucks(Math.abs(asNum(tx.amount)))}
                     </span>

@@ -1,5 +1,6 @@
 // apps/server/src/repositories/UnifiedContentRepository.ts
-import { PrismaClient, ArticleStatus } from '@prisma/client';
+import prisma from '../db';
+import { ArticleStatus } from '@prisma/client';
 import type {
   UnifiedContentFilters,
   UnifiedContentItem,
@@ -29,7 +30,7 @@ import { IUnifiedContentRepository } from './interfaces/IUnifiedContentRepositor
  * This repository does NOT replace existing repositories - it orchestrates them.
  */
 export class UnifiedContentRepository implements IUnifiedContentRepository {
-  constructor(private prisma: PrismaClient = new PrismaClient()) {}
+  private prisma = prisma;
 
   /**
    * Get unified content with comprehensive filtering

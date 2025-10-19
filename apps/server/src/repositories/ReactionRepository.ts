@@ -1,9 +1,10 @@
 // apps/server/src/repositories/ReactionRepository.ts
-import { PrismaClient, Reaction, ReactionType } from '@prisma/client';
+import prisma from '../db';
+import { Reaction, ReactionType } from '@prisma/client';
 import type { IReactionRepository } from './interfaces/IReactionRepository';
 
 export class ReactionRepository implements IReactionRepository {
-  constructor(private readonly prisma: PrismaClient = new PrismaClient()) {}
+  private readonly prisma = prisma;
 
   // ============================================
   // CONTENT REACTIONS (posts, comments)

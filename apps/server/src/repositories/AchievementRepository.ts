@@ -1,4 +1,5 @@
-import { PrismaClient, Prisma } from '@prisma/client';
+import prisma from '../db';
+import { Prisma } from '@prisma/client';
 import type {
   PrismaAchievement,
   PrismaUser,
@@ -31,8 +32,7 @@ interface JsonRuleAchievementData {
 
 export class AchievementRepository implements IAchievementRepository {
   private complexityTracker = new RuleComplexityTracker();
-
-  constructor(private prisma: PrismaClient) {}
+  private prisma = prisma;
 
   async findMany(params?: DbAchievementQueryParams): Promise<PrismaAchievement[]> {
     const where: Prisma.AchievementWhereInput = {};

@@ -1,12 +1,11 @@
 // apps/server/src/repositories/PayoutRepository.ts
-import { PrismaClient, Prisma } from '@prisma/client';
+import prisma from '../db';
+import { Prisma } from '@prisma/client';
 import type { IPayoutRepository } from './interfaces/IPayoutRepository';
 import type { PublicPrediction, DbUserStats } from '@ems/types';
 import { REDIS_CHANNELS } from '@ems/types';
 import { serializeBigInt } from '../utils/bigintSerializer';
 import { eventBus } from '../lib/EventBus';
-
-const prisma = new PrismaClient();
 
 export class PayoutRepository implements IPayoutRepository {
   private eventBus = eventBus;

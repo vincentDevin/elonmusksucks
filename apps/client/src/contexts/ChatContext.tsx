@@ -16,7 +16,7 @@ import {
 import { useSocketEvent } from './EventBusCoreContext';
 import { useSocket } from './SocketContext';
 import { useAuth } from './AuthContext';
-import { REDIS_CHANNELS, type ChatErrorPayload } from '@ems/types';
+import { REDIS_CHANNELS, SOCKET_EVENTS, type ChatErrorPayload } from '@ems/types';
 import type {
   ChatMessageDTO,
   ChatTypingPayload,
@@ -70,36 +70,46 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   /* 1. History bootstrap                                                   */
   /* ---------------------------------------------------------------------- */
   const handleHistory = useCallback((hist: ChatMessage[]) => {
+    console.log('[ChatContext] Received chat history:', hist.length, 'messages');
     setMessages(hist.sort((a, b) => +new Date(a.timestamp) - +new Date(b.timestamp)));
     setLoading(false);
   }, []);
 
-  // Migrated to EventBusCore: Chat history loading
-  useSocketEvent(REDIS_CHANNELS.CHAT_HISTORY, handleHistory);
-
+  // CRITICAL FIX: Use direct socket listener to bypass hydration watermark
+  // Chat history is request-response, not broadcast, so it should process immediately
   useEffect(() => {
     if (!socket) return;
 
+    console.log('[ChatContext] Setting up chat history direct listener and request');
+
+    // 1. Set up direct socket listener FIRST (bypasses EventBusCore hydration queue)
+    socket.on(SOCKET_EVENTS.CHAT_HISTORY_RESPONSE, handleHistory);
+
+    // 2. Request history AFTER listener is set up
     const requestHistory = () => {
       console.log('[ChatContext] Requesting chat history...');
-      socket.emit('chat:history', {});
+      socket.emit(SOCKET_EVENTS.CHAT_HISTORY_REQUEST, {});
     };
 
     if (socket.connected) {
+      // Socket already connected - request immediately
       requestHistory();
-      return undefined;
+    } else {
+      // Socket not connected - wait for connection then request
+      console.log('[ChatContext] Socket not connected, waiting for connection...');
+      const onConnect = () => {
+        console.log('[ChatContext] Socket connected, requesting chat history...');
+        socket.emit(SOCKET_EVENTS.CHAT_HISTORY_REQUEST, {});
+      };
+      socket.once('connect', onConnect);
     }
 
-    const onConnect = () => {
-      console.log('[ChatContext] Socket connected, requesting chat history...');
-      socket.emit('chat:history', {});
-    };
-    socket.on('connect', onConnect);
-
+    // 3. Cleanup - remove direct listener
     return () => {
-      socket.off('connect', onConnect);
+      console.log('[ChatContext] Cleaning up chat history direct listener');
+      socket.off(SOCKET_EVENTS.CHAT_HISTORY_RESPONSE, handleHistory);
     };
-  }, [socket]);
+  }, [socket, handleHistory]);
 
   /* ---------------------------------------------------------------------- */
   /* 2. Live message stream                                                 */
@@ -206,21 +216,24 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   /* ---------------------------------------------------------------------- */
   const sendTyping = useCallback(() => {
     if (!socket) return;
-    socket.emit('chat:typing', {});
+    socket.emit(SOCKET_EVENTS.CHAT_TYPING_SEND, {});
     if (localStopTimer.current) clearTimeout(localStopTimer.current);
-    localStopTimer.current = setTimeout(() => socket.emit('chat:stopTyping', {}), 3000);
+    localStopTimer.current = setTimeout(
+      () => socket.emit(SOCKET_EVENTS.CHAT_STOP_TYPING_SEND, {}),
+      3000,
+    );
   }, [socket]);
 
   const sendStopTyping = useCallback(() => {
     if (!socket) return;
-    socket.emit('chat:stopTyping', {});
+    socket.emit(SOCKET_EVENTS.CHAT_STOP_TYPING_SEND, {});
     if (localStopTimer.current) clearTimeout(localStopTimer.current);
   }, [socket]);
 
   const sendMessage = useCallback(
     (msg: string) => {
       if (!msg.trim() || !socket) return;
-      socket.emit('chat:message', { message: msg });
+      socket.emit(SOCKET_EVENTS.CHAT_MESSAGE_SEND, { message: msg });
       sendStopTyping(); // stop indicator for myself immediately
     },
     [socket, sendStopTyping],

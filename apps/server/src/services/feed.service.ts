@@ -1,13 +1,13 @@
-import { PrismaClient, FeedStatus } from '@prisma/client';
+import { FeedStatus } from '@prisma/client';
 import { FeedRepository } from '../repositories/FeedRepository';
 
-const prisma = new PrismaClient();
+// Using shared prisma from db.ts
 
 export class FeedService {
   private repository: FeedRepository;
 
   constructor() {
-    this.repository = new FeedRepository(prisma);
+    this.repository = new FeedRepository();
   }
 
   async listFeeds() {

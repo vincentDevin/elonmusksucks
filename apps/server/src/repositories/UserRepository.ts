@@ -1,6 +1,7 @@
 // apps/server/src/repositories/UserRepository.ts
 
-import { PrismaClient, Prisma } from '@prisma/client';
+import prisma from '../db';
+import { Prisma } from '@prisma/client';
 import type { IUserRepository } from './interfaces/IUserRepository';
 import type {
   PrismaUser,
@@ -12,8 +13,6 @@ import type {
 } from '@ems/types';
 
 export type { IUserRepository };
-
-const prisma = new PrismaClient();
 
 /**
  * User Repository Implementation

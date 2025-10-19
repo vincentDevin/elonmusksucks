@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import prisma from '../db';
 import type { IAnalyticsRepository } from './interfaces/IAnalyticsRepository';
 
 /**
@@ -6,7 +6,7 @@ import type { IAnalyticsRepository } from './interfaces/IAnalyticsRepository';
  * Handles all database queries for analytics dashboard
  */
 export class AnalyticsRepository implements IAnalyticsRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+  private readonly prisma = prisma;
 
   async getActiveUserCounts(
     last24h: Date,
@@ -619,5 +619,103 @@ export class AnalyticsRepository implements IAnalyticsRepository {
       day7: Math.round((Number(result.day7_retained) / totalUsers) * 100),
       day30: Math.round((Number(result.day30_retained) / totalUsers) * 100),
     };
+  }
+
+  /**
+   * Get daily content creation counts for all content types
+   */
+  async getDailyCreationCounts(
+    startDate: Date,
+    endDate: Date,
+  ): Promise<
+    Array<{
+      date: string;
+      articles: number;
+      posts: number;
+      predictions: number;
+      total: number;
+    }>
+  > {
+    const results: Array<{
+      date: string;
+      articles: number;
+      posts: number;
+      predictions: number;
+      total: number;
+    }> = [];
+
+    const current = new Date(startDate);
+    while (current <= endDate) {
+      const dayStart = new Date(current);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(current);
+      dayEnd.setHours(23, 59, 59, 999);
+
+      const [articleCount, postCount, predictionCount] = await Promise.all([
+        this.prisma.article.count({
+          where: {
+            createdAt: { gte: dayStart, lte: dayEnd },
+          },
+        }),
+        this.prisma.content.count({
+          where: {
+            type: 'POST',
+            createdAt: { gte: dayStart, lte: dayEnd },
+          },
+        }),
+        this.prisma.prediction.count({
+          where: {
+            createdAt: { gte: dayStart, lte: dayEnd },
+          },
+        }),
+      ]);
+
+      results.push({
+        date: current.toISOString().split('T')[0],
+        articles: articleCount,
+        posts: postCount,
+        predictions: predictionCount,
+        total: articleCount + postCount + predictionCount,
+      });
+
+      current.setDate(current.getDate() + 1);
+    }
+
+    return results;
+  }
+
+  /**
+   * Get top content authors by post count
+   */
+  async getTopAuthors(limit: number): Promise<
+    Array<{
+      userId: number;
+      username: string;
+      contentCount: number;
+    }>
+  > {
+    const authors = await this.prisma.content.groupBy({
+      by: ['authorId'],
+      _count: { id: true },
+      orderBy: { _count: { id: 'desc' } },
+      take: limit,
+    });
+
+    const authorsWithDetails = await Promise.all(
+      authors.map(async (author) => {
+        const user = await this.prisma.user.findUnique({
+          where: { id: author.authorId },
+          select: { id: true, name: true },
+        });
+
+        return {
+          userId: author.authorId,
+          username: user?.name || 'Unknown',
+          contentCount: author._count.id,
+        };
+      }),
+    );
+
+    return authorsWithDetails;
   }
 }

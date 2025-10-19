@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import prisma from '../db';
 import type { ITimelineRepository } from './interfaces/ITimelineRepository';
 import type {
   DbArticleFeedParams,
@@ -39,7 +39,7 @@ type ArticleTagWithTag = {
  * All methods use proper types from @ems/types with no `any` types.
  */
 export class TimelineRepository implements ITimelineRepository {
-  constructor(private prisma: PrismaClient) {}
+  private prisma = prisma;
 
   /**
    * Get approved articles for the timeline feed

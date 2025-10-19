@@ -84,4 +84,24 @@ export interface IFeedRepository {
   ): Promise<Article>;
 
   findArticleWithTagsAndFeed(articleId: number): Promise<any>;
+
+  // ============================================
+  // ARTICLE MODERATION
+  // ============================================
+
+  /** Get count of pending articles */
+  getPendingArticlesCount(): Promise<number>;
+
+  /** Get count of rejected articles */
+  getRejectedArticlesCount(): Promise<number>;
+
+  /** Update article status and moderation notes */
+  updateArticleStatus(
+    articleId: number,
+    status: 'PENDING' | 'APPROVED' | 'REJECTED',
+    modNotes?: string | null,
+  ): Promise<any>;
+
+  /** Delete article */
+  deleteArticle(articleId: number): Promise<boolean>;
 }

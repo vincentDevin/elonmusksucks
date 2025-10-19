@@ -1,8 +1,8 @@
+import prisma from '../db';
 // apps/server/src/workers/feed.worker.ts
 import 'dotenv/config';
 import { Worker } from 'bullmq';
 import { FeedFetchJobData, FeedHealthCheckData, REDIS_CHANNELS } from '@ems/types';
-import { PrismaClient } from '@prisma/client';
 import redisClient from '../lib/redis';
 import { eventBus } from '../lib/EventBus';
 
@@ -13,8 +13,8 @@ import Parser from 'rss-parser';
 import { createHash } from 'crypto';
 import { FeedRepository } from '../repositories/FeedRepository';
 
-const prisma = new PrismaClient();
-const feedRepo = new FeedRepository(prisma);
+// Using shared prisma from db.ts
+const feedRepo = new FeedRepository();
 
 // Note: Job data interfaces now imported from @ems/types
 

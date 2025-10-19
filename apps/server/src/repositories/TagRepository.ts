@@ -1,5 +1,6 @@
 // apps/server/src/repositories/TagRepository.ts
-import { PrismaClient, Tag } from '@prisma/client';
+import prisma from '../db';
+import { Tag } from '@prisma/client';
 import { ITagRepository } from './interfaces/ITagRepository';
 
 function slugify(text: string): string {
@@ -15,7 +16,7 @@ function slugify(text: string): string {
 }
 
 export class TagRepository implements ITagRepository {
-  constructor(private prisma: PrismaClient = new PrismaClient()) {}
+  private prisma = prisma;
 
   // ============================================
   // CREATE

@@ -136,4 +136,27 @@ export interface IAnalyticsRepository {
     day7: number;
     day30: number;
   }>;
+
+  // Daily content creation trends
+  getDailyCreationCounts(
+    startDate: Date,
+    endDate: Date,
+  ): Promise<
+    Array<{
+      date: string;
+      articles: number;
+      posts: number;
+      predictions: number;
+      total: number;
+    }>
+  >;
+
+  // Top content authors
+  getTopAuthors(limit: number): Promise<
+    Array<{
+      userId: number;
+      username: string;
+      contentCount: number;
+    }>
+  >;
 }

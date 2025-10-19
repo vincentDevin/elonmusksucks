@@ -2,7 +2,6 @@ import redisClient from '../lib/redis';
 import { CACHE_KEYS, getProfileImageTTL, getTTLUntilMidnight } from '../lib/cacheTTL';
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { PrismaClient } from '@prisma/client';
 import type { IUserRepository } from '../repositories/interfaces/IUserRepository';
 import { UserRepository } from '../repositories/UserRepository';
 import { StatsRepository } from '../repositories/StatsRepository';
@@ -30,7 +29,7 @@ export class UserService {
 
   constructor(repo: IUserRepository = new UserRepository()) {
     this.repo = repo;
-    this.statsRepo = new StatsRepository(new PrismaClient());
+    this.statsRepo = new StatsRepository();
     this.s3 = new S3Client({
       region: 'auto',
       endpoint: process.env.TIGRIS_S3_ENDPOINT,
