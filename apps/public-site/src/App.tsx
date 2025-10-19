@@ -1,8 +1,4 @@
-import Layout from './components/Layout';
 import LandingPage from './components/LandingPage';
-import PredictionsPage from './components/PredictionsPage';
-import LeaderboardPage from './components/LeaderboardPage';
-import TimelinePage from './components/TimelinePage';
 import type {
   PredictionView,
   LeaderboardEntryView,
@@ -47,28 +43,8 @@ function App({ serverData: propServerData }: AppProps) {
       currentPath: '/',
     };
 
-  // Use pathname from serverData to ensure consistency
-  const pathname = serverData.currentPath;
-  const clientAppUrl = serverData.clientAppUrl;
-
-  const renderPage = () => {
-    switch (pathname) {
-      case '/predictions':
-        return <PredictionsPage {...serverData} />;
-      case '/leaderboard':
-        return <LeaderboardPage {...serverData} />;
-      case '/timeline':
-        return <TimelinePage {...serverData} />;
-      default:
-        return <LandingPage {...serverData} />;
-    }
-  };
-
-  return (
-    <Layout currentPath={pathname} clientAppUrl={clientAppUrl}>
-      {renderPage()}
-    </Layout>
-  );
+  // Always render single landing page - no routing needed
+  return <LandingPage {...serverData} />;
 }
 
 export default App;

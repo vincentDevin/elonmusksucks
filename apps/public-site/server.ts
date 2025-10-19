@@ -295,15 +295,15 @@ async function createServer(): Promise<express.Application> {
   );
 
   // ──────────────────────────────────────────────────────────────────────────
-  // SSR Handler (catch-all for SSR routes)
+  // SSR Handler (catch-all for single landing page)
   // ──────────────────────────────────────────────────────────────────────────
 
   app.use(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const url = req.originalUrl;
 
     try {
-      // Fetch data based on the route
-      const serverData = await fetchServerData(url);
+      // Fetch all server data (single page, no routing)
+      const serverData = await fetchServerData();
 
       let render: (serverData: ServerData) => string;
       let template: string;
@@ -346,17 +346,8 @@ async function createServer(): Promise<express.Application> {
           `<script>window.__SERVER_DATA__ = ${serializeForHTML(serverData)}</script>`,
         );
 
-      // Set Cache-Control headers based on route
-      let cacheControlValue = 'public, max-age=60, stale-while-revalidate=120'; // Default: 1 min cache, 2 min stale
-      if (url === '/' || url === '') {
-        cacheControlValue = 'public, max-age=60, stale-while-revalidate=180'; // Landing: 1 min cache, 3 min stale
-      } else if (url === '/predictions') {
-        cacheControlValue = 'public, max-age=30, stale-while-revalidate=60'; // Predictions: 30s cache, 1 min stale
-      } else if (url === '/leaderboard') {
-        cacheControlValue = 'public, max-age=120, stale-while-revalidate=300'; // Leaderboard: 2 min cache, 5 min stale
-      } else if (url === '/timeline') {
-        cacheControlValue = 'public, max-age=60, stale-while-revalidate=120'; // Timeline: 1 min cache, 2 min stale
-      }
+      // Single cache strategy for landing page (30s cache, 1min stale)
+      const cacheControlValue = 'public, max-age=30, stale-while-revalidate=60';
 
       res
         .status(200)
@@ -481,43 +472,41 @@ class SimpleCache {
 const serverDataCache = new SimpleCache();
 
 // Run cleanup every 5 minutes
-setInterval(() => {
-  serverDataCache.cleanup();
-  console.log('[CACHE] Cleanup completed');
-}, 5 * 60 * 1000);
+setInterval(
+  () => {
+    serverDataCache.cleanup();
+    console.log('[CACHE] Cleanup completed');
+  },
+  5 * 60 * 1000,
+);
 
-// Cache TTLs (in seconds) - tuned for different data freshness requirements
-const CACHE_TTL = {
-  LANDING_PAGE: 60, // 1 minute - high traffic page
-  PREDICTIONS: 30, // 30 seconds - frequently updated
-  LEADERBOARD: 120, // 2 minutes - less frequently updated
-  TIMELINE: 60, // 1 minute - moderate update frequency
-} as const;
+// Cache TTL (in seconds) - single page cache strategy
+const CACHE_TTL = 30; // 30 seconds - balanced between freshness and performance
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Server Data Fetching
 // ══════════════════════════════════════════════════════════════════════════════
 
 /**
- * Fetch server-side data based on the current route
+ * Fetch all server-side data for the single landing page
  * Uses environment variables for API endpoints
  * Implements caching to reduce load on API server
  */
-async function fetchServerData(url: string): Promise<ServerData> {
+async function fetchServerData(): Promise<ServerData> {
   const clientAppUrl = env.CLIENT_APP_URL;
   const apiBaseUrl = `${env.API_BASE_URL}/api`;
 
-  // Generate cache key based on URL
-  const cacheKey = `server-data:${url}`;
+  // Single cache key for landing page
+  const cacheKey = 'server-data:landing';
 
   // Check cache first
   const cachedData = serverDataCache.get<ServerData>(cacheKey);
   if (cachedData) {
-    console.log(`[CACHE] HIT for ${url}`);
+    console.log('[CACHE] HIT for landing page');
     return cachedData;
   }
 
-  console.log(`[CACHE] MISS for ${url} - fetching from API`);
+  console.log('[CACHE] MISS for landing page - fetching from API');
 
   // Base server data structure
   const baseData: ServerData = {
@@ -530,129 +519,84 @@ async function fetchServerData(url: string): Promise<ServerData> {
     predictionsData: null,
     fullLeaderboardData: null,
     clientAppUrl,
-    currentPath: url,
+    currentPath: '/',
   };
 
   try {
-    // Use native fetch API (Node.js 18+)
-    // Fetch different data based on the route
-    if (url === '/' || url === '') {
-      // Landing page - fetch overview data
-      const [predictionsRes, leaderboardRes, activityRes, articlesRes, postsRes] =
-        await Promise.allSettled([
-          fetch(`${apiBaseUrl}/predictions`),
-          fetch(`${apiBaseUrl}/leaderboard`),
-          fetch(`${apiBaseUrl}/activity/recent?limit=10`),
-          fetch(`${apiBaseUrl}/timeline/articles?limit=5`),
-          fetch(`${apiBaseUrl}/posts?limit=5`),
-        ]);
-
-      // Get predictions data for trending - filter for APPROVED status only
-      if (predictionsRes.status === 'fulfilled' && predictionsRes.value.ok) {
-        const response = (await predictionsRes.value.json()) as { predictions: PredictionView[] };
-        const predictions = response.predictions;
-        if (Array.isArray(predictions)) {
-          const approvedPredictions = predictions.filter((p) => p.status === 'APPROVED');
-          baseData.trendingData = approvedPredictions.slice(0, 5);
-        }
-      }
-
-      // Get posts data for timeline preview
-      if (postsRes.status === 'fulfilled' && postsRes.value.ok) {
-        const postsResponse = (await postsRes.value.json()) as {
-          items: PublicPostView[];
-          nextCursor?: number;
-          hasMore: boolean;
-        };
-        baseData.postsData = Array.isArray(postsResponse.items) ? postsResponse.items : null;
-      }
-
-      // Get leaderboard data for preview
-      if (leaderboardRes.status === 'fulfilled' && leaderboardRes.value.ok) {
-        const leaderboard = (await leaderboardRes.value.json()) as LeaderboardEntryView[];
-        baseData.leaderboardData = Array.isArray(leaderboard) ? leaderboard.slice(0, 5) : null;
-      }
-
-      // Get activity data - response has { success, activities, count, cached }
-      if (activityRes.status === 'fulfilled' && activityRes.value.ok) {
-        const activityResponse = (await activityRes.value.json()) as {
-          success: boolean;
-          activities: UnifiedActivityEvent[];
-          count: number;
-          cached: boolean;
-        };
-        baseData.activityData = activityResponse.success ? activityResponse.activities : null;
-      }
-
-      // Get articles data for timeline preview - response has { items, pagination }
-      if (articlesRes.status === 'fulfilled' && articlesRes.value.ok) {
-        const articlesResponse = (await articlesRes.value.json()) as {
-          items: PublicArticle[];
-          pagination: { cursor?: string; hasMore: boolean };
-        };
-        baseData.articlesData = Array.isArray(articlesResponse.items)
-          ? articlesResponse.items
-          : null;
-      }
-      // Cache landing page data
-      serverDataCache.set(cacheKey, baseData, CACHE_TTL.LANDING_PAGE);
-    } else if (url === '/predictions') {
-      // Predictions page
-      const predictionsRes = await fetch(`${apiBaseUrl}/predictions`);
-      if (predictionsRes.ok) {
-        const response = (await predictionsRes.json()) as { predictions: PredictionView[] };
-        const predictions = response.predictions;
-        baseData.predictionsData = Array.isArray(predictions) ? predictions : null;
-      }
-      // Cache predictions data
-      serverDataCache.set(cacheKey, baseData, CACHE_TTL.PREDICTIONS);
-    } else if (url === '/leaderboard') {
-      // Leaderboard page - fetch both main and pong leaderboards
-      const [leaderboardRes, pongLeaderboardRes] = await Promise.allSettled([
-        fetch(`${apiBaseUrl}/leaderboard`),
-        fetch(`${apiBaseUrl}/leaderboard/pong/elo`),
+    // Fetch ALL data in parallel with proper limits for ultra-compact UI
+    const [predictionsRes, leaderboardRes, pongLeaderboardRes, activityRes, articlesRes, postsRes] =
+      await Promise.allSettled([
+        fetch(`${apiBaseUrl}/predictions`), // Get all predictions, filter to 8 approved
+        fetch(`${apiBaseUrl}/leaderboard`), // Get leaderboard, slice to 25
+        fetch(`${apiBaseUrl}/leaderboard/pong/elo`), // Get pong leaderboard, slice to 20
+        fetch(`${apiBaseUrl}/activity/recent?limit=30`), // 30 activities
+        fetch(`${apiBaseUrl}/timeline/articles?limit=10`), // 10 articles
+        fetch(`${apiBaseUrl}/posts?limit=10`), // 10 posts
       ]);
 
-      if (leaderboardRes.status === 'fulfilled' && leaderboardRes.value.ok) {
-        const leaderboard = (await leaderboardRes.value.json()) as LeaderboardEntryView[];
-        baseData.fullLeaderboardData = Array.isArray(leaderboard) ? leaderboard : null;
+    // Get predictions data - filter for APPROVED status only, take first 8
+    if (predictionsRes.status === 'fulfilled' && predictionsRes.value.ok) {
+      const response = (await predictionsRes.value.json()) as { predictions: PredictionView[] };
+      const predictions = response.predictions;
+      if (Array.isArray(predictions)) {
+        const approvedPredictions = predictions.filter((p) => p.status === 'APPROVED');
+        baseData.trendingData = approvedPredictions.slice(0, 8);
+        // Also store full predictions data (for potential future use)
+        baseData.predictionsData = approvedPredictions;
       }
-
-      if (pongLeaderboardRes.status === 'fulfilled' && pongLeaderboardRes.value.ok) {
-        const pongLeaderboard = (await pongLeaderboardRes.value.json()) as PongLeaderboardView[];
-        baseData.pongLeaderboardData = Array.isArray(pongLeaderboard) ? pongLeaderboard : null;
-      }
-      // Cache leaderboard data
-      serverDataCache.set(cacheKey, baseData, CACHE_TTL.LEADERBOARD);
-    } else if (url === '/timeline') {
-      // Timeline page
-      const [articlesRes, postsRes] = await Promise.allSettled([
-        fetch(`${apiBaseUrl}/timeline/articles`),
-        fetch(`${apiBaseUrl}/posts`),
-      ]);
-
-      if (articlesRes.status === 'fulfilled' && articlesRes.value.ok) {
-        const articlesResponse = (await articlesRes.value.json()) as {
-          items: PublicArticle[];
-          pagination: { cursor?: string; hasMore: boolean };
-        };
-        baseData.articlesData = Array.isArray(articlesResponse.items)
-          ? articlesResponse.items
-          : null;
-      }
-      if (postsRes.status === 'fulfilled' && postsRes.value.ok) {
-        const postsResponse = (await postsRes.value.json()) as {
-          items: PublicPostView[];
-          nextCursor?: number;
-          hasMore: boolean;
-        };
-        baseData.postsData = Array.isArray(postsResponse.items) ? postsResponse.items : null;
-      }
-      // Cache timeline data
-      serverDataCache.set(cacheKey, baseData, CACHE_TTL.TIMELINE);
     }
+
+    // Get market leaderboard data - take top 25
+    if (leaderboardRes.status === 'fulfilled' && leaderboardRes.value.ok) {
+      const leaderboard = (await leaderboardRes.value.json()) as LeaderboardEntryView[];
+      if (Array.isArray(leaderboard)) {
+        baseData.leaderboardData = leaderboard.slice(0, 25);
+        baseData.fullLeaderboardData = leaderboard; // Store full for reference
+      }
+    }
+
+    // Get pong leaderboard data - take top 20
+    if (pongLeaderboardRes.status === 'fulfilled' && pongLeaderboardRes.value.ok) {
+      const pongLeaderboard = (await pongLeaderboardRes.value.json()) as PongLeaderboardView[];
+      if (Array.isArray(pongLeaderboard)) {
+        baseData.pongLeaderboardData = pongLeaderboard.slice(0, 20);
+      }
+    }
+
+    // Get activity data (already limited to 30 by query param)
+    if (activityRes.status === 'fulfilled' && activityRes.value.ok) {
+      const activityResponse = (await activityRes.value.json()) as {
+        success: boolean;
+        activities: UnifiedActivityEvent[];
+        count: number;
+        cached: boolean;
+      };
+      baseData.activityData = activityResponse.success ? activityResponse.activities : null;
+    }
+
+    // Get articles data (already limited to 10 by query param)
+    if (articlesRes.status === 'fulfilled' && articlesRes.value.ok) {
+      const articlesResponse = (await articlesRes.value.json()) as {
+        items: PublicArticle[];
+        pagination: { cursor?: string; hasMore: boolean };
+      };
+      baseData.articlesData = Array.isArray(articlesResponse.items) ? articlesResponse.items : null;
+    }
+
+    // Get posts data (already limited to 10 by query param)
+    if (postsRes.status === 'fulfilled' && postsRes.value.ok) {
+      const postsResponse = (await postsRes.value.json()) as {
+        items: PublicPostView[];
+        nextCursor?: number;
+        hasMore: boolean;
+      };
+      baseData.postsData = Array.isArray(postsResponse.items) ? postsResponse.items : null;
+    }
+
+    // Cache all data with single TTL
+    serverDataCache.set(cacheKey, baseData, CACHE_TTL);
   } catch (error) {
-    console.error('Error fetching server data:', error);
+    console.error('[SERVER_DATA] Error fetching data:', error);
     // Return base data with nulls if API calls fail
     // Don't cache errors - let it retry on next request
   }
@@ -673,7 +617,8 @@ createServer()
       console.log(`   🌐 Server: http://${host}:${env.PORT}`);
       console.log(`   📡 API Base: ${env.API_BASE_URL}`);
       console.log(`   🔗 Client App: ${env.CLIENT_APP_URL}`);
-      console.log(`   💾 Cache: Enabled (TTL: 30-120s, cleanup: 5min)`);
+      console.log(`   💾 Cache: Enabled (TTL: 30s, cleanup: 5min)`);
+      console.log(`   📄 Single landing page - all data fetched in parallel`);
       console.log(`   🚀 CDN-ready with stale-while-revalidate\n`);
     });
 
