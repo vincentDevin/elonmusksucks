@@ -281,3 +281,114 @@ body {
   animation: ticker-scroll 30s linear infinite;
   will-change: transform;
 }
+
+/* ============================================================================
+ * Landing Page Component Styles
+ * ============================================================================ */
+
+/* Section Cards */
+.section-card {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
+  overflow-x: hidden;
+}
+
+.section-card:hover {
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* Preview Cards for Items */
+.preview-card {
+  position: relative;
+  background-color: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  transition: all 0.2s ease;
+  z-index: 1;
+}
+
+.preview-card:hover {
+  box-shadow:
+    0 10px 25px -5px rgba(0, 0, 0, 0.2),
+    0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  border-color: var(--color-primary);
+  transform: scale(1.02);
+  z-index: 10;
+}
+
+/* Hover Lift Effect */
+.hover-lift {
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Status Badge Styles */
+.status-badge {
+  padding: 0.25rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.status-badge.open {
+  background-color: var(--color-success);
+  color: var(--color-surface);
+}
+
+.status-badge.ending-soon {
+  background-color: var(--color-warning);
+  color: var(--color-surface);
+}
+
+.status-badge.expired {
+  background-color: var(--color-error);
+  color: var(--color-surface);
+}
+
+/* Rank Highlighting */
+.rank-1 {
+  background-color: rgba(245, 158, 11, 0.1);
+  border-left: 2px solid var(--color-warning);
+}
+
+.rank-2 {
+  background-color: rgba(226, 232, 240, 0.1);
+  border-left: 2px solid var(--color-muted);
+}
+
+.rank-3 {
+  background-color: rgba(245, 158, 11, 0.05);
+  border-left: 2px solid rgba(245, 158, 11, 0.5);
+}
+
+/* See More Button */
+.see-more-btn {
+  width: 100%;
+  padding: 0.5rem 1rem;
+  background-color: rgba(226, 232, 240, 0.2);
+  color: var(--color-content);
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  transition: all 0.2s ease;
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+.see-more-btn:hover {
+  background-color: rgba(226, 232, 240, 0.3);
+  border-color: var(--color-primary);
+}
