@@ -47,7 +47,7 @@ export const FloatingCreatePredictionWidget: React.FC<FloatingCreatePredictionWi
         className="
           w-12 h-12 rounded-full transition-all duration-200
           flex items-center justify-center backdrop-blur-sm
-          bg-accent text-white hover:bg-accent/90
+          bg-accent text-accent-foreground hover:bg-accent/90
           border-2 border-primary/40
           hover:scale-110
         "

@@ -6,7 +6,6 @@ import type { PredictionCreatedPayload, BetPlacedPayload } from '@ems/types';
 
 // New components
 import SimplePredictionCard from '../components/prediction/SimplePredictionCard';
-import FloatingParlayBuilder from '../components/prediction/FloatingParlayBuilder';
 import EnhancedPredictionFilters from '../components/prediction/EnhancedPredictionFilters';
 import PredictionPreview from '../components/prediction/PredictionPreview';
 import PredictionDetailView from '../components/prediction/PredictionDetailView';
@@ -57,7 +56,6 @@ export default function Predictions() {
 
   // State management
   const [viewMode, setViewMode] = useState<ViewMode>('list');
-  const [showParlayBuilder, setShowParlayBuilder] = useState(true);
   const [liveNotifications, setLiveNotifications] = useState<any[]>([]);
   const [previewPrediction, setPreviewPrediction] = useState<any>(null);
   const [previewTriggerRef, setPreviewTriggerRef] = useState<HTMLElement | null>(null);
@@ -73,13 +71,6 @@ export default function Predictions() {
     window.addEventListener('resize', checkIsMobile);
     return () => window.removeEventListener('resize', checkIsMobile);
   }, []);
-
-  // Show parlay builder when items are added
-  useEffect(() => {
-    if (parlayState.legs.length > 0 && !showParlayBuilder) {
-      setShowParlayBuilder(true);
-    }
-  }, [parlayState.legs.length]);
 
   // Real-time event handlers
   const handleNewPrediction = useCallback((data: PredictionCreatedPayload) => {
@@ -219,7 +210,7 @@ export default function Predictions() {
           {(filters.categories.length > 0 || filters.search) && (
             <button
               onClick={clearFilters}
-              className="px-6 py-2 bg-primary text-surface rounded-lg hover:bg-primary-hover"
+              className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary-hover"
             >
               Clear All Filters
             </button>
@@ -285,7 +276,7 @@ export default function Predictions() {
 
       case 'grid':
         return (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
             {enhancedPredictions.map((prediction) => (
               <div
                 key={prediction.id}
@@ -366,7 +357,7 @@ export default function Predictions() {
             </p>
             <button
               onClick={() => navigate('/predictions')}
-              className="px-6 py-2 bg-primary text-surface rounded-lg hover:bg-primary-hover"
+              className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary-hover"
             >
               Back to Predictions
             </button>
@@ -390,11 +381,6 @@ export default function Predictions() {
           }
           onBack={() => navigate('/predictions')}
         />
-
-        {/* Floating Parlay Builder */}
-        {parlayState.legs.length > 0 && showParlayBuilder && (
-          <FloatingParlayBuilder onClose={() => setShowParlayBuilder(false)} isMinimized={false} />
-        )}
       </div>
     );
   }
@@ -454,7 +440,7 @@ export default function Predictions() {
               {/* Create Prediction Button */}
               <button
                 onClick={() => openCreateModal()}
-                className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-all cursor-pointer font-medium"
+                className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-all cursor-pointer font-medium"
               >
                 <PlusIcon className="w-5 h-5" />
                 <span className="hidden sm:inline">Create Prediction</span>
@@ -506,11 +492,6 @@ export default function Predictions() {
 
       {/* Main Content */}
       <div className="px-6 py-6 max-w-[1800px] mx-auto">{renderPredictions()}</div>
-
-      {/* Floating Parlay Builder */}
-      {parlayState.legs.length > 0 && showParlayBuilder && (
-        <FloatingParlayBuilder onClose={() => setShowParlayBuilder(false)} isMinimized={false} />
-      )}
 
       {/* Prediction Preview (hover) */}
       {previewPrediction && previewTriggerRef && (

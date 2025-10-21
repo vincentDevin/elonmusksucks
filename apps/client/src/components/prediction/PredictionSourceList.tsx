@@ -24,16 +24,12 @@ export const PredictionSourceList: React.FC<PredictionSourceListProps> = ({
   const hasMore = sources.length > maxVisible;
 
   if (compact) {
-    const articleCount = sources.filter((s) => s.articleId !== null).length;
-    const tweetCount = sources.filter((s) => s.tweetId !== null).length;
 
     return (
       <div className="flex items-center gap-2 text-sm text-content-secondary">
         <LinkIcon className="w-3.5 h-3.5" />
         <span>
           {sources.length} source{sources.length !== 1 ? 's' : ''}
-          {articleCount > 0 && ` • ${articleCount} article${articleCount !== 1 ? 's' : ''}`}
-          {tweetCount > 0 && ` • ${tweetCount} tweet${tweetCount !== 1 ? 's' : ''}`}
         </span>
         {sources[0] && (
           <>

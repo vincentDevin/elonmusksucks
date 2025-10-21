@@ -4,6 +4,7 @@ import type { PredictionFull, BetWithUser } from '@ems/types';
 import BetModal from './BetModal';
 import { useParlay } from '../../contexts/ParlayContext';
 import PredictionReactions from './PredictionReactions';
+import { PredictionSourceList } from './PredictionSourceList';
 import {
   ChevronRightIcon,
   ClockIcon,
@@ -127,16 +128,16 @@ function SimplePredictionCard({
       <div
         className={`
           group relative bg-surface border border-border hover:border-primary/30
-          rounded-xl p-6 transition-all duration-200 hover:shadow-lg cursor-pointer
+          rounded-xl p-4 md:p-6 transition-all duration-200 hover:shadow-lg cursor-pointer
           ${className}
         `}
         onClick={onCardClick}
       >
-        {/* Main Horizontal Layout */}
-        <div className="flex items-center justify-between gap-8">
+        {/* Main Layout - Stacks on mobile, horizontal on desktop */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 md:gap-8">
           {/* Left: Title & Metadata */}
-          <div className="flex-1 min-w-0 space-y-3">
-            <h3 className="text-xl font-bold text-content line-clamp-1">{prediction.title}</h3>
+          <div className="flex-1 min-w-0 space-y-2 md:space-y-3">
+            <h3 className="text-lg md:text-xl font-bold text-content line-clamp-2 md:line-clamp-1">{prediction.title}</h3>
             <div className="flex items-center gap-4 flex-wrap">
               {prediction.category && (
                 <span className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm font-medium inline-flex items-center gap-1.5">
@@ -162,18 +163,25 @@ function SimplePredictionCard({
               )}
               <PredictionReactions predictionId={prediction.id} compact />
             </div>
+
+            {/* Source Links */}
+            {prediction.sourceLinks && prediction.sourceLinks.length > 0 && (
+              <div className="mt-2">
+                <PredictionSourceList sources={prediction.sourceLinks} compact />
+              </div>
+            )}
           </div>
 
-          {/* Center: Stats */}
-          <div className="flex items-center gap-8 text-base">
+          {/* Center: Stats - Hidden on mobile, shown on tablet+ */}
+          <div className="hidden md:flex items-center gap-4 lg:gap-8 text-sm md:text-base">
             <div className="flex items-center gap-2 text-tertiary">
-              <UsersIcon className="w-5 h-5" />
+              <UsersIcon className="w-4 h-4 md:w-5 md:h-5" />
               <span className="font-semibold">{totalBets}</span>
-              <span className="text-sm">bets</span>
+              <span className="text-xs md:text-sm hidden lg:inline">bets</span>
             </div>
             {totalVolume > 0 && (
               <div className="flex items-center gap-2 text-tertiary">
-                <CurrencyDollarIcon className="w-5 h-5" />
+                <CurrencyDollarIcon className="w-4 h-4 md:w-5 md:h-5" />
                 <span className="font-semibold text-success">
                   {formatMuskBucks(totalVolume)} 🪙
                 </span>
@@ -181,28 +189,29 @@ function SimplePredictionCard({
             )}
             {prediction.options.length > 0 && (
               <div className="flex items-center gap-2">
-                <ArrowTrendingUpIcon className="w-5 h-5 text-primary" />
+                <ArrowTrendingUpIcon className="w-4 h-4 md:w-5 md:h-5 text-primary" />
                 <span className="text-primary font-bold">{getOddsDisplay()}</span>
               </div>
             )}
           </div>
 
-          {/* Right: Actions & Status (All in one row) */}
-          <div className="flex items-center gap-4 flex-shrink-0">
+          {/* Right: Actions & Status - Responsive layout */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 md:gap-4 flex-shrink-0 w-full sm:w-auto">
             {/* Action Buttons */}
             {!isResolved && !isExpired && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 w-full sm:w-auto">
                 <button
                   onClick={handleBetClick}
-                  className="px-5 py-2 bg-primary hover:bg-primary-hover text-surface text-sm font-semibold rounded-lg transition-colors"
+                  className="flex-1 sm:flex-none px-4 sm:px-5 py-2 bg-primary hover:bg-primary-hover text-primary-foreground text-sm font-semibold rounded-lg transition-colors"
                 >
-                  Quick Bet
+                  <span className="hidden sm:inline">Quick Bet</span>
+                  <span className="sm:hidden">Bet</span>
                 </button>
                 <button
                   onClick={handleQuickParlayAdd}
                   disabled={isInParlay || isAddingToParlay}
                   className={`
-                    px-4 py-2 text-sm font-semibold rounded-lg transition-all
+                    flex-1 sm:flex-none px-3 sm:px-4 py-2 text-sm font-semibold rounded-lg transition-all
                     ${
                       isInParlay
                         ? 'bg-success/20 text-success cursor-not-allowed'
@@ -217,24 +226,26 @@ function SimplePredictionCard({
               </div>
             )}
 
-            {/* Time Display */}
-            <div
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${getStatusColor()} bg-opacity-10`}
-            >
-              <ClockIcon className="w-4 h-4" />
-              <span className="font-bold text-sm whitespace-nowrap">{getTimeDisplay()}</span>
-            </div>
-
-            {/* Hot Indicator */}
-            {totalBets > 5 && (
-              <div className="flex items-center gap-1.5 px-2 py-1 bg-warning/10 rounded-lg">
-                <BoltIcon className="w-4 h-4 text-warning animate-pulse" />
-                <span className="font-semibold text-warning text-xs">Hot</span>
+            {/* Time Display & Status Indicators */}
+            <div className="flex items-center gap-2 justify-between sm:justify-start">
+              <div
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${getStatusColor()} bg-opacity-10`}
+              >
+                <ClockIcon className="w-4 h-4" />
+                <span className="font-bold text-sm whitespace-nowrap">{getTimeDisplay()}</span>
               </div>
-            )}
 
-            {/* Navigate Icon */}
-            <ChevronRightIcon className="w-6 h-6 text-tertiary group-hover:text-primary transition-colors" />
+              {/* Hot Indicator */}
+              {totalBets > 5 && (
+                <div className="flex items-center gap-1.5 px-2 py-1 bg-warning/10 rounded-lg">
+                  <BoltIcon className="w-4 h-4 text-warning animate-pulse" />
+                  <span className="font-semibold text-warning text-xs">Hot</span>
+                </div>
+              )}
+
+              {/* Navigate Icon - Hidden on mobile */}
+              <ChevronRightIcon className="hidden md:block w-6 h-6 text-tertiary group-hover:text-primary transition-colors" />
+            </div>
           </div>
         </div>
 

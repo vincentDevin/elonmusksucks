@@ -341,7 +341,7 @@ export default function CreatePredictionForm({
         <button
           type="submit"
           disabled={!canSubmit}
-          className={`px-6 py-2 rounded-lg font-medium transition ${canSubmit ? 'bg-primary text-white hover:bg-secondary cursor-pointer' : 'bg-muted text-tertiary cursor-not-allowed'}`}
+          className={`px-6 py-2 rounded-lg font-medium transition ${canSubmit ? 'bg-primary text-primary-foreground hover:bg-secondary cursor-pointer' : 'bg-muted text-tertiary cursor-not-allowed'}`}
         >
           Create Prediction
         </button>

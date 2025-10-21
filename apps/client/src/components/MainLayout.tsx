@@ -4,6 +4,7 @@ import { ChatBar } from './ChatWidget';
 import ActivityFeed from './ActivityFeed';
 import { QuickThemeSwitcher } from '../theme';
 import { FloatingCreatePredictionWidget } from './prediction/FloatingCreatePredictionWidget';
+import { ParlayBuilderWidget } from './prediction/ParlayBuilderWidget';
 import CreatePredictionModal from './prediction/CreatePredictionModal';
 
 interface MainLayoutProps {
@@ -38,10 +39,13 @@ export default function MainLayout({ children }: MainLayoutProps) {
         </div>
       </div>
 
+      {/* Parlay Builder Widget - Bottom Right (appears when parlay has items) */}
+      <ParlayBuilderWidget position="bottom-right" hideOnMobile={false} />
+
       {/* Quick Theme Switcher - Bottom Right (has its own fixed positioning) */}
       <QuickThemeSwitcher position="bottom-right" hideOnMobile={false} />
 
-      {/* Create Prediction Widget - Above Theme Switcher (admin only) */}
+      {/* Create Prediction Widget - Above Theme Switcher */}
       <FloatingCreatePredictionWidget position="bottom-right" hideOnMobile={true} />
 
       {/* Global Create Prediction Modal - Controlled by PredictionContext */}
