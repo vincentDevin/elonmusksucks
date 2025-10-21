@@ -318,7 +318,7 @@ export default function LandingPage({
           </div>
 
           {/* Tabbed Content Section */}
-          <div className="section-card p-4">
+          <div className="p-2 md:p-6">
             {/* PREDICTIONS TAB */}
             {contentTab === 'predictions' && (
               <div>
@@ -356,22 +356,24 @@ export default function LandingPage({
 
                           {/* Title */}
                           <div className="pr-20 mb-3">
-                            <h3 className="font-semibold text-base leading-tight mb-2 text-content">
+                            <h3 className="font-semibold text-fluid-md leading-tight mb-2 text-content">
                               {prediction.title}
                             </h3>
                             <div className="flex gap-2 flex-wrap items-center">
                               <span
-                                className={`text-xs px-2 py-0.5 rounded-full border ${getCategoryColor(prediction.category?.name || '')}`}
+                                className={`text-fluid-xs px-2 py-0.5 rounded-full border ${getCategoryColor(prediction.category?.name || '')}`}
                               >
                                 {prediction.category?.name || 'Unknown'}
                               </span>
-                              <span className="text-xs text-content/70">{prediction.type}</span>
+                              <span className="text-fluid-xs text-content/70">
+                                {prediction.type}
+                              </span>
                             </div>
                           </div>
 
                           {/* Creator Info */}
                           {prediction.creator && (
-                            <div className="flex items-center gap-2 mb-3 text-sm">
+                            <div className="flex items-center gap-2 mb-3">
                               {prediction.creator.avatarUrl && (
                                 <img
                                   src={prediction.creator.avatarUrl}
@@ -379,7 +381,7 @@ export default function LandingPage({
                                   className="w-5 h-5 rounded-full object-cover"
                                 />
                               )}
-                              <span className="text-content/80 text-xs">
+                              <span className="text-content/80 text-fluid-xs">
                                 by{' '}
                                 <span className="text-content font-medium">
                                   {prediction.creator.name}
@@ -389,7 +391,7 @@ export default function LandingPage({
                           )}
 
                           {/* Stats */}
-                          <div className="flex items-center gap-4 text-sm text-content/80 mb-3">
+                          <div className="flex items-center gap-4 text-fluid-sm text-content/80 mb-3">
                             <span className="flex items-center gap-1">
                               <span>💰</span>
                               {formatMuskBucks(getTotalVolume(prediction))}
@@ -399,7 +401,7 @@ export default function LandingPage({
                               {prediction.bets.length} bets
                             </span>
                             {!prediction.resolvedAt && (
-                              <span className="flex items-center gap-1 text-xs">
+                              <span className="flex items-center gap-1 text-fluid-xs">
                                 <span>⏰</span>
                                 {getTimeRemaining(prediction.expiresAt)}
                               </span>
@@ -411,7 +413,7 @@ export default function LandingPage({
                             {prediction.options.map((option) => (
                               <div
                                 key={option.id}
-                                className="bg-surface/70 hover:bg-surface/90 border border-border/30 rounded px-3 py-1.5 text-sm transition-colors"
+                                className="bg-surface/70 hover:bg-surface/90 border border-border/30 rounded px-3 py-1.5 text-fluid-sm transition-colors"
                               >
                                 <span className="font-medium text-content">{option.label}</span>
                                 <span className="text-primary font-bold ml-2">
@@ -423,7 +425,7 @@ export default function LandingPage({
 
                           {/* Recent Bets */}
                           {prediction.bets.length > 0 && (
-                            <div className="mt-3 pt-3 border-t border-border text-xs text-content/80">
+                            <div className="mt-3 pt-3 border-t border-border text-fluid-xs text-content/80">
                               <div className="flex items-center gap-2">
                                 <span className="font-medium">Recent:</span>
                                 {prediction.bets.slice(0, 2).map((bet) => (
@@ -463,95 +465,98 @@ export default function LandingPage({
               <div>
                 <div className="space-y-3">
                   {articles.slice(0, showAllArticles ? articles.length : 4).map((article: any) => (
-                    <div key={article.id} className="preview-card p-4 flex gap-4">
-                      {/* Image Preview - Left Side */}
-                      {article.content.imageUrl && (
-                        <div className="w-48 h-32 overflow-hidden rounded-lg flex-shrink-0">
-                          <img
-                            src={article.content.imageUrl}
-                            alt={article.content.title}
-                            className="w-full h-full object-cover hover:scale-110 transition-transform duration-300 cursor-pointer"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).style.display = 'none';
-                            }}
-                          />
-                        </div>
-                      )}
-
-                      {/* Content - Right Side */}
-                      <div className="flex-1 min-w-0 flex flex-col">
-                        {/* Metadata */}
-                        <div className="flex gap-2 mb-2 text-xs items-center flex-wrap">
-                          <span className="text-info bg-info/10 border border-info/20 px-2 py-0.5 rounded font-medium">
-                            Article
-                          </span>
-                          <span className="text-content/80">
-                            {article.content.author || article.content.source}
-                          </span>
-                          <span className="text-content/70">•</span>
-                          <span className="text-content/80">
-                            {getRelativeTime(article.timestamp || article.createdAt)}
-                          </span>
-                          {article.content.source && article.content.author && (
-                            <>
-                              <span className="text-content/70">•</span>
-                              <span className="text-content/80">{article.content.source}</span>
-                            </>
-                          )}
-                        </div>
-
-                        {/* Title */}
-                        <h3 className="text-base font-semibold mb-2 line-clamp-2 leading-tight text-content hover:text-primary transition-colors">
-                          {article.content.title}
-                        </h3>
-
-                        {/* Excerpt */}
-                        {article.content.excerpt && (
-                          <p className="text-sm text-content/80 mb-3 line-clamp-2 leading-relaxed">
-                            {article.content.excerpt}
-                          </p>
+                    <div key={article.id} className="preview-card p-4">
+                      {/* Two-column layout: Image + Content */}
+                      <div className="flex gap-4 mb-3">
+                        {/* Image Preview - Left Side */}
+                        {article.content.imageUrl && (
+                          <div className="w-48 h-32 overflow-hidden rounded-lg flex-shrink-0">
+                            <img
+                              src={article.content.imageUrl}
+                              alt={article.content.title}
+                              className="w-full h-full object-cover hover:scale-110 transition-transform duration-300 cursor-pointer"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).style.display = 'none';
+                              }}
+                            />
+                          </div>
                         )}
 
-                        {/* Tags */}
-                        {article.tags && article.tags.length > 0 && (
-                          <div className="flex flex-wrap gap-1.5 mb-3">
-                            {article.tags.slice(0, 3).map((tag: string) => (
-                              <span
-                                key={tag}
-                                className="px-2 py-0.5 bg-surface/70 border border-border/30 text-content text-xs rounded-full"
-                              >
-                                {tag}
-                              </span>
-                            ))}
-                            {article.tags.length > 3 && (
-                              <span className="px-2 py-0.5 bg-surface/70 border border-border/30 text-content text-xs rounded-full">
-                                +{article.tags.length - 3}
-                              </span>
+                        {/* Content - Right Side */}
+                        <div className="flex-1 min-w-0 flex flex-col">
+                          {/* Metadata */}
+                          <div className="flex gap-2 mb-2 text-fluid-xs items-center flex-wrap">
+                            <span className="text-info bg-info/10 border border-info/20 px-2 py-0.5 rounded font-medium">
+                              Article
+                            </span>
+                            <span className="text-content/80">
+                              {article.content.author || article.content.source}
+                            </span>
+                            <span className="text-content/70">•</span>
+                            <span className="text-content/80">
+                              {getRelativeTime(article.timestamp || article.createdAt)}
+                            </span>
+                            {article.content.source && article.content.author && (
+                              <>
+                                <span className="text-content/70">•</span>
+                                <span className="text-content/80">{article.content.source}</span>
+                              </>
                             )}
                           </div>
-                        )}
 
-                        {/* Engagement & Action */}
-                        <div className="flex items-center justify-between mt-auto pt-3 border-t border-border">
-                          <div className="flex items-center gap-4 text-sm text-content/80">
-                            <span className="flex items-center gap-1">
-                              <span>👍</span>
-                              {article.engagement.reactions}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <span>💬</span>
-                              {article.engagement.comments}
-                            </span>
-                          </div>
-                          <a
-                            href={article.content.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="px-3 py-1.5 text-xs bg-primary hover:bg-primary-hover text-white rounded-lg font-medium transition-colors"
-                          >
-                            Read Article →
-                          </a>
+                          {/* Title */}
+                          <h3 className="text-fluid-md font-semibold mb-2 line-clamp-2 leading-tight text-content hover:text-primary transition-colors">
+                            {article.content.title}
+                          </h3>
+
+                          {/* Excerpt */}
+                          {article.content.excerpt && (
+                            <p className="text-fluid-sm text-content/80 mb-3 line-clamp-2 leading-relaxed">
+                              {article.content.excerpt}
+                            </p>
+                          )}
+
+                          {/* Tags */}
+                          {article.tags && article.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5">
+                              {article.tags.slice(0, 3).map((tag: string) => (
+                                <span
+                                  key={tag}
+                                  className="px-2 py-0.5 bg-surface/70 border border-border/30 text-content text-fluid-xs rounded-full"
+                                >
+                                  {tag}
+                                </span>
+                              ))}
+                              {article.tags.length > 3 && (
+                                <span className="px-2 py-0.5 bg-surface/70 border border-border/30 text-content text-fluid-xs rounded-full">
+                                  +{article.tags.length - 3}
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </div>
+                      </div>
+
+                      {/* Engagement & Action - Full width row below */}
+                      <div className="flex items-center justify-between gap-3 pt-3 border-t border-border">
+                        <div className="flex items-center gap-4 text-fluid-sm text-content/80">
+                          <span className="flex items-center gap-1">
+                            <span>👍</span>
+                            {article.engagement.reactions}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <span>💬</span>
+                            {article.engagement.comments}
+                          </span>
+                        </div>
+                        <a
+                          href={article.content.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3 py-1.5 text-fluid-xs bg-primary hover:bg-primary-hover text-white rounded-lg font-medium transition-colors whitespace-nowrap"
+                        >
+                          Read Article →
+                        </a>
                       </div>
                     </div>
                   ))}
@@ -599,22 +604,22 @@ export default function LandingPage({
                           )}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
-                              <span className="font-semibold text-content hover:text-primary transition-colors">
+                              <span className="font-semibold text-fluid-base text-content hover:text-primary transition-colors">
                                 {authorName}
                               </span>
                             </div>
-                            <div className="flex items-center gap-2 text-sm text-content/80">
-                              <span className="text-success bg-success/10 border border-success/20 px-2 py-0.5 rounded text-xs font-medium">
+                            <div className="flex items-center gap-2 text-fluid-xs text-content/80">
+                              <span className="text-success bg-success/10 border border-success/20 px-2 py-0.5 rounded font-medium">
                                 Post
                               </span>
-                              <span className="text-xs">{getRelativeTime(post.createdAt)}</span>
+                              <span>{getRelativeTime(post.createdAt)}</span>
                             </div>
                           </div>
                         </div>
 
                         {/* Post Content */}
                         <div className="mb-3">
-                          <p className="text-content leading-relaxed line-clamp-3 text-sm">
+                          <p className="text-content leading-relaxed line-clamp-3 text-fluid-sm">
                             {post.body}
                           </p>
                         </div>
@@ -639,7 +644,7 @@ export default function LandingPage({
 
                         {/* Engagement & Action */}
                         <div className="flex items-center justify-between pt-3 border-t border-border">
-                          <div className="flex items-center gap-4 text-sm text-content/80">
+                          <div className="flex items-center gap-4 text-fluid-sm text-content/80">
                             <span className="flex items-center gap-1.5">
                               <span className="text-base">❤️</span>
                               <span className="font-medium">{reactionsCount}</span>
@@ -651,7 +656,7 @@ export default function LandingPage({
                           </div>
                           <a
                             href={`${clientAppUrl}/login`}
-                            className="px-3 py-1.5 border border-border hover:border-primary rounded-lg text-content font-medium text-xs transition-colors"
+                            className="px-3 py-1.5 border border-border hover:border-primary rounded-lg text-content font-medium text-fluid-xs transition-colors"
                           >
                             Join Discussion
                           </a>
@@ -717,7 +722,7 @@ export default function LandingPage({
           </div>
 
           {/* Leaderboard Content */}
-          <div className="section-card p-2 md:p-6">
+          <div className="p-2 md:p-6">
             {leaderboardTab === 'market' ? (
               <div>
                 <ul className="space-y-2 md:space-y-3">
@@ -729,7 +734,7 @@ export default function LandingPage({
                         if (rank === 1) return 'bg-yellow-500/10 border-yellow-500/30';
                         if (rank === 2) return 'bg-gray-400/10 border-gray-400/30';
                         if (rank === 3) return 'bg-amber-600/10 border-amber-600/30';
-                        return 'bg-surface border-border';
+                        return 'bg-background border-border';
                       };
                       const getRankTextColor = () => {
                         if (rank === 1) return 'text-yellow-400';
@@ -741,7 +746,7 @@ export default function LandingPage({
                       return (
                         <li
                           key={entry.userId}
-                          className={`rounded-lg md:rounded-xl shadow-sm transition-all duration-300 hover:shadow-md border-2 ${getRankBg()} p-3 md:p-6`}
+                          className={`rounded-lg md:rounded-xl shadow-sm transition-all duration-300 hover:shadow-xl hover:border-primary hover:scale-[1.02] hover:z-10 border-2 ${getRankBg()} p-3 md:p-6 cursor-pointer`}
                         >
                           <div className="flex items-center gap-2 md:gap-6">
                             {/* Rank & Avatar */}
@@ -766,41 +771,41 @@ export default function LandingPage({
                             {/* Name & Stats */}
                             <div className="flex-1 min-w-0">
                               {/* Name */}
-                              <div className="font-bold text-sm md:text-xl text-content mb-2 md:mb-3 truncate">
+                              <div className="font-bold text-fluid-base md:text-fluid-xl text-content mb-2 md:mb-3 truncate">
                                 {entry.userName}
                               </div>
 
                               {/* Stats Grid */}
                               <div className="grid grid-cols-4 gap-1.5 md:gap-4">
                                 <div>
-                                  <div className="text-[9px] md:text-xs text-content/80 uppercase font-medium mb-0.5 md:mb-1 truncate">
+                                  <div className="text-fluid-2xs text-content/80 uppercase font-medium mb-0.5 md:mb-1 truncate">
                                     Profit
                                   </div>
-                                  <div className="font-bold text-xs md:text-lg text-primary truncate">
+                                  <div className="font-bold text-fluid-xs md:text-fluid-lg text-primary truncate">
                                     +{formatMuskBucks(entry.profitAll)}
                                   </div>
                                 </div>
                                 <div>
-                                  <div className="text-[9px] md:text-xs text-content/80 uppercase font-medium mb-0.5 md:mb-1 truncate">
+                                  <div className="text-fluid-2xs text-content/80 uppercase font-medium mb-0.5 md:mb-1 truncate">
                                     Win Rate
                                   </div>
-                                  <div className="font-bold text-xs md:text-lg text-content">
+                                  <div className="font-bold text-fluid-xs md:text-fluid-lg text-content">
                                     {Math.round(entry.winRate * 100)}%
                                   </div>
                                 </div>
                                 <div>
-                                  <div className="text-[9px] md:text-xs text-content/80 uppercase font-medium mb-0.5 md:mb-1 truncate">
+                                  <div className="text-fluid-2xs text-content/80 uppercase font-medium mb-0.5 md:mb-1 truncate">
                                     Bets
                                   </div>
-                                  <div className="font-bold text-xs md:text-base text-content">
+                                  <div className="font-bold text-fluid-xs md:text-fluid-base text-content">
                                     {entry.totalBets}
                                   </div>
                                 </div>
                                 <div>
-                                  <div className="text-[9px] md:text-xs text-content/80 uppercase font-medium mb-0.5 md:mb-1 truncate">
+                                  <div className="text-fluid-2xs text-content/80 uppercase font-medium mb-0.5 md:mb-1 truncate">
                                     ROI
                                   </div>
-                                  <div className="font-bold text-xs md:text-lg text-success">
+                                  <div className="font-bold text-fluid-xs md:text-fluid-lg text-success">
                                     {Math.round((entry.roi || 0) * 100)}%
                                   </div>
                                 </div>
@@ -825,8 +830,10 @@ export default function LandingPage({
             ) : pongLeaders.length === 0 ? (
               <div className="text-center py-16">
                 <div className="text-6xl mb-4">🏓</div>
-                <h3 className="text-xl font-bold text-content mb-2">No Pong Champions Yet!</h3>
-                <p className="text-sm text-content/80">
+                <h3 className="text-fluid-xl font-bold text-content mb-2">
+                  No Pong Champions Yet!
+                </h3>
+                <p className="text-fluid-sm text-content/80">
                   Be the first to dominate the Pong leaderboard.
                 </p>
               </div>
@@ -841,7 +848,7 @@ export default function LandingPage({
                         if (rank === 1) return 'bg-yellow-500/10 border-yellow-500/30';
                         if (rank === 2) return 'bg-gray-400/10 border-gray-400/30';
                         if (rank === 3) return 'bg-amber-600/10 border-amber-600/30';
-                        return 'bg-surface border-border';
+                        return 'bg-background border-border';
                       };
                       const getRankTextColor = () => {
                         if (rank === 1) return 'text-yellow-400';
@@ -853,7 +860,7 @@ export default function LandingPage({
                       return (
                         <li
                           key={entry.userId}
-                          className={`rounded-lg md:rounded-xl shadow-sm transition-all duration-300 hover:shadow-md border-2 ${getRankBg()} p-3 md:p-6`}
+                          className={`rounded-lg md:rounded-xl shadow-sm transition-all duration-300 hover:shadow-xl hover:border-primary hover:scale-[1.02] hover:z-10 border-2 ${getRankBg()} p-3 md:p-6 cursor-pointer`}
                         >
                           <div className="flex items-center gap-2 md:gap-6">
                             {/* Rank & Avatar */}
@@ -878,41 +885,41 @@ export default function LandingPage({
                             {/* Name & Stats */}
                             <div className="flex-1 min-w-0">
                               {/* Name */}
-                              <div className="font-bold text-sm md:text-xl text-content mb-2 md:mb-3 truncate">
+                              <div className="font-bold text-fluid-base md:text-fluid-xl text-content mb-2 md:mb-3 truncate">
                                 {entry.userName}
                               </div>
 
                               {/* Stats Grid */}
                               <div className="grid grid-cols-4 gap-1.5 md:gap-4">
                                 <div>
-                                  <div className="text-[9px] md:text-xs text-content/80 uppercase font-medium mb-0.5 md:mb-1 truncate">
+                                  <div className="text-fluid-2xs text-content/80 uppercase font-medium mb-0.5 md:mb-1 truncate">
                                     ELO
                                   </div>
-                                  <div className="font-bold text-xs md:text-lg text-primary">
+                                  <div className="font-bold text-fluid-xs md:text-fluid-lg text-primary">
                                     {entry.eloRating}
                                   </div>
                                 </div>
                                 <div>
-                                  <div className="text-[9px] md:text-xs text-content/80 uppercase font-medium mb-0.5 md:mb-1 truncate">
+                                  <div className="text-fluid-2xs text-content/80 uppercase font-medium mb-0.5 md:mb-1 truncate">
                                     Wins
                                   </div>
-                                  <div className="font-bold text-xs md:text-lg text-content">
+                                  <div className="font-bold text-fluid-xs md:text-fluid-lg text-content">
                                     {entry.wins || 0}
                                   </div>
                                 </div>
                                 <div>
-                                  <div className="text-[9px] md:text-xs text-content/80 uppercase font-medium mb-0.5 md:mb-1 truncate">
+                                  <div className="text-fluid-2xs text-content/80 uppercase font-medium mb-0.5 md:mb-1 truncate">
                                     Streak
                                   </div>
-                                  <div className="font-bold text-xs md:text-base text-content">
+                                  <div className="font-bold text-fluid-xs md:text-fluid-base text-content">
                                     {entry.winStreak || 0}
                                   </div>
                                 </div>
                                 <div>
-                                  <div className="text-[9px] md:text-xs text-content/80 uppercase font-medium mb-0.5 md:mb-1 truncate">
+                                  <div className="text-fluid-2xs text-content/80 uppercase font-medium mb-0.5 md:mb-1 truncate">
                                     Total Won
                                   </div>
-                                  <div className="font-bold text-xs md:text-lg text-success truncate">
+                                  <div className="font-bold text-fluid-xs md:text-fluid-lg text-success truncate">
                                     {formatMuskBucks(entry.totalWon || 0)}
                                   </div>
                                 </div>
@@ -938,18 +945,116 @@ export default function LandingPage({
           </div>
         </div>
 
-        {/* Compact Footer CTA */}
-        <div className="bg-surface border border-border rounded-lg p-4 md:p-6 text-center mt-16 md:mt-20 lg:mt-24">
-          <h2 className="text-lg md:text-xl font-bold mb-2">Ready to Predict the Chaos?</h2>
-          <p className="text-xs md:text-sm text-content/80 mb-3 md:mb-4">
-            Join thousands tracking Elon's moves
-          </p>
-          <a
-            href={`${clientAppUrl}/register`}
-            className="inline-block px-6 py-2.5 md:px-8 md:py-3 bg-gradient-primary text-white rounded-lg font-semibold text-xs md:text-sm hover-lift shadow-sm"
-          >
-            🚀 Get Started Free
-          </a>
+        {/* About This Site Section */}
+        <div className="p-6 md:p-8 lg:p-10 mt-16 md:mt-20 lg:mt-24">
+          <div className="max-w-6xl mx-auto">
+            {/* Header */}
+            <div className="text-center mb-6 md:mb-10">
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-3 md:mb-4 text-content">
+                What Is This Madness?
+              </h2>
+              <p className="text-fluid-base md:text-fluid-lg text-content/80 max-w-3xl mx-auto leading-relaxed">
+                A satirical prediction market where you can bet completely worthless{' '}
+                <span className="font-bold text-primary">MuskBucks</span> on the daily chaos of
+                billionaire antics. Because tracking Elon's moves is cheaper than therapy.
+              </p>
+            </div>
+
+            {/* Features Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+              {/* Prediction Markets */}
+              <div className="preview-card p-5 md:p-6 hover-lift">
+                <div className="text-4xl md:text-5xl mb-3">🎯</div>
+                <h3 className="text-fluid-lg md:text-fluid-xl font-bold mb-2 text-content">
+                  Prediction Markets
+                </h3>
+                <p className="text-fluid-sm text-content/80 leading-relaxed">
+                  Bet on whether Tesla stock will moon or crash, if SpaceX will blow something up,
+                  or what unhinged thing happens next. We use real events but fake money—the best
+                  combination.
+                </p>
+              </div>
+
+              {/* MuskBucks */}
+              <div className="preview-card p-5 md:p-6 hover-lift">
+                <div className="text-4xl md:text-5xl mb-3">💰</div>
+                <h3 className="text-fluid-lg md:text-fluid-xl font-bold mb-2 text-content">
+                  MuskBucks Currency
+                </h3>
+                <p className="text-fluid-sm text-content/80 leading-relaxed">
+                  Our proprietary virtual currency with{' '}
+                  <span className="font-bold">absolutely zero real-world value</span>. Perfect for
+                  gambling without the guilt! Start with 10,000 and watch your fortune rise or fall
+                  based on your terrible decisions.
+                </p>
+              </div>
+
+              {/* Pong */}
+              <div className="preview-card p-5 md:p-6 hover-lift">
+                <div className="text-4xl md:text-5xl mb-3">🏓</div>
+                <h3 className="text-fluid-lg md:text-fluid-xl font-bold mb-2 text-content">
+                  Real-time Pong
+                </h3>
+                <p className="text-fluid-sm text-content/80 leading-relaxed">
+                  Why have a prediction market without retro gaming? Challenge other users to
+                  multiplayer Pong with actual stakes (that are still completely fake). Climb the
+                  ELO leaderboard and become a Pong legend.
+                </p>
+              </div>
+
+              {/* Leaderboards */}
+              <div className="preview-card p-5 md:p-6 hover-lift">
+                <div className="text-4xl md:text-5xl mb-3">🏆</div>
+                <h3 className="text-fluid-lg md:text-fluid-xl font-bold mb-2 text-content">
+                  Competitive Leaderboards
+                </h3>
+                <p className="text-fluid-sm text-content/80 leading-relaxed">
+                  Track the top predictors and Pong champions. Flex your imaginary wealth, show off
+                  your win rate, and prove you're better at predicting chaos than everyone else.
+                  Fame without fortune!
+                </p>
+              </div>
+
+              {/* Timeline */}
+              <div className="preview-card p-5 md:p-6 hover-lift">
+                <div className="text-4xl md:text-5xl mb-3">📰</div>
+                <h3 className="text-fluid-lg md:text-fluid-xl font-bold mb-2 text-content">
+                  Live News Timeline
+                </h3>
+                <p className="text-fluid-sm text-content/80 leading-relaxed">
+                  RSS feeds aggregating the latest Tesla crashes (literal and stock-wise), SpaceX
+                  explosions, and whatever fresh hell is brewing. Stay informed about the chaos
+                  you're betting on.
+                </p>
+              </div>
+
+              {/* Achievements */}
+              <div className="preview-card p-5 md:p-6 hover-lift">
+                <div className="text-4xl md:text-5xl mb-3">🎖️</div>
+                <h3 className="text-fluid-lg md:text-fluid-xl font-bold mb-2 text-content">
+                  100+ Achievements
+                </h3>
+                <p className="text-fluid-sm text-content/80 leading-relaxed">
+                  Unlock badges for making predictions, winning bets, going broke, dominating Pong,
+                  and more. Because we have too much time on our hands and so do you. Gotta catch
+                  'em all!
+                </p>
+              </div>
+            </div>
+
+            {/* Bottom CTA */}
+            <div className="text-center mt-8 md:mt-12">
+              <p className="text-fluid-base text-content/70 mb-4">
+                Ready to waste time productively?
+              </p>
+              <a
+                href={`${clientAppUrl}/register`}
+                className="inline-block px-6 py-3 md:px-8 md:py-4 bg-gradient-primary text-white dark:text-background rounded-xl text-base md:text-lg font-bold hover-lift shadow-lg transition-all"
+              >
+                🚀 Join the Chaos
+              </a>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -959,19 +1064,19 @@ export default function LandingPage({
           <div className="flex flex-col md:flex-row items-center justify-center gap-2 md:gap-4 mb-2">
             <button
               onClick={() => setShowPrivacyModal(true)}
-              className="text-xs md:text-sm text-content/80 hover:text-primary transition-colors underline"
+              className="text-fluid-xs md:text-fluid-sm text-content/80 hover:text-primary transition-colors underline"
             >
               Privacy Policy
             </button>
             <span className="hidden md:inline text-content/70">•</span>
             <button
               onClick={() => setShowTermsModal(true)}
-              className="text-xs md:text-sm text-content/80 hover:text-primary transition-colors underline"
+              className="text-fluid-xs md:text-fluid-sm text-content/80 hover:text-primary transition-colors underline"
             >
               Terms of Service
             </button>
           </div>
-          <p className="text-[9px] md:text-xs text-content/70 text-center">
+          <p className="text-fluid-2xs md:text-fluid-xs text-content/70 text-center">
             © 2025 ElonMuskSucks.net
           </p>
         </div>
