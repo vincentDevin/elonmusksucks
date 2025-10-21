@@ -345,27 +345,34 @@ export default function LandingPage({
                       const status = getStatus();
 
                       return (
-                        <div key={prediction.id} className="preview-card p-4 relative group">
+                        <div
+                          key={prediction.id}
+                          className="preview-card p-3 sm:p-4 md:p-5 lg:p-6 xl:p-7 2xl:p-8 relative group"
+                        >
                           {/* Status Badge */}
-                          <div className="absolute top-3 right-3">
-                            <span className={`status-badge ${status.type}`}>
-                              <span>{status.icon}</span>
-                              {status.text}
+                          <div className="absolute top-2 right-2 sm:top-3 sm:right-3 xl:top-4 xl:right-4">
+                            <span
+                              className={`status-badge text-[10px] sm:text-xs lg:text-sm xl:text-base ${status.type}`}
+                            >
+                              <span className="text-xs sm:text-sm lg:text-base xl:text-lg">
+                                {status.icon}
+                              </span>
+                              <span className="hidden sm:inline">{status.text}</span>
                             </span>
                           </div>
 
                           {/* Title */}
-                          <div className="pr-20 mb-3">
-                            <h3 className="font-semibold text-fluid-md leading-tight mb-2 text-content">
+                          <div className="pr-12 sm:pr-20 xl:pr-24 2xl:pr-28 mb-2 sm:mb-3 xl:mb-4">
+                            <h3 className="font-semibold text-fluid-md xl:text-fluid-lg 2xl:text-fluid-xl leading-tight mb-1.5 sm:mb-2 xl:mb-3 text-content">
                               {prediction.title}
                             </h3>
-                            <div className="flex gap-2 flex-wrap items-center">
+                            <div className="flex gap-1.5 sm:gap-2 xl:gap-2.5 2xl:gap-3 flex-wrap items-center">
                               <span
-                                className={`text-fluid-xs px-2 py-0.5 rounded-full border ${getCategoryColor(prediction.category?.name || '')}`}
+                                className={`text-fluid-2xs sm:text-fluid-xs xl:text-fluid-sm px-1.5 sm:px-2 xl:px-2.5 2xl:px-3 py-0.5 xl:py-1 rounded-full border ${getCategoryColor(prediction.category?.name || '')}`}
                               >
                                 {prediction.category?.name || 'Unknown'}
                               </span>
-                              <span className="text-fluid-xs text-content/70">
+                              <span className="text-fluid-2xs sm:text-fluid-xs xl:text-fluid-sm text-content/70">
                                 {prediction.type}
                               </span>
                             </div>
@@ -373,15 +380,15 @@ export default function LandingPage({
 
                           {/* Creator Info */}
                           {prediction.creator && (
-                            <div className="flex items-center gap-2 mb-3">
+                            <div className="flex items-center gap-1.5 sm:gap-2 xl:gap-2.5 mb-2 sm:mb-3 xl:mb-4">
                               {prediction.creator.avatarUrl && (
                                 <img
                                   src={prediction.creator.avatarUrl}
                                   alt={prediction.creator.name}
-                                  className="w-5 h-5 rounded-full object-cover"
+                                  className="w-4 h-4 sm:w-5 sm:h-5 xl:w-6 xl:h-6 2xl:w-7 2xl:h-7 rounded-full object-cover"
                                 />
                               )}
-                              <span className="text-content/80 text-fluid-xs">
+                              <span className="text-content/80 text-fluid-2xs sm:text-fluid-xs xl:text-fluid-sm">
                                 by{' '}
                                 <span className="text-content font-medium">
                                   {prediction.creator.name}
@@ -391,32 +398,42 @@ export default function LandingPage({
                           )}
 
                           {/* Stats */}
-                          <div className="flex items-center gap-4 text-fluid-sm text-content/80 mb-3">
-                            <span className="flex items-center gap-1">
-                              <span>💰</span>
-                              {formatMuskBucks(getTotalVolume(prediction))}
+                          <div className="flex items-center gap-2 sm:gap-3 md:gap-4 xl:gap-5 2xl:gap-6 text-fluid-xs sm:text-fluid-sm xl:text-fluid-base text-content/80 mb-2 sm:mb-3 xl:mb-4 flex-wrap">
+                            <span className="flex items-center gap-0.5 sm:gap-1 xl:gap-1.5">
+                              <span className="text-sm sm:text-base xl:text-lg 2xl:text-xl">
+                                💰
+                              </span>
+                              <span className="text-fluid-2xs sm:text-fluid-sm xl:text-fluid-base">
+                                {formatMuskBucks(getTotalVolume(prediction))}
+                              </span>
                             </span>
-                            <span className="flex items-center gap-1">
-                              <span>📊</span>
-                              {prediction.bets.length} bets
+                            <span className="flex items-center gap-0.5 sm:gap-1 xl:gap-1.5">
+                              <span className="text-sm sm:text-base xl:text-lg 2xl:text-xl">
+                                📊
+                              </span>
+                              <span className="text-fluid-2xs sm:text-fluid-sm xl:text-fluid-base">
+                                {prediction.bets.length} bets
+                              </span>
                             </span>
                             {!prediction.resolvedAt && (
-                              <span className="flex items-center gap-1 text-fluid-xs">
-                                <span>⏰</span>
+                              <span className="flex items-center gap-0.5 sm:gap-1 xl:gap-1.5 text-fluid-2xs sm:text-fluid-xs xl:text-fluid-sm">
+                                <span className="text-sm sm:text-base xl:text-lg 2xl:text-xl">
+                                  ⏰
+                                </span>
                                 {getTimeRemaining(prediction.expiresAt)}
                               </span>
                             )}
                           </div>
 
                           {/* Options */}
-                          <div className="flex gap-2 flex-wrap">
+                          <div className="flex gap-1.5 sm:gap-2 xl:gap-2.5 2xl:gap-3 flex-wrap">
                             {prediction.options.map((option) => (
                               <div
                                 key={option.id}
-                                className="bg-surface/70 hover:bg-surface/90 border border-border/30 rounded px-3 py-1.5 text-fluid-sm transition-colors"
+                                className="bg-surface/70 hover:bg-surface/90 border border-border/30 rounded px-2 py-1 sm:px-3 sm:py-1.5 xl:px-4 xl:py-2 2xl:px-5 2xl:py-2.5 text-fluid-xs sm:text-fluid-sm xl:text-fluid-base transition-colors"
                               >
                                 <span className="font-medium text-content">{option.label}</span>
-                                <span className="text-primary font-bold ml-2">
+                                <span className="text-primary font-bold ml-1 sm:ml-2 xl:ml-2.5">
                                   {formatOdds(option.odds)}
                                 </span>
                               </div>
@@ -425,8 +442,8 @@ export default function LandingPage({
 
                           {/* Recent Bets */}
                           {prediction.bets.length > 0 && (
-                            <div className="mt-3 pt-3 border-t border-border text-fluid-xs text-content/80">
-                              <div className="flex items-center gap-2">
+                            <div className="mt-2 sm:mt-3 xl:mt-4 pt-2 sm:pt-3 xl:pt-4 border-t border-border text-fluid-2xs sm:text-fluid-xs xl:text-fluid-sm text-content/80">
+                              <div className="flex items-center gap-1.5 sm:gap-2 xl:gap-2.5 flex-wrap">
                                 <span className="font-medium">Recent:</span>
                                 {prediction.bets.slice(0, 2).map((bet) => (
                                   <span key={bet.id}>
@@ -463,14 +480,14 @@ export default function LandingPage({
             {/* ARTICLES TAB */}
             {contentTab === 'articles' && (
               <div>
-                <div className="space-y-3">
+                <div className="space-y-2 sm:space-y-3 xl:space-y-4">
                   {articles.slice(0, showAllArticles ? articles.length : 4).map((article: any) => (
-                    <div key={article.id} className="preview-card p-4">
+                    <div key={article.id} className="preview-card p-3 sm:p-4 md:p-5 xl:p-6 2xl:p-7">
                       {/* Two-column layout: Image + Content */}
-                      <div className="flex gap-4 mb-3">
-                        {/* Image Preview - Left Side */}
+                      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 xl:gap-5 2xl:gap-6 mb-3 xl:mb-4">
+                        {/* Image Preview - Top on mobile, Left on desktop */}
                         {article.content.imageUrl && (
-                          <div className="w-48 h-32 overflow-hidden rounded-lg flex-shrink-0">
+                          <div className="w-full h-40 sm:w-32 sm:h-24 md:w-40 md:h-28 lg:w-48 lg:h-32 xl:w-56 xl:h-36 2xl:w-64 2xl:h-40 overflow-hidden rounded-lg flex-shrink-0">
                             <img
                               src={article.content.imageUrl}
                               alt={article.content.title}
@@ -482,53 +499,55 @@ export default function LandingPage({
                           </div>
                         )}
 
-                        {/* Content - Right Side */}
+                        {/* Content - Bottom on mobile, Right on desktop */}
                         <div className="flex-1 min-w-0 flex flex-col">
                           {/* Metadata */}
-                          <div className="flex gap-2 mb-2 text-fluid-xs items-center flex-wrap">
-                            <span className="text-info bg-info/10 border border-info/20 px-2 py-0.5 rounded font-medium">
+                          <div className="flex gap-1.5 sm:gap-2 xl:gap-2.5 mb-1.5 sm:mb-2 xl:mb-3 text-fluid-2xs sm:text-fluid-xs xl:text-fluid-sm items-center flex-wrap">
+                            <span className="text-info bg-info/10 border border-info/20 px-1.5 sm:px-2 xl:px-2.5 2xl:px-3 py-0.5 xl:py-1 rounded font-medium">
                               Article
                             </span>
-                            <span className="text-content/80">
+                            <span className="text-content/80 truncate max-w-[120px] sm:max-w-none">
                               {article.content.author || article.content.source}
                             </span>
-                            <span className="text-content/70">•</span>
+                            <span className="text-content/70 hidden sm:inline">•</span>
                             <span className="text-content/80">
                               {getRelativeTime(article.timestamp || article.createdAt)}
                             </span>
                             {article.content.source && article.content.author && (
                               <>
-                                <span className="text-content/70">•</span>
-                                <span className="text-content/80">{article.content.source}</span>
+                                <span className="text-content/70 hidden md:inline">•</span>
+                                <span className="text-content/80 hidden md:inline">
+                                  {article.content.source}
+                                </span>
                               </>
                             )}
                           </div>
 
                           {/* Title */}
-                          <h3 className="text-fluid-md font-semibold mb-2 line-clamp-2 leading-tight text-content hover:text-primary transition-colors">
+                          <h3 className="text-fluid-sm sm:text-fluid-md xl:text-fluid-lg 2xl:text-fluid-xl font-semibold mb-1.5 sm:mb-2 xl:mb-3 line-clamp-2 leading-tight text-content hover:text-primary transition-colors">
                             {article.content.title}
                           </h3>
 
                           {/* Excerpt */}
                           {article.content.excerpt && (
-                            <p className="text-fluid-sm text-content/80 mb-3 line-clamp-2 leading-relaxed">
+                            <p className="text-fluid-xs sm:text-fluid-sm xl:text-fluid-base text-content/80 mb-2 sm:mb-3 xl:mb-4 line-clamp-2 leading-relaxed">
                               {article.content.excerpt}
                             </p>
                           )}
 
                           {/* Tags */}
                           {article.tags && article.tags.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5">
+                            <div className="flex flex-wrap gap-1 sm:gap-1.5 xl:gap-2">
                               {article.tags.slice(0, 3).map((tag: string) => (
                                 <span
                                   key={tag}
-                                  className="px-2 py-0.5 bg-surface/70 border border-border/30 text-content text-fluid-xs rounded-full"
+                                  className="px-1.5 sm:px-2 xl:px-2.5 2xl:px-3 py-0.5 xl:py-1 bg-surface/70 border border-border/30 text-content text-fluid-2xs sm:text-fluid-xs xl:text-fluid-sm rounded-full"
                                 >
                                   {tag}
                                 </span>
                               ))}
                               {article.tags.length > 3 && (
-                                <span className="px-2 py-0.5 bg-surface/70 border border-border/30 text-content text-fluid-xs rounded-full">
+                                <span className="px-1.5 sm:px-2 xl:px-2.5 2xl:px-3 py-0.5 xl:py-1 bg-surface/70 border border-border/30 text-content text-fluid-2xs sm:text-fluid-xs xl:text-fluid-sm rounded-full">
                                   +{article.tags.length - 3}
                                 </span>
                               )}
@@ -538,22 +557,22 @@ export default function LandingPage({
                       </div>
 
                       {/* Engagement & Action - Full width row below */}
-                      <div className="flex items-center justify-between gap-3 pt-3 border-t border-border">
-                        <div className="flex items-center gap-4 text-fluid-sm text-content/80">
-                          <span className="flex items-center gap-1">
-                            <span>👍</span>
-                            {article.engagement.reactions}
+                      <div className="flex items-center justify-between gap-2 sm:gap-3 xl:gap-4 pt-2 sm:pt-3 xl:pt-4 border-t border-border">
+                        <div className="flex items-center gap-2 sm:gap-3 md:gap-4 xl:gap-5 2xl:gap-6 text-fluid-xs sm:text-fluid-sm xl:text-fluid-base text-content/80">
+                          <span className="flex items-center gap-0.5 sm:gap-1 xl:gap-1.5">
+                            <span className="text-sm sm:text-base xl:text-lg 2xl:text-xl">👍</span>
+                            <span>{article.engagement.reactions}</span>
                           </span>
-                          <span className="flex items-center gap-1">
-                            <span>💬</span>
-                            {article.engagement.comments}
+                          <span className="flex items-center gap-0.5 sm:gap-1 xl:gap-1.5">
+                            <span className="text-sm sm:text-base xl:text-lg 2xl:text-xl">💬</span>
+                            <span>{article.engagement.comments}</span>
                           </span>
                         </div>
                         <a
                           href={article.content.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="px-3 py-1.5 text-fluid-xs bg-primary hover:bg-primary-hover text-white rounded-lg font-medium transition-colors whitespace-nowrap"
+                          className="px-2 py-1 sm:px-3 sm:py-1.5 xl:px-4 xl:py-2 2xl:px-5 2xl:py-2.5 text-fluid-2xs sm:text-fluid-xs xl:text-fluid-sm bg-primary hover:bg-primary-hover text-white rounded-lg font-medium transition-colors whitespace-nowrap"
                         >
                           Read Article →
                         </a>
@@ -577,7 +596,7 @@ export default function LandingPage({
             {/* COMMUNITY TAB */}
             {contentTab === 'community' && (
               <div>
-                <div className="space-y-3">
+                <div className="space-y-2 sm:space-y-3 xl:space-y-4">
                   {posts.slice(0, showAllPosts ? posts.length : 4).map((post) => {
                     const avatarUrl = post.author?.avatarUrl || undefined;
                     const authorName = post.author?.name || 'Unknown';
@@ -585,54 +604,56 @@ export default function LandingPage({
                     const reactionsCount = post.reactionsCount || 0;
 
                     return (
-                      <div key={post.id} className="preview-card p-4">
+                      <div key={post.id} className="preview-card p-3 sm:p-4 md:p-5 xl:p-6 2xl:p-7">
                         {/* Author Header */}
-                        <div className="flex items-start gap-3 mb-3">
+                        <div className="flex items-start gap-2 sm:gap-3 xl:gap-4 mb-2 sm:mb-3 xl:mb-4">
                           {avatarUrl ? (
                             <img
                               src={avatarUrl}
                               alt={authorName}
-                              className="w-11 h-11 rounded-full object-cover hover:ring-2 hover:ring-primary/30 transition-all flex-shrink-0"
+                              className="w-8 h-8 sm:w-10 sm:h-10 md:w-11 md:h-11 xl:w-12 xl:h-12 2xl:w-14 2xl:h-14 rounded-full object-cover hover:ring-2 hover:ring-primary/30 transition-all flex-shrink-0"
                               onError={(e) => {
                                 (e.target as HTMLImageElement).style.display = 'none';
                               }}
                             />
                           ) : (
-                            <div className="w-11 h-11 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white font-semibold flex-shrink-0 hover:ring-2 hover:ring-primary/30 transition-all">
+                            <div className="w-8 h-8 sm:w-10 sm:h-10 md:w-11 md:h-11 xl:w-12 xl:h-12 2xl:w-14 2xl:h-14 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white font-semibold text-xs sm:text-sm md:text-base xl:text-lg 2xl:text-xl flex-shrink-0 hover:ring-2 hover:ring-primary/30 transition-all">
                               {authorName.charAt(0).toUpperCase()}
                             </div>
                           )}
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="font-semibold text-fluid-base text-content hover:text-primary transition-colors">
+                            <div className="flex items-center gap-1.5 sm:gap-2 xl:gap-2.5 mb-0.5 sm:mb-1 xl:mb-1.5">
+                              <span className="font-semibold text-fluid-xs sm:text-fluid-base xl:text-fluid-md 2xl:text-fluid-lg text-content hover:text-primary transition-colors truncate">
                                 {authorName}
                               </span>
                             </div>
-                            <div className="flex items-center gap-2 text-fluid-xs text-content/80">
-                              <span className="text-success bg-success/10 border border-success/20 px-2 py-0.5 rounded font-medium">
+                            <div className="flex items-center gap-1.5 sm:gap-2 xl:gap-2.5 text-fluid-2xs sm:text-fluid-xs xl:text-fluid-sm text-content/80 flex-wrap">
+                              <span className="text-success bg-success/10 border border-success/20 px-1.5 sm:px-2 xl:px-2.5 2xl:px-3 py-0.5 xl:py-1 rounded font-medium">
                                 Post
                               </span>
-                              <span>{getRelativeTime(post.createdAt)}</span>
+                              <span className="text-fluid-2xs sm:text-fluid-xs xl:text-fluid-sm">
+                                {getRelativeTime(post.createdAt)}
+                              </span>
                             </div>
                           </div>
                         </div>
 
                         {/* Post Content */}
-                        <div className="mb-3">
-                          <p className="text-content leading-relaxed line-clamp-3 text-fluid-sm">
+                        <div className="mb-2 sm:mb-3 xl:mb-4">
+                          <p className="text-content leading-relaxed line-clamp-3 text-fluid-xs sm:text-fluid-sm xl:text-fluid-base 2xl:text-fluid-md">
                             {post.body}
                           </p>
                         </div>
 
                         {/* Media Grid */}
                         {post.mediaUrls && post.mediaUrls.length > 0 && (
-                          <div className="grid grid-cols-2 gap-2 mb-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 sm:gap-2 xl:gap-3 mb-2 sm:mb-3 xl:mb-4">
                             {post.mediaUrls.slice(0, 2).map((url, index) => (
                               <div key={index} className="overflow-hidden rounded-lg">
                                 <img
                                   src={url}
                                   alt=""
-                                  className="object-cover w-full h-32 hover:scale-110 transition-transform duration-300"
+                                  className="object-cover w-full h-24 sm:h-28 md:h-32 xl:h-36 2xl:h-40 hover:scale-110 transition-transform duration-300"
                                   onError={(e) => {
                                     (e.target as HTMLImageElement).style.display = 'none';
                                   }}
@@ -643,20 +664,24 @@ export default function LandingPage({
                         )}
 
                         {/* Engagement & Action */}
-                        <div className="flex items-center justify-between pt-3 border-t border-border">
-                          <div className="flex items-center gap-4 text-fluid-sm text-content/80">
-                            <span className="flex items-center gap-1.5">
-                              <span className="text-base">❤️</span>
+                        <div className="flex items-center justify-between pt-2 sm:pt-3 xl:pt-4 border-t border-border gap-2 xl:gap-3">
+                          <div className="flex items-center gap-2 sm:gap-3 md:gap-4 xl:gap-5 2xl:gap-6 text-fluid-xs sm:text-fluid-sm xl:text-fluid-base text-content/80">
+                            <span className="flex items-center gap-0.5 sm:gap-1 md:gap-1.5 xl:gap-2">
+                              <span className="text-sm sm:text-base xl:text-lg 2xl:text-xl">
+                                ❤️
+                              </span>
                               <span className="font-medium">{reactionsCount}</span>
                             </span>
-                            <span className="flex items-center gap-1.5">
-                              <span className="text-base">💬</span>
+                            <span className="flex items-center gap-0.5 sm:gap-1 md:gap-1.5 xl:gap-2">
+                              <span className="text-sm sm:text-base xl:text-lg 2xl:text-xl">
+                                💬
+                              </span>
                               <span className="font-medium">{commentsCount}</span>
                             </span>
                           </div>
                           <a
                             href={`${clientAppUrl}/login`}
-                            className="px-3 py-1.5 border border-border hover:border-primary rounded-lg text-content font-medium text-fluid-xs transition-colors"
+                            className="px-2 py-1 sm:px-3 sm:py-1.5 xl:px-4 xl:py-2 2xl:px-5 2xl:py-2.5 border border-border hover:border-primary rounded-lg text-content font-medium text-fluid-2xs sm:text-fluid-xs xl:text-fluid-sm transition-colors whitespace-nowrap"
                           >
                             Join Discussion
                           </a>
@@ -760,12 +785,23 @@ export default function LandingPage({
                                 </span>
                               </div>
 
-                              {/* Avatar placeholder */}
-                              <div
-                                className={`w-8 h-8 md:w-14 md:h-14 rounded-full flex items-center justify-center font-bold text-xs md:text-lg border-2 flex-shrink-0 ${rank <= 3 ? 'border-current bg-surface' : 'bg-surface/70 border-border'} ${getRankTextColor()}`}
-                              >
-                                {entry.userName.charAt(0).toUpperCase()}
-                              </div>
+                              {/* Avatar */}
+                              {entry.avatarUrl ? (
+                                <img
+                                  src={entry.avatarUrl}
+                                  alt={entry.userName}
+                                  className={`w-8 h-8 md:w-14 md:h-14 rounded-full object-cover border-2 flex-shrink-0 ${rank <= 3 ? 'border-current' : 'border-border'}`}
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).style.display = 'none';
+                                  }}
+                                />
+                              ) : (
+                                <div
+                                  className={`w-8 h-8 md:w-14 md:h-14 rounded-full flex items-center justify-center font-bold text-xs md:text-lg border-2 flex-shrink-0 ${rank <= 3 ? 'border-current bg-surface' : 'bg-surface/70 border-border'} ${getRankTextColor()}`}
+                                >
+                                  {entry.userName.charAt(0).toUpperCase()}
+                                </div>
+                              )}
                             </div>
 
                             {/* Name & Stats */}
@@ -874,12 +910,23 @@ export default function LandingPage({
                                 </span>
                               </div>
 
-                              {/* Avatar placeholder */}
-                              <div
-                                className={`w-8 h-8 md:w-14 md:h-14 rounded-full flex items-center justify-center font-bold text-xs md:text-lg border-2 flex-shrink-0 ${rank <= 3 ? 'border-current bg-surface' : 'bg-surface/70 border-border'} ${getRankTextColor()}`}
-                              >
-                                {entry.userName.charAt(0).toUpperCase()}
-                              </div>
+                              {/* Avatar */}
+                              {entry.avatarUrl ? (
+                                <img
+                                  src={entry.avatarUrl}
+                                  alt={entry.userName}
+                                  className={`w-8 h-8 md:w-14 md:h-14 rounded-full object-cover border-2 flex-shrink-0 ${rank <= 3 ? 'border-current' : 'border-border'}`}
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).style.display = 'none';
+                                  }}
+                                />
+                              ) : (
+                                <div
+                                  className={`w-8 h-8 md:w-14 md:h-14 rounded-full flex items-center justify-center font-bold text-xs md:text-lg border-2 flex-shrink-0 ${rank <= 3 ? 'border-current bg-surface' : 'bg-surface/70 border-border'} ${getRankTextColor()}`}
+                                >
+                                  {entry.userName.charAt(0).toUpperCase()}
+                                </div>
+                              )}
                             </div>
 
                             {/* Name & Stats */}
