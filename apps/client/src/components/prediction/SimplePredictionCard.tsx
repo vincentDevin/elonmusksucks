@@ -28,7 +28,6 @@ const asNum = (v: string | number | bigint | undefined | null) => Number(v ?? 0)
 function SimplePredictionCard({
   prediction,
   onCardClick,
-  onQuickBet,
   onAddToParlay,
   addOptimisticBet,
   className = '',
