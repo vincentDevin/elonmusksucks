@@ -150,6 +150,28 @@ export class PredictionRepository implements IPredictionRepository {
       },
     });
 
+    // Step 4: Batch fetch all source links for these predictions
+    const sourceLinks = await prisma.predictionSourceLink.findMany({
+      where: { predictionId: { in: predictionIds } },
+      include: {
+        article: {
+          select: {
+            id: true,
+            title: true,
+            url: true,
+            leadImageUrl: true,
+            feed: {
+              select: {
+                name: true,
+                siteUrl: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { capturedAt: 'desc' },
+    });
+
     // Create lookup maps for efficient joins
     const betsByPrediction = new Map<number, typeof bets>();
     bets.forEach((bet) => {
@@ -165,10 +187,20 @@ export class PredictionRepository implements IPredictionRepository {
       legsByOption.set(leg.optionId, existing);
     });
 
-    // Step 4: Join data client-side using maps
+    const sourceLinksByPrediction = new Map<number, typeof sourceLinks>();
+    sourceLinks.forEach((link) => {
+      const existing = sourceLinksByPrediction.get(link.predictionId) || [];
+      existing.push(link);
+      sourceLinksByPrediction.set(link.predictionId, existing);
+    });
+
+    // Step 5: Join data client-side using maps
     return preds.map((pred) => {
       // Get bets for this prediction from lookup map
       const predictionBets = betsByPrediction.get(pred.id) || [];
+
+      // Get source links for this prediction from lookup map
+      const predictionSourceLinks = sourceLinksByPrediction.get(pred.id) || [];
 
       // Get parlay legs for all options in this prediction
       const predParlayLegs: ParlayLegWithUser[] = [];
@@ -206,6 +238,7 @@ export class PredictionRepository implements IPredictionRepository {
         options: cleanOptions,
         bets: predictionBets as BetWithUser[],
         parlayLegs: predParlayLegs,
+        sourceLinks: predictionSourceLinks,
       } as PredictionWithRelations;
     });
   }
@@ -330,6 +363,28 @@ export class PredictionRepository implements IPredictionRepository {
       },
     });
 
+    // Step 5: Batch fetch all source links for these predictions
+    const sourceLinks = await prisma.predictionSourceLink.findMany({
+      where: { predictionId: { in: predictionIds } },
+      include: {
+        article: {
+          select: {
+            id: true,
+            title: true,
+            url: true,
+            leadImageUrl: true,
+            feed: {
+              select: {
+                name: true,
+                siteUrl: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { capturedAt: 'desc' },
+    });
+
     // Create lookup maps for efficient joins
     const betsByPrediction = new Map<number, typeof bets>();
     bets.forEach((bet) => {
@@ -345,10 +400,20 @@ export class PredictionRepository implements IPredictionRepository {
       legsByOption.set(leg.optionId, existing);
     });
 
-    // Step 5: Join data client-side using maps
+    const sourceLinksByPrediction = new Map<number, typeof sourceLinks>();
+    sourceLinks.forEach((link) => {
+      const existing = sourceLinksByPrediction.get(link.predictionId) || [];
+      existing.push(link);
+      sourceLinksByPrediction.set(link.predictionId, existing);
+    });
+
+    // Step 6: Join data client-side using maps
     const predictions = preds.map((pred) => {
       // Get bets for this prediction from lookup map
       const predictionBets = betsByPrediction.get(pred.id) || [];
+
+      // Get source links for this prediction from lookup map
+      const predictionSourceLinks = sourceLinksByPrediction.get(pred.id) || [];
 
       // Get parlay legs for all options in this prediction
       const predParlayLegs: ParlayLegWithUser[] = [];
@@ -386,6 +451,7 @@ export class PredictionRepository implements IPredictionRepository {
         options: cleanOptions,
         bets: predictionBets as BetWithUser[],
         parlayLegs: predParlayLegs,
+        sourceLinks: predictionSourceLinks,
       } as PredictionWithRelations;
     });
 
@@ -512,12 +578,31 @@ export class PredictionRepository implements IPredictionRepository {
             },
           },
         },
+        sourceLinks: {
+          include: {
+            article: {
+              select: {
+                id: true,
+                title: true,
+                url: true,
+                leadImageUrl: true,
+                feed: {
+                  select: {
+                    name: true,
+                    siteUrl: true,
+                  },
+                },
+              },
+            },
+          },
+          orderBy: { capturedAt: 'desc' },
+        },
       },
     });
 
     if (!pred) return null;
 
-    const { options, bets, ...rest } = pred;
+    const { options, bets, sourceLinks, ...rest } = pred;
 
     // Flatten parlay legs from nested structure
     const parlayLegs: ParlayLegWithUser[] = [];
@@ -555,6 +640,7 @@ export class PredictionRepository implements IPredictionRepository {
       options: cleanOptions,
       bets: bets as BetWithUser[],
       parlayLegs,
+      sourceLinks: sourceLinks || [],
     } as PredictionWithRelations;
   }
 
@@ -657,11 +743,30 @@ export class PredictionRepository implements IPredictionRepository {
             },
           },
         },
+        sourceLinks: {
+          include: {
+            article: {
+              select: {
+                id: true,
+                title: true,
+                url: true,
+                leadImageUrl: true,
+                feed: {
+                  select: {
+                    name: true,
+                    siteUrl: true,
+                  },
+                },
+              },
+            },
+          },
+          orderBy: { capturedAt: 'desc' },
+        },
       },
     });
 
     return preds.map((pred) => {
-      const { options, bets, ...rest } = pred;
+      const { options, bets, sourceLinks, ...rest } = pred;
 
       // Flatten parlay legs from nested structure
       const parlayLegs: ParlayLegWithUser[] = [];
@@ -699,6 +804,7 @@ export class PredictionRepository implements IPredictionRepository {
         options: cleanOptions,
         bets: bets as BetWithUser[],
         parlayLegs,
+        sourceLinks: sourceLinks || [],
       } as PredictionWithRelations;
     });
   }

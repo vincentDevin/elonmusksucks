@@ -444,12 +444,50 @@ export default function LandingPage({
                             </div>
                           )}
 
-                          {/* Betting Options - Centered 2-Column Grid */}
-                          <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 max-w-2xl mx-auto mb-4">
+                          {/* Source Links */}
+                          {prediction.sourceLinks && prediction.sourceLinks.length > 0 && (
+                            <div className="mb-4 sm:mb-5 md:mb-6 pb-4 sm:pb-5 md:pb-6 border-b border-border/30">
+                              <h4 className="text-content font-semibold text-xs sm:text-sm md:text-base mb-2 sm:mb-2.5 md:mb-3 uppercase tracking-wide flex items-center gap-2">
+                                <span className="text-base sm:text-lg md:text-xl">📰</span>
+                                <span>Sources</span>
+                              </h4>
+                              <div className="space-y-2">
+                                {prediction.sourceLinks.map((link) => (
+                                  <a
+                                    key={link.id}
+                                    href={link.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-start gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg bg-surface/50 hover:bg-surface border border-border/40 hover:border-primary/50 transition-all group"
+                                  >
+                                    <span className="text-lg sm:text-xl flex-shrink-0 mt-0.5">
+                                      📄
+                                    </span>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="text-content font-medium text-xs sm:text-sm md:text-base group-hover:text-primary transition-colors line-clamp-2">
+                                        {link.title || 'Source Article'}
+                                      </div>
+                                      {link.description && (
+                                        <div className="text-content/60 text-xs sm:text-sm mt-0.5">
+                                          {link.description}
+                                        </div>
+                                      )}
+                                    </div>
+                                    <span className="text-primary text-xs sm:text-sm flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      →
+                                    </span>
+                                  </a>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Betting Options - Flexible Row */}
+                          <div className="flex flex-wrap gap-2 sm:gap-3 md:gap-4 mb-4">
                             {prediction.options.map((option) => (
                               <div
                                 key={option.id}
-                                className="bg-surface/70 hover:bg-primary/10 border border-border/40 hover:border-primary/60 rounded-lg px-3 py-2.5 sm:px-4 sm:py-3 md:px-5 md:py-3.5 lg:px-6 lg:py-4 text-center transition-all cursor-pointer hover:scale-[1.02] hover:shadow-md"
+                                className="bg-surface/70 hover:bg-primary/10 border border-border/40 hover:border-primary/60 rounded-lg px-3 py-2.5 sm:px-4 sm:py-3 md:px-5 md:py-3.5 lg:px-6 lg:py-4 text-center transition-all cursor-pointer hover:scale-[1.02] hover:shadow-md w-full lg:flex-1 lg:min-w-[100px] lg:max-w-[200px] xl:max-w-[250px]"
                               >
                                 <div className="font-semibold text-content text-fluid-xs sm:text-fluid-sm md:text-fluid-base mb-1">
                                   {option.label}
