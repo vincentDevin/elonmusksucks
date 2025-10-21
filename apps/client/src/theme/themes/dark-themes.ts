@@ -12,8 +12,8 @@ export const darkThemes: UnifiedTheme[] = [
       primary: '#10B981', // Emerald 500
       secondary: '#059669', // Emerald 600
       accent: '#34D399', // Emerald 400
-      background: '#111827', // Gray 900
-      surface: '#1F2937', // Gray 800
+      background: '#0a0f1e',
+      surface: '#181f2aff', // Gray 800
       muted: '#374151', // Gray 700
       content: '#F9FAFB', // Gray 50
       tertiary: '#9CA3AF', // Gray 400
