@@ -43,6 +43,12 @@ export default function LandingPage({
   const [showAllPredictions, setShowAllPredictions] = React.useState(false);
   const [showAllArticles, setShowAllArticles] = React.useState(false);
   const [showAllPosts, setShowAllPosts] = React.useState(false);
+  const [showAllMarketLeaders, setShowAllMarketLeaders] = React.useState(false);
+  const [showAllPongLeaders, setShowAllPongLeaders] = React.useState(false);
+
+  // Modal state management
+  const [showPrivacyModal, setShowPrivacyModal] = React.useState(false);
+  const [showTermsModal, setShowTermsModal] = React.useState(false);
 
   const predictions = Array.isArray(predictionsData)
     ? predictionsData
@@ -127,9 +133,9 @@ export default function LandingPage({
       SpaceX: 'bg-secondary/10 text-secondary border-secondary/30',
       Stocks: 'bg-success/10 text-success border-success/30',
       Space: 'bg-info/10 text-info border-info/30',
-      TEST: 'bg-muted/30 text-content border-border',
+      TEST: 'bg-surface/80 text-content border-border',
     };
-    return colors[category] || 'bg-muted/30 text-content border-border';
+    return colors[category] || 'bg-surface/80 text-content border-border';
   };
 
   // Calculate global stats
@@ -146,50 +152,55 @@ export default function LandingPage({
         <ThemeToggle />
       </div>
 
-      {/* Ultra Compact Hero */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-primary via-secondary to-accent">
-        <div className="absolute inset-0 bg-background/95 dark:bg-background/90"></div>
-        <div className="relative container mx-auto px-3 py-6">
+      {/* Hero Section */}
+      <div className="bg-background border-b border-border">
+        <div className="container mx-auto px-4 py-8 md:py-12">
           <div className="max-w-6xl mx-auto text-center">
-            <h1 className="text-3xl md:text-4xl font-bold mb-1 text-content">ElonMuskSucks.net</h1>
-            <p className="text-sm md:text-base text-content mb-1 font-semibold">
+            <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-3 md:mb-4 text-content">
+              ElonMuskSucks.net
+            </h1>
+            <p className="text-lg sm:text-xl md:text-2xl text-content mb-2 md:mb-3 font-semibold">
               The World's Most Accurate Musk Weather Report
             </p>
-            <p className="text-xs text-content/70 mb-4">Forecast: Erratic with a chance of chaos</p>
+            <p className="text-sm sm:text-base md:text-lg text-content/80 mb-6 md:mb-8">
+              Forecast: Erratic with a chance of chaos
+            </p>
 
             {/* Inline Stats */}
-            <div className="flex justify-center gap-2 mb-4 flex-wrap">
-              <div className="bg-surface border border-border rounded px-3 py-1.5">
-                <div className="text-lg font-bold text-primary">{openPredictions.length}</div>
-                <div className="text-[9px] text-tertiary">Markets</div>
+            <div className="flex justify-center gap-3 md:gap-4 mb-6 md:mb-8 flex-wrap">
+              <div className="bg-surface border-2 border-border rounded-lg px-4 py-2.5 md:px-5 md:py-3 shadow-md">
+                <div className="text-xl md:text-2xl font-bold text-primary">
+                  {openPredictions.length}
+                </div>
+                <div className="text-xs md:text-sm text-content/80 font-medium">Markets</div>
               </div>
-              <div className="bg-surface border border-border rounded px-3 py-1.5">
-                <div className="text-lg font-bold text-success">{leaders.length}</div>
-                <div className="text-[9px] text-tertiary">Predictors</div>
+              <div className="bg-surface border-2 border-border rounded-lg px-4 py-2.5 md:px-5 md:py-3 shadow-md">
+                <div className="text-xl md:text-2xl font-bold text-success">{leaders.length}</div>
+                <div className="text-xs md:text-sm text-content/80 font-medium">Predictors</div>
               </div>
-              <div className="bg-surface border border-border rounded px-3 py-1.5">
-                <div className="text-lg font-bold text-warning">{totalBets}</div>
-                <div className="text-[9px] text-tertiary">Bets</div>
+              <div className="bg-surface border-2 border-border rounded-lg px-4 py-2.5 md:px-5 md:py-3 shadow-md">
+                <div className="text-xl md:text-2xl font-bold text-warning">{totalBets}</div>
+                <div className="text-xs md:text-sm text-content/80 font-medium">Bets</div>
               </div>
-              <div className="bg-surface border border-border rounded px-3 py-1.5">
-                <div className="text-lg font-bold text-secondary">
+              <div className="bg-surface border-2 border-border rounded-lg px-4 py-2.5 md:px-5 md:py-3 shadow-md">
+                <div className="text-xl md:text-2xl font-bold text-secondary">
                   {formatMuskBucks(totalVolume)}
                 </div>
-                <div className="text-[9px] text-tertiary">MuskBucks</div>
+                <div className="text-xs md:text-sm text-content/80 font-medium">MuskBucks</div>
               </div>
             </div>
 
             {/* CTAs */}
-            <div className="flex justify-center gap-2">
+            <div className="flex justify-center gap-3 md:gap-4 flex-wrap">
               <a
                 href={`${clientAppUrl}/register`}
-                className="px-4 py-1.5 bg-gradient-primary text-white rounded text-xs font-semibold hover-lift"
+                className="px-6 py-3 md:px-8 md:py-4 bg-primary hover:bg-primary-hover text-white dark:text-background rounded-xl text-base md:text-lg font-bold hover-lift shadow-lg transition-all"
               >
                 🚀 Start Predicting
               </a>
               <a
                 href={`${clientAppUrl}/login`}
-                className="px-4 py-1.5 bg-surface border border-content/20 text-content rounded text-xs font-semibold hover-lift"
+                className="px-6 py-3 md:px-8 md:py-4 bg-surface border-2 border-border hover:border-primary text-content rounded-xl text-base md:text-lg font-bold hover-lift shadow-lg transition-all"
               >
                 Sign In
               </a>
@@ -199,27 +210,27 @@ export default function LandingPage({
       </div>
 
       {/* Live Activity Ticker - Full Width Edge-to-Edge */}
-      <div className="border-y border-border bg-surface/80 backdrop-blur-sm overflow-hidden py-2">
-        <div className="flex items-center gap-3 px-2">
-          <div className="flex items-center gap-1 text-xs font-bold whitespace-nowrap flex-shrink-0">
-            <span>⚡</span>
+      <div className="border-y border-border bg-surface/80 backdrop-blur-sm overflow-hidden py-2 md:py-3">
+        <div className="flex items-center gap-2 md:gap-3 px-2 md:px-3">
+          <div className="flex items-center gap-1 md:gap-1.5 text-xs md:text-sm font-bold whitespace-nowrap flex-shrink-0">
+            <span className="text-sm md:text-base">⚡</span>
             <span>Live</span>
-            <div className="w-1.5 h-1.5 bg-success rounded-full animate-pulse"></div>
+            <div className="w-1.5 h-1.5 md:w-2 md:h-2 bg-success rounded-full animate-pulse"></div>
           </div>
           <div className="flex-1 overflow-hidden -mx-2">
-            <div className="flex gap-4 ticker-scroll">
+            <div className="flex gap-3 md:gap-4 lg:gap-5 ticker-scroll">
               {activities.slice(0, 30).map((activity) => (
                 <div
                   key={activity.id}
-                  className="flex items-center gap-1 text-[10px] whitespace-nowrap flex-shrink-0"
+                  className="flex items-center gap-1 md:gap-1.5 text-[10px] md:text-xs lg:text-sm whitespace-nowrap flex-shrink-0"
                 >
-                  <span className="text-sm">{activity.icon}</span>
+                  <span className="text-sm md:text-base lg:text-lg">{activity.icon}</span>
                   <span className="font-semibold text-primary">{activity.userName}</span>
-                  <span className="text-tertiary">{activity.description}</span>
+                  <span className="text-content/90">{activity.description}</span>
                   {activity.amount && (
                     <span className="text-success">({formatMuskBucks(activity.amount)}MB)</span>
                   )}
-                  <span className="text-tertiary text-[8px]">
+                  <span className="text-content/80 text-[8px] md:text-[10px] lg:text-xs">
                     • {getRelativeTime(activity.timestamp)}
                   </span>
                 </div>
@@ -228,15 +239,15 @@ export default function LandingPage({
               {activities.slice(0, 30).map((activity) => (
                 <div
                   key={`dup-${activity.id}`}
-                  className="flex items-center gap-1 text-[10px] whitespace-nowrap flex-shrink-0"
+                  className="flex items-center gap-1 md:gap-1.5 text-[10px] md:text-xs lg:text-sm whitespace-nowrap flex-shrink-0"
                 >
-                  <span className="text-sm">{activity.icon}</span>
+                  <span className="text-sm md:text-base lg:text-lg">{activity.icon}</span>
                   <span className="font-semibold text-primary">{activity.userName}</span>
-                  <span className="text-tertiary">{activity.description}</span>
+                  <span className="text-content/90">{activity.description}</span>
                   {activity.amount && (
                     <span className="text-success">({formatMuskBucks(activity.amount)}MB)</span>
                   )}
-                  <span className="text-tertiary text-[8px]">
+                  <span className="text-content/80 text-[8px] md:text-[10px] lg:text-xs">
                     • {getRelativeTime(activity.timestamp)}
                   </span>
                 </div>
@@ -249,59 +260,65 @@ export default function LandingPage({
       {/* Main Content Grid */}
       <div className="container mx-auto px-2 py-3">
         <div className="max-w-[1800px] mx-auto space-y-3">
+          {/* Tab Navigation - Outside content section, centered */}
+          <div className="flex justify-center mb-4 md:mb-6">
+            <div className="inline-flex flex-wrap justify-center gap-2 md:gap-3 bg-surface border border-border rounded-xl p-1.5 md:p-2 shadow-md max-w-full">
+              <button
+                onClick={() => {
+                  setContentTab('predictions');
+                  setShowAllPredictions(false);
+                }}
+                className={`px-3 py-2 sm:px-4 sm:py-2.5 md:px-6 md:py-3 text-sm sm:text-base md:text-lg rounded-lg font-semibold transition-all flex items-center gap-1.5 sm:gap-2 md:gap-2.5 whitespace-nowrap ${
+                  contentTab === 'predictions'
+                    ? 'bg-primary text-surface shadow-lg scale-105'
+                    : 'text-content hover:text-primary hover:bg-surface/80'
+                }`}
+              >
+                <span className="text-base sm:text-lg md:text-xl">🔥</span>
+                <span>Predictions</span>
+                <span className="text-xs sm:text-sm opacity-75 hidden sm:inline">
+                  ({openPredictions.length})
+                </span>
+              </button>
+              <button
+                onClick={() => {
+                  setContentTab('articles');
+                  setShowAllArticles(false);
+                }}
+                className={`px-3 py-2 sm:px-4 sm:py-2.5 md:px-6 md:py-3 text-sm sm:text-base md:text-lg rounded-lg font-semibold transition-all flex items-center gap-1.5 sm:gap-2 md:gap-2.5 whitespace-nowrap ${
+                  contentTab === 'articles'
+                    ? 'bg-primary text-surface shadow-lg scale-105'
+                    : 'text-content hover:text-primary hover:bg-surface/80'
+                }`}
+              >
+                <span className="text-base sm:text-lg md:text-xl">📰</span>
+                <span>Articles</span>
+                <span className="text-xs sm:text-sm opacity-75 hidden sm:inline">
+                  ({articles.length})
+                </span>
+              </button>
+              <button
+                onClick={() => {
+                  setContentTab('community');
+                  setShowAllPosts(false);
+                }}
+                className={`px-3 py-2 sm:px-4 sm:py-2.5 md:px-6 md:py-3 text-sm sm:text-base md:text-lg rounded-lg font-semibold transition-all flex items-center gap-1.5 sm:gap-2 md:gap-2.5 whitespace-nowrap ${
+                  contentTab === 'community'
+                    ? 'bg-primary text-surface shadow-lg scale-105'
+                    : 'text-content hover:text-primary hover:bg-surface/80'
+                }`}
+              >
+                <span className="text-base sm:text-lg md:text-xl">💬</span>
+                <span>Community</span>
+                <span className="text-xs sm:text-sm opacity-75 hidden sm:inline">
+                  ({posts.length})
+                </span>
+              </button>
+            </div>
+          </div>
+
           {/* Tabbed Content Section */}
           <div className="section-card p-4">
-            {/* Tab Navigation */}
-            <div className="flex items-center justify-between mb-4 border-b border-border pb-3">
-              <div className="flex gap-2">
-                <button
-                  onClick={() => {
-                    setContentTab('predictions');
-                    setShowAllPredictions(false);
-                  }}
-                  className={`px-4 py-2 text-sm rounded-lg font-medium transition-all flex items-center gap-2 ${
-                    contentTab === 'predictions'
-                      ? 'bg-primary text-white shadow-sm'
-                      : 'text-tertiary hover:text-content hover:bg-muted/20'
-                  }`}
-                >
-                  <span className="text-base">🔥</span>
-                  <span>Predictions</span>
-                  <span className="text-xs opacity-75">({openPredictions.length})</span>
-                </button>
-                <button
-                  onClick={() => {
-                    setContentTab('articles');
-                    setShowAllArticles(false);
-                  }}
-                  className={`px-4 py-2 text-sm rounded-lg font-medium transition-all flex items-center gap-2 ${
-                    contentTab === 'articles'
-                      ? 'bg-primary text-white shadow-sm'
-                      : 'text-tertiary hover:text-content hover:bg-muted/20'
-                  }`}
-                >
-                  <span className="text-base">📰</span>
-                  <span>Articles</span>
-                  <span className="text-xs opacity-75">({articles.length})</span>
-                </button>
-                <button
-                  onClick={() => {
-                    setContentTab('community');
-                    setShowAllPosts(false);
-                  }}
-                  className={`px-4 py-2 text-sm rounded-lg font-medium transition-all flex items-center gap-2 ${
-                    contentTab === 'community'
-                      ? 'bg-primary text-white shadow-sm'
-                      : 'text-tertiary hover:text-content hover:bg-muted/20'
-                  }`}
-                >
-                  <span className="text-base">💬</span>
-                  <span>Community</span>
-                  <span className="text-xs opacity-75">({posts.length})</span>
-                </button>
-              </div>
-            </div>
-
             {/* PREDICTIONS TAB */}
             {contentTab === 'predictions' && (
               <div>
@@ -348,7 +365,7 @@ export default function LandingPage({
                               >
                                 {prediction.category?.name || 'Unknown'}
                               </span>
-                              <span className="text-xs text-tertiary">{prediction.type}</span>
+                              <span className="text-xs text-content/70">{prediction.type}</span>
                             </div>
                           </div>
 
@@ -362,7 +379,7 @@ export default function LandingPage({
                                   className="w-5 h-5 rounded-full object-cover"
                                 />
                               )}
-                              <span className="text-tertiary text-xs">
+                              <span className="text-content/80 text-xs">
                                 by{' '}
                                 <span className="text-content font-medium">
                                   {prediction.creator.name}
@@ -372,7 +389,7 @@ export default function LandingPage({
                           )}
 
                           {/* Stats */}
-                          <div className="flex items-center gap-4 text-sm text-tertiary mb-3">
+                          <div className="flex items-center gap-4 text-sm text-content/80 mb-3">
                             <span className="flex items-center gap-1">
                               <span>💰</span>
                               {formatMuskBucks(getTotalVolume(prediction))}
@@ -394,7 +411,7 @@ export default function LandingPage({
                             {prediction.options.map((option) => (
                               <div
                                 key={option.id}
-                                className="bg-muted/20 hover:bg-muted/30 rounded px-3 py-1.5 text-sm transition-colors"
+                                className="bg-surface/70 hover:bg-surface/90 border border-border/30 rounded px-3 py-1.5 text-sm transition-colors"
                               >
                                 <span className="font-medium text-content">{option.label}</span>
                                 <span className="text-primary font-bold ml-2">
@@ -406,7 +423,7 @@ export default function LandingPage({
 
                           {/* Recent Bets */}
                           {prediction.bets.length > 0 && (
-                            <div className="mt-3 pt-3 border-t border-border text-xs text-tertiary">
+                            <div className="mt-3 pt-3 border-t border-border text-xs text-content/80">
                               <div className="flex items-center gap-2">
                                 <span className="font-medium">Recent:</span>
                                 {prediction.bets.slice(0, 2).map((bet) => (
@@ -468,17 +485,17 @@ export default function LandingPage({
                           <span className="text-info bg-info/10 border border-info/20 px-2 py-0.5 rounded font-medium">
                             Article
                           </span>
-                          <span className="text-tertiary">
+                          <span className="text-content/80">
                             {article.content.author || article.content.source}
                           </span>
-                          <span className="text-tertiary">•</span>
-                          <span className="text-tertiary">
+                          <span className="text-content/70">•</span>
+                          <span className="text-content/80">
                             {getRelativeTime(article.timestamp || article.createdAt)}
                           </span>
                           {article.content.source && article.content.author && (
                             <>
-                              <span className="text-tertiary">•</span>
-                              <span className="text-tertiary">{article.content.source}</span>
+                              <span className="text-content/70">•</span>
+                              <span className="text-content/80">{article.content.source}</span>
                             </>
                           )}
                         </div>
@@ -501,13 +518,13 @@ export default function LandingPage({
                             {article.tags.slice(0, 3).map((tag: string) => (
                               <span
                                 key={tag}
-                                className="px-2 py-0.5 bg-muted/20 text-content/70 text-xs rounded-full"
+                                className="px-2 py-0.5 bg-surface/70 border border-border/30 text-content text-xs rounded-full"
                               >
                                 {tag}
                               </span>
                             ))}
                             {article.tags.length > 3 && (
-                              <span className="px-2 py-0.5 bg-muted/20 text-content/70 text-xs rounded-full">
+                              <span className="px-2 py-0.5 bg-surface/70 border border-border/30 text-content text-xs rounded-full">
                                 +{article.tags.length - 3}
                               </span>
                             )}
@@ -516,7 +533,7 @@ export default function LandingPage({
 
                         {/* Engagement & Action */}
                         <div className="flex items-center justify-between mt-auto pt-3 border-t border-border">
-                          <div className="flex items-center gap-4 text-sm text-tertiary">
+                          <div className="flex items-center gap-4 text-sm text-content/80">
                             <span className="flex items-center gap-1">
                               <span>👍</span>
                               {article.engagement.reactions}
@@ -586,7 +603,7 @@ export default function LandingPage({
                                 {authorName}
                               </span>
                             </div>
-                            <div className="flex items-center gap-2 text-sm text-tertiary">
+                            <div className="flex items-center gap-2 text-sm text-content/80">
                               <span className="text-success bg-success/10 border border-success/20 px-2 py-0.5 rounded text-xs font-medium">
                                 Post
                               </span>
@@ -622,7 +639,7 @@ export default function LandingPage({
 
                         {/* Engagement & Action */}
                         <div className="flex items-center justify-between pt-3 border-t border-border">
-                          <div className="flex items-center gap-4 text-sm text-tertiary">
+                          <div className="flex items-center gap-4 text-sm text-content/80">
                             <span className="flex items-center gap-1.5">
                               <span className="text-base">❤️</span>
                               <span className="font-medium">{reactionsCount}</span>
@@ -657,168 +674,279 @@ export default function LandingPage({
             )}
           </div>
 
-          {/* LEADERBOARD - Enhanced Full Width */}
-          <div className="section-card p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold flex items-center gap-2">
-                <span className="text-2xl">{leaderboardTab === 'market' ? '🏆' : '🏓'}</span>
-                <span>{leaderboardTab === 'market' ? 'Market Leaderboard' : 'Pong Champions'}</span>
-              </h2>
-              <div className="flex gap-2 bg-background border border-border rounded-lg p-1">
-                <button
-                  onClick={() => setLeaderboardTab('market')}
-                  className={`px-4 py-2 text-sm rounded-md font-medium transition-all ${
-                    leaderboardTab === 'market'
-                      ? 'bg-primary text-white shadow-sm'
-                      : 'text-tertiary hover:text-content hover:bg-muted/20'
-                  }`}
-                >
-                  🏆 Market
-                </button>
-                <button
-                  onClick={() => setLeaderboardTab('pong')}
-                  className={`px-4 py-2 text-sm rounded-md font-medium transition-all ${
-                    leaderboardTab === 'pong'
-                      ? 'bg-primary text-white shadow-sm'
-                      : 'text-tertiary hover:text-content hover:bg-muted/20'
-                  }`}
-                >
-                  🏓 Pong
-                </button>
-              </div>
-            </div>
+          {/* LEADERBOARD SECTION */}
+          {/* Leaderboard Header */}
+          <div className="text-center mt-32 md:mt-40 lg:mt-48 mb-6 md:mb-8 pt-12 md:pt-16">
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-content">
+              🏆 Leaderboards
+            </h2>
+          </div>
 
-            <div className="overflow-x-auto">
-              {leaderboardTab === 'market' ? (
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/20 sticky top-0">
-                    <tr className="text-xs text-tertiary">
-                      <th className="px-3 py-3 text-left w-16">Rank</th>
-                      <th className="px-3 py-3 text-left">Player</th>
-                      <th className="px-3 py-3 text-right">Profit</th>
-                      <th className="px-3 py-3 text-right hidden sm:table-cell">Win Rate</th>
-                      <th className="px-3 py-3 text-right hidden md:table-cell">Total Bets</th>
-                      <th className="px-3 py-3 text-right hidden lg:table-cell">Balance</th>
-                      <th className="px-3 py-3 text-right">ROI</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {leaders.slice(0, 25).map((entry, index) => {
+          {/* Leaderboard Tab Navigation */}
+          <div className="flex justify-center mb-4 md:mb-6">
+            <div className="inline-flex gap-2 md:gap-3 bg-surface border border-border rounded-xl p-1.5 md:p-2 shadow-md">
+              <button
+                onClick={() => {
+                  setLeaderboardTab('market');
+                  setShowAllMarketLeaders(false);
+                }}
+                className={`px-4 py-2 sm:px-5 sm:py-2.5 md:px-6 md:py-3 text-sm sm:text-base md:text-lg rounded-lg font-semibold transition-all flex items-center gap-1.5 sm:gap-2 md:gap-2.5 whitespace-nowrap ${
+                  leaderboardTab === 'market'
+                    ? 'bg-primary text-surface shadow-lg scale-105'
+                    : 'text-content hover:text-primary hover:bg-surface/80'
+                }`}
+              >
+                <span className="text-base sm:text-lg md:text-xl">🏆</span>
+                <span>Market</span>
+              </button>
+              <button
+                onClick={() => {
+                  setLeaderboardTab('pong');
+                  setShowAllPongLeaders(false);
+                }}
+                className={`px-4 py-2 sm:px-5 sm:py-2.5 md:px-6 md:py-3 text-sm sm:text-base md:text-lg rounded-lg font-semibold transition-all flex items-center gap-1.5 sm:gap-2 md:gap-2.5 whitespace-nowrap ${
+                  leaderboardTab === 'pong'
+                    ? 'bg-primary text-surface shadow-lg scale-105'
+                    : 'text-content hover:text-primary hover:bg-surface/80'
+                }`}
+              >
+                <span className="text-base sm:text-lg md:text-xl">🏓</span>
+                <span>Pong</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Leaderboard Content */}
+          <div className="section-card p-2 md:p-6">
+            {leaderboardTab === 'market' ? (
+              <div>
+                <ul className="space-y-2 md:space-y-3">
+                  {leaders
+                    .slice(0, showAllMarketLeaders ? leaders.length : 10)
+                    .map((entry, index) => {
                       const rank = index + 1;
-                      const getRankClass = () => {
-                        if (rank === 1) return 'rank-1';
-                        if (rank === 2) return 'rank-2';
-                        if (rank === 3) return 'rank-3';
-                        return '';
+                      const getRankBg = () => {
+                        if (rank === 1) return 'bg-yellow-500/10 border-yellow-500/30';
+                        if (rank === 2) return 'bg-gray-400/10 border-gray-400/30';
+                        if (rank === 3) return 'bg-amber-600/10 border-amber-600/30';
+                        return 'bg-surface border-border';
+                      };
+                      const getRankTextColor = () => {
+                        if (rank === 1) return 'text-yellow-400';
+                        if (rank === 2) return 'text-gray-300';
+                        if (rank === 3) return 'text-amber-600';
+                        return 'text-primary';
                       };
 
                       return (
-                        <tr
+                        <li
                           key={entry.userId}
-                          className={`border-b border-border/50 hover:bg-muted/10 transition-colors ${getRankClass()}`}
+                          className={`rounded-lg md:rounded-xl shadow-sm transition-all duration-300 hover:shadow-md border-2 ${getRankBg()} p-3 md:p-6`}
                         >
-                          <td className="px-3 py-3 font-bold text-base">
-                            <span className="flex items-center gap-1">{getRankIcon(rank)}</span>
-                          </td>
-                          <td className="px-3 py-3">
-                            <span className="font-semibold text-content">{entry.userName}</span>
-                          </td>
-                          <td className="px-3 py-3 text-right">
-                            <span className="font-bold text-primary">
-                              +{formatMuskBucks(entry.profitAll)}
-                            </span>
-                          </td>
-                          <td className="px-3 py-3 text-right hidden sm:table-cell">
-                            <span className="font-medium">{Math.round(entry.winRate * 100)}%</span>
-                          </td>
-                          <td className="px-3 py-3 text-right hidden md:table-cell">
-                            <span className="text-tertiary">{entry.totalBets}</span>
-                          </td>
-                          <td className="px-3 py-3 text-right hidden lg:table-cell">
-                            <span className="text-tertiary">{formatMuskBucks(entry.balance)}</span>
-                          </td>
-                          <td className="px-3 py-3 text-right">
-                            <span className="font-bold text-success">
-                              {Math.round((entry.roi || 0) * 100)}%
-                            </span>
-                          </td>
-                        </tr>
+                          <div className="flex items-center gap-2 md:gap-6">
+                            {/* Rank & Avatar */}
+                            <div className="flex items-center gap-2 md:gap-3">
+                              {/* Rank */}
+                              <div className="w-8 h-8 md:w-14 md:h-14 flex items-center justify-center flex-shrink-0">
+                                <span
+                                  className={`text-lg md:text-3xl font-bold ${getRankTextColor()}`}
+                                >
+                                  {getRankIcon(rank)}
+                                </span>
+                              </div>
+
+                              {/* Avatar placeholder */}
+                              <div
+                                className={`w-8 h-8 md:w-14 md:h-14 rounded-full flex items-center justify-center font-bold text-xs md:text-lg border-2 flex-shrink-0 ${rank <= 3 ? 'border-current bg-surface' : 'bg-surface/70 border-border'} ${getRankTextColor()}`}
+                              >
+                                {entry.userName.charAt(0).toUpperCase()}
+                              </div>
+                            </div>
+
+                            {/* Name & Stats */}
+                            <div className="flex-1 min-w-0">
+                              {/* Name */}
+                              <div className="font-bold text-sm md:text-xl text-content mb-2 md:mb-3 truncate">
+                                {entry.userName}
+                              </div>
+
+                              {/* Stats Grid */}
+                              <div className="grid grid-cols-4 gap-1.5 md:gap-4">
+                                <div>
+                                  <div className="text-[9px] md:text-xs text-content/80 uppercase font-medium mb-0.5 md:mb-1 truncate">
+                                    Profit
+                                  </div>
+                                  <div className="font-bold text-xs md:text-lg text-primary truncate">
+                                    +{formatMuskBucks(entry.profitAll)}
+                                  </div>
+                                </div>
+                                <div>
+                                  <div className="text-[9px] md:text-xs text-content/80 uppercase font-medium mb-0.5 md:mb-1 truncate">
+                                    Win Rate
+                                  </div>
+                                  <div className="font-bold text-xs md:text-lg text-content">
+                                    {Math.round(entry.winRate * 100)}%
+                                  </div>
+                                </div>
+                                <div>
+                                  <div className="text-[9px] md:text-xs text-content/80 uppercase font-medium mb-0.5 md:mb-1 truncate">
+                                    Bets
+                                  </div>
+                                  <div className="font-bold text-xs md:text-base text-content">
+                                    {entry.totalBets}
+                                  </div>
+                                </div>
+                                <div>
+                                  <div className="text-[9px] md:text-xs text-content/80 uppercase font-medium mb-0.5 md:mb-1 truncate">
+                                    ROI
+                                  </div>
+                                  <div className="font-bold text-xs md:text-lg text-success">
+                                    {Math.round((entry.roi || 0) * 100)}%
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </li>
                       );
                     })}
-                  </tbody>
-                </table>
-              ) : pongLeaders.length === 0 ? (
-                <div className="text-center py-16">
-                  <div className="text-6xl mb-4">🏓</div>
-                  <h3 className="text-xl font-bold text-content mb-2">No Pong Champions Yet!</h3>
-                  <p className="text-sm text-tertiary">
-                    Be the first to dominate the Pong leaderboard.
-                  </p>
-                </div>
-              ) : (
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/20 sticky top-0">
-                    <tr className="text-xs text-tertiary">
-                      <th className="px-3 py-3 text-left w-16">Rank</th>
-                      <th className="px-3 py-3 text-left">Player</th>
-                      <th className="px-3 py-3 text-right">ELO Rating</th>
-                      <th className="px-3 py-3 text-right hidden sm:table-cell">Wins</th>
-                      <th className="px-3 py-3 text-right hidden md:table-cell">Win Streak</th>
-                      <th className="px-3 py-3 text-right hidden lg:table-cell">Total Won</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pongLeaders.slice(0, 20).map((entry) => {
+                </ul>
+
+                {/* Show More Button */}
+                {leaders.length > 10 && (
+                  <button
+                    onClick={() => setShowAllMarketLeaders(!showAllMarketLeaders)}
+                    className="see-more-btn mt-3"
+                  >
+                    {showAllMarketLeaders ? '▲ Show Less' : `▼ Show ${leaders.length - 10} More`}
+                  </button>
+                )}
+              </div>
+            ) : pongLeaders.length === 0 ? (
+              <div className="text-center py-16">
+                <div className="text-6xl mb-4">🏓</div>
+                <h3 className="text-xl font-bold text-content mb-2">No Pong Champions Yet!</h3>
+                <p className="text-sm text-content/80">
+                  Be the first to dominate the Pong leaderboard.
+                </p>
+              </div>
+            ) : (
+              <div>
+                <ul className="space-y-2 md:space-y-3">
+                  {pongLeaders
+                    .slice(0, showAllPongLeaders ? pongLeaders.length : 10)
+                    .map((entry) => {
                       const rank = entry.rank || 0;
-                      const getRankClass = () => {
-                        if (rank === 1) return 'rank-1';
-                        if (rank === 2) return 'rank-2';
-                        if (rank === 3) return 'rank-3';
-                        return '';
+                      const getRankBg = () => {
+                        if (rank === 1) return 'bg-yellow-500/10 border-yellow-500/30';
+                        if (rank === 2) return 'bg-gray-400/10 border-gray-400/30';
+                        if (rank === 3) return 'bg-amber-600/10 border-amber-600/30';
+                        return 'bg-surface border-border';
+                      };
+                      const getRankTextColor = () => {
+                        if (rank === 1) return 'text-yellow-400';
+                        if (rank === 2) return 'text-gray-300';
+                        if (rank === 3) return 'text-amber-600';
+                        return 'text-primary';
                       };
 
                       return (
-                        <tr
+                        <li
                           key={entry.userId}
-                          className={`border-b border-border/50 hover:bg-muted/10 transition-colors ${getRankClass()}`}
+                          className={`rounded-lg md:rounded-xl shadow-sm transition-all duration-300 hover:shadow-md border-2 ${getRankBg()} p-3 md:p-6`}
                         >
-                          <td className="px-3 py-3 font-bold text-base">
-                            <span className="flex items-center gap-1">{getRankIcon(rank)}</span>
-                          </td>
-                          <td className="px-3 py-3">
-                            <span className="font-semibold text-content">{entry.userName}</span>
-                          </td>
-                          <td className="px-3 py-3 text-right">
-                            <span className="font-bold text-primary">{entry.eloRating}</span>
-                          </td>
-                          <td className="px-3 py-3 text-right hidden sm:table-cell">
-                            <span className="font-medium">{entry.wins || 0}</span>
-                          </td>
-                          <td className="px-3 py-3 text-right hidden md:table-cell">
-                            <span className="text-tertiary">{entry.winStreak || 0}</span>
-                          </td>
-                          <td className="px-3 py-3 text-right hidden lg:table-cell">
-                            <span className="font-medium text-success">
-                              {formatMuskBucks(entry.totalWon || 0)}
-                            </span>
-                          </td>
-                        </tr>
+                          <div className="flex items-center gap-2 md:gap-6">
+                            {/* Rank & Avatar */}
+                            <div className="flex items-center gap-2 md:gap-3">
+                              {/* Rank */}
+                              <div className="w-8 h-8 md:w-14 md:h-14 flex items-center justify-center flex-shrink-0">
+                                <span
+                                  className={`text-lg md:text-3xl font-bold ${getRankTextColor()}`}
+                                >
+                                  {getRankIcon(rank)}
+                                </span>
+                              </div>
+
+                              {/* Avatar placeholder */}
+                              <div
+                                className={`w-8 h-8 md:w-14 md:h-14 rounded-full flex items-center justify-center font-bold text-xs md:text-lg border-2 flex-shrink-0 ${rank <= 3 ? 'border-current bg-surface' : 'bg-surface/70 border-border'} ${getRankTextColor()}`}
+                              >
+                                {entry.userName.charAt(0).toUpperCase()}
+                              </div>
+                            </div>
+
+                            {/* Name & Stats */}
+                            <div className="flex-1 min-w-0">
+                              {/* Name */}
+                              <div className="font-bold text-sm md:text-xl text-content mb-2 md:mb-3 truncate">
+                                {entry.userName}
+                              </div>
+
+                              {/* Stats Grid */}
+                              <div className="grid grid-cols-4 gap-1.5 md:gap-4">
+                                <div>
+                                  <div className="text-[9px] md:text-xs text-content/80 uppercase font-medium mb-0.5 md:mb-1 truncate">
+                                    ELO
+                                  </div>
+                                  <div className="font-bold text-xs md:text-lg text-primary">
+                                    {entry.eloRating}
+                                  </div>
+                                </div>
+                                <div>
+                                  <div className="text-[9px] md:text-xs text-content/80 uppercase font-medium mb-0.5 md:mb-1 truncate">
+                                    Wins
+                                  </div>
+                                  <div className="font-bold text-xs md:text-lg text-content">
+                                    {entry.wins || 0}
+                                  </div>
+                                </div>
+                                <div>
+                                  <div className="text-[9px] md:text-xs text-content/80 uppercase font-medium mb-0.5 md:mb-1 truncate">
+                                    Streak
+                                  </div>
+                                  <div className="font-bold text-xs md:text-base text-content">
+                                    {entry.winStreak || 0}
+                                  </div>
+                                </div>
+                                <div>
+                                  <div className="text-[9px] md:text-xs text-content/80 uppercase font-medium mb-0.5 md:mb-1 truncate">
+                                    Total Won
+                                  </div>
+                                  <div className="font-bold text-xs md:text-lg text-success truncate">
+                                    {formatMuskBucks(entry.totalWon || 0)}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </li>
                       );
                     })}
-                  </tbody>
-                </table>
-              )}
-            </div>
+                </ul>
+
+                {/* Show More Button */}
+                {pongLeaders.length > 10 && (
+                  <button
+                    onClick={() => setShowAllPongLeaders(!showAllPongLeaders)}
+                    className="see-more-btn mt-3"
+                  >
+                    {showAllPongLeaders ? '▲ Show Less' : `▼ Show ${pongLeaders.length - 10} More`}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
         {/* Compact Footer CTA */}
-        <div className="bg-surface border border-border rounded-lg p-6 text-center">
-          <h2 className="text-xl font-bold mb-2">Ready to Predict the Chaos?</h2>
-          <p className="text-sm text-tertiary mb-4">Join thousands tracking Elon's moves</p>
+        <div className="bg-surface border border-border rounded-lg p-4 md:p-6 text-center mt-16 md:mt-20 lg:mt-24">
+          <h2 className="text-lg md:text-xl font-bold mb-2">Ready to Predict the Chaos?</h2>
+          <p className="text-xs md:text-sm text-content/80 mb-3 md:mb-4">
+            Join thousands tracking Elon's moves
+          </p>
           <a
             href={`${clientAppUrl}/register`}
-            className="inline-block px-8 py-3 bg-gradient-primary text-white rounded-lg font-semibold text-sm hover-lift shadow-sm"
+            className="inline-block px-6 py-2.5 md:px-8 md:py-3 bg-gradient-primary text-white rounded-lg font-semibold text-xs md:text-sm hover-lift shadow-sm"
           >
             🚀 Get Started Free
           </a>
@@ -827,10 +955,360 @@ export default function LandingPage({
 
       {/* Footer */}
       <footer className="border-t border-border bg-surface/50 mt-4">
-        <div className="container mx-auto px-3 py-2 text-center">
-          <p className="text-[9px] text-tertiary">© 2025 ElonMuskSucks.net</p>
+        <div className="container mx-auto px-3 py-3 md:py-4">
+          <div className="flex flex-col md:flex-row items-center justify-center gap-2 md:gap-4 mb-2">
+            <button
+              onClick={() => setShowPrivacyModal(true)}
+              className="text-xs md:text-sm text-content/80 hover:text-primary transition-colors underline"
+            >
+              Privacy Policy
+            </button>
+            <span className="hidden md:inline text-content/70">•</span>
+            <button
+              onClick={() => setShowTermsModal(true)}
+              className="text-xs md:text-sm text-content/80 hover:text-primary transition-colors underline"
+            >
+              Terms of Service
+            </button>
+          </div>
+          <p className="text-[9px] md:text-xs text-content/70 text-center">
+            © 2025 ElonMuskSucks.net
+          </p>
         </div>
       </footer>
+
+      {/* Privacy Policy Modal */}
+      {showPrivacyModal && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowPrivacyModal(false)}
+        >
+          <div
+            className="bg-surface rounded-lg shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto text-content"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="sticky top-0 bg-surface border-b border-border p-6 flex items-center justify-between">
+              <h2 className="text-2xl font-bold">Privacy Policy</h2>
+              <button
+                onClick={() => setShowPrivacyModal(false)}
+                className="p-2 hover:bg-background rounded-lg transition-colors"
+                aria-label="Close modal"
+              >
+                <span className="text-2xl">×</span>
+              </button>
+            </div>
+            <div className="p-6 space-y-4 text-sm">
+              <section>
+                <h3 className="text-lg font-semibold mb-2">About This Site</h3>
+                <p className="text-content/85">
+                  ElonMuskSucks.net is a satirical prediction market platform making fun of Elon
+                  Musk and other billionaires. We take your privacy seriously despite our
+                  tongue-in-cheek approach to everything else.
+                </p>
+              </section>
+
+              <section>
+                <h3 className="text-lg font-semibold mb-2">1. What We Collect</h3>
+                <p className="text-content/85 mb-2">
+                  We collect only what's necessary to run the site:
+                </p>
+                <ul className="list-disc list-inside text-content/85 ml-4 space-y-1">
+                  <li>Account information (name, email address, password)</li>
+                  <li>Profile data (bio, location, avatar - all optional)</li>
+                  <li>Platform activity (predictions, bets, game scores, chat messages)</li>
+                  <li>Technical data (IP address, device info for security purposes)</li>
+                </ul>
+              </section>
+
+              <section>
+                <h3 className="text-lg font-semibold mb-2">2. How We Use Your Data</h3>
+                <p className="text-content/85 mb-2">
+                  Your information is used exclusively for site functionality:
+                </p>
+                <ul className="list-disc list-inside text-content/85 ml-4 space-y-1">
+                  <li>Providing core features (authentication, leaderboards, predictions)</li>
+                  <li>Maintaining game integrity and preventing abuse</li>
+                  <li>Technical support and bug fixes</li>
+                  <li>Detecting and preventing illegal activity</li>
+                </ul>
+                <p className="text-content/85 mt-2 font-semibold">
+                  We do NOT use your data for advertising, marketing, or any other commercial
+                  purposes.
+                </p>
+              </section>
+
+              <section>
+                <h3 className="text-lg font-semibold mb-2">3. We Never Share Your Data</h3>
+                <p className="text-content/85 mb-2">
+                  <strong>Period.</strong> We do not sell, trade, rent, or share your personal
+                  information with third parties. Ever.
+                </p>
+                <p className="text-content/85 mb-2">The only exceptions are:</p>
+                <ul className="list-disc list-inside text-content/85 ml-4 space-y-1">
+                  <li>When required by law (court orders, legal investigations)</li>
+                  <li>To report illegal activity to authorities</li>
+                  <li>To ban users engaged in illegal behavior</li>
+                </ul>
+                <p className="text-content/85 mt-2">
+                  That's it. No data brokers, no advertisers, no shady third parties.
+                </p>
+              </section>
+
+              <section>
+                <h3 className="text-lg font-semibold mb-2">4. Cookies</h3>
+                <p className="text-content/85">
+                  We use exactly two types of cookies, both essential for site functionality:
+                </p>
+                <ul className="list-disc list-inside text-content/85 ml-4 mt-2 space-y-1">
+                  <li>
+                    <strong>Session Token:</strong> HTTP-only cookie for authentication (can't be
+                    accessed by JavaScript)
+                  </li>
+                  <li>
+                    <strong>Refresh Token:</strong> Standard cookie to keep you logged in
+                  </li>
+                </ul>
+                <p className="text-content/85 mt-2">
+                  No tracking cookies. No analytics cookies. No advertising cookies. Just the bare
+                  minimum to keep you authenticated.
+                </p>
+              </section>
+
+              <section>
+                <h3 className="text-lg font-semibold mb-2">5. Data Security</h3>
+                <p className="text-content/85">
+                  We implement industry-standard security measures including password hashing,
+                  encrypted connections, and secure database storage. While no system is 100%
+                  secure, we do everything reasonable to protect your data.
+                </p>
+              </section>
+
+              <section>
+                <h3 className="text-lg font-semibold mb-2">6. Your Rights</h3>
+                <p className="text-content/85 mb-2">You have the right to:</p>
+                <ul className="list-disc list-inside text-content/85 ml-4 space-y-1">
+                  <li>Access your personal information</li>
+                  <li>Update or correct your data</li>
+                  <li>Request account deletion</li>
+                  <li>Export your data</li>
+                </ul>
+                <p className="text-content/85 mt-2">
+                  Contact us through the platform to exercise these rights.
+                </p>
+              </section>
+
+              <section>
+                <h3 className="text-lg font-semibold mb-2">7. Age Restriction</h3>
+                <p className="text-content/85">
+                  <strong>You must be 18 years or older to use this site.</strong> We do not
+                  knowingly collect information from anyone under 18. If you're a parent and
+                  discover your child has created an account, contact us immediately and we'll
+                  delete it.
+                </p>
+                <p className="text-content/85 mt-2">
+                  Age verification is the responsibility of users and parents. We are not liable for
+                  minors who misrepresent their age.
+                </p>
+              </section>
+
+              <section>
+                <h3 className="text-lg font-semibold mb-2">8. Data Retention</h3>
+                <p className="text-content/85">
+                  We keep your data for as long as your account is active. If you delete your
+                  account, we'll remove your personal information (though we may retain anonymized
+                  data for platform statistics).
+                </p>
+                <p className="text-content/85 mt-2">
+                  Exception: If you've been banned for illegal activity, we'll retain your IP
+                  address, device information, and relevant logs indefinitely for security purposes.
+                </p>
+              </section>
+
+              <section>
+                <h3 className="text-lg font-semibold mb-2">9. Changes to This Policy</h3>
+                <p className="text-content/85">
+                  We may update this Privacy Policy. Changes will be posted on this page with an
+                  updated date. Continued use of the site after changes constitutes acceptance.
+                </p>
+              </section>
+
+              <section>
+                <h3 className="text-lg font-semibold mb-2">10. Questions?</h3>
+                <p className="text-content/85">
+                  Contact us through the platform if you have questions about this Privacy Policy.
+                </p>
+              </section>
+
+              <p className="text-content/70 text-xs mt-6 pt-4 border-t border-border">
+                Last updated: October 2024
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Terms of Service Modal */}
+      {showTermsModal && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowTermsModal(false)}
+        >
+          <div
+            className="bg-surface rounded-lg shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto text-content"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="sticky top-0 bg-surface border-b border-border p-6 flex items-center justify-between">
+              <h2 className="text-2xl font-bold">Terms of Service</h2>
+              <button
+                onClick={() => setShowTermsModal(false)}
+                className="p-2 hover:bg-background rounded-lg transition-colors"
+                aria-label="Close modal"
+              >
+                <span className="text-2xl">×</span>
+              </button>
+            </div>
+            <div className="p-6 space-y-4 text-sm">
+              <section>
+                <h3 className="text-lg font-semibold mb-2">About This Site</h3>
+                <p className="text-content/85">
+                  ElonMuskSucks.net is a <strong>satirical</strong> prediction market platform
+                  poking fun at Elon Musk and other billionaires. This is entertainment, not
+                  financial advice. By using this site, you acknowledge you understand this is all
+                  in good fun (mostly).
+                </p>
+              </section>
+
+              <section>
+                <h3 className="text-lg font-semibold mb-2">1. Acceptance of Terms</h3>
+                <p className="text-content/85">
+                  By accessing elonmusksucks.net, you agree to these terms. If you don't agree,
+                  please close this tab and go touch some grass.
+                </p>
+              </section>
+
+              <section>
+                <h3 className="text-lg font-semibold mb-2">2. Age Requirement</h3>
+                <p className="text-content/85">
+                  <strong>You must be 18 years or older to use this site.</strong> Period. No
+                  exceptions. Age verification is your responsibility (and your parents' if you're a
+                  rebellious minor). We are not liable if you lie about your age.
+                </p>
+              </section>
+
+              <section>
+                <h3 className="text-lg font-semibold mb-2">3. Virtual Currency (MuskBucks)</h3>
+                <p className="text-content/85">
+                  MuskBucks have <strong>ZERO</strong> real-world monetary value. You cannot
+                  exchange them for actual money. They're imaginary internet points for
+                  entertainment purposes only. Don't quit your day job.
+                </p>
+              </section>
+
+              <section>
+                <h3 className="text-lg font-semibold mb-2">4. Account Responsibility</h3>
+                <p className="text-content/85">
+                  You're responsible for your account security. Don't share your password. Don't use
+                  "password123." Use a password manager like a responsible adult. Any activity under
+                  your account is your responsibility.
+                </p>
+              </section>
+
+              <section>
+                <h3 className="text-lg font-semibold mb-2">5. Market Manipulation & Gaming</h3>
+                <p className="text-content/85 mb-2">
+                  Here's the deal: You <em>can</em> try to manipulate prediction markets or game the
+                  system. Go ahead, be creative. <strong>However</strong>, if you get caught:
+                </p>
+                <ul className="list-disc list-inside text-content/85 ml-4 space-y-1">
+                  <li>First offense: Temporary ban (duration at our discretion)</li>
+                  <li>Repeat offense: Permanent ban</li>
+                  <li>Your username gets immortalized on the Wall of Shame for everyone to mock</li>
+                  <li>All your MuskBucks go poof (because they were never real anyway)</li>
+                </ul>
+                <p className="text-content/85 mt-2">
+                  Play stupid games, win stupid prizes. We're watching. 👀
+                </p>
+              </section>
+
+              <section>
+                <h3 className="text-lg font-semibold mb-2">6. Prohibited Activities</h3>
+                <p className="text-content/85 mb-2">You agree NOT to:</p>
+                <ul className="list-disc list-inside text-content/85 ml-4 space-y-1">
+                  <li>Do anything illegal (this should be obvious, but here we are)</li>
+                  <li>Harass, threaten, or abuse other users</li>
+                  <li>Post content that violates laws or others' rights</li>
+                  <li>Create multiple accounts to circumvent bans or limitations</li>
+                  <li>Use bots or automated tools without permission</li>
+                  <li>Attempt to hack, DDoS, or otherwise attack our infrastructure</li>
+                </ul>
+              </section>
+
+              <section>
+                <h3 className="text-lg font-semibold mb-2">7. Infrastructure Attacks</h3>
+                <p className="text-content/85 mb-2">
+                  If you attempt malicious attacks on our servers, databases, or infrastructure:
+                </p>
+                <ul className="list-disc list-inside text-content/85 ml-4 space-y-1">
+                  <li>We will permanently ban you</li>
+                  <li>We will save your IP address, device fingerprint, and location data</li>
+                  <li>We will report you to relevant authorities if warranted</li>
+                  <li>We may show up at your house (just kidding... or are we? 🏠)</li>
+                </ul>
+                <p className="text-content/85 mt-2">
+                  Don't be that person. We have logs. Lots of logs.
+                </p>
+              </section>
+
+              <section>
+                <h3 className="text-lg font-semibold mb-2">8. Content Guidelines</h3>
+                <p className="text-content/85">
+                  Keep it civil. Satire and mockery of billionaires is encouraged, but harassment of
+                  other users is not. We reserve the right to remove content and ban users who
+                  violate community standards. Use your brain.
+                </p>
+              </section>
+
+              <section>
+                <h3 className="text-lg font-semibold mb-2">9. Disclaimer</h3>
+                <p className="text-content/85">
+                  This site is provided "as is" with no warranties. We make no guarantees about
+                  uptime, accuracy, or anything else. Use at your own risk. We're not responsible
+                  for your poor betting decisions.
+                </p>
+              </section>
+
+              <section>
+                <h3 className="text-lg font-semibold mb-2">10. Liability Limitation</h3>
+                <p className="text-content/85">
+                  We are not liable for any damages arising from your use of this site. This
+                  includes but is not limited to: hurt feelings from losing fake internet money,
+                  FOMO from missing out on predictions, or rage-quitting after losing at Pong.
+                </p>
+              </section>
+
+              <section>
+                <h3 className="text-lg font-semibold mb-2">11. Changes to Terms</h3>
+                <p className="text-content/85">
+                  We can update these terms whenever we want. Continued use of the site means you
+                  accept the new terms. Check back occasionally if you care about this stuff.
+                </p>
+              </section>
+
+              <section>
+                <h3 className="text-lg font-semibold mb-2">12. Questions?</h3>
+                <p className="text-content/85">
+                  Contact us through the platform if you have questions about these Terms of
+                  Service.
+                </p>
+              </section>
+
+              <p className="text-content/70 text-xs mt-6 pt-4 border-t border-border">
+                Last updated: October 2024
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
