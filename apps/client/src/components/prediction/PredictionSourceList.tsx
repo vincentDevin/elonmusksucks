@@ -24,7 +24,6 @@ export const PredictionSourceList: React.FC<PredictionSourceListProps> = ({
   const hasMore = sources.length > maxVisible;
 
   if (compact) {
-
     return (
       <div className="flex items-center gap-2 text-sm text-content-secondary">
         <LinkIcon className="w-3.5 h-3.5" />

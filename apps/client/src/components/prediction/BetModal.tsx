@@ -559,7 +559,7 @@ export default function BetModal({
             type="button"
             onClick={submit}
             disabled={!amount || amount > balance || placing}
-            className="flex-1 px-4 py-3 bg-primary text-surface rounded-lg hover:bg-primary-hover hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 transition-all cursor-pointer font-medium shadow-md hover:shadow-lg"
+            className="flex-1 px-4 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary-hover hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 transition-all cursor-pointer font-medium shadow-md hover:shadow-lg"
           >
             {placing ? 'Placing...' : `Place Bet`}
           </button>
@@ -602,7 +602,7 @@ export function BetForm(props: {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors"
+        className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary-hover transition-colors"
       >
         Place Bet
       </button>
@@ -643,7 +643,7 @@ export function OptimisticBetForm(props: {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors"
+        className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary-hover transition-colors"
       >
         Bet on {props.optionName}
       </button>

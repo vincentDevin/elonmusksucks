@@ -26,7 +26,6 @@ import OddsBar from './OddsBar';
 import BetModal from './BetModal';
 import BetsList from './BetsList';
 import { PredictionSourceList } from './PredictionSourceList';
-import { FloatingParlayIndicator } from './ParlaySelectionIndicator';
 import PredictionAnalytics from './PredictionAnalytics';
 import PredictionComments from './PredictionComments';
 import PredictionReactions from './PredictionReactions';
@@ -541,11 +540,6 @@ export default function PredictionDetailView({
           </div>
         </div>
       </div>
-
-      {/* Parlay Indicator */}
-      {isInParlay && (
-        <FloatingParlayIndicator predictionId={prediction.id} position="bottom-right" />
-      )}
 
       {/* Bet Modal */}
       <BetModal

@@ -10,6 +10,7 @@ import EnhancedPredictionFilters from '../components/prediction/EnhancedPredicti
 import PredictionPreview from '../components/prediction/PredictionPreview';
 import PredictionDetailView from '../components/prediction/PredictionDetailView';
 import { FloatingParlayIndicator } from '../components/prediction/ParlaySelectionIndicator';
+import BetModal from '../components/prediction/BetModal';
 
 // Existing components
 import PredictionCard from '../components/prediction/PredictionCard';

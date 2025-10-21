@@ -100,11 +100,7 @@ function SimplePredictionCard({
 
   const handleBetClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (onQuickBet) {
-      onQuickBet(prediction);
-    } else {
-      setShowBetModal(true);
-    }
+    setShowBetModal(true);
   };
 
   const getStatusColor = () => {
@@ -137,7 +133,9 @@ function SimplePredictionCard({
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 md:gap-8">
           {/* Left: Title & Metadata */}
           <div className="flex-1 min-w-0 space-y-2 md:space-y-3">
-            <h3 className="text-lg md:text-xl font-bold text-content line-clamp-2 md:line-clamp-1">{prediction.title}</h3>
+            <h3 className="text-lg md:text-xl font-bold text-content line-clamp-2 md:line-clamp-1">
+              {prediction.title}
+            </h3>
             <div className="flex items-center gap-4 flex-wrap">
               {prediction.category && (
                 <span className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm font-medium inline-flex items-center gap-1.5">

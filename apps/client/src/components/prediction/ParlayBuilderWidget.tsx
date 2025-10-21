@@ -201,8 +201,7 @@ export const ParlayBuilderWidget: React.FC<ParlayBuilderWidgetProps> = ({
                 <span className="text-sm text-tertiary">{parlayState.legs.length} selections</span>
                 {bonusPercentage > 0 && (
                   <span className="px-2 py-0.5 bg-success/20 text-success text-xs rounded-full font-medium flex items-center gap-1">
-                    <Zap className="w-3 h-3" />
-                    +{bonusPercentage}% bonus
+                    <Zap className="w-3 h-3" />+{bonusPercentage}% bonus
                   </span>
                 )}
               </div>
@@ -286,7 +285,9 @@ export const ParlayBuilderWidget: React.FC<ParlayBuilderWidgetProps> = ({
                     <Zap className="w-3 h-3 text-warning" />
                     Parlay Bonus ({bonusPercentage}%)
                   </span>
-                  <span className="font-medium text-success">+{formatMuskBucks(bonusAmount)} 🪙</span>
+                  <span className="font-medium text-success">
+                    +{formatMuskBucks(bonusAmount)} 🪙
+                  </span>
                 </div>
               )}
               <div className="pt-2 border-t border-border">
