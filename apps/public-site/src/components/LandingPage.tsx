@@ -362,88 +362,109 @@ export default function LandingPage({
                           </div>
 
                           {/* Title */}
-                          <div className="pr-12 sm:pr-20 xl:pr-24 2xl:pr-28 mb-2 sm:mb-3 xl:mb-4">
-                            <h3 className="font-semibold text-fluid-md xl:text-fluid-lg 2xl:text-fluid-xl leading-tight mb-1.5 sm:mb-2 xl:mb-3 text-content">
+                          <div className="pr-12 sm:pr-20 mb-3 sm:mb-4 xl:mb-5">
+                            <h3 className="font-semibold text-fluid-md xl:text-fluid-lg 2xl:text-fluid-xl leading-tight text-content">
                               {prediction.title}
                             </h3>
-                            <div className="flex gap-1.5 sm:gap-2 xl:gap-2.5 2xl:gap-3 flex-wrap items-center">
+                          </div>
+
+                          {/* Metadata Row: Category/Type/Creator | Stats */}
+                          <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 mb-4 sm:mb-5 xl:mb-6 pb-3 sm:pb-4 md:pb-5 border-b border-border/50">
+                            {/* Left: Category, Type & Creator */}
+                            <div className="flex gap-3 md:gap-4 lg:gap-5 items-center flex-wrap">
                               <span
-                                className={`text-fluid-2xs sm:text-fluid-xs xl:text-fluid-sm px-1.5 sm:px-2 xl:px-2.5 2xl:px-3 py-0.5 xl:py-1 rounded-full border ${getCategoryColor(prediction.category?.name || '')}`}
+                                className={`text-xs sm:text-sm md:text-base lg:text-lg px-2.5 sm:px-3 md:px-3.5 lg:px-4 py-1 md:py-1.5 rounded-full border ${getCategoryColor(prediction.category?.name || '')}`}
                               >
                                 {prediction.category?.name || 'Unknown'}
                               </span>
-                              <span className="text-fluid-2xs sm:text-fluid-xs xl:text-fluid-sm text-content/70">
+                              <span className="text-xs sm:text-sm md:text-base lg:text-lg text-content/70">
                                 {prediction.type}
                               </span>
+
+                              {/* Creator Info */}
+                              {prediction.creator && (
+                                <div className="flex items-center gap-2 md:gap-2.5">
+                                  {prediction.creator.avatarUrl && (
+                                    <img
+                                      src={prediction.creator.avatarUrl}
+                                      alt={prediction.creator.name}
+                                      className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 lg:w-8 lg:h-8 rounded-full object-cover"
+                                    />
+                                  )}
+                                  <span className="text-content/80 text-xs sm:text-sm md:text-base lg:text-lg">
+                                    by{' '}
+                                    <span className="text-content font-medium">
+                                      {prediction.creator.name}
+                                    </span>
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Right: Stats */}
+                            <div className="flex items-center gap-4 md:gap-5 lg:gap-6 text-content/80">
+                              <span className="flex items-center gap-1.5 md:gap-2">
+                                <span className="text-base sm:text-lg md:text-xl lg:text-2xl">
+                                  💰
+                                </span>
+                                <span className="text-xs sm:text-sm md:text-base lg:text-lg font-medium">
+                                  {formatMuskBucks(getTotalVolume(prediction))}
+                                </span>
+                              </span>
+                              <span className="flex items-center gap-1.5 md:gap-2">
+                                <span className="text-base sm:text-lg md:text-xl lg:text-2xl">
+                                  📊
+                                </span>
+                                <span className="text-xs sm:text-sm md:text-base lg:text-lg font-medium">
+                                  {prediction.bets.length}
+                                </span>
+                              </span>
+                              {!prediction.resolvedAt && (
+                                <span className="flex items-center gap-1.5 md:gap-2">
+                                  <span className="text-base sm:text-lg md:text-xl lg:text-2xl">
+                                    ⏰
+                                  </span>
+                                  <span className="text-xs sm:text-sm md:text-base lg:text-lg font-medium">
+                                    {getTimeRemaining(prediction.expiresAt)}
+                                  </span>
+                                </span>
+                              )}
                             </div>
                           </div>
 
-                          {/* Creator Info */}
-                          {prediction.creator && (
-                            <div className="flex items-center gap-1.5 sm:gap-2 xl:gap-2.5 mb-2 sm:mb-3 xl:mb-4">
-                              {prediction.creator.avatarUrl && (
-                                <img
-                                  src={prediction.creator.avatarUrl}
-                                  alt={prediction.creator.name}
-                                  className="w-4 h-4 sm:w-5 sm:h-5 xl:w-6 xl:h-6 2xl:w-7 2xl:h-7 rounded-full object-cover"
-                                />
-                              )}
-                              <span className="text-content/80 text-fluid-2xs sm:text-fluid-xs xl:text-fluid-sm">
-                                by{' '}
-                                <span className="text-content font-medium">
-                                  {prediction.creator.name}
-                                </span>
-                              </span>
+                          {/* Description */}
+                          {prediction.description && (
+                            <div className="mb-4 sm:mb-5 md:mb-6">
+                              <h4 className="text-content font-semibold text-xs sm:text-sm md:text-base mb-2 sm:mb-2.5 md:mb-3 uppercase tracking-wide">
+                                Terms of Prediction
+                              </h4>
+                              <p className="text-content/90 text-sm sm:text-base md:text-lg leading-relaxed">
+                                {prediction.description}
+                              </p>
                             </div>
                           )}
 
-                          {/* Stats */}
-                          <div className="flex items-center gap-2 sm:gap-3 md:gap-4 xl:gap-5 2xl:gap-6 text-fluid-xs sm:text-fluid-sm xl:text-fluid-base text-content/80 mb-2 sm:mb-3 xl:mb-4 flex-wrap">
-                            <span className="flex items-center gap-0.5 sm:gap-1 xl:gap-1.5">
-                              <span className="text-sm sm:text-base xl:text-lg 2xl:text-xl">
-                                💰
-                              </span>
-                              <span className="text-fluid-2xs sm:text-fluid-sm xl:text-fluid-base">
-                                {formatMuskBucks(getTotalVolume(prediction))}
-                              </span>
-                            </span>
-                            <span className="flex items-center gap-0.5 sm:gap-1 xl:gap-1.5">
-                              <span className="text-sm sm:text-base xl:text-lg 2xl:text-xl">
-                                📊
-                              </span>
-                              <span className="text-fluid-2xs sm:text-fluid-sm xl:text-fluid-base">
-                                {prediction.bets.length} bets
-                              </span>
-                            </span>
-                            {!prediction.resolvedAt && (
-                              <span className="flex items-center gap-0.5 sm:gap-1 xl:gap-1.5 text-fluid-2xs sm:text-fluid-xs xl:text-fluid-sm">
-                                <span className="text-sm sm:text-base xl:text-lg 2xl:text-xl">
-                                  ⏰
-                                </span>
-                                {getTimeRemaining(prediction.expiresAt)}
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Options */}
-                          <div className="flex gap-1.5 sm:gap-2 xl:gap-2.5 2xl:gap-3 flex-wrap">
+                          {/* Betting Options - Centered 2-Column Grid */}
+                          <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 max-w-2xl mx-auto mb-4">
                             {prediction.options.map((option) => (
                               <div
                                 key={option.id}
-                                className="bg-surface/70 hover:bg-surface/90 border border-border/30 rounded px-2 py-1 sm:px-3 sm:py-1.5 xl:px-4 xl:py-2 2xl:px-5 2xl:py-2.5 text-fluid-xs sm:text-fluid-sm xl:text-fluid-base transition-colors"
+                                className="bg-surface/70 hover:bg-primary/10 border border-border/40 hover:border-primary/60 rounded-lg px-3 py-2.5 sm:px-4 sm:py-3 md:px-5 md:py-3.5 lg:px-6 lg:py-4 text-center transition-all cursor-pointer hover:scale-[1.02] hover:shadow-md"
                               >
-                                <span className="font-medium text-content">{option.label}</span>
-                                <span className="text-primary font-bold ml-1 sm:ml-2 xl:ml-2.5">
+                                <div className="font-semibold text-content text-fluid-xs sm:text-fluid-sm md:text-fluid-base mb-1">
+                                  {option.label}
+                                </div>
+                                <div className="text-primary font-bold text-fluid-sm sm:text-fluid-md md:text-fluid-lg lg:text-fluid-xl">
                                   {formatOdds(option.odds)}
-                                </span>
+                                </div>
                               </div>
                             ))}
                           </div>
 
                           {/* Recent Bets */}
                           {prediction.bets.length > 0 && (
-                            <div className="mt-2 sm:mt-3 xl:mt-4 pt-2 sm:pt-3 xl:pt-4 border-t border-border text-fluid-2xs sm:text-fluid-xs xl:text-fluid-sm text-content/80">
-                              <div className="flex items-center gap-1.5 sm:gap-2 xl:gap-2.5 flex-wrap">
+                            <div className="pt-3 sm:pt-4 border-t border-border text-fluid-2xs sm:text-fluid-xs xl:text-fluid-sm text-content/80">
+                              <div className="flex items-center gap-2 flex-wrap">
                                 <span className="font-medium">Recent:</span>
                                 {prediction.bets.slice(0, 2).map((bet) => (
                                   <span key={bet.id}>
