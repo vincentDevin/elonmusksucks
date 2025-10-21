@@ -17,7 +17,6 @@ import type {
   LeaderboardStatsResponse,
   LeaderboardQueryParams,
 } from '@ems/types';
-import { cache, CACHE_KEYS } from '../utils/cache';
 
 export type LeaderboardPeriod = 'all-time' | 'daily';
 export type LeaderboardMetric = 'profit' | 'winRate' | 'volume' | 'roi';
@@ -97,20 +96,9 @@ export function useLeaderboard(
   const previousDataRef = useRef<PublicLeaderboardEntry[]>([]);
   const achievementTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
-  // Fetch leaderboard data with pagination and caching
+  // Fetch leaderboard data with pagination
   const fetchLeaderboard = useCallback(
     async (page: number = 1, force = false) => {
-      const cacheKey = `${CACHE_KEYS.USER_LEADERBOARD(user?.id || 0, period)}_${page}_${metric}`;
-
-      // Check cache first unless forcing refresh
-      if (!force) {
-        const cachedData = cache.get<LeaderboardState>(cacheKey);
-        if (cachedData && !cachedData.loading) {
-          setState(cachedData);
-          return;
-        }
-      }
-
       setState((prev) => ({ ...prev, loading: true, error: null }));
 
       try {

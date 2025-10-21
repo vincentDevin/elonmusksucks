@@ -246,39 +246,49 @@ function SimplePredictionCard({
           </div>
         </div>
 
-        {/* Optional: Quick odds preview bar */}
-        {prediction.options.length === 2 && (
+        {/* Pool distribution bar */}
+        {prediction.options.length > 0 && (
           <div className="mt-3 pt-3 border-t border-border">
-            <div className="flex items-center justify-between text-xs">
+            <div className="flex items-center justify-between text-xs mb-2">
               {prediction.options.map((option) => {
+                // Calculate pool percentage based on total bet amounts
+                const totalPool = prediction.bets.reduce((sum, bet) => sum + asNum(bet.amount), 0);
+                const optionPool = prediction.bets
+                  .filter((b) => b.optionId === option.id)
+                  .reduce((sum, bet) => sum + asNum(bet.amount), 0);
                 const percentage =
-                  prediction.bets.length > 0
-                    ? (prediction.bets.filter((b) => b.optionId === option.id).length /
-                        prediction.bets.length) *
-                      100
-                    : 50;
+                  totalPool > 0 ? (optionPool / totalPool) * 100 : 100 / prediction.options.length;
+
                 return (
                   <div key={option.id} className="flex items-center gap-2">
-                    <span className="text-tertiary">{option.label}</span>
+                    <span className="text-tertiary truncate max-w-[100px]">{option.label}</span>
                     <span className="font-medium text-content">{percentage.toFixed(0)}%</span>
                   </div>
                 );
               })}
             </div>
-            <div className="mt-1 h-1.5 bg-muted rounded-full overflow-hidden flex">
+            <div className="h-1.5 bg-muted rounded-full overflow-hidden flex">
               {prediction.options.map((option, index) => {
+                const totalPool = prediction.bets.reduce((sum, bet) => sum + asNum(bet.amount), 0);
+                const optionPool = prediction.bets
+                  .filter((b) => b.optionId === option.id)
+                  .reduce((sum, bet) => sum + asNum(bet.amount), 0);
                 const percentage =
-                  prediction.bets.length > 0
-                    ? (prediction.bets.filter((b) => b.optionId === option.id).length /
-                        prediction.bets.length) *
-                      100
-                    : 50;
+                  totalPool > 0 ? (optionPool / totalPool) * 100 : 100 / prediction.options.length;
+
+                const colors = [
+                  'bg-primary',
+                  'bg-secondary',
+                  'bg-accent',
+                  'bg-warning',
+                  'bg-success',
+                  'bg-error',
+                ];
+
                 return (
                   <div
                     key={option.id}
-                    className={`h-full transition-all duration-300 ${
-                      index === 0 ? 'bg-primary' : 'bg-secondary'
-                    }`}
+                    className={`h-full transition-all duration-300 ${colors[index % colors.length]}`}
                     style={{ width: `${percentage}%` }}
                   />
                 );
