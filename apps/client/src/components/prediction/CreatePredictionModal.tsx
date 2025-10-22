@@ -1,7 +1,12 @@
 // apps/client/src/components/prediction/CreatePredictionModal.tsx
 import { useState, useEffect } from 'react';
-import CreatePredictionForm from './CreatePredictionForm';
-import { createPrediction, getCategories, type Category } from '../../api/predictions';
+import { PredictionType } from '@ems/types';
+import {
+  createPrediction,
+  getCategories,
+  type Category,
+  type CreatePredictionPayload,
+} from '../../api/predictions';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePredictionMarket } from '../../contexts/PredictionContext';
 import api from '../../api/axios';
@@ -21,6 +26,16 @@ export default function CreatePredictionModal() {
   const [categoryMap, setCategoryMap] = useState<Record<string, number>>({});
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | undefined>();
   const [categoriesLoaded, setCategoriesLoaded] = useState(false);
+
+  // Form state (from CreatePredictionForm)
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [categoryId, setCategoryId] = useState<number | ''>('');
+  const [expiresAt, setExpiresAt] = useState<string>('');
+  const [type, setType] = useState<PredictionType>(PredictionType.MULTIPLE);
+  const [threshold, setThreshold] = useState<number | ''>('');
+  const [options, setOptions] = useState<string[]>(['']);
+  const [categories, setCategories] = useState<Category[]>([]);
 
   // Prediction templates for quick creation
   const templates = [
@@ -94,10 +109,10 @@ export default function CreatePredictionModal() {
   useEffect(() => {
     async function loadCategories() {
       try {
-        const categories = await getCategories();
+        const cats = await getCategories();
         // Map template category names to category IDs
         const map: Record<string, number> = {};
-        categories.forEach((cat: Category) => {
+        cats.forEach((cat: Category) => {
           // Handle both exact matches and variations
           const normalizedName = cat.name.toLowerCase().replace(/\s+/g, '');
           map[normalizedName] = cat.id;
@@ -105,6 +120,7 @@ export default function CreatePredictionModal() {
           map[cat.name.toLowerCase()] = cat.id;
         });
         setCategoryMap(map);
+        setCategories(cats); // Also set for form dropdown
         setCategoriesLoaded(true);
       } catch (error) {
         console.error('Failed to load categories:', error);
@@ -118,19 +134,59 @@ export default function CreatePredictionModal() {
     setSelectedTemplate(template.id);
     // Map template category to category ID
     const normalizedCategory = template.category.toLowerCase().replace(/\s+/g, '');
-    const categoryId =
+    const templateCategoryId =
       categoryMap[normalizedCategory] || categoryMap[template.category.toLowerCase()];
-    setSelectedCategoryId(categoryId);
+    setSelectedCategoryId(templateCategoryId);
+    // Also set the form category
+    if (templateCategoryId) {
+      setCategoryId(templateCategoryId);
+    }
     // Small delay for visual feedback
     setTimeout(() => {
       template.action();
     }, 200);
   };
 
-  const handleCreatePrediction = async (payload: any) => {
+  // Form helper functions
+  const isBinary = type === PredictionType.BINARY;
+  const isOU = type === PredictionType.OVER_UNDER;
+  const isMultiple = type === PredictionType.MULTIPLE;
+
+  // Validate that expiration date is in the future
+  const isExpirationValid = expiresAt && new Date(expiresAt) > new Date();
+
+  const canSubmit =
+    Boolean(title) &&
+    Boolean(description) &&
+    typeof categoryId === 'number' &&
+    Boolean(expiresAt) &&
+    isExpirationValid &&
+    ((isMultiple && options.every((o) => o.trim().length > 0)) ||
+      isBinary ||
+      (isOU && threshold !== ''));
+
+  const addOption = () => setOptions((prev) => [...prev, '']);
+  const updateOption = (idx: number, value: string) =>
+    setOptions((prev) => prev.map((v, i) => (i === idx ? value : v)));
+  const removeOption = (idx: number) => setOptions((prev) => prev.filter((_, i) => i !== idx));
+
+  const handleCreatePrediction = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!canSubmit) return;
+
     try {
       setCreating(true);
       setError(null);
+
+      const payload: CreatePredictionPayload = {
+        title,
+        description,
+        categoryId: typeof categoryId === 'number' ? categoryId : Number(categoryId),
+        expiresAt: new Date(expiresAt),
+        type,
+        threshold: isOU ? Number(threshold) : undefined,
+        options: isMultiple ? options.map((label) => ({ label })) : undefined,
+      };
 
       console.log('Creating prediction with payload:', payload);
       const newPrediction = await createPrediction(payload);
@@ -195,6 +251,14 @@ export default function CreatePredictionModal() {
     setSelectedTemplate(null);
     setError(null);
     setCreating(false);
+    // Reset form state
+    setTitle('');
+    setDescription('');
+    setCategoryId('');
+    setExpiresAt('');
+    setType(PredictionType.MULTIPLE);
+    setThreshold('');
+    setOptions(['']);
     closeCreateModal();
   };
 
@@ -205,6 +269,14 @@ export default function CreatePredictionModal() {
       setShowForm(false);
       setError(null);
       setCreating(false);
+      // Reset form state
+      setTitle('');
+      setDescription('');
+      setCategoryId('');
+      setExpiresAt('');
+      setType(PredictionType.MULTIPLE);
+      setThreshold('');
+      setOptions(['']);
     }
   }, [createModalOpen]);
 
@@ -214,6 +286,21 @@ export default function CreatePredictionModal() {
       setShowForm(true);
     }
   }, [createModalOpen, createModalSourceData, categoriesLoaded]);
+
+  // Pre-populate title when source data is available
+  useEffect(() => {
+    if (createModalSourceData && createModalSourceData.title && !title) {
+      // Suggest a prediction title based on the article
+      setTitle(`Will ${createModalSourceData.title.split(' ').slice(0, 8).join(' ')}...?`);
+    }
+  }, [createModalSourceData, title]);
+
+  // Set default category ID when provided
+  useEffect(() => {
+    if (selectedCategoryId && categoryId === '') {
+      setCategoryId(selectedCategoryId);
+    }
+  }, [selectedCategoryId, categoryId]);
 
   if (!createModalOpen) return null;
 
@@ -278,13 +365,211 @@ export default function CreatePredictionModal() {
             )}
 
             <div className="p-6">
-              <CreatePredictionForm
-                onCreated={handleCreatePrediction}
-                onCancel={handleClose}
-                sourceData={createModalSourceData}
-                disabled={creating}
-                defaultCategoryId={selectedCategoryId}
-              />
+              <form onSubmit={handleCreatePrediction} className="space-y-6">
+                {/* Source Information */}
+                {createModalSourceData && (
+                  <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="font-semibold text-content flex items-center">
+                        <span className="mr-2">📰</span>
+                        Prediction Source
+                      </h3>
+                    </div>
+                    <div className="bg-background/50 rounded p-3">
+                      <h4 className="font-medium text-content text-sm line-clamp-2">
+                        {createModalSourceData.title}
+                      </h4>
+                      <p className="text-xs text-content/60 mt-1">
+                        {createModalSourceData.publisher} •{' '}
+                        {createModalSourceData.type === 'article' ? 'Article' : 'Tweet'}
+                      </p>
+                      {createModalSourceData.url && (
+                        <a
+                          href={createModalSourceData.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-primary hover:text-primary/80 mt-1 inline-block cursor-pointer"
+                        >
+                          View Original →
+                        </a>
+                      )}
+                    </div>
+                    <p className="text-xs text-content/60 mt-2">
+                      This source will be automatically linked to your prediction as supporting
+                      evidence.
+                    </p>
+                  </div>
+                )}
+
+                {/* Form Fields */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="title" className="block mb-1 text-sm">
+                      Title
+                    </label>
+                    <input
+                      id="title"
+                      type="text"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      className="w-full border rounded-lg px-3 py-2 bg-surface text-content placeholder:text-tertiary focus:outline-none focus:ring-2 focus:ring-primary border-muted cursor-pointer"
+                      disabled={creating}
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="categoryId" className="block mb-1 text-sm">
+                      Category
+                    </label>
+                    <select
+                      id="categoryId"
+                      value={categoryId}
+                      onChange={(e) =>
+                        setCategoryId(e.target.value === '' ? '' : Number(e.target.value))
+                      }
+                      className="w-full border rounded-lg px-3 py-2 bg-surface text-content placeholder:text-tertiary focus:outline-none focus:ring-2 focus:ring-primary border-muted cursor-pointer"
+                      disabled={creating || !categoriesLoaded}
+                    >
+                      <option value="">
+                        {!categoriesLoaded ? 'Loading categories...' : 'Select a category'}
+                      </option>
+                      {categories.map((cat) => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.icon} {cat.name}
+                        </option>
+                      ))}
+                    </select>
+                    {categoriesLoaded && categories.length === 0 && (
+                      <p className="text-xs text-red-500 mt-1">
+                        No categories available. Please contact an administrator.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label htmlFor="description" className="block mb-1 text-sm">
+                      Terms of Prediction
+                    </label>
+                    <textarea
+                      id="description"
+                      rows={3}
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      className="w-full border rounded-lg px-3 py-2 bg-surface text-content placeholder:text-tertiary focus:outline-none focus:ring-2 focus:ring-primary border-muted cursor-pointer"
+                      disabled={creating}
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="expiresAt" className="block mb-1 text-sm">
+                      Expires At
+                    </label>
+                    <input
+                      id="expiresAt"
+                      type="date"
+                      value={expiresAt}
+                      onChange={(e) => setExpiresAt(e.target.value)}
+                      className={`w-full border rounded-lg px-3 py-2 bg-surface text-content placeholder:text-tertiary focus:outline-none focus:ring-2 focus:ring-primary border-muted cursor-pointer ${expiresAt && !isExpirationValid ? 'border-red-500 focus:ring-red-500' : ''}`}
+                      disabled={creating}
+                    />
+                    {expiresAt && !isExpirationValid && (
+                      <p className="text-red-500 text-xs mt-1">
+                        Expiration date must be in the future
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label htmlFor="type" className="block mb-1 text-sm">
+                      Prediction Type
+                    </label>
+                    <select
+                      id="type"
+                      value={type}
+                      onChange={(e) => setType(e.target.value as PredictionType)}
+                      className="w-full border rounded-lg px-3 py-2 bg-surface text-content placeholder:text-tertiary focus:outline-none focus:ring-2 focus:ring-primary border-muted cursor-pointer"
+                      disabled={creating}
+                    >
+                      <option value={PredictionType.MULTIPLE}>Multiple choice</option>
+                      <option value={PredictionType.BINARY}>Yes / No</option>
+                      <option value={PredictionType.OVER_UNDER}>Over / Under</option>
+                    </select>
+                  </div>
+
+                  {isOU && (
+                    <div>
+                      <label htmlFor="threshold" className="block mb-1 text-sm">
+                        Threshold
+                      </label>
+                      <input
+                        id="threshold"
+                        type="number"
+                        placeholder="e.g. 100"
+                        value={threshold}
+                        onChange={(e) =>
+                          setThreshold(e.target.value === '' ? '' : Number(e.target.value))
+                        }
+                        className="w-full border rounded-lg px-3 py-2 bg-surface text-content placeholder:text-tertiary focus:outline-none focus:ring-2 focus:ring-primary border-muted cursor-pointer"
+                        disabled={creating}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {isMultiple && (
+                  <div className="space-y-3">
+                    <label className="block mb-1 text-sm">Options</label>
+                    {options.map((opt, i) => (
+                      <div key={i} className="flex items-center space-x-2">
+                        <input
+                          type="text"
+                          placeholder={`Option #${i + 1}`}
+                          value={opt}
+                          onChange={(e) => updateOption(i, e.target.value)}
+                          className="w-full border rounded-lg px-3 py-2 bg-surface text-content placeholder:text-tertiary focus:outline-none focus:ring-2 focus:ring-primary border-muted cursor-pointer"
+                          disabled={creating}
+                        />
+                        {options.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeOption(i)}
+                            className="text-red-500 hover:text-red-700 cursor-pointer"
+                            disabled={creating}
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={addOption}
+                      className="text-primary text-sm font-medium cursor-pointer disabled:opacity-50"
+                      disabled={creating}
+                    >
+                      + Add another option
+                    </button>
+                  </div>
+                )}
+
+                <div className="pt-4 border-t flex justify-end space-x-4">
+                  <button
+                    type="button"
+                    onClick={handleClose}
+                    className="px-4 py-2 rounded-lg bg-muted hover:bg-tertiary cursor-pointer disabled:opacity-50"
+                    disabled={creating}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={!canSubmit || creating}
+                    className={`px-6 py-2 rounded-lg font-medium transition ${canSubmit && !creating ? 'bg-primary text-primary-foreground hover:bg-secondary cursor-pointer' : 'bg-muted text-tertiary cursor-not-allowed'}`}
+                  >
+                    {creating ? 'Creating...' : 'Create Prediction'}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         ) : (

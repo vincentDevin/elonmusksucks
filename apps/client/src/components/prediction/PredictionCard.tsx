@@ -8,6 +8,11 @@ import {
   ArrowTrendingUpIcon as TrendingUp,
   ChevronDownIcon as ChevronDown,
   ChevronUpIcon as ChevronUp,
+  ChevronRightIcon,
+  ClockIcon,
+  UsersIcon,
+  CurrencyDollarIcon,
+  BoltIcon,
 } from '@heroicons/react/24/outline';
 
 // Helper to convert string/number to number
@@ -28,7 +33,7 @@ import PredictionReactions from './PredictionReactions';
 
 interface UnifiedPredictionCardProps {
   prediction: PredictionFull;
-  variant?: 'full' | 'compact' | 'mini';
+  variant?: 'full' | 'compact' | 'mini' | 'list';
   showActions?: boolean;
   showBetsList?: boolean;
   showParlayActions?: boolean;
@@ -36,6 +41,8 @@ interface UnifiedPredictionCardProps {
   className?: string;
   hideInlineParlaySelector?: boolean; // Hide inline parlay selector but keep parlay button
   onCardView?: () => void; // Callback when card is viewed (not when buttons are clicked)
+  onQuickBet?: (prediction: PredictionFull) => void; // Callback for quick bet action
+  onAddToParlay?: (prediction: PredictionFull, optionId: number) => void; // Callback for adding to parlay
 }
 
 function UnifiedPredictionCard({
@@ -48,16 +55,20 @@ function UnifiedPredictionCard({
   className = '',
   hideInlineParlaySelector = false,
   onCardView,
+  onQuickBet,
+  onAddToParlay,
 }: UnifiedPredictionCardProps) {
   const { dispatch: parlayDispatch, state: parlayState } = useParlay();
   const [showBetModal, setShowBetModal] = useState(false);
   const [addingToParlay, setAddingToParlay] = useState<number | null>(null);
   const [showParlaySelector, setShowParlaySelector] = useState(false);
+  const [isAddingToParlay, setIsAddingToParlay] = useState(false);
 
   const flatParlays: ParlayLegWithUser[] = prediction.parlayLegs ?? [];
   const isCompact = variant === 'compact';
   const isMini = variant === 'mini';
   const isFullSize = variant === 'full';
+  const isList = variant === 'list';
 
   // Check if prediction is already in parlay
   const isInParlay = parlayState.legs.some((leg) => leg.predictionId === prediction.id);
@@ -137,6 +148,75 @@ function UnifiedPredictionCard({
     }
   };
 
+  // Quick parlay add handler (for list variant)
+  const handleQuickParlayAdd = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const bestOption = prediction.options.reduce((best, current) =>
+      current.odds > best.odds ? current : best,
+    );
+
+    if (!bestOption || isInParlay || prediction.resolved || now > expires) return;
+
+    setIsAddingToParlay(true);
+
+    if (onAddToParlay) {
+      onAddToParlay(prediction, bestOption.id);
+    } else {
+      parlayDispatch({
+        type: 'ADD_LEG',
+        leg: {
+          predictionId: prediction.id,
+          optionId: bestOption.id,
+          label: bestOption.label,
+          predictionTitle: prediction.title,
+          odds: bestOption.odds,
+        },
+      });
+    }
+
+    setTimeout(() => setIsAddingToParlay(false), 1500);
+  };
+
+  // Quick bet handler (for list variant)
+  const handleQuickBet = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onQuickBet) {
+      onQuickBet(prediction);
+    } else {
+      setShowBetModal(true);
+    }
+  };
+
+  // Helper functions for list variant
+  const getStatusColor = () => {
+    if (prediction.resolved) return 'text-success';
+    if (now > expires) return 'text-error';
+    if (hoursLeft <= 24 && !prediction.resolved) return 'text-warning';
+    return 'text-tertiary';
+  };
+
+  const getTimeDisplay = () => {
+    if (prediction.resolved) return 'Resolved';
+    if (now > expires) return 'Expired';
+    const daysLeft = Math.floor(hoursLeft / 24);
+    if (daysLeft > 0) return `${daysLeft}d left`;
+    if (hoursLeft > 0) return `${hoursLeft}h left`;
+    const minutesLeft = Math.ceil(timeLeft / (1000 * 60));
+    return `${minutesLeft}m left`;
+  };
+
+  const getOddsDisplay = () => {
+    if (prediction.options.length === 2) {
+      const [opt1, opt2] = prediction.options;
+      return `${opt1.odds.toFixed(2)}x vs ${opt2.odds.toFixed(2)}x`;
+    } else if (prediction.options.length > 0) {
+      const minOdds = Math.min(...prediction.options.map((o) => o.odds));
+      const maxOdds = Math.max(...prediction.options.map((o) => o.odds));
+      return `${minOdds.toFixed(2)}x - ${maxOdds.toFixed(2)}x`;
+    }
+    return '';
+  };
+
   // Responsive classes based on variant
   const cardClasses = `
     relative bg-surface border border-muted shadow-sm hover:shadow-md transition-all duration-200 hover:border-muted/60
@@ -163,7 +243,167 @@ function UnifiedPredictionCard({
 
   return (
     <>
-      {isFullSize ? (
+      {isList ? (
+        /* List Variant - Horizontal layout for list views */
+        <div
+          className={`
+            group relative bg-surface border border-border hover:border-primary/30
+            rounded-xl p-4 md:p-6 transition-all duration-200 hover:shadow-lg cursor-pointer
+            ${className}
+          `}
+          onClick={onCardView}
+        >
+          {/* Main Layout - Stacks on mobile, horizontal on desktop */}
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 md:gap-8">
+            {/* Left: Title & Metadata */}
+            <div className="flex-1 min-w-0 space-y-2 md:space-y-3">
+              <h3 className="text-lg md:text-xl font-bold text-content line-clamp-2 md:line-clamp-1">
+                {prediction.title}
+              </h3>
+              <div className="flex items-center gap-4 flex-wrap">
+                {prediction.category && (
+                  <span className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm font-medium inline-flex items-center gap-1.5">
+                    {prediction.category.icon && (
+                      <span className="text-base">{prediction.category.icon}</span>
+                    )}
+                    <span>{prediction.category.name}</span>
+                  </span>
+                )}
+                {prediction.creator && (
+                  <div className="flex items-center gap-2 text-sm text-tertiary">
+                    {prediction.creator.avatarUrl && (
+                      <img
+                        src={prediction.creator.avatarUrl}
+                        alt={prediction.creator.name}
+                        className="w-5 h-5 rounded-full object-cover"
+                      />
+                    )}
+                    <span>
+                      by{' '}
+                      <span className="text-content font-semibold">{prediction.creator.name}</span>
+                    </span>
+                  </div>
+                )}
+                <PredictionReactions predictionId={prediction.id} compact />
+              </div>
+
+              {/* Source Links */}
+              {prediction.sourceLinks && prediction.sourceLinks.length > 0 && (
+                <div className="mt-2">
+                  <PredictionSourceList sources={prediction.sourceLinks} compact />
+                </div>
+              )}
+            </div>
+
+            {/* Center: Stats - Hidden on mobile, shown on tablet+ */}
+            <div className="hidden md:flex items-center gap-4 lg:gap-8 text-sm md:text-base">
+              <div className="flex items-center gap-2 text-tertiary">
+                <UsersIcon className="w-4 h-4 md:w-5 md:h-5" />
+                <span className="font-semibold">{totalBets}</span>
+                <span className="text-xs md:text-sm hidden lg:inline">bets</span>
+              </div>
+              {totalVolume > 0 && (
+                <div className="flex items-center gap-2 text-tertiary">
+                  <CurrencyDollarIcon className="w-4 h-4 md:w-5 md:h-5" />
+                  <span className="font-semibold text-success">
+                    {formatMuskBucks(totalVolume)} 🪙
+                  </span>
+                </div>
+              )}
+              {prediction.options.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 md:w-5 md:h-5 text-primary" />
+                  <span className="text-primary font-bold">{getOddsDisplay()}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Right: Actions & Status - Responsive layout */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 md:gap-4 flex-shrink-0 w-full sm:w-auto">
+              {/* Action Buttons */}
+              {!prediction.resolved && now <= expires && (
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <button
+                    onClick={handleQuickBet}
+                    className="flex-1 sm:flex-none px-4 sm:px-5 py-2 bg-primary hover:bg-primary-hover text-primary-foreground text-sm font-semibold rounded-lg transition-colors"
+                  >
+                    <span className="hidden sm:inline">Quick Bet</span>
+                    <span className="sm:hidden">Bet</span>
+                  </button>
+                  {showParlayActions && (
+                    <button
+                      onClick={handleQuickParlayAdd}
+                      disabled={isInParlay || isAddingToParlay}
+                      className={`
+                        flex-1 sm:flex-none px-3 sm:px-4 py-2 text-sm font-semibold rounded-lg transition-all
+                        ${
+                          isInParlay
+                            ? 'bg-success/20 text-success cursor-not-allowed'
+                            : isAddingToParlay
+                              ? 'bg-success text-surface scale-105'
+                              : 'bg-secondary/20 text-secondary hover:bg-secondary/30'
+                        }
+                      `}
+                    >
+                      {isInParlay ? '✓ In Parlay' : isAddingToParlay ? '✓ Added!' : '+ Parlay'}
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Time Display & Status Indicators */}
+              <div className="flex items-center gap-2 justify-between sm:justify-start">
+                <div
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${getStatusColor()} bg-opacity-10`}
+                >
+                  <ClockIcon className="w-4 h-4" />
+                  <span className="font-bold text-sm whitespace-nowrap">{getTimeDisplay()}</span>
+                </div>
+
+                {/* Hot Indicator */}
+                {totalBets > 5 && (
+                  <div className="flex items-center gap-1.5 px-2 py-1 bg-warning/10 rounded-lg">
+                    <BoltIcon className="w-4 h-4 text-warning animate-pulse" />
+                    <span className="font-semibold text-warning text-xs">Hot</span>
+                  </div>
+                )}
+
+                {/* Navigate Icon - Hidden on mobile */}
+                <ChevronRightIcon className="hidden md:block w-6 h-6 text-tertiary group-hover:text-primary transition-colors" />
+              </div>
+            </div>
+          </div>
+
+          {/* Pool distribution bar using OddsBar with 'pool' variant */}
+          {prediction.options.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-border">
+              <OddsBar
+                variant="pool"
+                type={prediction.type as PredictionType}
+                options={prediction.options as PublicPredictionOption[]}
+                bets={prediction.bets.map((bet) => ({
+                  ...bet,
+                  amount: bet.amount.toString(),
+                  potentialPayout: bet.potentialPayout?.toString() ?? null,
+                  payout: bet.payout?.toString() ?? null,
+                }))}
+                parlayLegs={flatParlays.map((leg) => ({
+                  ...leg,
+                  stake: asNum(leg.stake),
+                  createdAt:
+                    leg.createdAt instanceof Date ? leg.createdAt.toISOString() : leg.createdAt,
+                }))}
+                predictionId={prediction.id}
+                expiresAt={
+                  typeof prediction.expiresAt === 'string'
+                    ? prediction.expiresAt
+                    : prediction.expiresAt.toISOString()
+                }
+              />
+            </div>
+          )}
+        </div>
+      ) : isFullSize ? (
         <li className={cardClasses}>
           {/* Full Size Status Badge */}
           <div className="absolute top-4 right-4 flex items-center gap-2">
@@ -573,6 +813,9 @@ function arePropsEqual(
   // Creator info
   if (prev.prediction.creator?.id !== next.prediction.creator?.id) return false;
   if (prev.prediction.creator?.name !== next.prediction.creator?.name) return false;
+
+  // Category info
+  if (prev.prediction.category?.id !== next.prediction.category?.id) return false;
 
   // Variant and display settings
   if (prev.variant !== next.variant) return false;

@@ -14,7 +14,7 @@ import {
   StarIcon as Star,
   ChevronRightIcon as ChevronRight,
 } from '@heroicons/react/24/outline';
-import SimplePredictionCard from './SimplePredictionCard';
+import PredictionCard from './PredictionCard';
 
 interface RelatedPredictionsProps {
   currentPrediction: PredictionFull;
@@ -326,9 +326,12 @@ export default function RelatedPredictions({
                   {prediction.relationText}
                 </div>
 
-                <SimplePredictionCard
+                <PredictionCard
                   prediction={prediction}
-                  onCardClick={() => handlePredictionClick(prediction.id)}
+                  variant="list"
+                  showActions={true}
+                  showParlayActions={true}
+                  onCardView={() => handlePredictionClick(prediction.id)}
                   onAddToParlay={handleAddToParlay}
                   className="hover:shadow-lg transition-shadow pl-32"
                 />

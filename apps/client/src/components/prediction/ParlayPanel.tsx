@@ -1,5 +1,4 @@
-// apps/client/src/components/dashboard/ParlayPanel.tsx
-// Rollback: git checkout HEAD -- apps/client/src/components/dashboard/ParlayPanel.tsx
+// apps/client/src/components/prediction/ParlayPanel.tsx
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { REDIS_CHANNELS } from '@ems/types';
 import { useParlay } from '../../contexts/ParlayContext';
@@ -155,7 +154,7 @@ export default function ParlayPanel() {
 
   /* ---------- UI ---------- */
   return (
-    <div className="bg-surface border border-muted rounded-2xl p-4 shadow space-y-3">
+    <div className="space-y-3">
       <div className="flex justify-between items-center">
         <h2 className="text-lg font-semibold">Parlay Builder</h2>
         <div className="flex items-center space-x-2">

@@ -12,6 +12,7 @@ import {
   useCallback,
   useState,
   useMemo,
+  useRef,
   startTransition,
   useOptimistic,
   type ReactNode,
@@ -178,19 +179,35 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
     setCreateModalSourceData(null);
   }, []);
 
+  // ── Fetch deduplication ───────────────────────────────────────────────────
+  const fetchInProgressRef = useRef(false);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   // ── Initial fetch ─────────────────────────────────────────────────────────
-  const fetchAll = useCallback(async () => {
-    console.log('[PredictionContext] Starting predictions fetch...');
+  const fetchAll = useCallback(async (options?: { debounce?: boolean }) => {
+    // Debounce if requested (for rapid socket events)
+    if (options?.debounce) {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+      return new Promise<void>((resolve) => {
+        debounceTimerRef.current = setTimeout(async () => {
+          await fetchAll({ debounce: false });
+          resolve();
+        }, 300);
+      });
+    }
+
+    // Prevent duplicate fetches
+    if (fetchInProgressRef.current) {
+      return;
+    }
+
+    // Mark fetch as in progress
+    fetchInProgressRef.current = true;
+
     setLoading(true);
     setError(null);
-
-    // Add timeout to prevent infinite loading
-    const timeoutId = setTimeout(() => {
-      console.warn('[PredictionContext] Fetch timeout after 10s, using empty predictions');
-      setBasePredictions([]);
-      setLoading(false);
-      setError(new Error('Request timeout - predictions may be temporarily unavailable'));
-    }, 10000);
 
     try {
       // Fetch only 'open' predictions by default with reasonable limit
@@ -200,41 +217,45 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
         limit: 50,
         offset: 0,
       });
-      clearTimeout(timeoutId);
-      console.log(
-        `[PredictionContext] Fetched ${response.predictions.length} predictions (${response.pagination.total} total open)`,
-      );
+
       setBasePredictions(response.predictions || []);
-      // Could store pagination metadata here if we want "Load More" functionality later
-      // setPaginationMeta(response.pagination);
       setError(null);
     } catch (err: any) {
-      clearTimeout(timeoutId);
       console.error('[PredictionContext] Failed to fetch predictions:', err);
       setError(err);
-      setBasePredictions([]); // Set empty array on error to prevent infinite loading
+      // Keep existing predictions on error
     } finally {
       setLoading(false);
+      fetchInProgressRef.current = false;
     }
   }, []);
 
+  // Initial fetch on mount
   useEffect(() => {
     fetchAll();
   }, [fetchAll]);
+
+  // Cleanup on unmount: clear timers
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
 
   // ── Live EventBusCore updates ─────────────────────────────────────────────
   useEffect(() => {
     const unsubscribers = [
       // Prediction created events
       subscribe(REDIS_CHANNELS.PREDICTION_CREATED, (p: PredictionCreatedPayload) => {
-        console.log('🎯 Prediction created event received:', p);
-        // Refresh to get full prediction data from server
-        fetchAll();
+        // Debounced refresh to get full prediction data from server
+        // This is necessary because we need the full prediction object with all relationships
+        fetchAll({ debounce: true });
       }),
 
       // Prediction resolved events
       subscribe(REDIS_CHANNELS.PREDICTION_RESOLVE, (p: PredictionResolvedPayload) => {
-        console.log('🎯 Prediction resolved event received:', p);
         setBasePredictions((prev) =>
           prev.map((x) =>
             x.id === p.predictionId
@@ -248,18 +269,18 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
         );
       }),
 
-      // Bet placed events
+      // Bet placed events - NO REFETCH, optimistic updates handle this
       subscribe(REDIS_CHANNELS.BET_PLACED, (betPayload: BetPlacedPayload) => {
-        console.log('🎯 Bet placed event received:', betPayload);
-        // Refresh predictions to get updated bet counts and odds
-        fetchAll();
+        // Optimistic updates already handle bet placement via useOptimistic
+        // No need to refetch all predictions for a single bet
+        // The ODDS_UPDATE_ENHANCED event will handle odds changes if needed
       }),
 
-      // Parlay placed events
+      // Parlay placed events - NO REFETCH, optimistic updates handle this
       subscribe(REDIS_CHANNELS.PARLAY_PLACED, (parlayPayload: ParlayPlacedPayload) => {
-        console.log('🎯 Parlay placed event received:', parlayPayload);
-        // Refresh predictions to get updated parlay counts and data
-        fetchAll();
+        // Optimistic updates already handle parlay placement via useOptimistic
+        // No need to refetch all predictions for a single parlay
+        // The ODDS_UPDATE_ENHANCED event will handle odds changes if needed
       }),
 
       // Enhanced odds updates
@@ -276,8 +297,6 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
             changePercent: number;
           }>;
         }) => {
-          console.log('🎯 Enhanced odds updated for prediction:', data.predictionId, data);
-
           // Update the specific prediction with new odds and market status
           setBasePredictions((prev) =>
             prev.map((p) => {
@@ -303,7 +322,6 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
   // ── Create prediction via REST (admin tool) ───────────────────────────────
   const createPrediction = useCallback(
     async (input: CreatePredictionPayload) => {
-      console.log('[PredictionContext] Creating prediction:', input);
       setLoading(true);
 
       // Create optimistic prediction for immediate UI feedback
@@ -326,8 +344,6 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
         // For 'MULTIPLE' type, use provided options
         finalOptions = input.options || [];
       }
-
-      console.log('[PredictionContext] Final options for prediction:', finalOptions);
 
       const optimisticPrediction: PredictionView = {
         id: optimisticPredictionId,
@@ -369,7 +385,8 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
 
       try {
         await createPredictionApi(input);
-        await fetchAll(); // This will replace optimistic prediction with real data
+        // Use non-debounced fetch for immediate feedback on user action
+        await fetchAll({ debounce: false }); // This will replace optimistic prediction with real data
       } catch (err: any) {
         setError(err);
         // Revert optimistic prediction on error
@@ -391,8 +408,6 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
   // ── Bet/parlay helpers via socketRequest ──────────────────────────────────
   const placeBet = useCallback(
     async (payload: { optionId: number; amount: number }) => {
-      console.log('PredictionContext placeBet called', payload);
-
       // Create optimistic bet for immediate UI feedback using React 19 useOptimistic
       const optimisticBetId = `optimistic_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       const optimisticBet = {
@@ -417,11 +432,9 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
 
       try {
         const result = await socketRequest(REDIS_CHANNELS.BET_PLACE, payload);
-        console.log('PredictionContext placeBet success', result);
 
         // Replace optimistic bet with real bet data if available
         if (result && typeof result === 'object' && 'bet' in result) {
-          console.log('Updating with real bet data from server:', result.bet);
           setBasePredictions((prev) =>
             prev.map((pred) => ({
               ...pred,
@@ -431,10 +444,8 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
                 ) || [],
             })),
           );
-        } else {
-          console.log('Server response does not contain bet data, keeping optimistic state');
-          // The optimistic bet will be replaced when socket events arrive
         }
+        // Otherwise the optimistic bet will be replaced when socket events arrive
 
         // React 19 Optimization: Use startTransition for non-blocking user refresh
         // Note: AuthContext already handles optimistic updates via Socket.IO events

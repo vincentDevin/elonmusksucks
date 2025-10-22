@@ -49,6 +49,7 @@ export async function getPredictions(options?: {
   const { data } = await api.get<PaginatedPredictionsResponse>(
     `/api/predictions${queryString ? `?${queryString}` : ''}`,
   );
+
   return data;
 }
 

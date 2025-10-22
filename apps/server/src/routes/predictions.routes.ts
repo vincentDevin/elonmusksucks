@@ -26,6 +26,8 @@ import {
   getPredictionReactions,
   removeReaction,
   getReactionCounts,
+  getPredictionComments as getPredictionCommentsController,
+  createPredictionComment as createPredictionCommentController,
 } from '../controllers/predictions.controller';
 import { requireAuth } from '../middleware/auth.middleware';
 import type { AuthRequest } from '../middleware/auth.middleware';
@@ -185,11 +187,6 @@ router.delete('/:id/reactions/:type', requireAuth, removeReaction);
 // ===============================================
 // Note: Comments are now handled by the unified Content system
 // These routes use post.controller handlers which work with ContentRepository
-
-import {
-  getPredictionComments as getPredictionCommentsController,
-  createPredictionComment as createPredictionCommentController,
-} from '../controllers/predictions.controller';
 
 // GET /api/predictions/:id/comments - Get comments for a prediction
 router.get('/:id/comments', getPredictionCommentsController);

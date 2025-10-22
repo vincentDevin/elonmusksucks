@@ -30,6 +30,11 @@ export function serializeBigInt(obj: any): any {
     return obj.map(serializeBigInt);
   }
 
+  // Handle Date objects - return as-is so JSON.stringify converts them to ISO strings
+  if (obj instanceof Date) {
+    return obj;
+  }
+
   if (typeof obj === 'object') {
     const serialized: any = {};
     for (const key in obj) {

@@ -5,7 +5,6 @@ import { REDIS_CHANNELS } from '@ems/types';
 import type { PredictionCreatedPayload, BetPlacedPayload } from '@ems/types';
 
 // New components
-import SimplePredictionCard from '../components/prediction/SimplePredictionCard';
 import EnhancedPredictionFilters from '../components/prediction/EnhancedPredictionFilters';
 import PredictionPreview from '../components/prediction/PredictionPreview';
 import PredictionDetailView from '../components/prediction/PredictionDetailView';
@@ -251,7 +250,7 @@ export default function Predictions() {
                   <FloatingParlayIndicator predictionId={prediction.id} position="top-right" />
                 )}
 
-                <SimplePredictionCard
+                <PredictionCard
                   prediction={
                     {
                       ...prediction,
@@ -264,7 +263,10 @@ export default function Predictions() {
                       })),
                     } as any
                   }
-                  onCardClick={() => handlePredictionClick(prediction.id)}
+                  variant="list"
+                  showActions={true}
+                  showParlayActions={true}
+                  onCardView={() => handlePredictionClick(prediction.id)}
                   onQuickBet={handleQuickBet}
                   onAddToParlay={handleAddToParlay}
                   className="hover:shadow-lg transition-shadow"

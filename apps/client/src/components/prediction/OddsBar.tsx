@@ -14,7 +14,7 @@ interface FlattenedParlayLeg {
 }
 
 interface OddsBarProps {
-  variant?: 'full' | 'compact' | 'mini';
+  variant?: 'full' | 'compact' | 'mini' | 'pool';
   type: PredictionType;
   options: PublicPredictionOption[];
   bets?: PublicBet[];
@@ -42,6 +42,7 @@ export default function OddsBar({
   const isCompact = variant === 'compact';
   const isMini = variant === 'mini';
   const isFullSize = variant === 'full';
+  const isPool = variant === 'pool';
 
   // Listen for enhanced odds updates via EventBusCore
   useEffect(() => {
@@ -227,6 +228,54 @@ export default function OddsBar({
     cumPct += pct;
     return { label: opt.label, pct, left, color: palette[i], odds: opt.odds };
   });
+
+  // Pool-only variant - just show the distribution bar (for list views)
+  if (isPool) {
+    if (totalStaked === 0 || currentOptions.length === 0) {
+      return null; // Don't show anything if no bets yet
+    }
+
+    return (
+      <div className={className}>
+        {/* Option labels with percentages */}
+        <div className="flex items-center justify-between text-xs mb-2">
+          {pools.map((pool) => {
+            const percentage = pool.pct * 100;
+            return (
+              <div key={pool.label} className="flex items-center gap-2">
+                <span className="text-tertiary truncate max-w-[100px]">{pool.label}</span>
+                <span className="font-medium text-content">{percentage.toFixed(0)}%</span>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Pool distribution bar */}
+        <div className="h-1.5 bg-muted rounded-full overflow-hidden flex">
+          {pools.map((pool, index) => {
+            const percentage = pool.pct * 100;
+            const colors = [
+              'bg-primary',
+              'bg-secondary',
+              'bg-accent',
+              'bg-warning',
+              'bg-success',
+              'bg-error',
+            ];
+
+            return (
+              <div
+                key={pool.label}
+                className={`h-full transition-all duration-300 ${colors[index % colors.length]}`}
+                style={{ width: `${percentage}%` }}
+                title={`${pool.label}: ${percentage.toFixed(1)}%`}
+              />
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

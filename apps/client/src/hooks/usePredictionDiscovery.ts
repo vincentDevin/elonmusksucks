@@ -236,20 +236,31 @@ export function usePredictionDiscovery() {
 
   // Filter predictions based on current filters
   const filteredPredictions = useMemo(() => {
-    if (!predictions) return [];
+    if (!predictions) {
+      return [];
+    }
 
-    return predictions.filter((prediction) => {
+    const filtered = predictions.filter((prediction) => {
       const now = Date.now();
       const expires = new Date(prediction.expiresAt).getTime();
+      const isExpired = now > expires;
 
       // Status filter logic
       if (filters.status !== 'all') {
         switch (filters.status) {
           case 'pending':
-            if (prediction.status !== 'PENDING') return false;
+            if (prediction.status !== 'PENDING') {
+              return false;
+            }
             break;
           case 'open':
-            if (prediction.status !== 'APPROVED' || now > expires) return false;
+            // Check both 'APPROVED' and 'OPEN' status (backend might use either)
+            if (prediction.status !== 'APPROVED' && prediction.status !== 'OPEN') {
+              return false;
+            }
+            if (isExpired) {
+              return false;
+            }
             break;
           case 'expired':
             if (
@@ -338,6 +349,8 @@ export function usePredictionDiscovery() {
 
       return true;
     });
+
+    return filtered;
   }, [predictions, filters, calculateDifficulty, user?.id]);
 
   // Enhance predictions with recommendations and metadata
