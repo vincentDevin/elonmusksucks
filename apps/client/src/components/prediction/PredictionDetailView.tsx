@@ -189,7 +189,11 @@ export default function PredictionDetailView({
                       </span>
                     </div>
                   )}
-                  <PredictionReactions predictionId={prediction.id} />
+                  <PredictionReactions
+                    predictionId={prediction.id}
+                    initialReactionCounts={prediction.reactionCounts}
+                    initialUserReaction={prediction.userReaction}
+                  />
                 </div>
               </div>
             </div>

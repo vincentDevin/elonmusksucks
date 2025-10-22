@@ -612,6 +612,42 @@ export class ContentRepository implements IContentRepository {
   }
 
   /**
+   * Get comment counts for multiple predictions in bulk
+   * Returns map of prediction ID to comment count
+   */
+  async getPredictionCommentCountsBulk(predictionIds: number[]): Promise<Map<number, number>> {
+    if (predictionIds.length === 0) {
+      return new Map();
+    }
+
+    const counts = await this.prisma.content.groupBy({
+      by: ['predictionId'],
+      where: {
+        predictionId: { in: predictionIds },
+        type: 'COMMENT',
+        isDeleted: false,
+      },
+      _count: { id: true },
+    });
+
+    const countsMap = new Map<number, number>();
+
+    // Initialize all predictions with 0
+    predictionIds.forEach((id) => {
+      countsMap.set(id, 0);
+    });
+
+    // Populate with actual counts
+    counts.forEach((count) => {
+      if (count.predictionId) {
+        countsMap.set(count.predictionId, count._count.id);
+      }
+    });
+
+    return countsMap;
+  }
+
+  /**
    * Get reply count for content
    * Returns total number of direct replies (excluding deleted)
    */

@@ -6,6 +6,9 @@ interface PredictionReactionsProps {
   predictionId: number;
   className?: string;
   compact?: boolean;
+  // Optional initial data from PredictionView (embedded in prediction object)
+  initialReactionCounts?: Record<ReactionType, number>;
+  initialUserReaction?: ReactionType;
 }
 
 const REACTION_EMOJIS: Record<ReactionType, string> = {
@@ -30,14 +33,16 @@ export function PredictionReactions({
   predictionId,
   className = '',
   compact = false,
+  initialReactionCounts,
+  initialUserReaction,
 }: PredictionReactionsProps) {
   const { getReactionState, toggleReaction, initializeReactions } = useReactions();
   const [showReactionPicker, setShowReactionPicker] = useState(false);
 
-  // Initialize reactions if not already initialized
+  // Initialize reactions with embedded data from PredictionView
   useEffect(() => {
-    initializeReactions('prediction', predictionId);
-  }, [predictionId, initializeReactions]);
+    initializeReactions('prediction', predictionId, initialReactionCounts, initialUserReaction);
+  }, [predictionId, initializeReactions, initialReactionCounts, initialUserReaction]);
 
   const { reactionCounts, userReaction, isReacting } = getReactionState('prediction', predictionId);
   const totalReactions = Object.values(reactionCounts).reduce((sum, count) => sum + count, 0);

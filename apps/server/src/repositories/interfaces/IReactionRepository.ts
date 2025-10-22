@@ -96,6 +96,11 @@ export interface IReactionRepository {
   /** Get reaction counts for prediction */
   getPredictionReactionCounts(predictionId: number): Promise<Record<PrismaReactionType, number>>;
 
+  /** Get reaction counts for multiple predictions (bulk) */
+  getPredictionReactionCountsBulk(
+    predictionIds: number[],
+  ): Promise<Map<number, Record<PrismaReactionType, number>>>;
+
   // ============================================
   // BATCH OPERATIONS
   // ============================================

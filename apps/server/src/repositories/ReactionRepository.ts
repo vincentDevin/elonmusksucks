@@ -442,6 +442,46 @@ export class ReactionRepository implements IReactionRepository {
     return map;
   }
 
+  async getPredictionReactionCountsBulk(
+    predictionIds: number[],
+  ): Promise<Map<number, Record<ReactionType, number>>> {
+    if (predictionIds.length === 0) {
+      return new Map();
+    }
+
+    const reactions = await this.prisma.reaction.groupBy({
+      by: ['predictionId', 'type'],
+      where: { predictionId: { in: predictionIds } },
+      _count: { type: true },
+    });
+
+    const countsMap = new Map<number, Record<ReactionType, number>>();
+
+    // Initialize counts for all predictions
+    predictionIds.forEach((id) => {
+      countsMap.set(id, {
+        LIKE: 0,
+        LOVE: 0,
+        LAUGH: 0,
+        WOW: 0,
+        SAD: 0,
+        ANGRY: 0,
+      });
+    });
+
+    // Populate with actual counts
+    reactions.forEach((reaction) => {
+      if (reaction.predictionId) {
+        const counts = countsMap.get(reaction.predictionId);
+        if (counts) {
+          counts[reaction.type] = reaction._count.type;
+        }
+      }
+    });
+
+    return countsMap;
+  }
+
   // ============================================
   // STATISTICS
   // ============================================

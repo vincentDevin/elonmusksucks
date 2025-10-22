@@ -109,6 +109,9 @@ export interface IContentRepository {
   /** Get comment count for prediction */
   getPredictionCommentCount(predictionId: number): Promise<number>;
 
+  /** Get comment counts for multiple predictions in bulk */
+  getPredictionCommentCountsBulk(predictionIds: number[]): Promise<Map<number, number>>;
+
   /** Get reply count for content */
   getReplyCount(contentId: number): Promise<number>;
 

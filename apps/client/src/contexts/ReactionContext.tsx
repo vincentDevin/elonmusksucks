@@ -16,7 +16,7 @@ import { useEventBusCore } from './EventBusCoreContext';
 import type { ReactionType } from '@ems/types';
 import { togglePostReaction, getPostReactions } from '../api/posts';
 import { timelineApi } from '../api/timeline';
-import { togglePredictionReaction, getPredictionReactions } from '../api/predictions';
+import { togglePredictionReaction } from '../api/predictions';
 import { REDIS_CHANNELS } from '@ems/types';
 
 // Unified reaction state for posts, articles, and predictions
@@ -199,21 +199,14 @@ export const ReactionProvider: React.FC<{ children: ReactNode }> = ({ children }
                 }
               }
             } else {
-              // Predictions return different format: { reactions: array, counts: Record, userReaction?: string }
-              reactionData = await getPredictionReactions(contentId);
-
-              // Use counts directly from the API response
-              detailedCounts = {
-                LIKE: reactionData.counts?.LIKE || 0,
-                LOVE: reactionData.counts?.LOVE || 0,
-                LAUGH: reactionData.counts?.LAUGH || 0,
-                WOW: reactionData.counts?.WOW || 0,
-                SAD: reactionData.counts?.SAD || 0,
-                ANGRY: reactionData.counts?.ANGRY || 0,
-              };
-
-              // Use userReaction directly from the API response
-              currentUserReaction = reactionData.userReaction as ReactionType | undefined;
+              // Predictions: Should always have initial data passed from PredictionView
+              // If we reach here, it means initial data wasn't provided (shouldn't happen)
+              console.warn(
+                `[ReactionContext] Prediction ${contentId} initialized without initial data - this should not happen`,
+              );
+              // Use defaults - the data should come from the prediction object
+              detailedCounts = { ...DEFAULT_COUNTS };
+              currentUserReaction = undefined;
             }
 
             // Update with fetched data

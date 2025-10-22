@@ -16,12 +16,14 @@ import type {
   DbBet,
   PublicPrediction,
   ParlayLegWithUser,
+  PrismaReactionType,
 } from '@ems/types';
 import { REDIS_CHANNELS } from '@ems/types';
 import type { IPredictionRepository } from '../repositories/interfaces/IPredictionRepository';
 import { PredictionRepository } from '../repositories/PredictionRepository';
 import { PredictionType } from '@prisma/client';
 import { UserService } from '../services/user.service';
+import { ReactionService } from '../services/reaction.service';
 import { unifiedActivityService } from './unifiedActivity.service';
 import { eventBus } from '../lib/EventBus';
 import { serializeBigInt } from '../utils/bigintSerializer';
@@ -35,6 +37,7 @@ import { CacheInvalidation } from '../utils/cacheInvalidation';
 export class PredictionService {
   private userService = new UserService();
   private contentRepository: IContentRepository;
+  private reactionService = new ReactionService();
 
   constructor(private repo: IPredictionRepository = new PredictionRepository()) {
     this.contentRepository = new ContentRepository();
@@ -97,12 +100,15 @@ export class PredictionService {
   }
 
   /* ────────────────────────────────────────────────────────────────────────── */
-  /** Fetch filtered and paginated predictions with metadata */
-  async listPredictions(filters: {
-    status?: 'open' | 'pending' | 'expired' | 'resolved' | 'all';
-    limit?: number;
-    offset?: number;
-  }): Promise<{
+  /** Fetch filtered and paginated predictions with metadata and enrichment */
+  async listPredictions(
+    filters: {
+      status?: 'open' | 'pending' | 'expired' | 'resolved' | 'all';
+      limit?: number;
+      offset?: number;
+    },
+    userId?: number,
+  ): Promise<{
     predictions: Array<
       DbPrediction & {
         options: DbPredictionOption[];
@@ -123,6 +129,14 @@ export class PredictionService {
           name: string;
           avatarUrl: string | null;
         };
+        // Enrichment data
+        activityLevel: 'high' | 'medium' | 'low';
+        activityMetrics: any;
+        difficulty: 'easy' | 'medium' | 'hard' | 'expert';
+        viewStats: any;
+        reactionCounts: Record<PrismaReactionType, number>;
+        userReaction?: PrismaReactionType;
+        commentCount: number;
       }
     >;
     pagination: {
@@ -141,7 +155,7 @@ export class PredictionService {
     // Issue #3: Cache prediction lists with filter parameters
     const cacheKey = CacheKeys.PREDICTIONS_ACTIVE(validatedLimit, validatedOffset, status);
 
-    return withCache(cacheKey, CACHE_TTL.PREDICTIONS_ACTIVE, async () => {
+    const cachedData = await withCache(cacheKey, CACHE_TTL.PREDICTIONS_ACTIVE, async () => {
       const { predictions: raw, total } = await this.repo.listFilteredPredictions({
         status,
         limit: validatedLimit,
@@ -152,14 +166,28 @@ export class PredictionService {
 
       return {
         predictions,
-        pagination: {
-          total,
-          limit: validatedLimit,
-          offset: validatedOffset,
-          hasMore: validatedOffset + validatedLimit < total,
-        },
+        total,
       };
     });
+
+    // Fetch enrichment data (not cached - always fresh)
+    const enrichmentMap = await this.getBulkEnrichmentData(cachedData.predictions, userId);
+
+    // Merge enrichment data with predictions
+    const enrichedPredictions = cachedData.predictions.map((prediction) => ({
+      ...prediction,
+      ...enrichmentMap.get(prediction.id),
+    }));
+
+    return {
+      predictions: enrichedPredictions,
+      pagination: {
+        total: cachedData.total,
+        limit: validatedLimit,
+        offset: validatedOffset,
+        hasMore: validatedOffset + validatedLimit < cachedData.total,
+      },
+    };
   }
 
   /* ────────────────────────────────────────────────────────────────────────── */
@@ -271,7 +299,7 @@ export class PredictionService {
   }
 
   /* ────────────────────────────────────────────────────────────────────────── */
-  /** Fetch ONE prediction (public safe shape) with view tracking */
+  /** Fetch ONE prediction (public safe shape) with view tracking and enrichment data */
   async getPrediction(id: number, userId?: number) {
     // Issue #3: Cache prediction data with dynamic TTL (resolved = long, active = short)
     const cacheKey = CacheKeys.PREDICTION_SINGLE(id);
@@ -287,8 +315,10 @@ export class PredictionService {
       },
     );
 
+    if (!enrichedPrediction) return null;
+
     // Track prediction view in background (don't block response, happens regardless of cache)
-    if (userId && enrichedPrediction) {
+    if (userId) {
       setImmediate(async () => {
         try {
           await this.trackPredictionView(id, userId);
@@ -301,7 +331,13 @@ export class PredictionService {
       });
     }
 
-    return enrichedPrediction;
+    // Fetch enrichment data (not cached - always fresh)
+    const enrichmentData = await this.getEnrichmentData(id, userId);
+
+    return {
+      ...enrichedPrediction,
+      ...enrichmentData,
+    };
   }
 
   /**
@@ -2228,6 +2264,159 @@ export class PredictionService {
       .split(/\s+/)
       .filter((word) => word.length >= 3 && !commonWords.has(word))
       .slice(0, 10); // Top 10 keywords
+  }
+
+  // ===============================================
+  // Enrichment Data Helpers
+  // ===============================================
+
+  /**
+   * Get enrichment data for a single prediction
+   * Includes: activity metrics, difficulty, view stats, reactions, comments
+   */
+  private async getEnrichmentData(
+    predictionId: number,
+    userId?: number,
+  ): Promise<{
+    activityLevel: 'high' | 'medium' | 'low';
+    activityMetrics: {
+      totalBets: number;
+      totalParlayLegs: number;
+      bettingVelocity: number;
+      popularityScore: number;
+      lastActivityAt: string | null;
+    };
+    difficulty: 'easy' | 'medium' | 'hard' | 'expert';
+    viewStats: {
+      totalViews: number;
+      uniqueUserViews: number;
+      viewToEngagementRatio: number;
+    };
+    reactionCounts: Record<PrismaReactionType, number>;
+    userReaction?: PrismaReactionType;
+    commentCount: number;
+  }> {
+    // Fetch all enrichment data in parallel
+    const [activityMetrics, difficulty, viewStats, reactionCounts, userReaction, commentCount] =
+      await Promise.all([
+        this.getActivityMetrics(predictionId),
+        this.calculateDifficulty(predictionId),
+        this.getPredictionViewStats(predictionId),
+        this.reactionService.getPredictionReactionCounts(predictionId),
+        userId
+          ? this.reactionService.getUserReaction(predictionId, userId).catch(() => null)
+          : Promise.resolve(null),
+        this.contentRepository.getPredictionCommentCount(predictionId),
+      ]);
+
+    return {
+      activityLevel: activityMetrics.activityLevel,
+      activityMetrics: {
+        totalBets: activityMetrics.totalBets,
+        totalParlayLegs: activityMetrics.totalParlayLegs,
+        bettingVelocity: activityMetrics.bettingVelocity,
+        popularityScore: activityMetrics.popularityScore,
+        lastActivityAt: activityMetrics.lastActivityAt
+          ? activityMetrics.lastActivityAt.toISOString()
+          : null,
+      },
+      difficulty,
+      viewStats,
+      reactionCounts,
+      ...(userReaction && { userReaction }),
+      commentCount,
+    };
+  }
+
+  /**
+   * Get enrichment data for multiple predictions in bulk (efficient)
+   * Uses batch operations to avoid N+1 queries
+   */
+  private async getBulkEnrichmentData(
+    predictions: Array<{ id: number; bets?: any[]; parlayLegs?: any[]; options: any[] }>,
+    userId?: number,
+  ) {
+    const predictionIds = predictions.map((p) => p.id);
+
+    if (predictionIds.length === 0) {
+      return new Map();
+    }
+
+    // Fetch all enrichment data in bulk in parallel
+    const [viewStatsRecord, reactionCountsMap, userReactionsMap, commentCountsMap] =
+      await Promise.all([
+        this.getBulkViewStats(predictionIds),
+        this.reactionService.getPredictionReactionCountsBulk(predictionIds),
+        userId
+          ? this.reactionService.getUserPredictionReactionsBulk(userId, predictionIds)
+          : Promise.resolve(new Map()),
+        this.contentRepository.getPredictionCommentCountsBulk(predictionIds),
+      ]);
+
+    // Build enrichment map for each prediction
+    const enrichmentMap = new Map();
+
+    predictions.forEach((prediction) => {
+      // Calculate activity metrics from existing data
+      const betCount = prediction.bets?.length || 0;
+      const parlayCount = prediction.parlayLegs?.length || 0;
+      const totalActivity = betCount + parlayCount;
+
+      // Calculate activity level
+      let activityLevel: 'high' | 'medium' | 'low' = 'low';
+      if (totalActivity >= 15) {
+        activityLevel = 'high';
+      } else if (totalActivity >= 5) {
+        activityLevel = 'medium';
+      }
+
+      // Calculate difficulty from options
+      const difficulty = this.getDifficultyFromOptions(prediction.options);
+
+      // Get view stats
+      const viewStats = viewStatsRecord[prediction.id] || {
+        totalViews: 0,
+        uniqueUserViews: 0,
+        viewToEngagementRatio: 0,
+      };
+
+      // Get reaction counts
+      const reactionCounts = reactionCountsMap.get(prediction.id) || {
+        LIKE: 0,
+        LOVE: 0,
+        LAUGH: 0,
+        WOW: 0,
+        SAD: 0,
+        ANGRY: 0,
+      };
+
+      // Get user reaction if available
+      const userReaction = userReactionsMap.get(prediction.id);
+
+      // Get comment count
+      const commentCount = commentCountsMap.get(prediction.id) || 0;
+
+      // Calculate activity metrics
+      const activityMetrics = {
+        totalBets: betCount,
+        totalParlayLegs: parlayCount,
+        bettingVelocity: 0, // Can be calculated if needed
+        popularityScore: totalActivity > 0 ? Math.min(100, totalActivity * 5) : 0,
+        lastActivityAt: null as string | null,
+      };
+
+      enrichmentMap.set(prediction.id, {
+        activityLevel,
+        activityMetrics,
+        difficulty,
+        viewStats,
+        reactionCounts,
+        ...(userReaction && { userReaction }),
+        commentCount,
+      });
+    });
+
+    return enrichmentMap;
   }
 
   // ===============================================

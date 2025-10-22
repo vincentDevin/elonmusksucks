@@ -336,4 +336,33 @@ export class ReactionService {
     const validTypes = ['LIKE', 'LOVE', 'LAUGH', 'WOW', 'SAD', 'ANGRY'];
     return validTypes.includes(type);
   }
+
+  /**
+   * Get reaction counts for multiple predictions in bulk
+   */
+  async getPredictionReactionCountsBulk(
+    predictionIds: number[],
+  ): Promise<Map<number, Record<PrismaReactionType, number>>> {
+    return await this.reactionRepository.getPredictionReactionCountsBulk(predictionIds);
+  }
+
+  /**
+   * Get user reactions for multiple predictions in bulk
+   */
+  async getUserPredictionReactionsBulk(
+    userId: number,
+    predictionIds: number[],
+  ): Promise<Map<number, PrismaReactionType>> {
+    const reactionsMap = await this.reactionRepository.getUserReactionsForPredictions(
+      userId,
+      predictionIds,
+    );
+
+    const userReactionsMap = new Map<number, PrismaReactionType>();
+    reactionsMap.forEach((reaction, predictionId) => {
+      userReactionsMap.set(predictionId, reaction.type);
+    });
+
+    return userReactionsMap;
+  }
 }

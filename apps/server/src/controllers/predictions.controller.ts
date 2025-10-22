@@ -36,6 +36,9 @@ export const getAllPredictions = async (
     const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
     const offset = req.query.offset ? parseInt(req.query.offset as string) : 0;
 
+    // Get userId for user-specific enrichment (reactions)
+    const userId = (req as any).user?.id;
+
     // Validate status
     const validStatuses = ['open', 'pending', 'expired', 'resolved', 'all'];
     if (!validStatuses.includes(status)) {
@@ -62,12 +65,15 @@ export const getAllPredictions = async (
       return;
     }
 
-    // Fetch filtered and paginated predictions
-    const result = await predictionService.listPredictions({
-      status: status as 'open' | 'pending' | 'expired' | 'resolved' | 'all',
-      limit,
-      offset,
-    });
+    // Fetch filtered and paginated predictions with enrichment
+    const result = await predictionService.listPredictions(
+      {
+        status: status as 'open' | 'pending' | 'expired' | 'resolved' | 'all',
+        limit,
+        offset,
+      },
+      userId, // Pass userId for user-specific enrichment
+    );
 
     // Transform predictions to view format
     const predictions = result.predictions.map(toPredictionView) satisfies PredictionView[];
@@ -84,7 +90,7 @@ export const getAllPredictions = async (
 
 /**
  * GET /api/predictions/:id
- * Fetch one prediction by ID, including its options, bets, and parlay legs.
+ * Fetch one prediction by ID, including its options, bets, parlay legs, and enrichment data.
  */
 export const getPredictionById = async (
   req: Request,
@@ -93,7 +99,11 @@ export const getPredictionById = async (
 ): Promise<void> => {
   try {
     const id = Number(req.params.id);
-    const prediction = await predictionService.getPrediction(id);
+
+    // Get userId for user-specific enrichment (reactions, view tracking)
+    const userId = (req as any).user?.id;
+
+    const prediction = await predictionService.getPrediction(id, userId);
     if (!prediction) {
       res.status(404).json({ error: 'Prediction not found' });
       return;
@@ -251,167 +261,87 @@ export const getSourceLinks = async (
   }
 };
 
-export const findPredictionById = async (id: number) => {
-  return predictionService.findPredictionBasicById(id);
-};
-
-export const findExistingSourceLink = async (
-  predictionId: number,
-  articleId?: number,
-  tweetId?: string,
-) => {
-  return predictionService.findExistingSourceLink(predictionId, articleId, tweetId);
-};
-
-export const createSourceLink = async (
-  predictionId: number,
-  articleId: number | null,
-  tweetId: string | null,
-  url: string,
-  title: string | null,
-  publisher: string | null,
-) => {
-  return predictionService.createSourceLink(
-    predictionId,
-    articleId || null,
-    tweetId || null,
-    url,
-    title || null,
-    publisher || null,
-  );
-};
-
 /**
- * GET /api/predictions/:id/activity-level
- * Get activity level for a single prediction
+ * Create a source link for a prediction
+ * POST /api/predictions/source-links
  */
-export const getActivityLevel = async (
+export const createPredictionSourceLink = async (
   req: Request,
   res: Response,
   next: NextFunction,
 ): Promise<void> => {
   try {
-    const predictionId = parseInt(req.params.id);
+    const { predictionId, articleId, tweetId, url, title, publisher } = req.body;
 
-    if (isNaN(predictionId)) {
-      res.status(400).json({ error: 'Invalid prediction ID' });
+    // Validate required fields
+    if (!predictionId || !url) {
+      res.status(400).json({ error: 'Prediction ID and URL are required' });
       return;
     }
 
-    const activityLevel = await predictionService.calculateActivityLevel(predictionId);
-    res.json({ predictionId, activityLevel });
+    if (!articleId && !tweetId) {
+      res.status(400).json({ error: 'Either article ID or tweet ID is required' });
+      return;
+    }
+
+    // Check if prediction exists
+    const prediction = await predictionService.findPredictionBasicById(predictionId);
+    if (!prediction) {
+      res.status(404).json({ error: 'Prediction not found' });
+      return;
+    }
+
+    // Check if prediction is already resolved (can't add sources to resolved predictions)
+    if (prediction.resolved) {
+      res.status(400).json({ error: 'Cannot link sources to resolved predictions' });
+      return;
+    }
+
+    // Check if this link already exists
+    const existingLink = await predictionService.findExistingSourceLink(
+      predictionId,
+      articleId,
+      tweetId,
+    );
+    if (existingLink) {
+      res.status(409).json({ error: 'This source is already linked to this prediction' });
+      return;
+    }
+
+    // Create the source link
+    const sourceLink = await predictionService.createSourceLink(
+      predictionId,
+      articleId || null,
+      tweetId || null,
+      url,
+      title || null,
+      publisher || null,
+    );
+
+    res.status(201).json({
+      id: sourceLink.id,
+      predictionId: sourceLink.predictionId,
+      articleId: sourceLink.articleId,
+      tweetId: sourceLink.tweetId,
+      url: sourceLink.url,
+      title: sourceLink.title,
+      publisher: sourceLink.publisher,
+      capturedAt: sourceLink.capturedAt.toISOString(),
+      source: sourceLink.article || sourceLink.tweet || null,
+    });
   } catch (err) {
     next(err);
   }
 };
 
-/**
- * POST /api/predictions/activity-levels
- * Get activity levels for multiple predictions
- * Body: { predictionIds: number[] }
- */
-export const getBulkActivityLevels = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> => {
-  try {
-    const { predictionIds } = req.body;
-
-    if (!Array.isArray(predictionIds) || predictionIds.some((id) => typeof id !== 'number')) {
-      res.status(400).json({ error: 'predictionIds must be an array of numbers' });
-      return;
-    }
-
-    if (predictionIds.length > 100) {
-      res.status(400).json({ error: 'Maximum 100 predictions per request' });
-      return;
-    }
-
-    const activityLevels = await predictionService.calculateBulkActivityLevels(predictionIds);
-    res.json({ activityLevels });
-  } catch (err) {
-    next(err);
-  }
-};
-
-/**
- * GET /api/predictions/:id/activity-metrics
- * Get comprehensive activity metrics for a prediction
- */
-export const getActivityMetrics = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> => {
-  try {
-    const predictionId = parseInt(req.params.id);
-
-    if (isNaN(predictionId)) {
-      res.status(400).json({ error: 'Invalid prediction ID' });
-      return;
-    }
-
-    const metrics = await predictionService.getActivityMetrics(predictionId);
-    res.json({ predictionId, ...metrics });
-  } catch (err) {
-    next(err);
-  }
-};
-
-/**
- * GET /api/predictions/:id/difficulty
- * Get difficulty level for a single prediction
- */
-export const getDifficulty = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> => {
-  try {
-    const predictionId = parseInt(req.params.id);
-
-    if (isNaN(predictionId)) {
-      res.status(400).json({ error: 'Invalid prediction ID' });
-      return;
-    }
-
-    const difficulty = await predictionService.calculateDifficulty(predictionId);
-    res.json({ predictionId, difficulty });
-  } catch (err) {
-    next(err);
-  }
-};
-
-/**
- * POST /api/predictions/difficulties
- * Get difficulty levels for multiple predictions
- * Body: { predictionIds: number[] }
- */
-export const getBulkDifficulties = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> => {
-  try {
-    const { predictionIds } = req.body;
-
-    if (!Array.isArray(predictionIds) || predictionIds.some((id) => typeof id !== 'number')) {
-      res.status(400).json({ error: 'predictionIds must be an array of numbers' });
-      return;
-    }
-
-    if (predictionIds.length > 100) {
-      res.status(400).json({ error: 'Maximum 100 predictions per request' });
-      return;
-    }
-
-    const difficulties = await predictionService.calculateBulkDifficulties(predictionIds);
-    res.json({ difficulties });
-  } catch (err) {
-    next(err);
-  }
-};
+// ===============================================
+// DEPRECATED CONTROLLER FUNCTIONS REMOVED
+// Data now included in main prediction objects returned by GET /predictions and GET /predictions/:id:
+// - getActivityLevel, getBulkActivityLevels, getActivityMetrics
+// - getDifficulty, getBulkDifficulties
+// - getViewStats, getBulkViewStats
+// - getReactionCounts (removed below)
+// ===============================================
 
 /**
  * POST /api/predictions/filter
@@ -453,60 +383,6 @@ export const getFilteredPredictions = async (
 
     const result = await predictionService.getFilteredPredictions(filters);
     res.json(result);
-  } catch (err) {
-    next(err);
-  }
-};
-
-/**
- * GET /api/predictions/:id/view-stats
- * Get view analytics for a single prediction
- */
-export const getViewStats = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> => {
-  try {
-    const predictionId = parseInt(req.params.id);
-
-    if (isNaN(predictionId)) {
-      res.status(400).json({ error: 'Invalid prediction ID' });
-      return;
-    }
-
-    const stats = await predictionService.getPredictionViewStats(predictionId);
-    res.json({ predictionId, ...stats });
-  } catch (err) {
-    next(err);
-  }
-};
-
-/**
- * POST /api/predictions/view-stats
- * Get view analytics for multiple predictions
- * Body: { predictionIds: number[] }
- */
-export const getBulkViewStats = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> => {
-  try {
-    const { predictionIds } = req.body;
-
-    if (!Array.isArray(predictionIds) || predictionIds.some((id) => typeof id !== 'number')) {
-      res.status(400).json({ error: 'predictionIds must be an array of numbers' });
-      return;
-    }
-
-    if (predictionIds.length > 100) {
-      res.status(400).json({ error: 'Maximum 100 predictions per request' });
-      return;
-    }
-
-    const stats = await predictionService.getBulkViewStats(predictionIds);
-    res.json({ viewStats: stats });
   } catch (err) {
     next(err);
   }
@@ -819,38 +695,7 @@ export const toggleReaction = async (
   }
 };
 
-/**
- * Get reactions for a prediction
- * GET /api/predictions/:id/reactions
- */
-export const getPredictionReactions = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> => {
-  try {
-    const predictionId = parseInt(req.params.id);
-    const userId = (req as any).user?.id;
-    const cursor = req.query.cursor ? Number(req.query.cursor) : undefined;
-    const limit = req.query.limit ? Number(req.query.limit) : 20;
-    const type = req.query.type as ReactionType | undefined;
-
-    if (isNaN(predictionId)) {
-      res.status(400).json({ error: 'Invalid prediction ID' });
-      return;
-    }
-
-    const result = await reactionService.getPredictionReactions(predictionId, userId, {
-      cursor,
-      limit,
-      type,
-    });
-
-    res.json(result);
-  } catch (err) {
-    next(err);
-  }
-};
+// getPredictionReactions removed - reaction counts and userReaction now included in main prediction objects
 
 /**
  * Remove a specific reaction from a prediction
@@ -883,26 +728,4 @@ export const removeReaction = async (
   }
 };
 
-/**
- * Get reaction counts for a prediction (public endpoint)
- * GET /api/predictions/:id/reactions/counts
- */
-export const getReactionCounts = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> => {
-  try {
-    const predictionId = parseInt(req.params.id);
-
-    if (isNaN(predictionId)) {
-      res.status(400).json({ error: 'Invalid prediction ID' });
-      return;
-    }
-
-    const counts = await reactionService.getPredictionReactionCounts(predictionId);
-    res.json(counts);
-  } catch (err) {
-    next(err);
-  }
-};
+// getReactionCounts removed - reaction counts now included in main prediction objects

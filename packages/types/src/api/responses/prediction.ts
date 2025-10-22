@@ -5,7 +5,7 @@
  */
 
 import type { PublicPrediction, PublicPredictionOption } from '../../database/prediction';
-import type { BetWithUser, PrismaCategory } from '../../prisma';
+import type { BetWithUser, PrismaCategory, PrismaReactionType } from '../../prisma';
 
 // ============================================================================
 // API-Specific Types
@@ -92,6 +92,25 @@ export interface PredictionView {
     title: string;
     description: string | null;
   }>;
+
+  // Enrichment data (included in all prediction responses)
+  activityLevel: 'high' | 'medium' | 'low';
+  activityMetrics: {
+    totalBets: number;
+    totalParlayLegs: number;
+    bettingVelocity: number;
+    popularityScore: number;
+    lastActivityAt: string | null; // Date → ISO string
+  };
+  difficulty: 'easy' | 'medium' | 'hard' | 'expert';
+  viewStats: {
+    totalViews: number;
+    uniqueUserViews: number;
+    viewToEngagementRatio: number;
+  };
+  reactionCounts: Record<PrismaReactionType, number>;
+  userReaction?: PrismaReactionType; // Only if userId provided in request
+  commentCount: number;
 }
 
 // ============================================================================
@@ -109,6 +128,25 @@ export interface PredictionFull extends PublicPrediction {
     name: string;
     avatarUrl: string | null;
   };
+
+  // Enrichment data (same as PredictionView)
+  activityLevel?: 'high' | 'medium' | 'low';
+  activityMetrics?: {
+    totalBets: number;
+    totalParlayLegs: number;
+    bettingVelocity: number;
+    popularityScore: number;
+    lastActivityAt: string | null;
+  };
+  difficulty?: 'easy' | 'medium' | 'hard' | 'expert';
+  viewStats?: {
+    totalViews: number;
+    uniqueUserViews: number;
+    viewToEngagementRatio: number;
+  };
+  reactionCounts?: Record<PrismaReactionType, number>;
+  userReaction?: PrismaReactionType;
+  commentCount?: number;
 }
 
 // ============================================================================

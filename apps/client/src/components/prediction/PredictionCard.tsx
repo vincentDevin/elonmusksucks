@@ -284,7 +284,12 @@ function UnifiedPredictionCard({
                     </span>
                   </div>
                 )}
-                <PredictionReactions predictionId={prediction.id} compact />
+                <PredictionReactions
+                  predictionId={prediction.id}
+                  compact
+                  initialReactionCounts={prediction.reactionCounts}
+                  initialUserReaction={prediction.userReaction}
+                />
               </div>
 
               {/* Source Links */}
@@ -454,7 +459,11 @@ function UnifiedPredictionCard({
               <span className="text-primary">📈</span>
               {flatParlays.length} parlays
             </span>
-            <PredictionReactions predictionId={prediction.id} />
+            <PredictionReactions
+              predictionId={prediction.id}
+              initialReactionCounts={prediction.reactionCounts}
+              initialUserReaction={prediction.userReaction}
+            />
           </div>
 
           {/* Source Links */}
@@ -592,7 +601,14 @@ function UnifiedPredictionCard({
                   : `${Math.ceil((expires - now) / (1000 * 60 * 60))}h left`}
               </span>
             )}
-            {!isMini && <PredictionReactions predictionId={prediction.id} compact />}
+            {!isMini && (
+              <PredictionReactions
+                predictionId={prediction.id}
+                compact
+                initialReactionCounts={prediction.reactionCounts}
+                initialUserReaction={prediction.userReaction}
+              />
+            )}
           </div>
 
           {/* Source Links - Compact */}
