@@ -24,7 +24,7 @@ const Pong = lazy(() => import('../pages/Pong'));
 // Redirect to public site component
 const PublicSiteRedirect = () => {
   React.useEffect(() => {
-    window.location.href = env.PUBLIC_SITE_URL || '/';
+    window.location.href = env.PUBLIC_SITE_URL || '/login';
   }, []);
 
   return (

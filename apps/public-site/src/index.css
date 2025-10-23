@@ -2,49 +2,49 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Modern CSS Variables - Vibrant gradients and better contrast */
+/* Modern CSS Variables - Clean Professional Theme */
 :root {
-  /* Light theme - Modern Blue/Purple */
-  --color-primary: #2563eb;
+  /* Light theme - Clean Professional (aligned with client app) */
+  --color-primary: #3b82f6;
   --color-primary-hover: #1d4ed8;
-  --color-secondary: #7c3aed;
-  --color-accent: #0891b2;
-  --color-background: #f8fafc;
-  --color-surface: #ffffff;
-  --color-content: #0f172a;
+  --color-secondary: #60a5fa;
+  --color-accent: #10b981;
+  --color-background: #ffffff;
+  --color-surface: #f8fafc;
+  --color-content: #1e293b;
   --color-tertiary: #64748b;
   --color-muted: #e2e8f0;
-  --color-border: #cbd5e1;
-  --color-success: #059669;
-  --color-warning: #d97706;
-  --color-error: #dc2626;
-  --color-info: #2563eb;
+  --color-border: #e2e8f0;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+  --color-info: #3b82f6;
 
   /* Gradient colors */
-  --gradient-primary-start: #2563eb;
-  --gradient-primary-end: #7c3aed;
-  --gradient-secondary-start: #0891b2;
-  --gradient-secondary-end: #2563eb;
+  --gradient-primary-start: #3b82f6;
+  --gradient-primary-end: #60a5fa;
+  --gradient-secondary-start: #10b981;
+  --gradient-secondary-end: #3b82f6;
 
   /* Shadow & glow */
   --shadow-subtle: 0 1px 2px rgba(0, 0, 0, 0.05);
   --shadow-medium: 0 2px 8px rgba(0, 0, 0, 0.1);
   --shadow-dramatic: 0 10px 30px rgba(0, 0, 0, 0.15);
-  --glow-primary: 0 0 20px rgba(37, 99, 235, 0.3);
-  --glow-success: 0 0 20px rgba(5, 150, 105, 0.3);
+  --glow-primary: 0 0 20px rgba(59, 130, 246, 0.3);
+  --glow-success: 0 0 20px rgba(16, 185, 129, 0.3);
 }
 
 .dark {
-  /* Dark theme - Modern Emerald/Cyan with better contrast */
+  /* Dark theme - Dark Professional (aligned with client app) */
   --color-primary: #10b981;
   --color-primary-hover: #059669;
-  --color-secondary: #06b6d4;
+  --color-secondary: #059669;
   --color-accent: #34d399;
   --color-background: #0a0f1e;
-  --color-surface: #1a1f2e;
-  --color-content: #f1f5f9;
-  --color-tertiary: #94a3b8;
-  --color-muted: #2d3748;
+  --color-surface: #181f2a;
+  --color-content: #f9fafb;
+  --color-tertiary: #9ca3af;
+  --color-muted: #374151;
   --color-border: #374151;
   --color-success: #10b981;
   --color-warning: #f59e0b;
@@ -53,9 +53,9 @@
 
   /* Gradient colors for dark mode */
   --gradient-primary-start: #10b981;
-  --gradient-primary-end: #06b6d4;
+  --gradient-primary-end: #059669;
   --gradient-secondary-start: #059669;
-  --gradient-secondary-end: #0891b2;
+  --gradient-secondary-end: #34d399;
 
   /* Enhanced shadows & glows for dark mode */
   --shadow-subtle: 0 1px 3px rgba(0, 0, 0, 0.5);

@@ -347,51 +347,49 @@ export default function LandingPage({
                       return (
                         <div
                           key={prediction.id}
-                          className="preview-card p-3 sm:p-4 md:p-5 lg:p-6 xl:p-7 2xl:p-8 relative group"
+                          className="relative bg-surface border border-muted rounded-2xl p-5 shadow hover:shadow-md hover:border-muted/60 transition-all duration-200"
                         >
                           {/* Status Badge */}
-                          <div className="absolute top-2 right-2 sm:top-3 sm:right-3 xl:top-4 xl:right-4">
+                          <div className="absolute top-4 right-4">
                             <span
-                              className={`status-badge text-[10px] sm:text-xs lg:text-sm xl:text-base ${status.type}`}
+                              className={`px-3 py-1 rounded-full text-xs font-medium text-surface flex items-center gap-1 ${status.type === 'resolved' ? 'bg-accent' : status.type === 'expired' ? 'bg-error' : status.type === 'ending-soon' ? 'bg-warning' : status.type === 'info' ? 'bg-info' : 'bg-success'}`}
                             >
-                              <span className="text-xs sm:text-sm lg:text-base xl:text-lg">
-                                {status.icon}
-                              </span>
-                              <span className="hidden sm:inline">{status.text}</span>
+                              <span>{status.icon}</span>
+                              <span>{status.text}</span>
                             </span>
                           </div>
 
                           {/* Title */}
-                          <div className="pr-12 sm:pr-20 mb-3 sm:mb-4 xl:mb-5">
-                            <h3 className="font-semibold text-fluid-md xl:text-fluid-lg 2xl:text-fluid-xl leading-tight text-content">
+                          <div className="pr-12 sm:pr-20 mb-3 sm:mb-4">
+                            <h3 className="font-semibold text-xl sm:text-2xl md:text-3xl lg:text-4xl leading-tight text-content">
                               {prediction.title}
                             </h3>
                           </div>
 
-                          {/* Metadata Row: Category/Type/Creator | Stats */}
-                          <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 mb-4 sm:mb-5 xl:mb-6 pb-3 sm:pb-4 md:pb-5 border-b border-border/50">
-                            {/* Left: Category, Type & Creator */}
-                            <div className="flex gap-3 md:gap-4 lg:gap-5 items-center flex-wrap">
-                              <span
-                                className={`text-xs sm:text-sm md:text-base lg:text-lg px-2.5 sm:px-3 md:px-3.5 lg:px-4 py-1 md:py-1.5 rounded-full border ${getCategoryColor(prediction.category?.name || '')}`}
-                              >
-                                {prediction.category?.name || 'Unknown'}
-                              </span>
-                              <span className="text-xs sm:text-sm md:text-base lg:text-lg text-content/70">
-                                {prediction.type}
-                              </span>
+                          {/* Metadata Row: Category/Creator | Stats */}
+                          <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 mb-4 pb-4 border-b border-border">
+                            {/* Left: Category & Creator */}
+                            <div className="flex gap-3 md:gap-4 items-center flex-wrap">
+                              {prediction.category && (
+                                <span className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm font-medium inline-flex items-center gap-1.5">
+                                  {prediction.category.icon && (
+                                    <span className="text-base">{prediction.category.icon}</span>
+                                  )}
+                                  <span>{prediction.category.name}</span>
+                                </span>
+                              )}
 
                               {/* Creator Info */}
                               {prediction.creator && (
-                                <div className="flex items-center gap-2 md:gap-2.5">
+                                <div className="flex items-center gap-2">
                                   {prediction.creator.avatarUrl && (
                                     <img
                                       src={prediction.creator.avatarUrl}
                                       alt={prediction.creator.name}
-                                      className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 lg:w-8 lg:h-8 rounded-full object-cover"
+                                      className="w-5 h-5 sm:w-6 sm:h-6 rounded-full object-cover"
                                     />
                                   )}
-                                  <span className="text-content/80 text-xs sm:text-sm md:text-base lg:text-lg">
+                                  <span className="text-content/70 text-sm">
                                     by{' '}
                                     <span className="text-content font-medium">
                                       {prediction.creator.name}
@@ -402,29 +400,23 @@ export default function LandingPage({
                             </div>
 
                             {/* Right: Stats */}
-                            <div className="flex items-center gap-4 md:gap-5 lg:gap-6 text-content/80">
-                              <span className="flex items-center gap-1.5 md:gap-2">
-                                <span className="text-base sm:text-lg md:text-xl lg:text-2xl">
-                                  💰
-                                </span>
-                                <span className="text-xs sm:text-sm md:text-base lg:text-lg font-medium">
+                            <div className="flex items-center gap-4 md:gap-5 text-content/70">
+                              <span className="flex items-center gap-1.5">
+                                <span className="text-lg">💰</span>
+                                <span className="text-sm font-medium">
                                   {formatMuskBucks(getTotalVolume(prediction))}
                                 </span>
                               </span>
-                              <span className="flex items-center gap-1.5 md:gap-2">
-                                <span className="text-base sm:text-lg md:text-xl lg:text-2xl">
-                                  📊
-                                </span>
-                                <span className="text-xs sm:text-sm md:text-base lg:text-lg font-medium">
+                              <span className="flex items-center gap-1.5">
+                                <span className="text-lg">📊</span>
+                                <span className="text-sm font-medium">
                                   {prediction.bets.length}
                                 </span>
                               </span>
                               {!prediction.resolvedAt && (
-                                <span className="flex items-center gap-1.5 md:gap-2">
-                                  <span className="text-base sm:text-lg md:text-xl lg:text-2xl">
-                                    ⏰
-                                  </span>
-                                  <span className="text-xs sm:text-sm md:text-base lg:text-lg font-medium">
+                                <span className="flex items-center gap-1.5">
+                                  <span className="text-lg">⏰</span>
+                                  <span className="text-sm font-medium">
                                     {getTimeRemaining(prediction.expiresAt)}
                                   </span>
                                 </span>
@@ -432,13 +424,35 @@ export default function LandingPage({
                             </div>
                           </div>
 
+                          {/* Time remaining */}
+                          {!prediction.resolvedAt && (
+                            <div
+                              className={`text-sm font-medium flex items-center gap-2 mb-4 ${
+                                now > expires
+                                  ? 'text-error'
+                                  : hoursLeft <= 2
+                                    ? 'text-warning'
+                                    : hoursLeft <= 24
+                                      ? 'text-info'
+                                      : 'text-success'
+                              }`}
+                            >
+                              <span>{status.icon}</span>
+                              {now > expires
+                                ? `Expired ${new Date(prediction.expiresAt).toLocaleString()}`
+                                : hoursLeft <= 24
+                                  ? `${hoursLeft}h remaining`
+                                  : `Expires ${new Date(prediction.expiresAt).toLocaleString()}`}
+                            </div>
+                          )}
+
                           {/* Description */}
                           {prediction.description && (
-                            <div className="mb-4 sm:mb-5 md:mb-6">
-                              <h4 className="text-content font-semibold text-xs sm:text-sm md:text-base mb-2 sm:mb-2.5 md:mb-3 uppercase tracking-wide">
+                            <div className="mb-5">
+                              <h4 className="text-content font-semibold text-sm sm:text-base mb-3 uppercase tracking-wide">
                                 Terms of Prediction
                               </h4>
-                              <p className="text-content/90 text-sm sm:text-base md:text-lg leading-relaxed">
+                              <p className="text-content/90 text-base sm:text-lg leading-relaxed">
                                 {prediction.description}
                               </p>
                             </div>
@@ -446,9 +460,9 @@ export default function LandingPage({
 
                           {/* Source Links */}
                           {prediction.sourceLinks && prediction.sourceLinks.length > 0 && (
-                            <div className="mb-4 sm:mb-5 md:mb-6 pb-4 sm:pb-5 md:pb-6 border-b border-border/30">
-                              <h4 className="text-content font-semibold text-xs sm:text-sm md:text-base mb-2 sm:mb-2.5 md:mb-3 uppercase tracking-wide flex items-center gap-2">
-                                <span className="text-base sm:text-lg md:text-xl">📰</span>
+                            <div className="mb-5 pb-5 border-b border-border">
+                              <h4 className="text-content font-semibold text-sm sm:text-base mb-3 uppercase tracking-wide flex items-center gap-2">
+                                <span className="text-lg sm:text-xl">📰</span>
                                 <span>Sources</span>
                               </h4>
                               <div className="space-y-2">
@@ -458,22 +472,20 @@ export default function LandingPage({
                                     href={link.url}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="flex items-start gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg bg-surface/50 hover:bg-surface border border-border/40 hover:border-primary/50 transition-all group"
+                                    className="flex items-start gap-2 sm:gap-3 p-3 sm:p-4 rounded-lg bg-surface/50 hover:bg-surface border border-border hover:border-primary/50 transition-all group"
                                   >
-                                    <span className="text-lg sm:text-xl flex-shrink-0 mt-0.5">
-                                      📄
-                                    </span>
+                                    <span className="text-xl flex-shrink-0 mt-0.5">📄</span>
                                     <div className="flex-1 min-w-0">
-                                      <div className="text-content font-medium text-xs sm:text-sm md:text-base group-hover:text-primary transition-colors line-clamp-2">
+                                      <div className="text-content font-medium text-sm sm:text-base group-hover:text-primary transition-colors line-clamp-2">
                                         {link.title || 'Source Article'}
                                       </div>
                                       {link.description && (
-                                        <div className="text-content/60 text-xs sm:text-sm mt-0.5">
+                                        <div className="text-content/70 text-xs sm:text-sm mt-1">
                                           {link.description}
                                         </div>
                                       )}
                                     </div>
-                                    <span className="text-primary text-xs sm:text-sm flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <span className="text-primary text-sm flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                                       →
                                     </span>
                                   </a>
@@ -482,39 +494,43 @@ export default function LandingPage({
                             </div>
                           )}
 
-                          {/* Betting Options - Flexible Row */}
-                          <div className="flex flex-wrap gap-2 sm:gap-3 md:gap-4 mb-4">
-                            {prediction.options.map((option) => (
-                              <div
-                                key={option.id}
-                                className="bg-surface/70 hover:bg-primary/10 border border-border/40 hover:border-primary/60 rounded-lg px-3 py-2.5 sm:px-4 sm:py-3 md:px-5 md:py-3.5 lg:px-6 lg:py-4 text-center transition-all cursor-pointer hover:scale-[1.02] hover:shadow-md w-full lg:flex-1 lg:min-w-[100px] lg:max-w-[200px] xl:max-w-[250px]"
-                              >
-                                <div className="font-semibold text-content text-fluid-xs sm:text-fluid-sm md:text-fluid-base mb-1">
-                                  {option.label}
+                          {/* Betting Options */}
+                          <div className="mb-4">
+                            <h4 className="text-content font-semibold text-sm sm:text-base mb-3 uppercase tracking-wide">
+                              Prediction Options
+                            </h4>
+                            <div className="space-y-2">
+                              {prediction.options.map((option) => (
+                                <div
+                                  key={option.id}
+                                  className="bg-surface border border-border hover:border-primary rounded-lg p-3 sm:p-4 text-left transition-all hover:scale-[1.02] hover:shadow-md flex items-center justify-between group cursor-pointer"
+                                >
+                                  <div className="flex-1">
+                                    <div className="font-medium text-content group-hover:text-primary transition-colors text-base sm:text-lg">
+                                      {option.label}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-primary font-bold text-lg sm:text-xl">
+                                      {formatOdds(option.odds)}
+                                    </span>
+                                  </div>
                                 </div>
-                                <div className="text-primary font-bold text-fluid-sm sm:text-fluid-md md:text-fluid-lg lg:text-fluid-xl">
-                                  {formatOdds(option.odds)}
-                                </div>
-                              </div>
-                            ))}
+                              ))}
+                            </div>
                           </div>
 
                           {/* Recent Bets */}
                           {prediction.bets.length > 0 && (
-                            <div className="pt-3 sm:pt-4 border-t border-border text-fluid-2xs sm:text-fluid-xs xl:text-fluid-sm text-content/80">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-medium">Recent:</span>
-                                {prediction.bets.slice(0, 2).map((bet) => (
-                                  <span key={bet.id}>
-                                    {bet.userName} ({bet.amount}MB)
-                                  </span>
-                                ))}
-                                {prediction.bets.length > 2 && (
-                                  <span className="text-primary">
-                                    +{prediction.bets.length - 2} more
-                                  </span>
-                                )}
-                              </div>
+                            <div className="mt-2 flex items-center justify-between text-xs text-tertiary">
+                              <span>
+                                Latest:{' '}
+                                {prediction.bets[prediction.bets.length - 1]?.userName ||
+                                  'Anonymous'}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                {prediction.bets.length} total bets
+                              </span>
                             </div>
                           )}
                         </div>
@@ -539,99 +555,87 @@ export default function LandingPage({
             {/* ARTICLES TAB */}
             {contentTab === 'articles' && (
               <div>
-                <div className="space-y-2 sm:space-y-3 xl:space-y-4">
+                <div className="space-y-3">
                   {articles.slice(0, showAllArticles ? articles.length : 4).map((article: any) => (
-                    <div key={article.id} className="preview-card p-3 sm:p-4 md:p-5 xl:p-6 2xl:p-7">
-                      {/* Two-column layout: Image + Content */}
-                      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 xl:gap-5 2xl:gap-6 mb-3 xl:mb-4">
-                        {/* Image Preview - Top on mobile, Left on desktop */}
-                        {article.content.imageUrl && (
-                          <div className="w-full h-40 sm:w-32 sm:h-24 md:w-40 md:h-28 lg:w-48 lg:h-32 xl:w-56 xl:h-36 2xl:w-64 2xl:h-40 overflow-hidden rounded-lg flex-shrink-0">
-                            <img
-                              src={article.content.imageUrl}
-                              alt={article.content.title}
-                              className="w-full h-full object-cover hover:scale-110 transition-transform duration-300 cursor-pointer"
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).style.display = 'none';
-                              }}
-                            />
-                          </div>
-                        )}
-
-                        {/* Content - Bottom on mobile, Right on desktop */}
-                        <div className="flex-1 min-w-0 flex flex-col">
-                          {/* Metadata */}
-                          <div className="flex gap-1.5 sm:gap-2 xl:gap-2.5 mb-1.5 sm:mb-2 xl:mb-3 text-fluid-2xs sm:text-fluid-xs xl:text-fluid-sm items-center flex-wrap">
-                            <span className="text-info bg-info/10 border border-info/20 px-1.5 sm:px-2 xl:px-2.5 2xl:px-3 py-0.5 xl:py-1 rounded font-medium">
-                              Article
-                            </span>
-                            <span className="text-content/80 truncate max-w-[120px] sm:max-w-none">
-                              {article.content.author || article.content.source}
-                            </span>
-                            <span className="text-content/70 hidden sm:inline">•</span>
-                            <span className="text-content/80">
-                              {getRelativeTime(article.timestamp || article.createdAt)}
-                            </span>
-                            {article.content.source && article.content.author && (
-                              <>
-                                <span className="text-content/70 hidden md:inline">•</span>
-                                <span className="text-content/80 hidden md:inline">
-                                  {article.content.source}
-                                </span>
-                              </>
-                            )}
-                          </div>
-
-                          {/* Title */}
-                          <h3 className="text-fluid-sm sm:text-fluid-md xl:text-fluid-lg 2xl:text-fluid-xl font-semibold mb-1.5 sm:mb-2 xl:mb-3 line-clamp-2 leading-tight text-content hover:text-primary transition-colors">
-                            {article.content.title}
-                          </h3>
-
-                          {/* Excerpt */}
-                          {article.content.excerpt && (
-                            <p className="text-fluid-xs sm:text-fluid-sm xl:text-fluid-base text-content/80 mb-2 sm:mb-3 xl:mb-4 line-clamp-2 leading-relaxed">
-                              {article.content.excerpt}
-                            </p>
-                          )}
-
-                          {/* Tags */}
-                          {article.tags && article.tags.length > 0 && (
-                            <div className="flex flex-wrap gap-1 sm:gap-1.5 xl:gap-2">
-                              {article.tags.slice(0, 3).map((tag: string) => (
-                                <span
-                                  key={tag}
-                                  className="px-1.5 sm:px-2 xl:px-2.5 2xl:px-3 py-0.5 xl:py-1 bg-surface/70 border border-border/30 text-content text-fluid-2xs sm:text-fluid-xs xl:text-fluid-sm rounded-full"
-                                >
-                                  {tag}
-                                </span>
-                              ))}
-                              {article.tags.length > 3 && (
-                                <span className="px-1.5 sm:px-2 xl:px-2.5 2xl:px-3 py-0.5 xl:py-1 bg-surface/70 border border-border/30 text-content text-fluid-2xs sm:text-fluid-xs xl:text-fluid-sm rounded-full">
-                                  +{article.tags.length - 3}
-                                </span>
-                              )}
-                            </div>
-                          )}
+                    <div
+                      key={article.id}
+                      className="bg-surface border border-muted rounded-2xl p-5 shadow hover:shadow-md hover:border-muted/60 transition-all duration-200"
+                    >
+                      {/* Lead Image */}
+                      {article.content.imageUrl && (
+                        <div className="aspect-video w-full overflow-hidden rounded-lg mb-4">
+                          <img
+                            src={article.content.imageUrl}
+                            alt={article.content.title}
+                            className="w-full h-full object-cover hover:scale-105 transition-transform duration-200 cursor-pointer"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = 'none';
+                            }}
+                          />
                         </div>
+                      )}
+
+                      {/* Metadata */}
+                      <div className="text-sm sm:text-base text-tertiary mb-3">
+                        {article.content.author || article.content.source} •{' '}
+                        {getRelativeTime(article.timestamp || article.createdAt)}
+                        {article.content.source &&
+                          article.content.author &&
+                          ` • ${article.content.source}`}
                       </div>
 
-                      {/* Engagement & Action - Full width row below */}
-                      <div className="flex items-center justify-between gap-2 sm:gap-3 xl:gap-4 pt-2 sm:pt-3 xl:pt-4 border-t border-border">
-                        <div className="flex items-center gap-2 sm:gap-3 md:gap-4 xl:gap-5 2xl:gap-6 text-fluid-xs sm:text-fluid-sm xl:text-fluid-base text-content/80">
-                          <span className="flex items-center gap-0.5 sm:gap-1 xl:gap-1.5">
-                            <span className="text-sm sm:text-base xl:text-lg 2xl:text-xl">👍</span>
-                            <span>{article.engagement.reactions}</span>
-                          </span>
-                          <span className="flex items-center gap-0.5 sm:gap-1 xl:gap-1.5">
-                            <span className="text-sm sm:text-base xl:text-lg 2xl:text-xl">💬</span>
-                            <span>{article.engagement.comments}</span>
-                          </span>
+                      {/* Title */}
+                      <h3 className="text-lg sm:text-xl md:text-2xl font-semibold text-content hover:text-primary transition-colors mb-3 leading-tight">
+                        {article.content.title}
+                      </h3>
+
+                      {/* Excerpt */}
+                      {article.content.excerpt && (
+                        <p className="text-content/80 text-sm sm:text-base md:text-lg line-clamp-2 leading-relaxed mb-3">
+                          {article.content.excerpt}
+                        </p>
+                      )}
+
+                      {/* Tags */}
+                      {article.tags && article.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mb-4">
+                          {article.tags.slice(0, 4).map((tag: string) => (
+                            <span
+                              key={tag}
+                              className="px-2 py-1 bg-surface/70 border border-border text-content/70 text-xs sm:text-sm rounded-full"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                          {article.tags.length > 4 && (
+                            <span className="px-2 py-1 bg-surface/70 border border-border text-content/70 text-xs sm:text-sm rounded-full">
+                              +{article.tags.length - 4}
+                            </span>
+                          )}
                         </div>
+                      )}
+
+                      {/* Engagement & Action */}
+                      <div className="flex items-center justify-between text-sm sm:text-base">
+                        <div className="flex items-center space-x-4">
+                          {/* Reactions */}
+                          <button className="flex items-center space-x-1.5 text-tertiary hover:text-primary transition-colors hover:bg-surface/50 px-2 py-1 rounded-lg cursor-pointer">
+                            <span className="text-lg sm:text-xl">👍</span>
+                            <span className="font-medium">{article.engagement.reactions}</span>
+                          </button>
+
+                          {/* Comments */}
+                          <button className="flex items-center space-x-1.5 text-tertiary hover:text-primary transition-colors hover:bg-surface/50 px-2 py-1 rounded-lg cursor-pointer">
+                            <span className="text-lg sm:text-xl">💬</span>
+                            <span className="font-medium">{article.engagement.comments}</span>
+                          </button>
+                        </div>
+
                         <a
                           href={article.content.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="px-2 py-1 sm:px-3 sm:py-1.5 xl:px-4 xl:py-2 2xl:px-5 2xl:py-2.5 text-fluid-2xs sm:text-fluid-xs xl:text-fluid-sm bg-primary hover:bg-primary-hover text-white rounded-lg font-medium transition-colors whitespace-nowrap"
+                          className="px-3 py-2 sm:px-4 sm:py-2.5 bg-primary hover:bg-primary-hover text-surface text-sm sm:text-base font-medium rounded-lg transition-all duration-200 hover:scale-105 whitespace-nowrap"
                         >
                           Read Article →
                         </a>
@@ -655,7 +659,7 @@ export default function LandingPage({
             {/* COMMUNITY TAB */}
             {contentTab === 'community' && (
               <div>
-                <div className="space-y-2 sm:space-y-3 xl:space-y-4">
+                <div className="space-y-3">
                   {posts.slice(0, showAllPosts ? posts.length : 4).map((post) => {
                     const avatarUrl = post.author?.avatarUrl || undefined;
                     const authorName = post.author?.name || 'Unknown';
@@ -663,56 +667,56 @@ export default function LandingPage({
                     const reactionsCount = post.reactionsCount || 0;
 
                     return (
-                      <div key={post.id} className="preview-card p-3 sm:p-4 md:p-5 xl:p-6 2xl:p-7">
+                      <div
+                        key={post.id}
+                        className="bg-surface border border-muted rounded-2xl p-5 shadow hover:shadow-md hover:border-muted/60 transition-all duration-200"
+                      >
                         {/* Author Header */}
-                        <div className="flex items-start gap-2 sm:gap-3 xl:gap-4 mb-2 sm:mb-3 xl:mb-4">
-                          {avatarUrl ? (
-                            <img
-                              src={avatarUrl}
-                              alt={authorName}
-                              className="w-8 h-8 sm:w-10 sm:h-10 md:w-11 md:h-11 xl:w-12 xl:h-12 2xl:w-14 2xl:h-14 rounded-full object-cover hover:ring-2 hover:ring-primary/30 transition-all flex-shrink-0"
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).style.display = 'none';
-                              }}
-                            />
-                          ) : (
-                            <div className="w-8 h-8 sm:w-10 sm:h-10 md:w-11 md:h-11 xl:w-12 xl:h-12 2xl:w-14 2xl:h-14 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white font-semibold text-xs sm:text-sm md:text-base xl:text-lg 2xl:text-xl flex-shrink-0 hover:ring-2 hover:ring-primary/30 transition-all">
-                              {authorName.charAt(0).toUpperCase()}
-                            </div>
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-1.5 sm:gap-2 xl:gap-2.5 mb-0.5 sm:mb-1 xl:mb-1.5">
-                              <span className="font-semibold text-fluid-xs sm:text-fluid-base xl:text-fluid-md 2xl:text-fluid-lg text-content hover:text-primary transition-colors truncate">
-                                {authorName}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1.5 sm:gap-2 xl:gap-2.5 text-fluid-2xs sm:text-fluid-xs xl:text-fluid-sm text-content/80 flex-wrap">
-                              <span className="text-success bg-success/10 border border-success/20 px-1.5 sm:px-2 xl:px-2.5 2xl:px-3 py-0.5 xl:py-1 rounded font-medium">
-                                Post
-                              </span>
-                              <span className="text-fluid-2xs sm:text-fluid-xs xl:text-fluid-sm">
-                                {getRelativeTime(post.createdAt)}
-                              </span>
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex items-start space-x-3">
+                            {avatarUrl ? (
+                              <img
+                                src={avatarUrl}
+                                alt={authorName}
+                                className="w-11 h-11 sm:w-12 sm:h-12 rounded-full object-cover hover:ring-2 hover:ring-primary/30 transition-all flex-shrink-0"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display = 'none';
+                                }}
+                              />
+                            ) : (
+                              <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white font-semibold hover:ring-2 hover:ring-primary/30 transition-all flex-shrink-0">
+                                {authorName.charAt(0).toUpperCase()}
+                              </div>
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center space-x-2 mb-1">
+                                <span className="font-semibold text-base sm:text-lg text-content hover:text-primary transition-colors">
+                                  {authorName}
+                                </span>
+                              </div>
+                              <div className="flex items-center space-x-2 text-sm sm:text-base text-tertiary">
+                                <span>{getRelativeTime(post.createdAt)}</span>
+                              </div>
                             </div>
                           </div>
                         </div>
 
                         {/* Post Content */}
-                        <div className="mb-2 sm:mb-3 xl:mb-4">
-                          <p className="text-content leading-relaxed line-clamp-3 text-fluid-xs sm:text-fluid-sm xl:text-fluid-base 2xl:text-fluid-md">
+                        <div className="mb-4">
+                          <p className="text-content leading-relaxed line-clamp-3 text-sm sm:text-base md:text-lg">
                             {post.body}
                           </p>
                         </div>
 
                         {/* Media Grid */}
                         {post.mediaUrls && post.mediaUrls.length > 0 && (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 sm:gap-2 xl:gap-3 mb-2 sm:mb-3 xl:mb-4">
+                          <div className="grid grid-cols-2 gap-2 mb-4">
                             {post.mediaUrls.slice(0, 2).map((url, index) => (
                               <div key={index} className="overflow-hidden rounded-lg">
                                 <img
                                   src={url}
                                   alt=""
-                                  className="object-cover w-full h-24 sm:h-28 md:h-32 xl:h-36 2xl:h-40 hover:scale-110 transition-transform duration-300"
+                                  className="object-cover w-full h-32 sm:h-40 hover:scale-105 transition-transform duration-200"
                                   onError={(e) => {
                                     (e.target as HTMLImageElement).style.display = 'none';
                                   }}
@@ -723,24 +727,24 @@ export default function LandingPage({
                         )}
 
                         {/* Engagement & Action */}
-                        <div className="flex items-center justify-between pt-2 sm:pt-3 xl:pt-4 border-t border-border gap-2 xl:gap-3">
-                          <div className="flex items-center gap-2 sm:gap-3 md:gap-4 xl:gap-5 2xl:gap-6 text-fluid-xs sm:text-fluid-sm xl:text-fluid-base text-content/80">
-                            <span className="flex items-center gap-0.5 sm:gap-1 md:gap-1.5 xl:gap-2">
-                              <span className="text-sm sm:text-base xl:text-lg 2xl:text-xl">
-                                ❤️
-                              </span>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-5 text-sm sm:text-base">
+                            {/* Reactions */}
+                            <button className="flex items-center space-x-1.5 hover:text-primary transition-colors text-tertiary hover:bg-surface/50 px-2 py-1 rounded-lg">
+                              <span className="text-lg sm:text-xl">❤️</span>
                               <span className="font-medium">{reactionsCount}</span>
-                            </span>
-                            <span className="flex items-center gap-0.5 sm:gap-1 md:gap-1.5 xl:gap-2">
-                              <span className="text-sm sm:text-base xl:text-lg 2xl:text-xl">
-                                💬
-                              </span>
+                            </button>
+
+                            {/* Comments */}
+                            <button className="flex items-center space-x-1.5 hover:text-primary transition-colors text-tertiary hover:bg-surface/50 px-2 py-1 rounded-lg">
+                              <span className="text-lg sm:text-xl">💬</span>
                               <span className="font-medium">{commentsCount}</span>
-                            </span>
+                            </button>
                           </div>
+
                           <a
                             href={`${clientAppUrl}/login`}
-                            className="px-2 py-1 sm:px-3 sm:py-1.5 xl:px-4 xl:py-2 2xl:px-5 2xl:py-2.5 border border-border hover:border-primary rounded-lg text-content font-medium text-fluid-2xs sm:text-fluid-xs xl:text-fluid-sm transition-colors whitespace-nowrap"
+                            className="px-3 py-2 sm:px-4 sm:py-2.5 text-sm sm:text-base font-medium rounded-lg transition-all duration-200 bg-secondary hover:bg-secondary/90 text-content hover:scale-105"
                           >
                             Join Discussion
                           </a>
