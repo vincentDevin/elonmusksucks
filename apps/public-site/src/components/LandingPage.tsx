@@ -152,58 +152,110 @@ export default function LandingPage({
         <ThemeToggle />
       </div>
 
-      {/* Hero Section */}
-      <div className="bg-background border-b border-border">
-        <div className="container mx-auto px-4 py-8 md:py-12">
-          <div className="max-w-6xl mx-auto text-center">
-            <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-3 md:mb-4 text-content">
-              ElonMuskSucks.net
-            </h1>
-            <p className="text-lg sm:text-xl md:text-2xl text-content mb-2 md:mb-3 font-semibold">
-              The World's Most Accurate Musk Weather Report
-            </p>
-            <p className="text-sm sm:text-base md:text-lg text-content/80 mb-6 md:mb-8">
-              Forecast: Erratic with a chance of chaos
-            </p>
+      {/* Hero Section - With Background Image */}
+      <div className="relative bg-background border-b border-border overflow-hidden">
+        {/* Background Image - PLACEHOLDER (replace with your Elon collage) */}
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{
+            backgroundImage:
+              'url(https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1920&q=80)',
+          }}
+        />
 
-            {/* Inline Stats */}
-            <div className="flex justify-center gap-3 md:gap-4 mb-6 md:mb-8 flex-wrap">
-              <div className="bg-surface border-2 border-border rounded-lg px-4 py-2.5 md:px-5 md:py-3 shadow-md">
-                <div className="text-xl md:text-2xl font-bold text-primary">
-                  {openPredictions.length}
-                </div>
-                <div className="text-xs md:text-sm text-content/80 font-medium">Markets</div>
-              </div>
-              <div className="bg-surface border-2 border-border rounded-lg px-4 py-2.5 md:px-5 md:py-3 shadow-md">
-                <div className="text-xl md:text-2xl font-bold text-success">{leaders.length}</div>
-                <div className="text-xs md:text-sm text-content/80 font-medium">Predictors</div>
-              </div>
-              <div className="bg-surface border-2 border-border rounded-lg px-4 py-2.5 md:px-5 md:py-3 shadow-md">
-                <div className="text-xl md:text-2xl font-bold text-warning">{totalBets}</div>
-                <div className="text-xs md:text-sm text-content/80 font-medium">Bets</div>
-              </div>
-              <div className="bg-surface border-2 border-border rounded-lg px-4 py-2.5 md:px-5 md:py-3 shadow-md">
-                <div className="text-xl md:text-2xl font-bold text-secondary">
-                  {formatMuskBucks(totalVolume)}
-                </div>
-                <div className="text-xs md:text-sm text-content/80 font-medium">MuskBucks</div>
-              </div>
-            </div>
+        {/* Gradient Overlay for better readability */}
+        <div className="absolute inset-0 bg-gradient-to-b from-background/85 via-background/80 to-background/85" />
 
-            {/* CTAs */}
-            <div className="flex justify-center gap-3 md:gap-4 flex-wrap">
-              <a
-                href={`${clientAppUrl}/register`}
-                className="px-6 py-3 md:px-8 md:py-4 bg-primary hover:bg-primary-hover text-white dark:text-background rounded-xl text-base md:text-lg font-bold hover-lift shadow-lg transition-all"
-              >
-                🚀 Start Predicting
-              </a>
-              <a
-                href={`${clientAppUrl}/login`}
-                className="px-6 py-3 md:px-8 md:py-4 bg-surface border-2 border-border hover:border-primary text-content rounded-xl text-base md:text-lg font-bold hover-lift shadow-lg transition-all"
-              >
-                Sign In
-              </a>
+        {/* Content Container */}
+        <div className="relative container mx-auto px-4 py-12 md:py-16 lg:py-20">
+          <div className="max-w-5xl mx-auto">
+            {/* Main Content Box with Solid Background */}
+            <div className="bg-surface/95 backdrop-blur-xl border-2 border-border rounded-3xl shadow-2xl p-8 md:p-12 lg:p-16">
+              {/* Title with Gradient */}
+              <h1 className="text-3xl sm:text-4xl md:text-6xl lg:text-7xl xl:text-8xl font-bold mb-4 md:mb-6 text-center">
+                <span className="gradient-text bg-clip-text text-transparent bg-gradient-to-r from-primary via-secondary to-accent">
+                  ElonMuskSucks.net
+                </span>
+              </h1>
+
+              {/* Subtitle with enhanced styling */}
+              <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl xl:text-4xl text-content mb-3 md:mb-4 font-bold text-center">
+                The World's Most Accurate <span className="text-primary">Musk Weather Report</span>
+              </p>
+
+              {/* Tagline */}
+              <p className="text-base sm:text-lg md:text-xl text-content/80 mb-8 md:mb-10 text-center italic">
+                Forecast: <span className="text-warning font-semibold">Erratic</span> with a chance
+                of <span className="text-error font-semibold">chaos</span>
+              </p>
+
+              {/* Stats Grid with Enhanced Colors */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-8 md:mb-10">
+                {/* Markets - Sky Blue */}
+                <div className="bg-gradient-to-br from-stat-markets/25 to-stat-markets/10 border-2 border-stat-markets/40 rounded-xl px-4 py-4 md:px-5 md:py-5 shadow-lg hover:shadow-xl transition-all hover:scale-105 hover:border-stat-markets/60">
+                  <div className="text-2xl md:text-3xl lg:text-4xl font-bold text-stat-markets mb-1">
+                    {openPredictions.length}
+                  </div>
+                  <div className="text-xs md:text-sm text-content/80 font-semibold uppercase tracking-wide">
+                    Markets
+                  </div>
+                </div>
+
+                {/* Predictors - Emerald Green */}
+                <div className="bg-gradient-to-br from-stat-predictors/25 to-stat-predictors/10 border-2 border-stat-predictors/40 rounded-xl px-4 py-4 md:px-5 md:py-5 shadow-lg hover:shadow-xl transition-all hover:scale-105 hover:border-stat-predictors/60">
+                  <div className="text-2xl md:text-3xl lg:text-4xl font-bold text-stat-predictors mb-1">
+                    {leaders.length}
+                  </div>
+                  <div className="text-xs md:text-sm text-content/80 font-semibold uppercase tracking-wide">
+                    Predictors
+                  </div>
+                </div>
+
+                {/* Bets - Amber/Orange */}
+                <div className="bg-gradient-to-br from-stat-bets/25 to-stat-bets/10 border-2 border-stat-bets/40 rounded-xl px-4 py-4 md:px-5 md:py-5 shadow-lg hover:shadow-xl transition-all hover:scale-105 hover:border-stat-bets/60">
+                  <div className="text-2xl md:text-3xl lg:text-4xl font-bold text-stat-bets mb-1">
+                    {totalBets}
+                  </div>
+                  <div className="text-xs md:text-sm text-content/80 font-semibold uppercase tracking-wide">
+                    Bets
+                  </div>
+                </div>
+
+                {/* MuskBucks - Purple */}
+                <div className="bg-gradient-to-br from-stat-muskbucks/25 to-stat-muskbucks/10 border-2 border-stat-muskbucks/40 rounded-xl px-4 py-4 md:px-5 md:py-5 shadow-lg hover:shadow-xl transition-all hover:scale-105 hover:border-stat-muskbucks/60">
+                  <div className="text-2xl md:text-3xl lg:text-4xl font-bold text-stat-muskbucks mb-1">
+                    {formatMuskBucks(totalVolume)}
+                  </div>
+                  <div className="text-xs md:text-sm text-content/80 font-semibold uppercase tracking-wide">
+                    MuskBucks
+                  </div>
+                </div>
+              </div>
+
+              {/* CTA Buttons with Enhanced Styling */}
+              <div className="flex justify-center gap-4 md:gap-5 flex-wrap">
+                <a
+                  href={`${clientAppUrl}/register`}
+                  className="group relative px-8 py-4 md:px-10 md:py-5 bg-gradient-to-r from-primary to-secondary hover:from-primary-hover hover:to-primary text-surface rounded-2xl text-lg md:text-xl font-bold shadow-2xl hover:shadow-primary/50 transition-all hover:scale-105 overflow-hidden"
+                >
+                  <span className="relative z-10 flex items-center gap-2">
+                    <span className="text-2xl">🚀</span>
+                    <span>Start Predicting</span>
+                  </span>
+                  {/* Shine effect */}
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+                </a>
+
+                <a
+                  href={`${clientAppUrl}/login`}
+                  className="px-8 py-4 md:px-10 md:py-5 bg-gradient-to-br from-cyan/20 to-cyan/10 backdrop-blur-sm border-2 border-cyan/60 hover:border-cyan hover:from-cyan/30 hover:to-cyan/15 text-content rounded-2xl text-lg md:text-xl font-bold shadow-lg hover:shadow-cyan/20 hover:shadow-xl transition-all hover:scale-105"
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="text-2xl">👤</span>
+                    <span>Sign In</span>
+                  </span>
+                </a>
+              </div>
             </div>
           </div>
         </div>
@@ -261,7 +313,7 @@ export default function LandingPage({
       <div className="container mx-auto px-2 py-3">
         <div className="max-w-[1800px] mx-auto space-y-3">
           {/* Tab Navigation - Outside content section, centered */}
-          <div className="flex justify-center mb-4 md:mb-6">
+          <div className="flex justify-center mt-4 md:mt-6 mb-4 md:mb-6">
             <div className="inline-flex flex-wrap justify-center gap-2 md:gap-3 bg-surface border border-border rounded-xl p-1.5 md:p-2 shadow-md max-w-full">
               <button
                 onClick={() => {
@@ -585,7 +637,7 @@ export default function LandingPage({
                       </div>
 
                       {/* Title */}
-                      <h3 className="text-lg sm:text-xl md:text-2xl font-semibold text-content hover:text-primary transition-colors mb-3 leading-tight">
+                      <h3 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-content hover:text-primary transition-colors mb-3 leading-tight">
                         {article.content.title}
                       </h3>
 

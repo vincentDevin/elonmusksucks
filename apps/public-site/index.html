@@ -38,13 +38,63 @@
         -moz-osx-font-smoothing: grayscale;
       }
 
+      /* Hide content initially to prevent FOUC */
       #root {
         min-height: 100vh;
+        opacity: 0;
+        transition: opacity 0.4s ease-in-out;
+      }
+
+      #root.ready {
+        opacity: 1;
       }
 
       /* Prevent layout shift */
       body {
         overflow-y: scroll;
+      }
+
+      /* Loading overlay */
+      #loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: var(--color-background);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        opacity: 1;
+        transition: opacity 0.4s ease-in-out;
+      }
+
+      #loading-overlay.fade-out {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      /* Loading spinner */
+      .loading-spinner {
+        width: 50px;
+        height: 50px;
+        border: 3px solid var(--color-border);
+        border-top-color: var(--color-primary);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+
+      /* Loading text */
+      .loading-text {
+        margin-top: 1rem;
+        font-size: 0.875rem;
+        color: var(--color-content);
+        opacity: 0.7;
       }
     </style>
 
@@ -63,6 +113,15 @@
     </script>
   </head>
   <body>
+    <!-- Loading overlay - visible by default -->
+    <div id="loading-overlay">
+      <div style="display: flex; flex-direction: column; align-items: center;">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Loading ElonMuskSucks.net...</div>
+      </div>
+    </div>
+
+    <!-- Main content - hidden initially -->
     <div id="root"><!--ssr-outlet--></div>
     <!--server-data-->
     <script type="module" src="/src/entry-client.tsx"></script>
