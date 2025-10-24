@@ -2,6 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/favicon-16x16.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
     <!-- ═══════════════════════════════════════════════════════════════ -->
@@ -52,8 +53,83 @@
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
+
+    <!-- Loading State Styles -->
+    <style>
+      /* Critical inline styles for loading state */
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background-color: #0a0f1e;
+        color: #f9fafb;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue',
+          Arial, sans-serif;
+      }
+
+      #root {
+        min-height: 100vh;
+        opacity: 0;
+        transition: opacity 0.4s ease-in-out;
+      }
+
+      #root.ready {
+        opacity: 1;
+      }
+
+      #loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #0a0f1e;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        opacity: 1;
+        transition: opacity 0.4s ease-in-out;
+      }
+
+      #loading-overlay.fade-out {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .loading-spinner {
+        width: 50px;
+        height: 50px;
+        border: 3px solid #374151;
+        border-top-color: #10b981;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .loading-text {
+        margin-top: 1rem;
+        font-size: 0.875rem;
+        color: #f9fafb;
+        opacity: 0.7;
+      }
+    </style>
   </head>
   <body>
+    <!-- Loading overlay - visible by default -->
+    <div id="loading-overlay">
+      <div style="display: flex; flex-direction: column; align-items: center">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Loading ElonMuskSucks.net...</div>
+      </div>
+    </div>
+
+    <!-- Main content - hidden initially -->
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

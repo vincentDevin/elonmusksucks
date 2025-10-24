@@ -50,6 +50,19 @@ export default function LandingPage({
   const [showPrivacyModal, setShowPrivacyModal] = React.useState(false);
   const [showTermsModal, setShowTermsModal] = React.useState(false);
 
+  // Redirect loading state
+  const [redirecting, setRedirecting] = React.useState(false);
+
+  // Handle smooth redirect to client app
+  const handleRedirect = (url: string) => (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    setRedirecting(true);
+    // Short delay to show loading animation before redirect
+    setTimeout(() => {
+      window.location.href = url;
+    }, 300);
+  };
+
   const predictions = Array.isArray(predictionsData)
     ? predictionsData
     : Array.isArray(trendingData)
@@ -152,19 +165,19 @@ export default function LandingPage({
         <ThemeToggle />
       </div>
 
-      {/* Hero Section - With Background Image */}
+      {/* Hero Section - With Animated Gradient */}
       <div className="relative bg-background border-b border-border overflow-hidden">
-        {/* Background Image - PLACEHOLDER (replace with your Elon collage) */}
+        {/* Animated Gradient Background */}
         <div
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          className="absolute inset-0 animate-gradient-shift"
           style={{
-            backgroundImage:
-              'url(https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1920&q=80)',
+            background:
+              'linear-gradient(135deg, rgba(168, 85, 247, 0.15), rgba(6, 182, 212, 0.15), rgba(59, 130, 246, 0.15))',
           }}
         />
 
-        {/* Gradient Overlay for better readability */}
-        <div className="absolute inset-0 bg-gradient-to-b from-background/85 via-background/80 to-background/85" />
+        {/* Subtle overlay for depth */}
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/20 to-transparent" />
 
         {/* Content Container */}
         <div className="relative container mx-auto px-4 py-12 md:py-16 lg:py-20">
@@ -236,6 +249,7 @@ export default function LandingPage({
               <div className="flex justify-center gap-4 md:gap-5 flex-wrap">
                 <a
                   href={`${clientAppUrl}/register`}
+                  onClick={handleRedirect(`${clientAppUrl}/register`)}
                   className="group relative px-8 py-4 md:px-10 md:py-5 bg-gradient-to-r from-primary to-secondary hover:from-primary-hover hover:to-primary text-surface rounded-2xl text-lg md:text-xl font-bold shadow-2xl hover:shadow-primary/50 transition-all hover:scale-105 overflow-hidden"
                 >
                   <span className="relative z-10 flex items-center gap-2">
@@ -248,6 +262,7 @@ export default function LandingPage({
 
                 <a
                   href={`${clientAppUrl}/login`}
+                  onClick={handleRedirect(`${clientAppUrl}/login`)}
                   className="px-8 py-4 md:px-10 md:py-5 bg-gradient-to-br from-cyan/20 to-cyan/10 backdrop-blur-sm border-2 border-cyan/60 hover:border-cyan hover:from-cyan/30 hover:to-cyan/15 text-content rounded-2xl text-lg md:text-xl font-bold shadow-lg hover:shadow-cyan/20 hover:shadow-xl transition-all hover:scale-105"
                 >
                   <span className="flex items-center gap-2">
@@ -796,6 +811,7 @@ export default function LandingPage({
 
                           <a
                             href={`${clientAppUrl}/login`}
+                            onClick={handleRedirect(`${clientAppUrl}/login`)}
                             className="px-3 py-2 sm:px-4 sm:py-2.5 text-sm sm:text-base font-medium rounded-lg transition-all duration-200 bg-secondary hover:bg-secondary/90 text-content hover:scale-105"
                           >
                             Join Discussion
@@ -1211,6 +1227,7 @@ export default function LandingPage({
               </p>
               <a
                 href={`${clientAppUrl}/register`}
+                onClick={handleRedirect(`${clientAppUrl}/register`)}
                 className="inline-block px-6 py-3 md:px-8 md:py-4 bg-gradient-primary text-white dark:text-background rounded-xl text-base md:text-lg font-bold hover-lift shadow-lg transition-all"
               >
                 🚀 Join the Chaos
@@ -1573,6 +1590,19 @@ export default function LandingPage({
                 Last updated: October 2024
               </p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Redirect Loading Overlay */}
+      {redirecting && (
+        <div className="fixed inset-0 bg-background z-[9999] flex items-center justify-center animate-fade-in">
+          <div className="flex flex-col items-center gap-4">
+            <div className="w-16 h-16 border-4 border-border border-t-primary rounded-full animate-spin" />
+            <div className="text-lg md:text-xl font-semibold text-content">
+              Loading ElonMuskSucks.net...
+            </div>
+            <div className="text-sm text-tertiary">Preparing your chaos dashboard</div>
           </div>
         </div>
       )}

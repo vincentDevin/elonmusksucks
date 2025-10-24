@@ -29,6 +29,7 @@ interface ServerData {
   fullLeaderboardData: LeaderboardEntryView[] | null;
   clientAppUrl: string;
   currentPath: string;
+  is404?: boolean;
 }
 
 // ESM equivalent of __dirname
@@ -302,8 +303,16 @@ async function createServer(): Promise<express.Application> {
     const url = req.originalUrl;
 
     try {
+      // Valid routes for public site (only landing page)
+      const validRoutes = ['/'];
+      const is404 = !validRoutes.includes(req.path);
+
       // Fetch all server data (single page, no routing)
       const serverData = await fetchServerData();
+
+      // Add 404 flag and current path
+      serverData.is404 = is404;
+      serverData.currentPath = req.path;
 
       let render: (serverData: ServerData) => string;
       let template: string;
@@ -346,11 +355,14 @@ async function createServer(): Promise<express.Application> {
           `<script>window.__SERVER_DATA__ = ${serializeForHTML(serverData)}</script>`,
         );
 
-      // Single cache strategy for landing page (30s cache, 1min stale)
-      const cacheControlValue = 'public, max-age=30, stale-while-revalidate=60';
+      // Different caching strategy for 404 vs landing page
+      const statusCode = is404 ? 404 : 200;
+      const cacheControlValue = is404
+        ? 'public, max-age=300' // 5 minutes for 404 pages
+        : 'public, max-age=30, stale-while-revalidate=60'; // 30s cache for landing page
 
       res
-        .status(200)
+        .status(statusCode)
         .set({
           'Content-Type': 'text/html',
           'Cache-Control': cacheControlValue,

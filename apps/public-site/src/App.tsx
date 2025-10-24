@@ -1,4 +1,5 @@
 import LandingPage from './components/LandingPage';
+import NotFound from './components/NotFound';
 import type {
   PredictionView,
   LeaderboardEntryView,
@@ -20,6 +21,7 @@ interface ServerData {
   fullLeaderboardData: LeaderboardEntryView[] | null;
   clientAppUrl: string;
   currentPath: string;
+  is404?: boolean;
 }
 
 interface AppProps {
@@ -41,9 +43,15 @@ function App({ serverData: propServerData }: AppProps) {
       fullLeaderboardData: null,
       clientAppUrl: '',
       currentPath: '/',
+      is404: false,
     };
 
-  // Always render single landing page - no routing needed
+  // Render 404 page if server indicates unknown route
+  if (serverData.is404) {
+    return <NotFound clientAppUrl={serverData.clientAppUrl} />;
+  }
+
+  // Otherwise render landing page
   return <LandingPage {...serverData} />;
 }
 
