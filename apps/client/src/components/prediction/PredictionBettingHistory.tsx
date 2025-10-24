@@ -1,6 +1,8 @@
 import { useState, useMemo } from 'react';
 import { formatMuskBucks } from '../../utils/formatting';
 import type { PredictionFull } from '@ems/types';
+import { getOptionColor } from '../../utils/predictionColors';
+import { useUnifiedTheme } from '../../theme/hooks/useUnifiedTheme';
 import {
   ClockIcon as Clock,
   ArrowTrendingUpIcon as TrendingUp,
@@ -42,6 +44,7 @@ export default function PredictionBettingHistory({
   prediction,
   className = '',
 }: PredictionBettingHistoryProps) {
+  const { currentTheme } = useUnifiedTheme();
   const [sortBy, setSortBy] = useState<'time' | 'amount' | 'odds' | 'user'>('time');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [filterBy, setFilterBy] = useState<'all' | 'single' | 'parlay' | 'highStakes'>('all');
@@ -209,9 +212,11 @@ export default function PredictionBettingHistory({
     }
   };
 
-  const getOptionColor = (optionId: number) => {
-    const colors = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444'];
-    return colors[optionId % colors.length];
+  const getOptionColorForId = (optionId: number) => {
+    // Find the option index to use with the theme's color palette
+    const optionIndex = prediction.options.findIndex((opt) => opt.id === optionId);
+    if (optionIndex === -1) return currentTheme.colors.muted; // Fallback
+    return getOptionColor(currentTheme, prediction.type, optionIndex);
   };
 
   return (
@@ -415,7 +420,7 @@ export default function PredictionBettingHistory({
                     <div className="flex items-center gap-2">
                       <div
                         className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: getOptionColor(bet.optionId) }}
+                        style={{ backgroundColor: getOptionColorForId(bet.optionId) }}
                       />
                       <span className="text-sm text-content">{bet.optionLabel}</span>
                     </div>
@@ -487,7 +492,7 @@ export default function PredictionBettingHistory({
                 <div className="flex items-center gap-3">
                   <div
                     className="w-4 h-4 rounded-full"
-                    style={{ backgroundColor: getOptionColor(option.id) }}
+                    style={{ backgroundColor: getOptionColorForId(option.id) }}
                   />
                   <div>
                     <p className="text-sm font-medium text-content">{option.label}</p>

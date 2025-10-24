@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { formatMuskBucks } from '../../utils/formatting';
 import type { PredictionFull } from '@ems/types';
 import { useParlay } from '../../contexts/ParlayContext';
+import { getOptionClasses } from '../../utils/predictionColors';
+import { useUnifiedTheme } from '../../theme/hooks/useUnifiedTheme';
 import {
   ArrowLeftIcon as ArrowLeft,
   ShareIcon as Share2,
@@ -44,6 +46,7 @@ export default function PredictionDetailView({
   className = '',
 }: PredictionDetailViewProps) {
   const navigate = useNavigate();
+  const { currentTheme } = useUnifiedTheme();
   const { state: parlayState, dispatch: parlayDispatch } = useParlay();
   const [showBetModal, setShowBetModal] = useState(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
@@ -427,41 +430,15 @@ export default function PredictionDetailView({
                     <div className="space-y-2">
                       <p className="text-sm text-tertiary text-center">Add to parlay:</p>
                       {prediction.options.map((option, idx) => {
-                        // Color palette matching OddsBar
-                        const palette = ['bg-success', 'bg-error', 'bg-info', 'bg-warning'];
-                        const optionColor = palette[idx % palette.length];
-
-                        // Color mappings
-                        const borderColors: Record<string, string> = {
-                          'bg-success': 'border-success',
-                          'bg-error': 'border-error',
-                          'bg-info': 'border-info',
-                          'bg-warning': 'border-warning',
-                        };
-
-                        const textColors: Record<string, string> = {
-                          'bg-success': 'text-success',
-                          'bg-error': 'text-error',
-                          'bg-info': 'text-info',
-                          'bg-warning': 'text-warning',
-                        };
-
-                        const bgTints: Record<string, string> = {
-                          'bg-success': 'bg-success/10 hover:bg-success/20',
-                          'bg-error': 'bg-error/10 hover:bg-error/20',
-                          'bg-info': 'bg-info/10 hover:bg-info/20',
-                          'bg-warning': 'bg-warning/10 hover:bg-warning/20',
-                        };
-
-                        const borderClass = borderColors[optionColor] || 'border-muted';
-                        const textClass = textColors[optionColor] || 'text-content';
-                        const bgTintClass = bgTints[optionColor] || 'bg-muted/20 hover:bg-muted/30';
+                        // Get theme-aware color classes
+                        const colorClasses = getOptionClasses(currentTheme, prediction.type, idx);
 
                         return (
                           <button
                             key={option.id}
                             onClick={() => handleAddToParlay(option.id)}
-                            className={`w-full py-2 px-3 ${bgTintClass} ${textClass} border-2 ${borderClass} font-medium rounded-lg transition-all text-sm hover:scale-[1.02]`}
+                            className={`w-full py-2 px-3 ${colorClasses.bgTint} ${colorClasses.bgHover} ${colorClasses.text} border-2 font-medium rounded-lg transition-all text-sm hover:scale-[1.02]`}
+                            style={{ borderColor: colorClasses.hex }}
                           >
                             {option.label} ({option.odds.toFixed(2)}x)
                           </button>

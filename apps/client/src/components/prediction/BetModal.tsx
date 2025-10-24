@@ -14,6 +14,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { formatMuskBucks } from '../../utils/formatting';
 import { useOptimisticBetting } from '../../hooks/useOptimisticBetting';
 import type { BetWithUser, PredictionFull, PublicPredictionOption } from '@ems/types';
+import { getOptionClasses } from '../../utils/predictionColors';
+import { useUnifiedTheme } from '../../theme/hooks/useUnifiedTheme';
 
 type DisplayMode = 'modal' | 'inline' | 'quick';
 
@@ -38,6 +40,7 @@ export default function BetModal({
 }: BetModalProps) {
   const { placeBet, predictions } = usePredictionMarket();
   const { user } = useAuth();
+  const { currentTheme } = useUnifiedTheme();
 
   // Optimistic betting hook (only when enabled)
   const optimisticBetting = enableOptimistic ? useOptimisticBetting() : null;
@@ -295,30 +298,18 @@ export default function BetModal({
                 )}
                 <div className="flex flex-wrap gap-2">
                   {pred.options.map((opt, idx) => {
-                    const palette = ['bg-success', 'bg-error', 'bg-info', 'bg-warning'];
-                    const optionColor = palette[idx % palette.length];
-
-                    const borderColors: Record<string, string> = {
-                      'bg-success': 'border-success',
-                      'bg-error': 'border-error',
-                      'bg-info': 'border-info',
-                      'bg-warning': 'border-warning',
-                    };
-
-                    const textColors: Record<string, string> = {
-                      'bg-success': 'text-success',
-                      'bg-error': 'text-error',
-                      'bg-info': 'text-info',
-                      'bg-warning': 'text-warning',
-                    };
-
-                    const borderClass = borderColors[optionColor] || 'border-muted';
-                    const textClass = textColors[optionColor] || 'text-content';
+                    // Get theme-aware color classes
+                    const colorClasses = getOptionClasses(
+                      currentTheme,
+                      (activePrediction as PredictionFull).type,
+                      idx,
+                    );
 
                     return (
                       <span
                         key={opt.id}
-                        className={`text-xs px-2 py-1 rounded border ${borderClass} ${textClass} font-medium`}
+                        className={`text-xs px-2 py-1 rounded border ${colorClasses.text} font-medium`}
+                        style={{ borderColor: colorClasses.hex }}
                       >
                         {opt.label} ({(opt.odds || 0).toFixed(2)}x)
                       </span>
@@ -379,51 +370,12 @@ export default function BetModal({
           <label className="block text-sm font-medium text-content">Choose Option</label>
           <div className="grid gap-3">
             {activePrediction.options.map((option, idx) => {
-              // Color palette matching OddsBar
-              const palette = ['bg-success', 'bg-error', 'bg-info', 'bg-warning'];
-              const optionColor = palette[idx % palette.length];
-
-              // Color mappings
-              const borderColors: Record<string, string> = {
-                'bg-success': 'border-success',
-                'bg-error': 'border-error',
-                'bg-info': 'border-info',
-                'bg-warning': 'border-warning',
-              };
-
-              const textColors: Record<string, string> = {
-                'bg-success': 'text-success',
-                'bg-error': 'text-error',
-                'bg-info': 'text-info',
-                'bg-warning': 'text-warning',
-              };
-
-              const bgTints: Record<string, string> = {
-                'bg-success': 'bg-success/10',
-                'bg-error': 'bg-error/10',
-                'bg-info': 'bg-info/10',
-                'bg-warning': 'bg-warning/10',
-              };
-
-              const bgTintsHover: Record<string, string> = {
-                'bg-success': 'hover:bg-success/20',
-                'bg-error': 'hover:bg-error/20',
-                'bg-info': 'hover:bg-info/20',
-                'bg-warning': 'hover:bg-warning/20',
-              };
-
-              const badgeColors: Record<string, string> = {
-                'bg-success': 'bg-success text-surface',
-                'bg-error': 'bg-error text-surface',
-                'bg-info': 'bg-info text-surface',
-                'bg-warning': 'bg-warning text-surface',
-              };
-
-              const borderClass = borderColors[optionColor] || 'border-muted';
-              const textClass = textColors[optionColor] || 'text-content';
-              const bgTintClass = bgTints[optionColor] || 'bg-muted/10';
-              const bgTintHoverClass = bgTintsHover[optionColor] || 'hover:bg-muted/20';
-              const badgeClass = badgeColors[optionColor] || 'bg-muted text-content';
+              // Get theme-aware color classes
+              const colorClasses = getOptionClasses(
+                currentTheme,
+                (activePrediction as PredictionFull).type,
+                idx,
+              );
 
               const isSelected = optionId === option.id;
 
@@ -434,14 +386,21 @@ export default function BetModal({
                   onClick={() => setOptionId(option.id)}
                   className={`p-4 rounded-xl border-2 text-left transition-all ${
                     isSelected
-                      ? `${borderClass} ${bgTintClass} ${textClass} scale-[1.02] shadow-lg ring-2 ring-offset-2 ${borderClass.replace('border-', 'ring-')}`
-                      : `border-muted bg-background ${bgTintHoverClass} text-content hover:${borderClass} hover:scale-[1.01]`
+                      ? `${colorClasses.bgTint} ${colorClasses.text} scale-[1.02] shadow-lg ring-2 ring-offset-2`
+                      : `border-muted bg-background ${colorClasses.bgHover} text-content hover:scale-[1.01]`
                   }`}
+                  style={{
+                    borderColor: isSelected ? colorClasses.hex : undefined,
+                    boxShadow: isSelected ? `0 0 0 2px ${colorClasses.hex}40` : undefined,
+                  }}
                 >
                   <div className="flex items-center gap-3">
                     {/* Option Number Badge */}
                     <div
-                      className={`w-8 h-8 rounded-lg ${isSelected ? badgeClass : 'bg-muted/50 text-tertiary'} flex items-center justify-center font-bold text-sm flex-shrink-0`}
+                      className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm flex-shrink-0 ${isSelected ? 'text-surface' : 'bg-muted/50 text-tertiary'}`}
+                      style={{
+                        backgroundColor: isSelected ? colorClasses.hex : undefined,
+                      }}
                     >
                       {idx + 1}
                     </div>
@@ -466,7 +425,10 @@ export default function BetModal({
                     {/* Selected Checkmark */}
                     {isSelected && (
                       <div
-                        className={`w-6 h-6 rounded-full ${badgeClass} flex items-center justify-center flex-shrink-0`}
+                        className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-surface"
+                        style={{
+                          backgroundColor: colorClasses.hex,
+                        }}
                       >
                         <svg
                           className="w-4 h-4"

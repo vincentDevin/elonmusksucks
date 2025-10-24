@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import type { PublicPredictionOption, PublicBet } from '@ems/types';
 import { PredictionType, REDIS_CHANNELS } from '@ems/types';
 import { useEventBusCore } from '../../contexts/EventBusCoreContext';
+import { getOptionClasses } from '../../utils/predictionColors';
+import { useUnifiedTheme } from '../../theme/hooks/useUnifiedTheme';
 
 interface FlattenedParlayLeg {
   parlayId: number;
@@ -34,6 +36,7 @@ export default function OddsBar({
   expiresAt,
   className = '',
 }: OddsBarProps) {
+  const { currentTheme } = useUnifiedTheme();
   const { subscribe } = useEventBusCore();
   const [currentOptions, setCurrentOptions] = useState(options);
   const [oddsAnimations, setOddsAnimations] = useState<Record<number, 'up' | 'down' | null>>({});
@@ -115,39 +118,6 @@ export default function OddsBar({
 
   const excitementLevel = getExcitementLevel();
 
-  // Define color palettes using theme tokens
-  const palettes: Record<PredictionType, string[]> = {
-    [PredictionType.BINARY]: ['bg-success', 'bg-error'],
-    [PredictionType.OVER_UNDER]: ['bg-info', 'bg-warning'],
-    [PredictionType.MULTIPLE]: ['bg-info', 'bg-success', 'bg-warning', 'bg-error'],
-  };
-
-  // Border color mappings for each palette color
-  const borderColors: Record<string, string> = {
-    'bg-success': 'border-success',
-    'bg-error': 'border-error',
-    'bg-info': 'border-info',
-    'bg-warning': 'border-warning',
-  };
-
-  // Background tint mappings for each palette color
-  const bgTints: Record<string, string> = {
-    'bg-success': 'bg-success/10',
-    'bg-error': 'bg-error/10',
-    'bg-info': 'bg-info/10',
-    'bg-warning': 'bg-warning/10',
-  };
-
-  // Glow effect mappings for hot options
-  const glowEffects: Record<string, string> = {
-    'bg-success': 'shadow-lg shadow-success/50',
-    'bg-error': 'shadow-lg shadow-error/50',
-    'bg-info': 'shadow-lg shadow-info/50',
-    'bg-warning': 'shadow-lg shadow-warning/50',
-  };
-
-  const palette = palettes[type] ?? palettes[PredictionType.MULTIPLE];
-
   // Calculate total staked
   const asNum = (v: string | number | bigint | undefined | null) => Number(v ?? 0);
   const totalStaked =
@@ -172,21 +142,20 @@ export default function OddsBar({
           }`}
         >
           {currentOptions.map((option, optionIndex) => {
-            // Get this option's color from palette
-            const optionColor = palette[optionIndex % palette.length];
-            const borderClass = borderColors[optionColor] || 'border-muted';
-            const bgTintClass = bgTints[optionColor] || 'bg-surface';
+            // Get theme-aware color classes
+            const colorClasses = getOptionClasses(currentTheme, type, optionIndex);
 
             return (
               <div
                 key={option.id}
-                className={`relative border-2 ${borderClass} ${bgTintClass} hover:shadow-sm transition-all duration-300 ${
+                className={`relative border-2 ${colorClasses.bgTint} hover:shadow-sm transition-all duration-300 ${
                   isMini
                     ? 'p-1.5 rounded'
                     : isCompact
                       ? 'p-2 rounded-md'
                       : 'p-3 rounded-lg hover:shadow-md'
                 }`}
+                style={{ borderColor: colorClasses.hex }}
               >
                 <div
                   className={`font-semibold truncate text-content ${
@@ -215,7 +184,7 @@ export default function OddsBar({
 
   // Build pool data for visualization
   let cumPct = 0;
-  const pools = currentOptions.slice(0, palette.length).map((opt, i) => {
+  const pools = currentOptions.map((opt, i) => {
     const singles = bets
       .filter((b) => b.optionId === opt.id)
       .reduce<number>((s, b) => s + asNum(b.amount), 0);
@@ -226,7 +195,8 @@ export default function OddsBar({
     const pct = stake / totalStaked;
     const left = cumPct;
     cumPct += pct;
-    return { label: opt.label, pct, left, color: palette[i], odds: opt.odds };
+    const colorClasses = getOptionClasses(currentTheme, type, i);
+    return { label: opt.label, pct, left, colorClasses, odds: opt.odds };
   });
 
   // Pool-only variant - just show the distribution bar (for list views)
@@ -252,22 +222,17 @@ export default function OddsBar({
 
         {/* Pool distribution bar */}
         <div className="h-1.5 bg-muted rounded-full overflow-hidden flex">
-          {pools.map((pool, index) => {
+          {pools.map((pool) => {
             const percentage = pool.pct * 100;
-            const colors = [
-              'bg-primary',
-              'bg-secondary',
-              'bg-accent',
-              'bg-warning',
-              'bg-success',
-              'bg-error',
-            ];
 
             return (
               <div
                 key={pool.label}
-                className={`h-full transition-all duration-300 ${colors[index % colors.length]}`}
-                style={{ width: `${percentage}%` }}
+                className="h-full transition-all duration-300"
+                style={{
+                  width: `${percentage}%`,
+                  backgroundColor: pool.colorClasses.hex,
+                }}
                 title={`${pool.label}: ${percentage.toFixed(1)}%`}
               />
             );
@@ -359,11 +324,8 @@ export default function OddsBar({
               .reduce<number>((s, l) => s + asNum(l.stake), 0);
           const marketShare = optionStake / totalStaked;
 
-          // Get this option's color from palette
-          const optionColor = palette[optionIndex % palette.length];
-          const borderClass = borderColors[optionColor] || 'border-muted';
-          const bgTintClass = bgTints[optionColor] || 'bg-surface';
-          const glowClass = glowEffects[optionColor] || '';
+          // Get theme-aware color classes
+          const colorClasses = getOptionClasses(currentTheme, type, optionIndex);
 
           // Determine if this option is "hot" - high market share, recent changes, or blazing market
           const isHotOption =
@@ -374,11 +336,12 @@ export default function OddsBar({
           return (
             <div
               key={option.id}
-              className={`relative border-2 transition-all duration-300 ${borderClass} ${bgTintClass} ${
-                isHotOption ? `${glowClass} animate-pulse` : ''
+              className={`relative border-2 transition-all duration-300 ${colorClasses.bgTint} ${
+                isHotOption ? `${colorClasses.glow} animate-pulse` : ''
               } hover:scale-105 hover:brightness-110 ${
                 isMini ? 'p-1.5 rounded' : isCompact ? 'p-2 rounded-md' : 'p-3 rounded-lg'
               }`}
+              style={{ borderColor: colorClasses.hex }}
             >
               {/* Option Label */}
               <div
@@ -466,16 +429,19 @@ export default function OddsBar({
           </div>
           <div className="relative w-full h-3 bg-muted rounded-full overflow-hidden border border-border">
             {pools.map((p, idx) => {
-              const poolColor = palette[idx % palette.length];
               const isLargeSegment = p.pct > 0.4;
 
               return (
                 <div
                   key={p.label}
-                  className={`absolute top-0 h-full ${p.color} transition-all duration-500 ${
+                  className={`absolute top-0 h-full transition-all duration-500 ${
                     isLargeSegment ? 'opacity-90' : 'opacity-80'
                   } hover:opacity-100`}
-                  style={{ left: `${p.left * 100}%`, width: `${p.pct * 100}%` }}
+                  style={{
+                    left: `${p.left * 100}%`,
+                    width: `${p.pct * 100}%`,
+                    backgroundColor: p.colorClasses.hex,
+                  }}
                   title={`${p.label}: ${(p.pct * 100).toFixed(1)}%`}
                 >
                   {/* Add a subtle border between segments */}
@@ -488,13 +454,16 @@ export default function OddsBar({
           </div>
           {/* Legend */}
           <div className="flex flex-wrap gap-2 mt-2">
-            {pools.map((p, idx) => {
-              const poolColor = palette[idx % palette.length];
-              const borderClass = borderColors[poolColor] || 'border-muted';
-
+            {pools.map((p) => {
               return (
                 <div key={p.label} className="flex items-center gap-1">
-                  <div className={`w-3 h-3 rounded-sm ${p.color} border ${borderClass}`} />
+                  <div
+                    className="w-3 h-3 rounded-sm border"
+                    style={{
+                      backgroundColor: p.colorClasses.hex,
+                      borderColor: p.colorClasses.hex,
+                    }}
+                  />
                   <span className="text-xs text-content font-medium">{p.label}</span>
                   <span className="text-xs text-tertiary">({(p.pct * 100).toFixed(1)}%)</span>
                 </div>

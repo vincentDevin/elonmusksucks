@@ -1,6 +1,8 @@
 import { useState, useMemo } from 'react';
 import { formatMuskBucks } from '../../utils/formatting';
 import type { PredictionFull } from '@ems/types';
+import { getAllOptionColors } from '../../utils/predictionColors';
+import { useUnifiedTheme } from '../../theme/hooks/useUnifiedTheme';
 import {
   ArrowTrendingUpIcon as TrendingUp,
   ChartBarIcon as BarChart3,
@@ -42,6 +44,7 @@ interface PredictionStatsProps {
 const asNum = (v: string | number | bigint | undefined | null) => Number(v ?? 0);
 
 export default function PredictionStats({ prediction, className = '' }: PredictionStatsProps) {
+  const { currentTheme } = useUnifiedTheme();
   const [activeChart, setActiveChart] = useState<'volume' | 'odds' | 'activity' | 'demographics'>(
     'volume',
   );
@@ -91,7 +94,9 @@ export default function PredictionStats({ prediction, className = '' }: Predicti
 
   // Option performance data
   const optionData = useMemo(() => {
-    return prediction.options.map((option) => {
+    const colors = getAllOptionColors(currentTheme, prediction.type, prediction.options.length);
+
+    return prediction.options.map((option, index) => {
       const optionBets = prediction.bets.filter((bet) => bet.optionId === option.id);
       const optionParlayLegs = (prediction.parlayLegs || []).filter(
         (leg) => leg.optionId === option.id,
@@ -110,10 +115,10 @@ export default function PredictionStats({ prediction, className = '' }: Predicti
         volume,
         count,
         percentage,
-        color: option.id % 2 === 0 ? '#3b82f6' : '#8b5cf6',
+        color: colors[index],
       };
     });
-  }, [prediction]);
+  }, [prediction, currentTheme]);
 
   // Activity metrics
   const activityMetrics = useMemo(() => {

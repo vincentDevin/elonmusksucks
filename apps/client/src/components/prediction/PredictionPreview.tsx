@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { formatMuskBucks } from '../../utils/formatting';
 import type { PredictionFull } from '@ems/types';
+import { getOptionColor } from '../../utils/predictionColors';
+import { useUnifiedTheme } from '../../theme/hooks/useUnifiedTheme';
 import {
   ClockIcon as Clock,
   ArrowTrendingUpIcon as TrendingUp,
@@ -31,6 +33,7 @@ export default function PredictionPreview({
   offset = 8,
   className = '',
 }: PredictionPreviewProps) {
+  const { currentTheme } = useUnifiedTheme();
   const previewRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const [actualPlacement, setActualPlacement] = useState(placement);
@@ -300,8 +303,15 @@ export default function PredictionPreview({
                   </div>
                   <div className="h-1 bg-muted rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-primary transition-all duration-300"
-                      style={{ width: `${percentage}%` }}
+                      className="h-full transition-all duration-300"
+                      style={{
+                        width: `${percentage}%`,
+                        backgroundColor: getOptionColor(
+                          currentTheme,
+                          prediction.type,
+                          optionBets.findIndex((o) => o.option.id === option.id),
+                        ),
+                      }}
                     />
                   </div>
                 </div>
