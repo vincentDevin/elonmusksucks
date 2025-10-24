@@ -15,18 +15,8 @@ import { BookmarkProvider } from './contexts/BookmarkContext';
 import { NotificationProvider, NotificationContainer } from './components/notifications';
 import AppRoutes from './routes/AppRoutes';
 import { useAuth } from './contexts/AuthContext';
-import EventFlowTest from './components/debug/EventFlowTest';
-import { EventMetricsDashboard } from './components/debug/EventMetricsDashboard';
-import { LeakDetectionPanel } from './components/debug/LeakDetectionPanel';
 import EventHandlers from './components/EventHandlers';
 import HydrationMarker from './components/HydrationMarker';
-import { useListenerMonitoring } from './hooks/useListenerMonitoring';
-
-// Development-only listener monitoring component
-function ListenerMonitor() {
-  useListenerMonitoring();
-  return null; // No UI needed
-}
 
 // Inner component that has access to auth context
 function AppContent() {
@@ -54,17 +44,6 @@ function AppContent() {
                           <AppRoutes />
                           {/* Unified notification container */}
                           <NotificationContainer />
-                          {/* Development tools - only in development */}
-                          {/*
-                      {(import.meta.env.DEV || process.env.NODE_ENV === 'development') && (
-                        <>
-                          <ListenerMonitor />
-                          {// <EventFlowTest /> - DISABLED to reduce duplicate listeners }
-                          <EventMetricsDashboard />
-                          <LeakDetectionPanel />
-                        </>
-                      )}
-                      */}
                         </NotificationProvider>
                       </ChatProvider>
                     </ParlayProvider>

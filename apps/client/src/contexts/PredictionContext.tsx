@@ -19,6 +19,7 @@ import {
 } from 'react';
 import {
   getPredictions,
+  getPredictionById,
   createPrediction as createPredictionApi,
   type PredictionView,
   type CreatePredictionPayload,
@@ -244,6 +245,21 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // ── Refresh specific prediction ──────────────────────────────────────────
+  const refreshPrediction = useCallback(async (predictionId: number) => {
+    try {
+      const updatedPrediction = await getPredictionById(predictionId);
+
+      // Update the specific prediction in state
+      setBasePredictions((prev) =>
+        prev.map((p) => (p.id === predictionId ? updatedPrediction : p)),
+      );
+    } catch (err) {
+      console.error('[PredictionContext] Failed to refresh prediction:', predictionId, err);
+      // Don't throw - this is a non-critical enhancement
+    }
+  }, []);
+
   // ── Live EventBusCore updates ─────────────────────────────────────────────
   useEffect(() => {
     const unsubscribers = [
@@ -408,6 +424,11 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
   // ── Bet/parlay helpers via socketRequest ──────────────────────────────────
   const placeBet = useCallback(
     async (payload: { optionId: number; amount: number }) => {
+      // Find the predictionId for this option so we can refresh it after bet placement
+      const predictionId = basePredictions
+        .flatMap((p) => p.options?.map((opt) => ({ predictionId: p.id, optionId: opt.id })) || [])
+        .find((mapping) => mapping.optionId === payload.optionId)?.predictionId;
+
       // Create optimistic bet for immediate UI feedback using React 19 useOptimistic
       const optimisticBetId = `optimistic_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       const optimisticBet = {
@@ -447,6 +468,13 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
         }
         // Otherwise the optimistic bet will be replaced when socket events arrive
 
+        // Refresh the specific prediction to show the new bet and updated data
+        if (predictionId) {
+          startTransition(() => {
+            refreshPrediction(predictionId);
+          });
+        }
+
         // React 19 Optimization: Use startTransition for non-blocking user refresh
         // Note: AuthContext already handles optimistic updates via Socket.IO events
         startTransition(() => {
@@ -468,11 +496,26 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
         throw error;
       }
     },
-    [refreshUser, optimisticUpdatePredictions],
+    [refreshUser, optimisticUpdatePredictions, basePredictions, refreshPrediction],
   );
 
   const placeParlay = useCallback(
     async (payload: { legs: { optionId: number }[]; amount: number }) => {
+      // Find all predictionIds for parlay legs so we can refresh them after placement
+      const affectedPredictionIds = Array.from(
+        new Set(
+          payload.legs
+            .map((leg) => {
+              return basePredictions
+                .flatMap(
+                  (p) => p.options?.map((opt) => ({ predictionId: p.id, optionId: opt.id })) || [],
+                )
+                .find((mapping) => mapping.optionId === leg.optionId)?.predictionId;
+            })
+            .filter((id): id is number => id !== undefined),
+        ),
+      );
+
       // Create optimistic parlay for immediate UI feedback
       const optimisticParlayId = `optimistic_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       const optimisticParlay = {
@@ -505,6 +548,15 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
           setLatestParlay((result as any).parlay);
         }
 
+        // Refresh all affected predictions to show the new parlay and updated data
+        if (affectedPredictionIds.length > 0) {
+          startTransition(() => {
+            affectedPredictionIds.forEach((predictionId) => {
+              refreshPrediction(predictionId);
+            });
+          });
+        }
+
         // React 19 Optimization: Use startTransition for non-blocking user refresh
         // Note: AuthContext already handles optimistic updates via Socket.IO events
         startTransition(() => {
@@ -525,7 +577,7 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
         throw error;
       }
     },
-    [refreshUser, optimisticUpdatePredictions],
+    [refreshUser, optimisticUpdatePredictions, basePredictions, refreshPrediction],
   );
 
   const value = useMemo<Ctx>(

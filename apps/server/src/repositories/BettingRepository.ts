@@ -34,13 +34,17 @@ export class BettingRepository implements IBettingRepository {
     potentialPayout: bigint,
     wasAllIn: boolean,
     idempotencyKey?: string,
-  ): Promise<DbBet> {
+  ): Promise<{ bet: DbBet; balanceChange: { previous: bigint; new: bigint } }> {
     // Critical transaction: only financial operations to reduce lock contention
-    const bet = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       const user = await tx.user.update({
         where: { id: userId },
         data: { muskBucks: { decrement: amount } },
       });
+
+      // Capture balance change for event emission
+      const newBalance = user.muskBucks;
+      const previousBalance = newBalance + BigInt(amount);
 
       await tx.transaction.create({
         data: {
@@ -62,7 +66,7 @@ export class BettingRepository implements IBettingRepository {
         },
       });
 
-      return await tx.bet.create({
+      const bet = await tx.bet.create({
         data: {
           userId,
           predictionId,
@@ -74,7 +78,11 @@ export class BettingRepository implements IBettingRepository {
           idempotencyKey,
         },
       });
+
+      return { bet, balanceChange: { previous: previousBalance, new: newBalance } };
     });
+
+    const { bet } = result;
 
     // Update stats outside transaction to reduce lock scope
     await prisma.userStats.upsert({
@@ -149,7 +157,7 @@ export class BettingRepository implements IBettingRepository {
       // Don't fail the bet placement if achievement event fails
     }
 
-    return bet;
+    return result;
   }
 
   async placeParlay(
@@ -158,7 +166,7 @@ export class BettingRepository implements IBettingRepository {
     amount: number,
     potentialPayout: bigint,
     idempotencyKey?: string,
-  ): Promise<DbParlay> {
+  ): Promise<{ parlay: DbParlay; balanceChange: { previous: bigint; new: bigint } }> {
     const legCount = legs.length;
 
     return await prisma.$transaction(async (tx) => {
@@ -166,6 +174,10 @@ export class BettingRepository implements IBettingRepository {
         where: { id: userId },
         data: { muskBucks: { decrement: amount } },
       });
+
+      // Capture balance change for event emission
+      const newBalance = user.muskBucks;
+      const previousBalance = newBalance + BigInt(amount);
 
       await tx.transaction.create({
         data: {
@@ -237,7 +249,7 @@ export class BettingRepository implements IBettingRepository {
         },
       });
 
-      return parlay;
+      return { parlay, balanceChange: { previous: previousBalance, new: newBalance } };
     });
   }
 

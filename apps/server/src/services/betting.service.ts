@@ -10,6 +10,7 @@ import type {
   OptionWithPrediction,
 } from '../repositories/interfaces/IBettingRepository';
 import type { DbBet, DbParlay, ParlayLegWithUser, IEventBus, IEventCoalescer } from '@ems/types';
+import { REDIS_CHANNELS } from '@ems/types';
 import { BettingRepository } from '../repositories/BettingRepository';
 import { eventBus } from '../lib/EventBus';
 import { EventCoalescer } from '../lib/EventCoalescer';
@@ -103,7 +104,7 @@ export class BettingService {
         const potentialPayout = BigInt(Math.floor(amount * finalOdds));
 
         // 3) Execute all money operations atomically
-        const bet = await this.repo.placeBet(
+        const { bet, balanceChange } = await this.repo.placeBet(
           userId,
           opt.prediction.id,
           optionId,
@@ -146,6 +147,16 @@ export class BettingService {
 
           // Execute all post-transaction operations in parallel for performance
           await Promise.allSettled([
+            // Emit balance update event for real-time UI updates
+            this.eventBus.publish(REDIS_CHANNELS.BALANCE_UPDATE, {
+              userId,
+              newBalance: Number(balanceChange.new),
+              previousBalance: Number(balanceChange.previous),
+              change: -amount,
+              reason: `Bet wager on prediction ${opt.prediction.id}`,
+              timestamp: new Date().toISOString(),
+            }),
+
             // Publish real‑time event
             this.eventBus.publish('bet:place', betWithUser),
 
@@ -283,7 +294,7 @@ export class BettingService {
     const potentialPayout = BigInt(finalPayout);
 
     // 3) Execute all money operations atomically
-    const parlay = await this.repo.placeParlay(
+    const { parlay, balanceChange } = await this.repo.placeParlay(
       userId,
       validLegs.map((o) => ({
         predictionId: o.prediction.id,
@@ -334,6 +345,16 @@ export class BettingService {
 
       // Execute all post-transaction operations in parallel for performance
       await Promise.allSettled([
+        // Emit balance update event for real-time UI updates
+        this.eventBus.publish(REDIS_CHANNELS.BALANCE_UPDATE, {
+          userId,
+          newBalance: Number(balanceChange.new),
+          previousBalance: Number(balanceChange.previous),
+          change: -amount,
+          reason: `Parlay wager with ${validLegs.length} legs`,
+          timestamp: new Date().toISOString(),
+        }),
+
         // Publish legacy leg events
         ...legsPayload.map((leg) => this.eventBus.publish('parlay:place', leg)),
 
