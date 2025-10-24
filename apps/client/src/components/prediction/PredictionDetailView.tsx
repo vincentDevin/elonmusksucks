@@ -24,9 +24,9 @@ import {
 } from '@heroicons/react/24/outline';
 import OddsBar from './OddsBar';
 import BetModal from './BetModal';
-import BetsList from './BetsList';
 import { PredictionSourceList } from './PredictionSourceList';
-import PredictionAnalytics from './PredictionAnalytics';
+import PredictionStats from './PredictionStats';
+import PredictionBettingHistory from './PredictionBettingHistory';
 import PredictionComments from './PredictionComments';
 import PredictionReactions from './PredictionReactions';
 
@@ -71,11 +71,6 @@ export default function PredictionDetailView({
   const totalVolume =
     prediction.bets.reduce<number>((sum, bet) => sum + asNum(bet.amount), 0) +
     (prediction.parlayLegs?.reduce<number>((sum, leg) => sum + asNum(leg.stake), 0) || 0);
-
-  // Recent activity
-  const recentBets = prediction.bets
-    .filter((bet) => new Date(bet.createdAt).getTime() > now - 24 * 60 * 60 * 1000)
-    .slice(-10);
 
   // Check if in parlay
   const isInParlay = parlayState.legs.some((leg) => leg.predictionId === prediction.id);
@@ -319,77 +314,12 @@ export default function PredictionDetailView({
                         }
                       />
                     </div>
-
-                    {/* Recent Activity */}
-                    {recentBets.length > 0 && (
-                      <div>
-                        <h3 className="text-lg font-semibold text-content mb-3">
-                          Recent Activity (24h)
-                        </h3>
-                        <div className="space-y-2">
-                          {recentBets.map((bet) => {
-                            const option = prediction.options.find((o) => o.id === bet.optionId);
-                            // Handle both flattened and nested user data
-                            const userName = (bet as any).userName ?? bet.user?.name ?? 'Anonymous';
-                            const avatarUrl = (bet as any).avatarUrl ?? bet.user?.avatarUrl ?? null;
-
-                            return (
-                              <div
-                                key={bet.id}
-                                className="flex items-center justify-between p-3 bg-muted/30 rounded-lg"
-                              >
-                                <div className="flex items-center gap-3">
-                                  {avatarUrl ? (
-                                    <img
-                                      src={avatarUrl}
-                                      alt={userName}
-                                      className="w-8 h-8 rounded-full border border-border object-cover"
-                                    />
-                                  ) : (
-                                    <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center border border-border">
-                                      <span className="text-primary font-bold text-sm">
-                                        {userName.charAt(0).toUpperCase()}
-                                      </span>
-                                    </div>
-                                  )}
-                                  <div>
-                                    <p className="text-sm font-medium text-content">
-                                      {userName} bet on "{option?.label}"
-                                    </p>
-                                    <p className="text-xs text-tertiary">
-                                      {new Date(bet.createdAt).toLocaleString()}
-                                    </p>
-                                  </div>
-                                </div>
-                                <div className="text-right">
-                                  <p className="text-sm font-bold text-content">
-                                    {formatMuskBucks(asNum(bet.amount))} 🪙
-                                  </p>
-                                  <p className="text-xs text-tertiary">
-                                    {option?.odds.toFixed(2)}x odds
-                                  </p>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
                   </div>
                 )}
 
-                {activeTab === 'stats' && <PredictionAnalytics predictionId={prediction.id} />}
+                {activeTab === 'stats' && <PredictionStats prediction={prediction} />}
 
-                {activeTab === 'history' && (
-                  <div>
-                    <BetsList
-                      type={prediction.type as any}
-                      bets={prediction.bets}
-                      parlayLegs={prediction.parlayLegs || []}
-                      options={prediction.options as any}
-                    />
-                  </div>
-                )}
+                {activeTab === 'history' && <PredictionBettingHistory prediction={prediction} />}
 
                 {activeTab === 'comments' && <PredictionComments predictionId={prediction.id} />}
               </div>
@@ -461,7 +391,13 @@ export default function PredictionDetailView({
                     <TrendingUp className="w-4 h-4" />
                     <span className="text-sm">Today's Activity</span>
                   </div>
-                  <span className="font-bold text-content">{recentBets.length}</span>
+                  <span className="font-bold text-content">
+                    {
+                      prediction.bets.filter(
+                        (bet) => new Date(bet.createdAt).getTime() > now - 24 * 60 * 60 * 1000,
+                      ).length
+                    }
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-tertiary">

@@ -86,6 +86,18 @@ export interface PredictionView {
     status: string;
     createdAt: string; // Date → ISO string
   }>;
+  parlayLegs?: Array<{
+    parlayId: number;
+    user: {
+      id: number;
+      name: string;
+      avatarUrl: string | null;
+      profilePictureKey?: string | null;
+    };
+    stake: string;
+    optionId: number;
+    createdAt: string; // Date → ISO string
+  }>;
   sourceLinks?: Array<{
     id: number;
     url: string;

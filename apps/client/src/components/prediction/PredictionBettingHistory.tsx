@@ -8,7 +8,6 @@ import {
   MagnifyingGlassIcon as Search,
   ArrowsUpDownIcon as ArrowUpDown,
   Squares2X2Icon as Layers,
-  EllipsisHorizontalIcon as MoreHorizontal,
   BoltIcon as Zap,
   EyeIcon as Target,
   TrophyIcon as Award,
@@ -47,7 +46,6 @@ export default function PredictionBettingHistory({
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [filterBy, setFilterBy] = useState<'all' | 'single' | 'parlay' | 'highStakes'>('all');
   const [searchTerm, setSearchTerm] = useState('');
-  const [showDetails, setShowDetails] = useState<string | null>(null);
 
   // Combine and process betting data
   const combinedBets = useMemo(() => {
@@ -63,12 +61,16 @@ export default function PredictionBettingHistory({
       const isHighStakes = amount >= 500;
       const isRecent = new Date(bet.createdAt).getTime() > now - 60 * 60 * 1000; // Last hour
 
+      // Handle both flattened and nested user data
+      const userName = (bet as any).userName ?? bet.user?.name ?? 'Anonymous';
+      const userAvatar = (bet as any).avatarUrl ?? bet.user?.avatarUrl ?? undefined;
+
       bets.push({
         id: `bet-${bet.id}`,
         type: 'single',
         userId: bet.userId,
-        userName: bet.user?.name || 'Anonymous',
-        userAvatar: bet.user?.avatarUrl || undefined,
+        userName,
+        userAvatar,
         optionId: bet.optionId || 0,
         optionLabel: option.label,
         amount,
@@ -90,12 +92,16 @@ export default function PredictionBettingHistory({
       const isHighStakes = amount >= 500;
       const isRecent = new Date(leg.createdAt).getTime() > now - 60 * 60 * 1000;
 
+      // Handle both flattened and nested user data
+      const userName = (leg as any).userName ?? leg.user?.name ?? 'Anonymous';
+      const userAvatar = (leg as any).avatarUrl ?? leg.user?.avatarUrl ?? undefined;
+
       bets.push({
         id: `parlay-${leg.parlayId}-${leg.optionId}`,
         type: 'parlay',
         userId: leg.user?.id || 0,
-        userName: leg.user?.name || 'Anonymous',
-        userAvatar: leg.user?.avatarUrl || undefined,
+        userName,
+        userAvatar,
         optionId: leg.optionId || 0,
         optionLabel: option.label,
         amount,
@@ -219,7 +225,7 @@ export default function PredictionBettingHistory({
         <div className="bg-surface border border-border rounded-lg p-3">
           <div className="text-xs text-tertiary mb-1">Total Volume</div>
           <div className="text-lg font-bold text-content">
-            formatMuskBucks(summaryStats.totalVolume) 🪙
+            {formatMuskBucks(summaryStats.totalVolume)} 🪙
           </div>
         </div>
         <div className="bg-surface border border-border rounded-lg p-3">
@@ -241,7 +247,7 @@ export default function PredictionBettingHistory({
         <div className="bg-surface border border-border rounded-lg p-3">
           <div className="text-xs text-tertiary mb-1">Avg Bet</div>
           <div className="text-lg font-bold text-content">
-            formatMuskBucks(summaryStats.avgBetSize) 🪙
+            {formatMuskBucks(summaryStats.avgBetSize)} 🪙
           </div>
         </div>
       </div>
@@ -350,7 +356,6 @@ export default function PredictionBettingHistory({
                     <ArrowUpDown className="w-3 h-3" />
                   </button>
                 </th>
-                <th className="text-left p-4 text-sm font-medium text-tertiary">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -421,7 +426,7 @@ export default function PredictionBettingHistory({
                         bet.isHighStakes ? 'text-warning' : 'text-content'
                       }`}
                     >
-                      formatMuskBucks(bet.amount) 🪙
+                      {formatMuskBucks(bet.amount)} 🪙
                     </span>
                   </td>
                   <td className="p-4">
@@ -429,7 +434,7 @@ export default function PredictionBettingHistory({
                   </td>
                   <td className="p-4">
                     <span className="text-sm font-medium text-success">
-                      formatMuskBucks(bet.potentialPayout) 🪙
+                      {formatMuskBucks(bet.potentialPayout)} 🪙
                     </span>
                   </td>
                   <td className="p-4">
@@ -441,14 +446,6 @@ export default function PredictionBettingHistory({
                         {new Date(bet.createdAt).toLocaleTimeString()}
                       </p>
                     </div>
-                  </td>
-                  <td className="p-4">
-                    <button
-                      onClick={() => setShowDetails(showDetails === bet.id ? null : bet.id)}
-                      className="p-1 hover:bg-muted rounded transition-colors"
-                    >
-                      <MoreHorizontal className="w-4 h-4 text-tertiary" />
-                    </button>
                   </td>
                 </tr>
               ))}
@@ -501,7 +498,7 @@ export default function PredictionBettingHistory({
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-medium text-content">
-                    formatMuskBucks(optionVolume) 🪙
+                    {formatMuskBucks(optionVolume)} 🪙
                   </p>
                   <p className="text-xs text-tertiary">{percentage.toFixed(1)}%</p>
                 </div>

@@ -57,6 +57,18 @@ export const toPredictionView = (prediction: {
       avatarUrl: string | null;
     };
   }>;
+  parlayLegs?: Array<{
+    parlayId: number;
+    user: {
+      id: number;
+      name: string;
+      avatarUrl: string | null;
+      profilePictureKey?: string | null;
+    };
+    stake: string;
+    optionId: number;
+    createdAt: Date;
+  }>;
   sourceLinks?: Array<{
     id: number;
     predictionId: number;
@@ -102,6 +114,18 @@ export const toPredictionView = (prediction: {
     payout: bet.payout ? bet.payout.toString() : null,
     status: bet.status,
     createdAt: toISOStringSafe(bet.createdAt)!,
+  })),
+  parlayLegs: prediction.parlayLegs?.map((leg) => ({
+    parlayId: leg.parlayId,
+    user: {
+      id: leg.user.id,
+      name: leg.user.name,
+      avatarUrl: leg.user.avatarUrl,
+      ...(leg.user.profilePictureKey && { profilePictureKey: leg.user.profilePictureKey }),
+    },
+    stake: leg.stake,
+    optionId: leg.optionId,
+    createdAt: toISOStringSafe(leg.createdAt)!,
   })),
   sourceLinks: prediction.sourceLinks?.map((link) => ({
     id: link.id,
