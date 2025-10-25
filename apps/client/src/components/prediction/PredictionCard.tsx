@@ -113,6 +113,14 @@ function UnifiedPredictionCard({
     const selectedOption = prediction.options.find((opt: any) => opt.id === optionId);
     if (!selectedOption) return;
 
+    // Validate odds > 1.0 for parlays
+    if (selectedOption.odds <= 1.0) {
+      alert(
+        `Cannot add to parlay: ${selectedOption.label} has odds of ${selectedOption.odds.toFixed(2)}×.\n\nParlay legs must have odds greater than 1.0× (break-even or better).`,
+      );
+      return;
+    }
+
     setAddingToParlay(optionId);
 
     parlayDispatch({
@@ -156,6 +164,14 @@ function UnifiedPredictionCard({
     );
 
     if (!bestOption || isInParlay || prediction.resolved || now > expires) return;
+
+    // Validate odds > 1.0 for parlays
+    if (bestOption.odds <= 1.0) {
+      alert(
+        `Cannot add to parlay: ${bestOption.label} has odds of ${bestOption.odds.toFixed(2)}×.\n\nParlay legs must have odds greater than 1.0× (break-even or better).`,
+      );
+      return;
+    }
 
     setIsAddingToParlay(true);
 
@@ -229,8 +245,8 @@ function UnifiedPredictionCard({
   const titleClasses = `
     font-semibold mb-2 text-content
     ${isFullSize ? 'text-xl pr-24' : ''}
-    ${isCompact ? 'text-lg pr-16 line-clamp-2' : ''}
-    ${isMini ? 'text-base pr-12 line-clamp-1' : ''}
+    ${isCompact ? 'text-lg pr-16' : ''}
+    ${isMini ? 'text-base pr-12' : ''}
   `.trim();
 
   const badgeClasses = `
@@ -253,54 +269,54 @@ function UnifiedPredictionCard({
           `}
           onClick={onCardView}
         >
-          {/* Main Layout - Stacks on mobile, horizontal on desktop */}
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 md:gap-8">
-            {/* Left: Title & Metadata */}
-            <div className="flex-1 min-w-0 space-y-2 md:space-y-3">
-              <h3 className="text-lg md:text-xl font-bold text-content line-clamp-2 md:line-clamp-1">
-                {prediction.title}
-              </h3>
-              <div className="flex items-center gap-4 flex-wrap">
-                {prediction.category && (
-                  <span className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm font-medium inline-flex items-center gap-1.5">
-                    {prediction.category.icon && (
-                      <span className="text-base">{prediction.category.icon}</span>
-                    )}
-                    <span>{prediction.category.name}</span>
-                  </span>
-                )}
-                {prediction.creator && (
-                  <div className="flex items-center gap-2 text-sm text-tertiary">
-                    {prediction.creator.avatarUrl && (
-                      <img
-                        src={prediction.creator.avatarUrl}
-                        alt={prediction.creator.name}
-                        className="w-5 h-5 rounded-full object-cover"
-                      />
-                    )}
-                    <span>
-                      by{' '}
-                      <span className="text-content font-semibold">{prediction.creator.name}</span>
-                    </span>
-                  </div>
-                )}
-                <PredictionReactions
-                  predictionId={prediction.id}
-                  compact
-                  initialReactionCounts={prediction.reactionCounts}
-                  initialUserReaction={prediction.userReaction}
-                />
-              </div>
+          {/* Title Row - Always at top, full width */}
+          <h3 className="text-lg md:text-xl font-bold text-content mb-3">{prediction.title}</h3>
 
-              {/* Source Links */}
-              {prediction.sourceLinks && prediction.sourceLinks.length > 0 && (
-                <div className="mt-2">
-                  <PredictionSourceList sources={prediction.sourceLinks} compact />
+          {/* Metadata Row - Category, Creator, Reactions (Left) + Source Links (Right) */}
+          <div className="flex items-center justify-between gap-3 md:gap-4 mb-3 md:mb-4">
+            {/* Left: Category, Creator, Reactions */}
+            <div className="flex items-center gap-3 md:gap-4 flex-wrap">
+              {prediction.category && (
+                <span className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm font-medium inline-flex items-center gap-1.5">
+                  {prediction.category.icon && (
+                    <span className="text-base">{prediction.category.icon}</span>
+                  )}
+                  <span>{prediction.category.name}</span>
+                </span>
+              )}
+              {prediction.creator && (
+                <div className="flex items-center gap-2 text-sm text-tertiary">
+                  {prediction.creator.avatarUrl && (
+                    <img
+                      src={prediction.creator.avatarUrl}
+                      alt={prediction.creator.name}
+                      className="w-5 h-5 rounded-full object-cover"
+                    />
+                  )}
+                  <span>
+                    by <span className="text-content font-semibold">{prediction.creator.name}</span>
+                  </span>
                 </div>
               )}
+              <PredictionReactions
+                predictionId={prediction.id}
+                compact
+                initialReactionCounts={prediction.reactionCounts}
+                initialUserReaction={prediction.userReaction}
+              />
             </div>
 
-            {/* Center: Stats - Hidden on mobile, shown on tablet+ */}
+            {/* Right: Source Links */}
+            {prediction.sourceLinks && prediction.sourceLinks.length > 0 && (
+              <div className="flex-shrink-0">
+                <PredictionSourceList sources={prediction.sourceLinks} compact />
+              </div>
+            )}
+          </div>
+
+          {/* Main Layout - Stats and Actions */}
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 md:gap-6">
+            {/* Left: Stats - Hidden on mobile, shown on tablet+ */}
             <div className="hidden md:flex items-center gap-4 lg:gap-8 text-sm md:text-base">
               <div className="flex items-center gap-2 text-tertiary">
                 <UsersIcon className="w-4 h-4 md:w-5 md:h-5" />

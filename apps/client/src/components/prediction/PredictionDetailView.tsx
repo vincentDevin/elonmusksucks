@@ -112,6 +112,14 @@ export default function PredictionDetailView({
     const option = prediction.options.find((o) => o.id === optionId);
     if (!option) return;
 
+    // Validate odds > 1.0 for parlays
+    if (option.odds <= 1.0) {
+      alert(
+        `Cannot add to parlay: ${option.label} has odds of ${option.odds.toFixed(2)}×.\n\nParlay legs must have odds greater than 1.0× (break-even or better).`,
+      );
+      return;
+    }
+
     parlayDispatch({
       type: 'ADD_LEG',
       leg: {

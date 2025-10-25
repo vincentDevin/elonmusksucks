@@ -44,6 +44,13 @@ const initial: State = { legs: [], amount: 0 };
 function reducer(state: State, action: Action): State {
   switch (action.type) {
     case 'ADD_LEG': {
+      // Validate odds > 1.0 before adding leg (safety layer)
+      if (action.leg.odds <= 1.0) {
+        console.warn(
+          `[ParlayContext] Rejected leg with invalid odds: ${action.leg.label} (${action.leg.odds}×)`,
+        );
+        return state; // Don't add leg with invalid odds
+      }
       const filtered = state.legs.filter((l) => l.predictionId !== action.leg.predictionId);
       return { ...state, legs: [...filtered, action.leg] };
     }

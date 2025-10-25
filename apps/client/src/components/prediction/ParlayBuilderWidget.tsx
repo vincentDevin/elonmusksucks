@@ -1,5 +1,5 @@
 // apps/client/src/components/prediction/ParlayBuilderWidget.tsx
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { FaTimes } from 'react-icons/fa';
 import { ArrowTrendingUpIcon as TrendingUp } from '@heroicons/react/24/outline';
 import { useParlay } from '../../contexts/ParlayContext';
@@ -22,6 +22,17 @@ export const ParlayBuilderWidget: React.FC<ParlayBuilderWidgetProps> = ({
 }) => {
   const { state: parlayState } = useParlay();
   const [isOpen, setIsOpen] = useState(false);
+
+  // Track previous leg count to detect additions
+  const prevLegCountRef = useRef(parlayState.legs.length);
+
+  // Auto-open panel when a new leg is added
+  useEffect(() => {
+    if (parlayState.legs.length > prevLegCountRef.current && parlayState.legs.length > 0) {
+      setIsOpen(true);
+    }
+    prevLegCountRef.current = parlayState.legs.length;
+  }, [parlayState.legs.length]);
 
   // Position classes - stacked above FloatingCreatePredictionWidget (at 70px) and QuickThemeSwitcher
   const getPositionClasses = () => {
@@ -104,17 +115,6 @@ export const ParlayBuilderWidget: React.FC<ParlayBuilderWidgetProps> = ({
                 '0 0 20px color-mix(in srgb, var(--color-secondary) 30%, transparent), 0 10px 25px rgba(0, 0, 0, 0.15)',
             }}
           >
-            {/* Close button in top-right corner */}
-            <div className="absolute top-3 right-3 z-10">
-              <button
-                onClick={() => setIsOpen(false)}
-                className="p-1.5 rounded-lg hover:bg-muted transition-colors text-tertiary hover:text-content"
-                title="Close"
-              >
-                <FaTimes />
-              </button>
-            </div>
-
             {/* ParlayPanel content */}
             <div className="p-4 overflow-y-auto flex-1">
               <ParlayPanel />

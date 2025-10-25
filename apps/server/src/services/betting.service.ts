@@ -45,32 +45,17 @@ export class BettingService {
   }
 
   /**
-   * Calculate enhanced parlay odds with exciting leg bonuses
+   * Calculate traditional parlay odds (simple multiplication)
    */
-  private calculateEnhancedParlayOdds(individualOdds: number[]): {
+  private calculateParlayOdds(individualOdds: number[]): {
     baseCombinedOdds: number;
-    bonusMultiplier: number;
-    finalOdds: number;
     legCount: number;
   } {
     const legCount = individualOdds.length;
     const baseCombinedOdds = individualOdds.reduce((prod, odds) => prod * odds, 1);
 
-    // Exciting bonus multipliers for more legs!
-    // 2 legs: 15% bonus, 3 legs: 32% bonus, 4 legs: 52% bonus, 5+ legs: 75% bonus
-    let bonusMultiplier = 1;
-    if (legCount >= 2) {
-      bonusMultiplier = Math.pow(1.15, legCount - 1);
-      // Cap the bonus at 2.0x for balance (10+ legs would be wild otherwise)
-      bonusMultiplier = Math.min(bonusMultiplier, 2.0);
-    }
-
-    const finalOdds = baseCombinedOdds * bonusMultiplier;
-
     return {
       baseCombinedOdds,
-      bonusMultiplier,
-      finalOdds,
       legCount,
     };
   }
@@ -273,6 +258,13 @@ export class BettingService {
     const validLegs = detailed.filter((opt): opt is OptionWithPrediction => opt !== null);
     if (validLegs.length !== legs.length) throw new Error('OPTION_NOT_FOUND');
 
+    // Validate all legs have odds > 1.0 (no break-even or losing bets in parlays)
+    for (const opt of validLegs) {
+      if (opt.odds <= 1.0) {
+        throw new Error(`INVALID_ODDS_${opt.id}: Parlay legs must have odds greater than 1.0x`);
+      }
+    }
+
     // Ensure none closed
     for (const opt of validLegs) {
       if (opt.prediction.resolved || opt.prediction.expiresAt < new Date()) {
@@ -283,14 +275,14 @@ export class BettingService {
     const user = await this.repo.findUserById(userId);
     if (!user || Number(user.muskBucks) < amount) throw new Error('INSUFFICIENT_FUNDS');
 
-    // 2) Calculate enhanced odds matching frontend exactly (before transaction)
-    const oddsCalculation = this.calculateEnhancedParlayOdds(validLegs.map((o) => o.odds));
-    const basePayout = Math.floor(amount * oddsCalculation.finalOdds);
+    // 2) Calculate traditional parlay odds (before transaction)
+    const oddsCalculation = this.calculateParlayOdds(validLegs.map((o) => o.odds));
+    const basePayout = Math.floor(amount * oddsCalculation.baseCombinedOdds);
 
-    // 🚀 ALL-IN bonus detection for parlays (matching frontend logic)
+    // 🚀 ALL-IN bonus detection for parlays (50% bonus for betting ≥95% of balance)
     const isAllIn = amount >= Number(user.muskBucks) * 0.95;
     const allInMultiplier = isAllIn ? 1.5 : 1.0; // Extra 50% bonus for all-in parlays
-    const finalPayout = isAllIn ? Math.floor(basePayout * allInMultiplier) : basePayout;
+    const finalPayout = Math.floor(basePayout * allInMultiplier);
     const potentialPayout = BigInt(finalPayout);
 
     // 3) Execute all money operations atomically
@@ -372,7 +364,7 @@ export class BettingService {
             id: parlay.id,
             amount,
             legCount: oddsCalculation.legCount,
-            combinedOdds: oddsCalculation.finalOdds,
+            combinedOdds: oddsCalculation.baseCombinedOdds,
           },
         ),
 
@@ -386,7 +378,7 @@ export class BettingService {
             parlayId: parlay.id,
             amount, // Amount is already a number here (validated input), not BigInt
             legCount: oddsCalculation.legCount,
-            combinedOdds: oddsCalculation.finalOdds,
+            combinedOdds: oddsCalculation.baseCombinedOdds,
             predictions: validLegs.map((leg) => ({
               id: leg.prediction.id,
               title: leg.prediction.title,

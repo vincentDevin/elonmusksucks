@@ -35,21 +35,14 @@ export default function ParlayPanel() {
     return opt?.odds ?? 1;
   };
 
-  /* ---------- Enhanced parlay calculations with bonuses and excitement ---------- */
+  /* ---------- Traditional parlay calculations with all-in bonus ---------- */
   const parlayCalculations = useMemo(() => {
     const individualOdds = state.legs.map((leg) => getLegOdds(leg));
     const baseCombined = individualOdds.reduce((acc, odds) => acc * odds, 1);
     const legCount = state.legs.length;
 
-    // Apply exciting bonus multipliers for more legs!
-    let bonusMultiplier = 1;
-    if (legCount >= 2) {
-      bonusMultiplier = Math.pow(1.15, legCount - 1);
-      bonusMultiplier = Math.min(bonusMultiplier, 2.0); // Cap at 2.0x
-    }
-
-    const finalOdds = baseCombined * bonusMultiplier;
-    const basePayout = Math.floor(state.amount * finalOdds);
+    // Traditional parlay: just multiply odds (no leg count bonuses)
+    const basePayout = Math.floor(state.amount * baseCombined);
 
     // 🎯 Wager excitement level calculation
     let wagerLevel = 'Conservative';
@@ -74,16 +67,16 @@ export default function ParlayPanel() {
       excitementLevel = 'moderate';
     }
 
-    // 🚀 ALL-IN bonus detection for parlays
+    // 🚀 ALL-IN bonus detection for parlays (50% bonus for betting ≥95% of balance)
     const isAllIn = state.amount >= balance * 0.95;
     const allInMultiplier = isAllIn ? 1.5 : 1.0; // Extra 50% bonus for all-in parlays
-    const finalPayout = isAllIn ? Math.floor(basePayout * allInMultiplier) : basePayout;
+    const finalOdds = baseCombined * allInMultiplier;
+    const finalPayout = Math.floor(basePayout * allInMultiplier);
     const profit = finalPayout - state.amount;
     const profitPercent = state.amount > 0 ? (profit / state.amount) * 100 : 0;
 
     return {
       baseCombinedOdds: baseCombined,
-      bonusMultiplier,
       finalOdds,
       payout: finalPayout,
       legCount,
@@ -189,12 +182,6 @@ export default function ParlayPanel() {
                 <span>{riskInfo.emoji}</span>
                 <span>{riskInfo.level}</span>
               </div>
-              {parlayCalculations.bonusMultiplier > 1 && (
-                <div className="flex items-center space-x-1 bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-semibold">
-                  <span>🎉</span>
-                  <span>BONUS!</span>
-                </div>
-              )}
               {parlayCalculations.isAllIn && (
                 <div className="flex items-center space-x-1 bg-red-100 text-red-800 px-2 py-1 rounded-full text-xs font-semibold animate-pulse">
                   <span>🚀</span>
@@ -459,15 +446,6 @@ export default function ParlayPanel() {
               <span>{parlayCalculations.baseCombinedOdds.toFixed(2)}×</span>
             </div>
 
-            {parlayCalculations.bonusMultiplier > 1 && (
-              <div className="flex justify-between text-sm text-green-600 font-semibold animate-pulse">
-                <span className="flex items-center">
-                  🎉 {parlayCalculations.legCount}-Leg Bonus
-                </span>
-                <span>+{((parlayCalculations.bonusMultiplier - 1) * 100).toFixed(0)}%</span>
-              </div>
-            )}
-
             {parlayCalculations.isAllIn && (
               <div className="flex justify-between text-sm text-red-600 font-semibold animate-pulse">
                 <span className="flex items-center">🚀 ALL-IN BONUS!</span>
@@ -483,8 +461,8 @@ export default function ParlayPanel() {
                     ? 'scale-110 text-blue-500'
                     : parlayCalculations.excitementLevel === 'yolo'
                       ? 'text-red-600 animate-pulse'
-                      : parlayCalculations.bonusMultiplier > 1
-                        ? 'text-green-600'
+                      : parlayCalculations.isAllIn
+                        ? 'text-red-600'
                         : ''
                 }`}
               >
@@ -509,8 +487,8 @@ export default function ParlayPanel() {
                       ? 'text-red-600 font-bold text-lg animate-pulse'
                       : parlayCalculations.excitementLevel === 'high'
                         ? 'text-orange-600 font-bold'
-                        : parlayCalculations.bonusMultiplier > 1
-                          ? 'text-green-600 font-bold'
+                        : parlayCalculations.isAllIn
+                          ? 'text-red-600 font-bold'
                           : ''
                 }`}
               >
@@ -589,15 +567,13 @@ export default function ParlayPanel() {
               <button
                 onClick={() => setIsExpanded(true)}
                 className={`w-full py-2 rounded-lg font-bold disabled:opacity-50 transition-all duration-200 cursor-pointer ${
-                  parlayCalculations.bonusMultiplier > 1
-                    ? 'bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg hover:shadow-xl hover:from-green-600 hover:to-green-700'
+                  parlayCalculations.isAllIn
+                    ? 'bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg hover:shadow-xl hover:from-red-600 hover:to-red-700'
                     : 'bg-primary text-surface hover:opacity-90'
                 }`}
                 disabled={state.legs.length === 0 || placing}
               >
-                {parlayCalculations.bonusMultiplier > 1
-                  ? '🎉 Review Bonus Parlay'
-                  : 'Review & Place'}
+                {parlayCalculations.isAllIn ? '🚀 Review All-In Parlay' : 'Review & Place'}
               </button>
             ) : (
               <>
@@ -616,8 +592,8 @@ export default function ParlayPanel() {
                   onClick={handlePlaceParlay}
                   disabled={placing || !state.legs.length || state.amount <= 0}
                   className={`flex-1 px-6 py-2 rounded-lg font-bold disabled:opacity-50 transition-all duration-200 cursor-pointer ${
-                    parlayCalculations.bonusMultiplier > 1
-                      ? 'bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg hover:shadow-xl hover:from-green-600 hover:to-green-700'
+                    parlayCalculations.isAllIn
+                      ? 'bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg hover:shadow-xl hover:from-red-600 hover:to-red-700'
                       : 'bg-primary text-surface hover:opacity-90'
                   }`}
                 >
@@ -626,10 +602,10 @@ export default function ParlayPanel() {
                       <span className="animate-spin">⏳</span>
                       <span>Placing...</span>
                     </span>
-                  ) : parlayCalculations.bonusMultiplier > 1 ? (
+                  ) : parlayCalculations.isAllIn ? (
                     <span className="flex items-center justify-center space-x-1">
                       <span>🚀</span>
-                      <span>Place Bonus Parlay</span>
+                      <span>Place All-In Parlay</span>
                     </span>
                   ) : (
                     'Place Parlay'
