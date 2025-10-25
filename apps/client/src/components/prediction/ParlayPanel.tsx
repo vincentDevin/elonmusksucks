@@ -209,7 +209,7 @@ export default function ParlayPanel() {
                     <button
                       onClick={() => dispatch({ type: 'REMOVE_LEG', optionId: leg.optionId })}
                       aria-label="Remove leg"
-                      className="ml-2 text-red-600 hover:text-red-800 text-xs px-2 py-1 rounded hover:bg-red-100 transition"
+                      className="ml-2 text-red-600 hover:text-red-800 text-xs px-2 py-1 rounded hover:bg-red-100 transition cursor-pointer"
                     >
                       Remove
                     </button>
@@ -291,7 +291,7 @@ export default function ParlayPanel() {
                       amount: Math.floor(balance * percent),
                     })
                   }
-                  className="flex-1 px-2 py-1 text-xs bg-muted hover:bg-secondary rounded transition-colors"
+                  className="flex-1 px-2 py-1 text-xs bg-muted hover:bg-secondary rounded transition-colors cursor-pointer"
                   disabled={placing || balance === 0}
                 >
                   {percent === 1.0 ? 'ALL IN' : `${percent * 100}%`}
@@ -474,7 +474,7 @@ export default function ParlayPanel() {
             {!isExpanded ? (
               <button
                 onClick={() => setIsExpanded(true)}
-                className={`w-full py-2 rounded-lg font-bold disabled:opacity-50 transition-all duration-200 ${
+                className={`w-full py-2 rounded-lg font-bold disabled:opacity-50 transition-all duration-200 cursor-pointer ${
                   parlayCalculations.bonusMultiplier > 1
                     ? 'bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg hover:shadow-xl hover:from-green-600 hover:to-green-700'
                     : 'bg-primary text-surface hover:opacity-90'
@@ -493,7 +493,7 @@ export default function ParlayPanel() {
                     setIsExpanded(false);
                     setError(null);
                   }}
-                  className="px-4 py-2 bg-muted text-content rounded-lg hover:bg-tertiary transition"
+                  className="px-4 py-2 bg-muted text-content rounded-lg hover:bg-tertiary transition cursor-pointer"
                   disabled={placing}
                 >
                   Clear
@@ -501,7 +501,7 @@ export default function ParlayPanel() {
                 <button
                   onClick={handlePlaceParlay}
                   disabled={placing || !state.legs.length || state.amount <= 0}
-                  className={`flex-1 px-6 py-2 rounded-lg font-bold disabled:opacity-50 transition-all duration-200 ${
+                  className={`flex-1 px-6 py-2 rounded-lg font-bold disabled:opacity-50 transition-all duration-200 cursor-pointer ${
                     parlayCalculations.bonusMultiplier > 1
                       ? 'bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg hover:shadow-xl hover:from-green-600 hover:to-green-700'
                       : 'bg-primary text-surface hover:opacity-90'

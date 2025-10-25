@@ -100,7 +100,7 @@ export default function PredictionSectionCard({
 
           <button
             onClick={() => setIsExpanded(!isExpanded)}
-            className="p-2 hover:bg-surface rounded-lg transition-colors"
+            className="p-2 hover:bg-surface rounded-lg transition-colors cursor-pointer"
           >
             <span className={`transform transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
               ▼
@@ -223,7 +223,7 @@ export default function PredictionSectionCard({
             <div className="mt-4 text-center">
               <button
                 onClick={() => setShowAll(!showAll)}
-                className="px-4 py-2 bg-surface border border-muted rounded-lg text-content hover:bg-surface/80 transition-colors"
+                className="px-4 py-2 bg-surface border border-muted rounded-lg text-content hover:bg-surface/80 transition-colors cursor-pointer"
               >
                 {showAll ? 'Show Less' : `Show ${section.predictions.length - 3} More`}
               </button>

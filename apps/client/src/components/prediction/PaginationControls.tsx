@@ -64,7 +64,7 @@ export default function PaginationControls({
       <button
         onClick={onPrev}
         disabled={currentPage === 1 || loading}
-        className="flex items-center gap-1 px-3 py-2 rounded-lg border border-border bg-surface text-content hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        className="flex items-center gap-1 px-3 py-2 rounded-lg border border-border bg-surface text-content hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
         aria-label="Previous page"
       >
         <ChevronLeftIcon className="w-4 h-4" />
@@ -94,7 +94,7 @@ export default function PaginationControls({
               key={page}
               onClick={() => onPageChange(page)}
               disabled={loading}
-              className={`px-3 py-2 rounded-lg border transition-colors ${
+              className={`px-3 py-2 rounded-lg border transition-colors cursor-pointer ${
                 isActive
                   ? 'bg-primary text-primary-foreground border-primary font-medium'
                   : 'border-border bg-surface text-content hover:bg-muted'
@@ -112,7 +112,7 @@ export default function PaginationControls({
       <button
         onClick={onNext}
         disabled={!hasMore || currentPage === totalPages || loading}
-        className="flex items-center gap-1 px-3 py-2 rounded-lg border border-border bg-surface text-content hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        className="flex items-center gap-1 px-3 py-2 rounded-lg border border-border bg-surface text-content hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
         aria-label="Next page"
       >
         <span className="hidden sm:inline">Next</span>

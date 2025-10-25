@@ -325,7 +325,7 @@ export default function PredictionBettingHistory({
                 <th className="text-left p-4 text-sm font-medium text-tertiary">
                   <button
                     onClick={() => toggleSort('user')}
-                    className="flex items-center gap-1 hover:text-content"
+                    className="flex items-center gap-1 hover:text-content cursor-pointer transition-colors"
                   >
                     User
                     <ArrowUpDown className="w-3 h-3" />
@@ -336,7 +336,7 @@ export default function PredictionBettingHistory({
                 <th className="text-left p-4 text-sm font-medium text-tertiary">
                   <button
                     onClick={() => toggleSort('amount')}
-                    className="flex items-center gap-1 hover:text-content"
+                    className="flex items-center gap-1 hover:text-content cursor-pointer transition-colors"
                   >
                     Amount
                     <ArrowUpDown className="w-3 h-3" />
@@ -345,7 +345,7 @@ export default function PredictionBettingHistory({
                 <th className="text-left p-4 text-sm font-medium text-tertiary">
                   <button
                     onClick={() => toggleSort('odds')}
-                    className="flex items-center gap-1 hover:text-content"
+                    className="flex items-center gap-1 hover:text-content cursor-pointer transition-colors"
                   >
                     Odds
                     <ArrowUpDown className="w-3 h-3" />
@@ -355,7 +355,7 @@ export default function PredictionBettingHistory({
                 <th className="text-left p-4 text-sm font-medium text-tertiary">
                   <button
                     onClick={() => toggleSort('time')}
-                    className="flex items-center gap-1 hover:text-content"
+                    className="flex items-center gap-1 hover:text-content cursor-pointer transition-colors"
                   >
                     Time
                     <ArrowUpDown className="w-3 h-3" />

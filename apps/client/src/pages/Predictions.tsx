@@ -197,7 +197,10 @@ export default function Predictions() {
       return (
         <div className="text-center py-12">
           <p className="text-error mb-4">Error loading predictions: {String(error)}</p>
-          <button onClick={() => window.location.reload()} className="text-primary hover:underline">
+          <button
+            onClick={() => window.location.reload()}
+            className="text-primary hover:underline cursor-pointer"
+          >
             Try Again
           </button>
         </div>
@@ -397,23 +400,25 @@ export default function Predictions() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="bg-surface border-b border-border sticky top-0 z-20">
-        <div className="px-6 py-4 max-w-[1800px] mx-auto space-y-4">
-          {/* Title Row */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <h1 className="text-2xl font-bold text-content flex items-center gap-2">
-                <TrendingUp className="w-6 h-6 text-primary" />
-                Prediction Market
+        <div className="px-4 xl:px-6 py-3 max-w-[1800px] mx-auto">
+          {/* Single Row Layout - Stacks on mobile, single row on xl screens (1280px+) */}
+          <div className="flex flex-col xl:flex-row xl:items-center gap-3 xl:gap-4">
+            {/* Left Section: Title + View Toggle */}
+            <div className="flex items-center gap-3 flex-shrink-0">
+              <h1 className="text-xl font-bold text-content flex items-center gap-2 whitespace-nowrap">
+                <TrendingUp className="w-5 h-5 text-primary" />
+                <span className="hidden sm:inline">Prediction Market</span>
+                <span className="sm:hidden">Predictions</span>
               </h1>
 
               {/* View Mode Toggle */}
               <div className="hidden md:flex items-center bg-muted rounded-lg p-1">
                 <button
                   onClick={() => setViewMode('sections')}
-                  className={`p-2 rounded transition-colors ${
+                  className={`p-2 rounded transition-colors cursor-pointer ${
                     viewMode === 'sections'
                       ? 'bg-surface text-primary shadow-sm'
-                      : 'text-tertiary hover:text-content'
+                      : 'text-tertiary hover:text-content hover:bg-surface/50'
                   }`}
                   title="Sections View"
                 >
@@ -421,10 +426,10 @@ export default function Predictions() {
                 </button>
                 <button
                   onClick={() => setViewMode('list')}
-                  className={`p-2 rounded transition-colors ${
+                  className={`p-2 rounded transition-colors cursor-pointer ${
                     viewMode === 'list'
                       ? 'bg-surface text-primary shadow-sm'
-                      : 'text-tertiary hover:text-content'
+                      : 'text-tertiary hover:text-content hover:bg-surface/50'
                   }`}
                   title="List View"
                 >
@@ -432,10 +437,10 @@ export default function Predictions() {
                 </button>
                 <button
                   onClick={() => setViewMode('grid')}
-                  className={`p-2 rounded transition-colors ${
+                  className={`p-2 rounded transition-colors cursor-pointer ${
                     viewMode === 'grid'
                       ? 'bg-surface text-primary shadow-sm'
-                      : 'text-tertiary hover:text-content'
+                      : 'text-tertiary hover:text-content hover:bg-surface/50'
                   }`}
                   title="Grid View"
                 >
@@ -444,20 +449,34 @@ export default function Predictions() {
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            {/* Middle Section: Filters */}
+            <div className="flex-1 min-w-0">
+              <EnhancedPredictionFilters
+                filters={filters}
+                availableCategories={availableCategories}
+                onFiltersChange={updateFilters}
+                onClearFilters={clearFilters}
+                totalResults={enhancedPredictions.length}
+                layout="horizontal"
+              />
+            </div>
+
+            {/* Right Section: Create Button + Notifications */}
+            <div className="flex items-center gap-2 flex-shrink-0">
               {/* Create Prediction Button */}
               <button
                 onClick={() => openCreateModal()}
-                className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-all cursor-pointer font-medium"
+                className="flex items-center gap-1.5 px-3 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 hover:scale-105 transition-all cursor-pointer font-medium text-sm whitespace-nowrap"
               >
-                <PlusIcon className="w-5 h-5" />
-                <span className="hidden sm:inline">Create Prediction</span>
+                <PlusIcon className="w-4 h-4" />
+                <span className="hidden xl:inline">Create Prediction</span>
+                <span className="xl:hidden">Create</span>
               </button>
 
               {/* Live Notifications */}
               {liveNotifications.length > 0 && (
                 <div className="relative">
-                  <button className="p-2 hover:bg-muted rounded-lg relative">
+                  <button className="p-2 hover:bg-muted rounded-lg relative cursor-pointer transition-colors">
                     <Bell className="w-5 h-5 text-tertiary" />
                     <span className="absolute top-1 right-1 w-2 h-2 bg-error rounded-full animate-pulse" />
                   </button>
@@ -485,21 +504,11 @@ export default function Predictions() {
               )}
             </div>
           </div>
-
-          {/* Filters Row */}
-          <EnhancedPredictionFilters
-            filters={filters}
-            availableCategories={availableCategories}
-            onFiltersChange={updateFilters}
-            onClearFilters={clearFilters}
-            totalResults={enhancedPredictions.length}
-            layout="horizontal"
-          />
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="px-6 py-6 max-w-[1800px] mx-auto">
+      <div className="px-4 xl:px-6 py-4 xl:py-6 max-w-[1800px] mx-auto">
         {renderPredictions()}
 
         {/* Pagination Controls - Only show for list and grid views */}

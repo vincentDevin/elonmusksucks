@@ -138,7 +138,7 @@ export function PredictionReactions({
                     }}
                     disabled={isReacting}
                     className={`
-                      flex flex-col items-center p-1.5 rounded-md min-w-[36px] transition-all
+                      flex flex-col items-center p-1.5 rounded-md min-w-[36px] transition-all cursor-pointer
                       hover:bg-muted hover:scale-105
                       ${userReaction === type ? 'bg-primary/10 ring-1 ring-primary' : ''}
                       ${isReacting ? 'opacity-50 cursor-not-allowed' : ''}

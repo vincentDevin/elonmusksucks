@@ -96,7 +96,10 @@ function EnhancedPredictionFilters({
     return (
       <>
         {/* Backdrop */}
-        <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setShowMobileSheet(false)} />
+        <div
+          className="fixed inset-0 bg-black/50 z-40 cursor-pointer"
+          onClick={() => setShowMobileSheet(false)}
+        />
 
         {/* Mobile Filter Sheet */}
         <div className="fixed bottom-0 left-0 right-0 bg-surface rounded-t-2xl z-50 max-h-[85vh] overflow-hidden animate-in slide-in-from-bottom duration-300">
@@ -106,7 +109,7 @@ function EnhancedPredictionFilters({
               <h3 className="text-lg font-semibold text-content">Filters</h3>
               <button
                 onClick={() => setShowMobileSheet(false)}
-                className="p-1 hover:bg-muted rounded-lg"
+                className="p-1 hover:bg-muted rounded-lg cursor-pointer transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -125,8 +128,8 @@ function EnhancedPredictionFilters({
                   className={`
                     flex-1 px-3 py-2 rounded-lg text-sm font-medium
                     flex items-center justify-center gap-1.5
-                    transition-colors
-                    ${activeTab === tab.id ? 'bg-primary text-surface' : 'bg-muted text-content'}
+                    transition-colors cursor-pointer
+                    ${activeTab === tab.id ? 'bg-primary text-surface' : 'bg-muted text-content hover:bg-muted/80'}
                   `}
                 >
                   {tab.icon}
@@ -158,11 +161,11 @@ function EnhancedPredictionFilters({
                         className={`
                           p-3 rounded-lg border text-sm font-medium
                           flex items-center justify-center gap-2
-                          transition-all
+                          transition-all cursor-pointer
                           ${
                             tempFilters.status === status.value
                               ? 'bg-primary text-surface border-primary'
-                              : 'bg-surface text-content border-border hover:border-primary/50'
+                              : 'bg-surface text-content border-border hover:border-primary/50 hover:scale-105'
                           }
                         `}
                       >
@@ -190,11 +193,11 @@ function EnhancedPredictionFilters({
                         }
                         className={`
                           px-4 py-2 rounded-full text-sm whitespace-nowrap
-                          transition-all
+                          transition-all cursor-pointer
                           ${
                             tempFilters.timeRemaining === time.value
                               ? 'bg-primary text-surface'
-                              : 'bg-muted text-content'
+                              : 'bg-muted text-content hover:bg-muted/80'
                           }
                         `}
                       >
@@ -219,11 +222,11 @@ function EnhancedPredictionFilters({
                     }}
                     className={`
                       w-full p-3 rounded-lg border text-left
-                      transition-all flex items-center justify-between
+                      transition-all flex items-center justify-between cursor-pointer
                       ${
                         tempFilters.categories.includes(category.id)
                           ? 'bg-primary/10 text-primary border-primary'
-                          : 'bg-surface text-content border-border'
+                          : 'bg-surface text-content border-border hover:border-primary/50'
                       }
                     `}
                   >
@@ -252,13 +255,13 @@ function EnhancedPredictionFilters({
           <div className="sticky bottom-0 bg-surface border-t border-border p-4 flex gap-2">
             <button
               onClick={clearMobileFilters}
-              className="px-4 py-2 bg-muted text-content rounded-lg font-medium"
+              className="px-4 py-2 bg-muted text-content rounded-lg font-medium cursor-pointer hover:bg-muted/80 transition-colors"
             >
               Clear
             </button>
             <button
               onClick={applyMobileFilters}
-              className="flex-1 px-4 py-2 bg-primary text-surface rounded-lg font-medium"
+              className="flex-1 px-4 py-2 bg-primary text-surface rounded-lg font-medium cursor-pointer hover:bg-primary-hover transition-colors"
             >
               Apply Filters
               {activeFilterCount > 0 && ` (${activeFilterCount})`}
@@ -272,9 +275,9 @@ function EnhancedPredictionFilters({
   // Horizontal Layout (for header)
   if (layout === 'horizontal') {
     return (
-      <div className={`flex flex-wrap items-center gap-3 ${className}`}>
+      <div className={`flex flex-wrap xl:flex-nowrap items-center gap-2 ${className}`}>
         {/* Search Bar */}
-        <div className="relative flex-1 min-w-[200px] max-w-[300px]">
+        <div className="relative w-full sm:flex-1 sm:min-w-[160px] xl:min-w-[180px] xl:max-w-[240px]">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-tertiary" />
           <input
             ref={searchInputRef}
@@ -287,15 +290,15 @@ function EnhancedPredictionFilters({
           {filters.search && (
             <button
               onClick={() => onFiltersChange({ search: '' })}
-              className="absolute right-2 top-1/2 transform -translate-y-1/2"
+              className="absolute right-2 top-1/2 transform -translate-y-1/2 cursor-pointer"
             >
-              <X className="w-4 h-4 text-tertiary hover:text-content" />
+              <X className="w-4 h-4 text-tertiary hover:text-content transition-colors" />
             </button>
           )}
         </div>
 
         {/* Category Dropdown */}
-        <div className="relative">
+        <div className="relative flex-shrink-0">
           <select
             value={filters.categories[0] || ''}
             onChange={(e) =>
@@ -303,7 +306,7 @@ function EnhancedPredictionFilters({
                 categories: e.target.value ? [Number(e.target.value)] : [],
               })
             }
-            className="px-3 py-1.5 pr-8 bg-muted border border-transparent rounded-lg text-sm text-content focus:outline-none focus:border-primary appearance-none cursor-pointer"
+            className="px-3 py-2 pr-8 bg-muted border border-transparent rounded-lg text-sm text-content focus:outline-none focus:border-primary appearance-none cursor-pointer hover:bg-muted/80 transition-colors w-full sm:w-auto"
           >
             <option value="">All Categories</option>
             {deferredCategories.map((category) => (
@@ -316,11 +319,11 @@ function EnhancedPredictionFilters({
         </div>
 
         {/* Status Dropdown */}
-        <div className="relative">
+        <div className="relative flex-shrink-0">
           <select
             value={filters.status}
             onChange={(e) => onFiltersChange({ status: e.target.value as any })}
-            className="px-3 py-1.5 pr-8 bg-muted border border-transparent rounded-lg text-sm text-content focus:outline-none focus:border-primary appearance-none cursor-pointer"
+            className="px-3 py-2 pr-8 bg-muted border border-transparent rounded-lg text-sm text-content focus:outline-none focus:border-primary appearance-none cursor-pointer hover:bg-muted/80 transition-colors w-full sm:w-auto"
           >
             <option value="all">All Status</option>
             <option value="open">Open</option>
@@ -331,11 +334,11 @@ function EnhancedPredictionFilters({
         </div>
 
         {/* Time Dropdown */}
-        <div className="relative">
+        <div className="relative flex-shrink-0">
           <select
             value={filters.timeRemaining}
             onChange={(e) => onFiltersChange({ timeRemaining: e.target.value as any })}
-            className="px-3 py-1.5 pr-8 bg-muted border border-transparent rounded-lg text-sm text-content focus:outline-none focus:border-primary appearance-none cursor-pointer"
+            className="px-3 py-2 pr-8 bg-muted border border-transparent rounded-lg text-sm text-content focus:outline-none focus:border-primary appearance-none cursor-pointer hover:bg-muted/80 transition-colors w-full sm:w-auto"
           >
             <option value="all">Any Time</option>
             <option value="1h">1 Hour</option>
@@ -349,17 +352,18 @@ function EnhancedPredictionFilters({
         {hasActiveFilters && (
           <button
             onClick={onClearFilters}
-            className="px-3 py-1.5 bg-muted hover:bg-error/20 text-tertiary hover:text-error rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5"
+            className="px-2.5 py-2 bg-muted hover:bg-error/20 text-tertiary hover:text-error rounded-lg text-xs font-medium transition-colors flex items-center gap-1 cursor-pointer whitespace-nowrap flex-shrink-0"
           >
             <X className="w-3.5 h-3.5" />
-            Clear
+            <span className="hidden xl:inline">Clear</span>
           </button>
         )}
 
         {/* Results Count */}
         {totalResults !== undefined && (
-          <div className="text-xs text-tertiary ml-auto">
-            <span className="font-medium text-content">{totalResults}</span> results
+          <div className="text-xs text-tertiary whitespace-nowrap flex-shrink-0 ml-auto">
+            <span className="font-medium text-content">{totalResults}</span>{' '}
+            <span className="hidden xl:inline">results</span>
           </div>
         )}
       </div>
@@ -393,9 +397,9 @@ function EnhancedPredictionFilters({
           {filters.search && (
             <button
               onClick={() => onFiltersChange({ search: '' })}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2"
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 cursor-pointer"
             >
-              <X className="w-4 h-4 text-tertiary hover:text-content" />
+              <X className="w-4 h-4 text-tertiary hover:text-content transition-colors" />
             </button>
           )}
 
@@ -423,7 +427,7 @@ function EnhancedPredictionFilters({
       <div className="p-3">
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="flex items-center justify-between w-full text-left"
+          className="flex items-center justify-between w-full text-left cursor-pointer hover:opacity-80 transition-opacity"
         >
           <div className="flex items-center gap-2">
             <Filter className="w-4 h-4 text-tertiary" />
@@ -457,7 +461,7 @@ function EnhancedPredictionFilters({
                       onFiltersChange({ categories: newCats });
                     }}
                     className={`
-                      w-full px-2.5 py-1.5 rounded-lg text-xs border transition-colors text-left flex items-center justify-between
+                      w-full px-2.5 py-1.5 rounded-lg text-xs border transition-colors text-left flex items-center justify-between cursor-pointer
                       ${
                         filters.categories.includes(category.id)
                           ? 'bg-primary text-surface border-primary'
@@ -513,7 +517,7 @@ function EnhancedPredictionFilters({
               <div className="flex justify-end">
                 <button
                   onClick={onClearFilters}
-                  className="text-xs text-tertiary hover:text-error transition-colors"
+                  className="text-xs text-tertiary hover:text-error transition-colors cursor-pointer"
                 >
                   Clear All Filters
                 </button>
@@ -536,7 +540,7 @@ function EnhancedPredictionFilters({
       {isMobile && (
         <button
           onClick={() => setShowMobileSheet(true)}
-          className="fixed bottom-20 right-4 z-30 p-3 bg-primary text-surface rounded-full shadow-lg flex items-center gap-2"
+          className="fixed bottom-20 right-4 z-30 p-3 bg-primary text-surface rounded-full shadow-lg flex items-center gap-2 cursor-pointer hover:scale-110 transition-transform"
         >
           <Filter className="w-5 h-5" />
           {activeFilterCount > 0 && (

@@ -359,7 +359,10 @@ export default function BetModal({
             <div className="text-sm text-tertiary mt-1">Balance: {formatMuskBucks(balance)} 🪙</div>
           </div>
           {mode !== 'inline' && (
-            <button onClick={onClose} className="text-tertiary hover:text-content text-xl">
+            <button
+              onClick={onClose}
+              className="text-tertiary hover:text-content text-xl cursor-pointer transition-colors"
+            >
               ✕
             </button>
           )}
@@ -384,7 +387,7 @@ export default function BetModal({
                   key={option.id}
                   type="button"
                   onClick={() => setOptionId(option.id)}
-                  className={`p-4 rounded-xl border-2 text-left transition-all ${
+                  className={`p-4 rounded-xl border-2 text-left transition-all cursor-pointer ${
                     isSelected
                       ? `${colorClasses.bgTint} ${colorClasses.text} scale-[1.02] shadow-lg ring-2 ring-offset-2`
                       : `border-muted bg-background ${colorClasses.bgHover} text-content hover:scale-[1.01]`

@@ -225,7 +225,7 @@ export default function RelatedPredictions({
           </h3>
           <button
             onClick={() => navigate('/predictions')}
-            className="text-sm text-primary hover:text-primary-hover flex items-center gap-1"
+            className="text-sm text-primary hover:text-primary-hover flex items-center gap-1 cursor-pointer transition-colors"
           >
             View All
             <ArrowRight className="w-4 h-4" />
@@ -245,7 +245,7 @@ export default function RelatedPredictions({
               onClick={() => setActiveTab(tab.id as any)}
               className={`
                 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium
-                whitespace-nowrap transition-colors mr-2
+                whitespace-nowrap transition-colors mr-2 cursor-pointer
                 ${
                   activeTab === tab.id
                     ? 'bg-primary/10 text-primary border border-primary/20'
@@ -375,7 +375,7 @@ export default function RelatedPredictions({
                   },
                 })
               }
-              className="text-sm text-primary hover:text-primary-hover flex items-center gap-1"
+              className="text-sm text-primary hover:text-primary-hover flex items-center gap-1 cursor-pointer transition-colors"
             >
               Explore More
               <ArrowRight className="w-3 h-3" />

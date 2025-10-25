@@ -404,11 +404,11 @@ export default function PredictionStats({ prediction, className = '' }: Predicti
                 key={chart.id}
                 onClick={() => setActiveChart(chart.id as any)}
                 className={`
-                  flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium transition-colors
+                  flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium transition-colors cursor-pointer
                   ${
                     activeChart === chart.id
                       ? 'bg-surface text-primary shadow-sm'
-                      : 'text-tertiary hover:text-content'
+                      : 'text-tertiary hover:text-content hover:bg-muted/30'
                   }
                 `}
               >

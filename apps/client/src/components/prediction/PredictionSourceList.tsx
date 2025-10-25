@@ -118,7 +118,7 @@ export const PredictionSourceList: React.FC<PredictionSourceListProps> = ({
         {hasMore && (
           <button
             onClick={() => setExpanded(!expanded)}
-            className="text-sm text-accent-primary hover:text-accent-secondary flex items-center gap-1 transition-colors"
+            className="text-sm text-accent-primary hover:text-accent-secondary flex items-center gap-1 transition-colors cursor-pointer"
           >
             {expanded ? (
               <>

@@ -151,7 +151,7 @@ export default function PredictionDetailView({
             <div className="flex items-center gap-4">
               <button
                 onClick={onBack || (() => navigate(-1))}
-                className="p-2 hover:bg-muted rounded-lg transition-colors"
+                className="p-2 hover:bg-muted rounded-lg transition-colors cursor-pointer"
               >
                 <ArrowLeft className="w-5 h-5 text-tertiary" />
               </button>
@@ -199,7 +199,7 @@ export default function PredictionDetailView({
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setIsBookmarked(!isBookmarked)}
-                className={`p-2 rounded-lg transition-colors ${
+                className={`p-2 rounded-lg transition-colors cursor-pointer ${
                   isBookmarked ? 'text-warning bg-warning/10' : 'text-tertiary hover:bg-muted'
                 }`}
               >
@@ -211,7 +211,7 @@ export default function PredictionDetailView({
               </button>
               <button
                 onClick={handleShare}
-                className="p-2 text-tertiary hover:bg-muted rounded-lg transition-colors"
+                className="p-2 text-tertiary hover:bg-muted rounded-lg transition-colors cursor-pointer"
               >
                 <Share2 className="w-5 h-5" />
               </button>
@@ -268,11 +268,11 @@ export default function PredictionDetailView({
                       onClick={() => setActiveTab(tab.id as any)}
                       className={`
                         flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap
-                        transition-colors
+                        transition-colors cursor-pointer
                         ${
                           activeTab === tab.id
                             ? 'border-primary text-primary bg-primary/5'
-                            : 'border-transparent text-tertiary hover:text-content'
+                            : 'border-transparent text-tertiary hover:text-content hover:bg-muted/30'
                         }
                       `}
                     >
@@ -421,7 +421,7 @@ export default function PredictionDetailView({
                 <div className="space-y-3">
                   <button
                     onClick={() => setShowBetModal(true)}
-                    className="w-full py-3 px-4 bg-primary hover:bg-primary-hover text-surface font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+                    className="w-full py-3 px-4 bg-primary hover:bg-primary-hover text-surface font-medium rounded-lg transition-colors flex items-center justify-center gap-2 cursor-pointer hover:scale-105"
                   >
                     <Target className="w-4 h-4" />
                     Place Bet
@@ -437,7 +437,7 @@ export default function PredictionDetailView({
                           <button
                             key={option.id}
                             onClick={() => handleAddToParlay(option.id)}
-                            className={`w-full py-2 px-3 ${colorClasses.bgTint} ${colorClasses.bgHover} ${colorClasses.text} border-2 font-medium rounded-lg transition-all text-sm hover:scale-[1.02]`}
+                            className={`w-full py-3 px-4 ${colorClasses.bgTint} ${colorClasses.bgHover} border-2 font-semibold rounded-lg transition-all text-base md:text-lg hover:scale-[1.02] cursor-pointer text-content`}
                             style={{ borderColor: colorClasses.hex }}
                           >
                             {option.label} ({option.odds.toFixed(2)}x)
@@ -474,13 +474,13 @@ export default function PredictionDetailView({
             <div className="space-y-3">
               <button
                 onClick={copyToClipboard}
-                className="w-full py-2 px-4 bg-primary hover:bg-primary-hover text-surface rounded-lg transition-colors"
+                className="w-full py-2 px-4 bg-primary hover:bg-primary-hover text-surface rounded-lg transition-colors cursor-pointer"
               >
                 Copy Link
               </button>
               <button
                 onClick={() => setShowShareModal(false)}
-                className="w-full py-2 px-4 bg-muted hover:bg-muted/80 text-content rounded-lg transition-colors"
+                className="w-full py-2 px-4 bg-muted hover:bg-muted/80 text-content rounded-lg transition-colors cursor-pointer"
               >
                 Cancel
               </button>
