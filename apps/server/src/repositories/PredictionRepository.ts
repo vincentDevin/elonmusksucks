@@ -253,11 +253,14 @@ export class PredictionRepository implements IPredictionRepository {
     status?: 'open' | 'pending' | 'expired' | 'resolved' | 'all';
     limit?: number;
     offset?: number;
+    search?: string;
+    categoryId?: number;
+    timeRemaining?: '1h' | '1d' | '1w';
   }): Promise<{
     predictions: PredictionWithRelations[];
     total: number;
   }> {
-    const { status = 'all', limit = 50, offset = 0 } = filters;
+    const { status = 'all', limit = 50, offset = 0, search, categoryId, timeRemaining } = filters;
     const now = new Date();
 
     // Build where clause based on status filter
@@ -297,6 +300,35 @@ export class PredictionRepository implements IPredictionRepository {
         // No filtering - return all predictions
         whereClause = {};
         break;
+    }
+
+    // Add search filter (title or description)
+    if (search && search.trim()) {
+      whereClause.OR = [
+        { title: { contains: search.trim(), mode: 'insensitive' } },
+        { description: { contains: search.trim(), mode: 'insensitive' } },
+      ];
+    }
+
+    // Add category filter
+    if (categoryId !== undefined && categoryId !== null) {
+      whereClause.categoryId = categoryId;
+    }
+
+    // Add time remaining filter
+    if (timeRemaining) {
+      const timeThresholds = {
+        '1h': 1 * 60 * 60 * 1000, // 1 hour in milliseconds
+        '1d': 24 * 60 * 60 * 1000, // 1 day in milliseconds
+        '1w': 7 * 24 * 60 * 60 * 1000, // 1 week in milliseconds
+      };
+      const threshold = new Date(now.getTime() + timeThresholds[timeRemaining]);
+
+      // Only show predictions expiring within the timeframe
+      whereClause.expiresAt = {
+        ...whereClause.expiresAt,
+        lte: threshold,
+      };
     }
 
     // Step 1: Get total count for pagination metadata

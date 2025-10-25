@@ -29,6 +29,9 @@ export interface IPredictionRepository {
     status?: 'open' | 'pending' | 'expired' | 'resolved' | 'all';
     limit?: number;
     offset?: number;
+    search?: string;
+    categoryId?: number;
+    timeRemaining?: '1h' | '1d' | '1w';
   }): Promise<{
     predictions: PredictionWithRelations[];
     total: number;

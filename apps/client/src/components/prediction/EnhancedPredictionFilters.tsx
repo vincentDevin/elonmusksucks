@@ -3,22 +3,19 @@ import {
   MagnifyingGlassIcon as Search,
   FunnelIcon as Filter,
   XMarkIcon as X,
-  ClockIcon as Clock,
-  ArrowTrendingUpIcon as TrendingUp,
   TagIcon as Tag,
   BoltIcon as Zap,
   ChevronDownIcon as ChevronDown,
   ChevronUpIcon as ChevronUp,
-  ChartBarIcon as Activity,
   Squares2X2Icon as Layers,
   CheckIcon as Check,
 } from '@heroicons/react/24/outline';
 import type { PredictionFilter } from '../../hooks/usePredictionDiscovery';
-import type { PrismaCategory } from '@ems/types';
+import type { Category } from '../../api/predictions';
 
 interface EnhancedPredictionFiltersProps {
   filters: PredictionFilter;
-  availableCategories: PrismaCategory[];
+  availableCategories: Category[];
   onFiltersChange: (filters: Partial<PredictionFilter>) => void;
   onClearFilters: () => void;
   totalResults?: number;
@@ -58,28 +55,15 @@ function EnhancedPredictionFilters({
     }
   }, []);
 
-  // Quick filter pills
-  const quickFilters = [
-    { id: 'hot', label: 'Hot', icon: '🔥', filter: { activity: 'high' as const } },
-    { id: 'ending', label: 'Ending Soon', icon: '⏰', filter: { timeRemaining: '1d' as const } },
-    { id: 'new', label: 'New', icon: '✨', filter: { status: 'open' as const } },
-    { id: 'highOdds', label: 'High Odds', icon: '📈', filter: { activity: 'high' as const } },
-    { id: 'easy', label: 'Easy', icon: '🟢', filter: { difficulties: ['easy' as const] } },
-  ];
-
   const hasActiveFilters =
     filters.categories.length > 0 ||
-    filters.difficulties.length > 0 ||
     filters.timeRemaining !== 'all' ||
-    filters.activity !== 'all' ||
     filters.status !== 'all' ||
     filters.search.length > 0;
 
   const activeFilterCount =
     filters.categories.length +
-    filters.difficulties.length +
     (filters.timeRemaining !== 'all' ? 1 : 0) +
-    (filters.activity !== 'all' ? 1 : 0) +
     (filters.status !== 'all' ? 1 : 0) +
     (filters.search ? 1 : 0);
 
@@ -102,11 +86,8 @@ function EnhancedPredictionFilters({
     setTempFilters({
       search: '',
       categories: [],
-      difficulties: [],
       timeRemaining: 'all',
-      activity: 'all',
       status: 'all',
-      sortBy: 'relevance',
     });
   };
 
@@ -222,41 +203,6 @@ function EnhancedPredictionFilters({
                     ))}
                   </div>
                 </div>
-
-                {/* Difficulty */}
-                <div>
-                  <h4 className="text-sm font-medium text-tertiary mb-3">Difficulty</h4>
-                  <div className="grid grid-cols-2 gap-2">
-                    {(['easy', 'medium', 'hard', 'expert'] as const).map((diff) => (
-                      <button
-                        key={diff}
-                        onClick={() => {
-                          const newDiffs = tempFilters.difficulties.includes(diff)
-                            ? tempFilters.difficulties.filter((d) => d !== diff)
-                            : [...tempFilters.difficulties, diff];
-                          setTempFilters({ ...tempFilters, difficulties: newDiffs });
-                        }}
-                        className={`
-                          p-2 rounded-lg border text-sm capitalize
-                          transition-all flex items-center justify-center gap-2
-                          ${
-                            tempFilters.difficulties.includes(diff)
-                              ? 'bg-primary text-surface border-primary'
-                              : 'bg-surface text-content border-border'
-                          }
-                        `}
-                      >
-                        <span>
-                          {diff === 'easy' && '🟢'}
-                          {diff === 'medium' && '🟡'}
-                          {diff === 'hard' && '🟠'}
-                          {diff === 'expert' && '🔴'}
-                        </span>
-                        <span>{diff}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
               </div>
             )}
 
@@ -295,57 +241,9 @@ function EnhancedPredictionFilters({
 
             {activeTab === 'advanced' && (
               <div className="space-y-4">
-                {/* Activity Level */}
-                <div>
-                  <h4 className="text-sm font-medium text-tertiary mb-3">Activity Level</h4>
-                  <div className="grid grid-cols-2 gap-2">
-                    {[
-                      { value: 'all', label: 'All', icon: <Activity className="w-4 h-4" /> },
-                      { value: 'high', label: 'High', icon: <TrendingUp className="w-4 h-4" /> },
-                      { value: 'medium', label: 'Medium', icon: <Zap className="w-4 h-4" /> },
-                      { value: 'low', label: 'Low', icon: <Clock className="w-4 h-4" /> },
-                    ].map((activity) => (
-                      <button
-                        key={activity.value}
-                        onClick={() =>
-                          setTempFilters({ ...tempFilters, activity: activity.value as any })
-                        }
-                        className={`
-                          p-2 rounded-lg border text-sm
-                          flex items-center justify-center gap-2
-                          transition-all
-                          ${
-                            tempFilters.activity === activity.value
-                              ? 'bg-primary text-surface border-primary'
-                              : 'bg-surface text-content border-border'
-                          }
-                        `}
-                      >
-                        {activity.icon}
-                        <span>{activity.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Sort By */}
-                <div>
-                  <h4 className="text-sm font-medium text-tertiary mb-3">Sort By</h4>
-                  <select
-                    value={tempFilters.sortBy}
-                    onChange={(e) =>
-                      setTempFilters({ ...tempFilters, sortBy: e.target.value as any })
-                    }
-                    className="w-full p-2 bg-surface border border-border rounded-lg text-content"
-                  >
-                    <option value="relevance">Relevance</option>
-                    <option value="newest">Newest First</option>
-                    <option value="oldest">Oldest First</option>
-                    <option value="odds">Highest Odds</option>
-                    <option value="volume">Most Volume</option>
-                    <option value="activity">Most Active</option>
-                  </select>
-                </div>
+                <p className="text-sm text-tertiary text-center py-8">
+                  No advanced filters available
+                </p>
               </div>
             )}
           </div>
@@ -394,20 +292,6 @@ function EnhancedPredictionFilters({
               <X className="w-4 h-4 text-tertiary hover:text-content" />
             </button>
           )}
-        </div>
-
-        {/* Quick Filter Pills */}
-        <div className="flex gap-1.5 flex-wrap">
-          {quickFilters.slice(0, 4).map((filter) => (
-            <button
-              key={filter.id}
-              onClick={() => onFiltersChange(filter.filter)}
-              className="px-3 py-1.5 bg-muted hover:bg-primary/20 text-content text-xs rounded-full whitespace-nowrap transition-colors flex items-center gap-1.5"
-            >
-              <span>{filter.icon}</span>
-              <span>{filter.label}</span>
-            </button>
-          ))}
         </div>
 
         {/* Category Dropdown */}
@@ -533,20 +417,6 @@ function EnhancedPredictionFilters({
             </div>
           )}
         </div>
-
-        {/* Quick Filters */}
-        <div className="flex gap-1.5 mt-2 overflow-x-auto pb-1">
-          {quickFilters.map((filter) => (
-            <button
-              key={filter.id}
-              onClick={() => onFiltersChange(filter.filter)}
-              className="px-2.5 py-1 bg-muted hover:bg-primary/20 text-content text-xs rounded-full whitespace-nowrap transition-colors flex items-center gap-1"
-            >
-              <span>{filter.icon}</span>
-              <span>{filter.label}</span>
-            </button>
-          ))}
-        </div>
       </div>
 
       {/* Expandable Advanced Filters */}
@@ -636,21 +506,6 @@ function EnhancedPredictionFilters({
                   <option value="resolved">Resolved</option>
                 </select>
               </div>
-
-              {/* Activity */}
-              <div>
-                <label className="text-xs font-medium text-tertiary mb-1 block">Activity</label>
-                <select
-                  value={filters.activity}
-                  onChange={(e) => onFiltersChange({ activity: e.target.value as any })}
-                  className="w-full p-1.5 bg-muted border border-border rounded-lg text-content text-xs"
-                >
-                  <option value="all">All</option>
-                  <option value="high">High</option>
-                  <option value="medium">Medium</option>
-                  <option value="low">Low</option>
-                </select>
-              </div>
             </div>
 
             {/* Clear Filters */}
@@ -703,13 +558,9 @@ function arePropsEqual(
   const filtersEqual =
     prev.filters.search === next.filters.search &&
     prev.filters.timeRemaining === next.filters.timeRemaining &&
-    prev.filters.activity === next.filters.activity &&
     prev.filters.status === next.filters.status &&
-    prev.filters.sortBy === next.filters.sortBy &&
     prev.filters.categories.length === next.filters.categories.length &&
-    prev.filters.categories.every((cat) => next.filters.categories.includes(cat)) &&
-    prev.filters.difficulties.length === next.filters.difficulties.length &&
-    prev.filters.difficulties.every((diff) => next.filters.difficulties.includes(diff));
+    prev.filters.categories.every((cat) => next.filters.categories.includes(cat));
 
   if (!filtersEqual) return false;
 

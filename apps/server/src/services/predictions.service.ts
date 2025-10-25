@@ -106,6 +106,9 @@ export class PredictionService {
       status?: 'open' | 'pending' | 'expired' | 'resolved' | 'all';
       limit?: number;
       offset?: number;
+      search?: string;
+      categoryId?: number;
+      timeRemaining?: '1h' | '1d' | '1w';
     },
     userId?: number,
   ): Promise<{
@@ -146,20 +149,25 @@ export class PredictionService {
       hasMore: boolean;
     };
   }> {
-    const { status = 'all', limit = 50, offset = 0 } = filters;
+    const { status = 'all', limit = 50, offset = 0, search, categoryId, timeRemaining } = filters;
 
     // Validate limit and offset
     const validatedLimit = Math.min(Math.max(1, limit), 100); // Between 1 and 100
     const validatedOffset = Math.max(0, offset); // Non-negative
 
     // Issue #3: Cache prediction lists with filter parameters
-    const cacheKey = CacheKeys.PREDICTIONS_ACTIVE(validatedLimit, validatedOffset, status);
+    // Include all filter params in cache key
+    const filterKey = `${status}_${search || ''}_${categoryId || ''}_${timeRemaining || ''}`;
+    const cacheKey = `${CacheKeys.PREDICTIONS_ACTIVE(validatedLimit, validatedOffset, status)}_${filterKey}`;
 
     const cachedData = await withCache(cacheKey, CACHE_TTL.PREDICTIONS_ACTIVE, async () => {
       const { predictions: raw, total } = await this.repo.listFilteredPredictions({
         status,
         limit: validatedLimit,
         offset: validatedOffset,
+        search,
+        categoryId,
+        timeRemaining,
       });
 
       const predictions = await Promise.all(raw.map((p) => this.enrichAvatars(p)));

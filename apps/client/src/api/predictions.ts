@@ -32,18 +32,26 @@ export interface PaginatedPredictionsResponse {
 
 /**
  * Fetch predictions with optional filtering and pagination
- * @param options - Optional filters (status, limit, offset)
+ * @param options - Optional filters (status, limit, offset, search, categoryId, timeRemaining, activity)
  * @returns Paginated predictions response
  */
 export async function getPredictions(options?: {
   status?: 'open' | 'pending' | 'expired' | 'resolved' | 'all';
   limit?: number;
   offset?: number;
+  search?: string;
+  categoryId?: number;
+  timeRemaining?: '1h' | '1d' | '1w';
+  activity?: 'high' | 'medium' | 'low';
 }): Promise<PaginatedPredictionsResponse> {
   const params = new URLSearchParams();
   if (options?.status) params.append('status', options.status);
   if (options?.limit !== undefined) params.append('limit', options.limit.toString());
   if (options?.offset !== undefined) params.append('offset', options.offset.toString());
+  if (options?.search) params.append('search', options.search);
+  if (options?.categoryId !== undefined) params.append('categoryId', options.categoryId.toString());
+  if (options?.timeRemaining) params.append('timeRemaining', options.timeRemaining);
+  if (options?.activity) params.append('activity', options.activity);
 
   const queryString = params.toString();
   const { data } = await api.get<PaginatedPredictionsResponse>(

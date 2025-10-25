@@ -51,6 +51,15 @@ export interface PredictionSourceData {
   publisher: string;
 }
 
+// ---- Filters type ----
+export interface PredictionFilters {
+  search: string;
+  categoryId?: number;
+  timeRemaining?: '1h' | '1d' | '1w';
+  activity?: 'high' | 'medium' | 'low';
+  status: 'all' | 'open' | 'pending' | 'expired' | 'resolved';
+}
+
 // ---- Context shape ----
 interface Ctx {
   predictions: PredictionView[];
@@ -76,6 +85,11 @@ interface Ctx {
   goToPage: (page: number) => Promise<void>;
   nextPage: () => Promise<void>;
   prevPage: () => Promise<void>;
+
+  /* Filters */
+  filters: PredictionFilters;
+  updateFilters: (newFilters: Partial<PredictionFilters>) => void;
+  clearFilters: () => void;
 
   /* Create Modal State */
   createModalOpen: boolean;
@@ -185,6 +199,15 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
   // Calculate total pages
   const totalPages = Math.ceil(total / limit);
 
+  // ── Filters State ─────────────────────────────────────────────────────────
+  const [filters, setFilters] = useState<PredictionFilters>({
+    search: '',
+    categoryId: undefined,
+    timeRemaining: undefined,
+    activity: undefined,
+    status: 'open',
+  });
+
   // ── Create Modal State ────────────────────────────────────────────────────
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [createModalSourceData, setCreateModalSourceData] = useState<PredictionSourceData | null>(
@@ -239,14 +262,19 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
         const offset = (fetchPage - 1) * limit;
 
         console.log(
-          `[PredictionContext] Fetching predictions: page=${fetchPage}, limit=${limit}, offset=${offset}`,
+          `[PredictionContext] Fetching predictions: page=${fetchPage}, limit=${limit}, offset=${offset}, filters=`,
+          filters,
         );
 
-        // Fetch only 'open' predictions by default with pagination
+        // Fetch predictions with all filters and pagination
         const response = await getPredictions({
-          status: 'open',
+          status: filters.status,
           limit,
           offset,
+          search: filters.search || undefined,
+          categoryId: filters.categoryId,
+          timeRemaining: filters.timeRemaining,
+          activity: filters.activity,
         });
 
         setBasePredictions(response.predictions || []);
@@ -262,7 +290,7 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
         fetchInProgressRef.current = false;
       }
     },
-    [page, limit],
+    [page, limit, filters],
   );
 
   // Initial fetch on mount ONLY (not when fetchAll changes)
@@ -642,6 +670,35 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
     }
   }, [page, goToPage]);
 
+  // ── Filter management functions ───────────────────────────────────────────
+  const updateFilters = useCallback((newFilters: Partial<PredictionFilters>) => {
+    setFilters((prev) => ({ ...prev, ...newFilters }));
+    // Reset to page 1 when filters change
+    setPage(1);
+  }, []);
+
+  const clearFilters = useCallback(() => {
+    setFilters({
+      search: '',
+      categoryId: undefined,
+      timeRemaining: undefined,
+      activity: undefined,
+      status: 'open',
+    });
+    // Reset to page 1
+    setPage(1);
+  }, []);
+
+  // Refetch when filters change
+  useEffect(() => {
+    // Don't fetch on initial mount (handled by initial fetch effect)
+    // Only fetch when filters change
+    if (filters) {
+      fetchAll({ targetPage: page });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters]);
+
   const value = useMemo<Ctx>(
     () => ({
       predictions,
@@ -663,6 +720,9 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
       goToPage,
       nextPage,
       prevPage,
+      filters,
+      updateFilters,
+      clearFilters,
       createModalOpen,
       createModalSourceData,
       openCreateModal,
@@ -686,6 +746,9 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
       goToPage,
       nextPage,
       prevPage,
+      filters,
+      updateFilters,
+      clearFilters,
       createModalOpen,
       createModalSourceData,
       openCreateModal,

@@ -19,8 +19,12 @@ const reactionService = new ReactionService();
  * List predictions with optional filtering and pagination
  * Query params:
  *   - status: 'open' | 'pending' | 'expired' | 'resolved' | 'all' (default: 'all')
- *   - limit: number (1-100, default: 50)
+ *   - limit: number (1-100, default: 15)
  *   - offset: number (>=0, default: 0)
+ *   - search: string (optional) - search in title/description
+ *   - categoryId: number (optional) - filter by category
+ *   - timeRemaining: '1h' | '1d' | '1w' (optional) - filter by time remaining
+ *   - activity: 'high' | 'medium' | 'low' (optional) - filter by activity level
  * Returns:
  *   - predictions[] (each including options, bets, parlayLegs)
  *   - pagination metadata (total, limit, offset, hasMore)
@@ -35,6 +39,10 @@ export const getAllPredictions = async (
     const status = (req.query.status as string) || 'all';
     const limit = req.query.limit ? parseInt(req.query.limit as string) : 15;
     const offset = req.query.offset ? parseInt(req.query.offset as string) : 0;
+    const search = req.query.search as string | undefined;
+    const categoryId = req.query.categoryId ? parseInt(req.query.categoryId as string) : undefined;
+    const timeRemaining = req.query.timeRemaining as '1h' | '1d' | '1w' | undefined;
+    const activity = req.query.activity as 'high' | 'medium' | 'low' | undefined;
 
     // Get userId for user-specific enrichment (reactions)
     const userId = (req as any).user?.id;
@@ -65,12 +73,40 @@ export const getAllPredictions = async (
       return;
     }
 
+    // Validate categoryId if provided
+    if (categoryId !== undefined && isNaN(categoryId)) {
+      res.status(400).json({
+        error: 'categoryId must be a valid number',
+      });
+      return;
+    }
+
+    // Validate timeRemaining if provided
+    if (timeRemaining && !['1h', '1d', '1w'].includes(timeRemaining)) {
+      res.status(400).json({
+        error: 'timeRemaining must be one of: 1h, 1d, 1w',
+      });
+      return;
+    }
+
+    // Validate activity if provided
+    if (activity && !['high', 'medium', 'low'].includes(activity)) {
+      res.status(400).json({
+        error: 'activity must be one of: high, medium, low',
+      });
+      return;
+    }
+
     // Fetch filtered and paginated predictions with enrichment
+    // Note: activity filter is handled client-side since it's a computed property
     const result = await predictionService.listPredictions(
       {
         status: status as 'open' | 'pending' | 'expired' | 'resolved' | 'all',
         limit,
         offset,
+        search,
+        categoryId,
+        timeRemaining,
       },
       userId, // Pass userId for user-specific enrichment
     );
