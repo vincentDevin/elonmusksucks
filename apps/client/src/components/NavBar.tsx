@@ -24,12 +24,16 @@ export default function NavBar() {
 
   const linkClasses = (path: string) =>
     `px-2.5 py-1.5 rounded text-sm ${
-      loc.pathname === path ? 'bg-primary text-white' : 'hover:bg-muted transition-colors'
+      loc.pathname === path
+        ? 'bg-primary text-primary-foreground'
+        : 'hover:bg-muted transition-colors'
     }`;
 
   const mobileLinkClasses = (path: string) =>
     `block px-4 py-3 rounded-lg ${
-      loc.pathname === path ? 'bg-primary text-white' : 'hover:bg-muted transition-colors'
+      loc.pathname === path
+        ? 'bg-primary text-primary-foreground'
+        : 'hover:bg-muted transition-colors'
     }`;
 
   return (

@@ -36,33 +36,33 @@ const variantStyles = {
     titleColor: 'text-primary',
     bgGradient: 'from-primary/5 to-primary/10',
     borderColor: 'border-primary/20',
-    tabActiveStyle: 'bg-primary text-white shadow-lg',
-    tabHoverStyle: 'bg-surface text-content hover:bg-accent hover:text-primary',
-    filterColor: 'bg-primary text-white',
-    primaryColor: 'bg-primary text-white hover:bg-primary/90',
-    secondaryColor: 'bg-secondary text-white hover:bg-secondary/90',
+    tabActiveStyle: 'bg-primary text-primary-foreground shadow-lg',
+    tabHoverStyle: 'bg-surface text-content hover:bg-primary/20 hover:text-primary transition-all',
+    filterColor: 'bg-primary text-primary-foreground',
+    primaryColor: 'bg-primary text-primary-foreground hover:bg-primary/90',
+    secondaryColor: 'bg-secondary text-secondary-foreground hover:bg-secondary/90',
   },
   pong: {
-    iconColor: 'text-blue-500',
-    titleColor: 'text-blue-500',
-    bgGradient: 'from-blue-500/5 to-blue-500/10',
-    borderColor: 'border-blue-500/20',
-    tabActiveStyle: 'bg-blue-500 text-white shadow-lg',
-    tabHoverStyle: 'bg-surface text-content hover:bg-blue-500/10 hover:text-blue-500',
-    filterColor: 'bg-blue-500 text-white',
-    primaryColor: 'bg-blue-500 text-white hover:bg-blue-500/90',
-    secondaryColor: 'bg-blue-600 text-white hover:bg-blue-600/90',
+    iconColor: 'text-info',
+    titleColor: 'text-info',
+    bgGradient: 'from-info/5 to-info/10',
+    borderColor: 'border-info/20',
+    tabActiveStyle: 'bg-info text-info-foreground shadow-lg',
+    tabHoverStyle: 'bg-surface text-content hover:bg-info/20 hover:text-info transition-all',
+    filterColor: 'bg-info text-info-foreground',
+    primaryColor: 'bg-info text-info-foreground hover:bg-info/90',
+    secondaryColor: 'bg-info text-info-foreground hover:opacity-90',
   },
   shame: {
-    iconColor: 'text-red-500',
-    titleColor: 'text-red-500',
-    bgGradient: 'from-red-500/5 to-red-500/10',
-    borderColor: 'border-red-500/20',
-    tabActiveStyle: 'bg-red-500 text-white shadow-lg',
-    tabHoverStyle: 'bg-surface text-content hover:bg-red-50 hover:text-red-600',
-    filterColor: 'bg-red-500 text-white',
-    primaryColor: 'bg-red-500 text-white hover:bg-red-500/90',
-    secondaryColor: 'bg-red-600 text-white hover:bg-red-600/90',
+    iconColor: 'text-error',
+    titleColor: 'text-error',
+    bgGradient: 'from-error/5 to-error/10',
+    borderColor: 'border-error/20',
+    tabActiveStyle: 'bg-error text-error-foreground shadow-lg',
+    tabHoverStyle: 'bg-surface text-content hover:bg-error/20 hover:text-error transition-all',
+    filterColor: 'bg-error text-error-foreground',
+    primaryColor: 'bg-error text-error-foreground hover:bg-error/90',
+    secondaryColor: 'bg-error text-error-foreground hover:opacity-90',
   },
 };
 
@@ -231,7 +231,7 @@ export function CompactLeaderboardHeader({
                   } else if (action.variant === 'secondary') {
                     buttonStyle = styles.secondaryColor;
                   } else if (action.variant === 'danger') {
-                    buttonStyle = 'bg-red-500 text-white hover:bg-red-500/90';
+                    buttonStyle = 'bg-error text-error-foreground hover:bg-error/90';
                   }
 
                   return (

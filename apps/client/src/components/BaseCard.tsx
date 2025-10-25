@@ -73,15 +73,15 @@ export default function BaseCard({
   const getStatusColors = (type: StatusType) => {
     switch (type) {
       case 'success':
-        return 'bg-success text-surface';
+        return 'bg-success text-success-foreground';
       case 'warning':
-        return 'bg-warning text-surface';
+        return 'bg-warning text-warning-foreground';
       case 'error':
-        return 'bg-error text-surface';
+        return 'bg-error text-error-foreground';
       case 'info':
-        return 'bg-info text-surface';
+        return 'bg-info text-info-foreground';
       case 'accent':
-        return 'bg-accent text-surface';
+        return 'bg-accent text-accent-foreground';
       default:
         return 'bg-muted text-content';
     }
@@ -131,7 +131,7 @@ export default function BaseCard({
             </span>
           )}
           {hotActivity && (
-            <span className="px-2 py-1 bg-secondary text-primary text-xs rounded-full font-semibold animate-pulse">
+            <span className="px-2 py-1 bg-secondary text-secondary-foreground text-xs rounded-full font-semibold animate-pulse">
               🔥 Hot
             </span>
           )}
@@ -161,7 +161,7 @@ export default function BaseCard({
               disabled={primaryAction.loading}
               className={`
                 ${isMini ? 'w-full' : 'flex-1'}
-                px-3 py-2 bg-info hover:bg-info/90 text-surface text-sm font-medium
+                px-3 py-2 bg-info hover:bg-info/90 text-background text-sm font-medium
                 rounded-lg transition-all duration-200 hover:scale-105
                 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100
                 ${isFullSize ? 'py-3 px-6 font-bold shadow-lg hover:shadow-xl' : ''}
@@ -184,7 +184,7 @@ export default function BaseCard({
               className={`
                 px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200
                 disabled:opacity-60 disabled:cursor-not-allowed
-                bg-secondary hover:bg-secondary/90 text-content hover:scale-105
+                bg-secondary hover:bg-secondary/90 text-background hover:scale-105
               `}
             >
               <span className="flex items-center justify-center gap-1">

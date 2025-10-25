@@ -19,6 +19,15 @@
   --color-error: #ef4444;
   --color-info: #3b82f6;
 
+  /* Foreground colors (text on colored backgrounds) - computed dynamically */
+  --color-primary-foreground: #ffffff;
+  --color-secondary-foreground: #ffffff;
+  --color-accent-foreground: #ffffff;
+  --color-success-foreground: #ffffff;
+  --color-warning-foreground: #000000;
+  --color-error-foreground: #ffffff;
+  --color-info-foreground: #ffffff;
+
   /* Component-specific variables derived from semantic colors */
   --navbar-bg: var(--color-surface);
   --navbar-text: var(--color-content);
@@ -29,11 +38,11 @@
   --card-text: var(--color-content);
 
   --button-primary-bg: var(--color-primary);
-  --button-primary-text: white;
+  --button-primary-text: var(--color-primary-foreground);
   --button-primary-border: var(--color-primary);
 
   --button-secondary-bg: var(--color-secondary);
-  --button-secondary-text: white;
+  --button-secondary-text: var(--color-secondary-foreground);
   --button-secondary-border: var(--color-secondary);
 
   --input-bg: var(--color-background);
