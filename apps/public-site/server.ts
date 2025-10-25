@@ -99,11 +99,40 @@ async function createServer(): Promise<express.Application> {
     app.use(morgan('dev'));
   }
 
-  // HTTPS redirect for production (exclude health check)
+  // Health check endpoint (early in chain)
+  app.get('/health', (_req, res) => {
+    res.status(200).json({ ok: true });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Static Assets (MUST be before CORS to avoid blocking)
+  // ──────────────────────────────────────────────────────────────────────────
+
+  if (env.NODE_ENV === 'production') {
+    // Production: Serve pre-built static assets with no CORS restrictions
+    const sirv = (await import('sirv')).default;
+
+    app.use(
+      '/assets',
+      sirv(path.resolve(__dirname, 'dist/client/assets'), {
+        maxAge: 31536000, // 1 year cache for hashed assets
+        immutable: true,
+        setHeaders: (res) => {
+          // Allow assets to be loaded from any origin
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.setHeader('Access-Control-Allow-Methods', 'GET');
+        },
+      }),
+    );
+
+    console.log(`[STATIC] Serving assets from: ${path.resolve(__dirname, 'dist/client/assets')}`);
+  }
+
+  // HTTPS redirect for production (exclude health check and assets)
   if (env.NODE_ENV === 'production') {
     app.use((req, res, next) => {
-      // Allow health check to work over HTTP (internal Fly proxy check)
-      if (req.path === '/health') {
+      // Allow health check and assets to work over HTTP
+      if (req.path === '/health' || req.path.startsWith('/assets')) {
         return next();
       }
       if (req.header('x-forwarded-proto') !== 'https') {
@@ -217,10 +246,22 @@ async function createServer(): Promise<express.Application> {
   // Track rate limit violations for auto-banning
   app.use(createRateLimitTrackerMiddleware(ipBanService));
 
-  // Health check endpoint (before Vite middleware)
-  app.get('/health', (_req, res) => {
-    res.status(200).json({ ok: true });
-  });
+  // ──────────────────────────────────────────────────────────────────────────
+  // Vite Dev Server (Development Only)
+  // ──────────────────────────────────────────────────────────────────────────
+
+  let vite: ViteDevServer | undefined;
+
+  if (env.NODE_ENV === 'development') {
+    // Development: Use Vite dev server
+    vite = await createViteServer({
+      server: {
+        middlewareMode: true,
+      },
+      appType: 'custom',
+    });
+    app.use(vite.middlewares);
+  }
 
   // API proxy rate limiter (stricter - 30 requests per minute)
   const apiProxyLimiter = rateLimit({
@@ -231,30 +272,6 @@ async function createServer(): Promise<express.Application> {
     legacyHeaders: false,
     skip: (_req) => env.NODE_ENV === 'development',
   });
-
-  // Vite setup - dev server in development, static files in production
-  let vite: ViteDevServer | undefined;
-
-  if (env.NODE_ENV === 'production') {
-    // Production: Serve pre-built static assets
-    const sirv = (await import('sirv')).default;
-    app.use(
-      '/assets',
-      sirv(path.resolve(__dirname, 'dist/client/assets'), {
-        maxAge: 31536000, // 1 year cache for hashed assets
-        immutable: true,
-      }),
-    );
-  } else {
-    // Development: Use Vite dev server
-    vite = await createViteServer({
-      server: {
-        middlewareMode: true,
-      },
-      appType: 'custom',
-    });
-    app.use(vite.middlewares);
-  }
 
   // ──────────────────────────────────────────────────────────────────────────
   // API Proxy Middleware (with security enhancements)

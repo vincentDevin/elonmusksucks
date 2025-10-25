@@ -1,7 +1,6 @@
 // apps/client/src/components/prediction/FloatingCreatePredictionWidget.tsx
 import React from 'react';
 import { usePredictionMarket } from '../../contexts/PredictionContext';
-import { useAuth } from '../../contexts/AuthContext';
 
 interface FloatingCreatePredictionWidgetProps {
   className?: string;
@@ -19,13 +18,7 @@ export const FloatingCreatePredictionWidget: React.FC<FloatingCreatePredictionWi
   position = 'bottom-right',
   hideOnMobile = true,
 }) => {
-  const { user } = useAuth();
   const { openCreateModal } = usePredictionMarket();
-
-  // Only show for admin users
-  if (!user || user.role !== 'ADMIN') {
-    return null;
-  }
 
   // Position classes: 70px from bottom (above QuickThemeSwitcher at bottom-2 = 8px)
   const getPositionClasses = () => {

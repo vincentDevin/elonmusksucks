@@ -569,13 +569,18 @@ class GameManager {
     this.droppedFrames.set(game.id, 0);
 
     const interval = setInterval(() => {
-      if (game.status !== 'active') {
+      // ✅ Keep loop running during waiting states to broadcast paddle movements
+      // Only stop when game ends
+      if (game.status === 'ended') {
         clearInterval(interval);
         this.cleanupGameTracking(game.id);
         return;
       }
 
-      this.updateGame(game);
+      // Only update physics/ball during active gameplay
+      if (game.status === 'active') {
+        this.updateGame(game);
+      }
 
       // Adaptive frequency governor: 120Hz during active gameplay, 60Hz otherwise
       const now = Date.now();
@@ -957,6 +962,8 @@ class GameManager {
   }
 
   private async endGame(game: GameState, reason: string, winnerSlot?: 0 | 1): Promise<void> {
+    // Capture status BEFORE changing it (needed for match recording logic)
+    const previousStatus = game.status;
     game.status = 'ended';
 
     // Clear game loop and cleanup tracking
@@ -1022,32 +1029,62 @@ class GameManager {
     }
 
     // Record result in database - simplified data structure
-    const result: MatchResult = {
-      matchId: game.id,
-      winnerId: winnerUserId,
-      winnerName: winnerName || 'Unknown',
-      winnerScore,
-      loserId: loserUserId,
-      loserName: loserName || null,
-      loserScore,
-      duration,
-      wagerAmount: game.wager,
-      payoutAmount,
-      isAI: game.isAI,
-      reason: reason as any,
-    };
+    // IMPORTANT: Determine if match should be recorded
+    //
+    // RECORD matches where:
+    // 1. Game completed normally (reached winning score)
+    // 2. Game reached a state where both players were present (ragequit/forfeit after joining)
+    // 3. AI matches (always record)
+    //
+    // SKIP matches where:
+    // 1. Game never started (wager_failed, early disconnect in lobby before 2nd player joined)
+    // 2. No clear winner/loser (both players didn't exist)
 
-    await this.db.recordMatchResult(result);
+    const hasValidPlayers = winnerUserId !== null && loserUserId !== null;
+    const gameCompleted = reason === 'completed';
+
+    // Game "started" if both players were present and ready
+    // This includes: waiting_for_ready, countdown, active, paused
+    // Excludes: waiting_for_opponent (only 1 player)
+    const gameHadBothPlayers =
+      previousStatus === 'waiting_for_ready' ||
+      previousStatus === 'countdown' ||
+      previousStatus === 'active' ||
+      previousStatus === 'paused';
+
+    const shouldRecordMatch = game.isAI || gameCompleted || (gameHadBothPlayers && hasValidPlayers);
+
+    if (shouldRecordMatch && hasValidPlayers) {
+      const result: MatchResult = {
+        matchId: game.id,
+        winnerId: winnerUserId,
+        winnerName: winnerName || 'Unknown',
+        winnerScore,
+        loserId: loserUserId,
+        loserName: loserName || null,
+        loserScore,
+        duration,
+        wagerAmount: game.wager,
+        payoutAmount,
+        isAI: game.isAI,
+        reason: reason as any,
+      };
+
+      await this.db.recordMatchResult(result);
+    } else {
+      console.log(
+        `[endGame] Skipping match recording for ${game.id} - reason: ${reason}, winnerId: ${winnerUserId}, loserId: ${loserUserId}, status: ${game.status}, gameHadBothPlayers: ${gameHadBothPlayers}, hasValidPlayers: ${hasValidPlayers}`,
+      );
+    }
 
     // Send individual match_end events to each player with correct payout info
     if (game.players[0]) {
       const player1SocketId = this.auth.getSocketId(game.players[0].id);
       if (player1SocketId) {
-        const player1Payout =
-          winnerSlot === 0 ? result.payoutAmount : game.wager > 0 ? -game.wager : 0;
+        const player1Payout = winnerSlot === 0 ? payoutAmount : game.wager > 0 ? -game.wager : 0;
         this.io.to(player1SocketId).emit('match_end', {
           winner: winnerSlot !== undefined ? winnerSlot : null,
-          scores: [result.winnerScore, result.loserScore],
+          scores: [winnerScore, loserScore],
           reason,
           duration,
           payout: player1Payout,
@@ -1058,11 +1095,10 @@ class GameManager {
     if (game.players[1]) {
       const player2SocketId = this.auth.getSocketId(game.players[1].id);
       if (player2SocketId) {
-        const player2Payout =
-          winnerSlot === 1 ? result.payoutAmount : game.wager > 0 ? -game.wager : 0;
+        const player2Payout = winnerSlot === 1 ? payoutAmount : game.wager > 0 ? -game.wager : 0;
         this.io.to(player2SocketId).emit('match_end', {
           winner: winnerSlot !== undefined ? winnerSlot : null,
-          scores: [result.winnerScore, result.loserScore],
+          scores: [winnerScore, loserScore],
           reason,
           duration,
           payout: player2Payout,
@@ -1077,7 +1113,7 @@ class GameManager {
       spectatorSocketIds.forEach((socketId) => {
         this.io.to(socketId).emit('match_end', {
           winner: winnerSlot !== undefined ? winnerSlot : null,
-          scores: [result.winnerScore, result.loserScore],
+          scores: [winnerScore, loserScore],
           reason,
           duration,
           payout: 0, // Spectators don't get payout info

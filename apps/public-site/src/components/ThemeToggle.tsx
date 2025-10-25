@@ -30,18 +30,31 @@ export default function ThemeToggle() {
 
   // Listen for system theme changes (only if user hasn't manually set preference)
   useEffect(() => {
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    // Check if matchMedia is supported (webkit/mobile compatibility)
+    if (typeof window === 'undefined' || !window.matchMedia) {
+      return;
+    }
 
-    const handleChange = (e: MediaQueryListEvent) => {
-      // Only auto-switch if user hasn't explicitly set a preference
-      const hasExplicitPreference = localStorage.getItem('theme');
-      if (!hasExplicitPreference) {
-        setTheme(e.matches ? 'dark' : 'light');
+    try {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+
+      const handleChange = (e: MediaQueryListEvent) => {
+        // Only auto-switch if user hasn't explicitly set a preference
+        const hasExplicitPreference = localStorage.getItem('theme');
+        if (!hasExplicitPreference) {
+          setTheme(e.matches ? 'dark' : 'light');
+        }
+      };
+
+      // Some older webkit browsers might not support addEventListener
+      if (mediaQuery.addEventListener) {
+        mediaQuery.addEventListener('change', handleChange);
+        return () => mediaQuery.removeEventListener('change', handleChange);
       }
-    };
-
-    mediaQuery.addEventListener('change', handleChange);
-    return () => mediaQuery.removeEventListener('change', handleChange);
+    } catch (error) {
+      // Silently fail on browsers that don't support matchMedia properly
+      console.warn('matchMedia not fully supported:', error);
+    }
   }, []);
 
   const toggleTheme = () => {

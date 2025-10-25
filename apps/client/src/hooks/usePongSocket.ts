@@ -362,9 +362,15 @@ export function usePongSocket(): PongSocketHook {
         };
       });
 
-      // Update ping (separate state, can't avoid this)
-      const ping = Date.now() - data.timestamp;
-      setLastPing(ping);
+      // Note: Ping is now calculated via RTT ping_request/ping_response
+      // See ping measurement setup below
+    });
+
+    // ✅ RTT-based ping measurement (no clock skew issues)
+    newSocket.on('ping_response', (data: { clientTimestamp: number; serverTimestamp: number }) => {
+      const rtt = Date.now() - data.clientTimestamp;
+      const oneWayPing = Math.floor(rtt / 2); // Half of round-trip time
+      setLastPing(Math.max(0, oneWayPing));
     });
 
     newSocket.on('score_update', (data: ServerEvents['score_update']) => {
@@ -492,8 +498,15 @@ export function usePongSocket(): PongSocketHook {
       lastInputRef.current = { up: input.up, down: input.down };
 
       // Update local paddle position immediately for responsive feel
+      // ✅ Allow paddle movement in lobby/waiting states for better UX
       let newPaddleY = 0;
-      if (currentGame.status === 'active') {
+      const allowPaddleMovement =
+        currentGame.status === 'active' ||
+        currentGame.status === 'waiting_for_ready' ||
+        currentGame.status === 'waiting_for_opponent' ||
+        currentGame.status === 'countdown';
+
+      if (allowPaddleMovement) {
         const userPlayerSlot = currentGame.playerSlot;
         const userPlayer = currentGame.players[userPlayerSlot];
 
@@ -593,6 +606,17 @@ export function usePongSocket(): PongSocketHook {
       // as other components might still be using it
     };
   }, [user]);
+
+  // ✅ Periodic RTT ping measurement (every 2 seconds during active game)
+  useEffect(() => {
+    if (!socket || !isConnected || !currentGame) return;
+
+    const pingInterval = setInterval(() => {
+      socket.emit('ping_request', { clientTimestamp: Date.now() });
+    }, 2000); // Every 2 seconds
+
+    return () => clearInterval(pingInterval);
+  }, [socket, isConnected, currentGame]);
 
   return {
     socket,

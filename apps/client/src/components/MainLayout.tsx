@@ -46,7 +46,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
       <QuickThemeSwitcher position="bottom-right" hideOnMobile={false} />
 
       {/* Create Prediction Widget - Above Theme Switcher */}
-      <FloatingCreatePredictionWidget position="bottom-right" hideOnMobile={true} />
+      <FloatingCreatePredictionWidget position="bottom-right" hideOnMobile={false} />
 
       {/* Global Create Prediction Modal - Controlled by PredictionContext */}
       <CreatePredictionModal />

@@ -2,34 +2,6 @@ import { hydrateRoot } from 'react-dom/client';
 import App from './App';
 import './index.css';
 
-// Wait for styles to be ready (works for both dev and production)
-async function waitForStyles(): Promise<void> {
-  // In development, Vite injects styles as <style> tags
-  // In production, styles are in <link> tags
-  // We'll wait for either to be present, with a timeout
-
-  const maxWaitTime = 2000; // 2 second timeout
-  const startTime = Date.now();
-
-  while (Date.now() - startTime < maxWaitTime) {
-    // Check for style tags (dev mode) or link tags (production)
-    const hasStyles =
-      document.querySelector('style') || document.querySelector('link[rel="stylesheet"]');
-
-    if (hasStyles) {
-      // Wait a bit more to ensure styles are applied
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      return;
-    }
-
-    // Wait a bit before checking again
-    await new Promise((resolve) => setTimeout(resolve, 50));
-  }
-
-  // Timeout reached, proceed anyway
-  console.warn('Stylesheet loading timeout - proceeding with hydration');
-}
-
 // Initialize the app with loading animation
 async function initializeApp() {
   const root = document.getElementById('root');
@@ -40,11 +12,26 @@ async function initializeApp() {
     return;
   }
 
-  try {
-    // Wait for styles to be ready
-    await waitForStyles();
+  // Maximum timeout to force show content (prevents infinite loading on webkit/mobile)
+  const forceShowTimeout = setTimeout(() => {
+    console.warn('[INIT] Force showing content after timeout');
+    loadingOverlay.classList.add('fade-out');
+    root.classList.add('ready');
+    setTimeout(() => loadingOverlay.remove(), 500);
+  }, 5000); // 5 second absolute maximum
 
-    // Start fade transitions
+  try {
+    // Simple delay to ensure DOM is ready (especially on webkit browsers)
+    // We have inline critical CSS, so we don't need to wait for external stylesheets
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    // Hydrate the app first
+    hydrateRoot(root, <App />);
+
+    // Clear the force-show timeout since hydration succeeded
+    clearTimeout(forceShowTimeout);
+
+    // Start fade transitions after hydration
     loadingOverlay.classList.add('fade-out');
     root.classList.add('ready');
 
@@ -54,9 +41,6 @@ async function initializeApp() {
     // Remove loading overlay from DOM
     loadingOverlay.remove();
 
-    // Hydrate the app
-    hydrateRoot(root, <App />);
-
     // Enable transitions after hydration completes (prevents flash)
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
@@ -65,12 +49,28 @@ async function initializeApp() {
     });
   } catch (error) {
     console.error('Error initializing app:', error);
-    // Fallback: hydrate anyway to show content
-    hydrateRoot(root, <App />);
+
+    // Clear timeout and force show content on error
+    clearTimeout(forceShowTimeout);
+
+    // Fallback: try to hydrate and show content anyway
+    try {
+      hydrateRoot(root, <App />);
+    } catch (hydrationError) {
+      console.error('Hydration failed:', hydrationError);
+    }
+
+    // Always show content, even if hydration failed
     loadingOverlay.classList.add('fade-out');
     root.classList.add('ready');
+    setTimeout(() => loadingOverlay.remove(), 500);
   }
 }
 
-// Start initialization
-initializeApp();
+// Wait for DOM to be ready before initializing
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeApp);
+} else {
+  // DOM is already ready
+  initializeApp();
+}
