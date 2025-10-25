@@ -112,6 +112,7 @@ async function createServer(): Promise<express.Application> {
     // Production: Serve pre-built static assets with no CORS restrictions
     const sirv = (await import('sirv')).default;
 
+    // Serve hashed JS/CSS assets with long-term cache
     app.use(
       '/assets',
       sirv(path.resolve(__dirname, 'dist/client/assets'), {
@@ -125,14 +126,47 @@ async function createServer(): Promise<express.Application> {
       }),
     );
 
+    // Serve specific SEO files (favicon, robots.txt, sitemap.xml, manifest.json)
+    // Using express.static with specific routes to avoid interfering with SSR
+    const staticOptions = {
+      maxAge: '1d', // 24 hours cache
+      immutable: false,
+    };
+
+    const distClientPath = path.resolve(__dirname, 'dist/client');
+
+    // Favicon files
+    app.get('/favicon.ico', express.static(distClientPath, staticOptions));
+    app.get('/favicon-16x16.png', express.static(distClientPath, staticOptions));
+    app.get('/favicon-32x32.png', express.static(distClientPath, staticOptions));
+    app.get('/favicon-96x96.png', express.static(distClientPath, staticOptions));
+    app.get('/favicon-192x192.png', express.static(distClientPath, staticOptions));
+    app.get('/favicon-512x512.png', express.static(distClientPath, staticOptions));
+    app.get('/favicon.svg', express.static(distClientPath, staticOptions));
+    app.get('/apple-touch-icon.png', express.static(distClientPath, staticOptions));
+
+    // SEO files
+    app.get('/robots.txt', express.static(distClientPath, staticOptions));
+    app.get('/sitemap.xml', express.static(distClientPath, staticOptions));
+    app.get('/manifest.json', express.static(distClientPath, staticOptions));
+
     console.log(`[STATIC] Serving assets from: ${path.resolve(__dirname, 'dist/client/assets')}`);
+    console.log(`[STATIC] Serving SEO files (favicon, robots, sitemap, manifest)`);
   }
 
-  // HTTPS redirect for production (exclude health check and assets)
+  // HTTPS redirect for production (exclude health check, assets, and SEO files)
   if (env.NODE_ENV === 'production') {
     app.use((req, res, next) => {
-      // Allow health check and assets to work over HTTP
-      if (req.path === '/health' || req.path.startsWith('/assets')) {
+      // Allow health check, assets, and static SEO files to work over HTTP
+      if (
+        req.path === '/health' ||
+        req.path.startsWith('/assets') ||
+        req.path.endsWith('.ico') ||
+        req.path.endsWith('.png') ||
+        req.path.endsWith('.xml') ||
+        req.path.endsWith('.txt') ||
+        req.path.endsWith('.json')
+      ) {
         return next();
       }
       if (req.header('x-forwarded-proto') !== 'https') {

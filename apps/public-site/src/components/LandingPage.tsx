@@ -32,6 +32,13 @@ export default function LandingPage({
   postsData,
   clientAppUrl,
 }: LandingPageProps) {
+  // Track if we're on the client (after hydration) for proper timestamp formatting
+  const [isClient, setIsClient] = React.useState(false);
+
+  React.useEffect(() => {
+    setIsClient(true);
+  }, []);
+
   const [leaderboardTab, setLeaderboardTab] = React.useState<'market' | 'pong'>('market');
 
   // Content tab state
@@ -298,7 +305,10 @@ export default function LandingPage({
                     <span className="text-success">({formatMuskBucks(activity.amount)}MB)</span>
                   )}
                   <span className="text-content/80 text-[8px] md:text-[10px] lg:text-xs">
-                    • {getRelativeTime(activity.timestamp)}
+                    •{' '}
+                    {isClient
+                      ? getRelativeTime(activity.timestamp)
+                      : new Date(activity.timestamp).toISOString().split('T')[0]}
                   </span>
                 </div>
               ))}
@@ -315,7 +325,10 @@ export default function LandingPage({
                     <span className="text-success">({formatMuskBucks(activity.amount)}MB)</span>
                   )}
                   <span className="text-content/80 text-[8px] md:text-[10px] lg:text-xs">
-                    • {getRelativeTime(activity.timestamp)}
+                    •{' '}
+                    {isClient
+                      ? getRelativeTime(activity.timestamp)
+                      : new Date(activity.timestamp).toISOString().split('T')[0]}
                   </span>
                 </div>
               ))}
@@ -506,10 +519,14 @@ export default function LandingPage({
                             >
                               <span>{status.icon}</span>
                               {now > expires
-                                ? `Expired ${new Date(prediction.expiresAt).toLocaleString()}`
+                                ? isClient
+                                  ? `Expired ${new Date(prediction.expiresAt).toLocaleString()}`
+                                  : `Expired ${new Date(prediction.expiresAt).toISOString().split('T')[0]}`
                                 : hoursLeft <= 24
                                   ? `${hoursLeft}h remaining`
-                                  : `Expires ${new Date(prediction.expiresAt).toLocaleString()}`}
+                                  : isClient
+                                    ? `Expires ${new Date(prediction.expiresAt).toLocaleString()}`
+                                    : `Expires ${new Date(prediction.expiresAt).toISOString().split('T')[0]}`}
                             </div>
                           )}
 
@@ -645,7 +662,11 @@ export default function LandingPage({
                       {/* Metadata */}
                       <div className="text-sm sm:text-base text-tertiary mb-3">
                         {article.content.author || article.content.source} •{' '}
-                        {getRelativeTime(article.timestamp || article.createdAt)}
+                        {isClient
+                          ? getRelativeTime(article.timestamp || article.createdAt)
+                          : new Date(article.timestamp || article.createdAt)
+                              .toISOString()
+                              .split('T')[0]}
                         {article.content.source &&
                           article.content.author &&
                           ` • ${article.content.source}`}
@@ -762,7 +783,11 @@ export default function LandingPage({
                                 </span>
                               </div>
                               <div className="flex items-center space-x-2 text-sm sm:text-base text-tertiary">
-                                <span>{getRelativeTime(post.createdAt)}</span>
+                                <span>
+                                  {isClient
+                                    ? getRelativeTime(post.createdAt)
+                                    : new Date(post.createdAt).toISOString().split('T')[0]}
+                                </span>
                               </div>
                             </div>
                           </div>

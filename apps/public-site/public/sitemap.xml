@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+
+  <!-- Landing Page - Main entry point -->
+  <url>
+    <loc>https://elonmusksucks.net/</loc>
+    <lastmod>2025-01-26</lastmod>
+    <changefreq>hourly</changefreq>
+    <priority>1.0</priority>
+  </url>
+
+  <!-- Client App - Login -->
+  <url>
+    <loc>https://app.elonmusksucks.net/login</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <!-- Client App - Register -->
+  <url>
+    <loc>https://app.elonmusksucks.net/register</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <!-- Client App - Predictions -->
+  <url>
+    <loc>https://app.elonmusksucks.net/predictions</loc>
+    <changefreq>hourly</changefreq>
+    <priority>0.9</priority>
+  </url>
+
+  <!-- Client App - Leaderboard -->
+  <url>
+    <loc>https://app.elonmusksucks.net/leaderboard</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <!-- Client App - Pong -->
+  <url>
+    <loc>https://app.elonmusksucks.net/pong</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- Client App - Timeline -->
+  <url>
+    <loc>https://app.elonmusksucks.net/timeline</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+</urlset>
