@@ -33,7 +33,7 @@ export const getAllPredictions = async (
   try {
     // Parse query parameters
     const status = (req.query.status as string) || 'all';
-    const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
+    const limit = req.query.limit ? parseInt(req.query.limit as string) : 15;
     const offset = req.query.offset ? parseInt(req.query.offset as string) : 0;
 
     // Get userId for user-specific enrichment (reactions)

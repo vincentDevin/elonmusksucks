@@ -65,6 +65,18 @@ interface Ctx {
   latestBet: BetWithUser | null;
   latestParlay: ParlayLegWithUser | null;
 
+  /* Pagination */
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    hasMore: boolean;
+    totalPages: number;
+  };
+  goToPage: (page: number) => Promise<void>;
+  nextPage: () => Promise<void>;
+  prevPage: () => Promise<void>;
+
   /* Create Modal State */
   createModalOpen: boolean;
   createModalSourceData: PredictionSourceData | null;
@@ -164,6 +176,15 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
   const [latestBet] = useState<BetWithUser | null>(null);
   const [latestParlay, setLatestParlay] = useState<ParlayLegWithUser | null>(null);
 
+  // ── Pagination State ──────────────────────────────────────────────────────
+  const [page, setPage] = useState(1);
+  const [limit] = useState(15);
+  const [total, setTotal] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+
+  // Calculate total pages
+  const totalPages = Math.ceil(total / limit);
+
   // ── Create Modal State ────────────────────────────────────────────────────
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [createModalSourceData, setCreateModalSourceData] = useState<PredictionSourceData | null>(
@@ -185,56 +206,72 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // ── Initial fetch ─────────────────────────────────────────────────────────
-  const fetchAll = useCallback(async (options?: { debounce?: boolean }) => {
-    // Debounce if requested (for rapid socket events)
-    if (options?.debounce) {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
+  const fetchAll = useCallback(
+    async (options?: { debounce?: boolean; targetPage?: number }) => {
+      // Debounce if requested (for rapid socket events)
+      if (options?.debounce) {
+        if (debounceTimerRef.current) {
+          clearTimeout(debounceTimerRef.current);
+        }
+        return new Promise<void>((resolve) => {
+          debounceTimerRef.current = setTimeout(async () => {
+            await fetchAll({ debounce: false, targetPage: options.targetPage });
+            resolve();
+          }, 300);
+        });
       }
-      return new Promise<void>((resolve) => {
-        debounceTimerRef.current = setTimeout(async () => {
-          await fetchAll({ debounce: false });
-          resolve();
-        }, 300);
-      });
-    }
 
-    // Prevent duplicate fetches
-    if (fetchInProgressRef.current) {
-      return;
-    }
+      // Prevent duplicate fetches
+      if (fetchInProgressRef.current) {
+        console.log('[PredictionContext] Fetch already in progress, skipping duplicate call');
+        return;
+      }
 
-    // Mark fetch as in progress
-    fetchInProgressRef.current = true;
+      // Mark fetch as in progress
+      fetchInProgressRef.current = true;
 
-    setLoading(true);
-    setError(null);
-
-    try {
-      // Fetch only 'open' predictions by default with reasonable limit
-      // This dramatically reduces data transfer compared to fetching all predictions
-      const response = await getPredictions({
-        status: 'open',
-        limit: 50,
-        offset: 0,
-      });
-
-      setBasePredictions(response.predictions || []);
+      setLoading(true);
       setError(null);
-    } catch (err: any) {
-      console.error('[PredictionContext] Failed to fetch predictions:', err);
-      setError(err);
-      // Keep existing predictions on error
-    } finally {
-      setLoading(false);
-      fetchInProgressRef.current = false;
-    }
-  }, []);
 
-  // Initial fetch on mount
+      try {
+        // Use targetPage if provided, otherwise use current page state
+        const fetchPage = options?.targetPage ?? page;
+        const offset = (fetchPage - 1) * limit;
+
+        console.log(
+          `[PredictionContext] Fetching predictions: page=${fetchPage}, limit=${limit}, offset=${offset}`,
+        );
+
+        // Fetch only 'open' predictions by default with pagination
+        const response = await getPredictions({
+          status: 'open',
+          limit,
+          offset,
+        });
+
+        setBasePredictions(response.predictions || []);
+        setTotal(response.pagination.total);
+        setHasMore(response.pagination.hasMore);
+        setError(null);
+      } catch (err: any) {
+        console.error('[PredictionContext] Failed to fetch predictions:', err);
+        setError(err);
+        // Keep existing predictions on error
+      } finally {
+        setLoading(false);
+        fetchInProgressRef.current = false;
+      }
+    },
+    [page, limit],
+  );
+
+  // Initial fetch on mount ONLY (not when fetchAll changes)
+  // We explicitly call fetchAll in navigation functions (goToPage, etc.)
+  // so we don't want this effect to re-run when fetchAll callback changes
   useEffect(() => {
     fetchAll();
-  }, [fetchAll]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty deps = only run on mount
 
   // Cleanup on unmount: clear timers
   useEffect(() => {
@@ -580,6 +617,31 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
     [refreshUser, optimisticUpdatePredictions, basePredictions, refreshPrediction],
   );
 
+  // ── Pagination navigation functions ──────────────────────────────────────
+  const goToPage = useCallback(
+    async (targetPage: number) => {
+      if (targetPage < 1 || targetPage > totalPages) {
+        console.warn('[PredictionContext] Invalid page number:', targetPage);
+        return;
+      }
+      setPage(targetPage);
+      await fetchAll({ targetPage });
+    },
+    [totalPages, fetchAll],
+  );
+
+  const nextPage = useCallback(async () => {
+    if (hasMore && page < totalPages) {
+      await goToPage(page + 1);
+    }
+  }, [hasMore, page, totalPages, goToPage]);
+
+  const prevPage = useCallback(async () => {
+    if (page > 1) {
+      await goToPage(page - 1);
+    }
+  }, [page, goToPage]);
+
   const value = useMemo<Ctx>(
     () => ({
       predictions,
@@ -591,6 +653,16 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
       placeParlay,
       latestBet,
       latestParlay,
+      pagination: {
+        page,
+        limit,
+        total,
+        hasMore,
+        totalPages,
+      },
+      goToPage,
+      nextPage,
+      prevPage,
       createModalOpen,
       createModalSourceData,
       openCreateModal,
@@ -606,6 +678,14 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
       placeParlay,
       latestBet,
       latestParlay,
+      page,
+      limit,
+      total,
+      hasMore,
+      totalPages,
+      goToPage,
+      nextPage,
+      prevPage,
       createModalOpen,
       createModalSourceData,
       openCreateModal,

@@ -9,6 +9,7 @@ import EnhancedPredictionFilters from '../components/prediction/EnhancedPredicti
 import PredictionPreview from '../components/prediction/PredictionPreview';
 import PredictionDetailView from '../components/prediction/PredictionDetailView';
 import { FloatingParlayIndicator } from '../components/prediction/ParlaySelectionIndicator';
+import PaginationControls from '../components/prediction/PaginationControls';
 
 // Existing components
 import PredictionCard from '../components/prediction/PredictionCard';
@@ -38,7 +39,7 @@ export default function Predictions() {
   const { id: predictionId } = useParams<{ id: string }>();
   const { state: parlayState, dispatch: parlayDispatch } = useParlay();
   const { subscribe } = useEventBusCore();
-  const { openCreateModal } = usePredictionMarket();
+  const { openCreateModal, pagination, goToPage, nextPage, prevPage } = usePredictionMarket();
 
   // AI-powered discovery system
   const {
@@ -70,6 +71,11 @@ export default function Predictions() {
     window.addEventListener('resize', checkIsMobile);
     return () => window.removeEventListener('resize', checkIsMobile);
   }, []);
+
+  // Scroll to top when page changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [pagination.page]);
 
   // Real-time event handlers
   const handleNewPrediction = useCallback((data: PredictionCreatedPayload) => {
@@ -493,7 +499,22 @@ export default function Predictions() {
       </div>
 
       {/* Main Content */}
-      <div className="px-6 py-6 max-w-[1800px] mx-auto">{renderPredictions()}</div>
+      <div className="px-6 py-6 max-w-[1800px] mx-auto">
+        {renderPredictions()}
+
+        {/* Pagination Controls - Only show for list and grid views */}
+        {!loading && !error && enhancedPredictions.length > 0 && viewMode !== 'sections' && (
+          <PaginationControls
+            currentPage={pagination.page}
+            totalPages={pagination.totalPages}
+            hasMore={pagination.hasMore}
+            loading={loading}
+            onPageChange={goToPage}
+            onNext={nextPage}
+            onPrev={prevPage}
+          />
+        )}
+      </div>
 
       {/* Prediction Preview (hover) */}
       {previewPrediction && previewTriggerRef && (
