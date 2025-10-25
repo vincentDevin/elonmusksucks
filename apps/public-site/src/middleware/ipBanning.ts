@@ -10,12 +10,12 @@ import Redis from 'ioredis';
  */
 const BAN_CONFIG = {
   // 404 spam detection
-  NOT_FOUND_THRESHOLD: 10, // Number of different 404s
+  NOT_FOUND_THRESHOLD: 15, // Number of different 404s (increased from 10)
   NOT_FOUND_WINDOW: 5 * 60, // 5 minutes (in seconds)
   NOT_FOUND_BAN_DURATION: 60 * 60, // 1 hour ban (in seconds)
 
   // Rate limit violations
-  RATE_LIMIT_THRESHOLD: 3, // Number of rate limit hits
+  RATE_LIMIT_THRESHOLD: 5, // Number of rate limit hits (increased from 3)
   RATE_LIMIT_WINDOW: 10 * 60, // 10 minutes
   RATE_LIMIT_BAN_DURATION: 30 * 60, // 30 minute ban
 
@@ -31,12 +31,13 @@ const BAN_CONFIG = {
     // Path traversal
     /\.\.\//,
     /\.\.%2f/i,
-    // Common exploit paths
+    // Common exploit paths (WordPress, phpMyAdmin, etc.)
     /\/wp-admin/i,
     /\/wp-content/i,
     /\/wp-includes/i,
     /\/phpmyadmin/i,
-    /\/admin/i,
+    /\/wp-login\.php/i,
+    /\/xmlrpc\.php/i,
     /\.php$/i,
     /\.asp$/i,
     /\.aspx$/i,
@@ -73,13 +74,16 @@ const REDIS_KEYS = {
  */
 export class IPBanningService {
   private redis: Redis;
+  private whitelist: Set<string>;
 
-  constructor(redisUrl: string) {
+  constructor(redisUrl: string, whitelistedIPs: string[] = []) {
     this.redis = new Redis(redisUrl, {
       maxRetriesPerRequest: 3,
       enableReadyCheck: true,
       lazyConnect: false,
     });
+
+    this.whitelist = new Set(whitelistedIPs);
 
     this.redis.on('error', (err) => {
       console.error('[IP_BAN] Redis connection error:', err);
@@ -87,13 +91,28 @@ export class IPBanningService {
 
     this.redis.on('connect', () => {
       console.log('[IP_BAN] Redis connected for IP banning service');
+      if (this.whitelist.size > 0) {
+        console.log(`[IP_BAN] IP whitelist enabled: ${this.whitelist.size} IPs whitelisted`);
+      }
     });
+  }
+
+  /**
+   * Check if IP is whitelisted (never ban these IPs)
+   */
+  isWhitelisted(ip: string): boolean {
+    return this.whitelist.has(ip);
   }
 
   /**
    * Check if IP is banned
    */
   async isBanned(ip: string): Promise<{ banned: boolean; reason?: string; expiresIn?: number }> {
+    // Whitelisted IPs are never banned
+    if (this.isWhitelisted(ip)) {
+      return { banned: false };
+    }
+
     try {
       const banKey = REDIS_KEYS.BAN(ip);
       const banData = await this.redis.get(banKey);
@@ -148,6 +167,11 @@ export class IPBanningService {
     type: ViolationType,
     metadata?: { path?: string },
   ): Promise<{ shouldBan: boolean; reason?: string; duration?: number }> {
+    // Never track violations or ban whitelisted IPs
+    if (this.isWhitelisted(ip)) {
+      return { shouldBan: false };
+    }
+
     try {
       const violationKey = REDIS_KEYS.VIOLATIONS(ip, type);
 

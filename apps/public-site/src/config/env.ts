@@ -20,6 +20,7 @@ interface EnvironmentConfig {
 
   // Optional Configuration
   ALLOWED_ORIGINS?: string;
+  IP_WHITELIST?: string; // Comma-separated list of IPs to never ban
 }
 
 /**
@@ -88,6 +89,7 @@ function validateEnvironment(): EnvironmentConfig {
 
     // Optional Configuration
     ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS,
+    IP_WHITELIST: process.env.IP_WHITELIST,
   };
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -154,6 +156,10 @@ function validateEnvironment(): EnvironmentConfig {
   console.log(`   🗄️  Redis URL: ${config.REDIS_URL}`);
   if (config.ALLOWED_ORIGINS) {
     console.log(`   🔐 Allowed Origins: ${config.ALLOWED_ORIGINS}`);
+  }
+  if (config.IP_WHITELIST) {
+    const ipCount = config.IP_WHITELIST.split(',').filter((ip) => ip.trim()).length;
+    console.log(`   🛡️  IP Whitelist: ${ipCount} IP(s) whitelisted`);
   }
   console.log('');
 

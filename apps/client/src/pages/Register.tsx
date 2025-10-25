@@ -162,19 +162,25 @@ export default function Register() {
           )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <label className="block">
-              <span className="text-sm font-medium text-content">Name</span>
+              <span className="text-sm font-medium text-content">Username</span>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
                 disabled={isLoading}
+                placeholder="e.g., MuskRat420, TeslaTears, SpaceXFan69"
                 className="mt-1 w-full p-3 bg-background border border-border rounded-lg text-content
                        focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent
                        hover:border-primary/50 transition-all duration-200
-                       disabled:opacity-60 disabled:cursor-not-allowed"
-                aria-label="Full name"
+                       disabled:opacity-60 disabled:cursor-not-allowed
+                       placeholder:text-tertiary/50"
+                aria-label="Username"
               />
+              <p className="text-tertiary text-xs mt-1">
+                Choose a funny/creative username —{' '}
+                <strong className="text-warning">NOT your real name!</strong>
+              </p>
             </label>
             <label className="block">
               <span className="text-sm font-medium text-content">Email Address</span>

@@ -67,7 +67,14 @@ async function createServer(): Promise<express.Application> {
   // IP Banning Service Setup
   // ──────────────────────────────────────────────────────────────────────────
 
-  const ipBanService = new IPBanningService(env.REDIS_URL);
+  // Parse IP whitelist from environment (comma-separated)
+  const whitelistedIPs = env.IP_WHITELIST
+    ? env.IP_WHITELIST.split(',')
+        .map((ip) => ip.trim())
+        .filter((ip) => ip)
+    : [];
+
+  const ipBanService = new IPBanningService(env.REDIS_URL, whitelistedIPs);
 
   // Cleanup on shutdown
   process.on('SIGTERM', async () => {
