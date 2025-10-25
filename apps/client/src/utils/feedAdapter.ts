@@ -89,33 +89,18 @@ export async function fetchUnifiedFeed(params: {
   try {
     const limit = params.limit || 20;
 
-    // Check if there are meaningful filters (not just default values)
+    // Check if there's a search query or filters
     const hasSearch = params.filters?.search && params.filters.search.trim().length > 0;
-    const hasDateRange = params.filters?.dateRange?.start || params.filters?.dateRange?.end;
+    const hasMediaFilter =
+      params.filters?.hasMedia !== null && params.filters?.hasMedia !== undefined;
     const hasContentTypeFilter =
       params.filters?.contentType &&
       params.filters.contentType.length > 0 &&
       !params.filters.contentType.includes('all');
-    const hasSources = params.filters?.sources && params.filters.sources.length > 0;
-    const hasAuthors = params.filters?.authors && params.filters.authors.length > 0;
-    const hasEngagementFilter =
-      params.filters?.engagementLevel && params.filters.engagementLevel !== 'all';
-    const hasMediaFilter =
-      params.filters?.hasMedia !== null && params.filters?.hasMedia !== undefined;
-    const hasReactionsFilter =
-      params.filters?.hasReactions !== null && params.filters?.hasReactions !== undefined;
 
-    const hasMeaningfulFilters =
-      hasSearch ||
-      hasDateRange ||
-      hasContentTypeFilter ||
-      hasSources ||
-      hasAuthors ||
-      hasEngagementFilter ||
-      hasMediaFilter ||
-      hasReactionsFilter;
+    const hasMeaningfulFilters = hasSearch || hasMediaFilter || hasContentTypeFilter;
 
-    // If we have meaningful filters, use the search endpoint which supports full filtering
+    // If we have search or filters, use the search endpoint
     // Otherwise use the regular timeline endpoint for better performance
     const response = hasMeaningfulFilters
       ? await timelineApi.search({

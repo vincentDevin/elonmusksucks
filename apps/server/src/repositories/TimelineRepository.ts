@@ -310,7 +310,6 @@ export class TimelineRepository implements ITimelineRepository {
     filters: DbSearchFilters & {
       hasMedia?: boolean;
       hasReactions?: boolean;
-      engagementLevel?: 'all' | 'low' | 'medium' | 'high' | 'viral';
     };
     limit: number;
     cursor?: string;
@@ -471,7 +470,6 @@ export class TimelineRepository implements ITimelineRepository {
       authorId?: number;
       hasMedia?: boolean;
       hasReactions?: boolean;
-      engagementLevel?: 'all' | 'low' | 'medium' | 'high' | 'viral';
     };
     limit: number;
     cursor?: string;
@@ -480,10 +478,14 @@ export class TimelineRepository implements ITimelineRepository {
     const pageLimit = Math.min(params.limit || 30, 100);
 
     // Build search where clause for posts
+    // Search both post body AND author name
     const postWhere: Prisma.ContentWhereInput = {
       type: 'POST',
       visibility: 'PUBLIC',
-      body: { contains: params.query, mode: 'insensitive' },
+      OR: [
+        { body: { contains: params.query, mode: 'insensitive' } },
+        { author: { name: { contains: params.query, mode: 'insensitive' } } },
+      ],
     };
 
     // Apply cursor for pagination
@@ -507,12 +509,22 @@ export class TimelineRepository implements ITimelineRepository {
       }
     }
 
-    // Apply hashtag filter
+    // Apply hashtag filter (combine with OR if exists)
     if (params.filters.hashtag) {
-      postWhere.body = {
-        contains: `#${params.filters.hashtag}`,
-        mode: 'insensitive',
-      };
+      if (postWhere.OR) {
+        // If OR exists, wrap everything in AND with hashtag requirement
+        const existingOr = postWhere.OR;
+        delete postWhere.OR;
+        postWhere.AND = [
+          { OR: existingOr },
+          { body: { contains: `#${params.filters.hashtag}`, mode: 'insensitive' } },
+        ];
+      } else {
+        postWhere.body = {
+          contains: `#${params.filters.hashtag}`,
+          mode: 'insensitive',
+        };
+      }
     }
 
     // Apply author filter
@@ -569,28 +581,8 @@ export class TimelineRepository implements ITimelineRepository {
       take: pageLimit + 1,
     });
 
-    // Filter by engagement level after fetching (can't easily do in SQL)
-    let filteredPosts = posts;
-    if (params.filters.engagementLevel && params.filters.engagementLevel !== 'all') {
-      filteredPosts = posts.filter((post) => {
-        const totalEngagement = post._count.reactions + post._count.children;
-        switch (params.filters.engagementLevel) {
-          case 'low':
-            return totalEngagement < 50;
-          case 'medium':
-            return totalEngagement >= 50 && totalEngagement < 200;
-          case 'high':
-            return totalEngagement >= 200 && totalEngagement < 1000;
-          case 'viral':
-            return totalEngagement >= 1000;
-          default:
-            return true;
-        }
-      });
-    }
-
-    const hasMore = filteredPosts.length > pageLimit;
-    const items = filteredPosts.slice(0, pageLimit);
+    const hasMore = posts.length > pageLimit;
+    const items = posts.slice(0, pageLimit);
 
     const nextCursor =
       hasMore && items.length > 0 ? items[items.length - 1].createdAt.toISOString() : undefined;

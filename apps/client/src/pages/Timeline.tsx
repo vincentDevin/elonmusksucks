@@ -29,14 +29,9 @@ export default function Timeline() {
   const [selectedContent, setSelectedContent] = useState<UnifiedFeedItem | null>(null);
   const [showUnifiedModal, setShowUnifiedModal] = useState(false);
   const [filters, setFilters] = useState<TimelineFilter>({
-    dateRange: { start: null, end: null, preset: 'all' },
     contentType: ['all'],
-    sources: [],
-    authors: [],
-    engagementLevel: 'all',
-    sortBy: 'recent',
+    sortBy: 'newest',
     hasMedia: null,
-    hasReactions: null,
   });
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -51,10 +46,9 @@ export default function Timeline() {
   useEffect(() => {
     const search = searchParams.get('search');
     const hashtag = searchParams.get('hashtag');
-    const author = searchParams.get('author');
 
     // Only process if there are URL params
-    if (search || hashtag || author) {
+    if (search || hashtag) {
       // Set search query if present
       if (search) {
         setSearchQuery(search);
@@ -63,17 +57,6 @@ export default function Timeline() {
       // Set hashtag filter if present
       if (hashtag) {
         setSearchQuery(`#${hashtag}`);
-      }
-
-      // Set author filter if present
-      if (author) {
-        const authorId = parseInt(author);
-        if (!isNaN(authorId)) {
-          setFilters((prev) => ({
-            ...prev,
-            authors: [author],
-          }));
-        }
       }
 
       // Clear URL params after reading them so they don't persist
@@ -132,87 +115,33 @@ export default function Timeline() {
 
   // Handle search - clears filters and sets new search query
   const handleSearch = useCallback((query: string) => {
-    // Reset all filters when doing a new search
-    setFilters({
-      dateRange: { start: null, end: null, preset: 'all' },
-      contentType: ['all'],
-      sources: [],
-      authors: [],
-      engagementLevel: 'all',
-      sortBy: 'recent',
-      hasMedia: null,
-      hasReactions: null,
-    });
-    setSearchQuery(query);
-    // TimelineWithPosts will automatically fetch results when searchQuery changes
+    // Check if searching for a user (starts with @)
+    if (query.trim().startsWith('@')) {
+      // Extract username (remove @ prefix)
+      const username = query.trim().substring(1);
+
+      // Set search query without the @ for backend
+      setSearchQuery(username);
+
+      // Filter to show only posts (users don't write articles)
+      setFilters({
+        contentType: ['post'],
+        sortBy: 'newest',
+        hasMedia: null,
+      });
+    } else {
+      // Regular search - reset all filters
+      setFilters({
+        contentType: ['all'],
+        sortBy: 'newest',
+        hasMedia: null,
+      });
+      setSearchQuery(query);
+    }
+
+    // Trigger a refresh to fetch new results
+    setRefreshKey((prev) => prev + 1);
   }, []);
-
-  // Handle search suggestion clicks
-  const handleSuggestionClick = useCallback(
-    async (suggestion: any) => {
-      const searchTerm = suggestion.title || suggestion.value || suggestion;
-
-      // For user/author suggestions, filter by author ID
-      if (suggestion.type === 'user') {
-        // Reset all filters and search, then set author filter
-        setSearchQuery('');
-        setFilters({
-          dateRange: { start: null, end: null, preset: 'all' },
-          contentType: ['all'],
-          sources: [],
-          authors: [String(suggestion.id)],
-          engagementLevel: 'all',
-          sortBy: 'recent',
-          hasMedia: null,
-          hasReactions: null,
-        });
-        return;
-      }
-
-      // For article/post suggestions, fetch results and open the first one
-      if (suggestion.type === 'article' || suggestion.type === 'post') {
-        try {
-          const data = await timelineApi.search({
-            query: searchTerm,
-            limit: 1, // Just need the first result
-          });
-
-          if (data.items && data.items.length > 0) {
-            const firstResult = data.items[0];
-
-            // Extract numeric ID from string (e.g., "post-29" -> 29 or "article-123" -> 123)
-            const idString = String(firstResult.id);
-            const numericId = parseInt(idString.replace(/^(post-|article-)/, ''));
-
-            if (isNaN(numericId)) {
-              console.error('Invalid content ID:', firstResult.id);
-              handleSearch(searchTerm);
-              return;
-            }
-
-            // Check if it's a post or article based on ID prefix
-            if (idString.startsWith('post-')) {
-              // It's a post
-              await fetchAndOpenPost(numericId);
-            } else {
-              // It's an article
-              await fetchAndOpenArticle(numericId);
-            }
-          } else {
-            // No results, just show search
-            handleSearch(searchTerm);
-          }
-        } catch (error) {
-          console.error('Failed to fetch search results:', error);
-          handleSearch(searchTerm);
-        }
-      } else {
-        // For hashtags, feeds, etc., just perform search
-        handleSearch(searchTerm);
-      }
-    },
-    [handleSearch, fetchAndOpenArticle, fetchAndOpenPost],
-  );
 
   // Handle filter changes
   const handleFilterChange = useCallback(
@@ -220,25 +149,13 @@ export default function Timeline() {
       // Check if filters that require a fresh fetch changed
       const contentTypeChanged =
         JSON.stringify(filters.contentType) !== JSON.stringify(newFilters.contentType);
-      const authorsChanged = JSON.stringify(filters.authors) !== JSON.stringify(newFilters.authors);
-      const dateRangeChanged =
-        filters.dateRange.preset !== newFilters.dateRange.preset ||
-        filters.dateRange.start?.getTime() !== newFilters.dateRange.start?.getTime();
+      const sortByChanged = filters.sortBy !== newFilters.sortBy;
       const mediaFilterChanged = filters.hasMedia !== newFilters.hasMedia;
-      const reactionsFilterChanged = filters.hasReactions !== newFilters.hasReactions;
-      const engagementChanged = filters.engagementLevel !== newFilters.engagementLevel;
 
       setFilters(newFilters);
 
       // Force refresh when meaningful filters change
-      if (
-        contentTypeChanged ||
-        authorsChanged ||
-        dateRangeChanged ||
-        mediaFilterChanged ||
-        reactionsFilterChanged ||
-        engagementChanged
-      ) {
+      if (contentTypeChanged || sortByChanged || mediaFilterChanged) {
         setRefreshKey((prev) => prev + 1);
       }
     },
@@ -249,14 +166,9 @@ export default function Timeline() {
   const handleResetFilters = useCallback(() => {
     setSearchQuery(''); // Clear search query
     setFilters({
-      dateRange: { start: null, end: null, preset: 'all' },
       contentType: ['all'],
-      sources: [],
-      authors: [],
-      engagementLevel: 'all',
-      sortBy: 'recent',
+      sortBy: 'newest',
       hasMedia: null,
-      hasReactions: null,
     });
     setRefreshKey((prev) => prev + 1); // Force refresh to show default timeline
   }, []);
@@ -328,32 +240,41 @@ export default function Timeline() {
                 )}
               </div>
 
-              {/* Search and Filters Section */}
-              <div className="bg-surface rounded-lg p-4 shadow mb-6">
-                <div className="space-y-4">
-                  {/* Search Bar */}
-                  <TimelineSearch
-                    onSearch={handleSearch}
-                    onSuggestionClick={handleSuggestionClick}
-                    placeholder="Search articles, posts, users, or hashtags..."
-                    className="w-full"
-                  />
+              {/* Search and Filters Section - Compact Single Row */}
+              <div className="bg-surface rounded-lg px-4 py-2.5 shadow mb-4">
+                {/* Desktop: Single Row, Mobile: Stack */}
+                <div className="flex flex-col md:flex-row md:items-center gap-3">
+                  {/* Search Bar - Takes available space */}
+                  <div className="flex-1 min-w-0">
+                    <TimelineSearch onSearch={handleSearch} className="w-full" />
+                  </div>
 
-                  {/* Active Search Indicator */}
-                  {searchQuery && (
-                    <div className="text-sm text-content/70 text-center">
-                      Searching for: <span className="font-medium">"{searchQuery}"</span>
-                    </div>
-                  )}
-
-                  {/* Filters - Always Visible */}
-                  <TimelineFilters
-                    filters={filters}
-                    onFilterChange={handleFilterChange}
-                    onReset={handleResetFilters}
-                    hasSearchQuery={!!searchQuery}
-                  />
+                  {/* Filters - Compact inline */}
+                  <div className="flex-shrink-0">
+                    <TimelineFilters
+                      filters={filters}
+                      onFilterChange={handleFilterChange}
+                      onReset={handleResetFilters}
+                      hasSearchQuery={!!searchQuery}
+                    />
+                  </div>
                 </div>
+
+                {/* Active Search Indicator - Only show if searching */}
+                {searchQuery && (
+                  <div className="text-xs text-content/60 text-center mt-2">
+                    {filters.contentType.includes('post') &&
+                    !filters.contentType.includes('all') ? (
+                      <>
+                        Searching posts by user: <span className="font-medium">@{searchQuery}</span>
+                      </>
+                    ) : (
+                      <>
+                        Searching for: <span className="font-medium">"{searchQuery}"</span>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
