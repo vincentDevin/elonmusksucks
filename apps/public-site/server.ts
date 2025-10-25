@@ -8,6 +8,12 @@ import rateLimit from 'express-rate-limit';
 import cors from 'cors';
 import morgan from 'morgan';
 import env from './src/config/env.js';
+import {
+  IPBanningService,
+  createIPBanMiddleware,
+  create404TrackerMiddleware,
+  createRateLimitTrackerMiddleware,
+} from './src/middleware/ipBanning.js';
 import type {
   PredictionView,
   LeaderboardEntryView,
@@ -56,6 +62,24 @@ function serializeForHTML(data: unknown): string {
 
 async function createServer(): Promise<express.Application> {
   const app = express();
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // IP Banning Service Setup
+  // ──────────────────────────────────────────────────────────────────────────
+
+  const ipBanService = new IPBanningService(env.REDIS_URL);
+
+  // Cleanup on shutdown
+  process.on('SIGTERM', async () => {
+    console.log('[IP_BAN] Disconnecting from Redis...');
+    await ipBanService.disconnect();
+  });
+
+  process.on('SIGINT', async () => {
+    console.log('[IP_BAN] Disconnecting from Redis...');
+    await ipBanService.disconnect();
+    process.exit(0);
+  });
 
   // ──────────────────────────────────────────────────────────────────────────
   // Security Middleware
@@ -172,6 +196,19 @@ async function createServer(): Promise<express.Application> {
   });
 
   app.use(generalLimiter);
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // IP Banning Middleware (Applied to ALL routes)
+  // ──────────────────────────────────────────────────────────────────────────
+
+  // Check if IP is banned (early rejection)
+  app.use(createIPBanMiddleware(ipBanService));
+
+  // Track 404s for auto-banning
+  app.use(create404TrackerMiddleware(ipBanService));
+
+  // Track rate limit violations for auto-banning
+  app.use(createRateLimitTrackerMiddleware(ipBanService));
 
   // Health check endpoint (before Vite middleware)
   app.get('/health', (_req, res) => {
@@ -630,6 +667,7 @@ createServer()
       console.log(`   📡 API Base: ${env.API_BASE_URL}`);
       console.log(`   🔗 Client App: ${env.CLIENT_APP_URL}`);
       console.log(`   💾 Cache: Enabled (TTL: 30s, cleanup: 5min)`);
+      console.log(`   🛡️  IP Banning: Active (Redis-backed auto-ban)`);
       console.log(`   📄 Single landing page - all data fetched in parallel`);
       console.log(`   🚀 CDN-ready with stale-while-revalidate\n`);
     });

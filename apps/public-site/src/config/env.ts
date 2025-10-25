@@ -16,6 +16,7 @@ interface EnvironmentConfig {
   // API Configuration (REQUIRED - NO FALLBACKS)
   API_BASE_URL: string;
   CLIENT_APP_URL: string;
+  REDIS_URL: string;
 
   // Optional Configuration
   ALLOWED_ORIGINS?: string;
@@ -83,6 +84,7 @@ function validateEnvironment(): EnvironmentConfig {
     // API Configuration (REQUIRED - NO FALLBACKS)
     API_BASE_URL: getRequired('API_BASE_URL'),
     CLIENT_APP_URL: getRequired('CLIENT_APP_URL'),
+    REDIS_URL: getRequired('REDIS_URL'),
 
     // Optional Configuration
     ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS,
@@ -149,6 +151,7 @@ function validateEnvironment(): EnvironmentConfig {
   console.log(`   📡 API Base URL: ${config.API_BASE_URL}`);
   console.log(`   🌐 Client App URL: ${config.CLIENT_APP_URL}`);
   console.log(`   🎮 Server Port: ${config.PORT}`);
+  console.log(`   🗄️  Redis URL: ${config.REDIS_URL}`);
   if (config.ALLOWED_ORIGINS) {
     console.log(`   🔐 Allowed Origins: ${config.ALLOWED_ORIGINS}`);
   }
