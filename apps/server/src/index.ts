@@ -220,6 +220,16 @@ if (require.main === module) {
   // Create HTTP server and bind Express app
   const server = http.createServer(app);
 
+  // ══════════════════════════════════════════════════════════════════════════════
+  // Server Timeout Configuration
+  // ══════════════════════════════════════════════════════════════════════════════
+  // Set global timeout to prevent indefinite hangs
+  server.timeout = 30000; // 30 seconds max for any request
+  server.headersTimeout = 31000; // Slightly higher than timeout (prevents race condition)
+  server.keepAliveTimeout = 5000; // 5 seconds for keep-alive connections
+
+  console.log('[Server] Timeouts configured: request=30s, headers=31s, keepAlive=5s');
+
   // Initialize Socket.IO
   initSocket(server).catch((err) => {
     console.error('[socket] failed to initialize:', err);

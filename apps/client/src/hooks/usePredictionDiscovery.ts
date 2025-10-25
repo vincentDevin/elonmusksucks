@@ -3,7 +3,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { usePredictionMarket } from '../contexts/PredictionContext';
 import { useAuth } from '../contexts/AuthContext';
 import type { PredictionView } from '@ems/types';
-import { getCategories, type Category } from '../api/predictions';
+import type { Category } from '../api/predictions';
+import { useCategories } from './useCategories';
 
 export interface PredictionFilter {
   categories: number[]; // Category IDs
@@ -75,7 +76,9 @@ export function usePredictionDiscovery() {
 
   const [_viewedPredictions, setViewedPredictions] = useState<Set<number>>(new Set());
   const [userBettingHistory, setUserBettingHistory] = useState<string[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
+
+  // Fetch categories with caching
+  const { categories } = useCategories();
 
   // Load user preferences
   useEffect(() => {
@@ -93,20 +96,6 @@ export function usePredictionDiscovery() {
       }
     }
   }, [user?.id]);
-
-  // Fetch all categories from API
-  useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const fetchedCategories = await getCategories();
-        setCategories(fetchedCategories);
-      } catch (error) {
-        console.error('[usePredictionDiscovery] Failed to fetch categories:', error);
-      }
-    };
-
-    fetchCategories();
-  }, []);
 
   // Calculate recommendation score for personalization
   const calculateRecommendationScore = useCallback(

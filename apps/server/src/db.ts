@@ -46,6 +46,7 @@ interface QueryMetrics {
 }
 
 const SLOW_QUERY_THRESHOLD = parseInt(process.env.SLOW_QUERY_MS || '100'); // 100ms default
+const QUERY_TIMEOUT_MS = parseInt(process.env.QUERY_TIMEOUT_MS || '10000'); // 10s default max query time
 const queryMetrics: QueryMetrics[] = [];
 const MAX_METRICS_HISTORY = 1000; // Keep last 1000 queries for analysis
 const topSlowQueries: SlowQueryRecord[] = []; // Track top 5 slowest queries
@@ -57,8 +58,22 @@ const prismaWithMiddleware = prisma.$extends({
     $allOperations: async ({ model, operation, args, query }) => {
       const before = Date.now();
 
+      // ── QUERY TIMEOUT ─────────────────────────────────────────────────────
+      // Wrap query in a timeout promise to prevent indefinite hangs
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          const elapsed = Date.now() - before;
+          reject(
+            new Error(
+              `[DB TIMEOUT] ${model}.${operation} exceeded ${QUERY_TIMEOUT_MS}ms (elapsed: ${elapsed}ms)`,
+            ),
+          );
+        }, QUERY_TIMEOUT_MS);
+      });
+
       try {
-        const result = await query(args);
+        // Race between query execution and timeout
+        const result = await Promise.race([query(args), timeoutPromise]);
         const duration = Date.now() - before;
 
         // Track metrics
@@ -181,6 +196,9 @@ let isConnected = false;
 const poolSize = process.env.DATABASE_CONNECTION_LIMIT || '3';
 console.log('[DATABASE] Prisma client initialized (lazy connection)');
 console.log(`[DATABASE] Connection pool size: ${poolSize}`);
+console.log(
+  `[DATABASE] Query timeout: ${QUERY_TIMEOUT_MS}ms, Slow query threshold: ${SLOW_QUERY_THRESHOLD}ms`,
+);
 
 // Graceful shutdown handling
 const gracefulShutdown = async () => {

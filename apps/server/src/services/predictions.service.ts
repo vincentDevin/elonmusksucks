@@ -1164,9 +1164,12 @@ export class PredictionService {
       const predictions = await this.repo.findPredictionsByIds(predictionIds);
       const stats: Record<number, any> = {};
 
+      // Issue #3: Bulk operation to avoid N+1 query (single query instead of N queries)
+      const viewCountsMap = await this.repo.getUserViewCountsBulk(predictionIds);
+
       for (const prediction of predictions) {
         const totalViews = prediction.viewCount || 0;
-        const uniqueUserViews = await this.repo.getUserViewCount(prediction.id);
+        const uniqueUserViews = viewCountsMap.get(prediction.id) || 0;
         const totalEngagement =
           (prediction.bets?.length || 0) + (prediction.parlayLegs?.length || 0);
         const viewToEngagementRatio = totalViews > 0 ? totalEngagement / totalViews : 0;

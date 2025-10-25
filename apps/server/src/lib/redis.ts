@@ -21,12 +21,19 @@ const retryStrategy = (times: number) => Math.min(times * 50, 2000);
 
 let redisClient: IORedis;
 
+// ── Timeout configuration ────────────────────────────────────────────────────
+// Prevent Redis connection from hanging indefinitely
+const REDIS_CONNECT_TIMEOUT = 5000; // 5s to establish connection
+// Note: No commandTimeout - during startup, legitimate operations (138 channel subscriptions,
+// leaderboard refresh, etc.) can take >3s. Server-level timeouts handle hung requests.
+
 if (REDIS_URL) {
   // Production / cloud env: URL may be redis:// or rediss://
   redisClient = new IORedis(REDIS_URL, {
-    maxRetriesPerRequest: null,
+    maxRetriesPerRequest: null, // MUST be null for BullMQ blocking commands
     enableOfflineQueue: true,
     retryStrategy,
+    connectTimeout: REDIS_CONNECT_TIMEOUT,
     // Allow TLS without extra certs if the URL is rediss://
     tls: REDIS_URL.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined,
   });
@@ -37,9 +44,10 @@ if (REDIS_URL) {
     port: Number.parseInt(REDIS_PORT, 10) || 6379,
     password: REDIS_PASSWORD,
     username: REDIS_USERNAME, // ACL username if provided
-    maxRetriesPerRequest: null,
+    maxRetriesPerRequest: null, // MUST be null for BullMQ blocking commands
     enableOfflineQueue: true,
     retryStrategy,
+    connectTimeout: REDIS_CONNECT_TIMEOUT,
   };
   redisClient = new IORedis(options);
 }
@@ -47,6 +55,9 @@ if (REDIS_URL) {
 // ── Diagnostics ─────────────────────────────────────────────────────────────
 redisClient.on('connect', () => {
   console.log('[redis] connected →', REDIS_URL ? REDIS_URL : `${REDIS_HOST}:${REDIS_PORT}`);
+  console.log(
+    `[redis] Timeouts: connect=${REDIS_CONNECT_TIMEOUT}ms (no command timeout - server handles request timeouts)`,
+  );
 });
 redisClient.on('reconnecting', () => {
   console.warn('[redis] reconnecting…');

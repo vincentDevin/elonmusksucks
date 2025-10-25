@@ -10,24 +10,25 @@ import {
   getAnalyticsSummary,
 } from '../controllers/dashboardAnalytics.controller';
 import { requireAuth } from '../middleware/auth.middleware';
+import { heavyTimeout } from '../middleware/timeout.middleware';
 
 const router = Router();
 
 // All analytics endpoints require authentication
 // These endpoints provide sensitive business intelligence data
 
-// Core analytics endpoints
+// Core analytics endpoints (heavy computations, use 30s timeout)
 // GET /api/analytics/platform-health - Get comprehensive platform health metrics
-router.get('/platform-health', requireAuth, getPlatformHealthMetrics);
+router.get('/platform-health', heavyTimeout, requireAuth, getPlatformHealthMetrics);
 
 // GET /api/analytics/trends - Get trend analysis for specified time period
-router.get('/trends', requireAuth, getTrendAnalysis);
+router.get('/trends', heavyTimeout, requireAuth, getTrendAnalysis);
 
 // GET /api/analytics/cross-feature - Get cross-feature analytics
-router.get('/cross-feature', requireAuth, getCrossFeatureAnalytics);
+router.get('/cross-feature', heavyTimeout, requireAuth, getCrossFeatureAnalytics);
 
 // GET /api/analytics/content - Get content performance analytics
-router.get('/content', requireAuth, getContentAnalytics);
+router.get('/content', heavyTimeout, requireAuth, getContentAnalytics);
 
 // Comprehensive analytics endpoints
 // GET /api/analytics/dashboard - Get comprehensive dashboard data

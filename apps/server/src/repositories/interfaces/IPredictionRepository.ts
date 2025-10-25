@@ -100,6 +100,9 @@ export interface IPredictionRepository {
   /** Get the total number of unique user views for a prediction */
   getUserViewCount(predictionId: number): Promise<number>;
 
+  /** Get unique user view counts for multiple predictions (bulk operation to avoid N+1) */
+  getUserViewCountsBulk(predictionIds: number[]): Promise<Map<number, number>>;
+
   /** Get user activity log for recommendation analysis */
   getUserActivityLog(
     userId: number,

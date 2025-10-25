@@ -895,6 +895,52 @@ export class PredictionRepository implements IPredictionRepository {
   }
 
   /**
+   * Get unique user view counts for multiple predictions in a single query
+   * @param predictionIds - Array of prediction IDs
+   * @returns Map of prediction ID to view count
+   * NOTE: This is a bulk operation to avoid N+1 query issues
+   */
+  async getUserViewCountsBulk(predictionIds: number[]): Promise<Map<number, number>> {
+    if (predictionIds.length === 0) {
+      return new Map();
+    }
+
+    // Create a Set for O(1) lookup
+    const predictionIdSet = new Set(predictionIds);
+
+    // Get all prediction_viewed activity logs
+    // Note: Prisma doesn't support 'in' operator for JSON fields, so we fetch all
+    // prediction views and filter in memory. Still better than N queries!
+    const viewRecords = await prisma.userActivityLog.findMany({
+      where: {
+        activityType: 'prediction_viewed',
+      },
+      select: {
+        metadata: true,
+      },
+    });
+
+    // Count views per prediction
+    const countMap = new Map<number, number>();
+
+    // Initialize all prediction IDs with 0
+    for (const id of predictionIds) {
+      countMap.set(id, 0);
+    }
+
+    // Count views for each prediction (filter in memory)
+    for (const record of viewRecords) {
+      const predictionId = (record.metadata as any)?.predictionId;
+      if (typeof predictionId === 'number' && predictionIdSet.has(predictionId)) {
+        const currentCount = countMap.get(predictionId) || 0;
+        countMap.set(predictionId, currentCount + 1);
+      }
+    }
+
+    return countMap;
+  }
+
+  /**
    * Get user activity log for recommendation analysis
    * @param userId - User ID
    * @param activityTypes - Array of activity types to filter

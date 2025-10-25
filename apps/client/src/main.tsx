@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
+import { CacheProvider } from './contexts/CacheContext';
 import './index.css';
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -59,7 +60,9 @@ async function initializeApp() {
     // Render React app
     createRoot(root).render(
       <StrictMode>
-        <App />
+        <CacheProvider>
+          <App />
+        </CacheProvider>
       </StrictMode>,
     );
   } catch (error) {
@@ -67,7 +70,9 @@ async function initializeApp() {
     // Fallback: render anyway
     createRoot(root).render(
       <StrictMode>
-        <App />
+        <CacheProvider>
+          <App />
+        </CacheProvider>
       </StrictMode>,
     );
     loadingOverlay.classList.add('fade-out');

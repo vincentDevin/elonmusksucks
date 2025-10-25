@@ -22,13 +22,14 @@ import {
   createPredictionComment as createPredictionCommentController,
 } from '../controllers/predictions.controller';
 import { requireAuth } from '../middleware/auth.middleware';
+import { fastTimeout, standardTimeout } from '../middleware/timeout.middleware';
 
 const router = Router();
 
 // Public routes
-router.get('/', getAllPredictions);
-router.get('/categories', getCategories); // MUST be before /:id routes
-router.get('/:id', getPredictionById);
+router.get('/', standardTimeout, getAllPredictions); // Optimized with bulk queries
+router.get('/categories', fastTimeout, getCategories); // MUST be before /:id routes (simple query, cached)
+router.get('/:id', standardTimeout, getPredictionById);
 
 // Authenticated routes
 router.post('/', requireAuth, createPrediction);

@@ -1,29 +1,24 @@
-// Rollback: Delete this file and restore direct fetch usage in Home.tsx
-import { useState, useEffect, useCallback } from 'react';
 import { getMarketOverview } from '../api/market';
 import type { MarketStatsResponse } from '@ems/types';
+import { useCachedFetch } from './useCachedFetch';
 
+/**
+ * Fetch market overview with caching
+ * Cache TTL: 120 seconds (market stats don't change rapidly)
+ */
 export const useMarketOverview = () => {
-  const [data, setData] = useState<MarketStatsResponse | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data, error, isLoading, refetch } = useCachedFetch<MarketStatsResponse>(
+    async () => await getMarketOverview(),
+    {
+      cacheKey: 'market-overview',
+      ttl: 120000, // 2 minutes - market stats are relatively stable
+    },
+  );
 
-  const fetchMarketOverview = useCallback(async (force = false) => {
-    try {
-      setLoading(true);
-      setError(null);
-      const overview = await getMarketOverview();
-      setData(overview);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load market overview');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchMarketOverview();
-  }, [fetchMarketOverview]);
-
-  return { data, loading, error, refresh: () => fetchMarketOverview(true) };
+  return {
+    data,
+    loading: isLoading,
+    error: error ? error.message : null,
+    refresh: refetch,
+  };
 };
