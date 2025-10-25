@@ -281,22 +281,32 @@ class StatisticsManager {
 
   addConnectedPlayer(playerId: number): void {
     this.connectedPlayers.add(playerId);
-    console.log(`📊 Player ${playerId} connected. Total online: ${this.connectedPlayers.size}`);
+    // Only log in development (verbose)
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`📊 Player ${playerId} connected. Total online: ${this.connectedPlayers.size}`);
+    }
   }
 
   removeConnectedPlayer(playerId: number): void {
     this.connectedPlayers.delete(playerId);
-    console.log(`📊 Player ${playerId} disconnected. Total online: ${this.connectedPlayers.size}`);
+    // Only log in development (verbose)
+    if (process.env.NODE_ENV === 'development') {
+      console.log(
+        `📊 Player ${playerId} disconnected. Total online: ${this.connectedPlayers.size}`,
+      );
+    }
   }
 
   addActiveGame(gameId: string): void {
     this.activeGames.add(gameId);
-    console.log(`📊 Game ${gameId} started. Total active: ${this.activeGames.size}`);
+    // Keep this log for production (important event)
+    console.log(`📊 Game started. Total active: ${this.activeGames.size}`);
   }
 
   removeActiveGame(gameId: string): void {
     this.activeGames.delete(gameId);
-    console.log(`📊 Game ${gameId} ended. Total active: ${this.activeGames.size}`);
+    // Keep this log for production (important event)
+    console.log(`📊 Game ended. Total active: ${this.activeGames.size}`);
   }
 
   getStats(availableMatches: number) {
@@ -396,6 +406,11 @@ class GameManager {
   private droppedFrames = new Map<string, number>(); // Track dropped frames per game
   private countdownInProgress = new Map<string, boolean>(); // Track active countdowns to prevent duplicates
   private lastScoreTime = new Map<string, number>(); // Track last score time to prevent rapid scoring
+  private disconnectionGracePeriods = new Map<
+    number,
+    { gameId: string; timer: NodeJS.Timeout; disconnectedAt: number }
+  >(); // playerId -> grace period info
+  private readonly RECONNECTION_GRACE_PERIOD_MS = 10000; // 10 seconds to reconnect
 
   constructor(
     private io: SocketIOServer,
@@ -482,9 +497,11 @@ class GameManager {
   private startCountdown(game: GameState): void {
     // Guard: Prevent duplicate countdowns
     if (this.countdownInProgress.get(game.id)) {
-      console.warn(
-        `⚠️ Countdown already in progress for game ${game.id}, ignoring duplicate request`,
-      );
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(
+          `⚠️ Countdown already in progress for game ${game.id}, ignoring duplicate request`,
+        );
+      }
       return;
     }
 
@@ -538,9 +555,12 @@ class GameManager {
     game.ball.vx = Math.cos(angle) * PONG_PHYSICS.BALL_SPEED_INITIAL * direction;
     game.ball.vy = Math.sin(angle) * PONG_PHYSICS.BALL_SPEED_INITIAL;
 
-    console.log(
-      `🏓 Ball served in game ${game.id} (angle: ${((angle * 180) / Math.PI).toFixed(1)}°, direction: ${direction > 0 ? 'right' : 'left'})`,
-    );
+    // Only log ball serve details in development
+    if (process.env.NODE_ENV === 'development') {
+      console.log(
+        `🏓 Ball served in game ${game.id} (angle: ${((angle * 180) / Math.PI).toFixed(1)}°, direction: ${direction > 0 ? 'right' : 'left'})`,
+      );
+    }
   }
 
   private startGameLoop(game: GameState): void {
@@ -578,8 +598,11 @@ class GameManager {
         this.droppedFrames.set(game.id, dropped + 1);
       }
 
-      // Log dropped frames every 5 seconds for monitoring
-      if (game.tick % (PONG_PHYSICS.TICK_RATE * 5) === 0) {
+      // Log dropped frames every 5 seconds for monitoring (development only)
+      if (
+        process.env.NODE_ENV === 'development' &&
+        game.tick % (PONG_PHYSICS.TICK_RATE * 5) === 0
+      ) {
         const dropped = this.droppedFrames.get(game.id) || 0;
         if (dropped > 0) {
           const currentRate =
@@ -591,6 +614,9 @@ class GameManager {
           );
           this.droppedFrames.set(game.id, 0); // Reset counter
         }
+      } else if (game.tick % (PONG_PHYSICS.TICK_RATE * 5) === 0) {
+        // Still reset counter in production to avoid memory growth
+        this.droppedFrames.set(game.id, 0);
       }
     }, 1000 / PONG_PHYSICS.TICK_RATE);
 
@@ -732,8 +758,8 @@ class GameManager {
         ai.paddleY = Math.max(0, ai.paddleY - aiSpeed);
       }
 
-      // Debug log for significant changes
-      if (Math.abs(oldPaddleY - ai.paddleY) > 50) {
+      // Debug log for significant changes (development only)
+      if (process.env.NODE_ENV === 'development' && Math.abs(oldPaddleY - ai.paddleY) > 50) {
         console.log(
           `🏓 AI (${game.aiDifficulty}) paddle: ${oldPaddleY.toFixed(1)} -> ${ai.paddleY.toFixed(1)} (target: ${game.aiState.targetY.toFixed(1)}, ball: ${game.ball.y.toFixed(1)})`,
         );
@@ -913,8 +939,11 @@ class GameManager {
     const maxPaddleY = PONG_PHYSICS.FIELD_HEIGHT - PONG_PHYSICS.PADDLE_HEIGHT;
     const validatedPaddleY = Math.max(0, Math.min(maxPaddleY, input.paddleY));
 
-    // Debug log for paddle updates
-    if (Math.abs(player.paddleY - validatedPaddleY) > 10) {
+    // Debug log for paddle updates (development only)
+    if (
+      process.env.NODE_ENV === 'development' &&
+      Math.abs(player.paddleY - validatedPaddleY) > 10
+    ) {
       console.log(
         `🏓 Player ${playerId} (slot ${playerSlot}) paddle: ${player.paddleY.toFixed(1)} -> ${validatedPaddleY.toFixed(1)}`,
       );
@@ -1073,12 +1102,80 @@ class GameManager {
     }, 5000); // Keep game data for 5 seconds for final broadcasts
   }
 
-  forfeitGame(playerId: number): void {
+  /**
+   * Handle player reconnection during grace period
+   * Returns true if player was reconnecting and game was resumed
+   */
+  handlePlayerReconnection(playerId: number): boolean {
+    const graceInfo = this.disconnectionGracePeriods.get(playerId);
+    if (!graceInfo) return false;
+
+    console.log(`🔄 Player ${playerId} reconnected during grace period!`);
+
+    // Clear the grace period timer
+    clearTimeout(graceInfo.timer);
+    this.disconnectionGracePeriods.delete(playerId);
+
+    // Resume the game if it was paused
+    const game = this.games.get(graceInfo.gameId);
+    if (game && game.status === 'paused') {
+      console.log(`▶️ Resuming game ${graceInfo.gameId} after reconnection`);
+      game.status = 'active';
+
+      // Notify all players that the game has resumed
+      this.io.to(`game:${graceInfo.gameId}`).emit('game_resumed', {
+        message: 'Player reconnected, game resumed',
+      });
+    }
+
+    return true;
+  }
+
+  forfeitGame(playerId: number, immediate: boolean = false): void {
     const gameId = this.playerGames.get(playerId);
     if (!gameId) return;
 
     const game = this.games.get(gameId);
     if (!game) return;
+
+    // ✅ RECONNECTION GRACE PERIOD: Don't immediately forfeit
+    // Give player 10 seconds to reconnect for temporary network issues
+    if (!immediate && game.status === 'active' && !game.isAI) {
+      // Only apply grace period for active PVP games (not AI games)
+      console.log(
+        `⏳ Player disconnected - ${this.RECONNECTION_GRACE_PERIOD_MS / 1000}s grace period`,
+      );
+
+      // Pause the game
+      game.status = 'paused';
+
+      // Notify opponent that player disconnected
+      this.io.to(`game:${gameId}`).emit('player_disconnected', {
+        playerId,
+        message: `Opponent disconnected. Waiting ${this.RECONNECTION_GRACE_PERIOD_MS / 1000} seconds for reconnection...`,
+      });
+
+      // Start grace period timer
+      const timer = setTimeout(() => {
+        console.log(`⏰ Grace period expired - forfeiting game`);
+        this.disconnectionGracePeriods.delete(playerId);
+
+        // Forfeit the game immediately (skip grace period this time)
+        this.forfeitGame(playerId, true);
+      }, this.RECONNECTION_GRACE_PERIOD_MS);
+
+      // Store grace period info
+      this.disconnectionGracePeriods.set(playerId, {
+        gameId,
+        timer,
+        disconnectedAt: Date.now(),
+      });
+
+      return; // Don't forfeit yet
+    }
+
+    // Immediate forfeit (or grace period expired)
+    console.log(`❌ Player forfeited game${immediate ? ' (immediate)' : ''}`);
 
     // Determine winner (opponent)
     const winnerSlot = game.players[0].id === playerId ? 1 : 0;
@@ -1104,18 +1201,21 @@ class GameManager {
 
     // Update ready state
     game.readyStates[playerSlot] = ready;
-    console.log(
-      `🏓 Player ${playerId} ready: ${ready} (${game.readyStates[0] ? '✅' : '❌'}, ${game.readyStates[1] ? '✅' : '❌'})`,
-    );
+
+    // Log ready state (development only)
+    if (process.env.NODE_ENV === 'development') {
+      console.log(
+        `🏓 Player ${playerId} ready: ${ready} (${game.readyStates[0] ? '✅' : '❌'}, ${game.readyStates[1] ? '✅' : '❌'})`,
+      );
+    }
 
     // Broadcast ready state update
     this.io.to(`game:${gameId}`).emit('ready_state_update', { readyStates: game.readyStates });
 
     // Check if both players are ready
     if (game.readyStates[0] && game.readyStates[1] && game.status === 'waiting_for_ready') {
-      console.log(
-        `🏓 Both players ready in game ${gameId}, processing wagers and starting countdown!`,
-      );
+      // Log countdown start (keep in production for important event)
+      console.log(`🏓 Both players ready in game ${gameId}, starting countdown`);
 
       // Process wager transaction now that both players are committed
       if (game.wager > 0 && !game.isAI && game.players[0] && game.players[1]) {
@@ -1175,7 +1275,11 @@ class GameManager {
   private broadcastActiveGamesUpdate(): void {
     const activeGames = this.getActiveGames();
     this.io.to('lobby').emit('active_games', { games: activeGames });
-    console.log(`📡 Broadcasting ${activeGames.length} active games to lobby`);
+
+    // Only log in development (very verbose)
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`📡 Broadcasting ${activeGames.length} active games to lobby`);
+    }
   }
 
   addSpectator(gameId: string, socketId: string): boolean {
@@ -1322,6 +1426,10 @@ class GameManager {
     // Clear all game intervals
     this.gameIntervals.forEach((interval) => clearInterval(interval));
     this.gameIntervals.clear();
+
+    // Clear all reconnection grace period timers
+    this.disconnectionGracePeriods.forEach((graceInfo) => clearTimeout(graceInfo.timer));
+    this.disconnectionGracePeriods.clear();
 
     // Clear all game data
     this.games.clear();
@@ -1541,6 +1649,29 @@ export class PongGameServer {
         if (player) {
           console.log(`✅ Player ${player.name} (${player.id}) authenticated`);
 
+          // ✅ RECONNECTION GRACE PERIOD: Check if player is reconnecting
+          const wasReconnecting = this.game.handlePlayerReconnection(player.id);
+          if (wasReconnecting) {
+            console.log(`🔄 Player ${player.name} (${player.id}) reconnected to ongoing game`);
+            // Re-join the game room
+            const gameId = this.game['playerGames'].get(player.id);
+            if (gameId) {
+              socket.join(`game:${gameId}`);
+              const game = this.game.getGame(gameId);
+              if (game) {
+                // Send current game state to reconnected player
+                const playerSlot = game.players[0].id === player.id ? 0 : 1;
+                socket.emit('match_joined', {
+                  gameId,
+                  playerSlot,
+                  opponent: game.players[playerSlot === 0 ? 1 : 0],
+                  wager: game.wager,
+                  pot: game.isAI ? game.wager : game.wager * 2,
+                });
+              }
+            }
+          }
+
           // Auto-join lobby room for PvP lobby updates
           socket.join('lobby');
           console.log(`🏓 Player ${player.name} auto-joined lobby room`);
@@ -1729,7 +1860,12 @@ export class PongGameServer {
 
           // Keep lobby available for others to join
           const availableLobbies = this.lobby.getAvailableLobbies();
-          console.log(`🏓 Broadcasting ${availableLobbies.length} available lobbies to lobby room`);
+          // Only log in development (verbose)
+          if (process.env.NODE_ENV === 'development') {
+            console.log(
+              `🏓 Broadcasting ${availableLobbies.length} available lobbies to lobby room`,
+            );
+          }
           this.io.to('lobby').emit('lobby_state', { lobbies: availableLobbies });
         }
       });

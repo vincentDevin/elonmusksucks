@@ -92,7 +92,8 @@ export function usePongSocket(): PongSocketHook {
   });
 
   // Game state buffer for interpolation
-  const [gameStateBuffer] = useState(() => new GameStateBuffer(10));
+  // Buffer size increased from 10 to 50 to handle higher latency (400ms history at 120fps)
+  const [gameStateBuffer] = useState(() => new GameStateBuffer(50));
 
   // Refs for stable references
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
@@ -293,11 +294,22 @@ export function usePongSocket(): PongSocketHook {
       setCurrentGame((prev) => {
         if (!prev) return null;
 
-        // Only process game_state if we're actually in an active game
-        // Ignore game_state events if we're still waiting for ready-up
-        if (prev.status === 'waiting_for_ready' || prev.status === 'waiting_for_opponent') {
-          console.log(`🏓 User ${user.id} ignoring game_state while waiting for ready/opponent`);
-          return prev; // Don't update anything
+        // ✅ RACE CONDITION FIX: Accept game_state updates during countdown/active
+        // Only ignore if we're truly waiting (before game has started)
+        // This prevents desync during state transitions
+        const shouldIgnore =
+          prev.status === 'waiting_for_ready' || prev.status === 'waiting_for_opponent';
+
+        if (shouldIgnore) {
+          // Still update scores even during waiting to prevent desync
+          // But don't update ball/paddles or populate buffer
+          console.log(
+            `🏓 User ${user.id} received game_state during waiting - updating scores only`,
+          );
+          return {
+            ...prev,
+            scores: data.scores,
+          };
         }
 
         // Create updated player data with server paddle positions

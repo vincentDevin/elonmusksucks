@@ -6,6 +6,7 @@ import {
   type GameStateSnapshot,
 } from '../../types/pongInterpolation';
 import { usePongPerformanceMonitor } from '../../hooks/usePongPerformanceMonitor';
+import { PongClientPhysics } from '../../utils/pongClientPhysics';
 
 // Match the same interface from usePongSocketOptimized
 interface GameState {
@@ -37,6 +38,7 @@ interface PongCanvasProps {
   onSetReady?: (ready: boolean) => void;
   isSpectating?: boolean;
   gameStateBuffer?: GameStateBuffer;
+  shadowPhysics?: PongClientPhysics; // ✅ PHASE 2: Client-side physics simulation
   // Interpolation function props (optional for backward compatibility)
   getInterpolatedGameState?: (currentTime?: number) => {
     ball: { x: number; y: number; vx: number; vy: number };
@@ -98,6 +100,7 @@ export function PongCanvas({
   onSetReady,
   isSpectating = false,
   gameStateBuffer,
+  shadowPhysics,
   getInterpolatedGameState,
 }: PongCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -723,20 +726,26 @@ export function PongCanvas({
           // ✅ Determine if this is the player's own paddle (for both smoothing and visuals)
           const isPlayerPaddle = !isSpectating && index === gameState.playerSlot;
 
-          // ✅ Smooth paddle movement with lerp (fluid animation)
-          // Use different smoothing for player vs opponent to fix collision desync
-          const smoothingFactor = isPlayerPaddle
-            ? 0.85 // Player paddle: highly responsive (85% per frame ≈ 20ms lag) - matches server collision
-            : 0.3; // Opponent paddle: smooth animation (30% per frame) - visual only, no gameplay impact
+          // ✅ CRITICAL FIX: Only smooth opponent paddle to prevent visual desync
+          // Player paddle must render exactly where it is for collision accuracy
+          // Opponent paddle smoothing is visual-only (doesn't affect gameplay)
+          if (!isPlayerPaddle) {
+            // Smooth opponent paddle for fluid animation (30% per frame)
+            const smoothingFactor = 0.3;
 
-          if (smoothPaddlePositions.current[index] === null) {
-            smoothPaddlePositions.current[index] = paddleY;
+            if (smoothPaddlePositions.current[index] === null) {
+              smoothPaddlePositions.current[index] = paddleY;
+            } else {
+              // Lerp towards target position
+              const currentSmooth = smoothPaddlePositions.current[index]!;
+              smoothPaddlePositions.current[index] =
+                currentSmooth + (paddleY - currentSmooth) * smoothingFactor;
+              paddleY = smoothPaddlePositions.current[index]!;
+            }
           } else {
-            // Lerp towards target position
-            const currentSmooth = smoothPaddlePositions.current[index]!;
-            smoothPaddlePositions.current[index] =
-              currentSmooth + (paddleY - currentSmooth) * smoothingFactor;
-            paddleY = smoothPaddlePositions.current[index]!;
+            // Player paddle: NO smoothing - render exactly where it is
+            // This ensures visual position matches server collision detection
+            smoothPaddlePositions.current[index] = paddleY;
           }
 
           const y = 20 + paddleY * scaleY; // paddleY is the TOP of the paddle (server treats it this way)
@@ -764,19 +773,36 @@ export function PongCanvas({
       });
     }
 
-    // Draw ball with enhanced graphics (with interpolation)
+    // Draw ball with enhanced graphics (with shadow physics or interpolation)
     if (gameState.ball && gameState.status === 'active') {
       let ballPosition = gameState.ball;
 
-      // Use our simple interpolation first
-      const interpolatedBall = getInterpolatedBallPosition();
-      if (interpolatedBall) {
-        ballPosition = interpolatedBall;
-      } else if (getInterpolatedGameState) {
-        // Fallback to the advanced interpolation if available
-        const interpolated = getInterpolatedGameState();
-        if (interpolated && interpolated.confidence.ball > 0.1) {
-          ballPosition = interpolated.ball;
+      // ✅ PHASE 2: Prefer shadow physics (client-side prediction) for smoothest experience
+      if (shadowPhysics) {
+        // Update shadow physics with current paddle positions
+        const paddle1Y = gameState.players[0]?.paddleY;
+        const paddle2Y = gameState.players[1]?.paddleY;
+        const shadowBall = shadowPhysics.update(Date.now(), paddle1Y, paddle2Y);
+
+        if (shadowBall) {
+          ballPosition = {
+            x: shadowBall.x,
+            y: shadowBall.y,
+            vx: shadowBall.vx,
+            vy: shadowBall.vy,
+          };
+        }
+      } else {
+        // Fallback to interpolation if shadow physics not available
+        const interpolatedBall = getInterpolatedBallPosition();
+        if (interpolatedBall) {
+          ballPosition = interpolatedBall;
+        } else if (getInterpolatedGameState) {
+          // Fallback to the advanced interpolation if available
+          const interpolated = getInterpolatedGameState();
+          if (interpolated && interpolated.confidence.ball > 0.1) {
+            ballPosition = interpolated.ball;
+          }
         }
       }
 
@@ -791,6 +817,7 @@ export function PongCanvas({
   }, [
     gameState,
     isSpectating,
+    shadowPhysics,
     getInterpolatedGameState,
     getInterpolatedBallPosition,
     getInterpolatedPaddlePosition,

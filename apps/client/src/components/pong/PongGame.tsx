@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { usePongSocket } from '../../hooks/usePongSocket';
 import { usePongInput } from '../../hooks/usePongInput';
 import { PongCanvas } from './PongCanvas';
@@ -7,6 +7,7 @@ import { PongSpectator } from './PongSpectator';
 import { PongHeader } from './PongHeader';
 import { PongMatchCreatorModal } from './PongMatchCreatorModal';
 import { PONG_PHYSICS } from '@ems/types';
+import { PongClientPhysics } from '../../utils/pongClientPhysics';
 
 export function PongGame() {
   const {
@@ -35,6 +36,9 @@ export function PongGame() {
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   const { inputState, setSendInput } = usePongInput();
+
+  // ✅ PHASE 2: Client-side physics simulation for smoother gameplay
+  const shadowPhysicsRef = useRef<PongClientPhysics>(new PongClientPhysics());
 
   // Connect input system to socket
   useEffect(() => {
@@ -76,6 +80,40 @@ export function PongGame() {
       clearInterval(refreshInterval);
     };
   }, [isConnected, isAuthenticated, currentGame, spectatingGameId, joinLobby]);
+
+  // ✅ PHASE 2: Initialize shadow physics when game becomes active
+  useEffect(() => {
+    if (!currentGame || currentGame.status !== 'active') {
+      // Clear shadow physics when not in active game
+      shadowPhysicsRef.current.clear();
+      return;
+    }
+
+    // Initialize shadow physics with current ball state
+    shadowPhysicsRef.current.initialize(currentGame.ball);
+    console.log('🎮 Shadow physics initialized');
+  }, [currentGame?.status, currentGame?.ball]);
+
+  // ✅ PHASE 2: Reconcile shadow physics with server state
+  useEffect(() => {
+    if (!currentGame || currentGame.status !== 'active') return;
+
+    // Reconcile shadow state with server state
+    const needsReconciliation = shadowPhysicsRef.current.reconcile(currentGame.ball);
+
+    if (needsReconciliation && process.env.NODE_ENV === 'development') {
+      const stats = shadowPhysicsRef.current.getStats();
+      console.log(`🔄 Shadow reconciliation needed (divergence count: ${stats.divergenceCount})`);
+    }
+  }, [currentGame?.ball, currentGame?.status]);
+
+  // ✅ PHASE 2: Hard reset shadow physics on score events
+  useEffect(() => {
+    if (!currentGame || currentGame.status !== 'active') return;
+
+    // Reset shadow physics when score changes (ball was reset)
+    shadowPhysicsRef.current.reset(currentGame.ball);
+  }, [currentGame?.scores]);
 
   const handleCreateMatch = (wager: number, type: 'ai' | 'pvp', aiDifficulty?: string) => {
     createMatch(wager, type, aiDifficulty);
@@ -136,6 +174,7 @@ export function PongGame() {
                 onSetReady={setReady}
                 isSpectating={false}
                 gameStateBuffer={gameStateBuffer}
+                shadowPhysics={shadowPhysicsRef.current}
                 className="max-w-4xl w-full"
               />
             </div>
