@@ -94,9 +94,10 @@ export const ParlayBuilderWidget: React.FC<ParlayBuilderWidgetProps> = ({
             className={`
               absolute ${getPanelPositionClasses()}
               bg-surface border-2 border-secondary/40 rounded-xl backdrop-blur-sm
-              w-96 max-w-[calc(100vw-2rem)] max-h-[80vh] overflow-y-auto
+              w-[550px] lg:w-[600px] max-w-[calc(100vw-2rem)] max-h-[85vh] overflow-hidden
               transform transition-all duration-300
               ${isOpen ? 'scale-100 opacity-100' : 'scale-95 opacity-0 pointer-events-none'}
+              flex flex-col
             `}
             style={{
               boxShadow:
@@ -115,7 +116,7 @@ export const ParlayBuilderWidget: React.FC<ParlayBuilderWidgetProps> = ({
             </div>
 
             {/* ParlayPanel content */}
-            <div className="p-4">
+            <div className="p-4 overflow-y-auto flex-1">
               <ParlayPanel />
             </div>
           </div>

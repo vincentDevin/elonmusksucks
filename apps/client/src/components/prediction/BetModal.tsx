@@ -356,7 +356,6 @@ export default function BetModal({
                 ? String(activePrediction.title)
                 : 'Select Prediction'}
             </h3>
-            <div className="text-sm text-tertiary mt-1">Balance: {formatMuskBucks(balance)} 🪙</div>
           </div>
           {mode !== 'inline' && (
             <button
@@ -456,20 +455,119 @@ export default function BetModal({
         </div>
 
         {/* Amount Input */}
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-content">Bet Amount</label>
-          <input
-            type="number"
-            min="1"
-            max={balance}
-            value={amount || ''}
-            onChange={(e) => setAmount(Number(e.target.value) || 0)}
-            placeholder="Enter amount..."
-            className="w-full px-3 py-2 border border-muted rounded-lg bg-background text-content placeholder-tertiary focus:outline-none focus:border-primary"
-          />
-          <div className="flex justify-between text-xs text-tertiary">
-            <span>Min: 1 🪙</span>
-            <span>Max: {formatMuskBucks(balance)} 🪙</span>
+        <div className="bg-surface p-3 rounded-lg border border-muted space-y-3">
+          {/* Header */}
+          <h3 className="text-lg font-semibold text-content">Bet Amount</h3>
+
+          {/* Balance Row */}
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-tertiary">Balance</span>
+            <span className="font-bold text-content">{formatMuskBucks(balance)} 🪙</span>
+          </div>
+
+          {/* Bet Input Row */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-tertiary">Your Bet</span>
+              {betCalculations && amount > 0 && (
+                <div
+                  className={`px-1.5 py-0.5 rounded text-xs font-medium ${
+                    betCalculations.excitementLevel === 'yolo'
+                      ? 'bg-red-600/10 text-red-600'
+                      : betCalculations.excitementLevel === 'high'
+                        ? 'bg-orange-600/10 text-orange-600'
+                        : betCalculations.excitementLevel === 'aggressive'
+                          ? 'bg-yellow-600/10 text-yellow-600'
+                          : betCalculations.excitementLevel === 'moderate'
+                            ? 'bg-blue-600/10 text-blue-600'
+                            : 'bg-green-600/10 text-green-600'
+                  }`}
+                >
+                  {betCalculations.riskEmoji} {betCalculations.riskLevel}
+                </div>
+              )}
+            </div>
+            <div className="flex items-center space-x-2">
+              <input
+                type="number"
+                value={amount || ''}
+                onChange={(e) => setAmount(Number(e.target.value) || 0)}
+                min="0"
+                max={balance}
+                step="10"
+                placeholder="0"
+                className="w-32 px-3 py-2 bg-background border border-muted rounded text-right font-bold text-content focus:ring-2 focus:ring-primary focus:border-primary"
+              />
+              <span className="font-bold text-content">🪙</span>
+            </div>
+          </div>
+
+          {/* Slider */}
+          <div className="relative">
+            <input
+              type="range"
+              min="0"
+              max={balance}
+              step="10"
+              value={amount}
+              onChange={(e) => setAmount(parseInt(e.target.value))}
+              className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer slider"
+              style={{
+                background: `linear-gradient(to right, var(--color-primary) 0%, var(--color-primary) ${(amount / balance) * 100}%, var(--color-muted) ${(amount / balance) * 100}%, var(--color-muted) 100%)`,
+              }}
+            />
+            <div className="flex justify-between text-xs text-tertiary mt-1">
+              <span>0</span>
+              <span className="text-primary font-medium">{formatMuskBucks(amount)}</span>
+              <span>{formatMuskBucks(balance)}</span>
+            </div>
+          </div>
+
+          {/* Percentage Buttons */}
+          <div className="flex space-x-2">
+            {[0.1, 0.25, 0.5, 1.0].map((percent) => {
+              const percentAmount = Math.floor(balance * percent);
+              return (
+                <button
+                  key={percent}
+                  onClick={() => setAmount(percentAmount)}
+                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer ${
+                    amount === percentAmount
+                      ? 'bg-primary text-white shadow-lg'
+                      : 'bg-muted/20 text-content hover:bg-primary hover:text-white hover:shadow-xl hover:shadow-primary/50'
+                  }`}
+                  disabled={balance === 0}
+                >
+                  {percent === 1.0 ? '🚀 MAX' : `${percent * 100}%`}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Popular Stakes */}
+          <div className="pt-2 border-t border-muted">
+            <div className="text-xs text-tertiary mb-2">Popular Stakes</div>
+            <div className="grid grid-cols-4 gap-1">
+              {[50, 100, 250, 500].map((presetAmount) => {
+                const isDisabled = presetAmount > balance;
+                return (
+                  <button
+                    key={presetAmount}
+                    onClick={() => setAmount(Math.min(presetAmount, balance))}
+                    disabled={isDisabled}
+                    className={`px-2 py-1 text-xs rounded transition-all ${
+                      isDisabled
+                        ? 'opacity-60 cursor-not-allowed bg-muted/20 text-tertiary'
+                        : amount === presetAmount
+                          ? 'bg-primary text-white'
+                          : 'bg-muted/20 text-content hover:bg-primary hover:text-white hover:shadow-lg hover:shadow-primary/50 cursor-pointer'
+                    }`}
+                  >
+                    {formatMuskBucks(presetAmount)}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
 

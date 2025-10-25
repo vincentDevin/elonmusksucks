@@ -14,6 +14,7 @@ import PaginationControls from '../components/prediction/PaginationControls';
 // Existing components
 import PredictionCard from '../components/prediction/PredictionCard';
 import PredictionSectionCard from '../components/prediction/PredictionSectionCard';
+import BetModal from '../components/prediction/BetModal';
 
 // Hooks and contexts
 import { usePredictionDiscovery } from '../hooks/usePredictionDiscovery';
@@ -60,6 +61,8 @@ export default function Predictions() {
   const [previewPrediction, setPreviewPrediction] = useState<any>(null);
   const [previewTriggerRef, setPreviewTriggerRef] = useState<HTMLElement | null>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [betModalOpen, setBetModalOpen] = useState(false);
+  const [selectedPredictionForBet, setSelectedPredictionForBet] = useState<any>(null);
 
   // Refs for hover preview
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -176,8 +179,8 @@ export default function Predictions() {
 
   // Quick bet handler
   const handleQuickBet = useCallback((prediction: any) => {
-    // Open bet modal or navigate to bet page
-    console.log('Quick bet on:', prediction);
+    setSelectedPredictionForBet(prediction);
+    setBetModalOpen(true);
   }, []);
 
   // Render prediction cards based on view mode
@@ -532,6 +535,19 @@ export default function Predictions() {
           triggerRef={{ current: previewTriggerRef }}
           isVisible={true}
           placement="right"
+        />
+      )}
+
+      {/* Quick Bet Modal */}
+      {selectedPredictionForBet && (
+        <BetModal
+          prediction={selectedPredictionForBet}
+          isOpen={betModalOpen}
+          onClose={() => {
+            setBetModalOpen(false);
+            setSelectedPredictionForBet(null);
+          }}
+          mode="modal"
         />
       )}
     </div>
