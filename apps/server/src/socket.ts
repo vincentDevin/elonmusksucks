@@ -14,7 +14,7 @@ export { SOCKET_ROOMS, REDIS_CHANNELS } from '@ems/types';
 export type { SocketRoom, RedisChannel } from '@ems/types';
 import redisClient from './lib/redis';
 import { socketAuthMiddleware } from './middleware/socketAuthMiddleware';
-import { registerChatHandlers } from './handlers/chatHandlers';
+import { registerChatHandlers, publishOnlineUsers } from './handlers/chatHandlers';
 import { registerBetHandlers } from './handlers/betSocketHandlers';
 import { registerRedisEventHandlers } from './handlers/redisEventHandlers';
 import { registerModerationHandlers } from './handlers/moderationHandlers';
@@ -27,7 +27,7 @@ import { registerPostRedisHandlers } from './handlers/postRedisEventHandlers';
 import { socketCleanupManager } from './lib/SocketCleanupManager';
 import { registerRoomHandlers } from './handlers/roomHandlers';
 import { eventSystemMetricsService } from './services/eventSystemMetrics.service';
-import { REDIS_CHANNELS } from '@ems/types';
+import { REDIS_CHANNELS, CHAT_REDIS_KEYS } from '@ems/types';
 import env from './config/env';
 import {
   socketConnectionsActive,
@@ -59,6 +59,11 @@ function getAllowedOrigins(): string[] {
 // Connection deduplication: Track active connections per user
 // Prevents duplicate connections from same user across reconnects/multiple tabs
 const activeUserConnections = new Map<number, string>(); // userId -> socketId
+const socketActivityTimestamps = new Map<string, number>(); // socketId -> lastActivityTime
+
+// Periodic cleanup configuration
+const STALE_CONNECTION_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes of inactivity
+const CLEANUP_INTERVAL_MS = 60 * 1000; // Check every 60 seconds
 
 export async function initSocket(httpServer: HTTPServer) {
   // Optimized heartbeat configuration to reduce disconnects
@@ -223,8 +228,14 @@ export async function initSocket(httpServer: HTTPServer) {
         }
         // Track this user's new connection
         activeUserConnections.set(user.id, socket.id);
+        socketActivityTimestamps.set(socket.id, Date.now());
         console.log(`[socket] User ${user.id} connection registered: ${socket.id}`);
       }
+
+      // Update activity timestamp on any event
+      socket.onAny(() => {
+        socketActivityTimestamps.set(socket.id, Date.now());
+      });
 
       // Join user-specific room for personal events
       if (user?.id) {
@@ -269,6 +280,9 @@ export async function initSocket(httpServer: HTTPServer) {
             }
           }
 
+          // Clean up activity tracking
+          socketActivityTimestamps.delete(socket.id);
+
           await socketCleanupManager.cleanupSocket(socket.id);
 
           // ── PROMETHEUS METRICS: Update room count after cleanup ────────────
@@ -291,11 +305,101 @@ export async function initSocket(httpServer: HTTPServer) {
 
   io.on('error', (err) => console.error('[socket.io] SERVER ERROR:', err));
 
+  // ── PERIODIC CLEANUP: Remove stale socket connections ────────────────────
+  // Cleans up "ghost" connections where disconnect events didn't fire
+  const cleanupStaleConnections = async () => {
+    let cleanedCount = 0;
+    const now = Date.now();
+
+    // Check all tracked user connections
+    for (const [userId, socketId] of activeUserConnections.entries()) {
+      const socket = io.sockets.sockets.get(socketId);
+
+      // Remove if socket no longer exists
+      if (!socket) {
+        activeUserConnections.delete(userId);
+        socketActivityTimestamps.delete(socketId);
+        cleanedCount++;
+        console.log(
+          `[socket-cleanup] Removed ghost connection for user ${userId} (socket ${socketId} not found)`,
+        );
+        continue;
+      }
+
+      // Remove if socket hasn't had activity in STALE_CONNECTION_TIMEOUT_MS
+      const lastActivity = socketActivityTimestamps.get(socketId);
+      if (lastActivity && now - lastActivity > STALE_CONNECTION_TIMEOUT_MS) {
+        console.log(
+          `[socket-cleanup] Disconnecting stale connection for user ${userId} (inactive for ${Math.floor((now - lastActivity) / 1000)}s)`,
+        );
+        socket.disconnect(true);
+        activeUserConnections.delete(userId);
+        socketActivityTimestamps.delete(socketId);
+        cleanedCount++;
+      }
+    }
+
+    // Clean up orphaned activity timestamps
+    for (const socketId of socketActivityTimestamps.keys()) {
+      if (!io.sockets.sockets.has(socketId)) {
+        socketActivityTimestamps.delete(socketId);
+      }
+    }
+
+    // ── REDIS CLEANUP: Remove stale users from chat online list ──────────────
+    // Clean up users who are marked as online in Redis but have no active sockets
+    try {
+      const onlineUserIds = await redisClient.smembers(CHAT_REDIS_KEYS.ONLINE_USERS_SET);
+      let redisCleanedCount = 0;
+
+      for (const userIdStr of onlineUserIds) {
+        const userId = Number(userIdStr);
+
+        // Check if this user has an active socket connection
+        const hasActiveSocket = activeUserConnections.has(userId);
+
+        if (!hasActiveSocket) {
+          // User is marked as online in Redis but has no active socket - clean up
+          console.log(`[socket-cleanup] Removing stale user ${userId} from Redis online users`);
+
+          await redisClient.del(CHAT_REDIS_KEYS.CONNECTIONS_PREFIX + userIdStr);
+          await redisClient.srem(CHAT_REDIS_KEYS.ONLINE_USERS_SET, userIdStr);
+          await redisClient.hdel(CHAT_REDIS_KEYS.USER_INFO_HASH, userIdStr);
+
+          redisCleanedCount++;
+        }
+      }
+
+      if (redisCleanedCount > 0) {
+        console.log(`[socket-cleanup] Cleaned up ${redisCleanedCount} stale users from Redis`);
+
+        // Publish updated online users list with full user data
+        await publishOnlineUsers();
+      }
+    } catch (error) {
+      console.error('[socket-cleanup] Error cleaning up Redis online users:', error);
+    }
+
+    if (cleanedCount > 0) {
+      console.log(`[socket-cleanup] Cleaned up ${cleanedCount} stale socket connections`);
+    }
+  };
+
+  // Run cleanup every CLEANUP_INTERVAL_MS
+  const cleanupInterval = setInterval(cleanupStaleConnections, CLEANUP_INTERVAL_MS);
+  console.log(
+    `[socket] Stale connection cleanup scheduled every ${CLEANUP_INTERVAL_MS / 1000}s (timeout: ${STALE_CONNECTION_TIMEOUT_MS / 1000}s)`,
+  );
+
   // ── CRITICAL: Redis client cleanup on server shutdown ────────────────────
   const gracefulShutdown = async (signal: string) => {
     console.log(`[socket] Received ${signal}, cleaning up Redis connections...`);
 
     try {
+      // Stop periodic cleanup
+      clearInterval(cleanupInterval);
+      console.log('[socket] Stopped periodic cleanup interval');
+
       // Clean up socket listeners first
       console.log('[socket] Cleaning up socket listeners...');
       try {

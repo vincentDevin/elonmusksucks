@@ -362,7 +362,8 @@ export async function registerChatHandlers(socket: Socket) {
 }
 
 // Helper: broadcast current online list via Redis
-async function publishOnlineUsers(connectionUserId?: string) {
+// Exported for use in socket cleanup (apps/server/src/socket.ts)
+export async function publishOnlineUsers(connectionUserId?: string) {
   const ids = await redisClient.smembers(CHAT_REDIS_KEYS.ONLINE_USERS_SET);
   const infoArr = ids.length ? await redisClient.hmget(CHAT_REDIS_KEYS.USER_INFO_HASH, ...ids) : [];
   const onlineUsers: ChatUsersOnlinePayload = ids.map((id, i) => {

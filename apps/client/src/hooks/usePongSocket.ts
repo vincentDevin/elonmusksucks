@@ -607,6 +607,31 @@ export function usePongSocket(): PongSocketHook {
     };
   }, [user]);
 
+  // Periodic health check to clean up disconnected sockets
+  useEffect(() => {
+    if (!user) return;
+
+    const healthCheckInterval = setInterval(() => {
+      // Clean up stale entries from userSockets map
+      for (const [userId, userSocket] of userSockets.entries()) {
+        if (!userSocket.connected) {
+          console.log(`🏓 Cleaning up disconnected socket for user ${userId}`);
+          userSocket.disconnect();
+          userSockets.delete(userId);
+          userConnecting.delete(userId);
+
+          // If it's the current user, reconnect
+          if (userId === user.id && accessToken) {
+            console.log(`🏓 Current user's socket was disconnected, reconnecting...`);
+            setTimeout(() => connect(), 1000);
+          }
+        }
+      }
+    }, 30000); // Check every 30 seconds
+
+    return () => clearInterval(healthCheckInterval);
+  }, [user, accessToken, connect]);
+
   // ✅ Periodic RTT ping measurement (every 2 seconds during active game)
   useEffect(() => {
     if (!socket || !isConnected || !currentGame) return;

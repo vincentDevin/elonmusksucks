@@ -269,6 +269,36 @@ class AuthManager {
       this.authenticatedPlayers.delete(socketId);
     }
   }
+
+  /**
+   * Clean up stale socket connections (sockets that no longer exist)
+   * Returns number of connections cleaned up
+   */
+  cleanupStaleConnections(validSocketIds: Set<string>): number {
+    let cleanedCount = 0;
+
+    // Check all authenticated players
+    for (const [socketId, player] of this.authenticatedPlayers.entries()) {
+      if (!validSocketIds.has(socketId)) {
+        console.log(
+          `[auth-cleanup] Removing stale connection for player ${player.name} (${player.id})`,
+        );
+        this.playerSockets.delete(player.id);
+        this.authenticatedPlayers.delete(socketId);
+        cleanedCount++;
+      }
+    }
+
+    // Clean up orphaned player socket mappings
+    for (const [playerId, socketId] of this.playerSockets.entries()) {
+      if (!validSocketIds.has(socketId)) {
+        console.log(`[auth-cleanup] Removing orphaned socket mapping for player ${playerId}`);
+        this.playerSockets.delete(playerId);
+      }
+    }
+
+    return cleanedCount;
+  }
 }
 
 // ——————————————————————————————————————————————————————————————————————————————————
@@ -315,6 +345,24 @@ class StatisticsManager {
       activeGames: this.activeGames.size,
       availableMatches,
     };
+  }
+
+  /**
+   * Clean up stale player connections (players whose sockets no longer exist)
+   * Returns number of players cleaned up
+   */
+  cleanupStalePlayers(validPlayerIds: Set<number>): number {
+    let cleanedCount = 0;
+
+    for (const playerId of this.connectedPlayers) {
+      if (!validPlayerIds.has(playerId)) {
+        console.log(`[stats-cleanup] Removing stale player ${playerId} from connected players`);
+        this.connectedPlayers.delete(playerId);
+        cleanedCount++;
+      }
+    }
+
+    return cleanedCount;
   }
 }
 
@@ -389,6 +437,35 @@ class LobbyManager {
 
   deleteLobby(lobbyId: string): void {
     this.lobbies.delete(lobbyId);
+  }
+
+  /**
+   * Clean up lobbies whose creators are no longer connected
+   * Returns number of lobbies cleaned up
+   */
+  cleanupStaleLobbies(validPlayerIds: Set<number>): number {
+    let cleanedCount = 0;
+
+    for (const [lobbyId, lobby] of this.lobbies.entries()) {
+      if (!validPlayerIds.has(lobby.creatorId)) {
+        console.log(
+          `[lobby-cleanup] Removing lobby ${lobbyId} (creator ${lobby.creatorId} disconnected)`,
+        );
+        this.lobbies.delete(lobbyId);
+        this.playerLobbies.delete(lobby.creatorId);
+        cleanedCount++;
+      }
+    }
+
+    // Clean up orphaned player lobby mappings
+    for (const [playerId, lobbyId] of this.playerLobbies.entries()) {
+      if (!this.lobbies.has(lobbyId)) {
+        console.log(`[lobby-cleanup] Removing orphaned lobby mapping for player ${playerId}`);
+        this.playerLobbies.delete(playerId);
+      }
+    }
+
+    return cleanedCount;
   }
 }
 
@@ -1477,6 +1554,64 @@ class GameManager {
 
     console.log('🧹 Game manager cleanup complete');
   }
+
+  /**
+   * Clean up stale games where players are no longer connected
+   * Forfeits games where players have disconnected (but not in grace period)
+   * Returns number of games cleaned up
+   */
+  cleanupStaleGames(validPlayerIds: Set<number>): number {
+    let cleanedCount = 0;
+
+    for (const [gameId, game] of this.games.entries()) {
+      // Skip games that have already ended
+      if (game.status === 'ended') continue;
+
+      // Check player 0
+      if (game.players[0] && !validPlayerIds.has(game.players[0].id)) {
+        // Check if player 0 is in grace period
+        const graceInfo = this.disconnectionGracePeriods.get(game.players[0].id);
+        if (!graceInfo || graceInfo.gameId !== gameId) {
+          console.log(
+            `[game-cleanup] Player 0 (${game.players[0].id}) disconnected from game ${gameId}, forfeiting`,
+          );
+          this.endGame(game, 'forfeit', 1);
+          cleanedCount++;
+          continue;
+        }
+      }
+
+      // Check player 1 (if exists and not AI)
+      if (game.players[1] && !game.isAI && !validPlayerIds.has(game.players[1].id)) {
+        // Check if player 1 is in grace period
+        const graceInfo = this.disconnectionGracePeriods.get(game.players[1].id);
+        if (!graceInfo || graceInfo.gameId !== gameId) {
+          console.log(
+            `[game-cleanup] Player 1 (${game.players[1].id}) disconnected from game ${gameId}, forfeiting`,
+          );
+          this.endGame(game, 'forfeit', 0);
+          cleanedCount++;
+          continue;
+        }
+      }
+    }
+
+    // Clean up orphaned spectators
+    for (const [socketId, gameId] of this.spectatorGames.entries()) {
+      if (!this.games.has(gameId)) {
+        this.spectatorGames.delete(socketId);
+        const spectators = this.gameSpectators.get(gameId);
+        if (spectators) {
+          spectators.delete(socketId);
+          if (spectators.size === 0) {
+            this.gameSpectators.delete(gameId);
+          }
+        }
+      }
+    }
+
+    return cleanedCount;
+  }
 }
 
 // ——————————————————————————————————————————————————————————————————————————————————
@@ -1528,11 +1663,16 @@ export class PongGameServer {
   private game = new GameManager(this.io, this.db, this.auth, this.stats);
   private rateLimiter = new SocketRateLimiter();
   private statsInterval: NodeJS.Timeout | null = null;
+  private cleanupInterval: NodeJS.Timeout | null = null;
+
+  // Periodic cleanup configuration
+  private readonly CLEANUP_INTERVAL_MS = 60 * 1000; // Check every 60 seconds
 
   constructor() {
     this.setupMiddleware();
     this.setupSocketHandlers();
     this.setupStatsBroadcasting();
+    this.setupPeriodicCleanup();
   }
 
   private setupMiddleware(): void {
@@ -2220,6 +2360,48 @@ export class PongGameServer {
     }, 5000);
   }
 
+  private setupPeriodicCleanup(): void {
+    // Periodic cleanup of stale connections every 60 seconds
+    this.cleanupInterval = setInterval(() => {
+      this.cleanupStaleConnections();
+    }, this.CLEANUP_INTERVAL_MS);
+    console.log(
+      `[pong] Stale connection cleanup scheduled every ${this.CLEANUP_INTERVAL_MS / 1000}s`,
+    );
+  }
+
+  private cleanupStaleConnections(): void {
+    // Build set of valid socket IDs
+    const validSocketIds = new Set<string>();
+    const validPlayerIds = new Set<number>();
+
+    for (const [socketId] of this.io.sockets.sockets) {
+      validSocketIds.add(socketId);
+      // Get player from auth manager
+      const player = this.auth.getPlayer(socketId);
+      if (player) {
+        validPlayerIds.add(player.id);
+      }
+    }
+
+    // Run cleanup on all managers
+    const authCleaned = this.auth.cleanupStaleConnections(validSocketIds);
+    const statsCleaned = this.stats.cleanupStalePlayers(validPlayerIds);
+    const lobbyCleaned = this.lobby.cleanupStaleLobbies(validPlayerIds);
+    const gameCleaned = this.game.cleanupStaleGames(validPlayerIds);
+
+    const totalCleaned = authCleaned + statsCleaned + lobbyCleaned + gameCleaned;
+    if (totalCleaned > 0) {
+      console.log(
+        `[pong-cleanup] Cleaned up ${totalCleaned} stale entries (auth: ${authCleaned}, stats: ${statsCleaned}, lobby: ${lobbyCleaned}, games: ${gameCleaned})`,
+      );
+
+      // Broadcast updated lobby and stats
+      this.io.to('lobby').emit('lobby_state', { lobbies: this.lobby.getAvailableLobbies() });
+      this.broadcastStatsUpdate();
+    }
+  }
+
   private broadcastStatsUpdate(): void {
     const stats = this.stats.getStats(this.lobby.getAvailableLobbies().length);
     this.io.to('lobby').emit('stats_update', stats);
@@ -2260,6 +2442,12 @@ export class PongGameServer {
     if (this.statsInterval) {
       clearInterval(this.statsInterval);
       this.statsInterval = null;
+    }
+
+    // Clear the cleanup interval
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
     }
 
     // Clear all game intervals and data

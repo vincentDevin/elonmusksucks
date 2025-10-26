@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { usePongSocket } from '../../hooks/usePongSocket';
 import { usePongInput } from '../../hooks/usePongInput';
+import { usePongEvents } from '../../hooks/usePongEvents';
 import { PongCanvas } from './PongCanvas';
 import { PongGamesList } from './PongGamesList';
 import { PongSpectator } from './PongSpectator';
@@ -32,6 +33,9 @@ export function PongGame() {
     setReady,
     leaveMatch,
   } = usePongSocket();
+
+  // Subscribe to Elo update events
+  const { metrics } = usePongEvents();
 
   // Local state for spectator mode and match creation modal
   const [spectatingGameId, setSpectatingGameId] = useState<string | null>(null);
@@ -78,6 +82,23 @@ export function PongGame() {
       fetchUserElo();
     }
   }, [isAuthenticated]);
+
+  // Update local Elo state when event bus metrics change
+  useEffect(() => {
+    // Update from metrics whenever they change from their default values
+    // This means an event was received with real Elo data
+    if (metrics.currentElo !== 1000 || metrics.currentTier !== 'Bronze') {
+      setUserElo(metrics.currentElo);
+      setUserTier(metrics.currentTier);
+      console.log(
+        '[PongGame] Elo synced from event metrics:',
+        metrics.currentElo,
+        metrics.currentTier,
+      );
+    }
+    // Note: Don't include userElo/userTier in deps to avoid update loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [metrics.currentElo, metrics.currentTier]);
 
   // Cleanup on unmount - only disconnect when component actually unmounts (user leaves page)
   // NOT when user object updates (e.g., balance changes)

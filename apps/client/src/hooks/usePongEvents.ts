@@ -154,20 +154,23 @@ export function usePongEvents() {
         if (payload.userId === user.id) {
           console.log('[PongEvents] ELO update:', payload);
 
-          const eloChange = payload.newElo - payload.oldElo;
+          // Server sends 'newRating' and 'oldRating', not 'newElo'/'oldElo'
+          const newElo = payload.newRating;
+          const oldElo = payload.oldRating;
+          const eloChange = payload.change || newElo - oldElo;
           const isPositive = eloChange > 0;
           const tierInfo = getTierInfo(payload.tier);
 
           addAlert({
             type: 'elo_update',
             title: `🏓 ELO ${isPositive ? 'Gained' : 'Lost'}`,
-            description: `${isPositive ? '+' : ''}${eloChange} ELO (${payload.newElo}) ${tierInfo.icon} ${payload.tier}`,
+            description: `${isPositive ? '+' : ''}${eloChange} ELO (${newElo}) ${tierInfo.icon} ${payload.tier}`,
             timestamp: payload.timestamp || new Date().toISOString(),
             severity: isPositive ? 'success' : 'error',
             icon: isPositive ? '📈' : '📉',
             duration: 6000,
             eloChange,
-            newElo: payload.newElo,
+            newElo: newElo,
             tier: payload.tier,
             matchId: payload.matchId,
             opponentName: payload.opponentName,
@@ -187,9 +190,9 @@ export function usePongEvents() {
 
           // Update metrics
           updateMetrics({
-            currentElo: payload.newElo,
+            currentElo: newElo,
             currentTier: payload.tier,
-            highestElo: Math.max(metrics.highestElo, payload.newElo),
+            highestElo: Math.max(metrics.highestElo, newElo),
           });
         }
       }),
@@ -199,7 +202,9 @@ export function usePongEvents() {
         if (payload.userId === user.id) {
           console.log('[PongEvents] Tier change:', payload);
 
-          const isPromotion = payload.direction === 'up';
+          // Server sends 'isPromotion' boolean and 'eloRating', not 'direction' or 'elo'
+          const isPromotion = payload.isPromotion;
+          const eloRating = payload.eloRating;
           const tierInfo = getTierInfo(payload.newTier);
 
           addAlert({
@@ -210,7 +215,7 @@ export function usePongEvents() {
             severity: isPromotion ? 'success' : 'warning',
             icon: isPromotion ? '🎉' : '😔',
             duration: isPromotion ? 12000 : 8000,
-            newElo: payload.elo,
+            newElo: eloRating,
             tier: payload.newTier,
             actions: [
               {
@@ -229,7 +234,7 @@ export function usePongEvents() {
           // Update metrics
           updateMetrics({
             currentTier: payload.newTier,
-            currentElo: payload.elo,
+            currentElo: eloRating,
           });
         }
       }),
