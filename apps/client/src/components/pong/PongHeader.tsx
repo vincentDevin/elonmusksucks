@@ -1,6 +1,7 @@
 import { PONG_PAYOUT_CONSTANTS } from '@ems/types';
 import type { AIDifficulty } from '@ems/types';
 import { formatMuskBucks } from '../../utils/formatting';
+import PongTierBadge from './PongTierBadge';
 
 interface PongHeaderProps {
   mode: 'lobby' | 'game' | 'spectator';
@@ -15,7 +16,8 @@ interface PongHeaderProps {
     availableMatches: number;
   };
   onConnect: () => void;
-  onCreateMatch?: () => void;
+  userElo?: number;
+  userTier?: string;
 
   // Game-specific props (from PongGame header)
   currentGame?: any; // GameState type
@@ -31,7 +33,8 @@ export function PongHeader({
   connectionError,
   stats,
   onConnect,
-  onCreateMatch,
+  userElo,
+  userTier,
   currentGame,
   lastPing = 0,
   onBackToLobby,
@@ -121,18 +124,25 @@ export function PongHeader({
               </div>
             </div>
 
-            {/* Action Buttons */}
+            {/* Action Buttons / Elo Display */}
             <div className="flex items-center space-x-2">
               {isConnected && isAuthenticated ? (
                 <>
-                  {onCreateMatch && (
-                    <button
-                      onClick={onCreateMatch}
-                      className="px-4 py-2 bg-gradient-to-r from-primary to-accent text-white rounded-lg hover:shadow-lg transition-all text-sm font-medium cursor-pointer border-2 border-primary hover:border-accent hover:shadow-lg"
-                      title="Create a new match"
-                    >
-                      ➕ Create Match
-                    </button>
+                  {userElo !== undefined && userTier && (
+                    <div className="flex items-center space-x-3 px-4 py-2 bg-surface border border-border rounded-lg">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-lg">🏆</span>
+                        <div className="flex flex-col">
+                          <span className="text-xs text-tertiary">Your Elo</span>
+                          <span className="text-sm font-bold text-content">
+                            {userElo.toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="border-l border-border pl-3">
+                        <PongTierBadge tier={userTier} size="sm" />
+                      </div>
+                    </div>
                   )}
                 </>
               ) : (

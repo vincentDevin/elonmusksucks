@@ -8,6 +8,8 @@ import { PongHeader } from './PongHeader';
 import { PongMatchCreatorModal } from './PongMatchCreatorModal';
 import { PONG_PHYSICS } from '@ems/types';
 import { PongClientPhysics } from '../../utils/pongClientPhysics';
+import api from '../../api/axios';
+import { getTierFromElo } from './PongTierBadge';
 
 export function PongGame() {
   const {
@@ -34,6 +36,9 @@ export function PongGame() {
   // Local state for spectator mode and match creation modal
   const [spectatingGameId, setSpectatingGameId] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [modalVariant, setModalVariant] = useState<'ai' | 'pvp' | null>(null);
+  const [userElo, setUserElo] = useState<number | undefined>(undefined);
+  const [userTier, setUserTier] = useState<string | undefined>(undefined);
 
   const { inputState, setSendInput } = usePongInput();
 
@@ -53,6 +58,26 @@ export function PongGame() {
       connect();
     }
   }, [isConnected, socket, connect]);
+
+  // Fetch user's Elo rating on mount
+  useEffect(() => {
+    const fetchUserElo = async () => {
+      try {
+        const response = await api.get('/api/users/me/pong-stats');
+        const elo = response.data.eloRating || 1200;
+        setUserElo(elo);
+        setUserTier(getTierFromElo(elo));
+      } catch (error) {
+        console.error('Failed to fetch user Elo:', error);
+        setUserElo(1200); // Default
+        setUserTier('SILVER'); // Default tier
+      }
+    };
+
+    if (isAuthenticated) {
+      fetchUserElo();
+    }
+  }, [isAuthenticated]);
 
   // Cleanup on unmount - only disconnect when component actually unmounts (user leaves page)
   // NOT when user object updates (e.g., balance changes)
@@ -118,10 +143,34 @@ export function PongGame() {
   const handleCreateMatch = (wager: number, type: 'ai' | 'pvp', aiDifficulty?: string) => {
     createMatch(wager, type, aiDifficulty);
     setShowCreateModal(false); // Close modal after creating match
+    setModalVariant(null); // Reset variant
   };
 
-  const handleOpenCreateModal = () => {
+  const handlePlayAI = () => {
+    setModalVariant('ai');
     setShowCreateModal(true);
+  };
+
+  const handleChallengePlayers = () => {
+    setModalVariant('pvp');
+    setShowCreateModal(true);
+  };
+
+  const handleQuickMatch = () => {
+    // Auto-join first available lobby
+    if (lobbies.length > 0) {
+      joinMatch(lobbies[0].id);
+    } else {
+      // No lobbies available - could show a toast/notification here
+      console.log('No matches available to join');
+      // Optionally show a temporary message or toast
+      alert('No matches available at the moment. Try creating one!');
+    }
+  };
+
+  const handleCloseModal = () => {
+    setShowCreateModal(false);
+    setModalVariant(null);
   };
 
   const handleSpectateGame = (gameId: string) => {
@@ -150,7 +199,8 @@ export function PongGame() {
             connectionError={connectionError}
             stats={stats}
             onConnect={connect}
-            onCreateMatch={handleOpenCreateModal}
+            userElo={userElo}
+            userTier={userTier}
             currentGame={currentGame}
             lastPing={lastPing}
             onBackToLobby={handleBackToLobby}
@@ -224,16 +274,22 @@ export function PongGame() {
               activeGames={activeGames}
               onJoinMatch={joinMatch}
               onSpectateGame={handleSpectateGame}
+              onPlayAI={handlePlayAI}
+              onChallengePlayers={handleChallengePlayers}
+              onQuickMatch={handleQuickMatch}
             />
           </div>
         )}
 
         {/* Match Creation Modal */}
-        <PongMatchCreatorModal
-          isOpen={showCreateModal}
-          onClose={() => setShowCreateModal(false)}
-          onCreateMatch={handleCreateMatch}
-        />
+        {modalVariant && (
+          <PongMatchCreatorModal
+            isOpen={showCreateModal}
+            onClose={handleCloseModal}
+            onCreateMatch={handleCreateMatch}
+            variant={modalVariant}
+          />
+        )}
 
         {/* Debug Info (development only) */}
         {process.env.NODE_ENV === 'development' && (

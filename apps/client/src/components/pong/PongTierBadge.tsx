@@ -8,43 +8,43 @@ interface PongTierBadgeProps {
 
 const TIER_CONFIG = {
   BRONZE: {
-    colors: 'bg-muted text-tertiary border-muted',
+    colors: 'bg-amber-900/20 text-black dark:text-amber-500 border-amber-600/30',
     icon: '🥉',
     description: 'Beginners',
     range: '400-999',
   },
   SILVER: {
-    colors: 'bg-surface text-content border-accent/20',
+    colors: 'bg-slate-500/20 text-black dark:text-slate-300 border-slate-400/30',
     icon: '🥈',
     description: 'Casual players',
     range: '1000-1399',
   },
   GOLD: {
-    colors: 'bg-accent/10 text-accent border-accent/30',
+    colors: 'bg-yellow-500/20 text-black dark:text-yellow-400 border-yellow-500/30',
     icon: '🥇',
     description: 'Regular players',
     range: '1400-1799',
   },
   PLATINUM: {
-    colors: 'bg-success/10 text-success border-success/30',
+    colors: 'bg-cyan-500/20 text-black dark:text-cyan-400 border-cyan-500/30',
     icon: '💎',
     description: 'Skilled & profitable',
     range: '1800-2199',
   },
   DIAMOND: {
-    colors: 'bg-primary/10 text-primary border-primary/30',
+    colors: 'bg-blue-500/20 text-black dark:text-blue-400 border-blue-500/30',
     icon: '💠',
     description: 'Elite players',
     range: '2200-2599',
   },
   MASTER: {
-    colors: 'bg-error/10 text-error border-error/30',
+    colors: 'bg-purple-500/20 text-black dark:text-purple-400 border-purple-500/30',
     icon: '👑',
     description: 'Top performers',
     range: '2600-2999',
   },
   GRANDMASTER: {
-    colors: 'bg-accent/20 text-accent border-accent/50',
+    colors: 'bg-orange-500/20 text-black dark:text-orange-400 border-orange-500/30',
     icon: '⭐',
     description: 'Legendary status',
     range: '3000+',
