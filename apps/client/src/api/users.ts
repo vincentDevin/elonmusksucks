@@ -48,21 +48,34 @@ export async function updateUserProfile(
 }
 
 /** Upload a new profile image */
-export async function uploadProfileImage(userId: number, file: File): Promise<string> {
+export async function uploadProfileImage(
+  userId: number,
+  file: File,
+): Promise<{
+  avatarUrl: string;
+  sizes: {
+    thumbnail: string;
+    profile: string;
+    full: string;
+  };
+}> {
   const formData = new FormData();
   formData.append('image', file);
 
-  const res = await api.post<{ imageUrl: string }>(
-    `/api/users/${userId}/profile-picture`,
-    formData,
-    {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+  const res = await api.post<{
+    avatarUrl: string;
+    sizes: {
+      thumbnail: string;
+      profile: string;
+      full: string;
+    };
+  }>(`/api/users/${userId}/profile-picture`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
     },
-  );
+  });
 
-  return res.data.imageUrl;
+  return res.data;
 }
 
 /** ----------- FEED/POSTS ----------- */

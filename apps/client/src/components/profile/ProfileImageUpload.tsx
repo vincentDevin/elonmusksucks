@@ -1,5 +1,4 @@
 import React, { useState, useRef } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
 import { ImageCropper } from './ImageCropper';
 import { uploadProfileImage } from '../../api/users';
 import api from '../../api/axios';
@@ -35,12 +34,12 @@ export function ProfileImageUpload({
   className,
   disabled = false,
 }: ProfileImageUploadProps) {
-  const { accessToken } = useAuth();
   const [isUploading, setIsUploading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>('');
+  const [optimisticPreviewUrl, setOptimisticPreviewUrl] = useState<string>('');
   const [showCropper, setShowCropper] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -76,6 +75,11 @@ export function ProfileImageUpload({
 
   const handleCropComplete = (blob: Blob) => {
     setShowCropper(false);
+
+    // Create optimistic preview URL from the cropped blob
+    const optimisticUrl = URL.createObjectURL(blob);
+    setOptimisticPreviewUrl(optimisticUrl);
+
     // Upload the cropped image immediately
     uploadCroppedImage(blob);
   };
@@ -86,6 +90,10 @@ export function ProfileImageUpload({
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl);
       setPreviewUrl('');
+    }
+    if (optimisticPreviewUrl) {
+      URL.revokeObjectURL(optimisticPreviewUrl);
+      setOptimisticPreviewUrl('');
     }
     // Reset file input
     if (fileInputRef.current) {
@@ -107,22 +115,19 @@ export function ProfileImageUpload({
       const file = new File([blob], selectedFile.name, { type: blob.type });
 
       // Use the API function which has the correct baseURL configured
-      const imageUrl = await uploadProfileImage(userId, file);
+      const result = await uploadProfileImage(userId, file);
 
-      // Format the response to match expected structure
-      onUploadSuccess({
-        avatarUrl: imageUrl,
-        sizes: {
-          thumbnail: imageUrl,
-          profile: imageUrl,
-          full: imageUrl,
-        },
-      });
+      // Pass the full result to parent
+      onUploadSuccess(result);
 
-      // Cleanup
+      // Cleanup preview URLs
       if (previewUrl) {
         URL.revokeObjectURL(previewUrl);
         setPreviewUrl('');
+      }
+      if (optimisticPreviewUrl) {
+        URL.revokeObjectURL(optimisticPreviewUrl);
+        setOptimisticPreviewUrl('');
       }
       setSelectedFile(null);
 
@@ -133,6 +138,12 @@ export function ProfileImageUpload({
     } catch (error) {
       console.error('Upload error:', error);
       onUploadError(error instanceof Error ? error.message : 'Upload failed');
+
+      // Clear optimistic preview on error
+      if (optimisticPreviewUrl) {
+        URL.revokeObjectURL(optimisticPreviewUrl);
+        setOptimisticPreviewUrl('');
+      }
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
@@ -183,7 +194,7 @@ export function ProfileImageUpload({
         <div className="relative">
           <div className="h-24 w-24 rounded-full bg-muted overflow-hidden flex-shrink-0 border-2 border-muted">
             <img
-              src={currentAvatarUrl || fallbackAvatar}
+              src={optimisticPreviewUrl || currentAvatarUrl || fallbackAvatar}
               alt="Profile picture"
               className="h-full w-full object-cover"
               onError={(e) => {
