@@ -1,16 +1,14 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { usePongSocket } from '../../hooks/usePongSocket';
 import { usePongInput } from '../../hooks/usePongInput';
 import { usePongEvents } from '../../hooks/usePongEvents';
 import { PongCanvas } from './PongCanvas';
 import { PongGamesList } from './PongGamesList';
-import { PongSpectator } from './PongSpectator';
 import { PongHeader } from './PongHeader';
 import { PongMatchCreatorModal } from './PongMatchCreatorModal';
 import { PONG_PHYSICS } from '@ems/types';
 import { PongClientPhysics } from '../../utils/pongClientPhysics';
 import api from '../../api/axios';
-import { getTierFromElo } from './PongTierBadge';
 
 export function PongGame() {
   const {
@@ -24,6 +22,9 @@ export function PongGame() {
     lastPing,
     stats,
     gameStateBuffer,
+    spectatingGameId,
+    spectatorGameState,
+    shouldReturnToLobby,
     connect,
     disconnect,
     joinLobby,
@@ -32,13 +33,14 @@ export function PongGame() {
     sendInput,
     setReady,
     leaveMatch,
+    spectateGame,
+    leaveSpectating,
   } = usePongSocket();
 
   // Subscribe to Elo update events
   const { metrics } = usePongEvents();
 
-  // Local state for spectator mode and match creation modal
-  const [spectatingGameId, setSpectatingGameId] = useState<string | null>(null);
+  // Local state for match creation modal and user stats
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [modalVariant, setModalVariant] = useState<'ai' | 'pvp' | null>(null);
   const [userElo, setUserElo] = useState<number | undefined>(undefined);
@@ -63,14 +65,13 @@ export function PongGame() {
     }
   }, [isConnected, socket, connect]);
 
-  // Fetch user's Elo rating on mount
+  // Fetch user's Elo rating on mount (lightweight endpoint - only fetches elo and tier)
   useEffect(() => {
     const fetchUserElo = async () => {
       try {
-        const response = await api.get('/api/users/me/pong-stats');
-        const elo = response.data.eloRating || 1200;
-        setUserElo(elo);
-        setUserTier(getTierFromElo(elo));
+        const response = await api.get('/api/users/me/pong-elo');
+        setUserElo(response.data.eloRating);
+        setUserTier(response.data.tier);
       } catch (error) {
         console.error('Failed to fetch user Elo:', error);
         setUserElo(1200); // Default
@@ -109,23 +110,17 @@ export function PongGame() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Empty deps - only run on actual mount/unmount
 
-  // Auto-refresh lobby when in lobby mode (not in game or spectating)
+  // Join lobby ONCE on initial authentication to get initial state
+  // After that, server auto-broadcasts all updates (players never leave lobby room)
+  const hasJoinedLobbyRef = useRef(false);
   useEffect(() => {
-    // Only refresh when we're in lobby mode (not in a game or spectating)
-    if (currentGame || spectatingGameId || !isConnected || !isAuthenticated) return;
+    if (!isConnected || !isAuthenticated || hasJoinedLobbyRef.current) return;
 
-    // Initial lobby join when entering lobby mode
+    // Join lobby once on initial auth - we stay in lobby room even during matches
+    // Server broadcasts: active_games on game start/end, lobby_state on lobby changes, stats every 5s
     joinLobby();
-
-    // Set up periodic refresh every 15 seconds
-    const refreshInterval = setInterval(() => {
-      joinLobby();
-    }, 15000);
-
-    return () => {
-      clearInterval(refreshInterval);
-    };
-  }, [isConnected, isAuthenticated, currentGame, spectatingGameId, joinLobby]);
+    hasJoinedLobbyRef.current = true;
+  }, [isConnected, isAuthenticated, joinLobby]);
 
   // ✅ PHASE 2: Initialize shadow physics when game becomes active
   useEffect(() => {
@@ -136,9 +131,10 @@ export function PongGame() {
     }
 
     // Initialize shadow physics with current ball state
+    // Note: Only initialize once when status changes to 'active', not on every ball update
     shadowPhysicsRef.current.initialize(currentGame.ball);
     console.log('🎮 Shadow physics initialized');
-  }, [currentGame?.status, currentGame?.ball]);
+  }, [currentGame?.status]); // Only depend on status, not ball (ball updates every frame!)
 
   // ✅ PHASE 2: Reconcile shadow physics with server state
   useEffect(() => {
@@ -195,18 +191,78 @@ export function PongGame() {
   };
 
   const handleSpectateGame = (gameId: string) => {
-    setSpectatingGameId(gameId);
+    spectateGame(gameId);
   };
 
-  const handleBackToLobby = () => {
-    console.log('🏓 Main handleBackToLobby called, clearing spectatingGameId');
-    setSpectatingGameId(null);
-    leaveMatch();
-    joinLobby();
-  };
+  const handleBackToLobby = useCallback(() => {
+    console.log('🏓 handleBackToLobby called');
+
+    // Check if we were spectating or playing
+    const wasSpectating = spectatingGameId !== null;
+
+    if (wasSpectating) {
+      console.log('🏓 Leaving spectator mode');
+      leaveSpectating();
+    } else if (currentGame) {
+      console.log('🏓 Leaving match (was playing)');
+      leaveMatch();
+    }
+
+    // Note: Don't call joinLobby() here - the periodic refresh will handle it
+    // This prevents duplicate lobby joins
+  }, [spectatingGameId, currentGame, leaveSpectating, leaveMatch]);
+
+  // Auto-return to lobby when spectating and match ends
+  useEffect(() => {
+    if (shouldReturnToLobby && spectatingGameId) {
+      console.log('👁️ Auto-return to lobby triggered from shouldReturnToLobby flag');
+      handleBackToLobby();
+    }
+  }, [shouldReturnToLobby, spectatingGameId, handleBackToLobby]);
 
   // Determine current mode for header
   const headerMode = spectatingGameId ? 'spectator' : currentGame ? 'game' : 'lobby';
+
+  // Convert spectator game state to match currentGame format for header
+  const displayGame =
+    spectatingGameId && spectatorGameState
+      ? {
+          gameId: spectatorGameState.gameId,
+          playerSlot: 0 as const,
+          players: [
+            spectatorGameState.player1
+              ? {
+                  id: spectatorGameState.player1.id,
+                  name: spectatorGameState.player1.name,
+                  paddleY: spectatorGameState.player1.paddleY,
+                  score: spectatorGameState.player1.score,
+                  ping: 0,
+                  lastInputTime: Date.now(),
+                }
+              : null,
+            spectatorGameState.player2
+              ? {
+                  id: spectatorGameState.player2.id,
+                  name: spectatorGameState.player2.name,
+                  paddleY: spectatorGameState.player2.paddleY,
+                  score: spectatorGameState.player2.score,
+                  ping: 0,
+                  lastInputTime: Date.now(),
+                }
+              : null,
+          ] as [any, any],
+          ball: spectatorGameState.ball,
+          scores: spectatorGameState.scores,
+          status: spectatorGameState.status,
+          tick: spectatorGameState.tick,
+          timestamp: spectatorGameState.timestamp,
+          countdown: spectatorGameState.countdown,
+          winner: spectatorGameState.winner,
+          readyStates: spectatorGameState.readyStates,
+          wager: spectatorGameState.wager,
+          pot: spectatorGameState.pot,
+        }
+      : currentGame;
 
   return (
     <div className="min-h-screen bg-background p-4">
@@ -222,7 +278,7 @@ export function PongGame() {
             onConnect={connect}
             userElo={userElo}
             userTier={userTier}
-            currentGame={currentGame}
+            currentGame={displayGame}
             lastPing={lastPing}
             onBackToLobby={handleBackToLobby}
             spectatingGameId={spectatingGameId}
@@ -230,11 +286,96 @@ export function PongGame() {
         </div>
 
         {/* Show spectator if spectating */}
-        {spectatingGameId ? (
-          <>
-            {console.log('🏓 Rendering PongSpectator for gameId:', spectatingGameId)}
-            <PongSpectator gameId={spectatingGameId} onBackToLobby={handleBackToLobby} />
-          </>
+        {spectatingGameId && spectatorGameState ? (
+          <div className="space-y-6">
+            {/* Game Canvas - Spectator Mode */}
+            <div className="flex justify-center">
+              <PongCanvas
+                gameState={{
+                  gameId: spectatorGameState.gameId,
+                  playerSlot: 0 as const,
+                  players: [
+                    spectatorGameState.player1
+                      ? {
+                          id: spectatorGameState.player1.id,
+                          name: spectatorGameState.player1.name,
+                          paddleY: spectatorGameState.player1.paddleY,
+                          score: spectatorGameState.player1.score,
+                          ping: 0,
+                          lastInputTime: Date.now(),
+                        }
+                      : null,
+                    spectatorGameState.player2
+                      ? {
+                          id: spectatorGameState.player2.id,
+                          name: spectatorGameState.player2.name,
+                          paddleY: spectatorGameState.player2.paddleY,
+                          score: spectatorGameState.player2.score,
+                          ping: 0,
+                          lastInputTime: Date.now(),
+                        }
+                      : null,
+                  ] as [any, any],
+                  ball: spectatorGameState.ball,
+                  scores: spectatorGameState.scores,
+                  status: spectatorGameState.status,
+                  tick: spectatorGameState.tick,
+                  timestamp: spectatorGameState.timestamp,
+                  countdown: spectatorGameState.countdown,
+                  winner: spectatorGameState.winner,
+                  readyStates: spectatorGameState.readyStates,
+                  wager: spectatorGameState.wager,
+                  pot: spectatorGameState.pot,
+                }}
+                ping={0}
+                onSetReady={undefined}
+                isSpectating={true}
+                className="max-w-4xl w-full"
+              />
+            </div>
+
+            {/* Spectator Info */}
+            <div className="p-4 bg-surface border border-muted rounded-lg">
+              <h3 className="font-semibold text-content mb-2">Spectator Mode</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-secondary">
+                <div>
+                  <strong>Watch Only:</strong> You&apos;re viewing this game in real-time
+                </div>
+                <div>
+                  <strong>No Input:</strong> Spectators cannot control paddles
+                </div>
+              </div>
+            </div>
+
+            {/* Game Stats */}
+            {spectatorGameState.status === 'active' && (
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="p-3 bg-surface border border-muted rounded-lg text-center">
+                  <div className="text-lg font-bold text-accent">{spectatorGameState.tick}</div>
+                  <div className="text-xs text-tertiary">Game Tick</div>
+                </div>
+                <div className="p-3 bg-surface border border-muted rounded-lg text-center">
+                  <div className="text-lg font-bold text-warning">
+                    {Math.round(
+                      Math.sqrt(spectatorGameState.ball.vx ** 2 + spectatorGameState.ball.vy ** 2),
+                    )}
+                  </div>
+                  <div className="text-xs text-tertiary">Ball Speed</div>
+                </div>
+                <div className="p-3 bg-surface border border-muted rounded-lg text-center">
+                  <div className="text-lg font-bold text-info">👁️</div>
+                  <div className="text-xs text-tertiary">Spectating</div>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : spectatingGameId && !spectatorGameState ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="bg-surface border border-muted rounded-lg p-6 text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent mx-auto mb-4"></div>
+              <p className="text-secondary">Joining game as spectator...</p>
+            </div>
+          </div>
         ) : currentGame ? (
           <div className="space-y-6">
             {/* Game Canvas */}
@@ -292,7 +433,7 @@ export function PongGame() {
           <div className="space-y-6">
             <PongGamesList
               lobbies={lobbies}
-              activeGames={activeGames}
+              activeGames={activeGames.filter((game) => game.status !== 'ended')}
               onJoinMatch={joinMatch}
               onSpectateGame={handleSpectateGame}
               onPlayAI={handlePlayAI}

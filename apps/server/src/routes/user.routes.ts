@@ -26,11 +26,12 @@ import {
 import { getUserPosts as getUserPostsHandler } from '../controllers/post.controller';
 import { requireAuth } from '../middleware/auth.middleware';
 import { uploadConfig, validateFileContent } from '../middleware/fileValidation.middleware';
-import { getUserPongStats, getUserPongHistory } from '../controllers/pong.controller';
+import { getUserPongStats, getUserPongHistory, getUserElo } from '../controllers/pong.controller';
 
 const router = Router();
 
 // IMPORTANT: All /me routes MUST come first before any /:userId routes
+router.get('/me/pong-elo', requireAuth, getUserElo);
 router.get('/me/pong-stats', requireAuth, getUserPongStats);
 
 // User search for mentions - MUST come before /:userId routes

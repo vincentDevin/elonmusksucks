@@ -316,6 +316,30 @@ export const getUserPongStats = async (
   }
 };
 
+export const getUserElo = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+
+    const elo = await pongRepository.findEloByUserId(req.user.id);
+
+    // Return defaults if no stats exist yet
+    res.json({
+      eloRating: elo?.eloRating || 1200,
+      tier: elo?.tier || 'SILVER',
+    });
+  } catch (error) {
+    console.error('Get user Elo error:', error);
+    next(error);
+  }
+};
+
 /**
  * GET /api/pong/elo-distribution - Get global tier distribution
  */

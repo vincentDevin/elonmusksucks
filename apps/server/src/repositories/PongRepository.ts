@@ -21,6 +21,17 @@ export class PongRepository implements IPongRepository {
     return stats ? this.mapPongStats(stats) : null;
   }
 
+  async findEloByUserId(userId: number): Promise<{ eloRating: number; tier: string } | null> {
+    const stats = await prisma.pongStats.findUnique({
+      where: { userId },
+      select: {
+        eloRating: true,
+        tier: true,
+      },
+    });
+    return stats;
+  }
+
   async createStats(data: Partial<PongStatsData>): Promise<PongStatsData> {
     const { id, eloHistory, createdAt, updatedAt, ...createData } = data;
     const stats = await prisma.pongStats.create({

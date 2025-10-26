@@ -43,6 +43,30 @@ interface GameState {
   pot?: number; // Total pot amount
 }
 
+// Spectator-only game state (similar to GameState but for viewing only)
+interface SpectatorGameState {
+  gameId: string;
+  player1: { id: number; name: string; paddleY: number; score: number } | null;
+  player2: { id: number; name: string; paddleY: number; score: number } | null;
+  ball: { x: number; y: number; vx: number; vy: number };
+  scores: [number, number];
+  status:
+    | 'waiting'
+    | 'waiting_for_opponent'
+    | 'waiting_for_ready'
+    | 'countdown'
+    | 'active'
+    | 'paused'
+    | 'ended';
+  tick: number;
+  timestamp: number;
+  countdown?: number;
+  winner?: 0 | 1 | null;
+  wager?: number;
+  pot?: number;
+  readyStates?: [boolean, boolean];
+}
+
 interface PongSocketState {
   socket: Socket | null;
   isConnected: boolean;
@@ -58,6 +82,9 @@ interface PongSocketState {
     availableMatches: number;
   };
   gameStateBuffer: GameStateBuffer;
+  spectatingGameId: string | null;
+  spectatorGameState: SpectatorGameState | null;
+  shouldReturnToLobby: boolean;
 }
 
 interface PongSocketActions {
@@ -69,6 +96,8 @@ interface PongSocketActions {
   sendInput: (input: PlayerInput) => void;
   setReady: (ready: boolean) => void;
   leaveMatch: () => void;
+  spectateGame: (gameId: string) => void;
+  leaveSpectating: () => void;
 }
 
 interface PongSocketHook extends PongSocketState, PongSocketActions {}
@@ -90,6 +119,9 @@ export function usePongSocket(): PongSocketHook {
     activeGames: 0,
     availableMatches: 0,
   });
+  const [spectatingGameId, setSpectatingGameId] = useState<string | null>(null);
+  const [spectatorGameState, setSpectatorGameState] = useState<SpectatorGameState | null>(null);
+  const [shouldReturnToLobby, setShouldReturnToLobby] = useState(false);
 
   // Game state buffer for interpolation
   // Buffer size increased from 10 to 50 to handle higher latency (400ms history at 120fps)
@@ -271,6 +303,7 @@ export function usePongSocket(): PongSocketHook {
 
     newSocket.on('ready_state_update', (data: ServerEvents['ready_state_update']) => {
       console.log('🏓 Ready states updated:', data.readyStates);
+      // Update current game if playing
       setCurrentGame((prev) => {
         if (!prev) return null;
 
@@ -279,91 +312,133 @@ export function usePongSocket(): PongSocketHook {
           readyStates: data.readyStates,
         };
       });
+      // Also update spectator state if spectating
+      setSpectatorGameState((prev) => (prev ? { ...prev, readyStates: data.readyStates } : null));
     });
 
     // Game events
     newSocket.on('countdown', (data: ServerEvents['countdown']) => {
       console.log('🏓 Countdown:', data.seconds, data.message);
+      // Update current game if playing
       setCurrentGame((prev) =>
+        prev ? { ...prev, status: 'countdown', countdown: data.seconds } : null,
+      );
+      // Also update spectator state if spectating
+      setSpectatorGameState((prev) =>
         prev ? { ...prev, status: 'countdown', countdown: data.seconds } : null,
       );
     });
 
     newSocket.on('game_state', (data: ServerEvents['game_state']) => {
-      // ✅ Consolidate all updates into single setState
-      setCurrentGame((prev) => {
-        if (!prev) return null;
+      // Check if we're in spectator mode (spectator game_state has player1PaddleY/player2PaddleY)
+      const isSpectatorUpdate = 'player1PaddleY' in data && 'player2PaddleY' in data;
 
-        // ✅ RACE CONDITION FIX: Accept game_state updates during countdown/active
-        // Only ignore if we're truly waiting (before game has started)
-        // This prevents desync during state transitions
-        const shouldIgnore =
-          prev.status === 'waiting_for_ready' || prev.status === 'waiting_for_opponent';
+      if (isSpectatorUpdate) {
+        // Update spectator game state
+        setSpectatorGameState((prev) => {
+          if (!prev) return null;
 
-        if (shouldIgnore) {
-          // Still update scores even during waiting to prevent desync
-          // But don't update ball/paddles or populate buffer
-          console.log(
-            `🏓 User ${user.id} received game_state during waiting - updating scores only`,
-          );
           return {
             ...prev,
+            ball: data.ball,
             scores: data.scores,
+            status: 'active' as const,
+            tick: data.tick,
+            timestamp: data.timestamp,
+            wager: data.wager,
+            pot: data.pot,
+            player1: prev.player1
+              ? {
+                  ...prev.player1,
+                  paddleY: (data as any).player1PaddleY || prev.player1.paddleY,
+                  score: data.scores[0],
+                }
+              : null,
+            player2: prev.player2
+              ? {
+                  ...prev.player2,
+                  paddleY: (data as any).player2PaddleY || prev.player2.paddleY,
+                  score: data.scores[1],
+                }
+              : null,
           };
-        }
+        });
+      } else {
+        // Update player game state (normal gameplay)
+        setCurrentGame((prev) => {
+          if (!prev) return null;
 
-        // Create updated player data with server paddle positions
-        const updatedPlayers: [any, any] = [
-          prev.players[0]
-            ? {
-                ...prev.players[0],
-                paddleY:
-                  prev.playerSlot === 0
-                    ? prev.players[0].paddleY // Keep our own paddle unchanged
-                    : (data.opponentPaddleY ?? prev.players[0].paddleY), // Use server data for opponent
-              }
-            : null,
-          prev.players[1]
-            ? {
-                ...prev.players[1],
-                paddleY:
-                  prev.playerSlot === 1
-                    ? prev.players[1].paddleY // Keep our own paddle unchanged
-                    : (data.opponentPaddleY ?? prev.players[1].paddleY), // Use server data for opponent
-              }
-            : null,
-        ];
+          // ✅ RACE CONDITION FIX: Accept game_state updates during countdown/active
+          // Only ignore if we're truly waiting (before game has started)
+          // This prevents desync during state transitions
+          const shouldIgnore =
+            prev.status === 'waiting_for_ready' || prev.status === 'waiting_for_opponent';
 
-        // ✅ Side effect: Update buffer directly (not through setState)
-        // Note: Buffer is populated even during early game states for smooth interpolation
-        const bufferSnapshot: GameStateSnapshot = {
-          ball: data.ball,
-          players: updatedPlayers,
-          scores: data.scores,
-          tick: data.tick,
-          timestamp: data.timestamp,
-          serverTime: data.timestamp,
-          status: 'active',
-        };
-        gameStateBuffer.addState(bufferSnapshot);
+          if (shouldIgnore) {
+            // Still update scores even during waiting to prevent desync
+            // But don't update ball/paddles or populate buffer
+            console.log(
+              `🏓 User ${user.id} received game_state during waiting - updating scores only`,
+            );
+            return {
+              ...prev,
+              scores: data.scores,
+            };
+          }
 
-        // Return updated state (single state update)
-        return {
-          ...prev,
-          ball: data.ball,
-          scores: data.scores,
-          status: 'active' as const,
-          tick: data.tick,
-          timestamp: data.timestamp,
-          serverTick: data.tick, // Add for compatibility
-          wager: data.wager || prev.wager,
-          pot: data.pot || prev.pot,
-          players: updatedPlayers,
-        };
-      });
+          // Create updated player data with server paddle positions
+          const updatedPlayers: [any, any] = [
+            prev.players[0]
+              ? {
+                  ...prev.players[0],
+                  paddleY:
+                    prev.playerSlot === 0
+                      ? prev.players[0].paddleY // Keep our own paddle unchanged
+                      : (data.opponentPaddleY ?? prev.players[0].paddleY), // Use server data for opponent
+                }
+              : null,
+            prev.players[1]
+              ? {
+                  ...prev.players[1],
+                  paddleY:
+                    prev.playerSlot === 1
+                      ? prev.players[1].paddleY // Keep our own paddle unchanged
+                      : (data.opponentPaddleY ?? prev.players[1].paddleY), // Use server data for opponent
+                }
+              : null,
+          ];
 
-      // Note: Ping is now calculated via RTT ping_request/ping_response
-      // See ping measurement setup below
+          // ✅ Side effect: Update buffer directly (not through setState)
+          // Note: Buffer is populated even during early game states for smooth interpolation
+          const bufferSnapshot: GameStateSnapshot = {
+            ball: data.ball,
+            players: updatedPlayers,
+            scores: data.scores,
+            tick: data.tick,
+            timestamp: data.timestamp,
+            serverTime: data.timestamp,
+            status: 'active',
+          };
+          gameStateBuffer.addState(bufferSnapshot);
+
+          // Return updated state (single state update)
+          return {
+            ...prev,
+            ball: data.ball,
+            scores: data.scores,
+            status: 'active' as const,
+            tick: data.tick,
+            timestamp: data.timestamp,
+            serverTick: data.tick, // Add for compatibility
+            wager: data.wager || prev.wager,
+            pot: data.pot || prev.pot,
+            players: updatedPlayers,
+          };
+        });
+
+        // Note: Ping is now calculated via RTT ping_request/ping_response
+        // See ping measurement setup below
+      }
     });
 
     // ✅ RTT-based ping measurement (no clock skew issues)
@@ -384,6 +459,7 @@ export function usePongSocket(): PongSocketHook {
 
     newSocket.on('match_end', (data: ServerEvents['match_end']) => {
       console.log('🏓 Match ended:', data);
+      // Update current game if playing
       setCurrentGame((prev) =>
         prev
           ? {
@@ -395,6 +471,29 @@ export function usePongSocket(): PongSocketHook {
             }
           : null,
       );
+      // Also update spectator state if spectating
+      setSpectatorGameState((prev) => {
+        const wasSpectating = prev !== null;
+        const updatedState = prev
+          ? {
+              ...prev,
+              status: 'ended' as const,
+              winner: data.winner,
+              scores: data.scores,
+            }
+          : null;
+
+        // If spectating, trigger auto-return to lobby after 3 seconds
+        if (wasSpectating) {
+          console.log('👁️ Spectated match ended, auto-return to lobby in 3s');
+          setTimeout(() => {
+            console.log('👁️ Spectator auto-return to lobby triggered');
+            setShouldReturnToLobby(true);
+          }, 3000);
+        }
+
+        return updatedState;
+      });
 
       // Auto-clear game state after 5 seconds (gives time to see win screen and payout)
       setTimeout(() => {
@@ -411,6 +510,38 @@ export function usePongSocket(): PongSocketHook {
     newSocket.on('error', (data: ServerEvents['error']) => {
       console.error('🏓 Server error:', data);
       setConnectionError(data.message);
+    });
+
+    // Spectator events
+    newSocket.on('spectator_joined', (data: ServerEvents['spectator_joined']) => {
+      console.log('👁️ Joined as spectator for game:', data.gameId);
+      console.log('👁️ Player 1:', data.player1?.name, 'Player 2:', data.player2?.name);
+      setSpectatorGameState({
+        gameId: data.gameId,
+        player1: data.player1
+          ? {
+              id: data.player1.id,
+              name: data.player1.name,
+              paddleY: PONG_PHYSICS.FIELD_HEIGHT / 2 - PONG_PHYSICS.PADDLE_HEIGHT / 2,
+              score: 0,
+            }
+          : null,
+        player2: data.player2
+          ? {
+              id: data.player2.id,
+              name: data.player2.name,
+              paddleY: PONG_PHYSICS.FIELD_HEIGHT / 2 - PONG_PHYSICS.PADDLE_HEIGHT / 2,
+              score: 0,
+            }
+          : null,
+        ball: { x: PONG_PHYSICS.FIELD_WIDTH / 2, y: PONG_PHYSICS.FIELD_HEIGHT / 2, vx: 0, vy: 0 },
+        scores: [0, 0],
+        status: data.status,
+        tick: 0,
+        timestamp: Date.now(),
+        wager: data.wager,
+        pot: data.pot,
+      });
     });
 
     // Store as user-specific socket and local state
@@ -580,6 +711,33 @@ export function usePongSocket(): PongSocketHook {
     gameStateBuffer.clear();
   }, [socket, isAuthenticated, gameStateBuffer]);
 
+  const spectateGame = useCallback(
+    (gameId: string) => {
+      if (!socket || !isAuthenticated) {
+        console.log('👁️ Cannot spectate: not connected or authenticated');
+        return;
+      }
+
+      console.log('👁️ Spectating game:', gameId);
+      setSpectatingGameId(gameId);
+      socket.emit('spectate_match', { gameId } as ClientEvents['spectate_match']);
+    },
+    [socket, isAuthenticated],
+  );
+
+  const leaveSpectating = useCallback(() => {
+    if (!socket || !isAuthenticated) {
+      console.log('👁️ Cannot leave spectating: not connected or authenticated');
+      return;
+    }
+
+    console.log('👁️ Leaving spectator mode');
+    socket.emit('leave_match', {} as ClientEvents['leave_match']);
+    setSpectatingGameId(null);
+    setSpectatorGameState(null);
+    setShouldReturnToLobby(false); // Reset the flag
+  }, [socket, isAuthenticated]);
+
   // Auto-connect when user and token are available
   useEffect(() => {
     if (user && accessToken && !userSockets.has(user.id) && !userConnecting.has(user.id)) {
@@ -594,7 +752,7 @@ export function usePongSocket(): PongSocketHook {
     };
   }, [user, accessToken, connect]);
 
-  // Cleanup on unmount
+  // Cleanup on unmount - only depends on user.id to prevent unnecessary cleanups
   useEffect(() => {
     return () => {
       console.log('🏓 Cleaning up socket on unmount');
@@ -605,7 +763,7 @@ export function usePongSocket(): PongSocketHook {
       // Note: We don't disconnect the user socket on unmount
       // as other components might still be using it
     };
-  }, [user]);
+  }, [user?.id]); // Only depend on user ID, not the whole user object
 
   // Periodic health check to clean up disconnected sockets
   useEffect(() => {
@@ -654,6 +812,9 @@ export function usePongSocket(): PongSocketHook {
     lastPing,
     stats,
     gameStateBuffer,
+    spectatingGameId,
+    spectatorGameState,
+    shouldReturnToLobby,
     connect,
     disconnect,
     joinLobby,
@@ -662,5 +823,7 @@ export function usePongSocket(): PongSocketHook {
     sendInput,
     setReady,
     leaveMatch,
+    spectateGame,
+    leaveSpectating,
   };
 }

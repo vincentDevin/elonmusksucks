@@ -246,7 +246,15 @@ export interface ServerEvents {
   opponent_joined: { opponent: import('../../database/pong').Player };
   ready_state_update: { readyStates: [boolean, boolean] };
   countdown: { seconds: number; message?: string };
-  spectator_joined: { gameId: string; spectatorCount: number };
+  spectator_joined: {
+    gameId: string;
+    spectatorCount: number;
+    player1: { id: number; name: string } | null;
+    player2: { id: number; name: string } | null;
+    wager: number;
+    pot: number;
+    status: import('../../shared/enums').GameStatus;
+  };
   game_state: {
     ball: import('../../database/pong').Ball;
     opponentPaddleY?: number;

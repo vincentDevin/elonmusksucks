@@ -12,6 +12,7 @@ import type {
 export interface IPongRepository {
   // PongStats operations
   findStatsByUserId(userId: number): Promise<PongStatsData | null>;
+  findEloByUserId(userId: number): Promise<{ eloRating: number; tier: string } | null>;
   createStats(data: Partial<PongStatsData>): Promise<PongStatsData>;
   updateStats(userId: number, data: Partial<PongStatsData>): Promise<void>;
   upsertStats(userId: number, data: Partial<PongStatsData>): Promise<PongStatsData>;

@@ -29,6 +29,8 @@ interface GameState {
   winner?: 0 | 1 | null;
   payout?: number;
   readyStates?: [boolean, boolean];
+  wager?: number;
+  pot?: number;
 }
 
 interface PongCanvasProps {
@@ -968,9 +970,20 @@ export function PongCanvas({
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
           <div className="bg-surface/90 p-8 rounded-2xl shadow-2xl text-center">
             <div className="text-4xl font-bold mb-4">
-              {gameState.winner === gameState.playerSlot ? (
+              {isSpectating ? (
+                // Spectator view - show winner's name
+                gameState.winner === null || gameState.winner === undefined ? (
+                  <span className="text-warning">Draw!</span>
+                ) : (
+                  <span className="text-success">
+                    {gameState.players[gameState.winner]?.name || `Player ${gameState.winner + 1}`}{' '}
+                    Wins! 🎉
+                  </span>
+                )
+              ) : // Player view - show You Win/Lost
+              gameState.winner === gameState.playerSlot ? (
                 <span className="text-success">You Win! 🎉</span>
-              ) : gameState.winner === null ? (
+              ) : gameState.winner === null || gameState.winner === undefined ? (
                 <span className="text-warning">Draw!</span>
               ) : (
                 <span className="text-error">You Lost</span>
@@ -979,7 +992,7 @@ export function PongCanvas({
             <div className="text-2xl text-content mb-2">
               Final Score: {gameState.scores[0]} - {gameState.scores[1]}
             </div>
-            {gameState.payout !== undefined && gameState.payout > 0 && (
+            {!isSpectating && gameState.payout !== undefined && gameState.payout > 0 && (
               <div className="text-lg text-success">
                 +{gameState.payout.toLocaleString()} MuskBucks
               </div>

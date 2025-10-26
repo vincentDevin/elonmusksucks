@@ -210,6 +210,7 @@ coverage/
 .pytest_cache/
 junit.xml
 test-results/
+scripts/load-tests/results
 
 # ─── Cache & Build Files ──────────────────────────────────────────────────────
 .cache/

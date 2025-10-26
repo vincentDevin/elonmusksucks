@@ -306,23 +306,38 @@ class AuthManager {
 // ——————————————————————————————————————————————————————————————————————————————————
 
 class StatisticsManager {
-  private connectedPlayers = new Set<number>(); // Track unique connected player IDs
+  // Track all socket IDs per player ID (supports multiple sockets per player)
+  private playerSockets = new Map<number, Set<string>>();
   private activeGames = new Set<string>(); // Track active game IDs
 
-  addConnectedPlayer(playerId: number): void {
-    this.connectedPlayers.add(playerId);
-    // Only log in development (verbose)
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`📊 Player ${playerId} connected. Total online: ${this.connectedPlayers.size}`);
+  addConnectedPlayer(playerId: number, socketId: string): void {
+    if (!this.playerSockets.has(playerId)) {
+      this.playerSockets.set(playerId, new Set());
     }
-  }
+    this.playerSockets.get(playerId)!.add(socketId);
 
-  removeConnectedPlayer(playerId: number): void {
-    this.connectedPlayers.delete(playerId);
     // Only log in development (verbose)
     if (process.env.NODE_ENV === 'development') {
       console.log(
-        `📊 Player ${playerId} disconnected. Total online: ${this.connectedPlayers.size}`,
+        `📊 Player ${playerId} connected (socket ${socketId}). Total online: ${this.playerSockets.size}`,
+      );
+    }
+  }
+
+  removeConnectedPlayer(playerId: number, socketId: string): void {
+    const sockets = this.playerSockets.get(playerId);
+    if (sockets) {
+      sockets.delete(socketId);
+      // Only remove player from map if they have no more sockets
+      if (sockets.size === 0) {
+        this.playerSockets.delete(playerId);
+      }
+    }
+
+    // Only log in development (verbose)
+    if (process.env.NODE_ENV === 'development') {
+      console.log(
+        `📊 Player ${playerId} socket ${socketId} disconnected. Total online: ${this.playerSockets.size}`,
       );
     }
   }
@@ -341,7 +356,7 @@ class StatisticsManager {
 
   getStats(availableMatches: number) {
     return {
-      playersOnline: this.connectedPlayers.size,
+      playersOnline: this.playerSockets.size,
       activeGames: this.activeGames.size,
       availableMatches,
     };
@@ -354,10 +369,10 @@ class StatisticsManager {
   cleanupStalePlayers(validPlayerIds: Set<number>): number {
     let cleanedCount = 0;
 
-    for (const playerId of this.connectedPlayers) {
+    for (const playerId of this.playerSockets.keys()) {
       if (!validPlayerIds.has(playerId)) {
         console.log(`[stats-cleanup] Removing stale player ${playerId} from connected players`);
-        this.connectedPlayers.delete(playerId);
+        this.playerSockets.delete(playerId);
         cleanedCount++;
       }
     }
@@ -1450,9 +1465,9 @@ class GameManager {
     const activeGames: ActiveGameEntry[] = [];
 
     for (const [gameId, game] of this.games.entries()) {
-      // Only include games that have started or are about to start
-      if (game.status === 'waiting_for_opponent') {
-        continue; // Skip games waiting for players
+      // Only include games that have started or are about to start (exclude waiting and ended)
+      if (game.status === 'waiting_for_opponent' || game.status === 'ended') {
+        continue; // Skip games waiting for players and ended games
       }
 
       const pot = game.isAI ? game.wager : game.wager * 2; // AI games: wager, PvP: double wager
@@ -1854,8 +1869,8 @@ export class PongGameServer {
 
           socket.emit('auth_result', { success: true, player });
 
-          // Track connected player in statistics
-          this.stats.addConnectedPlayer(player.id);
+          // Track connected player in statistics (with socket ID to support multiple sockets per player)
+          this.stats.addConnectedPlayer(player.id, socket.id);
 
           // Send current lobby state immediately
           socket.emit('lobby_state', { lobbies: this.lobby.getAvailableLobbies() });
@@ -2293,6 +2308,27 @@ export class PongGameServer {
             socket.emit('spectator_joined', {
               gameId,
               spectatorCount: this.game.getSpectatorCount(gameId),
+              player1: game.players[0]
+                ? {
+                    id: game.players[0].id,
+                    name: game.players[0].name,
+                  }
+                : null,
+              player2: game.players[1]
+                ? {
+                    id: game.players[1].id,
+                    name: game.players[1].name,
+                  }
+                : null,
+              wager: game.wager,
+              pot: game.isAI
+                ? game.wager +
+                  game.wager *
+                    (game.aiDifficulty
+                      ? PONG_PAYOUT_CONSTANTS.AI_PAYOUT_MULTIPLIER[game.aiDifficulty]
+                      : 1)
+                : game.wager * 2,
+              status: game.status,
             });
 
             // Send initial game state for spectators immediately
@@ -2333,8 +2369,8 @@ export class PongGameServer {
             console.log(`🏓 Player ${player.name} left lobby ${leftLobbyId}`);
           }
 
-          // Track disconnected player in statistics
-          this.stats.removeConnectedPlayer(player.id);
+          // Track disconnected player in statistics (remove this specific socket)
+          this.stats.removeConnectedPlayer(player.id, socket.id);
 
           // Clean up rate limiting data
           this.rateLimiter.resetSocket(socket.id);
