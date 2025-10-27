@@ -899,6 +899,7 @@ export class PredictionRepository implements IPredictionRepository {
    * @param predictionIds - Array of prediction IDs
    * @returns Map of prediction ID to view count
    * NOTE: This is a bulk operation to avoid N+1 query issues
+   * OPTIMIZATION: Only counts views from the last 30 days to limit dataset size
    */
   async getUserViewCountsBulk(predictionIds: number[]): Promise<Map<number, number>> {
     if (predictionIds.length === 0) {
@@ -908,12 +909,21 @@ export class PredictionRepository implements IPredictionRepository {
     // Create a Set for O(1) lookup
     const predictionIdSet = new Set(predictionIds);
 
-    // Get all prediction_viewed activity logs
-    // Note: Prisma doesn't support 'in' operator for JSON fields, so we fetch all
-    // prediction views and filter in memory. Still better than N queries!
+    // Only look at views from last 30 days to limit dataset size
+    // This reduces query from potentially 100,000+ rows to a manageable subset
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    // Get recent prediction_viewed activity logs with date filter
+    // Note: Prisma doesn't support 'in' operator for JSON fields, so we fetch recent
+    // prediction views and filter in memory. Date filter dramatically reduces dataset!
+    // Uses idx_activity_type_time index for fast filtering
     const viewRecords = await prisma.userActivityLog.findMany({
       where: {
         activityType: 'prediction_viewed',
+        occurredAt: {
+          gte: thirtyDaysAgo, // Only last 30 days
+        },
       },
       select: {
         metadata: true,

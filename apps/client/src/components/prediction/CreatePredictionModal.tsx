@@ -17,7 +17,7 @@ import api from '../../api/axios';
  * Accessible from anywhere via FloatingCreatePredictionWidget or UseAsSourceModal
  */
 export default function CreatePredictionModal() {
-  const { user, accessToken } = useAuth();
+  const { user } = useAuth();
   const { createModalOpen, createModalSourceData, closeCreateModal } = usePredictionMarket();
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -194,7 +194,7 @@ export default function CreatePredictionModal() {
 
       // If we have source data, link it to the prediction
       if (createModalSourceData) {
-        if (!user || !accessToken) {
+        if (!user) {
           console.error('User not authenticated for source linking');
           setError(
             'Prediction created successfully, but failed to link source: User not authenticated',
@@ -217,8 +217,6 @@ export default function CreatePredictionModal() {
 
           console.log('Linking source to prediction:', linkData);
           console.log('Current user:', user);
-          console.log('Access token exists:', !!accessToken);
-          console.log('Access token in localStorage:', !!localStorage.getItem('accessToken'));
 
           const response = await api.post('/api/predictions/source-links', linkData);
           console.log('Source link created successfully:', response.data);

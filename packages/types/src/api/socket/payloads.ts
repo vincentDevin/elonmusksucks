@@ -256,6 +256,7 @@ export interface ServerEvents {
     status: import('../../shared/enums').GameStatus;
   };
   game_state: {
+    gameId: string; // Game identifier to prevent cross-game contamination
     ball: import('../../database/pong').Ball;
     opponentPaddleY?: number;
     player1PaddleY?: number;
@@ -266,7 +267,7 @@ export interface ServerEvents {
     wager?: number;
     pot?: number;
   };
-  score_update: { scores: [number, number]; scorer: 0 | 1 };
+  score_update: { gameId: string; scores: [number, number]; scorer: 0 | 1 };
   match_end: {
     winner: 0 | 1 | null;
     scores: [number, number];

@@ -29,14 +29,7 @@ export async function unfollowUser(userId: number): Promise<void> {
 /** Update profile for the authenticated user */
 export type UpdateProfilePayload = Pick<
   PublicUserProfile,
-  | 'bio'
-  | 'avatarUrl'
-  | 'location'
-  | 'timezone'
-  | 'notifyOnResolve'
-  | 'theme'
-  | 'twoFactorEnabled'
-  | 'profileComplete'
+  'bio' | 'avatarUrl' | 'notifyOnResolve' | 'theme' | 'twoFactorEnabled' | 'profileComplete'
 >;
 
 export async function updateUserProfile(

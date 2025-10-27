@@ -24,15 +24,15 @@ export default function PrivateRoute({
   requireProfile = true,
   showSpinner = true,
 }: PrivateRouteProps) {
-  const { accessToken, loading, user } = useAuth();
+  const { loading, user } = useAuth();
 
   // External redirect mode (original AuthGuard behavior)
   useEffect(() => {
-    if (mode === 'external' && !loading && !accessToken) {
+    if (mode === 'external' && !loading && !user) {
       const redirectUrl = fallbackUrl || env.PUBLIC_SITE_URL || 'http://localhost:5173';
       window.location.href = redirectUrl;
     }
-  }, [accessToken, loading, fallbackUrl, mode]);
+  }, [user, loading, fallbackUrl, mode]);
 
   // Loading state
   if (loading) {
@@ -47,8 +47,8 @@ export default function PrivateRoute({
     );
   }
 
-  // Authentication check
-  if (!accessToken) {
+  // Authentication check - user object is the source of truth
+  if (!user) {
     switch (mode) {
       case 'external':
         // External redirect handled by useEffect, show spinner while redirecting

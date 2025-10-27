@@ -134,8 +134,8 @@ export function usePongSocket(): PongSocketHook {
   const inputSequenceRef = useRef(0);
 
   const connect = useCallback(() => {
-    if (!user || !accessToken) {
-      console.log('🏓 Cannot connect: missing user or token');
+    if (!user) {
+      console.log('🏓 Cannot connect: missing user');
       return;
     }
 
@@ -330,6 +330,9 @@ export function usePongSocket(): PongSocketHook {
     });
 
     newSocket.on('game_state', (data: ServerEvents['game_state']) => {
+      // ✅ CRITICAL: Validate gameId to prevent score contamination between games
+      const incomingGameId = data.gameId;
+
       // Check if we're in spectator mode (spectator game_state has player1PaddleY/player2PaddleY)
       const isSpectatorUpdate = 'player1PaddleY' in data && 'player2PaddleY' in data;
 
@@ -337,6 +340,14 @@ export function usePongSocket(): PongSocketHook {
         // Update spectator game state
         setSpectatorGameState((prev) => {
           if (!prev) return null;
+
+          // ✅ Validate gameId matches current spectator game
+          if (incomingGameId !== prev.gameId) {
+            console.warn(
+              `👁️ Ignoring spectator game_state for game ${incomingGameId} (currently spectating ${prev.gameId})`,
+            );
+            return prev; // Don't update
+          }
 
           return {
             ...prev,
@@ -350,14 +361,14 @@ export function usePongSocket(): PongSocketHook {
             player1: prev.player1
               ? {
                   ...prev.player1,
-                  paddleY: (data as any).player1PaddleY || prev.player1.paddleY,
+                  paddleY: data.player1PaddleY ?? prev.player1.paddleY,
                   score: data.scores[0],
                 }
               : null,
             player2: prev.player2
               ? {
                   ...prev.player2,
-                  paddleY: (data as any).player2PaddleY || prev.player2.paddleY,
+                  paddleY: data.player2PaddleY ?? prev.player2.paddleY,
                   score: data.scores[1],
                 }
               : null,
@@ -367,6 +378,14 @@ export function usePongSocket(): PongSocketHook {
         // Update player game state (normal gameplay)
         setCurrentGame((prev) => {
           if (!prev) return null;
+
+          // ✅ CRITICAL FIX: Validate gameId to prevent score contamination
+          if (incomingGameId !== prev.gameId) {
+            console.warn(
+              `🏓 User ${user.id} ignoring game_state for game ${incomingGameId} (currently in ${prev.gameId})`,
+            );
+            return prev; // Don't update
+          }
 
           // ✅ RACE CONDITION FIX: Accept game_state updates during countdown/active
           // Only ignore if we're truly waiting (before game has started)
@@ -452,6 +471,14 @@ export function usePongSocket(): PongSocketHook {
       console.log('🏓 Score update:', data.scores, 'scorer:', data.scorer);
       setCurrentGame((prev) => {
         if (!prev) return null;
+
+        // ✅ CRITICAL: Validate gameId to prevent score contamination
+        if (data.gameId !== prev.gameId) {
+          console.warn(
+            `🏓 Ignoring score_update for game ${data.gameId} (currently in ${prev.gameId})`,
+          );
+          return prev; // Don't update
+        }
 
         return { ...prev, scores: data.scores };
       });
@@ -738,9 +765,9 @@ export function usePongSocket(): PongSocketHook {
     setShouldReturnToLobby(false); // Reset the flag
   }, [socket, isAuthenticated]);
 
-  // Auto-connect when user and token are available
+  // Auto-connect when user is available
   useEffect(() => {
-    if (user && accessToken && !userSockets.has(user.id) && !userConnecting.has(user.id)) {
+    if (user && !userSockets.has(user.id) && !userConnecting.has(user.id)) {
       console.log(`🏓 Auto-connecting user ${user.id} to Pong server...`);
       connect();
     }
@@ -750,7 +777,7 @@ export function usePongSocket(): PongSocketHook {
         clearTimeout(reconnectTimeoutRef.current);
       }
     };
-  }, [user, accessToken, connect]);
+  }, [user, connect]);
 
   // Cleanup on unmount - only depends on user.id to prevent unnecessary cleanups
   useEffect(() => {

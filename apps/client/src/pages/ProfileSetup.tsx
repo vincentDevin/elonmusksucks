@@ -11,10 +11,8 @@ export default function ProfileSetup() {
   const [formData, setFormData] = useState<UpdateProfilePayload>({
     bio: '',
     avatarUrl: '',
-    location: '',
-    timezone: '',
     notifyOnResolve: true,
-    theme: 'LIGHT',
+    theme: 'dark-professional',
     twoFactorEnabled: false,
     profileComplete: false,
   });
@@ -29,8 +27,6 @@ export default function ProfileSetup() {
         setFormData({
           bio: profile.bio ?? '',
           avatarUrl: profile.avatarUrl ?? '',
-          location: profile.location ?? '',
-          timezone: profile.timezone ?? '',
           notifyOnResolve: profile.notifyOnResolve,
           theme: profile.theme,
           twoFactorEnabled: profile.twoFactorEnabled,
@@ -169,38 +165,6 @@ export default function ProfileSetup() {
                        disabled:opacity-60 disabled:cursor-not-allowed resize-none"
               rows={4}
               aria-label="Bio"
-            />
-          </label>
-
-          <label className="block">
-            <span className="text-sm font-medium text-content">Location</span>
-            <input
-              name="location"
-              value={formData.location ?? ''}
-              onChange={handleChange}
-              disabled={isSubmitting}
-              placeholder="e.g., San Francisco, CA"
-              className="mt-1 w-full p-3 bg-background border border-border rounded-lg text-content
-                       focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent
-                       hover:border-primary/50 transition-all duration-200
-                       disabled:opacity-60 disabled:cursor-not-allowed"
-              aria-label="Location"
-            />
-          </label>
-
-          <label className="block">
-            <span className="text-sm font-medium text-content">Timezone</span>
-            <input
-              name="timezone"
-              value={formData.timezone ?? ''}
-              onChange={handleChange}
-              disabled={isSubmitting}
-              placeholder="e.g., America/Los_Angeles"
-              className="mt-1 w-full p-3 bg-background border border-border rounded-lg text-content
-                       focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent
-                       hover:border-primary/50 transition-all duration-200
-                       disabled:opacity-60 disabled:cursor-not-allowed"
-              aria-label="Timezone"
             />
           </label>
 

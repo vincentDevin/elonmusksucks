@@ -11,7 +11,7 @@ import { UserBalance } from './UserBalance';
  * Replaces the old NavBar with conflicting theme toggle
  */
 export default function NavBar() {
-  const { accessToken, logout, user } = useAuth();
+  const { logout, user } = useAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
@@ -45,78 +45,74 @@ export default function NavBar() {
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center space-x-2">
-          {accessToken ? (
-            user ? (
-              <>
-                <Link to="/timeline" className={linkClasses('/timeline')}>
-                  Timeline
-                </Link>
-                <Link to="/predictions" className={linkClasses('/predictions')}>
-                  Predictions
-                </Link>
-                <Link to="/leaderboard" className={linkClasses('/leaderboard')}>
-                  Leaderboard
-                </Link>
-                <Link to="/pong" className={linkClasses('/pong')}>
-                  🏓 Pong
-                </Link>
-                <div className="relative">
-                  <button
-                    onClick={() => setDropdownOpen(!dropdownOpen)}
-                    className="flex items-center space-x-2 px-2.5 py-1.5 rounded hover:bg-muted transition-colors cursor-pointer text-sm"
-                  >
-                    <span className="font-medium">{user.name}</span>
-                    <UserBalance />
-                  </button>
-                  {dropdownOpen && (
-                    <ul
-                      className="
+          {user ? (
+            <>
+              <Link to="/timeline" className={linkClasses('/timeline')}>
+                Timeline
+              </Link>
+              <Link to="/predictions" className={linkClasses('/predictions')}>
+                Predictions
+              </Link>
+              <Link to="/leaderboard" className={linkClasses('/leaderboard')}>
+                Leaderboard
+              </Link>
+              <Link to="/pong" className={linkClasses('/pong')}>
+                🏓 Pong
+              </Link>
+              <div className="relative">
+                <button
+                  onClick={() => setDropdownOpen(!dropdownOpen)}
+                  className="flex items-center space-x-2 px-2.5 py-1.5 rounded hover:bg-muted transition-colors cursor-pointer text-sm"
+                >
+                  <span className="font-medium">{user.name}</span>
+                  <UserBalance />
+                </button>
+                {dropdownOpen && (
+                  <ul
+                    className="
                         absolute right-0 mt-2 z-[100]
                         bg-surface text-content
                         border border-muted rounded shadow-xl
                         space-y-1 p-2 w-40
                         transition-colors
                       "
-                    >
-                      {user.role === 'ADMIN' && (
-                        <li>
-                          <Link
-                            to="/admin"
-                            className="block px-2.5 py-1.5 rounded hover:bg-muted transition-colors cursor-pointer text-sm"
-                            onClick={() => setDropdownOpen(false)}
-                          >
-                            Admin
-                          </Link>
-                        </li>
-                      )}
+                  >
+                    {user.role === 'ADMIN' && (
                       <li>
                         <Link
-                          to={`/profile/${user.id}`}
+                          to="/admin"
                           className="block px-2.5 py-1.5 rounded hover:bg-muted transition-colors cursor-pointer text-sm"
                           onClick={() => setDropdownOpen(false)}
                         >
-                          Profile
+                          Admin
                         </Link>
                       </li>
-                      <li>
-                        <button
-                          onClick={handleLogout}
-                          className="
+                    )}
+                    <li>
+                      <Link
+                        to={`/profile/${user.id}`}
+                        className="block px-2.5 py-1.5 rounded hover:bg-muted transition-colors cursor-pointer text-sm"
+                        onClick={() => setDropdownOpen(false)}
+                      >
+                        Profile
+                      </Link>
+                    </li>
+                    <li>
+                      <button
+                        onClick={handleLogout}
+                        className="
                             w-full text-left px-2.5 py-1.5 rounded text-sm
                             hover:bg-error hover:text-white
                             transition-colors cursor-pointer
                           "
-                        >
-                          Logout
-                        </button>
-                      </li>
-                    </ul>
-                  )}
-                </div>
-              </>
-            ) : (
-              <div className="px-2.5 py-1.5 text-sm">Loading...</div>
-            )
+                      >
+                        Logout
+                      </button>
+                    </li>
+                  </ul>
+                )}
+              </div>
+            </>
           ) : (
             <>
               <a
@@ -175,83 +171,79 @@ export default function NavBar() {
       {mobileMenuOpen && (
         <div className="md:hidden absolute top-full left-0 right-0 bg-surface border-b border-muted shadow-lg">
           <div className="container mx-auto p-4 space-y-2">
-            {accessToken ? (
-              user ? (
-                <>
-                  <Link
-                    to="/dashboard"
-                    className={mobileLinkClasses('/dashboard')}
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    Dashboard
-                  </Link>
-                  <Link
-                    to="/timeline"
-                    className={mobileLinkClasses('/timeline')}
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    Timeline
-                  </Link>
-                  <Link
-                    to="/predictions"
-                    className={mobileLinkClasses('/predictions')}
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    Predictions
-                  </Link>
-                  <Link
-                    to="/leaderboard"
-                    className={mobileLinkClasses('/leaderboard')}
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    Leaderboard
-                  </Link>
-                  <Link
-                    to="/pong"
-                    className={mobileLinkClasses('/pong')}
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    🏓 Pong
-                  </Link>
+            {user ? (
+              <>
+                <Link
+                  to="/dashboard"
+                  className={mobileLinkClasses('/dashboard')}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Dashboard
+                </Link>
+                <Link
+                  to="/timeline"
+                  className={mobileLinkClasses('/timeline')}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Timeline
+                </Link>
+                <Link
+                  to="/predictions"
+                  className={mobileLinkClasses('/predictions')}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Predictions
+                </Link>
+                <Link
+                  to="/leaderboard"
+                  className={mobileLinkClasses('/leaderboard')}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Leaderboard
+                </Link>
+                <Link
+                  to="/pong"
+                  className={mobileLinkClasses('/pong')}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  🏓 Pong
+                </Link>
 
-                  <div className="border-t border-muted pt-2 mt-2">
-                    <div className="flex items-center space-x-3 px-4 py-3">
-                      <span className="font-medium">{user.name}</span>
-                      <UserBalance />
-                    </div>
+                <div className="border-t border-muted pt-2 mt-2">
+                  <div className="flex items-center space-x-3 px-4 py-3">
+                    <span className="font-medium">{user.name}</span>
+                    <UserBalance />
+                  </div>
 
-                    {user.role === 'ADMIN' && (
-                      <Link
-                        to="/admin"
-                        className={mobileLinkClasses('/admin')}
-                        onClick={() => setMobileMenuOpen(false)}
-                      >
-                        Admin
-                      </Link>
-                    )}
-
+                  {user.role === 'ADMIN' && (
                     <Link
-                      to={`/profile/${user.id}`}
-                      className={mobileLinkClasses(`/profile/${user.id}`)}
+                      to="/admin"
+                      className={mobileLinkClasses('/admin')}
                       onClick={() => setMobileMenuOpen(false)}
                     >
-                      Profile
+                      Admin
                     </Link>
+                  )}
 
-                    <button
-                      onClick={() => {
-                        handleLogout();
-                        setMobileMenuOpen(false);
-                      }}
-                      className="w-full text-left px-4 py-3 rounded-lg hover:bg-error hover:text-white transition-colors cursor-pointer"
-                    >
-                      Logout
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <div className="px-4 py-3 text-tertiary">Loading...</div>
-              )
+                  <Link
+                    to={`/profile/${user.id}`}
+                    className={mobileLinkClasses(`/profile/${user.id}`)}
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Profile
+                  </Link>
+
+                  <button
+                    onClick={() => {
+                      handleLogout();
+                      setMobileMenuOpen(false);
+                    }}
+                    className="w-full text-left px-4 py-3 rounded-lg hover:bg-error hover:text-white transition-colors cursor-pointer"
+                  >
+                    Logout
+                  </button>
+                </div>
+              </>
             ) : (
               <>
                 <a

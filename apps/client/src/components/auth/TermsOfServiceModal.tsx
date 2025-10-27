@@ -1,4 +1,3 @@
-import React from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 
 interface TermsOfServiceModalProps {
@@ -160,7 +159,7 @@ export default function TermsOfServiceModal({ isOpen, onClose }: TermsOfServiceM
           </section>
 
           <p className="text-tertiary text-xs mt-6 pt-4 border-t border-border">
-            Last updated: October 2024
+            Last updated: October 2025
           </p>
         </div>
       </div>

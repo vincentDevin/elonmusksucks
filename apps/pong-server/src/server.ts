@@ -983,6 +983,7 @@ class GameManager {
 
   private onScore(game: GameState, scorer: 0 | 1): void {
     this.io.to(`game:${game.id}`).emit('score_update', {
+      gameId: game.id,
       scores: [game.players[0].score, game.players[1]?.score || 0],
       scorer,
     });
@@ -1219,15 +1220,58 @@ class GameManager {
     // Broadcast active games update when game ends
     this.broadcastActiveGamesUpdate();
 
-    // Cleanup
+    // ✅ CRITICAL: Remove all players from Socket.IO room to prevent cross-game contamination
+    console.log(`🧹 Cleaning up Socket.IO rooms for game ${game.id}`);
+
+    // Remove player 1 from game room
+    if (game.players[0]) {
+      const player1SocketId = this.auth.getSocketId(game.players[0].id);
+      if (player1SocketId) {
+        const socket = this.io.sockets.sockets.get(player1SocketId);
+        if (socket) {
+          socket.leave(`game:${game.id}`);
+          console.log(`  ✅ Removed player ${game.players[0].id} from room game:${game.id}`);
+        }
+      }
+    }
+
+    // Remove player 2 from game room
+    if (game.players[1]) {
+      const player2SocketId = this.auth.getSocketId(game.players[1].id);
+      if (player2SocketId) {
+        const socket = this.io.sockets.sockets.get(player2SocketId);
+        if (socket) {
+          socket.leave(`game:${game.id}`);
+          console.log(`  ✅ Removed player ${game.players[1].id} from room game:${game.id}`);
+        }
+      }
+    }
+
+    // Remove all spectators from game room and clean up tracking
+    if (spectators && spectators.size > 0) {
+      spectators.forEach((socketId) => {
+        const socket = this.io.sockets.sockets.get(socketId);
+        if (socket) {
+          socket.leave(`game:${game.id}`);
+        }
+        // Remove from spectator tracking
+        this.spectatorGames.delete(socketId);
+      });
+      console.log(`  ✅ Removed ${spectators.size} spectators from room game:${game.id}`);
+      this.gameSpectators.delete(game.id);
+    }
+
+    // Cleanup player-to-game mappings
     this.playerGames.delete(game.players[0].id);
     if (game.players[1]) {
       this.playerGames.delete(game.players[1].id);
     }
 
+    // Delete game after 5 seconds (allows time for final broadcasts to complete)
     setTimeout(() => {
       this.games.delete(game.id);
-    }, 5000); // Keep game data for 5 seconds for final broadcasts
+      console.log(`🗑️ Deleted game ${game.id} from memory`);
+    }, 5000);
   }
 
   /**
@@ -1505,6 +1549,7 @@ class GameManager {
       const player1SocketId = this.auth.getSocketId(game.players[0].id);
       if (player1SocketId) {
         this.io.to(player1SocketId).emit('game_state', {
+          gameId: game.id,
           ball: game.ball,
           opponentPaddleY: player2PaddleY,
           scores: [game.players[0].score, game.players[1]?.score || 0],
@@ -1520,6 +1565,7 @@ class GameManager {
       const player2SocketId = this.auth.getSocketId(game.players[1].id);
       if (player2SocketId) {
         this.io.to(player2SocketId).emit('game_state', {
+          gameId: game.id,
           ball: game.ball,
           opponentPaddleY: player1PaddleY,
           scores: [game.players[0]?.score || 0, game.players[1].score],
@@ -1537,6 +1583,7 @@ class GameManager {
       const spectatorSocketIds = Array.from(spectators);
       spectatorSocketIds.forEach((socketId) => {
         this.io.to(socketId).emit('game_state', {
+          gameId: game.id,
           ball: game.ball,
           player1PaddleY,
           player2PaddleY,
@@ -2145,6 +2192,12 @@ export class PongGameServer {
 
         // Update game state with second player
         game.players[1] = player;
+
+        // ✅ CRITICAL: Reset both players' scores to ensure clean slate for new game
+        // This prevents score contamination from previous games
+        game.players[0].score = 0;
+        game.players[1].score = 0;
+
         game.status = 'waiting_for_ready';
         this.game['playerGames'].set(player.id, existingGameId);
 

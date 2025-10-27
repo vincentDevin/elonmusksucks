@@ -42,7 +42,7 @@ const RouteFallback = () => (
 );
 
 export default function AppRoutes() {
-  const { accessToken } = useAuth();
+  const { user } = useAuth();
 
   return (
     <Routes>
@@ -174,7 +174,7 @@ export default function AppRoutes() {
       {/* Fallback - redirect unknown routes */}
       <Route
         path="*"
-        element={accessToken ? <Navigate to="/timeline" replace /> : <PublicSiteRedirect />}
+        element={user ? <Navigate to="/timeline" replace /> : <PublicSiteRedirect />}
       />
     </Routes>
   );

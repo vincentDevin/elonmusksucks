@@ -70,26 +70,6 @@ export function ProfileEditForm({
           />
         </label>
 
-        <label className="block">
-          <span className="text-sm font-medium">Location</span>
-          <input
-            name="location"
-            value={formData.location ?? ''}
-            onChange={handleChange}
-            className="mt-1 w-full p-2 border rounded"
-          />
-        </label>
-
-        <label className="block">
-          <span className="text-sm font-medium">Timezone</span>
-          <input
-            name="timezone"
-            value={formData.timezone ?? ''}
-            onChange={handleChange}
-            className="mt-1 w-full p-2 border rounded"
-          />
-        </label>
-
         <label className="flex items-center space-x-2">
           <input
             type="checkbox"

@@ -38,7 +38,7 @@ export function useUserProfile(userId?: number | null): UseUserProfileResult {
     location: null,
     timezone: null,
     notifyOnResolve: true,
-    theme: 'LIGHT',
+    theme: 'dark-professional',
     twoFactorEnabled: false,
     profileComplete: false,
   });
@@ -59,7 +59,7 @@ export function useUserProfile(userId?: number | null): UseUserProfileResult {
           location: null,
           timezone: null,
           notifyOnResolve: true,
-          theme: 'LIGHT',
+          theme: 'dark-professional',
           twoFactorEnabled: false,
           profileComplete: false,
         });

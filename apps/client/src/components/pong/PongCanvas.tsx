@@ -36,7 +36,7 @@ interface GameState {
 interface PongCanvasProps {
   gameState?: GameState;
   className?: string;
-  ping?: number;
+  ping?: number; // One-way ping for latency compensation
   onSetReady?: (ready: boolean) => void;
   isSpectating?: boolean;
   gameStateBuffer?: GameStateBuffer;
@@ -99,6 +99,7 @@ const VISUAL_CONFIG = {
 export function PongCanvas({
   gameState,
   className = '',
+  ping = 0,
   onSetReady,
   isSpectating = false,
   gameStateBuffer,
@@ -781,10 +782,21 @@ export function PongCanvas({
 
       // ✅ PHASE 2: Prefer shadow physics (client-side prediction) for smoothest experience
       if (shadowPhysics) {
-        // Update shadow physics with current paddle positions
-        const paddle1Y = gameState.players[0]?.paddleY;
-        const paddle2Y = gameState.players[1]?.paddleY;
-        const shadowBall = shadowPhysics.update(Date.now(), paddle1Y, paddle2Y);
+        // Use interpolated paddle positions for more accurate collision detection
+        // This ensures shadow physics collision detection matches what's rendered on screen
+        const currentTime = Date.now();
+        let paddle1Y = gameState.players[0]?.paddleY;
+        let paddle2Y = gameState.players[1]?.paddleY;
+
+        // Try to use interpolated positions (more accurate than raw server state)
+        const interpolatedPaddle1Y = getInterpolatedPaddlePosition(0, currentTime);
+        const interpolatedPaddle2Y = getInterpolatedPaddlePosition(1, currentTime);
+
+        if (interpolatedPaddle1Y !== null) paddle1Y = interpolatedPaddle1Y;
+        if (interpolatedPaddle2Y !== null) paddle2Y = interpolatedPaddle2Y;
+
+        // Update shadow physics with interpolated positions and ping for latency compensation
+        const shadowBall = shadowPhysics.update(currentTime, paddle1Y, paddle2Y, ping);
 
         if (shadowBall) {
           ballPosition = {
