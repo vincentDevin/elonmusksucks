@@ -1,6 +1,6 @@
 // apps/client/src/contexts/SocketContext.tsx
 // Rollback: Remove socket event constants import and restore string literals
-import { createContext, useContext, useMemo, useEffect } from 'react';
+import { createContext, useContext, useMemo } from 'react';
 import type { ReactNode } from 'react';
 import { socket } from '../lib/socket';
 

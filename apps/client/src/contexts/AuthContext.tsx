@@ -23,6 +23,7 @@ import type { User } from '../api/auth';
 import { setAccessToken, setAuthFailureCallback, setTokenRefreshCallback } from '../api/axios';
 import { useEventBusCore } from './EventBusCoreContext';
 import { useSocket } from './SocketContext';
+import { startHeartbeat, stopHeartbeat } from '../lib/socket';
 import {
   REDIS_CHANNELS,
   type BalanceUpdatePayload,
@@ -240,12 +241,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       connectionState.isConnected = true;
       connectionState.isConnecting = false;
 
+      // Start keep-alive heartbeat to prevent idle disconnection
+      // Wait for connection to be established before starting heartbeat
+      socket.once('connect', () => {
+        startHeartbeat(socket);
+      });
+
       return;
     }
 
     // Case 2: User logged out - disconnect socket
     if (!currentUserId && connectionState.lastUserId !== null) {
       console.log('[AuthContext] User logged out, disconnecting socket');
+
+      // Stop keep-alive heartbeat
+      stopHeartbeat();
+
       if (socket.connected) {
         socket.disconnect();
       }
@@ -270,6 +281,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       connectionState.lastUserId = currentUserId;
       connectionState.isConnected = true;
       connectionState.isConnecting = false;
+
+      // Start keep-alive heartbeat after connection established
+      socket.once('connect', () => {
+        startHeartbeat(socket);
+      });
     }
   }, [socket, accessToken, user?.id]);
 

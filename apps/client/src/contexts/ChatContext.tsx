@@ -91,23 +91,38 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       socket.emit(SOCKET_EVENTS.CHAT_HISTORY_REQUEST, {});
     };
 
+    let connectHandler: (() => void) | null = null;
+
     if (socket.connected) {
-      // Socket already connected - request immediately
-      requestHistory();
+      // Socket already connected - request with small delay to avoid race condition
+      // CRITICAL: Server needs ~15-20ms to register all socket handlers after connection
+      // If we emit immediately, the event arrives before handlers are ready and is lost
+      console.log('[ChatContext] Socket already connected, requesting history with 50ms delay');
+      setTimeout(() => {
+        requestHistory();
+      }, 50);
     } else {
       // Socket not connected - wait for connection then request
       console.log('[ChatContext] Socket not connected, waiting for connection...');
-      const onConnect = () => {
+      connectHandler = () => {
         console.log('[ChatContext] Socket connected, requesting chat history...');
-        socket.emit(SOCKET_EVENTS.CHAT_HISTORY_REQUEST, {});
+        // CRITICAL: Add delay to avoid race condition where client emits before server finishes registering handlers
+        // Server takes ~15-20ms to register all handlers after connection, so 50ms is safe
+        setTimeout(() => {
+          socket.emit(SOCKET_EVENTS.CHAT_HISTORY_REQUEST, {});
+        }, 50);
       };
-      socket.once('connect', onConnect);
+      socket.once('connect', connectHandler);
     }
 
-    // 3. Cleanup - remove direct listener
+    // 3. Cleanup - remove direct listener AND connect handler
     return () => {
-      console.log('[ChatContext] Cleaning up chat history direct listener');
+      console.log('[ChatContext] Cleaning up chat history listeners');
       socket.off(SOCKET_EVENTS.CHAT_HISTORY_RESPONSE, handleHistory);
+      // Remove connect handler if it was registered but hasn't fired yet
+      if (connectHandler) {
+        socket.off('connect', connectHandler);
+      }
     };
   }, [socket, handleHistory]);
 

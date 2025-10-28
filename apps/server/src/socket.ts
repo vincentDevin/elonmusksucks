@@ -62,7 +62,10 @@ const activeUserConnections = new Map<number, string>(); // userId -> socketId
 const socketActivityTimestamps = new Map<string, number>(); // socketId -> lastActivityTime
 
 // Periodic cleanup configuration
-const STALE_CONNECTION_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes of inactivity
+// CRITICAL: 15 minutes allows for idle browsing without disconnection
+// Socket.IO has its own health checks (ping every 15s, timeout after 10s)
+// This cleanup only handles edge cases where disconnect events don't fire
+const STALE_CONNECTION_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes of inactivity
 const CLEANUP_INTERVAL_MS = 60 * 1000; // Check every 60 seconds
 
 export async function initSocket(httpServer: HTTPServer) {
@@ -237,6 +240,19 @@ export async function initSocket(httpServer: HTTPServer) {
         socketActivityTimestamps.set(socket.id, Date.now());
       });
 
+      // CRITICAL: Listen to Socket.IO ping events to track connection health
+      // Without this, idle users get disconnected even though connection is healthy
+      // Socket.IO pings every 15s but onAny() doesn't capture internal events
+      socket.on('ping', () => {
+        socketActivityTimestamps.set(socket.id, Date.now());
+        // Uncomment for debugging: console.log(`[socket] ping received from ${socket.id}`);
+      });
+
+      // Also track pong responses for completeness
+      socket.on('pong', () => {
+        socketActivityTimestamps.set(socket.id, Date.now());
+      });
+
       // Join user-specific room for personal events
       if (user?.id) {
         socket.join(`user:${user.id}`);
@@ -329,8 +345,12 @@ export async function initSocket(httpServer: HTTPServer) {
       // Remove if socket hasn't had activity in STALE_CONNECTION_TIMEOUT_MS
       const lastActivity = socketActivityTimestamps.get(socketId);
       if (lastActivity && now - lastActivity > STALE_CONNECTION_TIMEOUT_MS) {
+        const inactiveDuration = Math.floor((now - lastActivity) / 1000);
+        const inactiveMinutes = Math.floor(inactiveDuration / 60);
         console.log(
-          `[socket-cleanup] Disconnecting stale connection for user ${userId} (inactive for ${Math.floor((now - lastActivity) / 1000)}s)`,
+          `[socket-cleanup] Disconnecting stale connection for user ${userId} ` +
+            `(socket ${socketId}, inactive for ${inactiveMinutes}m ${inactiveDuration % 60}s, ` +
+            `threshold: ${STALE_CONNECTION_TIMEOUT_MS / 60000}m)`,
         );
         socket.disconnect(true);
         activeUserConnections.delete(userId);
@@ -388,7 +408,8 @@ export async function initSocket(httpServer: HTTPServer) {
   // Run cleanup every CLEANUP_INTERVAL_MS
   const cleanupInterval = setInterval(cleanupStaleConnections, CLEANUP_INTERVAL_MS);
   console.log(
-    `[socket] Stale connection cleanup scheduled every ${CLEANUP_INTERVAL_MS / 1000}s (timeout: ${STALE_CONNECTION_TIMEOUT_MS / 1000}s)`,
+    `[socket] Stale connection cleanup scheduled every ${CLEANUP_INTERVAL_MS / 1000}s ` +
+      `(timeout: ${STALE_CONNECTION_TIMEOUT_MS / 60000} minutes)`,
   );
 
   // ── CRITICAL: Redis client cleanup on server shutdown ────────────────────

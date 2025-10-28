@@ -89,8 +89,12 @@ export async function registerChatHandlers(socket: Socket) {
   // 2. History request (no Redis needed)
   // ────────────────────────────────────────────────────────────────────────────
   const historyHandler = async () => {
+    console.log(
+      `[chat] History request received from socket ${socket.id} (user: ${authSock.user?.id})`,
+    );
     try {
       const history: MessageWithUser[] = await getRecentMessages(CHAT_CONSTANTS.GLOBAL_ROOM_ID, 50);
+      console.log(`[chat] Retrieved ${history.length} messages from database`);
 
       // Extract unique users from message history
       const uniqueUsers = new Map<
@@ -123,6 +127,9 @@ export async function registerChatHandlers(socket: Socket) {
         timestamp: msg.timestamp instanceof Date ? msg.timestamp.toISOString() : `${msg.timestamp}`,
       }));
 
+      console.log(
+        `[chat] Sending ${messages.length} messages to socket ${socket.id} via event: ${SOCKET_EVENTS.CHAT_HISTORY_RESPONSE}`,
+      );
       socket.emit(SOCKET_EVENTS.CHAT_HISTORY_RESPONSE, messages);
     } catch (err) {
       console.error('[chat] Failed to fetch history:', err);
@@ -130,6 +137,9 @@ export async function registerChatHandlers(socket: Socket) {
       socket.emit(SOCKET_EVENTS.CHAT_ERROR_RESPONSE, errorResponse);
     }
   };
+  console.log(
+    `[chat] Registering history handler on event: ${SOCKET_EVENTS.CHAT_HISTORY_REQUEST} for socket ${socket.id}`,
+  );
   socket.on(SOCKET_EVENTS.CHAT_HISTORY_REQUEST, historyHandler);
   socketCleanupManager.registerHandler(
     socket.id,

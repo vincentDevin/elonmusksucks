@@ -259,4 +259,19 @@ export function registerRoomHandlers(_io: Server, socket: Socket) {
       callback?.(rooms);
     }
   });
+
+  // Keep-alive heartbeat handler
+  // Client sends periodic heartbeat to prevent idle disconnection
+  // Activity is already tracked by socket.onAny() in socket.ts, this is just for redundancy
+  socket.on('heartbeat', (data?: { timestamp?: number }) => {
+    // No-op handler - activity tracking happens in socket.ts via socket.onAny()
+    // This ensures the event is registered and doesn't cause errors
+    // Optional debug logging (disabled by default to reduce noise)
+    if (process.env.DEBUG_HEARTBEAT === 'true') {
+      console.log(
+        `[heartbeat] Received from user ${authSocket.user?.id} (socket ${socket.id})`,
+        data,
+      );
+    }
+  });
 }

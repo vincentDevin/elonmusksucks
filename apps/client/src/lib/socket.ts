@@ -36,3 +36,57 @@ export const socket: Socket = io(env.SOCKET_URL || undefined, {
   // Transport options (prefer WebSocket, fallback to polling)
   transports: ['websocket', 'polling'],
 });
+
+/**
+ * Keep-alive heartbeat mechanism
+ *
+ * CRITICAL: Prevents server from disconnecting idle users
+ * - Server tracks activity via socket.onAny() and ping/pong events
+ * - This provides redundancy in case Socket.IO internals change
+ * - Sends lightweight heartbeat every 4 minutes (well under 15min timeout)
+ */
+let heartbeatInterval: NodeJS.Timeout | null = null;
+const HEARTBEAT_INTERVAL_MS = 4 * 60 * 1000; // 4 minutes
+
+/**
+ * Start sending periodic heartbeat events to server
+ * Called by AuthContext when user connects
+ */
+export function startHeartbeat(sock: Socket = socket): void {
+  // Clear any existing interval
+  stopHeartbeat();
+
+  // Only start if socket is connected
+  if (!sock.connected) {
+    console.log('[socket] Skipping heartbeat - socket not connected');
+    return;
+  }
+
+  console.log('[socket] Starting keep-alive heartbeat (every 4 minutes)');
+
+  // Send initial heartbeat immediately
+  sock.emit('heartbeat', { timestamp: Date.now() });
+
+  // Set up periodic heartbeat
+  heartbeatInterval = setInterval(() => {
+    if (sock.connected) {
+      sock.emit('heartbeat', { timestamp: Date.now() });
+      console.log('[socket] Heartbeat sent');
+    } else {
+      console.log('[socket] Skipping heartbeat - socket disconnected');
+      stopHeartbeat();
+    }
+  }, HEARTBEAT_INTERVAL_MS);
+}
+
+/**
+ * Stop sending heartbeat events
+ * Called by AuthContext when user disconnects
+ */
+export function stopHeartbeat(): void {
+  if (heartbeatInterval) {
+    clearInterval(heartbeatInterval);
+    heartbeatInterval = null;
+    console.log('[socket] Keep-alive heartbeat stopped');
+  }
+}

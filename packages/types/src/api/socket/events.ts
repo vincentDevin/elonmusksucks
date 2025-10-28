@@ -434,7 +434,7 @@ export const SOCKET_EVENTS = {
   CHAT_STOP_TYPING_SEND: 'chat:stopTyping',
 
   // Chat events (server-to-client broadcasts)
-  CHAT_HISTORY_RESPONSE: 'chat:history',
+  CHAT_HISTORY_RESPONSE: 'chat:history:response', // Different from request to avoid event name conflict
   CHAT_ERROR_RESPONSE: 'chat:error',
 
   // Betting events (client-to-server)
