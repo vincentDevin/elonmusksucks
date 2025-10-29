@@ -10,6 +10,7 @@ import type {
   ArticleModerationData,
   OPMLImportResult,
   FeedStatsResponse,
+  TrendingContentResponse,
 } from '@ems/types';
 
 /**
@@ -22,7 +23,28 @@ import type {
 
 export const timelineApi = {
   /**
-   * Get articles timeline with pagination
+   * Get unified timeline (articles + posts) with pagination
+   * Backend merges both content types automatically
+   */
+  getTimeline: async (params?: {
+    cursor?: string;
+    limit?: number;
+    search?: string;
+  }): Promise<TimelineResponse> => {
+    const searchParams = new URLSearchParams();
+
+    searchParams.set('limit', String(params?.limit || 30));
+
+    // Optional parameters
+    if (params?.cursor) searchParams.set('cursor', params.cursor);
+    if (params?.search) searchParams.set('search', params.search);
+
+    const response = await api.get(`/api/timeline?${searchParams.toString()}`);
+    return response.data;
+  },
+
+  /**
+   * @deprecated Use getTimeline() instead - backend returns unified feed
    */
   getArticles: async (params?: {
     cursor?: string;
@@ -32,33 +54,23 @@ export const timelineApi = {
     sort?: 'newest' | 'oldest';
     search?: string;
   }): Promise<TimelineResponse> => {
-    const searchParams = new URLSearchParams();
-
-    // Default parameters
-    searchParams.set('status', params?.status || 'APPROVED');
-    searchParams.set('limit', String(params?.limit || 30));
-    searchParams.set('sort', params?.sort || 'newest');
-
-    // Optional parameters
-    if (params?.cursor) searchParams.set('cursor', params.cursor);
-    if (params?.tag) searchParams.set('tag', params.tag);
-    if (params?.search) searchParams.set('search', params.search);
-
-    const response = await api.get(`/api/timeline/articles?${searchParams.toString()}`);
-    return response.data;
+    // Just call getTimeline - backend doesn't support filtering by type
+    return timelineApi.getTimeline({
+      cursor: params?.cursor,
+      limit: params?.limit,
+      search: params?.search,
+    });
   },
 
   /**
-   * Get tweets timeline with pagination
+   * @deprecated Use getTimeline() instead - backend returns unified feed
    */
-  getTweets: async (params?: { cursor?: string; limit?: number }): Promise<TimelineResponse> => {
-    const searchParams = new URLSearchParams();
-
-    searchParams.set('limit', String(params?.limit || 50));
-    if (params?.cursor) searchParams.set('cursor', params.cursor);
-
-    const response = await api.get(`/api/timeline/tweets?${searchParams.toString()}`);
-    return response.data;
+  getPosts: async (params?: { cursor?: string; limit?: number }): Promise<TimelineResponse> => {
+    // Just call getTimeline - backend doesn't support filtering by type
+    return timelineApi.getTimeline({
+      cursor: params?.cursor,
+      limit: params?.limit,
+    });
   },
 
   /**
@@ -140,6 +152,173 @@ export const timelineApi = {
     const response = await api.get(
       `/api/timeline/articles/${articleId}/comments?${searchParams.toString()}`,
     );
+    return response.data;
+  },
+
+  /**
+   * Search timeline content
+   */
+  search: async (params: {
+    query: string;
+    filters?: any;
+    limit?: number;
+    cursor?: string;
+  }): Promise<TimelineResponse> => {
+    const searchParams = new URLSearchParams();
+    searchParams.set('q', params.query);
+    searchParams.set('limit', String(params.limit || 30));
+
+    if (params.cursor) searchParams.set('cursor', params.cursor);
+    if (params.filters) searchParams.set('filters', JSON.stringify(params.filters));
+
+    const response = await api.get(`/api/timeline/search?${searchParams.toString()}`);
+    return response.data;
+  },
+
+  /**
+   * Get search suggestions
+   */
+  getSearchSuggestions: async (
+    query: string,
+  ): Promise<{
+    suggestions: Array<{
+      type: 'article' | 'tag' | 'author' | 'feed';
+      value: string;
+      id?: number;
+      count?: number;
+    }>;
+  }> => {
+    const response = await api.get(
+      `/api/timeline/search/suggestions?q=${encodeURIComponent(query)}`,
+    );
+    return response.data;
+  },
+
+  /**
+   * Get trending content
+   */
+  getTrending: async (params?: {
+    timeRange?: 'hour' | 'day' | 'week' | 'month';
+    limit?: number;
+    type?: 'articles' | 'posts' | 'all';
+  }): Promise<TrendingContentResponse> => {
+    const searchParams = new URLSearchParams();
+    searchParams.set('timeRange', params?.timeRange || 'day');
+    searchParams.set('limit', String(params?.limit || 10));
+    searchParams.set('type', params?.type || 'all');
+
+    const response = await api.get(`/api/timeline/trending?${searchParams.toString()}`);
+    return response.data;
+  },
+
+  /**
+   * Check if article is bookmarked
+   */
+  checkBookmarkStatus: async (articleId: number): Promise<{ isBookmarked: boolean }> => {
+    const response = await api.get(`/api/timeline/bookmarks/check/${articleId}`);
+    return response.data;
+  },
+
+  /**
+   * Check bookmark status for multiple articles at once (bulk operation)
+   */
+  checkBookmarkStatusBulk: async (
+    articleIds: number[],
+  ): Promise<{ bookmarks: Record<number, boolean> }> => {
+    const response = await api.post('/api/timeline/bookmarks/check-bulk', { articleIds });
+    return response.data;
+  },
+
+  /**
+   * Toggle article bookmark
+   */
+  toggleBookmark: async (
+    articleId: number,
+    collectionId?: number,
+  ): Promise<{
+    action: 'added' | 'removed';
+    bookmarkId?: number;
+  }> => {
+    const response = await api.post(`/api/timeline/articles/${articleId}/bookmark`, {
+      collectionId,
+    });
+    return response.data;
+  },
+
+  /**
+   * Get user bookmarks
+   */
+  getBookmarks: async (params?: {
+    limit?: number;
+    cursor?: string;
+    collectionId?: number;
+  }): Promise<{
+    bookmarks: any[];
+    pagination: { cursor?: string; hasMore: boolean; total?: number };
+  }> => {
+    const searchParams = new URLSearchParams();
+    searchParams.set('limit', String(params?.limit || 20));
+
+    if (params?.cursor) searchParams.set('cursor', params.cursor);
+    if (params?.collectionId) searchParams.set('collectionId', String(params.collectionId));
+
+    const response = await api.get(`/api/timeline/bookmarks?${searchParams.toString()}`);
+    return response.data;
+  },
+
+  /**
+   * Get user's bookmark collections
+   */
+  getBookmarkCollections: async (): Promise<{
+    collections: Array<{
+      id: number;
+      name: string;
+      description?: string | null;
+      isPrivate: boolean;
+      createdAt: string;
+      updatedAt: string;
+      _count: { bookmarks: number };
+    }>;
+  }> => {
+    const response = await api.get('/api/timeline/bookmark-collections');
+    return response.data;
+  },
+
+  /**
+   * Create a new bookmark collection
+   */
+  createBookmarkCollection: async (data: {
+    name: string;
+    description?: string;
+    isPrivate?: boolean;
+  }): Promise<{
+    id: number;
+    name: string;
+    description?: string | null;
+    isPrivate: boolean;
+    createdAt: string;
+    updatedAt: string;
+    _count: { bookmarks: number };
+  }> => {
+    const response = await api.post('/api/timeline/bookmark-collections', data);
+    return response.data;
+  },
+
+  /**
+   * Share article
+   */
+  shareArticle: async (
+    articleId: number,
+    data: {
+      platform: string;
+      message?: string;
+      targetUsers?: number[];
+    },
+  ): Promise<{
+    shareId: number;
+    shareUrl?: string;
+  }> => {
+    const response = await api.post(`/api/timeline/articles/${articleId}/share`, data);
     return response.data;
   },
 };

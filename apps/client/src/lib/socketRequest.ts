@@ -1,4 +1,4 @@
-// apps/client/src/lib/socketRequest.ts
+// Rollback: Revert to string event parameter, remove typed imports
 // -----------------------------------------------------------------------------
 // Helper to emit a socket.io command with ACK semantics and a timeout.
 // Usage:
@@ -7,6 +7,7 @@
 // -----------------------------------------------------------------------------
 
 import { socket } from './socket';
+import { type SocketEvent } from '@ems/types';
 
 /**
  * Emit a socket event that expects an ACK function `(err, data)`.
@@ -15,7 +16,7 @@ import { socket } from './socket';
  * @param timeout ms before rejecting with SOCKET_TIMEOUT (default 5000)
  */
 export function socketRequest<T = unknown>(
-  event: string,
+  event: SocketEvent,
   payload: any,
   timeout = 5000,
 ): Promise<T> {

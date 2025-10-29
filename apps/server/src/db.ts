@@ -1,31 +1,30 @@
 import dotenv from 'dotenv';
 import path from 'path';
 import { PrismaClient, Prisma } from '@prisma/client';
+import type { SlowQueryRecord } from '@ems/types';
+import {
+  dbQueryDuration,
+  dbQueryTotal,
+  dbSlowQueries,
+  dbErrorsTotal,
+  safeIncCounter,
+} from './lib/prometheusMetrics';
 
 // Load environment variables based on NODE_ENV
-const envFile = process.env.NODE_ENV === 'test' ? '.env.test' : '.env';
-dotenv.config({ path: path.resolve(__dirname, '../../../', envFile) });
+// In production (Fly.io), environment variables are injected directly, no .env file needed
+if (process.env.NODE_ENV !== 'production') {
+  const envFile = process.env.NODE_ENV === 'test' ? '.env.test' : '.env';
+  dotenv.config({ path: path.resolve(__dirname, '../../../', envFile) });
+}
 
 // ── DATABASE CONNECTION POOLING CONFIGURATION ─────────────────────────────────
 // Optimized connection pool settings for production performance
-const connectionLimit = process.env.DATABASE_CONNECTION_LIMIT
-  ? parseInt(process.env.DATABASE_CONNECTION_LIMIT)
-  : 10;
-
-// Build connection URL with pooling parameters
-const getDatabaseUrl = () => {
-  const baseUrl = process.env.DATABASE_URL;
-  if (!baseUrl) throw new Error('DATABASE_URL is not set');
-
-  // Add connection pooling parameters to the URL
-  const url = new URL(baseUrl);
-  url.searchParams.set('connection_limit', connectionLimit.toString());
-  url.searchParams.set('pool_timeout', '10'); // 10 seconds timeout
-  url.searchParams.set('connect_timeout', '10'); // 10 seconds connection timeout
-  url.searchParams.set('pgbouncer', 'true'); // Enable PgBouncer mode if available
-
-  return url.toString();
-};
+// Note: For Fly Managed Postgres, connection parameters are configured via environment variables
+// DATABASE_URL: Uses pgbouncer for connection pooling (port 5432)
+// DIRECT_URL: Direct connection bypassing pgbouncer (port 5433) - used for migrations
+if (!process.env.DATABASE_URL) {
+  throw new Error('DATABASE_URL is not set');
+}
 
 // ── PRISMA CLIENT CONFIGURATION ───────────────────────────────────────────────
 // Configure Prisma with optimal settings for production
@@ -33,11 +32,6 @@ const prismaLogLevel: Prisma.LogLevel[] =
   process.env.NODE_ENV === 'production' ? ['error', 'warn'] : ['query', 'info', 'warn', 'error'];
 
 const prisma = new PrismaClient({
-  datasources: {
-    db: {
-      url: getDatabaseUrl(),
-    },
-  },
   log: prismaLogLevel,
   errorFormat: 'colorless',
 });
@@ -52,80 +46,159 @@ interface QueryMetrics {
 }
 
 const SLOW_QUERY_THRESHOLD = parseInt(process.env.SLOW_QUERY_MS || '100'); // 100ms default
+const QUERY_TIMEOUT_MS = parseInt(process.env.QUERY_TIMEOUT_MS || '10000'); // 10s default max query time
 const queryMetrics: QueryMetrics[] = [];
 const MAX_METRICS_HISTORY = 1000; // Keep last 1000 queries for analysis
+const topSlowQueries: SlowQueryRecord[] = []; // Track top 5 slowest queries
+const MAX_SLOW_QUERIES = 5;
 
-// Performance monitoring middleware
-prisma.$use(async (params, next) => {
-  const before = Date.now();
+// Performance monitoring middleware using new $extends API
+const prismaWithMiddleware = prisma.$extends({
+  query: {
+    $allOperations: async ({ model, operation, args, query }) => {
+      const before = Date.now();
 
-  try {
-    const result = await next(params);
-    const duration = Date.now() - before;
+      // ── QUERY TIMEOUT ─────────────────────────────────────────────────────
+      // Wrap query in a timeout promise to prevent indefinite hangs
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          const elapsed = Date.now() - before;
+          reject(
+            new Error(
+              `[DB TIMEOUT] ${model}.${operation} exceeded ${QUERY_TIMEOUT_MS}ms (elapsed: ${elapsed}ms)`,
+            ),
+          );
+        }, QUERY_TIMEOUT_MS);
+      });
 
-    // Track metrics
-    const metric: QueryMetrics = {
-      model: params.model,
-      action: params.action,
-      duration,
-      timestamp: new Date(),
-    };
+      try {
+        // Race between query execution and timeout
+        const result = await Promise.race([query(args), timeoutPromise]);
+        const duration = Date.now() - before;
 
-    // Store metrics (circular buffer)
-    queryMetrics.push(metric);
-    if (queryMetrics.length > MAX_METRICS_HISTORY) {
-      queryMetrics.shift();
-    }
-
-    // Log slow queries
-    if (duration > SLOW_QUERY_THRESHOLD) {
-      console.warn(`[SLOW QUERY] ${params.model}.${params.action} took ${duration}ms`);
-
-      // In production, you might want to send this to monitoring service
-      if (process.env.NODE_ENV === 'production') {
-        // TODO: Send to Sentry, DataDog, or other monitoring service
-        console.error('[SLOW QUERY ALERT]', {
-          model: params.model,
-          action: params.action,
+        // Track metrics
+        const metric: QueryMetrics = {
+          model,
+          action: operation,
           duration,
-          // Don't log args in production for security reasons
-          args: undefined,
+          timestamp: new Date(),
+        };
+
+        // Store metrics (circular buffer)
+        queryMetrics.push(metric);
+        if (queryMetrics.length > MAX_METRICS_HISTORY) {
+          queryMetrics.shift();
+        }
+
+        // ── PROMETHEUS METRICS ────────────────────────────────────────────────
+        // Record Prometheus metrics for Grafana dashboards
+        const durationSeconds = duration / 1000;
+        const modelName = model || 'unknown';
+        const operationName = operation || 'unknown';
+
+        // Track query duration
+        dbQueryDuration.observe({ operation: operationName, model: modelName }, durationSeconds);
+
+        // Track query count
+        safeIncCounter(dbQueryTotal, 1, {
+          operation: operationName,
+          model: modelName,
+          status: 'success',
         });
+
+        // Log slow queries
+        if (duration > SLOW_QUERY_THRESHOLD) {
+          // Track slow query count in Prometheus
+          safeIncCounter(dbSlowQueries, 1, {
+            operation: operationName,
+            model: modelName,
+          });
+          const traceId = `trace_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          console.warn(`[SLOW QUERY] ${model}.${operation} took ${duration}ms [${traceId}]`);
+
+          // Track top slow queries
+          const slowQuery: SlowQueryRecord = {
+            traceId,
+            model: model || 'unknown',
+            action: operation || 'unknown',
+            duration,
+            timestamp: new Date().toISOString(),
+            params:
+              process.env.NODE_ENV === 'development'
+                ? JSON.stringify(args).substring(0, 200)
+                : undefined,
+          };
+
+          // Add to top slow queries (keep top 5 slowest)
+          topSlowQueries.push(slowQuery);
+          topSlowQueries.sort((a, b) => b.duration - a.duration);
+          if (topSlowQueries.length > MAX_SLOW_QUERIES) {
+            topSlowQueries.pop();
+          }
+
+          // In production, you might want to send this to monitoring service
+          if (process.env.NODE_ENV === 'production') {
+            // TODO: Send to Sentry, DataDog, or other monitoring service
+            console.error('[SLOW QUERY ALERT]', {
+              traceId,
+              model,
+              action: operation,
+              duration,
+              // Don't log args in production for security reasons
+              args: undefined,
+            });
+          }
+        }
+
+        // Log all queries in development
+        if (process.env.NODE_ENV === 'development' && process.env.LOG_QUERIES === 'true') {
+          console.log(`[QUERY] ${model}.${operation} - ${duration}ms`);
+        }
+
+        return result;
+      } catch (error) {
+        const duration = Date.now() - before;
+        const modelName = model || 'unknown';
+        const operationName = operation || 'unknown';
+
+        // Track database errors in Prometheus
+        const errorType = error instanceof Error ? error.name : 'UnknownError';
+        safeIncCounter(dbErrorsTotal, 1, {
+          operation: operationName,
+          model: modelName,
+          error_type: errorType,
+        });
+
+        // Also count as failed query
+        safeIncCounter(dbQueryTotal, 1, {
+          operation: operationName,
+          model: modelName,
+          status: 'error',
+        });
+
+        console.error(`[QUERY ERROR] ${model}.${operation} failed after ${duration}ms`, error);
+        throw error;
       }
-    }
-
-    // Log all queries in development
-    if (process.env.NODE_ENV === 'development' && process.env.LOG_QUERIES === 'true') {
-      console.log(`[QUERY] ${params.model}.${params.action} - ${duration}ms`);
-    }
-
-    return result;
-  } catch (error) {
-    const duration = Date.now() - before;
-    console.error(
-      `[QUERY ERROR] ${params.model}.${params.action} failed after ${duration}ms`,
-      error,
-    );
-    throw error;
-  }
+    },
+  },
 });
+
+// Export both the original client (for repositories) and extended client (for monitoring)
+export { prisma }; // Original client for repositories
+export { prismaWithMiddleware }; // Extended client with middleware
 
 // ── CONNECTION HEALTH MONITORING ──────────────────────────────────────────────
 // Monitor connection pool health and database connectivity
 let isConnected = false;
 
-// Verify database connection on startup
-prisma
-  .$connect()
-  .then(() => {
-    isConnected = true;
-    console.log('[DATABASE] Successfully connected to PostgreSQL');
-    console.log(`[DATABASE] Connection pool size: ${connectionLimit}`);
-  })
-  .catch((error) => {
-    console.error('[DATABASE] Failed to connect:', error);
-    process.exit(1);
-  });
+// Prisma connects lazily on first query - no need for eager connection
+// This allows the app to start even if DB is temporarily unavailable
+const poolSize = process.env.DATABASE_CONNECTION_LIMIT || '3';
+console.log('[DATABASE] Prisma client initialized (lazy connection)');
+console.log(`[DATABASE] Connection pool size: ${poolSize}`);
+console.log(
+  `[DATABASE] Query timeout: ${QUERY_TIMEOUT_MS}ms, Slow query threshold: ${SLOW_QUERY_THRESHOLD}ms`,
+);
 
 // Graceful shutdown handling
 const gracefulShutdown = async () => {
@@ -151,6 +224,10 @@ export const getQueryMetrics = () => ({
 
 export const clearQueryMetrics = () => {
   queryMetrics.length = 0;
+};
+
+export const getTopSlowQueries = (): SlowQueryRecord[] => {
+  return [...topSlowQueries]; // Return copy to prevent external modification
 };
 
 export const isDbConnected = () => isConnected;

@@ -1,5 +1,18 @@
 // apps/server/src/handlers/timelineHandlers.ts
 import type { Server as IOServer, Socket } from 'socket.io';
+import {
+  REDIS_CHANNELS,
+  SOCKET_EVENTS,
+  SOCKET_ROOMS,
+  type AdminFeedRefreshRequest,
+  type AdminFeedRefreshAck,
+  type FeedArticleApprovedBroadcast,
+  type FeedArticleRejectedBroadcast,
+  type FeedArticleNewBroadcast,
+  type FeedTweetNewBroadcast,
+  type FeedTweetHiddenBroadcast,
+  type FeedManagementUpdateBroadcast,
+} from '@ems/types';
 import redisClient from '../lib/redis';
 
 /**
@@ -17,52 +30,52 @@ export function registerTimelineHandlers(io: IOServer) {
   const timelineSub = redisClient.duplicate();
 
   // Article moderation events
-  timelineSub.subscribe('feed:article:approved');
-  timelineSub.subscribe('feed:article:rejected');
-  timelineSub.subscribe('feed:article:new');
+  timelineSub.subscribe(REDIS_CHANNELS.FEED_ARTICLE_APPROVED);
+  timelineSub.subscribe(REDIS_CHANNELS.FEED_ARTICLE_REJECTED);
+  timelineSub.subscribe(REDIS_CHANNELS.FEED_ARTICLE_NEW);
 
   // Tweet events (optional)
-  timelineSub.subscribe('feed:tweet:new');
-  timelineSub.subscribe('feed:tweet:hidden');
+  timelineSub.subscribe(REDIS_CHANNELS.FEED_TWEET_NEW);
+  timelineSub.subscribe(REDIS_CHANNELS.FEED_TWEET_HIDDEN);
 
   // Feed management events
-  timelineSub.subscribe('feed:source:created');
-  timelineSub.subscribe('feed:source:updated');
-  timelineSub.subscribe('feed:source:deleted');
+  timelineSub.subscribe(REDIS_CHANNELS.FEED_SOURCE_CREATED);
+  timelineSub.subscribe(REDIS_CHANNELS.FEED_SOURCE_UPDATED);
+  timelineSub.subscribe(REDIS_CHANNELS.FEED_SOURCE_DELETED);
 
   timelineSub.on('message', async (channel, message) => {
     try {
       const data = JSON.parse(message);
 
       switch (channel) {
-        case 'feed:article:approved':
+        case REDIS_CHANNELS.FEED_ARTICLE_APPROVED:
           // Broadcast new approved article to public timeline
           await handleArticleApproved(io, data);
           break;
 
-        case 'feed:article:rejected':
+        case REDIS_CHANNELS.FEED_ARTICLE_REJECTED:
           // Notify admin room only
           await handleArticleRejected(io, data);
           break;
 
-        case 'feed:article:new':
+        case REDIS_CHANNELS.FEED_ARTICLE_NEW:
           // Notify admin moderation queue
           await handleNewArticle(io, data);
           break;
 
-        case 'feed:tweet:new':
+        case REDIS_CHANNELS.FEED_TWEET_NEW:
           // Broadcast new tweet to public timeline (optional)
           await handleNewTweet(io, data);
           break;
 
-        case 'feed:tweet:hidden':
+        case REDIS_CHANNELS.FEED_TWEET_HIDDEN:
           // Remove tweet from public timeline
           await handleTweetHidden(io, data);
           break;
 
-        case 'feed:source:created':
-        case 'feed:source:updated':
-        case 'feed:source:deleted':
+        case REDIS_CHANNELS.FEED_SOURCE_CREATED:
+        case REDIS_CHANNELS.FEED_SOURCE_UPDATED:
+        case REDIS_CHANNELS.FEED_SOURCE_DELETED:
           // Notify admin feed managers
           await handleFeedManagementEvent(io, channel, data);
           break;
@@ -78,35 +91,35 @@ export function registerTimelineHandlers(io: IOServer) {
   // Socket connection handlers
   io.on('connection', (socket: Socket) => {
     // Timeline room joining
-    socket.on('timeline:join', () => {
-      socket.join('public:timeline');
+    socket.on(SOCKET_EVENTS.TIMELINE_JOIN, () => {
+      socket.join(SOCKET_ROOMS.PUBLIC_TIMELINE);
       console.log(`[timeline] Socket ${socket.id} joined public timeline`);
     });
 
-    socket.on('timeline:leave', () => {
-      socket.leave('public:timeline');
+    socket.on(SOCKET_EVENTS.TIMELINE_LEAVE, () => {
+      socket.leave(SOCKET_ROOMS.PUBLIC_TIMELINE);
       console.log(`[timeline] Socket ${socket.id} left public timeline`);
     });
 
     // Admin timeline room joining
-    socket.on('admin:timeline:join', () => {
+    socket.on(SOCKET_EVENTS.ADMIN_TIMELINE_JOIN, () => {
       if (socket.data.user?.role === 'ADMIN') {
-        socket.join('admin:timeline');
+        socket.join(SOCKET_ROOMS.ADMIN_TIMELINE);
         console.log(`[timeline] Admin socket ${socket.id} joined admin timeline`);
       } else {
-        socket.emit('error', { message: 'Unauthorized: Admin role required' });
+        socket.emit(SOCKET_EVENTS.ERROR, { message: 'Unauthorized: Admin role required' });
       }
     });
 
-    socket.on('admin:timeline:leave', () => {
-      socket.leave('admin:timeline');
+    socket.on(SOCKET_EVENTS.ADMIN_TIMELINE_LEAVE, () => {
+      socket.leave(SOCKET_ROOMS.ADMIN_TIMELINE);
       console.log(`[timeline] Socket ${socket.id} left admin timeline`);
     });
 
     // Manual feed refresh request (admin only)
-    socket.on('admin:feed:refresh', async (data: { feedId: number }) => {
+    socket.on(SOCKET_EVENTS.ADMIN_FEED_REFRESH, async (data: AdminFeedRefreshRequest) => {
       if (socket.data.user?.role !== 'ADMIN') {
-        socket.emit('error', { message: 'Unauthorized: Admin role required' });
+        socket.emit(SOCKET_EVENTS.ERROR, { message: 'Unauthorized: Admin role required' });
         return;
       }
 
@@ -117,17 +130,18 @@ export function registerTimelineHandlers(io: IOServer) {
         //   forceRefresh: true
         // });
 
-        socket.emit('admin:feed:refresh:ack', {
+        const ackResponse: AdminFeedRefreshAck = {
           feedId: data.feedId,
           status: 'queued',
-        });
+        };
+        socket.emit(SOCKET_EVENTS.ADMIN_FEED_REFRESH_ACK, ackResponse);
 
         console.log(
           `[timeline] Admin ${socket.data.user.id} triggered refresh for feed ${data.feedId}`,
         );
       } catch (error) {
         console.error('[timeline] Error triggering feed refresh:', error);
-        socket.emit('error', { message: 'Failed to refresh feed' });
+        socket.emit(SOCKET_EVENTS.ERROR, { message: 'Failed to refresh feed' });
       }
     });
   });
@@ -150,11 +164,15 @@ async function handleArticleApproved(
     card: any; // TimelineItem payload
   },
 ) {
-  io.to('public:timeline').emit('feed:article:approved', {
+  const broadcast: FeedArticleApprovedBroadcast = {
     articleId: data.articleId,
     card: data.card,
     timestamp: new Date().toISOString(),
-  });
+  };
+  io.to(SOCKET_ROOMS.PUBLIC_TIMELINE).emit(
+    SOCKET_EVENTS.FEED_ARTICLE_APPROVED_BROADCAST,
+    broadcast,
+  );
 
   console.log(`[timeline] Broadcasted approved article ${data.articleId} to public timeline`);
 }
@@ -169,11 +187,12 @@ async function handleArticleRejected(
     reason?: string;
   },
 ) {
-  io.to('admin:timeline').emit('feed:article:rejected', {
+  const broadcast: FeedArticleRejectedBroadcast = {
     articleId: data.articleId,
     reason: data.reason,
     timestamp: new Date().toISOString(),
-  });
+  };
+  io.to(SOCKET_ROOMS.ADMIN_TIMELINE).emit(SOCKET_EVENTS.FEED_ARTICLE_REJECTED_BROADCAST, broadcast);
 
   console.log(`[timeline] Notified admins of rejected article ${data.articleId}`);
 }
@@ -189,12 +208,13 @@ async function handleNewArticle(
     publisher: string;
   },
 ) {
-  io.to('admin:timeline').emit('feed:article:new', {
+  const broadcast: FeedArticleNewBroadcast = {
     articleId: data.articleId,
     title: data.title,
     publisher: data.publisher,
     timestamp: new Date().toISOString(),
-  });
+  };
+  io.to(SOCKET_ROOMS.ADMIN_TIMELINE).emit(SOCKET_EVENTS.FEED_ARTICLE_NEW_BROADCAST, broadcast);
 
   console.log(`[timeline] Notified admins of new article ${data.articleId} for moderation`);
 }
@@ -208,10 +228,11 @@ async function handleNewTweet(
     tweet: any; // TimelineItem payload
   },
 ) {
-  io.to('public:timeline').emit('feed:tweet:new', {
+  const broadcast: FeedTweetNewBroadcast = {
     tweet: data.tweet,
     timestamp: new Date().toISOString(),
-  });
+  };
+  io.to(SOCKET_ROOMS.PUBLIC_TIMELINE).emit(SOCKET_EVENTS.FEED_TWEET_NEW_BROADCAST, broadcast);
 
   console.log(`[timeline] Broadcasted new tweet ${data.tweet.id} to public timeline`);
 }
@@ -225,10 +246,11 @@ async function handleTweetHidden(
     tweetId: string;
   },
 ) {
-  io.to('public:timeline').emit('feed:tweet:hidden', {
+  const broadcast: FeedTweetHiddenBroadcast = {
     tweetId: data.tweetId,
     timestamp: new Date().toISOString(),
-  });
+  };
+  io.to(SOCKET_ROOMS.PUBLIC_TIMELINE).emit(SOCKET_EVENTS.FEED_TWEET_HIDDEN_BROADCAST, broadcast);
 
   console.log(`[timeline] Removed hidden tweet ${data.tweetId} from public timeline`);
 }
@@ -237,11 +259,12 @@ async function handleTweetHidden(
  * Handle feed management events for admin notifications
  */
 async function handleFeedManagementEvent(io: IOServer, event: string, data: any) {
-  io.to('admin:timeline').emit('feed:management:update', {
+  const broadcast: FeedManagementUpdateBroadcast = {
     event,
     data,
     timestamp: new Date().toISOString(),
-  });
+  };
+  io.to(SOCKET_ROOMS.ADMIN_TIMELINE).emit(SOCKET_EVENTS.FEED_MANAGEMENT_UPDATE, broadcast);
 
   console.log(`[timeline] Notified admins of feed management event: ${event}`);
 }

@@ -1,444 +1,753 @@
-# elonmusksucks.net 🚀
+# ElonMuskSucks.net
 
-A satirical prediction market platform parodying Elon Musk's ventures. Users bet "MuskBucks" on outrageous predictions, compete on leaderboards, and engage in real-time chat. Features a comprehensive RSS feed timeline system, achievement badges, and dynamic odds calculation. Production-ready TypeScript monorepo with real-time Socket.IO updates.
+> Because someone needs to keep score of the world's most interesting billionaire
 
-## 🏗️ Architecture & Tech Stack
+**ElonMuskSucks.net** is a full-stack TypeScript prediction market platform where users bet on Elon's next move, play Pong for MuskBucks, and track the timeline of chaos. Built with React 19, Socket.IO real-time events, and an unhealthy obsession with technical over-engineering.
 
-**Frontend:**
-- **Vite 6** + **React 19** + **TypeScript 5.8** + **TailwindCSS 4**
-- **Socket.IO Client** for real-time updates
-- **Unified Theme System** with 10 themes across light/dark/high-contrast categories
-- **Responsive Design** with separate desktop/mobile dashboard variants
-
-**Backend:**
-- **Express 5** + **TypeScript** + **Prisma 6.11** ORM
-- **PostgreSQL 15** with optimized indexes and materialized views
-- **Redis 7** for caching, pub/sub, and session storage (IORedis client)
-- **Socket.IO Server** with Redis adapter for horizontal scaling
-- **BullMQ** job queue system for async processing
-
-**Infrastructure:**
-- **Real-time Updates:** Socket.IO with Redis pub/sub for cross-server broadcasting
-- **Background Jobs:** BullMQ workers for payouts, leaderboards, RSS feeds, and statistics
-- **File Storage:** Tigris S3-compatible object storage with image processing
-- **Authentication:** JWT (access + refresh tokens) with bcrypt hashing
-- **Email Service:** SendGrid integration for auth flows (verification, password reset)
-- **Deployment:** Docker containers ready for Fly.io or similar platforms
+**🎮 Live Site:** [https://elonmusksucks.net](https://elonmusksucks.net)
 
 ---
 
-## 📂 Repository Structure
+## What Is This?
+
+A production-grade prediction market platform featuring:
+
+- 🎯 **Real-time prediction markets** with 6-factor dynamic odds engine
+- 🏓 **Multiplayer Pong** with MuskBucks wagering and ELO rankings
+- 📰 **Live timeline** of RSS feeds, articles, and tweets
+- 🏆 **77 achievements** across 8 categories (including "Tesla Skeptic" and "Rocket Fanboy")
+- 💬 **Live chat** and social features with optimistic UI updates
+- 👑 **Admin dashboard** for content moderation and analytics
+
+All wrapped in a dual-application architecture (authenticated SPA + server-side rendered public site) served by a unified Express backend with 75+ Socket.IO event channels.
+
+---
+
+## Architecture
+
+```mermaid
+graph TB
+    subgraph "Frontend Layer"
+        CLIENT["Client SPA<br/>(React 19 + Vite)<br/>Port 3000"]
+        PUBLIC["Public Site<br/>(SSR + Express)<br/>Port 5173"]
+    end
+
+    subgraph "Backend Layer"
+        API["API Server<br/>(Express 5)<br/>Port 5000"]
+        PONG["Pong Server<br/>(128fps Game Loop)<br/>Port 5001"]
+        ACHIEVEMENT["Achievement Server<br/>(Event Processing)<br/>Port 5002"]
+    end
+
+    subgraph "Infrastructure"
+        PG[(PostgreSQL 16<br/>44 Indexes)]
+        REDIS[(Redis<br/>Pub/Sub + Cache)]
+        BULLMQ[BullMQ Workers<br/>6 Queues]
+        S3[Tigris S3<br/>Object Storage]
+    end
+
+    CLIENT -->|REST API| API
+    CLIENT -->|Socket.IO| API
+    PUBLIC -->|SSR Fetch| API
+
+    API --> PG
+    API --> REDIS
+    API --> BULLMQ
+    API --> S3
+
+    PONG --> PG
+    PONG --> REDIS
+    PONG -->|Socket.IO| CLIENT
+
+    ACHIEVEMENT --> REDIS
+    ACHIEVEMENT --> PG
+
+    REDIS -->|Pub/Sub<br/>75+ Channels| API
+    REDIS -->|Pub/Sub| PONG
+    REDIS -->|Pub/Sub| ACHIEVEMENT
+
+    BULLMQ -->|Payouts| PG
+    BULLMQ -->|Leaderboard| PG
+    BULLMQ -->|RSS Feeds| PG
+
+    style CLIENT fill:#60a5fa
+    style PUBLIC fill:#60a5fa
+    style API fill:#34d399
+    style PONG fill:#34d399
+    style ACHIEVEMENT fill:#34d399
+    style PG fill:#f59e0b
+    style REDIS fill:#ef4444
+    style BULLMQ fill:#a78bfa
+```
+
+**Key Design Decisions:**
+
+- **Dual Frontend**: Authenticated users get a rich SPA experience; public visitors get SEO-optimized SSR pages
+- **Microservices (sort of)**: Pong and achievements run as separate Node processes but share the same database
+- **EventBusCore**: React 19-optimized event handling with `startTransition` and `useOptimistic` for zero-latency UI
+- **Layered Architecture**: Strict separation of Routes → Controllers → Services → Repositories → Prisma
+
+📚 **Deep Dive:** [Architecture Documentation](docs/architecture/overview.md)
+
+---
+
+## Tech Stack
+
+### Frontend
+- **React 19** - Concurrent features, `useOptimistic`, `startTransition`
+- **Vite 7** - Lightning-fast builds with HMR
+- **TypeScript 5.8-5.9** - Strict mode, zero `any` types
+- **TailwindCSS 3/4** - Client app uses v4, public site uses v3
+- **Socket.IO Client 4.8** - Real-time event subscriptions via EventBusCore
+
+### Backend
+- **Node.js ≥24.0.0** - ESM modules, top-level await
+- **Express 5** - REST API + SSR rendering
+- **Prisma 6.10-6.16** - Type-safe ORM with 44 optimized indexes
+- **PostgreSQL 16** - Primary data store with full-text search
+- **Socket.IO 4.8** - WebSocket server with Redis adapter
+- **Redis (IORedis 5.4-5.8)** - Pub/sub (75+ channels) + caching
+- **BullMQ 5.36-5.56** - Background job processing (6 workers)
+
+### Infrastructure
+- **Tigris S3** - Object storage for avatars and media
+- **SendGrid** - Transactional email (verification, notifications)
+- **Fly.io** - Multi-region deployment with Docker
+- **GitHub Actions** - CI/CD pipeline
+
+### Development
+- **npm Workspaces** - Monorepo with shared types
+- **Vitest 3** - Unit and integration testing
+- **ESLint 9 + Prettier 3** - Zero-warning policy
+- **TypeScript Strict Mode** - All packages share `@ems/types`
+
+---
+
+## Quick Start
+
+### Prerequisites
+
+Ensure you have these installed:
+
+- **Node.js ≥24.0.0** (strict requirement)
+- **npm ≥10.0.0**
+- **PostgreSQL 16+**
+- **Redis 7+**
+- **Git**
+
+### Setup (5 minutes)
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/yourusername/elonmusksucks.git
+   cd elonmusksucks
+   ```
+
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
+
+3. **Configure environment variables**
+   ```bash
+   cp .env.example .env
+   # Edit .env with your database credentials, JWT secrets, etc.
+   ```
+
+4. **Initialize the database**
+   ```bash
+   npm run prisma:migrate:dev
+   npm run seed:dev
+   npm run seed:achievements  # 77 achievements
+   ```
+
+5. **Start all services**
+   ```bash
+   npm run dev
+   ```
+
+6. **Verify everything is running**
+   - ✅ Client App: http://localhost:3000
+   - ✅ API Server: http://localhost:5000/health
+   - ✅ Public Site: http://localhost:5173
+   - ✅ Pong Server: http://localhost:5001/health
+   - ✅ Achievement Server: http://localhost:5002/health
+
+🎉 **You're ready!** Register a new account at `localhost:3000/register` and start betting.
+
+---
+
+## Key Features
+
+### 🎯 Prediction Markets
+
+Create and bet on predictions about Elon's next move:
+
+- **6-Factor Dynamic Odds** - Real-time odds calculation based on bet volume, bettor count, market maturity, category multipliers, and house edge
+- **Multiple Market Types** - Binary (Yes/No), Multiple Choice, Over/Under
+- **Parlay Betting** - Combine multiple predictions for exponential payouts (up to 10x bonus multiplier)
+- **Source Attribution** - Link predictions to articles, tweets, and news sources
+- **Live Updates** - Socket.IO events update odds and balances instantly
+
+**Markets include:**
+- "Will Elon tweet about crypto today?"
+- "Tesla stock price at market close"
+- "Days until next SpaceX launch"
+- "Number of tweets this week (over/under)"
+
+📖 [Prediction Engine Docs](apps/server/README.md#prediction-service)
+
+---
+
+### 🏓 Multiplayer Pong
+
+Bet MuskBucks and compete for ELO supremacy:
+
+- **128fps Game Loop** - Server-authoritative physics with 7.8ms tick rate
+- **Client-Authoritative Paddles** - Zero-latency controls with server validation
+- **MuskBucks Wagering** - Secure escrow system with configurable bet limits
+- **ELO Rating System** - Skill-based matchmaking (K-factor 32)
+- **AI Opponents** - 4 difficulty levels (Easy, Medium, Hard, Impossible)
+- **Spectator Mode** - Watch live matches with real-time game state
+- **Mobile Controls** - Touch-optimized for mobile browsers
+
+**Wager Limits by Difficulty:**
+- Easy AI: 10-100 MuskBucks
+- Medium AI: 50-500 MuskBucks
+- Hard AI: 100-1,000 MuskBucks
+- Impossible AI: 250-2,500 MuskBucks
+- PVP: 10-10,000 MuskBucks
+
+📖 [Pong Server Architecture](apps/pong-server/README.md)
+
+---
+
+### 📰 Content Timeline
+
+Stay updated with the latest Elon news:
+
+- **RSS Feed Integration** - Automated fetching from 20+ sources via BullMQ workers
+- **Admin Moderation Queue** - Bulk approve/reject with keyboard shortcuts
+- **Auto-Tagging System** - Rule-based categorization (Tesla, SpaceX, Legal, Controversy, etc.)
+- **Infinite Scroll** - Virtualized list rendering for performance
+- **OPML Import/Export** - Manage feed subscriptions
+- **Public SSR Timeline** - SEO-optimized server-rendered timeline at `/timeline`
+
+**Feed Categories:**
+- 📰 News (Reuters, Bloomberg, WSJ)
+- 🐦 Twitter (via RSS bridges)
+- 📺 YouTube (SpaceX launches, Tesla reviews)
+- 💼 Financial (SEC filings, stock analysis)
+
+📖 [Timeline Architecture](apps/client/README.md#timeline-context)
+
+---
+
+### 🏆 Achievement System
+
+77 achievements across 8 categories:
+
+- **Betting Achievements** - "First Blood" (first bet), "High Roller" (10k+ wager), "Perfect Week" (7-day streak)
+- **Pong Achievements** - "Pong Prodigy" (first win), "Undefeated" (10-win streak), "ELO Elite" (1800+ rating)
+- **Financial Achievements** - "Millionaire" (1M balance), "Bankruptcy" (negative balance), "Diamond Hands" (hold 100k+ for 30 days)
+- **Social Achievements** - "Influencer" (100 followers), "Conversationalist" (1000 messages), "Viral" (post liked 100+ times)
+- **Prediction Achievements** - "Oracle" (10 correct predictions), "Contrarian" (win underdog bet), "Market Maker" (create 50 predictions)
+- **Streak Achievements** - Daily login streaks, betting streaks, winning streaks
+- **Special Achievements** - Easter eggs and hidden unlocks
+
+**Real-time Unlocking:**
+- Instant Socket.IO notifications when achievements are earned
+- Achievement progress tracking in profile
+- Rarity tiers (Common, Rare, Epic, Legendary)
+
+📖 [Achievement Server Docs](apps/achievement-server/README.md)
+
+---
+
+### 💬 Social Features
+
+Connect with other users:
+
+- **Live Global Chat** - Socket.IO-powered chat with real-time message delivery
+- **User Profiles** - Stats, betting history, achievements, ELO rating
+- **Performance Graphs** - Balance over time, win rate trends, category preferences
+- **Follow System** - Track favorite users and their bets
+- **Activity Feed** - Real-time stream of bets, achievements, and posts
+- **Reactions** - Like, bookmark, and share content
+
+📖 [Social Features Docs](apps/client/README.md#chat-context)
+
+---
+
+### 👑 Admin Dashboard
+
+Comprehensive admin tools:
+
+- **User Management** - Ban users, adjust balances, view detailed analytics
+- **Content Moderation** - Approve/reject timeline articles with bulk actions
+- **System Monitoring** - Event system metrics, Socket.IO health, queue status
+- **Financial Oversight** - Transaction tracking, volume analytics, payout verification
+- **Feed Management** - Add/remove RSS sources, configure auto-tagging rules
+- **Database Tools** - Run migrations, seed data, backup/restore
+
+**Admin Capabilities:**
+- Create admin-only predictions
+- Resolve prediction markets early
+- Override automated payout calculations
+- View real-time user sessions and Socket.IO connections
+
+📖 [Admin Features](apps/client/README.md#admin-components)
+
+---
+
+## Project Structure
 
 ```
 elonmusksucks/
 ├── apps/
-│   ├── client/          # Vite + React frontend (TypeScript, TailwindCSS)
+│   ├── client/              # React 19 SPA (Port 3000)
 │   │   ├── src/
-│   │   │   ├── components/  # UI components (unified cards, timeline, admin panels, pong)
-│   │   │   ├── contexts/    # React contexts (Auth, Parlay, Chat, Socket, Timeline)
-│   │   │   ├── hooks/       # Custom hooks (activity streams, stats, profiles, pong)
-│   │   │   ├── pages/       # Route components (Dashboard, Profile, Admin, Timeline, Pong)
-│   │   │   ├── theme/       # Unified theme system (10 themes, semantic colors)
-│   │   │   └── api/         # Axios API clients with auto-refresh tokens
-│   │   └── dist/            # Production build output
-│   ├── server/          # Express backend (TypeScript, Prisma)
+│   │   │   ├── components/  # 75+ React components
+│   │   │   ├── contexts/    # 16 React contexts
+│   │   │   ├── hooks/       # 30+ custom hooks
+│   │   │   └── utils/       # Helper functions
+│   │   └── README.md        # Client architecture docs
+│   │
+│   ├── server/              # Express API (Port 5000)
 │   │   ├── src/
-│   │   │   ├── controllers/ # REST endpoint handlers (auth, predictions, feeds)
-│   │   │   ├── services/    # Business logic layer (predictions, achievements, email)
-│   │   │   ├── repositories/# Data access layer (Prisma wrappers)
-│   │   │   ├── handlers/    # Socket.IO event handlers (real-time updates)
-│   │   │   └── workers/     # BullMQ job processors (feeds, payouts, leaderboards)
-│   │   └── dist/            # Compiled JavaScript
-│   └── pong-server/     # Dedicated Pong game server (Socket.IO, optimized)
+│   │   │   ├── routes/      # Express route definitions
+│   │   │   ├── controllers/ # Request handlers (16 controllers)
+│   │   │   ├── services/    # Business logic (32+ services)
+│   │   │   ├── repositories/# Data access (22 repositories)
+│   │   │   ├── handlers/    # Socket.IO event handlers (11)
+│   │   │   ├── workers/     # BullMQ background jobs (6)
+│   │   │   └── middleware/  # Auth, error handling, etc.
+│   │   └── README.md        # Server architecture docs
+│   │
+│   ├── public-site/         # SSR Marketing Site (Port 5173)
+│   │   ├── src/
+│   │   │   ├── components/  # SSR components
+│   │   │   ├── entry-server.tsx  # SSR entry point
+│   │   │   └── entry-client.tsx  # Hydration entry
+│   │   └── README.md        # SSR architecture docs
+│   │
+│   ├── pong-server/         # Pong Game Server (Port 5001)
+│   │   ├── src/
+│   │   │   ├── game/        # Physics engine, collision detection
+│   │   │   ├── ai/          # AI opponent logic
+│   │   │   └── handlers/    # Socket.IO game event handlers
+│   │   └── README.md        # Game server docs
+│   │
+│   └── achievement-server/  # Achievement Service (Port 5002)
 │       ├── src/
-│       │   ├── managers/    # Game state management (Auth, Lobby, Game, Statistics)
-│       │   ├── lib/         # Core game logic (physics, AI, validation)
-│       │   └── types/       # Game-specific TypeScript interfaces
-│       └── dist/            # Compiled game server
+│       │   ├── engine/      # Achievement processing logic
+│       │   ├── handlers/    # Redis event subscribers
+│       │   └── repositories/# Achievement data access
+│       └── README.md        # Achievement server docs
+│
 ├── packages/
-│   └── types/           # Shared TypeScript types (auto-generated from Prisma)
+│   └── types/              # Shared TypeScript types
+│       ├── api/            # API request/response types
+│       ├── database/       # Prisma-generated types
+│       └── config/         # Configuration types
+│
 ├── prisma/
-│   ├── schema.prisma    # Database schema definition
-│   ├── migrations/      # Schema migration history
-│   └── seed.ts          # Development data seeder
-├── docker-compose.yml   # Local dev environment (Postgres, Redis)
-├── Dockerfile.server    # Production server image
-├── Dockerfile.client    # Production client image (nginx)
-└── CLAUDE.md           # Comprehensive engineering guide & architecture docs
+│   ├── schema.prisma       # Database schema (20+ models)
+│   ├── migrations/         # Migration history
+│   └── seed/              # Database seeders
+│
+├── docs/
+│   ├── architecture/       # System architecture docs
+│   │   ├── overview.md
+│   │   ├── design-patterns.md
+│   │   ├── real-time-events.md
+│   │   └── room-authorization.md
+│   │
+│   ├── guides/            # How-to guides
+│   │   ├── deployment.md
+│   │   ├── security-checklist.md
+│   │   ├── ip-banning.md
+│   │   └── redis-migration.md
+│   │
+│   └── dev/              # Development notes
+│       └── performance-issues/
+│
+├── scripts/              # Deployment & utility scripts
+│   ├── deploy-all.sh
+│   └── backup-db.sh
+│
+├── CLAUDE.md             # AI assistant context & instructions
+├── CONTRIBUTING.md       # Contribution guidelines
+└── README.md            # This file
 ```
+
+### Application Documentation
+
+Each application has comprehensive developer-focused documentation:
+
+- 📱 **[Client App](apps/client/README.md)** - React 19 architecture, EventBusCore, contexts, hooks, components
+- 🖥️ **[API Server](apps/server/README.md)** - Layered architecture, services, repositories, workers, Socket.IO handlers
+- 🌐 **[Public Site](apps/public-site/README.md)** - SSR architecture, theme system, data fetching, SEO optimization
+- 🏓 **[Pong Server](apps/pong-server/README.md)** - Game loop, physics engine, AI system, wagering, ELO ratings
+- 🏆 **[Achievement Server](apps/achievement-server/README.md)** - Event-driven architecture, achievement engine, Redis handlers
 
 ---
 
-## ⚙️ Prerequisites
+## Documentation
 
-- **Node.js** ≥ 24.x & **npm** ≥ 8.x (for workspaces support)
-- **PostgreSQL 15+** running locally with a created database
-- **Redis 7+** running locally for caching, pub/sub, and job queues
-- **Tigris Account** for S3-compatible file storage (profile images)
-- **dotenv-cli** (`npm i -g dotenv-cli`) for environment management
+### Architecture Documentation
 
-**Optional but Recommended:**
-- **SendGrid Account** for email services (auth flows)
-- **Docker** & **Docker Compose** for containerized deployment
-- **Fly.io account** or similar platform for hosting
-- **Sentry Account** for error tracking in production
+- **[System Overview](docs/architecture/overview.md)** - High-level architecture, tech stack, deployment topology
+- **[Design Patterns](docs/architecture/design-patterns.md)** - Layered architecture, EventBusCore, repository pattern, state management
+- **[Real-time Events](docs/architecture/real-time-events.md)** - Socket.IO architecture, 75+ Redis channels, EventBusCore implementation
+- **[Room Authorization](docs/architecture/room-authorization.md)** - Socket.IO room security, user isolation, admin access
+
+### Deployment & Operations
+
+- **[Deployment Guide](docs/guides/deployment.md)** - Fly.io deployment, Docker multi-stage builds, environment configuration
+- **[Security Checklist](docs/guides/security-checklist.md)** - Pre-launch security audit, JWT configuration, input validation
+- **[IP Banning](docs/guides/ip-banning.md)** - Rate limiting, ban management, Redis-based tracking
+- **[Redis Migration](docs/guides/redis-migration.md)** - Upstash → Fly.io Redis migration process
+
+### Development
+
+- **[CLAUDE.md](CLAUDE.md)** - AI assistant context and project instructions
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Contribution guidelines, code standards, Git workflow
+- **[Performance Analysis](docs/dev/performance-issues/SUMMARY.md)** - Performance optimization notes and solutions
 
 ---
 
-## 🔧 Quick Start
+## Development Commands
 
-### 1. **Clone & Navigate**
-
-```bash
-git clone https://github.com/vincentDevin/elonmusksucks.git
-cd elonmusksucks
-```
-
-### 2. **Environment Setup**
-
-Copy example files and configure with your values:
+### Common Commands
 
 ```bash
-cp .env.example .env
-cp .env.test.example .env.test
-```
-
-**Required Environment Variables:**
-```env
-# Database
-DATABASE_URL=postgresql://user:pass@localhost:5432/elonmusksucks
-
-# Redis
-REDIS_URL=redis://localhost:6379
-
-# JWT Secrets (generate secure 32+ character strings)
-ACCESS_TOKEN_SECRET=your_secure_access_token_secret_here
-REFRESH_TOKEN_SECRET=your_secure_refresh_token_secret_here
-
-# Tigris S3 Storage
-TIGRIS_S3_ENDPOINT=https://fly.storage.tigris.dev
-TIGRIS_ACCESS_KEY_ID=tid_your_access_key
-TIGRIS_SECRET_ACCESS_KEY=tsec_your_secret_key
-TIGRIS_S3_BUCKET=your_bucket_name
-
-# SendGrid Email (optional, for auth flows)
-SENDGRID_API_KEY=SG.your_sendgrid_api_key
-FROM_EMAIL=noreply@elonmusksucks.net
-```
-
-### 3. **Complete Setup**
-
-```bash
-npm run setup
-```
-
-This comprehensive setup command will:
-- Install dependencies across all workspaces
-- Reset database and apply all Prisma migrations
-- Generate Prisma client and shared TypeScript types
-- Build the type packages
-- Seed development data (predictions, users, bets)
-- Seed achievement catalog (77 achievements across 8 categories)
-
-### 4. **Start Development Environment**
-
-```bash
+# Start all services (client, server, public-site, pong, achievement, workers)
 npm run dev
-```
 
-**Access Points:**
-- **Frontend (Client):** [http://localhost:3000](http://localhost:3000)
-- **Backend API:** [http://localhost:5000](http://localhost:5000)
-- **Pong Game Server:** [http://localhost:5001](http://localhost:5001)
-- **Admin Dashboard:** [http://localhost:3000/admin](http://localhost:3000/admin)
-- **Pong Arena:** [http://localhost:3000/pong](http://localhost:3000/pong)
-
-**Development Features:**
-- 🔄 Hot reload on both client and server
-- 🔌 Real-time WebSocket connections
-- 📊 Live prediction markets with dynamic odds calculation
-- 💬 Real-time chat functionality (desktop only currently)
-- 🏓 **Real-time multiplayer Pong game** with MuskBucks wagering
-- 🎨 Theme system with 10 themes across light/dark/high-contrast
-- 📰 RSS feed timeline with admin moderation
-- 🏆 Achievement system with 77 unlockable badges
-- 🎯 Parlay betting system with multipliers
-
----
-
-## 🧪 Testing & Quality Assurance
-
-### **Test Suite**
-```bash
-# Run all tests across the monorepo
-npm test
-
-# Backend-specific tests
-npm run test:server
+# Type checking (all apps)
+npm run tsc
 
 # Linting & formatting
-npm run lint
-npm run format
+npm run lint              # ESLint (zero-warning policy)
+npm run format            # Prettier
+
+# Run all tests
+npm test
+
+# Build all apps for production
+npm run build
 ```
 
-### **Test Coverage**
-- **Unit Tests:** Service layer, utilities, and business logic
-- **Integration Tests:** API endpoints and database operations  
-- **Component Tests:** React components and hooks (limited coverage)
+### Database Commands
 
-**Test Structure:**
-- `apps/server/tests/unit/` - Service and utility tests
-- `apps/server/tests/integration/` - API endpoint tests
-- Uses separate `.env.test` environment for isolated testing
-
-### **Code Quality**
-- **ESLint:** Zero-warning policy enforced
-- **Prettier:** Consistent code formatting
-- **TypeScript:** Strict type checking across all packages
-- **Pre-commit Hooks:** Automated linting and formatting
-
----
-
-## ⚡ Core Features & Architecture
-
-### **Prediction Market Engine**
-- **Multi-option Predictions:** Users create and bet on complex prediction markets
-- **6-Factor Dynamic Odds Engine:** Real-time odds calculation with market heat indicators  
-- **Advanced Parlay System:** Combine multiple predictions with bonus multipliers
-- **Automated Payouts:** BullMQ workers process results and distribute winnings
-- **Prediction Source Links:** Link articles/tweets as evidence for predictions
-
-### **Real-time Systems**
-- **Socket.IO Integration:** Live updates for bets, predictions, chat, timeline, leaderboards, and pong games
-- **Unified Activity Feed:** Real-time global activity ticker with Redis pub/sub
-- **Live Statistics:** User stats, rankings, and achievements update instantly
-- **Cross-server Broadcasting:** Redis adapter enables horizontal scaling
-- **21+ Socket Event Types:** Comprehensive real-time coverage across all features
-- **Dedicated Pong Server:** Optimized game server with 60fps physics and minimal latency
-
-### **Content & Timeline**
-- **RSS Feed Ingestion:** BullMQ workers fetch and process feeds with deduplication
-- **Admin Moderation Queue:** Bulk approve/reject articles with keyboard shortcuts
-- **Homepage Timeline:** Infinite-scroll articles with "Use as prediction source"
-- **Auto-tagging System:** Rule-based categorization (Tesla, SpaceX, Legal, Markets, AI)
-- **OPML Import/Export:** Manage feed subscriptions efficiently
-
-### **User Experience**
-- **Unified Theme System:** 10 themes across light/dark/high-contrast categories
-- **Responsive Dashboard:** Desktop and mobile-optimized layouts (chat desktop-only)
-- **Profile System:** Avatar uploads with automatic image processing via Tigris S3
-- **Achievement System:** 77 achievements across 8 categories with real-time unlocking
-- **RuneScape-Style Currency:** Formatted as 1.2k, 1.5M with wealth-based colors
-- **Real-time Pong Arena:** Multiplayer Pong with MuskBucks wagering, AI opponents, and spectating
-
-### **🏓 Real-time Pong Game System**
-- **Multiplayer Gaming:** Real-time PVP and AI opponents with adjustable difficulty
-- **MuskBucks Wagering:** Secure upfront wager deduction with automatic payouts
-- **Advanced Physics:** 128fps game loop with client-authoritative paddle movement
-- **Spectator System:** Watch live games with dedicated socket connections
-- **Performance Optimized:** ~1KB per game, 3 database queries per match
-- **Mobile Support:** Touch controls with responsive canvas rendering
-- **Free Play Mode:** 0 MuskBucks wager for testing and practice
-- **Production Scaling:** Fly.io auto-scaling architecture for 10,000+ concurrent players
-
-### **Admin & Moderation**
-- **Admin Dashboard:** Prediction management, user moderation, feed management
-- **Real-time Metrics:** Live performance monitoring with Socket.IO broadcasts
-- **Shame Wall System:** Public display of banned users with reason tracking
-- **Feed Health Monitoring:** Track success rates, failures, and approval metrics
-- **Bulk Operations:** Mass moderation actions with transaction safety
-
----
-
-## 📦 Available Scripts
-
-### **Root Level Commands**
-
-| Command | Description |
-|---------|-------------|
-| `npm run setup` | Complete initial setup: install deps, migrate DB, seed data, build types |
-| `npm run dev` | Start all services concurrently (client:3000, server:5000, workers) |
-| `npm run build` | Production build: generate types → build client → build server |
-| `npm run lint` | ESLint check with zero-warning policy |
-| `npm run format` | Prettier formatting across all code |
-| `npm test` | Run Jest test suite (limited coverage currently) |
-| `npm run test:server` | Server-only Jest tests |
-
-### **Database & Development**
-
-| Command | Description |
-|---------|-------------|
-| `npm run prisma:generate` | Regenerate Prisma client after schema changes |
-| `npm run prisma:migrate:dev` | Reset DB and apply all migrations |
-| `npm run seed:dev` | Populate DB with test data |
-| `npm run seed:achievements` | Seed achievement catalog (77 achievements) |
-| `npm run worker` | Start payout + leaderboard + feed workers manually |
-| `npm run dev:pong` | Start pong game server only (port 5001) |
-
-### **Workspace-Specific Commands**
-
-**Client (`apps/client/`):**
-- `npm run dev` - Vite development server
-- `npm run build` - Production build  
-- `npm run preview` - Preview production build
-
-**Server (`apps/server/`):**
-- `npm run dev` - Express server with hot reload
-- `npm run build` - Compile TypeScript to JavaScript
-- `npm run start` - Start production server
-- `npm run worker` - Start background job workers
-
-**Pong Server (`apps/pong-server/`):**
-- `npm run dev` - Pong game server with hot reload
-- `npm run build` - Compile TypeScript to JavaScript
-- `npm run start` - Start production pong server
-
----
-
-## 🐞 Troubleshooting
-
-### **Common Issues**
-
-**Environment Variables Not Loading**
-- Ensure `.env` and `.env.test` are in the repository root
-- Check that all required variables are set (see environment setup)
-- Verify no syntax errors in env files (no spaces around `=`)
-
-**Database Connection Issues**
-- Confirm PostgreSQL 15+ is running locally
-- Verify database exists: `createdb elonmusksucks`
-- Check DATABASE_URL format: `postgresql://user:pass@host:port/dbname`
-- Run `npm run prisma:migrate:dev` to reset and apply all migrations
-
-**Redis Connection Failures**
-- Start Redis server: `redis-server` or via Docker
-- Verify Redis is accessible: `redis-cli ping` should return `PONG`
-- Check REDIS_URL format: `redis://localhost:6379`
-
-**Tigris/S3 Upload Errors**
-- Verify Tigris credentials are correct in `.env`
-- Ensure bucket exists and is accessible
-- Check network connectivity to Tigris endpoint
-- **Fixed Issue:** Profile image uploads now properly handle authentication tokens
-
-**Socket.IO/WebSocket Issues**
-- Check that both client and server are running
-- Verify ports 3000 (client), 5000 (server), and 5001 (pong server) are not blocked
-- Monitor browser console and server logs for connection errors
-- **Fixed Issue:** All Socket.IO memory leaks and event handling resolved
-
-**Pong Game Issues**
-- Ensure pong server is running on port 5001: `npm run dev:pong`
-- Check that user has sufficient MuskBucks balance for wagering
-- Verify WebSocket connection to pong server in browser dev tools
-- **Fixed Issue:** Auth context refresh no longer breaks pong gameplay
-- **Fixed Issue:** Paddle movement and physics prediction working perfectly
-
-**Node.js Version Issues**
-- Use Node.js ≥24.x: `node --version`
-- Use npm ≥8.x: `npm --version`  
-- Consider using `.nvmrc` for version consistency
-
-### **Performance Issues**
-- **Large Bundle Size:** Code splitting is implemented for admin dashboard
-- **Database Queries:** Optimized with proper indexes and includes
-- **Memory Usage:** Socket.IO cleanup and Redis connection pooling implemented
-
-### **Getting Help**
-- Check `CLAUDE.md` for comprehensive architecture documentation
-- Review recent commit messages for context on fixes
-- Open an issue on GitHub with error logs and environment details
-
----
-
-## 🚀 Production Status & Roadmap
-
-### **✅ Production Ready Features**
-- **Dynamic Betting System:** 6-factor odds engine with real-time updates
-- **Real-time Pong Arena:** Complete multiplayer game system with secure wagering
-- **Achievement System:** 77 achievements across 8 categories fully operational
-- **Homepage Timeline:** RSS feed ingestion with admin moderation
-- **Prediction Source Links:** Articles/tweets linked to predictions
-- **Unified Theme System:** 10 themes with semantic color classes
-- **Unified Activity System:** Real-time global activity feed
-- **Socket.IO Infrastructure:** 21+ event types with Redis adapter
-- **Transaction Atomicity:** All money operations wrapped in Prisma transactions
-- **BigInt Migration:** Unlimited monetary precision for all financial values
-- **Email Service:** SendGrid integration for auth flows
-- **Database Performance:** 44 production indexes covering all query patterns
-- **Pong Scaling Architecture:** Fly.io multi-region auto-scaling for 10,000+ players
-
-### **🚧 Current Priority Tasks**
-- **Mobile Chat Integration:** Add chat panel to mobile dashboard (currently desktop-only)
-- **Logging Infrastructure:** Replace 50+ console.logs with structured logging
-- **Performance Monitoring:** Load testing for timeline and betting systems
-- **SSR Implementation:** Server-side rendering for SEO optimization
-
-### **📋 Known Issues & Technical Debt**
-- **Mobile Chat Missing:** Chat component not included in mobile dashboard
-- **Console.log Statements:** Development logs in production code (50+ files)
-- **Limited Test Coverage:** Currently ~5% coverage, needs expansion
-- **No API Versioning:** API endpoints not versioned for backwards compatibility
-
-### **🎯 Upcoming Features**
-1. **3D Pong Upgrade:** Three.js 3D rendering with dynamic camera angles and particle effects
-2. **Enhanced Analytics:** User behavior tracking and prediction performance metrics
-3. **Advanced Parlay Builder:** Visual interface for complex multi-leg bets
-4. **Social Features:** User follows, prediction sharing, comment threads
-5. **Pong Tournament System:** Brackets, leaderboards, and championship events
-6. **Market Insights:** AI-powered prediction analysis and trends
-
-### **🤝 Contributing**
-
-We welcome contributions! Please see our [contribution guidelines](./CONTRIBUTING.md) and check the [project board](https://github.com/vincentDevin/elonmusksucks/projects/1) for current issues.
-
-**Development Workflow:**
 ```bash
-git checkout -b feat/your-feature-name
-# Make changes following the patterns in CLAUDE.md
-npm run lint  # Ensure zero warnings
-npm test      # Run tests
-git commit -m "feat: add your feature description"
+# Generate Prisma client after schema changes
+npm run prisma:generate
+
+# Reset database and apply all migrations
+npm run prisma:migrate:dev
+
+# Seed development data
+npm run seed:dev
+
+# Seed achievements (77 achievements)
+npm run seed:achievements
+
+# Open Prisma Studio (database GUI)
+npm run prisma:studio
 ```
 
-**Commit Style:** `type(scope): message`
-- Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
-- Example: `feat(predictions): add multi-option support`
+### Workspace-Specific Commands
+
+```bash
+# Client app
+npm -w apps/client run dev           # Dev server (port 3000)
+npm -w apps/client run build         # Production build
+npm -w apps/client run test          # Vitest tests
+
+# Server
+npm -w apps/server run dev           # Express with hot reload (port 5000)
+npm -w apps/server run build         # TypeScript compilation
+npm -w apps/server run worker        # Start all 6 BullMQ workers
+
+# Public site (SSR)
+npm -w apps/public-site run dev      # SSR dev server (port 5173)
+npm -w apps/public-site run build    # SSR production build
+
+# Pong server
+npm -w apps/pong-server run dev      # Pong server with hot reload (port 5001)
+npm -w apps/pong-server run build    # TypeScript compilation
+
+# Achievement server
+npm -w apps/achievement-server run dev      # Achievement service (port 5002)
+npm -w apps/achievement-server run build    # TypeScript compilation
+```
+
+📖 **Full command reference:** [CLAUDE.md - Common Commands](CLAUDE.md#common-commands)
 
 ---
 
-## 📜 License & Legal
+## Contributing
 
-**MIT License** — see [LICENSE](./LICENSE) for full details.
+We welcome contributions from the community! Whether it's bug fixes, new features, or documentation improvements.
 
-**Disclaimer:** This is a satirical project for educational and entertainment purposes. No real money is involved. No liability if Elon Musk attempts to acquire, manipulate, or otherwise interfere with this platform.
+### Quick Contribution Workflow
 
-**Privacy & Security:**
-- JWT-based authentication with secure token refresh
-- Password hashing via bcrypt with configurable rounds
-- CORS configured for known origins only
-- Input validation on all API endpoints
-- SQL injection protection via Prisma parameterized queries
+1. **Fork the repository**
+2. **Create a feature branch**: `git checkout -b feat/amazing-feature`
+3. **Make your changes** following our code standards
+4. **Run tests & linting**: `npm test && npm run lint`
+5. **Commit with conventional commits**: `git commit -m "feat(scope): add amazing feature"`
+6. **Push to your fork**: `git push origin feat/amazing-feature`
+7. **Open a Pull Request**
+
+### Code Standards
+
+- ✅ **TypeScript strict mode** - No `any` types allowed
+- ✅ **ESLint zero-warning policy** - All warnings must be fixed
+- ✅ **Layered architecture** - Routes → Controllers → Services → Repositories → Prisma
+- ✅ **No enums in shared types** - Use `as const` objects with type extraction
+- ✅ **EventBusCore for Socket.IO** - No direct `socket.on()` calls in components
+- ✅ **Comprehensive tests** - Unit tests for services, integration tests for APIs
+
+### Development Rules
+
+**DO ✅:**
+- Use shared types from `@ems/types` package
+- Follow layered architecture pattern strictly
+- Subscribe to events via EventBusCore in React components
+- Use `startTransition` for non-critical UI updates
+- Implement optimistic updates for user actions
+- Add tests for all new business logic
+
+**DON'T ❌:**
+- Use Prisma directly in routes/controllers/services (repositories only)
+- Use direct Socket.IO/Redis in routes/controllers (inject via dependency)
+- Add schema libraries (zod, yup, valibot) - use TypeScript types
+- Use `socket.on()` directly in components - use EventBusCore
+- Recreate types locally - import from `@ems/types`
+- Skip TypeScript strict mode checks
+
+📖 **Full contribution guide:** [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ---
 
-## 📚 Documentation & Resources
+## Deployment
 
-- **[CLAUDE.md](./CLAUDE.md)** - Comprehensive engineering guide and architecture documentation
-- **[Database Schema](./prisma/schema.prisma)** - Complete data model definitions with 44 indexes
-- **[Theme System Guide](./CLAUDE.md#unified-theme-system)** - Component development with 10 themes
-- **[Socket Events Reference](./CLAUDE.md#socket-events)** - Real-time event documentation
+### Fly.io Deployment (Recommended)
 
-**External Dependencies:**
-- **[Vite](https://vitejs.dev)** - Frontend build tool and dev server
-- **[React](https://react.dev)** - UI library with hooks and context
-- **[Prisma](https://www.prisma.io/docs)** - Database ORM and migrations  
-- **[Socket.IO](https://socket.io/docs/v4)** - Real-time WebSocket communication
-- **[BullMQ](https://docs.bullmq.io)** - Redis-based job queue system
-- **[TailwindCSS](https://tailwindcss.com/docs)** - Utility-first CSS framework
-- **[Tigris](https://docs.tigris.dev)** - S3-compatible object storage
+The platform is optimized for Fly.io with multi-region support and sticky sessions:
+
+```bash
+# Deploy server
+cd apps/server
+fly deploy
+
+# Deploy client (static assets via server)
+cd apps/client
+npm run build
+# Assets served by Express in production
+
+# Deploy public site (SSR)
+cd apps/public-site
+fly deploy
+
+# Deploy pong server
+cd apps/pong-server
+fly deploy
+
+# Deploy achievement server
+cd apps/achievement-server
+fly deploy
+```
+
+### Docker Deployment
+
+All apps include production-ready multi-stage Dockerfiles:
+
+```bash
+# Build server image
+docker build -t elonmusksucks-server -f apps/server/Dockerfile .
+
+# Run with environment variables
+docker run -p 5000:5000 --env-file .env elonmusksucks-server
+
+# Build all services with docker-compose
+docker-compose up -d
+```
+
+### Production Checklist
+
+Before deploying to production:
+
+- [ ] Set secure JWT secrets (32+ characters, randomly generated)
+- [ ] Configure PostgreSQL with connection pooling (PgBouncer recommended)
+- [ ] Set up Redis cluster or managed Redis for high availability
+- [ ] Enable sticky sessions in load balancer (required for Socket.IO)
+- [ ] Configure CORS for production domains only
+- [ ] Set `NODE_ENV=production` environment variable
+- [ ] Enable compression middleware in Express
+- [ ] Set up database backups (automated daily snapshots)
+- [ ] Configure monitoring and alerts (CPU, memory, database connections)
+- [ ] Review security checklist for JWT, bcrypt, rate limiting
+
+📖 **Detailed deployment guide:** [docs/guides/deployment.md](docs/guides/deployment.md)
 
 ---
 
-**Built with ❤️ and questionable life choices by the development team.**  
-*Now with 100% more TypeScript and 0% more Elon approval.*
+## Testing
+
+### Running Tests
+
+```bash
+# Run all tests (Vitest)
+npm test
+
+# Run tests for specific app
+npm -w apps/server test
+npm -w apps/client test
+
+# Run tests in watch mode
+npm test -- --watch
+
+# Generate coverage report
+npm test -- --coverage
+```
+
+### Test Structure
+
+```
+apps/
+├── server/
+│   └── src/
+│       ├── services/
+│       │   └── __tests__/
+│       │       ├── betting.service.test.ts
+│       │       ├── prediction.service.test.ts
+│       │       └── user.service.test.ts
+│       ├── controllers/
+│       │   └── __tests__/
+│       └── repositories/
+│           └── __tests__/
+└── client/
+    └── src/
+        ├── components/
+        │   └── __tests__/
+        ├── hooks/
+        │   └── __tests__/
+        └── utils/
+            └── __tests__/
+```
+
+**Test Coverage Goals:**
+- Services: 80%+ coverage (business logic)
+- Controllers: 70%+ coverage (request handling)
+- Utilities: 90%+ coverage (pure functions)
+- Components: 60%+ coverage (UI logic)
+
+---
+
+## Troubleshooting
+
+### Common Issues
+
+#### Socket.IO not connecting
+
+```bash
+# Check server is running
+curl http://localhost:5000/health
+
+# Check Redis connection
+redis-cli ping
+
+# Enable Socket.IO debug logging in browser console
+localStorage.debug = 'socket.io-client:*'
+```
+
+#### Database connection errors
+
+```bash
+# Verify PostgreSQL is running
+psql -U postgres -d elonmusksucks
+
+# Run migrations
+npm run prisma:migrate:dev
+
+# Reset database (WARNING: deletes all data)
+npm run prisma:migrate:reset
+```
+
+#### Port conflicts
+
+```bash
+# Kill processes on required ports
+lsof -ti:3000,5000,5001,5002,5173 | xargs kill -9
+
+# Or use the cleanup script
+npm run cleanup
+```
+
+#### Type errors after schema changes
+
+```bash
+# Regenerate Prisma client and TypeScript types
+npm run prisma:generate
+
+# Rebuild all apps
+npm run build
+```
+
+#### Redis connection failures
+
+```bash
+# Check Redis is running
+redis-cli ping
+
+# Start Redis (macOS)
+brew services start redis
+
+# Start Redis (Linux)
+sudo systemctl start redis
+
+# Check Redis connection in Node
+redis-cli -h localhost -p 6379
+```
+
+---
+
+## License
+
+This project is licensed under the **MIT License**.
+
+---
+
+## Built With
+
+- [React 19](https://react.dev/) - UI framework with concurrent features
+- [Node.js](https://nodejs.org/) - JavaScript runtime
+- [TypeScript](https://www.typescriptlang.org/) - Type safety and developer experience
+- [Express](https://expressjs.com/) - Minimalist web framework
+- [Socket.IO](https://socket.io/) - Real-time bidirectional communication
+- [Prisma](https://www.prisma.io/) - Next-generation ORM
+- [PostgreSQL](https://www.postgresql.org/) - Advanced open-source database
+- [Redis](https://redis.io/) - In-memory data structure store
+- [TailwindCSS](https://tailwindcss.com/) - Utility-first CSS framework
+- [Vite](https://vitejs.dev/) - Next-generation frontend tooling
+- [BullMQ](https://docs.bullmq.io/) - Premium message queue
+- [Fly.io](https://fly.io/) - Global application platform
+
+---
+
+## Support
+
+Need help or want to report an issue?
+
+- 💬 **GitHub Discussions** - Ask questions and share ideas
+- 🐛 **GitHub Issues** - Report bugs and request features
+- 📧 **Email** - support@elonmusksucks.net
+
+---
+
+**Made with ❤️ (and a healthy dose of sarcasm) by the ElonMuskSucks.net team**
+
+*Remember: Past prediction performance does not guarantee future Elon-related chaos*

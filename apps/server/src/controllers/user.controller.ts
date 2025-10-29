@@ -1,10 +1,30 @@
 import { Request, Response, NextFunction } from 'express';
 import { UserService } from '../services/user.service';
 import { EnhancedUserStatsService } from '../services/enhancedUserStats.service';
+import { UserRepository } from '../repositories/UserRepository';
+import { BettingRepository } from '../repositories/BettingRepository';
+import { StatsRepository } from '../repositories/StatsRepository';
 import { unifiedActivityService } from '../services/unifiedActivity.service';
-import { achievementService } from '../services/achievement.service';
-import { adminAchievementService } from '../services/adminAchievement.service';
-import type { PublicUserProfile, UserFeedPost, UserActivity, UserStatsDTO } from '@ems/types';
+import { adminAchievementService } from '../services/achievements/adminAchievement.service';
+import type {
+  PublicUserProfile,
+  UserFeedPost,
+  UserStatsView,
+  UserProfileView,
+  UpdateProfilePayload,
+  CreateUserPostPayload,
+  UserBetView,
+  UserParlayView,
+  UserEnhancedStatsView,
+  UserAchievementProgressView,
+  UnifiedActivityEvent,
+} from '@ems/types';
+import {
+  toUserProfileView,
+  toUserEnhancedStatsView,
+  toUserAchievementProgressView,
+} from '../view/user.view';
+import { toUserBetView, toUserParlayView } from '../view/betting.view';
 
 // Define MulterFile type explicitly to avoid mismatched declarations
 export type MulterFile = {
@@ -18,16 +38,24 @@ export type MulterFile = {
 
 // Extend Request to include authenticated user and optionally an uploaded file
 export type ReqWithUser = Request & {
-  user?: { id: number };
+  user?: { id: number; role?: string };
   file?: MulterFile;
 };
 
 // Instantiate the services (uses Prisma-backed repository by default)
 const userService = new UserService();
-const enhancedUserStatsService = new EnhancedUserStatsService();
+const userRepository = new UserRepository();
+const bettingRepository = new BettingRepository();
+// Using shared prisma from db.ts
+const statsRepository = new StatsRepository();
+const enhancedUserStatsService = new EnhancedUserStatsService(
+  userRepository,
+  bettingRepository,
+  statsRepository,
+);
 
 /**
- * GET /api/users/:userId
+ * GET /api/users/profile/:userId
  * Fetch a user's profile
  */
 export async function getProfile(
@@ -44,8 +72,11 @@ export async function getProfile(
     }
 
     const viewerId = req.user?.id;
-    const profileDTO: PublicUserProfile = await userService.getUserProfile(targetUserId, viewerId);
-    res.json(profileDTO);
+    const profileData: PublicUserProfile = await userService.getUserProfile(targetUserId, viewerId);
+
+    // Map to standardized DTO with BigInt → string conversion
+    const payload = toUserProfileView(profileData) satisfies UserProfileView;
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -83,6 +114,31 @@ export async function uploadProfileImageHandler(
 }
 
 /**
+ * DELETE /api/users/:userId/profile-picture
+ * Delete user's custom profile image (revert to default avatar)
+ */
+export async function deleteProfileImageHandler(
+  req: ReqWithUser,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const targetUserId = Number(req.params.userId);
+    const authUserId = req.user?.id;
+
+    if (authUserId !== targetUserId) {
+      res.status(403).json({ error: 'Forbidden' });
+      return;
+    }
+
+    await userService.deleteUserProfileImage(targetUserId);
+    res.status(204).send();
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
  * POST /api/users/:userId/follow
  * Authenticated user follows another user
  */
@@ -100,41 +156,29 @@ export async function followUserHandler(
     }
     await userService.followUser(followerId, followingId);
 
-    // Record activity (legacy)
-    await userService.createUserActivity(followerId, 'USER_FOLLOWED', { followingId });
+    // Add to unified activity feed
+    try {
+      const followedUser = await userService.getPublicSocketUser(followingId);
+      const followerUser = await userService.getPublicSocketUser(followerId);
 
-    // Publish follow activity through unified system
-    const followedUser = await userService.getUserProfile(followingId);
-    const followerUser = await userService.getUserProfile(followerId);
-
-    if (followedUser && followerUser) {
-      await unifiedActivityService.publishActivity({
-        type: 'user_followed',
-        userId: followerId,
-        userName: followerUser.name,
-        title: `${followerUser.name} followed ${followedUser.name}`,
-        description: `New connection in the prediction community`,
-        icon: '👥',
-        color: 'text-blue-400',
-        priority: 'low',
-        isPersonal: false, // User follows are public social activities
-        isHighValue: false, // Low priority social activity
-        meta: {
-          followedUserId: followingId,
-          followedUserName: followedUser.name,
-        },
-      });
+      if (followedUser && followerUser) {
+        await unifiedActivityService.createFollowActivity(
+          {
+            id: followerUser.id,
+            name: followerUser.name,
+            avatarUrl: followerUser.avatarUrl || undefined,
+          },
+          {
+            id: followedUser.id,
+            name: followedUser.name,
+          },
+        );
+        console.log('[user.controller] ✅ Follow activity created');
+      }
+    } catch (activityError) {
+      console.error('[user.controller] Error creating follow activity:', activityError);
+      // Don't fail the request if activity creation fails
     }
-
-    // Check for achievement unlocks
-    await achievementService.checkAndUpdateAchievements({
-      type: 'user_followed',
-      userId: followerId,
-      data: {
-        followedUserId: followingId,
-        followedUserName: followedUser?.name || 'Unknown',
-      },
-    });
 
     res.sendStatus(204);
   } catch (err) {
@@ -160,9 +204,6 @@ export async function unfollowUserHandler(
     }
     await userService.unfollowUser(followerId, followingId);
 
-    // Record activity
-    await userService.createUserActivity(followerId, 'USER_UNFOLLOWED', { followingId });
-
     res.sendStatus(204);
   } catch (err) {
     next(err);
@@ -187,8 +228,14 @@ export async function updateProfileHandler(
       return;
     }
 
-    const updated: PublicUserProfile = await userService.updateUserProfile(targetUserId, req.body);
-    res.json(updated);
+    const updateData = req.body as UpdateProfilePayload;
+    const updated: PublicUserProfile = await userService.updateUserProfile(
+      targetUserId,
+      updateData,
+    );
+
+    const payload = toUserProfileView(updated) satisfies UserProfileView;
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -225,7 +272,7 @@ export async function createUserPostHandler(
   try {
     const profileUserId = Number(req.params.userId); // whose profile
     const authUserId = req.user?.id; // who is posting
-    const { content, parentId } = req.body;
+    const { content, parentId } = req.body as CreateUserPostPayload;
     if (!authUserId) {
       res.status(401).json({ error: 'Not authenticated' });
       return;
@@ -239,7 +286,7 @@ export async function createUserPostHandler(
       res.status(403).json({ error: 'Forbidden' });
       return;
     }
-    // Create post/comment (pass ownerId=profileUserId, authorId=authUserId)
+    // Create post/comment
     const post: UserFeedPost = await userService.createUserPost(
       authUserId,
       content,
@@ -263,9 +310,21 @@ export async function getUserActivityHandler(
 ): Promise<void> {
   try {
     const userId = Number(req.params.userId);
-    const viewerId = req.user?.id;
-    const activity: UserActivity[] = await userService.getUserActivity(userId, viewerId);
-    res.json(activity);
+
+    // Check user privacy settings
+    const user = await userService.getUserProfile(userId);
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    // Get activities for this specific user
+    const userActivities: UnifiedActivityEvent[] = await unifiedActivityService.getUserActivities(
+      userId,
+      200,
+    );
+
+    res.json(userActivities);
   } catch (err) {
     next(err);
   }
@@ -288,13 +347,43 @@ export async function getUserStatsHandler(
       return;
     }
 
-    const stats: UserStatsDTO | null = await userService.getUserStats(userId);
+    const stats: UserStatsView | null = await userService.getUserStats(userId);
     if (!stats) {
       res.status(404).json({ error: 'Stats not found' });
       return;
     }
+
+    // Service already returns UserStatsView, no need to transform
     res.json(stats);
   } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * GET /api/users/:userId/activity-stats
+ * Get aggregated activity stats (posts, reactions, comments, predictions) for today, week, and all time
+ */
+export async function getUserActivityStatsHandler(
+  req: ReqWithUser,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const userId = Number(req.params.userId);
+
+    if (isNaN(userId)) {
+      res.status(400).json({ error: 'Invalid user ID' });
+      return;
+    }
+
+    const activityStats = await userService.getUserActivityStats(userId);
+    res.json(activityStats);
+  } catch (err) {
+    if (err instanceof Error && err.message === 'User not found') {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
     next(err);
   }
 }
@@ -319,7 +408,8 @@ export async function getUserBetsHandler(
     }
 
     const bets = await userService.getUserActiveBets(targetUserId);
-    res.json(bets);
+    const payload = bets.map(toUserBetView) satisfies UserBetView[];
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -345,7 +435,8 @@ export async function getUserParlaysHandler(
     }
 
     const parlays = await userService.getUserActiveParlays(targetUserId);
-    res.json(parlays);
+    const payload = parlays.map(toUserParlayView) satisfies UserParlayView[];
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -399,7 +490,8 @@ export async function getEnhancedUserStatsHandler(
     // Get enhanced stats using the new service with real data calculations
     const enhancedStats = await enhancedUserStatsService.getEnhancedStats(targetUserId);
 
-    res.json(enhancedStats);
+    const payload = toUserEnhancedStatsView(enhancedStats) satisfies UserEnhancedStatsView;
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -424,10 +516,13 @@ export async function getUserAchievementsHandler(
       return;
     }
 
-    // Get user achievement progress
-    const achievements = await achievementService.getUserAchievementProgress(targetUserId);
+    // Get user achievement progress using the modern system
+    const achievements = await adminAchievementService.getUserAchievementProgress(targetUserId);
 
-    res.json(achievements);
+    const payload = achievements.map(
+      toUserAchievementProgressView,
+    ) satisfies UserAchievementProgressView[];
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -454,6 +549,109 @@ export async function getRecentAchievementsHandler(
       limit,
     );
     res.json(recentAchievements);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getAllAchievementsHandler(
+  _req: ReqWithUser,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    // Get all available achievements (public endpoint)
+    const achievements = await adminAchievementService.getAllAchievements();
+    res.json(achievements);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Search users by name/username
+ * GET /api/users/search?q=searchterm
+ */
+export async function searchUsersHandler(
+  req: ReqWithUser,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const query = req.query.q as string;
+
+    if (!query || query.trim().length === 0) {
+      res.json([]);
+      return;
+    }
+
+    if (query.length < 2) {
+      res.status(400).json({ error: 'Search query must be at least 2 characters' });
+      return;
+    }
+
+    const users = await userService.searchUsers(query.trim());
+    res.json(users);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Get user's followers list
+ * GET /api/users/:userId/followers
+ */
+export async function getUserFollowersHandler(
+  req: ReqWithUser,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const userId = Number(req.params.userId);
+    const { limit = '20', cursor } = req.query;
+    const pageLimit = Math.min(parseInt(limit as string) || 20, 100);
+
+    if (isNaN(userId)) {
+      res.status(400).json({ error: 'Invalid user ID' });
+      return;
+    }
+
+    const followers = await userService.getUserFollowers(userId, {
+      limit: pageLimit,
+      cursor: cursor as string,
+    });
+
+    res.json(followers);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Get users that this user is following
+ * GET /api/users/:userId/following
+ */
+export async function getUserFollowingHandler(
+  req: ReqWithUser,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const userId = Number(req.params.userId);
+    const { limit = '20', cursor } = req.query;
+    const pageLimit = Math.min(parseInt(limit as string) || 20, 100);
+
+    if (isNaN(userId)) {
+      res.status(400).json({ error: 'Invalid user ID' });
+      return;
+    }
+
+    const following = await userService.getUserFollowing(userId, {
+      limit: pageLimit,
+      cursor: cursor as string,
+    });
+
+    res.json(following);
   } catch (err) {
     next(err);
   }

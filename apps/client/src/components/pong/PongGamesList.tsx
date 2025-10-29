@@ -5,6 +5,9 @@ interface PongGamesListProps {
   activeGames: ActiveGameEntry[];
   onJoinMatch: (matchId: string) => void;
   onSpectateGame: (gameId: string) => void;
+  onPlayAI: () => void;
+  onChallengePlayers: () => void;
+  onQuickMatch: () => void;
 }
 
 export function PongGamesList({
@@ -12,6 +15,9 @@ export function PongGamesList({
   activeGames,
   onJoinMatch,
   onSpectateGame,
+  onPlayAI,
+  onChallengePlayers,
+  onQuickMatch,
 }: PongGamesListProps) {
   const formatTimeAgo = (timestamp: number) => {
     const seconds = Math.floor((Date.now() - timestamp) / 1000);
@@ -59,21 +65,30 @@ export function PongGamesList({
           <div className="text-6xl opacity-50">🏓</div>
           <div className="text-xl font-semibold text-content">No Games Available</div>
           <div className="text-secondary">
-            Be the first to create a match! Use the buttons above to get started.
+            Be the first to create a match! Use the buttons below to get started.
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6 text-sm">
-            <div className="p-3 bg-accent/10 border border-accent/20 rounded-lg">
+            <button
+              onClick={onPlayAI}
+              className="p-3 bg-accent/10 border border-accent/20 rounded-lg hover:bg-accent/20 hover:border-accent/30 transition-all cursor-pointer hover:shadow-lg"
+            >
               <div className="font-medium text-accent">🤖 Play AI</div>
               <div className="text-tertiary">Practice your skills</div>
-            </div>
-            <div className="p-3 bg-warning/10 border border-warning/20 rounded-lg">
+            </button>
+            <button
+              onClick={onChallengePlayers}
+              className="p-3 bg-warning/10 border border-warning/20 rounded-lg hover:bg-warning/20 hover:border-warning/30 transition-all cursor-pointer hover:shadow-lg"
+            >
               <div className="font-medium text-warning">👤 Challenge Players</div>
               <div className="text-tertiary">Create PVP lobby</div>
-            </div>
-            <div className="p-3 bg-info/10 border border-info/20 rounded-lg">
+            </button>
+            <button
+              onClick={onQuickMatch}
+              className="p-3 bg-info/10 border border-info/20 rounded-lg hover:bg-info/20 hover:border-info/30 transition-all cursor-pointer hover:shadow-lg"
+            >
               <div className="font-medium text-info">🎯 Quick Match</div>
               <div className="text-tertiary">Join any available</div>
-            </div>
+            </button>
           </div>
         </div>
       </div>
@@ -82,6 +97,31 @@ export function PongGamesList({
 
   return (
     <div className="space-y-6">
+      {/* Action Buttons - Always visible when games exist */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <button
+          onClick={onPlayAI}
+          className="p-4 bg-accent/10 border-2 border-accent/20 rounded-lg hover:bg-accent/20 hover:border-accent/30 transition-all cursor-pointer hover:shadow-lg hover:scale-105"
+        >
+          <div className="font-semibold text-accent text-lg">🤖 Play AI</div>
+          <div className="text-tertiary text-sm">Practice your skills</div>
+        </button>
+        <button
+          onClick={onChallengePlayers}
+          className="p-4 bg-warning/10 border-2 border-warning/20 rounded-lg hover:bg-warning/20 hover:border-warning/30 transition-all cursor-pointer hover:shadow-lg hover:scale-105"
+        >
+          <div className="font-semibold text-warning text-lg">👤 Challenge Players</div>
+          <div className="text-tertiary text-sm">Create PVP lobby</div>
+        </button>
+        <button
+          onClick={onQuickMatch}
+          className="p-4 bg-info/10 border-2 border-info/20 rounded-lg hover:bg-info/20 hover:border-info/30 transition-all cursor-pointer hover:shadow-lg hover:scale-105"
+        >
+          <div className="font-semibold text-info text-lg">🎯 Quick Match</div>
+          <div className="text-tertiary text-sm">Join any available</div>
+        </button>
+      </div>
+
       {/* Available Matches Section */}
       {hasAvailableMatches && (
         <div className="bg-surface border border-muted rounded-xl overflow-hidden">

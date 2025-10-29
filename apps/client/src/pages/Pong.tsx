@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
-import { PongGameOptimized } from '../components/pong/PongGameOptimized';
-import { useAuth } from '../hooks/useAuth';
+import { PongGame } from '../components/pong/PongGame';
+import { useAuth } from '../contexts/AuthContext';
+import PageContainer from '../components/PageContainer';
 
 export default function Pong() {
   const { user, refreshUserBalance } = useAuth();
@@ -15,14 +16,20 @@ export default function Pong() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-content mb-4">Authentication Required</h1>
-          <p className="text-tertiary">Please log in to play Pong</p>
+      <PageContainer>
+        <div className="min-h-96 flex items-center justify-center">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-content mb-4">Authentication Required</h1>
+            <p className="text-tertiary">Please log in to play Pong</p>
+          </div>
         </div>
-      </div>
+      </PageContainer>
     );
   }
 
-  return <PongGameOptimized />;
+  return (
+    <PageContainer>
+      <PongGame />
+    </PageContainer>
+  );
 }

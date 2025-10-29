@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
 import { ImageCropper } from './ImageCropper';
+import { uploadProfileImage } from '../../api/users';
+import api from '../../api/axios';
 
 interface ProfileImageUploadProps {
   userId: number;
@@ -33,11 +34,12 @@ export function ProfileImageUpload({
   className,
   disabled = false,
 }: ProfileImageUploadProps) {
-  const { accessToken } = useAuth();
   const [isUploading, setIsUploading] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>('');
+  const [optimisticPreviewUrl, setOptimisticPreviewUrl] = useState<string>('');
   const [showCropper, setShowCropper] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -73,6 +75,11 @@ export function ProfileImageUpload({
 
   const handleCropComplete = (blob: Blob) => {
     setShowCropper(false);
+
+    // Create optimistic preview URL from the cropped blob
+    const optimisticUrl = URL.createObjectURL(blob);
+    setOptimisticPreviewUrl(optimisticUrl);
+
     // Upload the cropped image immediately
     uploadCroppedImage(blob);
   };
@@ -84,6 +91,10 @@ export function ProfileImageUpload({
       URL.revokeObjectURL(previewUrl);
       setPreviewUrl('');
     }
+    if (optimisticPreviewUrl) {
+      URL.revokeObjectURL(optimisticPreviewUrl);
+      setOptimisticPreviewUrl('');
+    }
     // Reset file input
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -91,8 +102,8 @@ export function ProfileImageUpload({
   };
 
   const uploadCroppedImage = async (blob: Blob) => {
-    if (!selectedFile || !accessToken) {
-      onUploadError('Authentication required');
+    if (!selectedFile) {
+      onUploadError('No file selected');
       return;
     }
 
@@ -100,31 +111,23 @@ export function ProfileImageUpload({
     setUploadProgress(0);
 
     try {
-      // Create FormData with the cropped image
-      const formData = new FormData();
-      formData.append('image', blob, selectedFile.name);
+      // Create a File object from the blob
+      const file = new File([blob], selectedFile.name, { type: blob.type });
 
-      // Upload with progress tracking
-      const response = await fetch(`/api/users/${userId}/profile-picture`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: formData,
-      });
+      // Use the API function which has the correct baseURL configured
+      const result = await uploadProfileImage(userId, file);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Upload failed');
-      }
-
-      const result = await response.json();
+      // Pass the full result to parent
       onUploadSuccess(result);
 
-      // Cleanup
+      // Cleanup preview URLs
       if (previewUrl) {
         URL.revokeObjectURL(previewUrl);
         setPreviewUrl('');
+      }
+      if (optimisticPreviewUrl) {
+        URL.revokeObjectURL(optimisticPreviewUrl);
+        setOptimisticPreviewUrl('');
       }
       setSelectedFile(null);
 
@@ -135,6 +138,12 @@ export function ProfileImageUpload({
     } catch (error) {
       console.error('Upload error:', error);
       onUploadError(error instanceof Error ? error.message : 'Upload failed');
+
+      // Clear optimistic preview on error
+      if (optimisticPreviewUrl) {
+        URL.revokeObjectURL(optimisticPreviewUrl);
+        setOptimisticPreviewUrl('');
+      }
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
@@ -142,8 +151,29 @@ export function ProfileImageUpload({
   };
 
   const handleButtonClick = () => {
-    if (disabled || isUploading) return;
+    if (disabled || isUploading || isDeleting) return;
     fileInputRef.current?.click();
+  };
+
+  const handleUseDefault = async () => {
+    if (!confirm('Use the site default avatar? This will remove your custom profile picture.')) {
+      return;
+    }
+
+    setIsDeleting(true);
+
+    try {
+      // Use the axios instance which has the correct baseURL configured
+      await api.delete(`/api/users/${userId}/profile-picture`);
+
+      // Notify parent of success - need to refresh to get the new default avatar URL
+      window.location.reload();
+    } catch (error) {
+      console.error('Delete avatar error:', error);
+      onUploadError(error instanceof Error ? error.message : 'Failed to reset avatar');
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   if (showCropper && previewUrl) {
@@ -164,7 +194,7 @@ export function ProfileImageUpload({
         <div className="relative">
           <div className="h-24 w-24 rounded-full bg-muted overflow-hidden flex-shrink-0 border-2 border-muted">
             <img
-              src={currentAvatarUrl || fallbackAvatar}
+              src={optimisticPreviewUrl || currentAvatarUrl || fallbackAvatar}
               alt="Profile picture"
               className="h-full w-full object-cover"
               onError={(e) => {
@@ -183,11 +213,11 @@ export function ProfileImageUpload({
 
         {/* Upload Controls */}
         <div className="flex-1 space-y-2">
-          <div>
+          <div className="flex gap-2">
             <button
               type="button"
               onClick={handleButtonClick}
-              disabled={disabled || isUploading}
+              disabled={disabled || isUploading || isDeleting}
               className="inline-flex items-center px-4 py-2 bg-surface text-content shadow-sm border border-muted rounded-md cursor-pointer hover:bg-muted hover:border-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isUploading ? (
@@ -219,6 +249,15 @@ export function ProfileImageUpload({
               )}
             </button>
 
+            <button
+              type="button"
+              onClick={handleUseDefault}
+              disabled={disabled || isUploading || isDeleting}
+              className="inline-flex items-center px-4 py-2 bg-surface text-content shadow-sm border border-muted rounded-md cursor-pointer hover:bg-muted hover:border-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isDeleting ? 'Setting...' : 'Use Default'}
+            </button>
+
             {/* Hidden file input */}
             <input
               ref={fileInputRef}
@@ -226,7 +265,7 @@ export function ProfileImageUpload({
               accept="image/jpeg,image/png,image/webp"
               className="sr-only"
               onChange={handleFileSelect}
-              disabled={disabled || isUploading}
+              disabled={disabled || isUploading || isDeleting}
             />
           </div>
 

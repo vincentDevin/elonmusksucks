@@ -1,83 +1,110 @@
-// apps/client/src/components/ProfileFeed.tsx
-import { useState } from 'react';
+import React, { useState, useCallback } from 'react';
+import GenericFeed from '../GenericFeed';
+import { PostCard } from '../posts/core/PostCard';
+import { ContentModal } from '../timeline/core';
+import { fetchUserPostsFeed, type UnifiedFeedItem } from '../../utils/feedAdapter';
 import type { UserFeedPost } from '@ems/types';
-import { CreatePostForm } from './CreatePostForm';
 
-type ProfileFeedProps = {
-  feed: UserFeedPost[];
-  loading?: boolean;
-  onSubmit?: (content: string, parentId?: number | null) => Promise<void>;
-};
-
-export function ProfileFeed({ feed, loading = false, onSubmit }: ProfileFeedProps) {
-  if (loading) return <div>Loading feed…</div>;
-  if (!feed.length) return <div className="text-gray-500">No posts yet.</div>;
-
-  return (
-    <div className="space-y-4">
-      {feed.map((post) => (
-        <FeedPost key={post.id} post={post} onSubmit={onSubmit} />
-      ))}
-    </div>
-  );
+interface ProfileFeedProps {
+  userId: number;
+  includeReplies?: boolean;
+  className?: string;
 }
 
-function FeedPost({
-  post,
-  onSubmit,
-}: {
-  post: UserFeedPost;
-  onSubmit?: (content: string, parentId?: number | null) => Promise<void>;
-}) {
-  const [isReplying, setIsReplying] = useState(false);
+/**
+ * Profile-specific feed component using GenericFeed pattern
+ * Shows only posts from the specified user
+ */
+export const ProfileFeed: React.FC<ProfileFeedProps> = ({
+  userId,
+  includeReplies = false,
+  className = '',
+}) => {
+  const [selectedContent, setSelectedContent] = useState<UnifiedFeedItem | null>(null);
+  const [showModal, setShowModal] = useState(false);
 
-  const handleReplySubmit = async (content: string, parentId?: number | null) => {
-    if (onSubmit) {
-      await onSubmit(content, parentId);
-      setIsReplying(false);
-    }
+  // Handle post interactions
+  const handleViewDetails = (item: UnifiedFeedItem) => {
+    setSelectedContent(item);
+    setShowModal(true);
   };
 
-  return (
-    <div className="border rounded p-3 bg-surface">
-      <div className="flex items-center space-x-2">
-        <span className="font-bold">{post.authorName ?? `User #${post.authorId}`}</span>
-        <span className="text-xs text-gray-500">{new Date(post.createdAt).toLocaleString()}</span>
-      </div>
-      <div className="my-2">{post.content}</div>
-      <div className="flex gap-2">
-        {onSubmit && !isReplying && (
-          <button
-            className="text-xs text-blue-600 hover:underline cursor-pointer"
-            onClick={() => setIsReplying(true)}
-          >
-            Reply
-          </button>
-        )}
-        {isReplying && (
-          <button
-            className="text-xs text-gray-500 hover:text-gray-700"
-            onClick={() => setIsReplying(false)}
-          >
-            Cancel
-          </button>
-        )}
-      </div>
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setSelectedContent(null);
+  };
 
-      {/* Reply form directly below this post */}
-      {isReplying && (
-        <div className="mt-3 pl-4 border-l-2 border-blue-200">
-          <CreatePostForm onSubmit={handleReplySubmit} parentId={post.id} disabled={false} />
-        </div>
-      )}
-      {/* Render comments if present */}
-      {post.children && post.children.length > 0 && (
-        <div className="ml-4 border-l pl-3 mt-2 space-y-2">
-          {post.children.map((child) => (
-            <FeedPost key={child.id} post={child} onSubmit={onSubmit} />
-          ))}
-        </div>
+  // Render function for post items
+  const renderFeedItem = (item: UnifiedFeedItem) => {
+    // Profile feed only shows posts, not articles
+    const post = item.originalData as UserFeedPost;
+    return (
+      <PostCard
+        post={post}
+        showComments={false}
+        onExpand={() => handleViewDetails(item)}
+        onUpdate={(updatedPost) => {
+          // Handle post updates (reactions, etc.)
+          console.log('Post updated:', updatedPost);
+        }}
+        onDelete={(postId) => {
+          // Handle post deletion
+          console.log('Post deleted:', postId);
+        }}
+      />
+    );
+  };
+
+  // Fetch function for GenericFeed
+  const fetchItems = useCallback(
+    async (params: any) => {
+      return fetchUserPostsFeed({
+        userId,
+        cursor: params.cursor,
+        limit: params.limit,
+        includeReplies,
+      });
+    },
+    [userId, includeReplies],
+  );
+
+  return (
+    <div className={className}>
+      {/* User Posts Feed using GenericFeed */}
+      <GenericFeed<UnifiedFeedItem>
+        fetchItems={fetchItems}
+        renderItem={renderFeedItem}
+        className="w-full"
+        enableInfiniteScroll={true}
+        enableSearch={false}
+        itemsPerPage={20}
+        variant="list"
+        spacing="normal"
+        loadingComponent={
+          <div className="flex items-center space-x-3">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+            <span className="text-tertiary">Loading posts...</span>
+          </div>
+        }
+        errorComponent={(error) => (
+          <div className="text-center">
+            <div className="text-error mb-2">⚠️ Error loading posts</div>
+            <p className="text-tertiary text-sm">{error}</p>
+          </div>
+        )}
+        emptyComponent={
+          <div className="text-center text-tertiary py-8">
+            <div className="text-4xl mb-2">📝</div>
+            <p>No posts yet.</p>
+            <p className="text-sm mt-2">This user hasn't posted anything yet.</p>
+          </div>
+        }
+      />
+
+      {/* Post Detail Modal */}
+      {showModal && selectedContent && (
+        <ContentModal content={selectedContent} isOpen={showModal} onClose={handleCloseModal} />
       )}
     </div>
   );
-}
+};

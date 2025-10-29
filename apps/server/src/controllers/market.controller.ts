@@ -1,8 +1,11 @@
 import type { RequestHandler } from 'express';
-import { PrismaClient } from '@prisma/client';
 import redisClient from '../lib/redis';
-
-const prisma = new PrismaClient();
+import {
+  getMarketOverviewStats,
+  getTrendingPredictions as getTrendingPredictionsService,
+} from '../services/market.service';
+import { toMarketOverviewView } from '../view/market.view';
+import type { MarketOverviewView } from '@ems/types';
 
 export const getMarketOverview: RequestHandler = async (_req, res, _next) => {
   try {
@@ -10,53 +13,19 @@ export const getMarketOverview: RequestHandler = async (_req, res, _next) => {
     const cached = await redisClient.get(cacheKey);
 
     if (cached) {
-      res.json({ cached: true, ...JSON.parse(cached) });
+      const cachedStats = JSON.parse(cached);
+      const payload = toMarketOverviewView(cachedStats, true) satisfies MarketOverviewView;
+      res.json(payload);
       return;
     }
 
-    // Get current statistics
-    const [totalVolumeResult, activeMarkets, totalUsers] = await Promise.all([
-      // Total volume from all bets and parlays
-      prisma.$queryRaw<[{ total: bigint }]>`
-        SELECT COALESCE(
-          (SELECT SUM(amount) FROM "Bet") + 
-          (SELECT SUM(amount) FROM "Parlay"), 
-          0
-        ) as total
-      `,
-
-      // Active (unresolved) predictions
-      prisma.prediction.count({
-        where: {
-          resolved: false,
-          approved: true,
-          expiresAt: { gt: new Date() },
-        },
-      }),
-
-      // Total registered users
-      prisma.user.count(),
-    ]);
-
-    const totalVolume = Number(totalVolumeResult[0]?.total || 0);
-
-    const stats = {
-      totalVolume,
-      activeMarkets,
-      totalUsers,
-      volumeChange: Math.random() * 20 - 10, // TODO: Calculate real change
-      trending: [
-        { category: 'Sports', icon: '⚽', growth: 23.5 },
-        { category: 'Politics', icon: '🗳️', growth: 18.2 },
-        { category: 'Tech', icon: '💻', growth: 15.7 },
-        { category: 'Entertainment', icon: '🎭', growth: 12.1 },
-      ],
-    };
+    const stats = await getMarketOverviewStats();
 
     // Cache for 30 seconds
     await redisClient.setex(cacheKey, 30, JSON.stringify(stats));
 
-    res.json({ cached: false, ...stats });
+    const payload = toMarketOverviewView(stats, false) satisfies MarketOverviewView;
+    res.json(payload);
   } catch (error) {
     console.error('Error fetching market overview:', error);
     res.status(500).json({
@@ -108,33 +77,7 @@ export const getMarketHealth: RequestHandler = async (_req, res) => {
 export const getTrendingPredictions: RequestHandler = async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit as string) || 10, 50);
-
-    const trending = await prisma.prediction.findMany({
-      where: {
-        resolved: false,
-        approved: true,
-        expiresAt: { gt: new Date() },
-      },
-      include: {
-        _count: {
-          select: { bets: true },
-        },
-      },
-      orderBy: {
-        bets: { _count: 'desc' },
-      },
-      take: limit,
-    });
-
-    const formattedTrending = trending.map((prediction) => ({
-      id: prediction.id,
-      title: prediction.title,
-      category: prediction.category,
-      volume: Math.floor(Math.random() * 10000) + 1000, // TODO: Calculate real volume
-      betCount: prediction._count.bets,
-      expiresAt: prediction.expiresAt.toISOString(),
-    }));
-
+    const formattedTrending = await getTrendingPredictionsService(limit);
     res.json(formattedTrending);
   } catch (error) {
     console.error('Error fetching trending predictions:', error);

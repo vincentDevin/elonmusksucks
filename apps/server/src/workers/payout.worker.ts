@@ -7,7 +7,14 @@
 
 import 'dotenv/config';
 import { Worker, Job } from 'bullmq';
-import redisClient from '../lib/redis';
+import { PayoutJobData, REDIS_CHANNELS } from '@ems/types';
+// TODO: Use QUEUE_NAMES and QueueOptions from @ems/types once imports resolve
+import { createWorkerOptions } from '../lib/bullmqConfig';
+import { eventBus } from '../lib/EventBus';
+import { CacheInvalidation } from '../utils/cacheInvalidation';
+
+// Configurable concurrency to keep CPU saturation <70%
+const PAYOUT_CONCURRENCY = parseInt(process.env.WORKER_PAYOUT_CONCURRENCY || '2');
 import { PayoutRepository } from '../repositories/PayoutRepository';
 import type { PublicPrediction } from '@ems/types';
 import { leaderboardService } from '../services/leaderboard.service';
@@ -15,11 +22,15 @@ import type { LeaderboardTrigger } from '../services/leaderboard.service';
 
 const payoutRepo = new PayoutRepository();
 
-const payoutWorker = new Worker<{ predictionId: number; winningOptionId: number }>(
+const payoutWorker = new Worker<PayoutJobData>(
   'payouts',
-  async (job: Job<{ predictionId: number; winningOptionId: number }>) => {
+  async (job: Job<PayoutJobData>) => {
     const { predictionId, winningOptionId } = job.data;
     console.log(`[worker] Processing payout for prediction ${predictionId}`);
+
+    if (!winningOptionId) {
+      throw new Error(`No winning option ID provided for prediction ${predictionId}`);
+    }
 
     try {
       // 1. Run the full payout logic and get back the updated prediction
@@ -29,17 +40,17 @@ const payoutWorker = new Worker<{ predictionId: number; winningOptionId: number 
       );
 
       // 2. Publish present‑tense event so all socket gateways rebroadcast
-      await redisClient.publish('prediction:resolve', JSON.stringify(updated));
+      await eventBus.publish(REDIS_CHANNELS.PREDICTION_RESOLVE, updated);
 
       // 3. Trigger leaderboard update for the resolved prediction
       const trigger: LeaderboardTrigger = {
         event: 'prediction:completed',
         priority: 'immediate',
-        affectedMetrics: ['profit', 'winRate', 'streak'],
+        affectedMetrics: ['profit', 'win_rate', 'streak'],
         metadata: {
           predictionId,
           winningOptionId,
-          category: updated.category,
+          category: updated.categoryId,
         },
       };
 
@@ -53,21 +64,27 @@ const payoutWorker = new Worker<{ predictionId: number; winningOptionId: number 
         timestamp: new Date().toISOString(),
       };
 
-      await redisClient.publish('payout:completed', JSON.stringify(payoutData));
+      await eventBus.publish(REDIS_CHANNELS.PAYOUT_COMPLETED, payoutData);
+
+      // Issue #3: Invalidate caches after payout processing
+      await Promise.allSettled([
+        CacheInvalidation.invalidatePrediction(predictionId),
+        CacheInvalidation.invalidateLeaderboard(), // Leaderboard rankings changed
+      ]);
 
       console.log(
-        `[worker] Prediction ${predictionId} resolved, events published, leaderboard triggered`,
+        `[worker] Prediction ${predictionId} resolved, events published, leaderboard triggered, caches invalidated`,
       );
     } catch (error) {
       console.error(`[worker] Failed to process payout for prediction ${predictionId}:`, error);
       throw error; // Re-throw to mark job as failed
     }
   },
-  {
-    connection: redisClient,
-    concurrency: 5,
-  },
+  createWorkerOptions('PAYOUTS', PAYOUT_CONCURRENCY),
 );
+
+// Log configured concurrency on startup
+console.log(`[payout-worker] Configured concurrency: ${PAYOUT_CONCURRENCY}`);
 
 payoutWorker.on('completed', (job) => {
   console.log(`[worker] Job ${job.id} completed`);

@@ -4,25 +4,36 @@
 // published when the resolution happens synchronously (tests / dev mode).
 // -----------------------------------------------------------------------------
 
-import type { IPayoutRepository } from '../repositories/IPayoutRepository';
+import type { IPayoutRepository } from '../repositories/interfaces/IPayoutRepository';
 import type { PublicPrediction } from '@ems/types';
+import { QUEUE_NAMES, REDIS_CHANNELS } from '@ems/types';
 import { PayoutRepository } from '../repositories/PayoutRepository';
 import { Queue } from 'bullmq';
-import redis from '../lib/redis';
 import IORedis from 'ioredis';
+import { createQueueOptions } from '../lib/bullmqConfig';
 import { leaderboardService } from './leaderboard.service';
 import type { LeaderboardTrigger } from './leaderboard.service';
 import { unifiedActivityService } from './unifiedActivity.service';
+import { eventBus } from '../lib/EventBus';
 
 // Create a separate Redis client for subscriptions to avoid conflicts
-const subscriptionRedis = new IORedis({
-  host: process.env.REDIS_HOST || '127.0.0.1',
-  port: Number.parseInt(process.env.REDIS_PORT || '6379', 10),
-  password: process.env.REDIS_PASSWORD,
-  maxRetriesPerRequest: null,
-  enableOfflineQueue: true,
-  retryStrategy: (times: number) => Math.min(times * 50, 2000),
-});
+const subscriptionRedis = process.env.REDIS_URL
+  ? new IORedis(process.env.REDIS_URL, {
+      maxRetriesPerRequest: null,
+      enableOfflineQueue: true,
+      retryStrategy: (times: number) => Math.min(times * 50, 2000),
+      tls: process.env.REDIS_URL.startsWith('rediss://')
+        ? { rejectUnauthorized: false }
+        : undefined,
+    })
+  : new IORedis({
+      host: process.env.REDIS_HOST || '127.0.0.1',
+      port: Number.parseInt(process.env.REDIS_PORT || '6379', 10),
+      password: process.env.REDIS_PASSWORD,
+      maxRetriesPerRequest: null,
+      enableOfflineQueue: true,
+      retryStrategy: (times: number) => Math.min(times * 50, 2000),
+    });
 
 subscriptionRedis.on('error', (err: Error) => {
   console.error('[leaderboard] Subscription Redis client error:', err);
@@ -33,7 +44,7 @@ subscriptionRedis.on('connect', () => {
 });
 
 export class PayoutService {
-  private payoutQueue = new Queue('payouts', { connection: redis });
+  private payoutQueue = new Queue(QUEUE_NAMES.PAYOUTS, createQueueOptions('PAYOUTS'));
 
   constructor(private repo: IPayoutRepository = new PayoutRepository()) {}
 
@@ -51,8 +62,8 @@ export class PayoutService {
     if (typeof this.repo.markResolving !== 'function') {
       const resolved = await this.repo.resolvePrediction(predictionId, winningOptionId);
 
-      // Publish real‑time update so front‑end sees result instantly (legacy)
-      await redis.publish('prediction:resolve', JSON.stringify(resolved));
+      // Publish real‑time update so front‑end sees result instantly
+      await eventBus.publish(REDIS_CHANNELS.PREDICTION_RESOLVE, resolved);
 
       // The resolved prediction from the repository includes options
       const resolvedWithOptions = resolved as PublicPrediction & {
@@ -75,7 +86,7 @@ export class PayoutService {
           {
             id: resolved.id,
             title: resolved.title,
-            category: resolved.category,
+            category: `category_${resolved.categoryId}`, // TODO: Fetch category name from categoryId
             winningOption: winningOption.label,
           },
           resolver,
@@ -102,7 +113,7 @@ export class PayoutService {
     const trigger: LeaderboardTrigger = {
       event: 'prediction:completed',
       priority: 'batched',
-      affectedMetrics: ['profit', 'winRate', 'streak'],
+      affectedMetrics: ['profit', 'win_rate', 'streak'],
       metadata: { predictionId, winningOptionId },
     };
 
@@ -121,10 +132,10 @@ export class PayoutService {
       const trigger: LeaderboardTrigger = {
         event: 'prediction:completed',
         priority: 'immediate', // Immediate for sync path
-        affectedMetrics: ['profit', 'winRate', 'streak'],
+        affectedMetrics: ['profit', 'win_rate', 'streak'],
         metadata: {
           predictionId,
-          category: resolvedPrediction.category,
+          categoryId: resolvedPrediction.categoryId,
         },
       };
 
@@ -164,7 +175,7 @@ const initializePayoutSubscription = async () => {
                 event: 'bet:resolved',
                 priority: 'batched',
                 userId,
-                affectedMetrics: ['profit', 'winRate'],
+                affectedMetrics: ['profit', 'win_rate'],
                 metadata: { predictionId },
               };
 

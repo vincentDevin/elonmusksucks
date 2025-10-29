@@ -2,9 +2,30 @@
 import { Request, Response, NextFunction } from 'express';
 import * as adminService from '../services/admin.service';
 import { payoutService } from '../services/payout.service';
-import { adminAchievementService } from '../services/adminAchievement.service';
+import { adminAchievementService } from '../services/achievements/adminAchievement.service';
 import { shameWallService } from '../services/shameWall.service';
+import { RuleSimulationService } from '../services/achievements/ruleSimulation.service';
+import { UserService } from '../services/user.service';
+
+const ruleSimulationService = new RuleSimulationService();
+const userService = new UserService();
 import { serializeBigInt } from '../utils/bigintSerializer';
+import {
+  toAdminUserView,
+  toAdminBetView,
+  toAdminTransactionView,
+  toAdminUserSearchResponse,
+  toAdminFinancialDataResponse,
+  toAdminFinancialAnalyticsResponse,
+  toAdminBulkPredictionsResponse,
+  toAdminAchievementView,
+  toAdminBulkOperationResponse,
+  toAdminUserAchievementView,
+  toAdminAchievementAnalyticsResponse,
+  toAdminBanHistoryView,
+} from '../view/admin.view';
+import { AdminActions } from '@ems/types';
+import type { JsonRuleAchievementData } from '@ems/types';
 import type {
   PublicUser,
   PublicPrediction,
@@ -12,8 +33,18 @@ import type {
   PublicTransaction,
   PublicBadge,
   PublicUserBadge,
-  PublicAITweet,
-  AdminTransaction,
+  AdminTransactionView,
+  AdminUserView,
+  AdminBetView,
+  AdminUserSearchResponse,
+  AdminFinancialDataResponse,
+  AdminFinancialAnalyticsResponse,
+  AdminBulkPredictionsResponse,
+  AdminAchievementView,
+  AdminBulkOperationResponse,
+  AdminUserAchievementView,
+  AdminAchievementAnalyticsResponse,
+  AdminBanHistoryView,
 } from '@ems/types';
 import type { Role } from '@prisma/client';
 import type {
@@ -22,14 +53,22 @@ import type {
   BulkUserOperation,
   PredictionSearchParams,
   BulkPredictionOperation,
-} from '../repositories/IAdminRepository';
+} from '../repositories/interfaces/IAdminRepository';
 
 // -- Enhanced User Management --
-export async function getUsers(_req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function getUsers(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    // Legacy endpoint - kept for backward compatibility
+    // Log permission check for audit trail
+    const authReq = req as any;
+    console.log(
+      `[admin-rbac] ${AdminActions.ManageUsers} requested by user ${authReq.user?.id} (role: ${authReq.user?.role})`,
+    );
+
+    // RBAC: Only ADMIN role can manage users
+    // This is enforced by requireAdmin middleware, but logged here for audit
     const users: PublicUser[] = await adminService.listUsers();
-    res.json(serializeBigInt(users));
+    const payload = users.map(toAdminUserView) satisfies AdminUserView[];
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -51,7 +90,8 @@ export async function searchUsers(req: Request, res: Response, next: NextFunctio
     };
 
     const result = await adminService.searchUsers(params);
-    res.json(serializeBigInt(result));
+    const payload = toAdminUserSearchResponse(result) satisfies AdminUserSearchResponse;
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -71,7 +111,7 @@ export async function getUserDetails(
       return;
     }
 
-    res.json(user);
+    res.json(serializeBigInt(user));
   } catch (err) {
     next(err);
   }
@@ -97,7 +137,8 @@ export async function bulkUpdateUsers(
     }
 
     const result = await adminService.bulkUpdateUsers(operation);
-    res.json(serializeBigInt(result));
+    const payload = toAdminBulkOperationResponse(result) satisfies AdminBulkOperationResponse;
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -112,7 +153,7 @@ export async function updateUserRole(
     const userId = Number(req.params.id);
     const { role } = req.body as { role: Role };
     const updated: PublicUser = await adminService.changeUserRole(userId, role);
-    res.json(updated);
+    res.json(serializeBigInt(updated));
   } catch (err) {
     next(err);
   }
@@ -123,7 +164,7 @@ export async function activateUser(req: Request, res: Response, next: NextFuncti
     const userId = Number(req.params.id);
     const { active } = req.body as { active: boolean };
     const updated: PublicUser = await adminService.setUserActive(userId, active);
-    res.json(updated);
+    res.json(serializeBigInt(updated));
   } catch (err) {
     next(err);
   }
@@ -138,8 +179,130 @@ export async function updateUserBalance(
     const userId = Number(req.params.id);
     const { amount } = req.body as { amount: number };
     const updated: PublicUser = await adminService.adjustUserBalance(userId, amount);
-    res.json(updated);
+    res.json(serializeBigInt(updated));
   } catch (err) {
+    next(err);
+  }
+}
+
+// -- Admin Avatar Management --
+export async function uploadUserProfileImage(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const targetUserId = Number(req.params.userId);
+    const adminId = (req as any).user?.id;
+    const file = (req as any).file;
+
+    if (!adminId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    if (!file) {
+      res.status(400).json({ error: 'No file uploaded' });
+      return;
+    }
+
+    console.log(`[admin-avatar] Admin ${adminId} uploading profile image for user ${targetUserId}`);
+
+    const result = await userService.adminUploadUserProfileImage(adminId, targetUserId, file);
+    res.json(result);
+  } catch (err) {
+    console.error('[admin-avatar] Upload error:', err);
+    next(err);
+  }
+}
+
+export async function deleteUserProfileImage(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const targetUserId = Number(req.params.userId);
+    const adminId = (req as any).user?.id;
+
+    if (!adminId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    console.log(`[admin-avatar] Admin ${adminId} deleting profile image for user ${targetUserId}`);
+
+    await userService.deleteUserProfileImage(targetUserId);
+    res.status(204).send();
+  } catch (err) {
+    console.error('[admin-avatar] Delete error:', err);
+    next(err);
+  }
+}
+
+// -- Site Default Avatar Management --
+export async function getDefaultAvatar(
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const defaultAvatarUrl = await userService.getDefaultAvatarUrl();
+    res.json({ avatarUrl: defaultAvatarUrl });
+  } catch (err) {
+    console.error('[admin-default-avatar] Get error:', err);
+    next(err);
+  }
+}
+
+export async function uploadDefaultAvatar(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const adminId = (req as any).user?.id;
+    const file = (req as any).file;
+
+    if (!adminId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    if (!file) {
+      res.status(400).json({ error: 'No file uploaded' });
+      return;
+    }
+
+    console.log(`[admin-default-avatar] Admin ${adminId} uploading default avatar`);
+
+    const result = await userService.uploadDefaultAvatar(file);
+    res.json(result);
+  } catch (err) {
+    console.error('[admin-default-avatar] Upload error:', err);
+    next(err);
+  }
+}
+
+export async function deleteDefaultAvatar(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const adminId = (req as any).user?.id;
+
+    if (!adminId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    console.log(`[admin-default-avatar] Admin ${adminId} deleting default avatar`);
+
+    await userService.deleteDefaultAvatar();
+    res.status(204).send();
+  } catch (err) {
+    console.error('[admin-default-avatar] Delete error:', err);
     next(err);
   }
 }
@@ -153,7 +316,7 @@ export async function getPredictions(
   try {
     const filters = req.query as unknown as QueryParams;
     const preds: PublicPrediction[] = await adminService.listPredictions(filters);
-    res.json(preds);
+    res.json(serializeBigInt(preds));
   } catch (err) {
     next(err);
   }
@@ -197,7 +360,10 @@ export async function searchPredictions(
     };
 
     const result = await adminService.searchPredictions(params);
-    res.json(serializeBigInt(result));
+
+    // Use the existing BigInt serialization utility
+    const serializedResult = serializeBigInt(result);
+    res.json(serializedResult);
   } catch (err) {
     next(err);
   }
@@ -217,7 +383,7 @@ export async function getPredictionDetails(
       return;
     }
 
-    res.json(prediction);
+    res.json(serializeBigInt(prediction));
   } catch (err) {
     next(err);
   }
@@ -247,7 +413,8 @@ export async function bulkUpdatePredictions(
     }
 
     const result = await adminService.bulkUpdatePredictions(operation);
-    res.json(serializeBigInt(result));
+    const payload = toAdminBulkPredictionsResponse(result) satisfies AdminBulkPredictionsResponse;
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -261,7 +428,7 @@ export async function approvePrediction(
   try {
     const id = Number(req.params.id);
     const updated: PublicPrediction = await adminService.setPredictionStatus(id, 'approved');
-    res.json(updated);
+    res.json(serializeBigInt(updated));
   } catch (err) {
     next(err);
   }
@@ -275,7 +442,7 @@ export async function rejectPrediction(
   try {
     const id = Number(req.params.id);
     const updated: PublicPrediction = await adminService.setPredictionStatus(id, 'rejected');
-    res.json(updated);
+    res.json(serializeBigInt(updated));
   } catch (err) {
     next(err);
   }
@@ -287,11 +454,15 @@ export async function resolvePrediction(
   next: NextFunction,
 ): Promise<void> {
   try {
+    console.log(
+      `[admin-rbac] ${AdminActions.ManagePredictions} requested by user ${(req as any).user?.id} (role: ${(req as any).user?.role})`,
+    );
+
     const id = Number(req.params.id);
     const { winningOptionId } = req.body as { winningOptionId: number };
     // enqueue the payout job (no return value)
     await payoutService.resolvePrediction(id, winningOptionId);
-    // 202 Accepted indicates “we got it, working in background”
+    // 202 Accepted indicates "we got it, working in background"
     res.status(202).json({ message: 'Payout job enqueued' });
   } catch (err) {
     next(err);
@@ -301,9 +472,14 @@ export async function resolvePrediction(
 // -- Bet & Transaction Oversight --
 export async function getBets(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
+    console.log(
+      `[admin-rbac] ${AdminActions.ManageBets} requested by user ${(req as any).user?.id} (role: ${(req as any).user?.role})`,
+    );
+
     const filters = req.query as unknown as QueryParams;
     const bets = await adminService.listBets(filters);
-    res.json(serializeBigInt(bets));
+    const payload = bets.map(toAdminBetView) satisfies AdminBetView[];
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -313,7 +489,7 @@ export async function refundBet(req: Request, res: Response, next: NextFunction)
   try {
     const id = Number(req.params.id);
     const updated: PublicBet = await adminService.refundBet(id);
-    res.json(updated);
+    res.json(serializeBigInt(updated));
   } catch (err) {
     next(err);
   }
@@ -329,12 +505,13 @@ export async function getTransactions(
     const txns: PublicTransaction[] = await adminService.listTransactions(filters);
     const users: PublicUser[] = await adminService.listUsers();
 
-    const detailedTxns: AdminTransaction[] = txns.map((t) => ({
-      ...t,
-      userName: users.find((u) => u.id === t.userId)?.name ?? 'Unknown',
-    }));
-
-    res.json(serializeBigInt(detailedTxns));
+    const payload = txns.map((t) =>
+      toAdminTransactionView({
+        ...t,
+        userName: users.find((u) => u.id === t.userId)?.name ?? 'Unknown',
+      }),
+    ) satisfies AdminTransactionView[];
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -347,9 +524,43 @@ export async function searchFinancialData(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const params = req.query as unknown as any; // Will be typed properly in service
+    // Map query parameters to typed FinancialSearchParams
+    const params = {
+      search: req.query.search as string,
+      userId: req.query.userId ? parseInt(req.query.userId as string) : undefined,
+      predictionId: req.query.predictionId ? parseInt(req.query.predictionId as string) : undefined,
+      betType: req.query.betType
+        ? ((Array.isArray(req.query.betType) ? req.query.betType : [req.query.betType]) as any)
+        : undefined,
+      status: req.query.status
+        ? ((Array.isArray(req.query.status) ? req.query.status : [req.query.status]) as any)
+        : undefined,
+      transactionType: req.query.transactionType
+        ? ((Array.isArray(req.query.transactionType)
+            ? req.query.transactionType
+            : [req.query.transactionType]) as any)
+        : undefined,
+      transactionSubtype: req.query.transactionSubtype
+        ? ((Array.isArray(req.query.transactionSubtype)
+            ? req.query.transactionSubtype
+            : [req.query.transactionSubtype]) as any)
+        : undefined,
+      includePongTransactions: req.query.includePongTransactions === 'true',
+      includeMetadata: req.query.includeMetadata === 'true',
+      minAmount: req.query.minAmount ? parseFloat(req.query.minAmount as string) : undefined,
+      maxAmount: req.query.maxAmount ? parseFloat(req.query.maxAmount as string) : undefined,
+      startDate: req.query.startDate as string,
+      endDate: req.query.endDate as string,
+      suspiciousOnly: req.query.suspiciousOnly === 'true',
+      page: parseInt(req.query.page as string) || 0,
+      limit: parseInt(req.query.limit as string) || 25,
+      sortBy: (req.query.sortBy as any) || 'createdAt',
+      sortOrder: (req.query.sortOrder as any) || 'desc',
+    };
+
     const data = await adminService.searchFinancialData(params);
-    res.json(serializeBigInt(data));
+    const payload = toAdminFinancialDataResponse(data) satisfies AdminFinancialDataResponse;
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -363,7 +574,35 @@ export async function getFinancialAnalytics(
   try {
     const params = req.query as unknown as any;
     const analytics = await adminService.getFinancialAnalytics(params);
-    res.json(serializeBigInt(analytics));
+    const payload = toAdminFinancialAnalyticsResponse(
+      analytics,
+    ) satisfies AdminFinancialAnalyticsResponse;
+    res.json(payload);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// NEW: Unified Analytics endpoint for cross-transaction insights
+export async function getUnifiedAnalytics(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { startDate, endDate, includeHourlyTrends, includeRiskMetrics, topUsersLimit } =
+      req.query;
+
+    const params = {
+      startDate: startDate as string | undefined,
+      endDate: endDate as string | undefined,
+      includeHourlyTrends: includeHourlyTrends === 'true',
+      includeRiskMetrics: includeRiskMetrics === 'true',
+      topUsersLimit: topUsersLimit ? parseInt(topUsersLimit as string) : 10,
+    };
+
+    const analytics = await adminService.getUnifiedAnalytics(params);
+    res.json(analytics); // Return directly as the repository already formats it correctly
   } catch (err) {
     next(err);
   }
@@ -741,20 +980,6 @@ export async function revokeBadge(req: Request, res: Response, next: NextFunctio
   }
 }
 
-// -- Leaderboard & Stats --
-export async function refreshLeaderboard(
-  _req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> {
-  try {
-    await adminService.refreshLeaderboard();
-    res.status(204).end();
-  } catch (err) {
-    next(err);
-  }
-}
-
 export async function getUserStats(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const userId = Number(req.params.userId);
@@ -767,18 +992,6 @@ export async function getUserStats(req: Request, res: Response, next: NextFuncti
 }
 
 // -- Miscellaneous --
-export async function triggerAITweet(
-  _req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> {
-  try {
-    const tweet: PublicAITweet = await adminService.generateAITweet();
-    res.status(201).json(tweet);
-  } catch (err) {
-    next(err);
-  }
-}
 
 // -- Achievement Management System --
 
@@ -789,7 +1002,8 @@ export async function getAllAchievements(
 ): Promise<void> {
   try {
     const achievements = await adminAchievementService.getAllAchievements();
-    res.json(serializeBigInt(achievements));
+    const payload = achievements.map(toAdminAchievementView) satisfies AdminAchievementView[];
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -802,6 +1016,12 @@ export async function getAchievementById(
 ): Promise<void> {
   try {
     const achievementId = parseInt(req.params.id);
+
+    if (isNaN(achievementId)) {
+      res.status(400).json({ error: 'Invalid achievement ID' });
+      return;
+    }
+
     const achievement = await adminAchievementService.getAchievementById(achievementId);
 
     if (!achievement) {
@@ -809,7 +1029,8 @@ export async function getAchievementById(
       return;
     }
 
-    res.json(serializeBigInt(achievement));
+    const payload = toAdminAchievementView(achievement) satisfies AdminAchievementView;
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -823,7 +1044,8 @@ export async function createAchievement(
   try {
     const data = req.body;
     const achievement = await adminAchievementService.createAchievement(data);
-    res.status(201).json(serializeBigInt(achievement));
+    const payload = toAdminAchievementView(achievement) satisfies AdminAchievementView;
+    res.status(201).json(payload);
   } catch (err) {
     next(err);
   }
@@ -838,7 +1060,8 @@ export async function updateAchievement(
     const achievementId = parseInt(req.params.id);
     const data = req.body;
     const achievement = await adminAchievementService.updateAchievement(achievementId, data);
-    res.json(serializeBigInt(achievement));
+    const payload = toAdminAchievementView(achievement) satisfies AdminAchievementView;
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -917,7 +1140,8 @@ export async function getUsersWithAchievement(
   try {
     const achievementId = parseInt(req.params.id);
     const users = await adminAchievementService.getUsersWithAchievement(achievementId);
-    res.json(serializeBigInt(users));
+    const payload = users.map(toAdminUserAchievementView) satisfies AdminUserAchievementView[];
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -930,7 +1154,10 @@ export async function getAchievementAnalytics(
 ): Promise<void> {
   try {
     const analytics = await adminAchievementService.getAchievementAnalytics();
-    res.json(serializeBigInt(analytics));
+    const payload = toAdminAchievementAnalyticsResponse(
+      analytics,
+    ) satisfies AdminAchievementAnalyticsResponse;
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -960,7 +1187,8 @@ export async function issueBan(req: Request, res: Response, next: NextFunction):
       moderatorId,
     });
 
-    res.status(201).json(serializeBigInt(banHistory));
+    const payload = toAdminBanHistoryView(banHistory) satisfies AdminBanHistoryView;
+    res.status(201).json(payload);
   } catch (err) {
     next(err);
   }
@@ -991,7 +1219,8 @@ export async function getBanHistory(
 ): Promise<void> {
   try {
     const history = await shameWallService.getBanHistory();
-    res.json(serializeBigInt(history));
+    const payload = history.map(toAdminBanHistoryView) satisfies AdminBanHistoryView[];
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -1018,3 +1247,125 @@ export async function awardShameAchievement(
     next(err);
   }
 }
+
+export const simulateRule = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const { rule, events, scenario, eventCount } = req.body;
+
+    if (!rule) {
+      res.status(400).json({ error: 'Rule is required' });
+      return;
+    }
+
+    let simulationEvents = events;
+
+    if (!simulationEvents) {
+      simulationEvents = await ruleSimulationService.generateTestEvents(
+        rule as JsonRuleAchievementData,
+        scenario || 'mixed',
+        eventCount || 50,
+      );
+    }
+
+    const result = await ruleSimulationService.simulateRule(
+      rule as JsonRuleAchievementData,
+      simulationEvents,
+    );
+
+    res.json({
+      success: true,
+      simulation: result,
+      generatedEvents: !events,
+    });
+  } catch (err) {
+    console.error('Rule simulation failed:', err);
+    next(err);
+  }
+};
+
+export const generateTestEvents = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const { rule, scenario, eventCount } = req.body;
+
+    if (!rule) {
+      res.status(400).json({ error: 'Rule is required' });
+      return;
+    }
+
+    const events = await ruleSimulationService.generateTestEvents(
+      rule as JsonRuleAchievementData,
+      scenario || 'mixed',
+      eventCount || 50,
+    );
+
+    res.json({
+      success: true,
+      events,
+      scenario: scenario || 'mixed',
+      count: events.length,
+    });
+  } catch (err) {
+    console.error('Test event generation failed:', err);
+    next(err);
+  }
+};
+
+export const quickSimulate = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const { rule } = req.body;
+
+    if (!rule) {
+      res.status(400).json({ error: 'Rule is required' });
+      return;
+    }
+
+    const scenarios = ['success', 'failure', 'mixed'] as const;
+    const results: Record<string, any> = {};
+
+    for (const scenario of scenarios) {
+      const events = await ruleSimulationService.generateTestEvents(
+        rule as JsonRuleAchievementData,
+        scenario,
+        30,
+      );
+      const result = await ruleSimulationService.simulateRule(
+        rule as JsonRuleAchievementData,
+        events,
+      );
+
+      results[scenario] = {
+        ...result,
+        eventCount: events.length,
+      };
+    }
+
+    res.json({
+      success: true,
+      scenarios: results,
+      rule: {
+        eventKeys: rule.eventKeys,
+        progressType: rule.progress.kind,
+        complexity: results.mixed.complexity,
+      },
+    });
+  } catch (err) {
+    console.error('Quick simulation failed:', err);
+    next(err);
+  }
+};
+
+// ——————————————————————————————————————————————————————————————————————————————
+// Unified Content Management Endpoints (Deprecated - service removed)
+// ——————————————————————————————————————————————————————————————————————————————

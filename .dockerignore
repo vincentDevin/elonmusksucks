@@ -1,0 +1,60 @@
+# Ignore package-lock.json to allow platform-specific dependency resolution
+package-lock.json
+
+# Node modules (will be installed in Docker)
+node_modules/
+**/node_modules/
+
+# Build outputs (will be built in Docker)
+dist/
+**/dist/
+build/
+**/build/
+
+# Local environment files
+.env
+.env.local
+.env.*.local
+
+# IMPORTANT: Allow .env.production and .env.development for Vite builds
+!.env.production
+!.env.development
+!apps/*/.env.production
+!apps/*/.env.development
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# CI/CD
+.github/
+
+# Documentation
+README.md
+docs/
+*.md
+
+# Test files
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+**/__tests__/
+**/__mocks__/
+
+# Development files
+.secrets.production.txt
+.prettierrc
+.eslintrc.js
+.prettierignore

@@ -1,5 +1,6 @@
 // apps/client/src/api/activity.ts
 import axios from 'axios';
+import type { ActivityFeedResponse } from '@ems/types';
 
 // Create a public API client that doesn't require authentication
 const publicApi = axios.create({
@@ -8,12 +9,8 @@ const publicApi = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-export interface ActivityResponse {
-  success: boolean;
-  activities: any[];
-  count: number;
-  cached: boolean;
-}
+// Type alias for backwards compatibility
+export type ActivityResponse = ActivityFeedResponse;
 
 /**
  * Get recent activities from Redis cache
@@ -21,8 +18,20 @@ export interface ActivityResponse {
  * PUBLIC ENDPOINT - No authentication required
  */
 export const getRecentActivities = async (limit = 50): Promise<ActivityResponse> => {
-  const response = await publicApi.get(`/activity/recent?limit=${limit}`);
-  return response.data;
+  try {
+    console.log('[activity.ts] Fetching recent activities, limit:', limit);
+    const response = await publicApi.get(`/activity/recent?limit=${limit}`);
+    console.log('[activity.ts] Response received:', response.status, response.data);
+    return response.data;
+  } catch (error: any) {
+    console.error('[activity.ts] Error fetching activities:', {
+      message: error.message,
+      status: error.response?.status,
+      data: error.response?.data,
+      url: error.config?.url,
+    });
+    throw error;
+  }
 };
 
 /**

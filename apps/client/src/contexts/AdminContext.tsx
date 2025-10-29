@@ -1,20 +1,22 @@
+// Rollback: Remove useEffect import and role change monitoring
 // apps/client/src/contexts/AdminContext.tsx
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
 import type { ReactNode } from 'react';
 import * as adminApi from '../api/admin';
+import { useAuth } from './AuthContext';
 import type {
-  PublicUser,
   PublicPrediction,
   PublicBet,
   PublicTransaction,
   PublicBadge,
   UserStatsDTO,
   Role,
+  AdminUserView,
 } from '@ems/types';
 
 interface AdminContextType {
   // state
-  users: PublicUser[];
+  users: AdminUserView[];
   pendingPredictions: PublicPrediction[];
   bets: PublicBet[];
   transactions: PublicTransaction[];
@@ -43,12 +45,30 @@ interface AdminContextType {
 const AdminContext = createContext<AdminContextType | undefined>(undefined);
 
 export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [users, setUsers] = useState<PublicUser[]>([]);
+  const { user } = useAuth();
+  const [users, setUsers] = useState<AdminUserView[]>([]);
   const [pendingPredictions, setPendingPredictions] = useState<PublicPrediction[]>([]);
   const [bets, setBets] = useState<PublicBet[]>([]);
   const [transactions, setTransactions] = useState<PublicTransaction[]>([]);
   const [badges, setBadges] = useState<PublicBadge[]>([]);
   const [statsFor, setStatsFor] = useState<Record<number, UserStatsDTO | null>>({});
+
+  // Rollback: Remove clearAdminData function and useEffect for role monitoring
+  const clearAdminData = useCallback(() => {
+    setUsers([]);
+    setPendingPredictions([]);
+    setBets([]);
+    setTransactions([]);
+    setBadges([]);
+    setStatsFor({});
+  }, []);
+
+  // Monitor user role changes and clear admin data when role downgrades from ADMIN
+  useEffect(() => {
+    if (user && user.role !== 'ADMIN') {
+      clearAdminData();
+    }
+  }, [user?.role, clearAdminData]);
 
   const loadUsers = useCallback(async () => {
     const data = await adminApi.listUsers();
@@ -72,7 +92,7 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const loadPendingPredictions = useCallback(async () => {
     const all = await adminApi.listPredictions();
-    setPendingPredictions(all.filter((p) => !(p as any).approved));
+    setPendingPredictions(all.filter((p) => !p.approved && !p.resolved));
   }, []);
 
   const approvePrediction = useCallback(async (id: number) => {
@@ -135,37 +155,61 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     await adminApi.refreshLeaderboard();
   }, []);
 
-  return (
-    <AdminContext.Provider
-      value={{
-        users,
-        pendingPredictions,
-        bets,
-        transactions,
-        badges,
-        statsFor,
-        loadUsers,
-        updateUserRole,
-        activateUser,
-        updateUserBalance,
-        loadPendingPredictions,
-        loadBets,
-        loadTransactions,
-        loadBadges,
-        loadUserStats,
-        approvePrediction,
-        rejectPrediction,
-        resolvePrediction,
-        refundBet,
-        createBadge,
-        assignBadge,
-        revokeBadge,
-        refreshLeaderboard,
-      }}
-    >
-      {children}
-    </AdminContext.Provider>
+  // Memoize context value to prevent unnecessary re-renders
+  const contextValue = useMemo(
+    () => ({
+      users,
+      pendingPredictions,
+      bets,
+      transactions,
+      badges,
+      statsFor,
+      loadUsers,
+      updateUserRole,
+      activateUser,
+      updateUserBalance,
+      loadPendingPredictions,
+      loadBets,
+      loadTransactions,
+      loadBadges,
+      loadUserStats,
+      approvePrediction,
+      rejectPrediction,
+      resolvePrediction,
+      refundBet,
+      createBadge,
+      assignBadge,
+      revokeBadge,
+      refreshLeaderboard,
+    }),
+    [
+      users,
+      pendingPredictions,
+      bets,
+      transactions,
+      badges,
+      statsFor,
+      loadUsers,
+      updateUserRole,
+      activateUser,
+      updateUserBalance,
+      loadPendingPredictions,
+      loadBets,
+      loadTransactions,
+      loadBadges,
+      loadUserStats,
+      approvePrediction,
+      rejectPrediction,
+      resolvePrediction,
+      refundBet,
+      createBadge,
+      assignBadge,
+      revokeBadge,
+      refreshLeaderboard,
+    ],
   );
+
+  return <AdminContext.Provider value={contextValue}>{children}</AdminContext.Provider>;
 };
 
 export function useAdmin(): AdminContextType {

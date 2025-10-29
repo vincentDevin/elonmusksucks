@@ -1,0 +1,60 @@
+# fly.toml - Achievement Server (Dedicated Microservice)
+app = 'ems-achievement-server'
+primary_region = 'ord'
+
+[build]
+  dockerfile = 'Dockerfile'
+
+[env]
+  NODE_ENV = 'production'
+  PORT = '3001'
+
+# Achievement Server Process (no HTTP service, just internal health checks)
+[processes]
+  app = "node dist/index.js"
+
+# SECURITY: Internal HTTP service ONLY - NO public exposure
+# This service is accessible only via Fly.io's internal .internal DNS
+# Health checks and metrics are internal-only
+[http_service]
+  internal_port = 3001
+  force_https = false  # Internal only, no public HTTPS needed
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+  # IMPORTANT: No public ports configured - internal access only via:
+  # http://ems-achievement-server.internal:3001
+
+  [http_service.concurrency]
+    type = "connections"
+    hard_limit = 100  # Lower than main server - just for health checks
+    soft_limit = 80
+
+[[http_service.checks]]
+  grace_period = '10s'
+  interval = '30s'
+  method = 'GET'
+  timeout = '5s'
+  path = '/health'
+
+# Prometheus Metrics - Scraped by Fly.io and sent to VictoriaMetrics
+# Metrics available at https://fly-metrics.net
+[metrics]
+  port = 3001
+  path = "/metrics"
+
+# VM Configuration
+# Start small, can scale up if needed based on load
+[[vm]]
+  size = 'shared-cpu-1x'
+  memory = '512mb'
+  cpus = 1
+
+# Auto-scaling configuration
+# Scale up if CPU/memory usage is high
+# Scale down during low traffic periods
+[scaling]
+  min_count = 1
+  max_count = 3

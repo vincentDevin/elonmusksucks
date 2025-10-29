@@ -3,176 +3,93 @@ import {
   getAllPredictions,
   getPredictionById,
   createPrediction,
+  getCategories,
+  getSourceLinks,
+  createPredictionSourceLink,
+  getFilteredPredictions,
+  trackView,
+  getPredictionAnalytics,
+  getDetailedAnalytics,
+  getCategoryAnalytics,
+  getPerformanceMetrics,
+  getHotMarkets,
+  getMarketTrends,
+  getPersonalizedRecommendations,
+  getSimilarPredictions,
+  toggleReaction,
+  removeReaction,
+  getPredictionComments as getPredictionCommentsController,
+  createPredictionComment as createPredictionCommentController,
 } from '../controllers/predictions.controller';
-import { requireAuth, type AuthRequest } from '../middleware/auth.middleware';
-import { PrismaClient } from '@prisma/client';
+import { requireAuth } from '../middleware/auth.middleware';
+import { fastTimeout, standardTimeout } from '../middleware/timeout.middleware';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // Public routes
-router.get('/', getAllPredictions);
-router.get('/:id', getPredictionById);
+router.get('/', standardTimeout, getAllPredictions); // Optimized with bulk queries
+router.get('/categories', fastTimeout, getCategories); // MUST be before /:id routes (simple query, cached)
+router.get('/:id', standardTimeout, getPredictionById);
 
 // Authenticated routes
 router.post('/', requireAuth, createPrediction);
 
 // POST /api/predictions/source-links - Link article to prediction
-router.post('/source-links', requireAuth, async (req: AuthRequest, res: any) => {
-  try {
-    const { predictionId, articleId, tweetId, url, title, publisher } = req.body;
-    // const userId = req.user!.id; // Not currently used, but available for future permissions
-
-    // Validate required fields
-    if (!predictionId || !url) {
-      res.status(400).json({ error: 'Prediction ID and URL are required' });
-      return;
-    }
-
-    if (!articleId && !tweetId) {
-      res.status(400).json({ error: 'Either article ID or tweet ID is required' });
-      return;
-    }
-
-    // Check if prediction exists and user has permission to link sources
-    const prediction = await prisma.prediction.findUnique({
-      where: { id: predictionId },
-      select: { id: true, creatorId: true, resolved: true },
-    });
-
-    if (!prediction) {
-      res.status(404).json({ error: 'Prediction not found' });
-      return;
-    }
-
-    if (prediction.resolved) {
-      res.status(400).json({ error: 'Cannot link sources to resolved predictions' });
-      return;
-    }
-
-    // For now, allow any authenticated user to link sources
-    // Later we might restrict to prediction creator or admins
-
-    // Check if this link already exists
-    const existingLink = await prisma.predictionSourceLink.findFirst({
-      where: {
-        predictionId,
-        ...(articleId ? { articleId } : { tweetId }),
-      },
-    });
-
-    if (existingLink) {
-      res.status(409).json({ error: 'This source is already linked to this prediction' });
-      return;
-    }
-
-    // Create the source link
-    const sourceLink = await prisma.predictionSourceLink.create({
-      data: {
-        predictionId,
-        articleId: articleId || null,
-        tweetId: tweetId || null,
-        url,
-        title: title || null,
-        publisher: publisher || null,
-      },
-      include: {
-        article: {
-          select: {
-            id: true,
-            title: true,
-            url: true,
-            feed: {
-              select: {
-                name: true,
-                siteUrl: true,
-              },
-            },
-          },
-        },
-        tweet: {
-          select: {
-            id: true,
-            text: true,
-            permalink: true,
-            authorHandle: true,
-          },
-        },
-      },
-    });
-
-    res.status(201).json({
-      id: sourceLink.id,
-      predictionId: sourceLink.predictionId,
-      articleId: sourceLink.articleId,
-      tweetId: sourceLink.tweetId,
-      url: sourceLink.url,
-      title: sourceLink.title,
-      publisher: sourceLink.publisher,
-      capturedAt: sourceLink.capturedAt.toISOString(),
-      source: sourceLink.article || sourceLink.tweet || null,
-    });
-  } catch (error) {
-    console.error('[predictions] Error creating source link:', error);
-    res.status(500).json({ error: 'Failed to create source link' });
-  }
-});
+router.post('/source-links', requireAuth, createPredictionSourceLink);
 
 // GET /api/predictions/:id/source-links - Get source links for a prediction
-router.get('/:id/source-links', async (req: any, res: any) => {
-  try {
-    const predictionId = parseInt(req.params.id);
+router.get('/:id/source-links', getSourceLinks);
 
-    if (isNaN(predictionId)) {
-      res.status(400).json({ error: 'Invalid prediction ID' });
-      return;
-    }
+// POST /api/predictions/filter - Get filtered and sorted predictions with analytics support
+router.post('/filter', getFilteredPredictions);
 
-    const sourceLinks = await prisma.predictionSourceLink.findMany({
-      where: { predictionId },
-      include: {
-        article: {
-          select: {
-            id: true,
-            title: true,
-            url: true,
-            leadImageUrl: true,
-            feed: {
-              select: {
-                name: true,
-                siteUrl: true,
-              },
-            },
-          },
-        },
-        tweet: {
-          select: {
-            id: true,
-            text: true,
-            permalink: true,
-            authorHandle: true,
-          },
-        },
-      },
-      orderBy: { capturedAt: 'desc' },
-    });
+// POST /api/predictions/:id/track-view - Track a user viewing a prediction (manual endpoint)
+router.post('/:id/track-view', trackView);
 
-    const formattedLinks = sourceLinks.map((link) => ({
-      id: link.id,
-      predictionId: link.predictionId,
-      url: link.url,
-      title: link.title,
-      publisher: link.publisher,
-      capturedAt: link.capturedAt.toISOString(),
-      type: link.articleId ? 'article' : 'tweet',
-      source: link.article || link.tweet || null,
-    }));
+// GET /api/predictions/analytics - Get general prediction analytics
+router.get('/analytics', getPredictionAnalytics);
 
-    res.json(formattedLinks);
-  } catch (error) {
-    console.error('[predictions] Error fetching source links:', error);
-    res.status(500).json({ error: 'Failed to fetch source links' });
-  }
-});
+// GET /api/predictions/analytics/categories - Get analytics breakdown by category
+router.get('/analytics/categories', getCategoryAnalytics);
+
+// GET /api/predictions/analytics/performance - Get performance metrics and trends
+router.get('/analytics/performance', getPerformanceMetrics);
+
+// GET /api/predictions/:id/analytics - Get detailed analytics for a specific prediction
+router.get('/:id/analytics', getDetailedAnalytics);
+
+// GET /api/predictions/hot-markets - Detect currently hot prediction markets
+router.get('/hot-markets', getHotMarkets);
+
+// GET /api/predictions/market-trends - Get trending, emerging, and cooling markets
+router.get('/market-trends', getMarketTrends);
+
+// POST /api/predictions/recommendations - Get personalized recommendations for a user
+router.post('/recommendations', getPersonalizedRecommendations);
+
+// GET /api/predictions/:id/similar - Get similar predictions based on content and user behavior
+router.get('/:id/similar', getSimilarPredictions);
+
+// ===============================================
+// Prediction Reactions
+// ===============================================
+
+// POST /api/predictions/:id/reactions - Toggle a reaction on a prediction
+router.post('/:id/reactions', requireAuth, toggleReaction);
+
+// DELETE /api/predictions/:id/reactions/:type - Remove a specific reaction
+router.delete('/:id/reactions/:type', requireAuth, removeReaction);
+
+// ===============================================
+// Prediction Comments (unified Content system)
+// ===============================================
+// Note: Comments are now handled by the unified Content system
+// These routes use post.controller handlers which work with ContentRepository
+
+// GET /api/predictions/:id/comments - Get comments for a prediction
+router.get('/:id/comments', getPredictionCommentsController);
+
+// POST /api/predictions/:id/comments - Create a comment on a prediction
+router.post('/:id/comments', requireAuth, createPredictionCommentController);
 
 export default router;

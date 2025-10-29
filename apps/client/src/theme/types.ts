@@ -32,12 +32,89 @@ export interface UnifiedTheme {
     info: string;
   };
 
+  // Prediction option colors
+  predictionOptions: {
+    // Core palette - 8 distinct colors that don't conflict with semantic UI colors
+    palette: string[];
+    // Type-specific overrides
+    binary: [string, string]; // [yes/true, no/false]
+    overUnder: [string, string]; // [over, under]
+  };
+
   // Visual effects
   effects: {
     animations: boolean;
     particles: boolean;
     glow: boolean;
     shadows: 'none' | 'subtle' | 'dramatic';
+  };
+
+  // Achievement-specific colors
+  achievements: {
+    rarities: {
+      common: {
+        background: string; // Card background gradient
+        border: string; // Border color
+        accent: string; // Badge background
+        text: string; // Badge text color
+        leftBorder: string; // Left border accent
+        progress: string; // Progress bar color
+      };
+      uncommon: {
+        background: string;
+        border: string;
+        accent: string;
+        text: string;
+        leftBorder: string;
+        progress: string;
+      };
+      rare: {
+        background: string;
+        border: string;
+        accent: string;
+        text: string;
+        leftBorder: string;
+        progress: string;
+      };
+      legendary: {
+        background: string;
+        border: string;
+        accent: string;
+        text: string;
+        leftBorder: string;
+        progress: string;
+      };
+      epic: {
+        background: string;
+        border: string;
+        accent: string;
+        text: string;
+        leftBorder: string;
+        progress: string;
+      };
+      secret: {
+        background: string;
+        border: string;
+        accent: string;
+        text: string;
+        leftBorder: string;
+        progress: string;
+      };
+      shame: {
+        background: string;
+        border: string;
+        accent: string;
+        text: string;
+        leftBorder: string;
+        progress: string;
+      };
+    };
+    categories: {
+      [key: string]: {
+        icon: string; // Category icon/emoji
+        color: string; // Category accent color
+      };
+    };
   };
 }
 

@@ -1,37 +1,108 @@
 // apps/server/src/services/admin.service.ts
 import type { Role } from '@prisma/client';
+import type { IAdminRepository } from '../repositories/interfaces/IAdminRepository';
 import type {
-  IAdminRepository,
   QueryParams,
   UserSearchParams,
   PaginatedUsers,
   DetailedUser,
+  PredictionSearchParams,
+} from '@ems/types';
+import { REDIS_CHANNELS } from '@ems/types';
+import type {
   BulkUserOperation,
   BulkOperationResult,
-  PredictionSearchParams,
   PaginatedPredictions,
   DetailedPrediction,
   BulkPredictionOperation,
   BulkPredictionResult,
-} from '../repositories/IAdminRepository';
+} from '../repositories/interfaces/IAdminRepository';
 import { PrismaAdminRepository } from '../repositories/AdminRepository';
 import type { UserStatsDTO } from '@ems/types';
-import redisClient from '../lib/redis';
+import { eventBus } from '../lib/EventBus';
+import { UserService } from './user.service';
 
 const repo: IAdminRepository = new PrismaAdminRepository();
+const userService = new UserService();
 
 // -- Enhanced User Management --
 export const listUsers = async () => {
   // Legacy method - kept for backward compatibility
-  return repo.findAllUsers();
+  const users = await repo.findAllUsers();
+
+  // Enrich users with signed avatar URLs
+  const enrichedUsers = await userService.enrichUsersWithAvatars(users);
+
+  return enrichedUsers;
 };
 
 export const searchUsers = async (params: UserSearchParams): Promise<PaginatedUsers> => {
-  return repo.searchUsers(params);
+  const result = await repo.searchUsers(params);
+
+  // Enrich users with signed avatar URLs
+  const enrichedUsers = await userService.enrichUsersWithAvatars(result.users);
+
+  return {
+    ...result,
+    users: enrichedUsers,
+  };
 };
 
 export const getUserDetails = async (userId: number): Promise<DetailedUser | null> => {
-  return repo.getUserWithDetails(userId);
+  const user = await repo.getUserWithDetails(userId);
+
+  if (!user) return null;
+
+  // Enrich user with signed avatar URL
+  const enrichedUser = await userService.enrichUserWithAvatar(user);
+
+  // Transform stats to match UserStatsDTO format if stats exist
+  if (enrichedUser.stats) {
+    // Calculate winRate properly (same logic as getUserStats)
+    const totalBets = enrichedUser.stats.totalBets;
+    const betsWon = enrichedUser.stats.betsWon;
+    const winRate = totalBets > 0 ? (betsWon / totalBets) * 100 : 0;
+
+    // Calculate ROI properly
+    const totalWagered = enrichedUser.stats.totalWagered || BigInt(0);
+    const profit = enrichedUser.stats.profit || BigInt(0);
+    const roi = totalWagered > BigInt(0) ? (Number(profit) / Number(totalWagered)) * 100 : 0;
+
+    const transformedStats = {
+      totalBets: enrichedUser.stats.totalBets,
+      betsWon: enrichedUser.stats.betsWon,
+      betsLost: enrichedUser.stats.betsLost,
+      totalParlays: enrichedUser.stats.totalParlays,
+      parlaysWon: enrichedUser.stats.parlaysWon,
+      parlaysLost: enrichedUser.stats.parlaysLost,
+      totalParlayLegs: enrichedUser.stats.totalParlayLegs,
+      parlayLegsWon: enrichedUser.stats.parlayLegsWon,
+      parlayLegsLost: enrichedUser.stats.parlayLegsLost,
+      totalWagered: enrichedUser.stats.totalWagered.toString(),
+      totalWinnings: enrichedUser.stats.totalWon.toString(),
+      totalLosses: (enrichedUser.stats.totalWagered - enrichedUser.stats.totalWon).toString(),
+      netProfit: enrichedUser.stats.profit.toString(),
+      currentStreak: enrichedUser.stats.currentStreak,
+      longestWinStreak: enrichedUser.stats.longestStreak || 0,
+      longestLoseStreak: enrichedUser.stats.longestLoseStreak || 0,
+      averageBetSize: (enrichedUser.stats.totalBets > 0
+        ? enrichedUser.stats.totalWagered / BigInt(enrichedUser.stats.totalBets)
+        : BigInt(0)
+      ).toString(),
+      averageOdds: enrichedUser.stats.averageOdds || 0,
+      biggestWin: enrichedUser.stats.biggestWin?.toString() || '0',
+      biggestLoss: enrichedUser.stats.biggestLoss?.toString() || '0',
+      winRate: winRate, // Calculated percentage (0-100)
+      roi: roi, // Calculated percentage
+    };
+
+    return {
+      ...enrichedUser,
+      stats: transformedStats as any,
+    };
+  }
+
+  return enrichedUser;
 };
 
 export const bulkUpdateUsers = async (
@@ -76,29 +147,72 @@ export const bulkUpdatePredictions = async (
 
   // Broadcast events for successful operations
   if (result.successCount > 0) {
-    const redisClient = require('../lib/redis').default;
-
     for (const prediction of result.updatedPredictions) {
       if (operation.operation === 'approve') {
-        await redisClient.publish(
-          'prediction:approved',
-          JSON.stringify({
-            id: prediction.id,
-            title: prediction.title,
-            category: prediction.category,
-            timestamp: new Date().toISOString(),
-          }),
-        );
+        await eventBus.publish(REDIS_CHANNELS.PREDICTION_APPROVED, {
+          id: prediction.id,
+          title: prediction.title,
+          categoryId: prediction.categoryId,
+          timestamp: new Date().toISOString(),
+        });
+
+        // Publish JSON rule achievement event for bulk prediction approval
+        try {
+          await eventBus.publish(REDIS_CHANNELS.PREDICTION_APPROVED, {
+            key: 'prediction:approved',
+            userId: prediction.creatorId,
+            occurredAt: new Date().toISOString(),
+            idempotencyKey: `prediction:${prediction.id}:approved:bulk`,
+            payload: {
+              predictionId: prediction.id,
+              title: prediction.title,
+              categoryId: prediction.categoryId,
+              bulkOperation: true,
+            },
+          });
+        } catch (achievementError) {
+          console.error(
+            '[admin] Error publishing bulk prediction approval achievement event:',
+            achievementError,
+          );
+        }
+      } else if (operation.operation === 'reject') {
+        await eventBus.publish(REDIS_CHANNELS.PREDICTION_REJECTED, {
+          id: prediction.id,
+          title: prediction.title,
+          categoryId: prediction.categoryId,
+          reason: operation.params?.reason ?? null,
+          timestamp: new Date().toISOString(),
+        });
       } else if (operation.operation === 'resolve') {
-        await redisClient.publish(
-          'prediction:resolved',
-          JSON.stringify({
-            id: prediction.id,
-            title: prediction.title,
-            winningOptionId: prediction.resolutionData?.winningOptionId,
-            timestamp: new Date().toISOString(),
-          }),
-        );
+        await eventBus.publish(REDIS_CHANNELS.PREDICTION_RESOLVE, {
+          id: prediction.id,
+          title: prediction.title,
+          winningOptionId: prediction.resolutionData?.winningOptionId,
+          timestamp: new Date().toISOString(),
+        });
+
+        // Publish JSON rule achievement event for prediction resolution
+        try {
+          await eventBus.publish(REDIS_CHANNELS.PREDICTION_RESOLVE, {
+            key: 'prediction:resolved',
+            userId: prediction.creatorId,
+            occurredAt: new Date().toISOString(),
+            idempotencyKey: `prediction:${prediction.id}:resolved:bulk`,
+            payload: {
+              predictionId: prediction.id,
+              title: prediction.title,
+              categoryId: prediction.categoryId,
+              winningOptionId: prediction.resolutionData?.winningOptionId,
+              bulkOperation: true,
+            },
+          });
+        } catch (achievementError) {
+          console.error(
+            '[admin] Error publishing prediction resolution achievement event:',
+            achievementError,
+          );
+        }
       }
     }
   }
@@ -114,19 +228,38 @@ export const setPredictionStatus = async (
 
   // 🎊 Broadcast prediction approval/rejection event
   if (status === 'approved') {
-    const redisClient = require('../lib/redis').default;
-    await redisClient.publish(
-      'prediction:approved',
-      JSON.stringify({
-        id: updated.id,
-        title: updated.title,
-        description: updated.description,
-        category: updated.category,
-        type: updated.type,
-        approved: true,
-        timestamp: new Date().toISOString(),
-      }),
-    );
+    await eventBus.publish(REDIS_CHANNELS.PREDICTION_APPROVED, {
+      id: updated.id,
+      title: updated.title,
+      description: updated.description,
+      categoryId: updated.categoryId,
+      type: updated.type,
+      approved: true,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Publish JSON rule achievement event for prediction approval
+    try {
+      await eventBus.publish(REDIS_CHANNELS.PREDICTION_APPROVED, {
+        key: 'prediction:approved',
+        userId: updated.creatorId,
+        occurredAt: new Date().toISOString(),
+        idempotencyKey: `prediction:${updated.id}:approved`,
+        payload: {
+          predictionId: updated.id,
+          title: updated.title,
+          categoryId: updated.categoryId,
+          description: updated.description,
+          type: updated.type,
+        },
+      });
+    } catch (achievementError) {
+      console.error(
+        '[admin] Error publishing prediction approval achievement event:',
+        achievementError,
+      );
+      // Don't fail the approval if achievement event fails
+    }
   }
 
   return updated;
@@ -158,11 +291,56 @@ export const listTransactions = async (filters?: QueryParams) => {
 
 // -- Enhanced Financial Operations Dashboard --
 export const searchFinancialData = async (params: any) => {
-  return repo.searchFinancialData(params);
+  const result = await repo.searchFinancialData(params);
+
+  // Enrich user avatars in transactions
+  if (result.transactions && result.transactions.length > 0) {
+    const users = result.transactions.filter((t: any) => t.user).map((t: any) => t.user);
+
+    if (users.length > 0) {
+      const enrichedUsers = await userService.enrichUsersWithAvatars(users);
+      const userMap = new Map(enrichedUsers.map((user) => [user.id, user]));
+
+      result.transactions.forEach((t: any) => {
+        if (t.user) {
+          const enrichedUser = userMap.get(t.user.id);
+          if (enrichedUser) {
+            t.user = enrichedUser;
+          }
+        }
+      });
+    }
+  }
+
+  // Enrich user avatars in bets
+  if (result.bets && result.bets.length > 0) {
+    const betUsers = result.bets.filter((b: any) => b.user).map((b: any) => b.user);
+
+    if (betUsers.length > 0) {
+      const enrichedUsers = await userService.enrichUsersWithAvatars(betUsers);
+      const userMap = new Map(enrichedUsers.map((user) => [user.id, user]));
+
+      result.bets.forEach((b: any) => {
+        if (b.user) {
+          const enrichedUser = userMap.get(b.user.id);
+          if (enrichedUser) {
+            b.user = enrichedUser;
+          }
+        }
+      });
+    }
+  }
+
+  return result;
 };
 
 export const getFinancialAnalytics = async (params: any) => {
   return repo.getFinancialAnalytics(params);
+};
+
+// NEW: Unified Analytics endpoint
+export const getUnifiedAnalytics = async (params: any) => {
+  return repo.getUnifiedAnalytics(params);
 };
 
 export const bulkFinancialOperation = async (operation: any) => {
@@ -239,17 +417,20 @@ export const revokeBadge = async (userId: number, badgeId: number) => {
   return repo.removeBadgeFromUser(userId, badgeId);
 };
 
-// -- Leaderboard & Stats --
-export const refreshLeaderboard = async () => {
-  return repo.recalculateLeaderboard();
-};
-
 /**
  * Fetches raw stats, then maps Date→ISO and returns the DTO.
  */
 export const getUserStats = async (userId: number): Promise<UserStatsDTO | null> => {
   const raw = await repo.findUserStats(userId);
   if (!raw) return null;
+
+  // Calculate derived fields
+  const totalWinnings = raw.totalWon || BigInt(0);
+  const totalWagered = raw.totalWagered || BigInt(0);
+  const netProfit = raw.profit || BigInt(0);
+  const totalLosses = totalWagered - totalWinnings; // wagered - winnings = losses
+  const averageBetSize = raw.totalBets > 0 ? totalWagered / BigInt(raw.totalBets) : BigInt(0);
+  const winRate = raw.totalBets > 0 ? (raw.betsWon / raw.totalBets) * 100 : 0;
 
   return {
     totalBets: raw.totalBets,
@@ -261,15 +442,19 @@ export const getUserStats = async (userId: number): Promise<UserStatsDTO | null>
     totalParlayLegs: raw.totalParlayLegs,
     parlayLegsWon: raw.parlayLegsWon,
     parlayLegsLost: raw.parlayLegsLost,
-    totalWagered: raw.totalWagered.toString(),
-    totalWon: raw.totalWon.toString(),
-    profit: raw.profit.toString(),
-    roi: raw.roi,
+    totalWagered: totalWagered.toString(),
+    totalWinnings: totalWinnings.toString(),
+    totalLosses: totalLosses.toString(),
+    netProfit: netProfit.toString(),
     currentStreak: raw.currentStreak,
-    longestStreak: raw.longestStreak,
-    mostCommonBet: raw.mostCommonBet,
-    biggestWin: raw.biggestWin.toString(),
-    updatedAt: raw.updatedAt.toISOString(),
+    longestWinStreak: raw.longestStreak || 0,
+    longestLoseStreak: raw.longestLoseStreak || 0,
+    averageBetSize: averageBetSize.toString(),
+    averageOdds: raw.averageOdds || 0,
+    biggestWin: raw.biggestWin?.toString() || '0',
+    biggestLoss: raw.biggestLoss?.toString() || '0',
+    winRate: winRate,
+    roi: raw.roi,
   };
 };
 
@@ -302,11 +487,6 @@ export const exportAnalyticsData = async (params: {
   return repo.exportAnalyticsData(params);
 };
 
-// -- Miscellaneous --
-export const generateAITweet = async () => {
-  return repo.triggerAITweet();
-};
-
 // -- Real-time Metrics Broadcasting --
 /**
  * Broadcast real-time metrics update to admin dashboard
@@ -318,14 +498,11 @@ export const broadcastRealtimeMetrics = async () => {
     const metrics = await repo.getRealtimeMetrics();
 
     // Publish to Redis for Socket.IO broadcasting
-    await redisClient.publish(
-      'admin:metrics:update',
-      JSON.stringify({
-        metrics,
-        timestamp: new Date().toISOString(),
-        type: 'realtime_update',
-      }),
-    );
+    await eventBus.publish(REDIS_CHANNELS.ADMIN_METRICS_UPDATE, {
+      metrics,
+      timestamp: new Date().toISOString(),
+      type: 'realtime_update',
+    });
 
     console.log('[admin-service] Broadcast real-time metrics update');
   } catch (error) {

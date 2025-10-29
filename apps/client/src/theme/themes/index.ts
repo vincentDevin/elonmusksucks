@@ -21,8 +21,8 @@ export const getThemeById = (themeId: string): UnifiedTheme | null => {
 export const getDefaultThemeForCategory = (category: ThemeCategory): UnifiedTheme => {
   const themes = getThemesByCategory(category);
   if (themes.length === 0) {
-    // Fallback to clean professional if category not found
-    return lightThemes[0];
+    // Fallback to dark professional if category not found
+    return darkThemes[0];
   }
 
   // Return first theme in category as default

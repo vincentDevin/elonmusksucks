@@ -1,9 +1,8 @@
 // apps/server/src/repositories/BettingRepository.ts
-import { PrismaClient } from '@prisma/client';
-import type { IBettingRepository, OptionWithPrediction } from './IBettingRepository';
+import prisma from '../db';
+import type { IBettingRepository, OptionWithPrediction } from './interfaces/IBettingRepository';
 import type { DbBet, DbParlay } from '@ems/types';
-
-const prisma = new PrismaClient();
+import { eventBus } from '../lib/EventBus';
 
 export class BettingRepository implements IBettingRepository {
   async findOptionWithPrediction(optionId: number): Promise<OptionWithPrediction | null> {
@@ -24,6 +23,8 @@ export class BettingRepository implements IBettingRepository {
     });
   }
 
+  // Rollback: Remove idempotencyKey parameter and usage
+  // Rollback: Move stats upsert back into main transaction
   async placeBet(
     userId: number,
     predictionId: number,
@@ -31,21 +32,37 @@ export class BettingRepository implements IBettingRepository {
     amount: number,
     oddsAtPlacement: number,
     potentialPayout: bigint,
-  ): Promise<DbBet> {
-    return await prisma.$transaction(async (tx) => {
+    wasAllIn: boolean,
+    idempotencyKey?: string,
+  ): Promise<{ bet: DbBet; balanceChange: { previous: bigint; new: bigint } }> {
+    // Critical transaction: only financial operations to reduce lock contention
+    const result = await prisma.$transaction(async (tx) => {
       const user = await tx.user.update({
         where: { id: userId },
         data: { muskBucks: { decrement: amount } },
       });
 
+      // Capture balance change for event emission
+      const newBalance = user.muskBucks;
+      const previousBalance = newBalance + BigInt(amount);
+
       await tx.transaction.create({
         data: {
           userId,
           type: 'DEBIT',
+          subtype: 'BET_WAGER',
           amount: BigInt(amount),
           balanceAfter: user.muskBucks,
-          relatedBetId: null,
+          description: `Bet wager on prediction ${predictionId}`,
+          metadata: {
+            predictionId,
+            optionId,
+            oddsAtPlacement,
+            wasAllIn,
+          },
+          relatedBetId: null, // Will be updated after bet creation
           relatedParlayId: null,
+          idempotencyKey: idempotencyKey ? `${idempotencyKey}-debit` : undefined,
         },
       });
 
@@ -57,42 +74,90 @@ export class BettingRepository implements IBettingRepository {
           amount: BigInt(amount),
           oddsAtPlacement,
           potentialPayout,
+          wasAllIn,
+          idempotencyKey,
         },
       });
 
-      // upsert stats for single bet
-      await tx.userStats.upsert({
-        where: { userId },
-        create: {
-          userId,
-          totalBets: 1,
-          betsWon: 0,
-          betsLost: 0,
-          totalParlays: 0,
-          parlaysWon: 0,
-          parlaysLost: 0,
-          totalParlayLegs: 0,
-          parlayLegsWon: 0,
-          parlayLegsLost: 0,
-          totalWagered: BigInt(amount),
-          totalWon: BigInt(0),
-          profit: BigInt(-amount),
-          roi: 0,
-          currentStreak: 0,
-          longestStreak: 0,
-          mostCommonBet: null,
-          biggestWin: BigInt(0),
-          updatedAt: new Date(),
-        },
-        update: {
-          totalBets: { increment: 1 },
-          totalWagered: { increment: BigInt(amount) },
-          profit: { decrement: BigInt(amount) },
-        },
-      });
-
-      return bet;
+      return { bet, balanceChange: { previous: previousBalance, new: newBalance } };
     });
+
+    const { bet } = result;
+
+    // Update stats outside transaction to reduce lock scope
+    await prisma.userStats.upsert({
+      where: { userId },
+      create: {
+        userId,
+        totalBets: 1,
+        betsWon: 0,
+        betsLost: 0,
+        totalParlays: 0,
+        parlaysWon: 0,
+        parlaysLost: 0,
+        totalParlayLegs: 0,
+        parlayLegsWon: 0,
+        parlayLegsLost: 0,
+        totalWagered: BigInt(amount),
+        totalWon: BigInt(0),
+        profit: BigInt(-amount),
+        roi: 0,
+        currentStreak: 0,
+        longestStreak: 0,
+        mostCommonBet: null,
+        biggestWin: BigInt(0),
+        updatedAt: new Date(),
+      },
+      update: {
+        totalBets: { increment: 1 },
+        totalWagered: { increment: BigInt(amount) },
+        profit: { decrement: BigInt(amount) },
+      },
+    });
+
+    // Publish user balance snapshot event for balance-based achievements
+    try {
+      // Get updated user data with stats
+      const userWithStats = await prisma.user.findUnique({
+        where: { id: userId },
+        include: {
+          stats: true,
+        },
+      });
+
+      if (userWithStats) {
+        await eventBus.publish('user:balance:snapshot', {
+          key: 'user:balance:snapshot',
+          userId,
+          occurredAt: new Date().toISOString(),
+          idempotencyKey: `balance:snapshot:${userId}:bet:${bet.id}`,
+          payload: {
+            balance: Number(userWithStats.muskBucks),
+            previousBalance: Number(userWithStats.muskBucks) + amount, // Balance before bet
+            changeAmount: -amount,
+            changeReason: 'bet_placed',
+            betId: bet.id,
+            // Include stats for achievements that check net profit, total lost, etc.
+            totalWagered: userWithStats.stats ? Number(userWithStats.stats.totalWagered) : amount,
+            totalWon: userWithStats.stats ? Number(userWithStats.stats.totalWon) : 0,
+            totalLost: userWithStats.stats
+              ? Number(userWithStats.stats.totalWagered) - Number(userWithStats.stats.totalWon)
+              : amount,
+            netProfit: userWithStats.stats ? Number(userWithStats.stats.profit) : -amount,
+            totalBets: userWithStats.stats ? userWithStats.stats.totalBets : 1,
+            winRate:
+              userWithStats.stats && userWithStats.stats.totalBets > 0
+                ? userWithStats.stats.betsWon / userWithStats.stats.totalBets
+                : 0,
+          },
+        });
+      }
+    } catch (achievementError) {
+      console.error('[betting] Error publishing balance snapshot event:', achievementError);
+      // Don't fail the bet placement if achievement event fails
+    }
+
+    return result;
   }
 
   async placeParlay(
@@ -100,7 +165,8 @@ export class BettingRepository implements IBettingRepository {
     legs: Array<{ predictionId: number; optionId: number; oddsAtPlacement: number }>,
     amount: number,
     potentialPayout: bigint,
-  ): Promise<DbParlay> {
+    idempotencyKey?: string,
+  ): Promise<{ parlay: DbParlay; balanceChange: { previous: bigint; new: bigint } }> {
     const legCount = legs.length;
 
     return await prisma.$transaction(async (tx) => {
@@ -109,14 +175,29 @@ export class BettingRepository implements IBettingRepository {
         data: { muskBucks: { decrement: amount } },
       });
 
+      // Capture balance change for event emission
+      const newBalance = user.muskBucks;
+      const previousBalance = newBalance + BigInt(amount);
+
       await tx.transaction.create({
         data: {
           userId,
           type: 'DEBIT',
+          subtype: 'PARLAY_WAGER',
           amount: BigInt(amount),
           balanceAfter: user.muskBucks,
+          description: `Parlay wager with ${legCount} legs`,
+          metadata: {
+            legCount,
+            legs: legs.map((l) => ({
+              predictionId: l.predictionId,
+              optionId: l.optionId,
+              oddsAtPlacement: l.oddsAtPlacement,
+            })),
+          },
           relatedBetId: null,
-          relatedParlayId: null,
+          relatedParlayId: null, // Will be updated after parlay creation
+          idempotencyKey: idempotencyKey ? `${idempotencyKey}-debit` : undefined,
         },
       });
 
@@ -126,6 +207,7 @@ export class BettingRepository implements IBettingRepository {
           amount: BigInt(amount),
           combinedOdds: legs.reduce((a, l) => a * l.oddsAtPlacement, 1),
           potentialPayout,
+          idempotencyKey,
           legs: {
             create: legs.map((l) => ({
               optionId: l.optionId,
@@ -167,7 +249,7 @@ export class BettingRepository implements IBettingRepository {
         },
       });
 
-      return parlay;
+      return { parlay, balanceChange: { previous: previousBalance, new: newBalance } };
     });
   }
 
@@ -324,5 +406,122 @@ export class BettingRepository implements IBettingRepository {
       select: { id: true, label: true, odds: true },
       orderBy: { id: 'asc' },
     });
+  }
+
+  async getRecentBetsForStreak(
+    userId: number,
+    limit: number,
+  ): Promise<Array<{ status: string; createdAt: Date }>> {
+    return await prisma.bet.findMany({
+      where: {
+        userId,
+        status: { in: ['WON', 'LOST'] },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      select: {
+        status: true,
+        createdAt: true,
+      },
+    });
+  }
+
+  async findUserBets(
+    userId: number,
+    options?: {
+      limit?: number;
+      createdAfter?: Date;
+      createdBefore?: Date;
+      status?: string;
+      predictionId?: number;
+    },
+  ): Promise<
+    Array<
+      DbBet & {
+        prediction: {
+          id: number;
+          title: string;
+          category: string | null;
+          resolved: boolean;
+        };
+        option: {
+          id: number;
+          label: string;
+        } | null;
+      }
+    >
+  > {
+    const where: any = { userId };
+
+    // Apply optional filters
+    if (options?.createdAfter || options?.createdBefore) {
+      where.createdAt = {};
+      if (options.createdAfter) {
+        where.createdAt.gte = options.createdAfter;
+      }
+      if (options.createdBefore) {
+        where.createdAt.lte = options.createdBefore;
+      }
+    }
+
+    if (options?.status) {
+      where.status = options.status;
+    }
+
+    if (options?.predictionId) {
+      where.predictionId = options.predictionId;
+    }
+
+    const bets = await prisma.bet.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: options?.limit || 100,
+      include: {
+        prediction: {
+          select: {
+            id: true,
+            title: true,
+            category: true,
+            resolved: true,
+          },
+        },
+        optionOption: {
+          select: {
+            id: true,
+            label: true,
+          },
+        },
+      },
+    });
+
+    // Map the results to match the expected interface
+    return bets.map((bet) => ({
+      ...bet,
+      prediction: {
+        id: bet.prediction.id,
+        title: bet.prediction.title,
+        category: bet.prediction.category?.name ?? null,
+        resolved: bet.prediction.resolved,
+      },
+      option: bet.optionOption
+        ? {
+            id: bet.optionOption.id,
+            label: bet.optionOption.label,
+          }
+        : null,
+    })) as Array<
+      DbBet & {
+        prediction: {
+          id: number;
+          title: string;
+          category: string | null;
+          resolved: boolean;
+        };
+        option: {
+          id: number;
+          label: string;
+        } | null;
+      }
+    >;
   }
 }

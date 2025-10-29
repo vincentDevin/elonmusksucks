@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { TrophyIcon, FireIcon, ChartBarIcon, CurrencyDollarIcon } from '@heroicons/react/24/solid';
-import type { Achievement } from '../../hooks/useEnhancedLeaderboard';
+import type { Achievement } from '../../hooks/useLeaderboard';
 
 interface AchievementNotificationProps {
   achievements: Achievement[];
@@ -25,32 +25,34 @@ export default function AchievementNotification({
   }, [achievements]);
 
   const getAchievementIcon = (type: Achievement['type']) => {
+    // Uses theme semantic colors that automatically adapt to current theme
     switch (type) {
       case 'rank_milestone':
-        return <TrophyIcon className="w-6 h-6 text-yellow-400" />;
+        return <TrophyIcon className="w-6 h-6 text-accent" />;
       case 'streak':
-        return <FireIcon className="w-6 h-6 text-orange-400" />;
+        return <FireIcon className="w-6 h-6 text-warning" />;
       case 'volume':
-        return <ChartBarIcon className="w-6 h-6 text-blue-400" />;
+        return <ChartBarIcon className="w-6 h-6 text-info" />;
       case 'profit':
-        return <CurrencyDollarIcon className="w-6 h-6 text-green-400" />;
+        return <CurrencyDollarIcon className="w-6 h-6 text-success" />;
       default:
-        return <TrophyIcon className="w-6 h-6 text-yellow-400" />;
+        return <TrophyIcon className="w-6 h-6 text-accent" />;
     }
   };
 
   const getAchievementColor = (type: Achievement['type']) => {
+    // Map achievement types to theme semantic colors
     switch (type) {
       case 'rank_milestone':
-        return 'from-yellow-500/20 to-yellow-600/20 border-yellow-400/50';
+        return 'from-accent/20 to-accent/30 border-accent/50';
       case 'streak':
-        return 'from-orange-500/20 to-red-600/20 border-orange-400/50';
+        return 'from-warning/20 to-warning/30 border-warning/50';
       case 'volume':
-        return 'from-blue-500/20 to-blue-600/20 border-blue-400/50';
+        return 'from-info/20 to-info/30 border-info/50';
       case 'profit':
-        return 'from-green-500/20 to-green-600/20 border-green-400/50';
+        return 'from-success/20 to-success/30 border-success/50';
       default:
-        return 'from-yellow-500/20 to-yellow-600/20 border-yellow-400/50';
+        return 'from-accent/20 to-accent/30 border-accent/50';
     }
   };
 
@@ -83,13 +85,13 @@ export default function AchievementNotification({
   }
 
   return (
-    <div className="fixed top-4 right-4 z-50 space-y-2 max-w-sm">
+    <div className="fixed top-6 right-6 z-50 space-y-3 max-w-sm">
       {/* Clear all button */}
       {visibleAchievements.length > 1 && (
         <div className="flex justify-end">
           <button
             onClick={clearAll}
-            className="text-xs bg-surface/80 hover:bg-surface text-tertiary hover:text-content px-2 py-1 rounded-full transition-colors"
+            className="text-sm bg-surface/90 hover:bg-surface text-tertiary hover:text-content px-3 py-2 rounded-lg transition-colors shadow-sm"
           >
             Clear All
           </button>
@@ -105,13 +107,13 @@ export default function AchievementNotification({
             ${
               animatingOut.has(achievement.id)
                 ? 'translate-x-full opacity-0 scale-95'
-                : 'translate-x-0 opacity-100 scale-100 animate-bounce'
+                : 'translate-x-0 opacity-100 scale-100'
             }
           `}
         >
           <div
             className={`
-            relative bg-gradient-to-r rounded-lg border p-4 shadow-lg backdrop-blur-sm
+            relative bg-gradient-to-r rounded-lg border p-5 shadow-lg backdrop-blur-sm
             ${getAchievementColor(achievement.type)}
           `}
           >
@@ -124,30 +126,26 @@ export default function AchievementNotification({
             </button>
 
             {/* Achievement content */}
-            <div className="flex items-start space-x-3 pr-6">
+            <div className="flex items-start space-x-4 pr-8">
               {/* Icon */}
-              <div className="flex-shrink-0 p-2 bg-surface/20 rounded-full">
+              <div className="flex-shrink-0 p-3 bg-surface/20 rounded-full">
                 {getAchievementIcon(achievement.type)}
               </div>
 
               {/* Text content */}
               <div className="flex-1 min-w-0">
-                <h3 className="font-bold text-white text-sm mb-1">{achievement.title}</h3>
-                <p className="text-gray-200 text-xs leading-relaxed">{achievement.description}</p>
-                <p className="text-gray-400 text-xs mt-2">
+                <h3 className="font-bold text-white text-base mb-2">{achievement.title}</h3>
+                <p className="text-gray-200 text-sm leading-relaxed">{achievement.description}</p>
+                <p className="text-gray-400 text-sm mt-3">
                   {achievement.timestamp.toLocaleTimeString()}
                 </p>
               </div>
             </div>
 
-            {/* Celebration animation */}
+            {/* Subtle celebration animation */}
             <div className="absolute inset-0 pointer-events-none">
-              <div className="absolute top-2 left-2 w-2 h-2 bg-yellow-400 rounded-full animate-ping" />
-              <div className="absolute top-4 right-8 w-1 h-1 bg-white rounded-full animate-pulse" />
-              <div
-                className="absolute bottom-3 left-6 w-1.5 h-1.5 bg-yellow-300 rounded-full animate-bounce"
-                style={{ animationDelay: '0.5s' }}
-              />
+              <div className="absolute top-3 left-3 w-1.5 h-1.5 bg-yellow-400 rounded-full animate-pulse" />
+              <div className="absolute top-5 right-10 w-1 h-1 bg-white rounded-full animate-pulse" />
             </div>
           </div>
         </div>
@@ -155,7 +153,7 @@ export default function AchievementNotification({
 
       {/* Auto-dismiss notification */}
       <div className="text-center">
-        <p className="text-xs text-tertiary">Achievements auto-clear in 5 seconds</p>
+        <p className="text-sm text-tertiary">Achievements auto-clear in 5 seconds</p>
       </div>
     </div>
   );

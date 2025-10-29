@@ -43,15 +43,14 @@ export const MIGRATION_STEPS: MigrationStep[] = [
   {
     id: 'update-dashboard-settings',
     title: '3. Update Dashboard Settings',
-    description: 'Replace ThemeSelector with AdvancedThemeSelector in dashboard settings',
-    files: ['src/components/dashboard/customization/DashboardSettings.tsx'],
+    description:
+      'DashboardSettings component removed - functionality moved to UnifiedDashboardSettings',
+    files: ['src/components/dashboard/customization/UnifiedDashboardSettings.tsx'],
     changes: [
-      'Remove: import ThemeSelector from "./ThemeSelector"',
-      'Add: import { AdvancedThemeSelector } from "../../../theme"',
-      'Replace: <ThemeSelector /> with <AdvancedThemeSelector />',
-      'Remove old useDashboardCustomization theme logic',
+      'DashboardSettings.tsx deleted - superseded by UnifiedDashboardSettings',
+      'All dashboard customization now handled by unified component',
     ],
-    automated: false,
+    automated: true,
   },
   {
     id: 'remove-old-contexts',

@@ -1,61 +1,19 @@
 // apps/client/src/api/moderation.ts
 import axios from './axios';
-import type { BanType } from '@ems/types';
+import type {
+  BanUserRequest,
+  MuteUserRequest,
+  KickUserRequest,
+  UserBanResponse,
+  ModerationLogEntryResponse,
+} from '@ems/types';
 
-export interface BanRequest {
-  userId: number;
-  banType: BanType;
-  reason: string;
-  duration?: number; // minutes for temporary bans
-}
-
-export interface MuteRequest {
-  userId: number;
-  duration: number; // minutes
-  reason: string;
-}
-
-export interface KickRequest {
-  userId: number;
-  reason: string;
-}
-
-export interface DeleteContentRequest {
-  reason: string;
-}
-
-export interface UserBan {
-  id: number;
-  userId: number;
-  banType: BanType;
-  reason: string;
-  expiresAt?: string;
-  isActive: boolean;
-  createdAt: string;
-  user: {
-    id: number;
-    name: string;
-    email: string;
-  };
-}
-
-export interface ModerationLogEntry {
-  id: number;
-  moderatorId: number;
-  targetUserId?: number;
-  action: string;
-  reason?: string;
-  details?: any;
-  createdAt: string;
-  moderator: {
-    id: number;
-    name: string;
-  };
-  targetUser?: {
-    id: number;
-    name: string;
-  };
-}
+// Type aliases for backwards compatibility
+export type BanRequest = BanUserRequest;
+export type MuteRequest = MuteUserRequest;
+export type KickRequest = KickUserRequest;
+export type UserBan = UserBanResponse;
+export type ModerationLogEntry = ModerationLogEntryResponse;
 
 // User moderation
 export async function banUser(data: BanRequest): Promise<UserBan> {

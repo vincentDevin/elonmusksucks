@@ -1,162 +1,122 @@
-import { PrismaClient } from '@prisma/client';
+import {
+  CategoryAccuracy,
+  Streak,
+  TrendData,
+  CategoryStats,
+  UserRanking,
+  EnhancedUserStats,
+  REDIS_CHANNELS,
+} from '@ems/types';
 import { leaderboardService } from './leaderboard.service';
+import { eventBus } from '../lib/EventBus';
+import { UserRepository } from '../repositories/UserRepository';
+import { BettingRepository } from '../repositories/BettingRepository';
+import type { IStatsRepository } from '../repositories/interfaces/IStatsRepository';
+import { withCache, CacheKeys, CACHE_TTL } from '../utils/analyticsCache';
 import redisClient from '../lib/redis';
 
-export interface CategoryAccuracy {
-  category: string;
-  accuracy: number;
-  totalBets: number;
-  wins: number;
-}
-
-export interface Streak {
-  type: 'win' | 'lose';
-  count: number;
-  isActive: boolean;
-}
-
-export interface TrendData {
-  date: string;
-  value: number;
-}
-
-export interface CategoryStats {
-  category: string;
-  betCount: number;
-  winRate: number;
-  profitLoss: number;
-  avgBetSize: number;
-}
-
-export interface UserRanking {
-  rank: number | null;
-  percentile: number;
-  rankChange: number | null;
-  totalUsers: number;
-  category: 'allTime' | 'daily';
-}
-
-export interface EnhancedUserStats {
-  // Performance metrics
-  totalBets: number;
-  winRate: number;
-  profitLoss: number;
-  categoryAccuracy: CategoryAccuracy[];
-  currentStreak: Streak;
-  bestCategory: string;
-  totalWagered: number;
-  avgBetSize: number;
-
-  // Ranking data
-  ranking: {
-    allTime: UserRanking;
-    daily: UserRanking;
-  };
-
-  // Achievement progress
-  achievementProgress: Array<{
-    id: string;
-    title: string;
-    description: string;
-    progress: number;
-    target: number;
-    isCompleted: boolean;
-  }>;
-  achievementCompletionRate: number;
-
-  // Trend data
-  weeklyVolume: TrendData[];
-  monthlyProfitLoss: TrendData[];
-  categoryStats: CategoryStats[];
-}
+// Note: User stats service interfaces now imported from @ems/types
 
 export class EnhancedUserStatsService {
-  private prisma: PrismaClient;
+  private userRepository: UserRepository;
+  private bettingRepository: BettingRepository;
+  private statsRepository: IStatsRepository;
 
-  constructor() {
-    this.prisma = new PrismaClient();
+  constructor(
+    userRepository: UserRepository,
+    bettingRepository: BettingRepository,
+    statsRepository: IStatsRepository,
+  ) {
+    this.userRepository = userRepository;
+    this.bettingRepository = bettingRepository;
+    this.statsRepository = statsRepository;
   }
 
   async getEnhancedStats(userId: number): Promise<EnhancedUserStats> {
-    const [basicStats, categoryAccuracy, currentStreak, trends, ranking] = await Promise.all([
-      this.getBasicStats(userId),
-      this.calculateCategoryAccuracy(userId),
-      this.calculateCurrentStreak(userId),
-      this.calculateTrends(userId),
-      this.getUserRanking(userId),
-    ]);
+    // Issue #3: Cache enhanced stats for 30 seconds to reduce database load
+    const cacheKey = CacheKeys.USER_STATS_ENHANCED(userId);
 
-    const bestCategory =
-      categoryAccuracy.length > 0
-        ? categoryAccuracy.reduce((best, current) =>
-            current.accuracy > best.accuracy ? current : best,
-          ).category
-        : 'None';
+    return withCache(cacheKey, CACHE_TTL.USER_STATS, async () => {
+      const [basicStats, categoryAccuracy, currentStreak, trends, ranking] = await Promise.all([
+        this.getBasicStats(userId),
+        this.calculateCategoryAccuracy(userId),
+        this.calculateCurrentStreak(userId),
+        this.calculateTrends(userId),
+        this.getUserRanking(userId),
+      ]);
 
-    const winRate = basicStats.totalBets > 0 ? basicStats.betsWon / basicStats.totalBets : 0;
-    const avgBetSize =
-      basicStats.totalBets > 0 ? Number(basicStats.totalWagered) / basicStats.totalBets : 0;
+      const bestCategory =
+        categoryAccuracy.length > 0
+          ? categoryAccuracy.reduce((best, current) =>
+              current.accuracy > best.accuracy ? current : best,
+            ).category
+          : 'None';
 
-    return {
-      // Performance metrics
-      totalBets: basicStats.totalBets,
-      winRate,
-      profitLoss: Number(basicStats.profit),
-      categoryAccuracy,
-      currentStreak,
-      bestCategory,
-      totalWagered: Number(basicStats.totalWagered),
-      avgBetSize,
+      const winRate = basicStats.totalBets > 0 ? basicStats.betsWon / basicStats.totalBets : 0;
+      const avgBetSize =
+        basicStats.totalBets > 0 ? Number(basicStats.totalWagered) / basicStats.totalBets : 0;
 
-      // Ranking data
-      ranking,
-
-      // Achievement progress (calculated from real data)
-      achievementProgress: this.calculateAchievementProgress(
-        basicStats,
+      return {
+        // Performance metrics
+        totalBets: basicStats.totalBets,
+        winRate,
+        profitLoss: Number(basicStats.profit),
         categoryAccuracy,
         currentStreak,
-      ),
-      achievementCompletionRate: this.calculateAchievementCompletionRate(
-        basicStats,
-        categoryAccuracy,
-        currentStreak,
-      ),
+        bestCategory,
+        totalWagered: Number(basicStats.totalWagered),
+        avgBetSize,
 
-      // Trend data
-      weeklyVolume: trends.weeklyVolume,
-      monthlyProfitLoss: trends.monthlyProfitLoss,
-      categoryStats: this.calculateCategoryStats(categoryAccuracy, Number(basicStats.totalWagered)),
-    };
+        // Ranking data
+        ranking,
+
+        // Achievement progress (calculated from real data)
+        achievementProgress: this.calculateAchievementProgress(
+          basicStats,
+          categoryAccuracy,
+          currentStreak,
+        ),
+        achievementCompletionRate: this.calculateAchievementCompletionRate(
+          basicStats,
+          categoryAccuracy,
+          currentStreak,
+        ),
+
+        // Trend data
+        weeklyVolume: trends.weeklyVolume,
+        monthlyProfitLoss: trends.monthlyProfitLoss,
+        categoryStats: this.calculateCategoryStats(
+          categoryAccuracy,
+          Number(basicStats.totalWagered),
+        ),
+      };
+    });
   }
 
   private async getUserRanking(
     userId: number,
   ): Promise<{ allTime: UserRanking; daily: UserRanking }> {
     try {
-      const [allTimeRank, dailyRank, stats] = await Promise.all([
-        leaderboardService.getUserRank(userId, 'allTime'),
-        leaderboardService.getUserRank(userId, 'daily'),
-        leaderboardService.getLeaderboardStats(),
-      ]);
+      // Optimized: Single query instead of 3 separate queries (50-150ms savings)
+      const ranking = await leaderboardService.getUserRankingCombined(userId);
 
       const allTimeRanking: UserRanking = {
-        rank: allTimeRank.allTimeRank,
-        percentile: allTimeRank.allTimeRank
-          ? Math.round((1 - allTimeRank.allTimeRank / stats.totalUsers) * 100)
+        rank: ranking.allTimeRank,
+        percentile: ranking.allTimeRank
+          ? Math.round((1 - ranking.allTimeRank / ranking.totalUsers) * 100)
           : 0,
         rankChange: null, // UserRank interface doesn't have rankChange - would need to be calculated separately
-        totalUsers: stats.totalUsers,
+        totalUsers: ranking.totalUsers,
         category: 'allTime',
       };
 
       const dailyRanking: UserRanking = {
-        rank: dailyRank.dailyRank,
-        percentile: dailyRank.dailyRank
-          ? Math.round((1 - dailyRank.dailyRank / stats.totalUsers) * 100)
+        rank: ranking.dailyRank,
+        percentile: ranking.dailyRank
+          ? Math.round((1 - ranking.dailyRank / ranking.totalUsers) * 100)
           : 0,
         rankChange: null, // UserRank interface doesn't have rankChange - would need to be calculated separately
-        totalUsers: stats.totalUsers,
+        totalUsers: ranking.totalUsers,
         category: 'daily',
       };
 
@@ -181,9 +141,7 @@ export class EnhancedUserStatsService {
   }
 
   private async getBasicStats(userId: number) {
-    const stats = await this.prisma.userStats.findUnique({
-      where: { userId },
-    });
+    const stats = await this.userRepository.getUserStats(userId);
 
     return (
       stats || {
@@ -200,26 +158,7 @@ export class EnhancedUserStatsService {
   }
 
   async calculateCategoryAccuracy(userId: number): Promise<CategoryAccuracy[]> {
-    const categoryStats = await this.prisma.$queryRaw<
-      Array<{
-        category: string;
-        totalBets: bigint;
-        wins: bigint;
-        accuracy: number;
-      }>
-    >`
-      SELECT 
-        p.category,
-        COUNT(*)::bigint as "totalBets",
-        SUM(CASE WHEN b.status = 'WON' THEN 1 ELSE 0 END)::bigint as wins,
-        AVG(CASE WHEN b.status = 'WON' THEN 1.0 ELSE 0.0 END) as accuracy
-      FROM "Bet" b 
-      JOIN "Prediction" p ON b."predictionId" = p.id 
-      WHERE b."userId" = ${userId} AND b.status IN ('WON', 'LOST')
-      GROUP BY p.category
-      HAVING COUNT(*) >= 3
-      ORDER BY accuracy DESC
-    `;
+    const categoryStats = await this.statsRepository.getCategoryAccuracy(userId);
 
     return categoryStats.map((stat) => ({
       category: stat.category,
@@ -230,18 +169,7 @@ export class EnhancedUserStatsService {
   }
 
   async calculateCurrentStreak(userId: number): Promise<Streak> {
-    const recentBets = await this.prisma.bet.findMany({
-      where: {
-        userId,
-        status: { in: ['WON', 'LOST'] },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 50,
-      select: {
-        status: true,
-        createdAt: true,
-      },
-    });
+    const recentBets = await this.bettingRepository.getRecentBetsForStreak(userId, 50);
 
     if (recentBets.length === 0) {
       return { type: 'win', count: 0, isActive: false };
@@ -273,50 +201,10 @@ export class EnhancedUserStatsService {
     monthlyProfitLoss: TrendData[];
   }> {
     // Get bet volume for the last 7 days
-    const weeklyVolume = await this.prisma.$queryRaw<
-      Array<{
-        date: string;
-        volume: bigint;
-      }>
-    >`
-      SELECT 
-        dates.date::text as date,
-        COALESCE(SUM(b.amount), 0)::bigint as volume
-      FROM generate_series(
-        CURRENT_DATE - INTERVAL '6 days',
-        CURRENT_DATE,
-        INTERVAL '1 day'
-      ) as dates(date)
-      LEFT JOIN "Bet" b ON DATE(b."createdAt") = dates.date AND b."userId" = ${userId}
-      GROUP BY dates.date
-      ORDER BY dates.date
-    `;
+    const weeklyVolume = await this.statsRepository.getWeeklyVolume(userId);
 
     // Get profit/loss for the last 30 days
-    const monthlyProfitLoss = await this.prisma.$queryRaw<
-      Array<{
-        date: string;
-        profit: bigint;
-      }>
-    >`
-      SELECT 
-        dates.date::text as date,
-        COALESCE(SUM(
-          CASE 
-            WHEN b.status = 'WON' THEN COALESCE(b.payout, 0) - b.amount
-            WHEN b.status = 'LOST' THEN -b.amount
-            ELSE 0
-          END
-        ), 0)::bigint as profit
-      FROM generate_series(
-        CURRENT_DATE - INTERVAL '29 days',
-        CURRENT_DATE,
-        INTERVAL '1 day'
-      ) as dates(date)
-      LEFT JOIN "Bet" b ON DATE(b."createdAt") = dates.date AND b."userId" = ${userId}
-      GROUP BY dates.date
-      ORDER BY dates.date
-    `;
+    const monthlyProfitLoss = await this.statsRepository.getMonthlyProfitLoss(userId);
 
     return {
       weeklyVolume: weeklyVolume.map((item) => ({
@@ -427,7 +315,7 @@ export class EnhancedUserStatsService {
         timestamp: new Date().toISOString(),
       };
 
-      await redisClient.publish('stats:update', JSON.stringify(statsPayload));
+      await eventBus.publish(REDIS_CHANNELS.STATS_UPDATE, statsPayload);
       console.log(`[enhancedUserStats] Published stats update for user ${userId}`);
     } catch (error) {
       console.error('[enhancedUserStats] Error publishing stats update:', error);
@@ -447,7 +335,7 @@ export class EnhancedUserStatsService {
         timestamp: new Date().toISOString(),
       };
 
-      await redisClient.publish('stats:refresh', JSON.stringify(refreshPayload));
+      await eventBus.publish(REDIS_CHANNELS.STATS_REFRESH, refreshPayload);
       console.log(`[enhancedUserStats] Published stats refresh for user ${userId}`);
     } catch (error) {
       console.error('[enhancedUserStats] Error publishing stats refresh:', error);
@@ -473,12 +361,29 @@ export class EnhancedUserStatsService {
         timestamp: new Date().toISOString(),
       };
 
-      await redisClient.publish('ranking:change', JSON.stringify(rankingPayload));
+      await eventBus.publish(REDIS_CHANNELS.RANKING_CHANGE, rankingPayload);
       console.log(
         `[enhancedUserStats] Published ranking change for user ${userId}: ${oldRank} -> ${newRank}`,
       );
     } catch (error) {
       console.error('[enhancedUserStats] Error publishing ranking change:', error);
+    }
+  }
+
+  /**
+   * Invalidate user stats cache
+   * Call this after: bet placement, payout, achievement unlock, balance change
+   * Issue #3: Cache invalidation for enhanced user stats
+   */
+  async invalidateUserStatsCache(userId: number): Promise<void> {
+    try {
+      await Promise.all([
+        redisClient.del(CacheKeys.USER_STATS_ENHANCED(userId)),
+        redisClient.del(CacheKeys.USER_STATS_BASIC(userId)),
+      ]);
+      console.log(`[enhancedUserStats] Invalidated stats cache for user ${userId}`);
+    } catch (error) {
+      console.error(`[enhancedUserStats] Error invalidating cache for user ${userId}:`, error);
     }
   }
 }

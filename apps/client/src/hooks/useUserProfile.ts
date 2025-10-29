@@ -38,7 +38,7 @@ export function useUserProfile(userId?: number | null): UseUserProfileResult {
     location: null,
     timezone: null,
     notifyOnResolve: true,
-    theme: 'LIGHT',
+    theme: 'dark-professional',
     twoFactorEnabled: false,
     profileComplete: false,
   });
@@ -59,7 +59,7 @@ export function useUserProfile(userId?: number | null): UseUserProfileResult {
           location: null,
           timezone: null,
           notifyOnResolve: true,
-          theme: 'LIGHT',
+          theme: 'dark-professional',
           twoFactorEnabled: false,
           profileComplete: false,
         });
@@ -85,7 +85,7 @@ export function useUserProfile(userId?: number | null): UseUserProfileResult {
           }),
           getUserStats(userId).catch((err) => {
             if (err?.response?.status === 404) {
-              // Provide empty stats fallback for 404
+              // Provide empty stats fallback for 404 matching UserStatsDTO
               return {
                 totalBets: 0,
                 betsWon: 0,
@@ -96,15 +96,19 @@ export function useUserProfile(userId?: number | null): UseUserProfileResult {
                 totalParlayLegs: 0,
                 parlayLegsWon: 0,
                 parlayLegsLost: 0,
-                totalWagered: 0,
-                totalWon: 0,
-                profit: 0,
-                roi: 0,
+                totalWagered: '0',
+                totalWinnings: '0',
+                totalLosses: '0',
+                netProfit: '0',
                 currentStreak: 0,
-                longestStreak: 0,
-                mostCommonBet: null,
-                biggestWin: 0,
-                updatedAt: new Date().toISOString(),
+                longestWinStreak: 0,
+                longestLoseStreak: 0,
+                averageBetSize: '0',
+                averageOdds: 0,
+                biggestWin: '0',
+                biggestLoss: '0',
+                winRate: 0,
+                roi: 0,
               };
             }
             console.warn('Failed to load user stats:', err);

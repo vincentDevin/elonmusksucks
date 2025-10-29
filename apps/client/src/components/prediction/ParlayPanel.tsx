@@ -1,0 +1,653 @@
+// apps/client/src/components/prediction/ParlayPanel.tsx
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { REDIS_CHANNELS } from '@ems/types';
+import { useParlay } from '../../contexts/ParlayContext';
+import { usePredictionMarket } from '../../contexts/PredictionContext';
+import { useEventBusCore } from '../../contexts/EventBusCoreContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { formatMuskBucks } from '../../utils/formatting';
+import { ChevronDownIcon } from '@heroicons/react/24/outline';
+
+export default function ParlayPanel() {
+  const { state, dispatch, clear } = useParlay();
+  const { predictions, placeParlay } = usePredictionMarket();
+  const { subscribe } = useEventBusCore();
+  const { user } = useAuth();
+
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isCalculating, setIsCalculating] = useState(false);
+  const [placing, setPlacing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showScrollIndicator, setShowScrollIndicator] = useState(false);
+
+  const legsListRef = useRef<HTMLUListElement>(null);
+  const balance = Number(user?.muskBucks ?? 0);
+
+  /* ---------- Helpers ---------- */
+  const findPrediction = (predId: number) => predictions.find((p) => p.id === predId);
+
+  const findOption = (predId: number, optId: number) =>
+    findPrediction(predId)?.options.find((o: any) => o.id === optId);
+
+  /** Return current odds for the given leg (falls back to 1). */
+  const getLegOdds = (leg: { predictionId: number; optionId: number }) => {
+    const opt = findOption(leg.predictionId, leg.optionId);
+    return opt?.odds ?? 1;
+  };
+
+  /* ---------- Traditional parlay calculations with all-in bonus ---------- */
+  const parlayCalculations = useMemo(() => {
+    const individualOdds = state.legs.map((leg) => getLegOdds(leg));
+    const baseCombined = individualOdds.reduce((acc, odds) => acc * odds, 1);
+    const legCount = state.legs.length;
+
+    // Traditional parlay: just multiply odds (no leg count bonuses)
+    const basePayout = Math.floor(state.amount * baseCombined);
+
+    // 🎯 Wager excitement level calculation
+    let wagerLevel = 'Conservative';
+    let wagerEmoji = '😌';
+    let excitementLevel = 'normal';
+
+    if (state.amount > balance * 0.8) {
+      wagerLevel = 'YOLO 🚀🚀🚀';
+      wagerEmoji = '🚀';
+      excitementLevel = 'yolo';
+    } else if (state.amount > balance * 0.5) {
+      wagerLevel = 'HIGH RISK';
+      wagerEmoji = '🔥';
+      excitementLevel = 'high';
+    } else if (state.amount > balance * 0.3) {
+      wagerLevel = 'Aggressive';
+      wagerEmoji = '⚡';
+      excitementLevel = 'aggressive';
+    } else if (state.amount > balance * 0.1) {
+      wagerLevel = 'Moderate';
+      wagerEmoji = '📈';
+      excitementLevel = 'moderate';
+    }
+
+    // 🚀 ALL-IN bonus detection for parlays (50% bonus for betting ≥95% of balance)
+    const isAllIn = state.amount >= balance * 0.95;
+    const allInMultiplier = isAllIn ? 1.5 : 1.0; // Extra 50% bonus for all-in parlays
+    const finalOdds = baseCombined * allInMultiplier;
+    const finalPayout = Math.floor(basePayout * allInMultiplier);
+    const profit = finalPayout - state.amount;
+    const profitPercent = state.amount > 0 ? (profit / state.amount) * 100 : 0;
+
+    return {
+      baseCombinedOdds: baseCombined,
+      finalOdds,
+      payout: finalPayout,
+      legCount,
+      individualOdds,
+      wagerLevel,
+      wagerEmoji,
+      excitementLevel,
+      isAllIn,
+      allInMultiplier,
+      profit,
+      profitPercent,
+      balanceAfter: balance - state.amount,
+      isYolo: state.amount > balance * 0.8,
+      isHugeNumber: finalPayout > Number.MAX_SAFE_INTEGER,
+    };
+  }, [state.legs, state.amount, balance]);
+
+  /* ---------- Risk level calculation ---------- */
+  const getRiskLevel = () => {
+    const { legCount } = parlayCalculations;
+    if (legCount <= 1) return { level: 'Single', color: 'text-gray-500', emoji: '📈' };
+    if (legCount === 2) return { level: 'Low Risk', color: 'text-green-500', emoji: '🟢' };
+    if (legCount === 3) return { level: 'Medium Risk', color: 'text-yellow-500', emoji: '🟡' };
+    if (legCount === 4) return { level: 'High Risk', color: 'text-orange-500', emoji: '🟠' };
+    return { level: 'EXTREME RISK', color: 'text-red-500 font-bold', emoji: '🔥' };
+  };
+
+  const riskInfo = getRiskLevel();
+
+  /* ---------- Memoized socket handlers to prevent recreation ---------- */
+  const handleBetPlaced = useCallback(() => {
+    // When someone places a bet, odds may change - trigger recalculation animation
+    setIsCalculating(true);
+    setTimeout(() => setIsCalculating(false), 500);
+  }, []);
+
+  const handlePredictionUpdate = useCallback(() => {
+    setIsCalculating(true);
+    setTimeout(() => setIsCalculating(false), 500);
+  }, []);
+
+  /* ---------- Real-time odds updates via EventBusCore ---------- */
+  useEffect(() => {
+    const unsubscribers = [
+      subscribe(REDIS_CHANNELS.BET_PLACED, handleBetPlaced),
+      subscribe(REDIS_CHANNELS.PREDICTION_CREATED, handlePredictionUpdate),
+      subscribe(REDIS_CHANNELS.PREDICTION_RESOLVED, handlePredictionUpdate),
+    ];
+
+    return () => {
+      unsubscribers.forEach((unsub) => unsub());
+    };
+  }, [subscribe, handleBetPlaced, handlePredictionUpdate]);
+
+  /* ---------- Scroll indicator logic ---------- */
+  useEffect(() => {
+    const checkScrollable = () => {
+      if (legsListRef.current && state.legs.length > 5) {
+        const { scrollHeight, clientHeight, scrollTop } = legsListRef.current;
+        const isScrollable = scrollHeight > clientHeight;
+        const isAtBottom = scrollHeight - scrollTop - clientHeight < 10; // 10px threshold
+        setShowScrollIndicator(isScrollable && !isAtBottom);
+      } else {
+        setShowScrollIndicator(false);
+      }
+    };
+
+    checkScrollable();
+
+    const listElement = legsListRef.current;
+    if (listElement) {
+      listElement.addEventListener('scroll', checkScrollable);
+      return () => listElement.removeEventListener('scroll', checkScrollable);
+    }
+  }, [state.legs.length, isExpanded]);
+
+  /* ---------- Parlay placement handler ---------- */
+  const handlePlaceParlay = async () => {
+    if (!state.legs.length || state.amount <= 0) return;
+    setPlacing(true);
+    setError(null);
+    try {
+      await placeParlay({ legs: state.legs, amount: state.amount });
+      // Clear parlay after successful placement
+      clear();
+      setIsExpanded(false);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Parlay failed');
+    } finally {
+      setPlacing(false);
+    }
+  };
+
+  /* ---------- UI ---------- */
+  return (
+    <div className="space-y-3">
+      <div className="flex justify-between items-center">
+        <h2 className="text-lg font-semibold">Parlay Builder</h2>
+        <div className="flex items-center space-x-2">
+          {state.legs.length > 0 && (
+            <>
+              <div className={`text-sm ${riskInfo.color} flex items-center space-x-1`}>
+                <span>{riskInfo.emoji}</span>
+                <span>{riskInfo.level}</span>
+              </div>
+              {parlayCalculations.isAllIn && (
+                <div className="flex items-center space-x-1 bg-red-100 text-red-800 px-2 py-1 rounded-full text-xs font-semibold animate-pulse">
+                  <span>🚀</span>
+                  <span>ALL IN!</span>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
+      {state.legs.length === 0 ? (
+        <p className="italic text-tertiary">Add legs from the list →</p>
+      ) : (
+        <>
+          {/* Legs list with remove functionality */}
+          <div className="relative">
+            <ul
+              ref={legsListRef}
+              className="text-sm space-y-1 overflow-y-auto"
+              style={{
+                maxHeight: isExpanded
+                  ? `min(${Math.min(state.legs.length * 120, 600)}px, 60vh)`
+                  : `min(${Math.min(state.legs.length * 120, 400)}px, 40vh)`,
+              }}
+            >
+              {state.legs.map((leg, i) => {
+                const odds = getLegOdds(leg);
+                const pred = findPrediction(leg.predictionId);
+                const opt = findOption(leg.predictionId, leg.optionId);
+                const allOptions = pred?.options || [];
+
+                return (
+                  <li
+                    key={`${leg.predictionId}-${leg.optionId}-${i}`}
+                    className="flex flex-col space-y-2 py-2 border-b border-muted last:border-b-0"
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold truncate">
+                          {pred ? pred.title : `Prediction #${leg.predictionId}`}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => dispatch({ type: 'REMOVE_LEG', optionId: leg.optionId })}
+                        aria-label="Remove leg"
+                        className="ml-2 text-red-600 hover:text-red-800 text-xs px-2 py-1 rounded hover:bg-red-100 transition cursor-pointer"
+                      >
+                        Remove
+                      </button>
+                    </div>
+
+                    {/* Option selector for this leg */}
+                    {allOptions.length > 1 ? (
+                      <select
+                        value={leg.optionId}
+                        onChange={(e) => {
+                          const newOptionId = Number(e.target.value);
+                          const newOption = allOptions.find((opt) => opt.id === newOptionId);
+                          if (newOption) {
+                            dispatch({
+                              type: 'ADD_LEG', // This will replace existing leg for same prediction
+                              leg: {
+                                optionId: newOptionId,
+                                predictionId: leg.predictionId,
+                                label: newOption.label,
+                                predictionTitle: leg.predictionTitle,
+                                odds: newOption.odds,
+                              },
+                            });
+                          }
+                        }}
+                        className="w-full text-sm border border-muted rounded-md px-2 py-1 bg-background text-content focus:outline-none focus:ring-1 focus:ring-primary"
+                        disabled={placing}
+                      >
+                        {allOptions.map((option: any) => (
+                          <option key={option.id} value={option.id}>
+                            {option.label} (@{option.odds?.toFixed(2) || '1.00'}×)
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="text-xs text-tertiary flex items-center justify-between">
+                        <span className="truncate">{opt?.label ?? leg.label}</span>
+                        <span className="ml-2 flex-shrink-0">@&nbsp;{odds.toFixed(2)}×</span>
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+
+            {/* Scroll indicator */}
+            {showScrollIndicator && (
+              <div className="absolute bottom-0 left-0 right-0 pointer-events-none">
+                {/* Gradient fade */}
+                <div className="h-12 bg-gradient-to-t from-surface via-surface/80 to-transparent" />
+                {/* Scroll icon */}
+                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 animate-bounce">
+                  <span className="text-xs text-primary font-medium">Scroll for more</span>
+                  <ChevronDownIcon className="w-4 h-4 text-primary" />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Enhanced wager amount input with percentage buttons */}
+          <div className="bg-surface p-3 rounded-lg border border-muted space-y-3">
+            {/* Header */}
+            <h3 className="text-lg font-semibold text-content">Wager Amount</h3>
+
+            {/* Balance Row */}
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-tertiary">Balance</span>
+              <span className="font-bold text-content">{formatMuskBucks(balance)} 🪙</span>
+            </div>
+
+            {/* Wager Input Row */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-tertiary">Your Wager</span>
+                {state.amount > 0 && (
+                  <div
+                    className={`px-1.5 py-0.5 rounded text-xs font-medium ${
+                      parlayCalculations.excitementLevel === 'yolo'
+                        ? 'bg-red-600/10 text-red-600'
+                        : parlayCalculations.excitementLevel === 'high'
+                          ? 'bg-orange-600/10 text-orange-600'
+                          : parlayCalculations.excitementLevel === 'aggressive'
+                            ? 'bg-yellow-600/10 text-yellow-600'
+                            : parlayCalculations.excitementLevel === 'moderate'
+                              ? 'bg-blue-600/10 text-blue-600'
+                              : 'bg-green-600/10 text-green-600'
+                    }`}
+                  >
+                    {parlayCalculations.wagerEmoji} {parlayCalculations.wagerLevel}
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="number"
+                  value={state.amount || ''}
+                  onChange={(e) =>
+                    dispatch({
+                      type: 'SET_AMOUNT',
+                      amount: Math.min(Number(e.target.value) || 0, balance),
+                    })
+                  }
+                  min="0"
+                  max={balance}
+                  step="10"
+                  placeholder="0"
+                  className="w-32 px-3 py-2 bg-background border border-muted rounded text-right font-bold text-content focus:ring-2 focus:ring-primary focus:border-primary"
+                  disabled={placing}
+                />
+                <span className="font-bold text-content">🪙</span>
+              </div>
+            </div>
+
+            {/* Slider */}
+            <div className="relative">
+              <input
+                type="range"
+                min="0"
+                max={balance}
+                step="10"
+                value={state.amount}
+                onChange={(e) =>
+                  dispatch({
+                    type: 'SET_AMOUNT',
+                    amount: parseInt(e.target.value),
+                  })
+                }
+                className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer slider"
+                style={{
+                  background: `linear-gradient(to right, var(--color-primary) 0%, var(--color-primary) ${(state.amount / balance) * 100}%, var(--color-muted) ${(state.amount / balance) * 100}%, var(--color-muted) 100%)`,
+                }}
+                disabled={placing}
+              />
+              <div className="flex justify-between text-xs text-tertiary mt-1">
+                <span>0</span>
+                <span className="text-primary font-medium">{formatMuskBucks(state.amount)}</span>
+                <span>{formatMuskBucks(balance)}</span>
+              </div>
+            </div>
+
+            {/* Percentage Buttons */}
+            <div className="flex space-x-2">
+              {[0.1, 0.25, 0.5, 1.0].map((percent) => {
+                const amount = Math.floor(balance * percent);
+                return (
+                  <button
+                    key={percent}
+                    onClick={() =>
+                      dispatch({
+                        type: 'SET_AMOUNT',
+                        amount,
+                      })
+                    }
+                    className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer ${
+                      state.amount === amount
+                        ? 'bg-primary text-white shadow-lg'
+                        : 'bg-muted/20 text-content hover:bg-primary hover:text-white hover:shadow-xl hover:shadow-primary/50'
+                    }`}
+                    disabled={placing || balance === 0}
+                  >
+                    {percent === 1.0 ? '🚀 MAX' : `${percent * 100}%`}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Popular Stakes */}
+            <div className="pt-2 border-t border-muted">
+              <div className="text-xs text-tertiary mb-2">Popular Stakes</div>
+              <div className="grid grid-cols-4 gap-1">
+                {[100, 250, 500, 1000].map((amount) => {
+                  const isDisabled = amount > balance;
+                  return (
+                    <button
+                      key={amount}
+                      onClick={() =>
+                        dispatch({
+                          type: 'SET_AMOUNT',
+                          amount: Math.min(amount, balance),
+                        })
+                      }
+                      disabled={isDisabled || placing}
+                      className={`px-2 py-1 text-xs rounded transition-all ${
+                        isDisabled
+                          ? 'opacity-60 cursor-not-allowed bg-muted/20 text-tertiary'
+                          : state.amount === amount
+                            ? 'bg-primary text-white'
+                            : 'bg-muted/20 text-content hover:bg-primary hover:text-white hover:shadow-lg hover:shadow-primary/50 cursor-pointer'
+                      }`}
+                    >
+                      {formatMuskBucks(amount)}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Odds and payout summary with dynamic styling */}
+          <div
+            className={`space-y-2 rounded-lg p-3 transition-all duration-300 ${
+              state.amount > 0
+                ? parlayCalculations.excitementLevel === 'yolo'
+                  ? 'bg-red-600/5 border border-red-600/20'
+                  : parlayCalculations.excitementLevel === 'high'
+                    ? 'bg-orange-600/5 border border-orange-600/20'
+                    : parlayCalculations.excitementLevel === 'aggressive'
+                      ? 'bg-yellow-600/5 border border-yellow-600/20'
+                      : 'bg-muted'
+                : 'bg-muted'
+            }`}
+          >
+            <div className="flex justify-between text-sm">
+              <span>Base Odds</span>
+              <span>{parlayCalculations.baseCombinedOdds.toFixed(2)}×</span>
+            </div>
+
+            {parlayCalculations.isAllIn && (
+              <div className="flex justify-between text-sm text-red-600 font-semibold animate-pulse">
+                <span className="flex items-center">🚀 ALL-IN BONUS!</span>
+                <span>+{((parlayCalculations.allInMultiplier - 1) * 100).toFixed(0)}%</span>
+              </div>
+            )}
+
+            <div className="flex justify-between text-lg font-bold border-t border-muted pt-2">
+              <span>Final Odds</span>
+              <span
+                className={`transition-all duration-300 ${
+                  isCalculating
+                    ? 'scale-110 text-blue-500'
+                    : parlayCalculations.excitementLevel === 'yolo'
+                      ? 'text-red-600 animate-pulse'
+                      : parlayCalculations.isAllIn
+                        ? 'text-red-600'
+                        : ''
+                }`}
+              >
+                {parlayCalculations.finalOdds.toFixed(2)}×
+              </span>
+            </div>
+
+            <div className="flex justify-between text-sm">
+              <span>Profit:</span>
+              <span className="font-bold text-green-600">
+                +{parlayCalculations.profitPercent.toFixed(0)}%
+              </span>
+            </div>
+
+            <div className="flex justify-between text-sm font-medium">
+              <span>Potential Payout</span>
+              <span
+                className={`transition-all duration-300 ${
+                  isCalculating
+                    ? 'scale-110 text-blue-500'
+                    : parlayCalculations.excitementLevel === 'yolo'
+                      ? 'text-red-600 font-bold text-lg animate-pulse'
+                      : parlayCalculations.excitementLevel === 'high'
+                        ? 'text-orange-600 font-bold'
+                        : parlayCalculations.isAllIn
+                          ? 'text-red-600 font-bold'
+                          : ''
+                }`}
+              >
+                {state.amount ? formatMuskBucks(parlayCalculations.payout) : '–'} 🪙
+              </span>
+            </div>
+
+            {state.amount > 0 && (
+              <div className="flex justify-between text-sm text-tertiary">
+                <span>Balance After:</span>
+                <span
+                  className={
+                    parlayCalculations.balanceAfter < balance * 0.2
+                      ? 'text-orange-600 font-semibold'
+                      : ''
+                  }
+                >
+                  {formatMuskBucks(parlayCalculations.balanceAfter)} 🪙
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Profit potential bar */}
+          {state.amount > 0 && (
+            <div className="mt-3">
+              <div className="flex justify-between text-xs text-tertiary mb-1">
+                <span>Profit Potential</span>
+                <span>
+                  +{(((parlayCalculations.payout - state.amount) / state.amount) * 100).toFixed(0)}%
+                </span>
+              </div>
+              <div className="w-full bg-muted rounded-full h-2">
+                <div
+                  className={`h-2 rounded-full transition-all duration-500 ${
+                    parlayCalculations.finalOdds < 2
+                      ? 'bg-green-400'
+                      : parlayCalculations.finalOdds < 5
+                        ? 'bg-yellow-400'
+                        : parlayCalculations.finalOdds < 10
+                          ? 'bg-orange-400'
+                          : 'bg-red-400'
+                  }`}
+                  style={{ width: `${Math.min((parlayCalculations.finalOdds / 20) * 100, 100)}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Huge number precision warning */}
+          {parlayCalculations.isHugeNumber && (
+            <div className="bg-purple-600/10 border border-purple-600/20 rounded-lg p-2">
+              <p className="text-xs text-purple-600 font-semibold flex items-center">
+                <span className="mr-1">🚀</span>
+                ASTRONOMICAL PAYOUT: Numbers this large may have display precision limits!
+              </p>
+            </div>
+          )}
+
+          {/* Market impact warning */}
+          {state.amount > 5000 && (
+            <div className="bg-yellow-600/10 border border-yellow-600/20 rounded-lg p-2">
+              <p className="text-xs text-yellow-600 font-semibold flex items-center">
+                <span className="mr-1">⚡</span>
+                MARKET IMPACT: Your large bet may move the odds!
+              </p>
+            </div>
+          )}
+
+          {/* Error display */}
+          {error && <p className="text-sm text-red-500">Error: {error}</p>}
+
+          {/* Action buttons */}
+          <div className="flex gap-2">
+            {!isExpanded ? (
+              <button
+                onClick={() => setIsExpanded(true)}
+                className={`w-full py-2 rounded-lg font-bold disabled:opacity-50 transition-all duration-200 cursor-pointer ${
+                  parlayCalculations.isAllIn
+                    ? 'bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg hover:shadow-xl hover:from-red-600 hover:to-red-700'
+                    : 'bg-primary text-surface hover:opacity-90'
+                }`}
+                disabled={state.legs.length === 0 || placing}
+              >
+                {parlayCalculations.isAllIn ? '🚀 Review All-In Parlay' : 'Review & Place'}
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={() => {
+                    clear();
+                    setIsExpanded(false);
+                    setError(null);
+                  }}
+                  className="px-4 py-2 bg-muted text-content rounded-lg hover:bg-tertiary transition cursor-pointer"
+                  disabled={placing}
+                >
+                  Clear
+                </button>
+                <button
+                  onClick={handlePlaceParlay}
+                  disabled={placing || !state.legs.length || state.amount <= 0}
+                  className={`flex-1 px-6 py-2 rounded-lg font-bold disabled:opacity-50 transition-all duration-200 cursor-pointer ${
+                    parlayCalculations.isAllIn
+                      ? 'bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg hover:shadow-xl hover:from-red-600 hover:to-red-700'
+                      : 'bg-primary text-surface hover:opacity-90'
+                  }`}
+                >
+                  {placing ? (
+                    <span className="flex items-center justify-center space-x-2">
+                      <span className="animate-spin">⏳</span>
+                      <span>Placing...</span>
+                    </span>
+                  ) : parlayCalculations.isAllIn ? (
+                    <span className="flex items-center justify-center space-x-1">
+                      <span>🚀</span>
+                      <span>Place All-In Parlay</span>
+                    </span>
+                  ) : (
+                    'Place Parlay'
+                  )}
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* Detailed view in expanded mode */}
+          {isExpanded && state.amount > 0 && (
+            <div className="bg-muted rounded-lg p-3 mt-3 space-y-2">
+              <div className="text-sm font-semibold mb-2">Parlay Summary</div>
+              {state.legs.map((leg, i) => {
+                const pred = findPrediction(leg.predictionId);
+                const opt = findOption(leg.predictionId, leg.optionId);
+                const odds = parlayCalculations.individualOdds[i];
+                return (
+                  <div key={`summary-${i}`} className="text-xs flex justify-between">
+                    <span className="text-tertiary">
+                      {pred?.title} - {opt?.label}
+                    </span>
+                    <span>{odds.toFixed(2)}×</span>
+                  </div>
+                );
+              })}
+              <div className="border-t border-muted pt-2 mt-2">
+                <div className="flex justify-between text-sm">
+                  <span>Your Stake:</span>
+                  <span className="font-bold">{formatMuskBucks(state.amount)} 🪙</span>
+                </div>
+                <div className="flex justify-between text-sm mt-1">
+                  <span>Total Return:</span>
+                  <span className="font-bold text-green-600">
+                    {formatMuskBucks(parlayCalculations.payout)} 🪙
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}

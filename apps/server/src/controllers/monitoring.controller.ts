@@ -4,6 +4,17 @@
 import { Request, Response, NextFunction } from 'express';
 import { getQueryMetrics, clearQueryMetrics, isDbConnected } from '../db';
 import redisClient from '../lib/redis';
+import {
+  toDatabaseMetricsResponse,
+  toClearMetricsResponse,
+  toHealthCheckResponse,
+} from '../view/monitoring.view';
+import type {
+  DatabaseMetricsResponse,
+  ClearMetricsResponse,
+  HealthCheckResponse,
+} from '@ems/types';
+import { eventSystemMetricsService } from '../services/eventSystemMetrics.service';
 
 /**
  * Get current database query performance metrics
@@ -20,7 +31,7 @@ export async function getDatabaseMetrics(
     // Add database connection status
     const dbStatus = {
       connected: isDbConnected(),
-      timestamp: new Date().toISOString(),
+      timestamp: new Date(),
     };
 
     // Get Redis status as well
@@ -38,14 +49,13 @@ export async function getDatabaseMetrics(
       };
     }
 
-    res.json({
-      database: {
-        ...metrics,
-        status: dbStatus,
-      },
-      redis: redisStatus,
-      timestamp: new Date().toISOString(),
-    });
+    const payload = toDatabaseMetricsResponse({
+      metrics,
+      dbStatus,
+      redisStatus,
+      timestamp: new Date(),
+    }) satisfies DatabaseMetricsResponse;
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -62,11 +72,12 @@ export async function clearDatabaseMetrics(
 ): Promise<void> {
   try {
     clearQueryMetrics();
-    res.json({
+    const payload = toClearMetricsResponse({
       success: true,
       message: 'Query metrics cleared',
-      timestamp: new Date().toISOString(),
-    });
+      clearedAt: new Date(),
+    }) satisfies ClearMetricsResponse;
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -104,9 +115,117 @@ export async function healthCheck(
   const isHealthy = checks.database && checks.redis;
   const statusCode = isHealthy ? 200 : 503;
 
-  res.status(statusCode).json({
+  const payload = toHealthCheckResponse({
     status: isHealthy ? 'healthy' : 'unhealthy',
     checks,
-    timestamp: new Date().toISOString(),
-  });
+    timestamp: new Date(),
+  }) satisfies HealthCheckResponse;
+  res.status(statusCode).json(payload);
+}
+
+/**
+ * Get Event System metrics and health status
+ * Requires admin authentication
+ */
+export async function getEventSystemMetrics(
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const systemMetrics = await eventSystemMetricsService.getSystemMetrics();
+    const eventMetrics = Array.from(eventSystemMetricsService.getEventMetrics().values());
+    const topEvents = eventSystemMetricsService.getTopEventsByCount(10);
+    const slowestEvents = eventSystemMetricsService.getSlowestEvents(5);
+    const monitoringStatus = eventSystemMetricsService.getMonitoringStatus();
+    const isHealthy = await eventSystemMetricsService.isHealthy();
+
+    const payload = {
+      system: systemMetrics,
+      events: eventMetrics,
+      topEvents,
+      slowestEvents,
+      monitoring: monitoringStatus,
+      isHealthy,
+      timestamp: new Date().toISOString(),
+    };
+
+    res.json(payload);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Reset Event System metrics
+ * Requires admin authentication
+ */
+export async function resetEventSystemMetrics(
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    eventSystemMetricsService.resetMetrics();
+
+    const payload = {
+      success: true,
+      message: 'Event System metrics reset successfully',
+      timestamp: new Date().toISOString(),
+    };
+
+    res.json(payload);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Start Event System monitoring
+ * Requires admin authentication
+ */
+export async function startEventSystemMonitoring(
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    await eventSystemMetricsService.startMonitoring();
+
+    const payload = {
+      success: true,
+      message: 'Event System monitoring started',
+      status: eventSystemMetricsService.getMonitoringStatus(),
+      timestamp: new Date().toISOString(),
+    };
+
+    res.json(payload);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Stop Event System monitoring
+ * Requires admin authentication
+ */
+export async function stopEventSystemMonitoring(
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    await eventSystemMetricsService.stopMonitoring();
+
+    const payload = {
+      success: true,
+      message: 'Event System monitoring stopped',
+      status: eventSystemMetricsService.getMonitoringStatus(),
+      timestamp: new Date().toISOString(),
+    };
+
+    res.json(payload);
+  } catch (err) {
+    next(err);
+  }
 }

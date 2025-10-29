@@ -1,20 +1,30 @@
 // apps/server/src/repositories/ModerationRepository.ts
-import { PrismaClient } from '@prisma/client';
+import prisma from '../db';
+import { BanType as PrismaBanType } from '@prisma/client';
 import type {
   IModerationRepository,
   CreateBanData,
   CreateModerationLogData,
   BanWithUser,
   ModerationLogWithUsers,
-} from './IModerationRepository';
-import type { UserBan, ModerationLog, User, Message, UserPost } from '@prisma/client';
+} from './interfaces/IModerationRepository';
+import type { UserBan, ModerationLog, User, Message, Content } from '@prisma/client';
 
 export class ModerationRepository implements IModerationRepository {
-  constructor(private prisma: PrismaClient) {}
+  private prisma = prisma;
 
   async createBan(data: CreateBanData): Promise<UserBan> {
+    // Convert lowercase banType to uppercase for Prisma enum
+    const prismaBanType = data.banType.toUpperCase() as PrismaBanType;
+
     return this.prisma.userBan.create({
-      data,
+      data: {
+        userId: data.userId,
+        banType: prismaBanType,
+        reason: data.reason,
+        expiresAt: data.expiresAt,
+        isActive: data.isActive !== undefined ? data.isActive : true,
+      },
     });
   }
 
@@ -33,11 +43,30 @@ export class ModerationRepository implements IModerationRepository {
             id: true,
             name: true,
             email: true,
+            avatarUrl: true,
+            profilePictureKey: true, // Needed for generating signed Tigris URLs
           },
         },
       },
       orderBy: {
         createdAt: 'desc',
+      },
+    });
+  }
+
+  async getBanById(banId: number): Promise<BanWithUser | null> {
+    return this.prisma.userBan.findUnique({
+      where: { id: banId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            avatarUrl: true,
+            profilePictureKey: true,
+          },
+        },
       },
     });
   }
@@ -65,8 +94,8 @@ export class ModerationRepository implements IModerationRepository {
     });
   }
 
-  async checkExpiredBans(): Promise<void> {
-    await this.prisma.userBan.updateMany({
+  async checkExpiredBans(): Promise<number> {
+    const result = await this.prisma.userBan.updateMany({
       where: {
         isActive: true,
         expiresAt: {
@@ -76,6 +105,13 @@ export class ModerationRepository implements IModerationRepository {
       data: {
         isActive: false,
       },
+    });
+    return result.count;
+  }
+
+  async countUserBans(userId: number): Promise<number> {
+    return this.prisma.userBan.count({
+      where: { userId },
     });
   }
 
@@ -90,16 +126,18 @@ export class ModerationRepository implements IModerationRepository {
     }
   }
 
-  async getMessage(messageId: number): Promise<Message | null> {
+  async getMessage(messageId: number): Promise<(Message & { user: User | null }) | null> {
     return this.prisma.message.findUnique({
       where: { id: messageId },
-    });
+      include: { user: true },
+    }) as Promise<(Message & { user: User | null }) | null>;
   }
 
   async deletePost(postId: number): Promise<boolean> {
     try {
-      await this.prisma.userPost.delete({
+      await this.prisma.content.update({
         where: { id: postId },
+        data: { isDeleted: true },
       });
       return true;
     } catch {
@@ -107,8 +145,8 @@ export class ModerationRepository implements IModerationRepository {
     }
   }
 
-  async getPost(postId: number): Promise<UserPost | null> {
-    return this.prisma.userPost.findUnique({
+  async getPost(postId: number): Promise<Content | null> {
+    return this.prisma.content.findUnique({
       where: { id: postId },
     });
   }
@@ -170,6 +208,66 @@ export class ModerationRepository implements IModerationRepository {
         createdAt: 'desc',
       },
     });
+  }
+
+  async getBanHistoryWithModerator(limit: number): Promise<
+    Array<{
+      id: number;
+      userId: number;
+      userName: string;
+      banType: PrismaBanType;
+      reason: string;
+      startDate: string;
+      endDate: string | null;
+      isActive: boolean;
+      moderatorName: string;
+    }>
+  > {
+    const bans = await this.prisma.userBan.findMany({
+      include: {
+        user: {
+          select: { name: true },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      take: limit,
+    });
+
+    // Get moderator info from moderation logs
+    const result = [];
+    for (const ban of bans) {
+      const log = await this.prisma.moderationLog.findFirst({
+        where: {
+          action: 'USER_BAN',
+          targetUserId: ban.userId,
+          createdAt: {
+            gte: new Date(ban.createdAt.getTime() - 1000), // 1 second tolerance
+            lte: new Date(ban.createdAt.getTime() + 1000),
+          },
+        },
+        include: {
+          moderator: {
+            select: { name: true },
+          },
+        },
+      });
+
+      result.push({
+        id: ban.id,
+        userId: ban.userId,
+        userName: ban.user.name,
+        banType: ban.banType,
+        reason: ban.reason,
+        startDate: ban.createdAt.toISOString(),
+        endDate: ban.expiresAt?.toISOString() || null,
+        isActive: ban.isActive,
+        moderatorName: log?.moderator.name || 'System',
+      });
+    }
+
+    return result;
   }
 
   async getUserById(userId: number): Promise<User | null> {

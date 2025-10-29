@@ -7,7 +7,7 @@ import type {
   PaginatedLeaderboard,
   UserRank,
   LeaderboardStats,
-} from './ILeaderboardRepository';
+} from './interfaces/ILeaderboardRepository';
 import { UserService } from '../services/user.service';
 import redisClient from '../lib/redis';
 
@@ -40,7 +40,7 @@ export class LeaderboardRepository implements ILeaderboardRepository {
   }
 
   /**
-   * Enhanced method with caching and pagination
+   * Enhanced method with caching and pagination - now queries UserStats directly
    */
   async getTopAllTimePaginated(params: LeaderboardQuery): Promise<PaginatedLeaderboard> {
     const { limit = 25, offset = 0 } = params;
@@ -56,21 +56,29 @@ export class LeaderboardRepository implements ILeaderboardRepository {
       console.warn('[leaderboard] Cache read failed:', error);
     }
 
-    // Query from materialized view using Prisma raw query (needed for materialized view)
-    const rows = await prisma.$queryRaw<any[]>`
-      SELECT * FROM leaderboard_view 
-      ORDER BY profit_all DESC 
-      LIMIT ${limit} OFFSET ${offset}
-    `;
+    // Query UserStats directly (like Pong does) with User data
+    const userStats = await prisma.userStats.findMany({
+      take: limit,
+      skip: offset,
+      orderBy: { profit: 'desc' },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            avatarUrl: true,
+            profilePictureKey: true,
+            muskBucks: true,
+          },
+        },
+      },
+    });
 
     // Get total count for pagination
-    const [totalResult] = await prisma.$queryRaw<[{ count: bigint }]>`
-      SELECT COUNT(*) as count FROM leaderboard_view
-    `;
-    const totalCount = Number(totalResult.count);
+    const totalCount = await prisma.userStats.count();
 
     // Process entries with optimized avatar handling
-    const entries = await this.processLeaderboardEntries(rows);
+    const entries = await this.processUserStatsEntries(userStats);
 
     const result: PaginatedLeaderboard = {
       entries,
@@ -100,7 +108,7 @@ export class LeaderboardRepository implements ILeaderboardRepository {
   }
 
   /**
-   * Enhanced method with caching and pagination
+   * Enhanced method with caching and pagination - daily period calculated dynamically
    */
   async getTopDailyPaginated(params: LeaderboardQuery): Promise<PaginatedLeaderboard> {
     const { limit = 25, offset = 0 } = params;
@@ -116,18 +124,49 @@ export class LeaderboardRepository implements ILeaderboardRepository {
       console.warn('[leaderboard] Cache read failed:', error);
     }
 
-    // Query from materialized view
+    // For daily leaderboard, we need to calculate profit from recent bets/parlays
+    // Use raw query to get daily profits and join with UserStats for other data
     const rows = await prisma.$queryRaw<any[]>`
-      SELECT * FROM leaderboard_view 
-      ORDER BY profit_period DESC 
+      SELECT 
+        us."userId" as user_id,
+        u.name as user_name,
+        u."avatarUrl" as avatar_url,
+        u."profilePictureKey" as avatar_key,
+        u."muskBucks" as balance,
+        us."totalBets" + us."totalParlays" as total_bets,
+        CASE 
+          WHEN (us."totalBets" + us."totalParlays") > 0 
+          THEN CAST((us."betsWon" + us."parlaysWon") AS FLOAT) / (us."totalBets" + us."totalParlays")
+          ELSE 0 
+        END as win_rate,
+        us.profit as profit_all,
+        COALESCE(
+          (SELECT SUM(CASE WHEN b.won = true THEN b.payout - b.amount ELSE -b.amount END)
+           FROM "Bet" b 
+           WHERE b."userId" = us."userId" AND b."createdAt" >= CURRENT_DATE - INTERVAL '1 day'
+          ), 0
+        ) + COALESCE(
+          (SELECT SUM(CASE WHEN p.status = 'WON' THEN p."potentialPayout" - p.amount ELSE -p.amount END)
+           FROM "Parlay" p
+           WHERE p."userId" = us."userId" AND p."createdAt" >= CURRENT_DATE - INTERVAL '1 day'
+          ), 0
+        ) as profit_period,
+        us.roi,
+        us."longestStreak" as longest_streak,
+        us."currentStreak" as current_streak,
+        us."totalParlays" as parlays_started,
+        us."parlaysWon" as parlays_won,
+        us."totalParlayLegs" as total_parlay_legs,
+        us."parlayLegsWon" as parlay_legs_won,
+        0 as rank_change
+      FROM "UserStats" us
+      JOIN "User" u ON us."userId" = u.id
+      ORDER BY profit_period DESC
       LIMIT ${limit} OFFSET ${offset}
     `;
 
     // Get total count for pagination
-    const [totalResult] = await prisma.$queryRaw<[{ count: bigint }]>`
-      SELECT COUNT(*) as count FROM leaderboard_view
-    `;
-    const totalCount = Number(totalResult.count);
+    const totalCount = await prisma.userStats.count();
 
     // Process entries with optimized avatar handling
     const entries = await this.processLeaderboardEntries(rows);
@@ -152,7 +191,95 @@ export class LeaderboardRepository implements ILeaderboardRepository {
   }
 
   /**
-   * Get specific user's rank across different time periods
+   * Get combined user ranking data in a single query (optimized for enhanced stats)
+   * Combines all-time rank, daily rank, and leaderboard stats in one CTE query
+   */
+  async getUserRankingCombined(userId: number): Promise<{
+    allTimeRank: number | null;
+    dailyRank: number | null;
+    totalUsers: number;
+  }> {
+    const cacheKey = `user_rank_combined:${userId}`;
+
+    // Try cache first
+    try {
+      const cached = await redisClient.get(cacheKey);
+      if (cached) {
+        return JSON.parse(cached);
+      }
+    } catch (error) {
+      console.warn('[leaderboard] Cache read failed:', error);
+    }
+
+    // Single CTE query to get all ranking data at once
+    const result = await prisma.$queryRaw<
+      Array<{
+        all_time_rank: bigint | null;
+        daily_rank: bigint | null;
+        total_users: bigint;
+      }>
+    >`
+      WITH all_time_ranks AS (
+        SELECT
+          "userId",
+          ROW_NUMBER() OVER (ORDER BY profit DESC) as rank
+        FROM "UserStats"
+      ),
+      daily_profits AS (
+        SELECT
+          us."userId",
+          COALESCE(
+            (SELECT SUM(CASE WHEN b.won = true THEN b.payout - b.amount ELSE -b.amount END)
+             FROM "Bet" b
+             WHERE b."userId" = us."userId" AND b."createdAt" >= CURRENT_DATE - INTERVAL '1 day'
+            ), 0
+          ) + COALESCE(
+            (SELECT SUM(CASE WHEN p.status = 'WON' THEN p."potentialPayout" - p.amount ELSE -p.amount END)
+             FROM "Parlay" p
+             WHERE p."userId" = us."userId" AND p."createdAt" >= CURRENT_DATE - INTERVAL '1 day'
+            ), 0
+          ) as daily_profit
+        FROM "UserStats" us
+      ),
+      daily_ranks AS (
+        SELECT
+          "userId",
+          ROW_NUMBER() OVER (ORDER BY daily_profit DESC) as rank
+        FROM daily_profits
+      ),
+      user_stats AS (
+        SELECT COUNT(*)::bigint as total_users
+        FROM "UserStats"
+      )
+      SELECT
+        atr.rank as all_time_rank,
+        dr.rank as daily_rank,
+        us.total_users
+      FROM user_stats us
+      LEFT JOIN all_time_ranks atr ON atr."userId" = ${userId}
+      LEFT JOIN daily_ranks dr ON dr."userId" = ${userId}
+    `;
+
+    const [row] = result;
+
+    const ranking = {
+      allTimeRank: row?.all_time_rank ? Number(row.all_time_rank) : null,
+      dailyRank: row?.daily_rank ? Number(row.daily_rank) : null,
+      totalUsers: row?.total_users ? Number(row.total_users) : 0,
+    };
+
+    // Cache the result
+    try {
+      await redisClient.setex(cacheKey, CACHE_TTL.USER_RANK, JSON.stringify(ranking));
+    } catch (error) {
+      console.warn('[leaderboard] Cache write failed:', error);
+    }
+
+    return ranking;
+  }
+
+  /**
+   * Get specific user's rank across different time periods - now queries UserStats directly
    */
   async getUserRank(userId: number, period: 'allTime' | 'daily'): Promise<UserRank> {
     const cacheKey = getCacheKey.userRank(userId, period);
@@ -167,27 +294,44 @@ export class LeaderboardRepository implements ILeaderboardRepository {
       console.warn('[leaderboard] Cache read failed:', error);
     }
 
-    // Query user's rank using window functions
+    // Query user's rank using window functions on UserStats
     let result: any[];
     if (period === 'allTime') {
       result = await prisma.$queryRaw<any[]>`
         WITH ranked_users AS (
           SELECT 
-            user_id,
-            ROW_NUMBER() OVER (ORDER BY profit_all DESC) as rank
-          FROM leaderboard_view
+            "userId",
+            ROW_NUMBER() OVER (ORDER BY profit DESC) as rank
+          FROM "UserStats"
         )
-        SELECT rank FROM ranked_users WHERE user_id = ${userId}
+        SELECT rank FROM ranked_users WHERE "userId" = ${userId}
       `;
     } else {
+      // For daily ranking, calculate daily profit dynamically
       result = await prisma.$queryRaw<any[]>`
-        WITH ranked_users AS (
+        WITH daily_profits AS (
           SELECT 
-            user_id,
-            ROW_NUMBER() OVER (ORDER BY profit_period DESC) as rank
-          FROM leaderboard_view
+            us."userId",
+            COALESCE(
+              (SELECT SUM(CASE WHEN b.won = true THEN b.payout - b.amount ELSE -b.amount END)
+               FROM "Bet" b 
+               WHERE b."userId" = us."userId" AND b."createdAt" >= CURRENT_DATE - INTERVAL '1 day'
+              ), 0
+            ) + COALESCE(
+              (SELECT SUM(CASE WHEN p.status = 'WON' THEN p."potentialPayout" - p.amount ELSE -p.amount END)
+               FROM "Parlay" p
+               WHERE p."userId" = us."userId" AND p."createdAt" >= CURRENT_DATE - INTERVAL '1 day'
+              ), 0
+            ) as daily_profit
+          FROM "UserStats" us
+        ),
+        ranked_users AS (
+          SELECT 
+            "userId",
+            ROW_NUMBER() OVER (ORDER BY daily_profit DESC) as rank
+          FROM daily_profits
         )
-        SELECT rank FROM ranked_users WHERE user_id = ${userId}
+        SELECT rank FROM ranked_users WHERE "userId" = ${userId}
       `;
     }
 
@@ -212,7 +356,7 @@ export class LeaderboardRepository implements ILeaderboardRepository {
   }
 
   /**
-   * Get overall leaderboard statistics
+   * Get overall leaderboard statistics - now queries UserStats directly
    */
   async getLeaderboardStats(): Promise<LeaderboardStats> {
     const cacheKey = getCacheKey.stats();
@@ -227,34 +371,23 @@ export class LeaderboardRepository implements ILeaderboardRepository {
       console.warn('[leaderboard] Cache read failed:', error);
     }
 
-    // Use Prisma aggregations for better performance
+    // Use Prisma aggregations on UserStats for better performance
     const [statsResult] = await prisma.$queryRaw<any[]>`
       SELECT 
         COUNT(*) as total_users,
-        COUNT(CASE WHEN total_bets > 0 THEN 1 END) as active_users,
-        SUM(total_bets) as total_bets,
-        SUM(CASE WHEN profit_all > 0 THEN profit_all ELSE 0 END) as total_volume
-      FROM leaderboard_view
+        COUNT(CASE WHEN "totalBets" + "totalParlays" > 0 THEN 1 END) as active_users,
+        SUM("totalBets" + "totalParlays") as total_bets,
+        SUM("totalWagered") as total_volume
+      FROM "UserStats"
     `;
 
-    // Get last refresh time from Redis if available
-    let lastRefresh: Date | null = null;
-    try {
-      const refreshData = await redisClient.get('leaderboard:last_refresh');
-      if (refreshData) {
-        const parsed = JSON.parse(refreshData);
-        lastRefresh = new Date(parsed.timestamp);
-      }
-    } catch (error) {
-      console.warn('[leaderboard] Failed to get last refresh time:', error);
-    }
-
+    // No longer need last refresh time since we're querying live data
     const stats: LeaderboardStats = {
       totalUsers: Number(statsResult.total_users),
       activeUsers: Number(statsResult.active_users),
       totalBets: Number(statsResult.total_bets),
       totalVolume: Number(statsResult.total_volume),
-      lastRefresh,
+      lastRefresh: new Date(), // Always current since we're querying live data
     };
 
     // Cache the result
@@ -268,121 +401,42 @@ export class LeaderboardRepository implements ILeaderboardRepository {
   }
 
   /**
-   * Refresh leaderboard data and clear related caches
-   * Note: leaderboard_view is now a regular table, not a materialized view
+   * Refresh method is now simplified - just clear caches since we query live data
+   * No more leaderboard_view table to maintain!
    */
   async refreshMaterializedView(): Promise<void> {
-    // Refresh the leaderboard_view table with current data
-    await prisma.$executeRaw`
-      INSERT INTO leaderboard_view (
-        user_id, user_name, avatar_url, balance, total_bets, win_rate,
-        profit_all, profit_period, roi, longest_streak, current_streak,
-        parlays_started, parlays_won, total_parlay_legs, parlay_legs_won, rank_change
-      )
-      SELECT
-        u.id AS user_id,
-        u.name AS user_name,
-        u."avatarUrl" AS avatar_url,
-        u."muskBucks" AS balance,
-        COALESCE(COUNT(DISTINCT b.id), 0) AS total_bets,
-        CASE 
-          WHEN COUNT(b.id) > 0 
-          THEN CAST(COUNT(CASE WHEN b.won = true THEN 1 END) AS FLOAT) / COUNT(b.id)
-          ELSE 0 
-        END AS win_rate,
-        COALESCE(SUM(CASE WHEN b.won = true THEN b.payout - b.amount ELSE -b.amount END), 0) AS profit_all,
-        COALESCE(SUM(
-          CASE 
-            WHEN b."createdAt" >= CURRENT_DATE - INTERVAL '30 days' 
-            THEN CASE WHEN b.won = true THEN b.payout - b.amount ELSE -b.amount END
-            ELSE 0
-          END
-        ), 0) AS profit_period,
-        CASE 
-          WHEN SUM(b.amount) > 0 
-          THEN CAST(SUM(CASE WHEN b.won = true THEN b.payout - b.amount ELSE -b.amount END) AS FLOAT) / SUM(b.amount)
-          ELSE 0 
-        END AS roi,
-        COALESCE(u."longestStreak", 0) AS longest_streak,
-        COALESCE(u."currentStreak", 0) AS current_streak,
-        COALESCE(COUNT(DISTINCT p.id), 0) AS parlays_started,
-        COALESCE(COUNT(DISTINCT CASE WHEN p.status = 'WON' THEN p.id END), 0) AS parlays_won,
-        COALESCE(COUNT(DISTINCT pl.id), 0) AS total_parlay_legs,
-        COALESCE(COUNT(DISTINCT CASE WHEN p.status = 'WON' THEN pl.id END), 0) AS parlay_legs_won,
-        0 AS rank_change
-      FROM "User" u
-      LEFT JOIN "Bet" b ON u.id = b."userId"
-      LEFT JOIN "Parlay" p ON u.id = p."userId"
-      LEFT JOIN "ParlayLeg" pl ON p.id = pl."parlayId"
-      WHERE u.role IN ('USER', 'ADMIN')
-      GROUP BY u.id, u.name, u."avatarUrl", u."muskBucks", u."longestStreak", u."currentStreak"
-      ON CONFLICT (user_id) DO UPDATE SET
-        user_name = EXCLUDED.user_name,
-        avatar_url = EXCLUDED.avatar_url,
-        balance = EXCLUDED.balance,
-        total_bets = EXCLUDED.total_bets,
-        win_rate = EXCLUDED.win_rate,
-        profit_all = EXCLUDED.profit_all,
-        profit_period = EXCLUDED.profit_period,
-        roi = EXCLUDED.roi,
-        longest_streak = EXCLUDED.longest_streak,
-        current_streak = EXCLUDED.current_streak,
-        parlays_started = EXCLUDED.parlays_started,
-        parlays_won = EXCLUDED.parlays_won,
-        total_parlay_legs = EXCLUDED.total_parlay_legs,
-        parlay_legs_won = EXCLUDED.parlay_legs_won,
-        rank_change = EXCLUDED.rank_change;
-    `;
+    console.log('[leaderboard] Refreshing by clearing caches (now using live UserStats data)');
 
-    // Clear all leaderboard caches after data update
+    // Clear all leaderboard caches - data is always fresh from UserStats
     await this.clearCache();
+
+    console.log('[leaderboard] Refresh complete - all caches cleared');
   }
 
   /**
    * Process leaderboard entries with optimized avatar handling
+   * Uses batch avatar URL fetching to reduce N+1 queries
    */
   private async processLeaderboardEntries(rows: any[]): Promise<PublicLeaderboardEntry[]> {
-    // Batch avatar URL generation for better performance
-    const avatarPromises = rows.map(async (r) => {
-      if (r.avatar_key) {
-        const cacheKey = getCacheKey.avatar(r.user_id, r.avatar_key);
+    if (rows.length === 0) {
+      return [];
+    }
 
-        // Check cache first
-        try {
-          const cached = await redisClient.get(cacheKey);
-          if (cached) {
-            return cached;
-          }
-        } catch (error) {
-          console.warn('[leaderboard] Avatar cache read failed:', error);
-        }
+    // Collect all users that need avatar URLs
+    const usersForAvatars = rows.map((r) => ({
+      id: Number(r.user_id),
+      profilePictureKey: r.avatar_key,
+      avatarUrl: r.avatar_url,
+    }));
 
-        // Generate URL and cache it
-        const avatarUrl = await userService.getCachedProfileImageUrl(
-          r.user_id,
-          r.avatar_key,
-          CACHE_TTL.AVATAR,
-        );
+    // Batch fetch avatar URLs (single MGET + parallel S3 calls)
+    const avatarUrlMap = await userService.getBatchedAvatarUrls(usersForAvatars);
 
-        try {
-          await redisClient.setex(cacheKey, CACHE_TTL.AVATAR, avatarUrl || '');
-        } catch (error) {
-          console.warn('[leaderboard] Avatar cache write failed:', error);
-        }
-
-        return avatarUrl;
-      } else if (r.avatar_url) {
-        return r.avatar_url;
-      }
-      return null;
-    });
-
-    const avatarUrls = await Promise.all(avatarPromises);
-
-    return rows.map((r, index) => ({
+    // Map results back to rows
+    return rows.map((r) => ({
       userId: Number(r.user_id),
       userName: r.user_name,
-      avatarUrl: avatarUrls[index],
+      avatarUrl: avatarUrlMap.get(Number(r.user_id)) || null,
       balance: r.balance.toString(),
       totalBets: Number(r.total_bets),
       winRate: Number(r.win_rate),
@@ -400,19 +454,65 @@ export class LeaderboardRepository implements ILeaderboardRepository {
   }
 
   /**
+   * Process UserStats entries directly (for all-time leaderboard)
+   * Uses batch avatar URL fetching to reduce N+1 queries
+   */
+  private async processUserStatsEntries(userStats: any[]): Promise<PublicLeaderboardEntry[]> {
+    if (userStats.length === 0) {
+      return [];
+    }
+
+    // Collect all users that need avatar URLs
+    const usersForAvatars = userStats.map((stat) => ({
+      id: stat.user.id,
+      profilePictureKey: stat.user.profilePictureKey,
+      avatarUrl: stat.user.avatarUrl,
+    }));
+
+    // Batch fetch avatar URLs (single MGET + parallel S3 calls)
+    const avatarUrlMap = await userService.getBatchedAvatarUrls(usersForAvatars);
+
+    // Map results back to stats
+    return userStats.map((stat) => {
+      const user = stat.user;
+      return {
+        userId: user.id,
+        userName: user.name,
+        avatarUrl: avatarUrlMap.get(user.id) || null,
+        balance: user.muskBucks.toString(),
+        totalBets: stat.totalBets + stat.totalParlays,
+        winRate:
+          stat.totalBets + stat.totalParlays > 0
+            ? (stat.betsWon + stat.parlaysWon) / (stat.totalBets + stat.totalParlays)
+            : 0,
+        profitAll: stat.profit.toString(),
+        profitPeriod: '0', // Will be calculated separately for daily leaderboard
+        roi: stat.roi,
+        longestStreak: stat.longestStreak,
+        currentStreak: stat.currentStreak,
+        parlaysStarted: stat.totalParlays,
+        parlaysWon: stat.parlaysWon,
+        totalParlayLegs: stat.totalParlayLegs,
+        parlayLegsWon: stat.parlayLegsWon,
+        rankChange: null, // Can be calculated if needed
+      };
+    });
+  }
+
+  /**
    * Clear all leaderboard-related caches
    */
   private async clearCache(): Promise<void> {
     try {
       const keys = await redisClient.keys('leaderboard:*');
       const userRankKeys = await redisClient.keys('user_rank:*');
-      const avatarKeys = await redisClient.keys('avatar:*');
+      // Keep avatar cache as it's still useful
 
-      const allKeys = [...keys, ...userRankKeys, ...avatarKeys];
+      const allKeys = [...keys, ...userRankKeys];
 
       if (allKeys.length > 0) {
         await redisClient.del(...allKeys);
-        console.log(`[leaderboard] Cleared ${allKeys.length} cache keys`);
+        console.log(`[leaderboard] Cleared ${allKeys.length} cache keys (keeping avatar cache)`);
       }
     } catch (error) {
       console.warn('[leaderboard] Cache clear failed:', error);

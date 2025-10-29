@@ -1,161 +1,554 @@
-// apps/client/src/pages/Predictions.tsx
-// -----------------------------------------------------------------------------
-// Main predictions list page with enhanced betting experience.
-// Uses PredictionCard components with the new BetModal system.
-// Parlay functionality has been moved to the dashboard.
-// -----------------------------------------------------------------------------
+// Enhanced Predictions page with integrated parlay workflow
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { REDIS_CHANNELS } from '@ems/types';
+import type { PredictionCreatedPayload, BetPlacedPayload } from '@ems/types';
 
-import { useState, useMemo } from 'react';
+// New components
+import EnhancedPredictionFilters from '../components/prediction/EnhancedPredictionFilters';
+import PredictionPreview from '../components/prediction/PredictionPreview';
+import PredictionDetailView from '../components/prediction/PredictionDetailView';
+import { FloatingParlayIndicator } from '../components/prediction/ParlaySelectionIndicator';
+import PaginationControls from '../components/prediction/PaginationControls';
 
-import CreatePredictionForm from '../components/CreatePredictionForm';
-import UnifiedPredictionCard from '../components/UnifiedPredictionCard';
+// Existing components
+import PredictionCard from '../components/prediction/PredictionCard';
+import PredictionSectionCard from '../components/prediction/PredictionSectionCard';
+import BetModal from '../components/prediction/BetModal';
 
+// Hooks and contexts
+import { usePredictionDiscovery } from '../hooks/usePredictionDiscovery';
+import { useEventBusCore } from '../contexts/EventBusCoreContext';
+import { useParlay } from '../contexts/ParlayContext';
 import { usePredictionMarket } from '../contexts/PredictionContext';
-import { useAuth } from '../contexts/AuthContext';
+
+// Icons
+import {
+  Squares2X2Icon as Grid,
+  ListBulletIcon as List,
+  SquaresPlusIcon as Layers,
+  ArrowTrendingUpIcon as TrendingUp,
+  BellIcon as Bell,
+  PlusIcon,
+} from '@heroicons/react/24/outline';
+import { toast } from 'react-hot-toast';
+
+type ViewMode = 'sections' | 'list' | 'grid';
 
 export default function Predictions() {
-  const { predictions: raw, loading, error, createPrediction } = usePredictionMarket();
-  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { id: predictionId } = useParams<{ id: string }>();
+  const { state: parlayState, dispatch: parlayDispatch } = useParlay();
+  const { subscribe } = useEventBusCore();
+  const { openCreateModal, pagination, goToPage, nextPage, prevPage } = usePredictionMarket();
 
-  const [creating, setCreating] = useState(false);
-  const [tab, setTab] = useState<'OPEN' | 'EXPIRED' | 'RESOLVED' | 'PENDING'>('OPEN');
+  // AI-powered discovery system
+  const {
+    predictionSections,
+    enhancedPredictions,
+    filters,
+    availableCategories,
+    loading,
+    error,
+    updateFilters,
+    clearFilters,
+    markAsViewed,
+  } = usePredictionDiscovery();
 
-  const filtered = useMemo(() => {
-    const now = Date.now();
-    return raw.filter((p) => {
-      const expires = new Date(p.expiresAt).getTime();
+  // State management
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [liveNotifications, setLiveNotifications] = useState<any[]>([]);
+  const [previewPrediction, setPreviewPrediction] = useState<any>(null);
+  const [previewTriggerRef, setPreviewTriggerRef] = useState<HTMLElement | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+  const [betModalOpen, setBetModalOpen] = useState(false);
+  const [selectedPredictionForBet, setSelectedPredictionForBet] = useState<any>(null);
 
-      switch (tab) {
-        case 'PENDING':
-          return !p.approved;
-        case 'RESOLVED':
-          return p.approved && p.resolved;
-        case 'EXPIRED':
-          return p.approved && !p.resolved && now > expires;
-        case 'OPEN':
-        default:
-          return p.approved && !p.resolved && now <= expires;
-      }
-    });
-  }, [raw, tab]);
+  // Refs for hover preview
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  /* ---------- Render ---------- */
-  if (loading) return <p className="p-4 text-center">Loading predictions…</p>;
-  if (error) return <p className="p-4 text-center text-red-500">Error: {String(error)}</p>;
+  // Detect mobile screen
+  useEffect(() => {
+    const checkIsMobile = () => setIsMobile(window.innerWidth < 768);
+    checkIsMobile();
+    window.addEventListener('resize', checkIsMobile);
+    return () => window.removeEventListener('resize', checkIsMobile);
+  }, []);
+
+  // Scroll to top when page changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [pagination.page]);
+
+  // Real-time event handlers
+  const handleNewPrediction = useCallback((data: PredictionCreatedPayload) => {
+    const notification = {
+      id: `new_${data.payload.predictionId}`,
+      type: 'new',
+      title: 'New Prediction',
+      message: data.payload.title,
+      timestamp: Date.now(),
+    };
+    setLiveNotifications((prev) => [notification, ...prev.slice(0, 4)]);
+
+    // Auto-remove after 10 seconds
+    setTimeout(() => {
+      setLiveNotifications((prev) => prev.filter((n) => n.id !== notification.id));
+    }, 10000);
+  }, []);
+
+  const handleBettingActivity = useCallback((data: BetPlacedPayload) => {
+    // Show high-value bets as notifications
+    if (data.payload.amount > 10000) {
+      toast(
+        `💰 ${data.payload.amount.toLocaleString()} MuskBucks bet on ${data.payload.optionLabel}!`,
+        {
+          duration: 5000,
+          position: 'top-right',
+        },
+      );
+    }
+  }, []);
+
+  // Real-time event subscriptions via EventBusCore
+  useEffect(() => {
+    const unsubscribers = [
+      subscribe(REDIS_CHANNELS.PREDICTION_CREATED, handleNewPrediction),
+      subscribe(REDIS_CHANNELS.BET_PLACED, handleBettingActivity),
+    ];
+
+    return () => {
+      unsubscribers.forEach((unsub) => unsub());
+    };
+  }, [subscribe, handleNewPrediction, handleBettingActivity]);
+
+  // Handle prediction card click for detailed view
+  const handlePredictionClick = useCallback(
+    (predictionId: number) => {
+      navigate(`/predictions/${predictionId}`);
+      markAsViewed(predictionId);
+    },
+    [navigate, markAsViewed],
+  );
+
+  // Handle hover preview
+  const handlePredictionHover = useCallback(
+    (prediction: any, triggerElement: HTMLElement) => {
+      if (isMobile) return;
+
+      hoverTimeoutRef.current = setTimeout(() => {
+        setPreviewPrediction(prediction);
+        setPreviewTriggerRef(triggerElement);
+      }, 500);
+    },
+    [isMobile],
+  );
+
+  const handlePredictionLeave = useCallback(() => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+    setPreviewPrediction(null);
+    setPreviewTriggerRef(null);
+  }, []);
+
+  // Handle adding to parlay
+  const handleAddToParlay = useCallback(
+    (prediction: any, optionId: number) => {
+      const option = prediction.options.find((o: any) => o.id === optionId);
+      if (!option) return;
+
+      parlayDispatch({
+        type: 'ADD_LEG',
+        leg: {
+          predictionId: prediction.id,
+          optionId,
+          label: option.label,
+          predictionTitle: prediction.title,
+          odds: option.odds,
+        },
+      });
+
+      toast.success(`Added "${prediction.title}" to parlay`, {
+        duration: 2000,
+        position: 'bottom-center',
+      });
+    },
+    [parlayDispatch],
+  );
+
+  // Quick bet handler
+  const handleQuickBet = useCallback((prediction: any) => {
+    setSelectedPredictionForBet(prediction);
+    setBetModalOpen(true);
+  }, []);
+
+  // Render prediction cards based on view mode
+  const renderPredictions = useCallback(() => {
+    if (loading) {
+      return (
+        <div className="flex justify-center items-center py-12">
+          <div className="text-center">
+            <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-tertiary">Loading predictions...</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (error) {
+      return (
+        <div className="text-center py-12">
+          <p className="text-error mb-4">Error loading predictions: {String(error)}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="text-primary hover:underline cursor-pointer"
+          >
+            Try Again
+          </button>
+        </div>
+      );
+    }
+
+    if (enhancedPredictions.length === 0) {
+      return (
+        <div className="text-center py-12">
+          <div className="text-6xl mb-4">🔍</div>
+          <h3 className="text-xl font-semibold text-content mb-2">No predictions found</h3>
+          <p className="text-tertiary mb-6">
+            Try adjusting your filters or check back later for new predictions.
+          </p>
+          {(filters.categories.length > 0 || filters.search) && (
+            <button
+              onClick={clearFilters}
+              className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary-hover"
+            >
+              Clear All Filters
+            </button>
+          )}
+        </div>
+      );
+    }
+
+    switch (viewMode) {
+      case 'sections':
+        return (
+          <div className="space-y-8">
+            {predictionSections.map((section) => (
+              <PredictionSectionCard
+                key={section.id}
+                section={section}
+                onMarkViewed={markAsViewed}
+                className="bg-surface border border-border shadow-sm hover:shadow-md transition-shadow rounded-xl overflow-hidden"
+              />
+            ))}
+          </div>
+        );
+
+      case 'list':
+        return (
+          <div className="space-y-6">
+            {enhancedPredictions.map((prediction) => (
+              <div
+                key={prediction.id}
+                className="relative"
+                onMouseEnter={(e) =>
+                  handlePredictionHover(prediction, e.currentTarget as HTMLElement)
+                }
+                onMouseLeave={handlePredictionLeave}
+              >
+                {/* Parlay indicator */}
+                {parlayState.legs.some((leg) => leg.predictionId === prediction.id) && (
+                  <FloatingParlayIndicator predictionId={prediction.id} position="top-right" />
+                )}
+
+                <PredictionCard
+                  prediction={
+                    {
+                      ...prediction,
+                      options: prediction.options.map((opt) => ({
+                        ...opt,
+                        createdAt:
+                          typeof opt.createdAt === 'string'
+                            ? new Date(opt.createdAt)
+                            : opt.createdAt,
+                      })),
+                    } as any
+                  }
+                  variant="list"
+                  showActions={true}
+                  showParlayActions={true}
+                  onCardView={() => handlePredictionClick(prediction.id)}
+                  onQuickBet={handleQuickBet}
+                  onAddToParlay={handleAddToParlay}
+                  className="hover:shadow-lg transition-shadow"
+                />
+              </div>
+            ))}
+          </div>
+        );
+
+      case 'grid':
+        return (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
+            {enhancedPredictions.map((prediction) => (
+              <div
+                key={prediction.id}
+                className="relative"
+                onMouseEnter={(e) =>
+                  handlePredictionHover(prediction, e.currentTarget as HTMLElement)
+                }
+                onMouseLeave={handlePredictionLeave}
+              >
+                <PredictionCard
+                  prediction={
+                    {
+                      ...prediction,
+                      options: prediction.options.map((opt) => ({
+                        ...opt,
+                        createdAt:
+                          typeof opt.createdAt === 'string'
+                            ? new Date(opt.createdAt)
+                            : opt.createdAt,
+                      })),
+                    } as any
+                  }
+                  variant="compact"
+                  showActions={true}
+                  showBetsList={false}
+                  showParlayActions={true}
+                  onCardView={() => handlePredictionClick(prediction.id)}
+                  className="h-full"
+                />
+              </div>
+            ))}
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  }, [
+    viewMode,
+    enhancedPredictions,
+    predictionSections,
+    loading,
+    error,
+    filters,
+    parlayState.legs,
+    clearFilters,
+    markAsViewed,
+    handlePredictionClick,
+    handleQuickBet,
+    handleAddToParlay,
+    handlePredictionHover,
+    handlePredictionLeave,
+  ]);
+
+  // If we have a prediction ID, find and display the detailed view
+  if (predictionId) {
+    const detailedPrediction = enhancedPredictions.find((p) => p.id?.toString() === predictionId);
+
+    if (loading) {
+      return (
+        <div className="min-h-screen bg-background flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-tertiary">Loading prediction...</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (!detailedPrediction) {
+      return (
+        <div className="min-h-screen bg-background flex items-center justify-center">
+          <div className="text-center">
+            <div className="text-6xl mb-4">❓</div>
+            <h2 className="text-2xl font-bold text-content mb-2">Prediction Not Found</h2>
+            <p className="text-tertiary mb-6">
+              The prediction you're looking for doesn't exist or has been removed.
+            </p>
+            <button
+              onClick={() => navigate('/predictions')}
+              className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary-hover"
+            >
+              Back to Predictions
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="min-h-screen bg-background">
+        <PredictionDetailView
+          prediction={
+            {
+              ...detailedPrediction,
+              options: detailedPrediction.options.map((opt) => ({
+                ...opt,
+                createdAt:
+                  typeof opt.createdAt === 'string' ? new Date(opt.createdAt) : opt.createdAt,
+              })),
+            } as any
+          }
+          onBack={() => navigate('/predictions')}
+        />
+      </div>
+    );
+  }
 
   return (
-    <div className="p-6 max-w-3xl mx-auto bg-background rounded-lg">
-      {/* Create prediction toggle */}
-      <div className="flex justify-center mb-6">
-        <button
-          onClick={() => setCreating((c) => !c)}
-          className="px-6 py-3 bg-green-500 hover:bg-green-600 active:bg-green-700 text-white text-lg font-bold rounded-full shadow-xl transform hover:scale-105 transition"
-        >
-          {creating ? 'Cancel Prediction' : 'Make Prediction'}
-        </button>
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <div className="bg-surface border-b border-border sticky top-0 z-20">
+        <div className="px-4 xl:px-6 py-3 max-w-[1800px] mx-auto">
+          {/* Single Row Layout - Stacks on mobile, single row on xl screens (1280px+) */}
+          <div className="flex flex-col xl:flex-row xl:items-center gap-3 xl:gap-4">
+            {/* Left Section: Title + View Toggle */}
+            <div className="flex items-center gap-3 flex-shrink-0">
+              <h1 className="text-xl font-bold text-content flex items-center gap-2 whitespace-nowrap">
+                <TrendingUp className="w-5 h-5 text-primary" />
+                <span className="hidden sm:inline">Prediction Market</span>
+                <span className="sm:hidden">Predictions</span>
+              </h1>
+
+              {/* View Mode Toggle */}
+              <div className="hidden md:flex items-center bg-muted rounded-lg p-1">
+                <button
+                  onClick={() => setViewMode('sections')}
+                  className={`p-2 rounded transition-colors cursor-pointer ${
+                    viewMode === 'sections'
+                      ? 'bg-surface text-primary shadow-sm'
+                      : 'text-tertiary hover:text-content hover:bg-surface/50'
+                  }`}
+                  title="Sections View"
+                >
+                  <Layers className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`p-2 rounded transition-colors cursor-pointer ${
+                    viewMode === 'list'
+                      ? 'bg-surface text-primary shadow-sm'
+                      : 'text-tertiary hover:text-content hover:bg-surface/50'
+                  }`}
+                  title="List View"
+                >
+                  <List className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`p-2 rounded transition-colors cursor-pointer ${
+                    viewMode === 'grid'
+                      ? 'bg-surface text-primary shadow-sm'
+                      : 'text-tertiary hover:text-content hover:bg-surface/50'
+                  }`}
+                  title="Grid View"
+                >
+                  <Grid className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Middle Section: Filters */}
+            <div className="flex-1 min-w-0">
+              <EnhancedPredictionFilters
+                filters={filters}
+                availableCategories={availableCategories}
+                onFiltersChange={updateFilters}
+                onClearFilters={clearFilters}
+                totalResults={enhancedPredictions.length}
+                layout="horizontal"
+              />
+            </div>
+
+            {/* Right Section: Create Button + Notifications */}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {/* Create Prediction Button */}
+              <button
+                onClick={() => openCreateModal()}
+                className="flex items-center gap-1.5 px-3 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 hover:scale-105 transition-all cursor-pointer font-medium text-sm whitespace-nowrap"
+              >
+                <PlusIcon className="w-4 h-4" />
+                <span className="hidden xl:inline">Create Prediction</span>
+                <span className="xl:hidden">Create</span>
+              </button>
+
+              {/* Live Notifications */}
+              {liveNotifications.length > 0 && (
+                <div className="relative">
+                  <button className="p-2 hover:bg-muted rounded-lg relative cursor-pointer transition-colors">
+                    <Bell className="w-5 h-5 text-tertiary" />
+                    <span className="absolute top-1 right-1 w-2 h-2 bg-error rounded-full animate-pulse" />
+                  </button>
+
+                  {/* Notification dropdown */}
+                  <div className="absolute top-full right-0 mt-2 w-72 bg-surface border border-border rounded-lg shadow-xl hidden">
+                    <div className="p-3 border-b border-border">
+                      <h3 className="font-medium text-content">Live Updates</h3>
+                    </div>
+                    <div className="max-h-64 overflow-y-auto">
+                      {liveNotifications.map((notif) => (
+                        <div key={notif.id} className="p-3 border-b border-border hover:bg-muted">
+                          <div className="flex items-start gap-2">
+                            <span className="text-lg">{notif.type === 'new' ? '✨' : '🔥'}</span>
+                            <div className="flex-1">
+                              <p className="text-sm font-medium text-content">{notif.title}</p>
+                              <p className="text-xs text-tertiary">{notif.message}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Create form */}
-      {creating && (
-        <div className="mb-6">
-          <CreatePredictionForm
-            onCreated={async (input) => {
-              await createPrediction(input);
-              setCreating(false);
-            }}
-            onCancel={() => setCreating(false)}
+      {/* Main Content */}
+      <div className="px-4 xl:px-6 py-4 xl:py-6 max-w-[1800px] mx-auto">
+        {renderPredictions()}
+
+        {/* Pagination Controls - Only show for list and grid views */}
+        {!loading && !error && enhancedPredictions.length > 0 && viewMode !== 'sections' && (
+          <PaginationControls
+            currentPage={pagination.page}
+            totalPages={pagination.totalPages}
+            hasMore={pagination.hasMore}
+            loading={loading}
+            onPageChange={goToPage}
+            onNext={nextPage}
+            onPrev={prevPage}
           />
-        </div>
+        )}
+      </div>
+
+      {/* Prediction Preview (hover) */}
+      {previewPrediction && previewTriggerRef && (
+        <PredictionPreview
+          prediction={previewPrediction}
+          triggerRef={{ current: previewTriggerRef }}
+          isVisible={true}
+          placement="right"
+        />
       )}
 
-      {/* Tabs */}
-      <div className="flex justify-center mb-6 space-x-2 overflow-x-auto">
-        <button
-          className={`px-4 py-2 rounded whitespace-nowrap ${
-            tab === 'OPEN' ? 'bg-primary text-surface' : 'bg-surface text-content'
-          }`}
-          onClick={() => setTab('OPEN')}
-        >
-          Open
-        </button>
-        <button
-          className={`px-4 py-2 rounded whitespace-nowrap ${
-            tab === 'EXPIRED' ? 'bg-primary text-surface' : 'bg-surface text-content'
-          }`}
-          onClick={() => setTab('EXPIRED')}
-        >
-          Expired
-        </button>
-        <button
-          className={`px-4 py-2 rounded whitespace-nowrap ${
-            tab === 'RESOLVED' ? 'bg-primary text-surface' : 'bg-surface text-content'
-          }`}
-          onClick={() => setTab('RESOLVED')}
-        >
-          Resolved
-        </button>
-        <button
-          className={`px-4 py-2 rounded whitespace-nowrap ${
-            tab === 'PENDING' ? 'bg-primary text-surface' : 'bg-surface text-content'
-          }`}
-          onClick={() => setTab('PENDING')}
-        >
-          Pending
-        </button>
-      </div>
-
-      {/* List */}
-      {filtered.length === 0 ? (
-        <p className="p-4 text-center">
-          {tab === 'OPEN' && 'No open predictions available.'}
-          {tab === 'EXPIRED' && 'No expired predictions.'}
-          {tab === 'RESOLVED' && 'No resolved predictions.'}
-          {tab === 'PENDING' && 'No predictions pending approval.'}
-        </p>
-      ) : (
-        <ul className="space-y-6">
-          {filtered.map((pred) => {
-            // Only show approved predictions or user's own predictions
-            if (!pred.approved && pred.creatorId !== user?.id) {
-              return null;
-            }
-
-            // For non-approved predictions, show status message
-            if (!pred.approved) {
-              return (
-                <li
-                  key={pred.id}
-                  className="relative bg-surface border border-muted p-6 rounded-2xl shadow"
-                >
-                  <span className="absolute top-4 right-4 px-3 py-1 rounded-full text-xs font-medium bg-yellow-600 text-white">
-                    Pending
-                  </span>
-                  <h2 className="text-2xl font-semibold mb-2 text-content pr-24">{pred.title}</h2>
-                  <p className="mb-3 text-base text-tertiary">{pred.description}</p>
-                  <p className="text-sm italic text-yellow-600">
-                    Your prediction is awaiting admin approval.
-                  </p>
-                </li>
-              );
-            }
-
-            // For approved predictions, use the unified PredictionCard
-            return (
-              <UnifiedPredictionCard
-                key={pred.id}
-                prediction={pred}
-                variant="full"
-                showActions={true}
-                showBetsList={true}
-                showParlayActions={false}
-                addOptimisticBet={(bet) => {
-                  // Handle optimistic update if needed
-                  console.log('Optimistic bet placed:', bet);
-                }}
-              />
-            );
-          })}
-        </ul>
+      {/* Quick Bet Modal */}
+      {selectedPredictionForBet && (
+        <BetModal
+          prediction={selectedPredictionForBet}
+          isOpen={betModalOpen}
+          onClose={() => {
+            setBetModalOpen(false);
+            setSelectedPredictionForBet(null);
+          }}
+          mode="modal"
+        />
       )}
     </div>
   );

@@ -1,19 +1,20 @@
 // apps/client/src/pages/Profile.tsx
 import { useState, useEffect, useCallback } from 'react';
+
+// Helper to convert string/number to number
 import { useParams } from 'react-router-dom';
 import { followUser, unfollowUser } from '../api/users';
 import { useAuth } from '../contexts/AuthContext';
 import { useUserProfile } from '../hooks/useUserProfile';
 import type { UpdateProfilePayload } from '../api/users';
+import PageContainer from '../components/PageContainer';
 
 // Profile sections
 import { ProfileHeader } from '../components/profile/ProfileHeader';
 import { ProfileEditForm } from '../components/profile/ProfileEditForm';
-import { ProfileStats } from '../components/profile/ProfileStats';
-import { ProfileBadges } from '../components/profile/ProfileBadges';
+import { ProfileStatsPanel } from '../components/profile/ProfileStats';
 import { CreatePostForm } from '../components/profile/CreatePostForm';
 import { ProfileFeed } from '../components/profile/ProfileFeed';
-import { ProfileActivity } from '../components/profile/ProfileActivity';
 
 export default function Profile() {
   const { user: currentUser } = useAuth();
@@ -27,8 +28,6 @@ export default function Profile() {
     formData,
     setFormData,
     refresh: reloadProfile,
-    feed,
-    activity,
     stats,
     saveProfile, // from hook
     postToFeed,
@@ -120,7 +119,7 @@ export default function Profile() {
     );
   }
 
-  // Full stats object (new fields) with a fallback
+  // Full stats object (new fields) with a fallback matching UserStatsDTO
   const statsData = stats ?? {
     totalBets: 0,
     betsWon: 0,
@@ -131,61 +130,70 @@ export default function Profile() {
     totalParlayLegs: 0,
     parlayLegsWon: 0,
     parlayLegsLost: 0,
-    totalWagered: 0,
-    totalWon: 0,
-    profit: 0,
-    roi: 0,
+    totalWagered: '0',
+    totalWinnings: '0',
+    totalLosses: '0',
+    netProfit: '0',
     currentStreak: 0,
-    longestStreak: 0,
-    mostCommonBet: null,
-    biggestWin: 0,
-    updatedAt: new Date().toISOString(),
+    longestWinStreak: 0,
+    longestLoseStreak: 0,
+    averageBetSize: '0',
+    averageOdds: 0,
+    biggestWin: '0',
+    biggestLoss: '0',
+    winRate: 0,
+    roi: 0,
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <ProfileHeader
-        profile={profile}
-        isOwn={isOwn}
-        editing={editing}
-        setEditing={setEditing}
-        following={following}
-        toggleFollow={toggleFollow}
-        followersCount={profile.followersCount}
-        followingCount={profile.followingCount}
-      />
-
-      {editing ? (
-        <ProfileEditForm
-          userId={profile.id}
-          formData={formData}
-          setFormData={setFormData}
-          handleSave={handleSave}
-          saving={saving}
+    <PageContainer>
+      <div className="max-w-4xl mx-auto space-y-6">
+        <ProfileHeader
+          profile={profile}
+          isOwn={isOwn}
+          editing={editing}
+          setEditing={setEditing}
+          following={following}
+          toggleFollow={toggleFollow}
+          followersCount={profile.followersCount}
+          followingCount={profile.followingCount}
         />
-      ) : (
-        <>
-          <ProfileBadges badges={profile.badges} />
 
-          <ProfileStats
-            profile={{ muskBucks: profile.muskBucks, rank: profile.rank }}
-            stats={statsData}
-            isOwn={isOwn}
+        {editing ? (
+          <ProfileEditForm
+            userId={profile.id}
+            formData={formData}
+            setFormData={setFormData}
+            handleSave={handleSave}
+            saving={saving}
           />
+        ) : (
+          <>
+            <ProfileStatsPanel
+              profile={{
+                id: profile.id,
+                name: profile.name,
+                muskBucks: profile.muskBucks,
+                rank: profile.rank,
+                achievements: profile.achievements,
+                badges: profile.badges,
+              }}
+              stats={statsData}
+              isOwn={isOwn}
+            />
 
-          <ProfileActivity activity={activity ?? []} />
+            {isOwn ? (
+              <CreatePostForm onSubmit={handlePost} disabled={loading} />
+            ) : (
+              <p className="text-gray-500">
+                Only {profile.name} can post on their own wall. You can reply to posts below.
+              </p>
+            )}
 
-          {isOwn ? (
-            <CreatePostForm onSubmit={handlePost} disabled={loading} />
-          ) : (
-            <p className="text-gray-500">
-              Only {profile.name} can post on their own wall. You can reply to posts below.
-            </p>
-          )}
-
-          <ProfileFeed feed={feed} loading={loading} onSubmit={handlePost} />
-        </>
-      )}
-    </div>
+            <ProfileFeed userId={numericId} includeReplies={true} />
+          </>
+        )}
+      </div>
+    </PageContainer>
   );
 }

@@ -1,16 +1,20 @@
 // apps/server/src/workers/article.worker.ts
 import 'dotenv/config';
 import { Worker } from 'bullmq';
-import { PrismaClient } from '@prisma/client';
 import redisClient from '../lib/redis';
-import type { Job } from 'bullmq';
-import type { ArticleProcessingJob } from '@ems/types';
-import ogs from 'open-graph-scraper';
 
-const prisma = new PrismaClient();
+// Configurable concurrency to keep CPU saturation <70%
+const ARTICLE_CONCURRENCY = parseInt(process.env.WORKER_ARTICLE_CONCURRENCY || '5');
+import type { Job } from 'bullmq';
+import type { ArticleProcessingJobData } from '@ems/types';
+import ogs from 'open-graph-scraper';
+import { FeedRepository } from '../repositories/FeedRepository';
+
+// Using shared prisma from db.ts
+const feedRepo = new FeedRepository();
 
 // Job data interfaces
-interface ArticleEnrichmentData extends ArticleProcessingJob {
+interface ArticleEnrichmentData extends ArticleProcessingJobData {
   articleId: number;
   extractImages?: boolean;
   generateTags?: boolean;
@@ -52,7 +56,7 @@ const articleWorker = new Worker(
   },
   {
     connection: redisClient,
-    concurrency: 10, // Process multiple articles simultaneously
+    concurrency: ARTICLE_CONCURRENCY, // Process articles with controlled concurrency
     removeOnComplete: { count: 100 },
     removeOnFail: { count: 200 },
   },
@@ -76,11 +80,8 @@ async function processArticleEnrichment(job: Job<ArticleEnrichmentData>): Promis
   console.log(`[article-worker] Enriching article ${articleId}`);
 
   try {
-    // 1. Fetch article from database
-    const article = await prisma.article.findUnique({
-      where: { id: articleId },
-      include: { feed: true },
-    });
+    // 1. Fetch article from database using repository
+    const article = await feedRepo.findArticleWithTagsAndFeed(articleId);
 
     if (!article) {
       throw new Error(`Article ${articleId} not found`);
@@ -163,7 +164,7 @@ async function processArticleEnrichment(job: Job<ArticleEnrichmentData>): Promis
 
     // 4. Generate enhanced tags
     if (generateTags) {
-      const existingTags = new Set(article.tags);
+      const existingTags = new Set(article.tags.map((t) => t.tag.name));
       const newTags = generateEnhancedTags(
         article.title,
         article.excerpt || updates.excerpt,
@@ -180,19 +181,31 @@ async function processArticleEnrichment(job: Job<ArticleEnrichmentData>): Promis
       }
 
       if (tagsAdded.length > 0) {
-        updates.tags = Array.from(existingTags);
+        updates.tags = {
+          create: tagsAdded.map((tagName) => ({
+            tag: {
+              connectOrCreate: {
+                where: { name: tagName },
+                create: {
+                  name: tagName,
+                  slug: tagName
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]+/g, '-')
+                    .replace(/^-|-$/g, ''),
+                },
+              },
+            },
+          })),
+        };
         hasUpdates = true;
       }
     }
 
     await job.updateProgress(80);
 
-    // 5. Update article record
+    // 5. Update article record using repository
     if (hasUpdates) {
-      await prisma.article.update({
-        where: { id: articleId },
-        data: updates,
-      });
+      await feedRepo.updateArticleEnrichment(articleId, updates);
       enriched = true;
       console.log(`[article-worker] Updated article ${articleId} with:`, Object.keys(updates));
     }
@@ -239,6 +252,9 @@ async function processBulkTagging(job: Job<BulkTaggingData>): Promise<{
     errors: ['Bulk tagging not yet implemented'],
   };
 }
+
+// Log configured concurrency on startup
+console.log(`[article-worker] Configured concurrency: ${ARTICLE_CONCURRENCY}`);
 
 // Event handlers
 articleWorker.on('completed', (job) => {

@@ -1,9 +1,25 @@
 // apps/client/src/api/axios.ts
+// Rollback: Remove metrics imports and interceptors, restore original axios config
 import axios from 'axios';
+import { devMetrics } from '../lib/metrics';
+import env from '../config/env';
+// CSRF Note: SPA uses JWT Bearer tokens for authentication, providing equivalent CSRF protection
 
+/**
+ * Axios instance for API requests
+ *
+ * SECURITY: Authentication using JWT Bearer tokens
+ * - Access tokens sent in Authorization header (not cookies)
+ * - Refresh tokens stored in HTTP-only cookies by server
+ * - Bearer tokens provide CSRF protection (cannot be sent by malicious sites)
+ *
+ * ENVIRONMENT CONFIGURATION:
+ * - Development: baseURL = '' (uses Vite proxy at localhost:3000)
+ * - Production: baseURL = VITE_API_BASE_URL (e.g., https://api.elonmusksucks.net)
+ */
 const api = axios.create({
-  baseURL: '', // ← purely relative
-  withCredentials: true, // ← still send cookies along
+  baseURL: env.API_BASE_URL, // Development: '' (Vite proxy), Production: full URL
+  withCredentials: true, // ← still send cookies along (for refresh token)
   headers: { 'Content-Type': 'application/json' },
 });
 
@@ -44,22 +60,71 @@ const processQueue = (error: any, token: string | null = null) => {
   failedQueue = [];
 };
 
-// Attach Authorization header if token is set
+// Attach Authorization header if token is set and add request deduplication
 api.interceptors.request.use((config) => {
   if (accessToken && config.headers) {
     config.headers.Authorization = `Bearer ${accessToken}`;
   }
+
+  // Start timing for dev metrics
+  const requestId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  (config as any).metadata = { ...(config as any).metadata, requestId, startTime: Date.now() };
+
+  devMetrics.startRequest(requestId, config.method?.toUpperCase() || 'GET', config.url || '');
+
+  // CSRF Protection: Bearer tokens in Authorization header provide CSRF protection
+  // as they cannot be sent by malicious sites via simple form submissions
   return config;
 });
 
+// Helper to create requests with AbortController support
+export const createAbortableRequest = () => {
+  const controller = new AbortController();
+
+  const request = {
+    get: (url: string, config: any = {}) => api.get(url, { ...config, signal: controller.signal }),
+    post: (url: string, data?: any, config: any = {}) =>
+      api.post(url, data, { ...config, signal: controller.signal }),
+    put: (url: string, data?: any, config: any = {}) =>
+      api.put(url, data, { ...config, signal: controller.signal }),
+    delete: (url: string, config: any = {}) =>
+      api.delete(url, { ...config, signal: controller.signal }),
+    abort: () => controller.abort(),
+  };
+
+  return request;
+};
+
 // Handle 401 responses and automatically refresh tokens
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // End timing for dev metrics
+    if ((response.config as any).metadata) {
+      const { requestId } = (response.config as any).metadata;
+      devMetrics.endRequest(
+        requestId,
+        response.config.method?.toUpperCase() || 'GET',
+        response.config.url || '',
+        response.status,
+      );
+    }
+    return response;
+  },
   async (error) => {
     const originalRequest = error.config;
 
     // If error is not 401 or request has already been retried, reject immediately
     if (error.response?.status !== 401 || originalRequest._retry) {
+      // End timing for dev metrics even on error
+      if (error.config?.metadata) {
+        const { requestId } = error.config.metadata;
+        devMetrics.endRequest(
+          requestId,
+          error.config.method?.toUpperCase() || 'GET',
+          error.config.url || '',
+          error.response?.status,
+        );
+      }
       return Promise.reject(error);
     }
 
@@ -104,16 +169,31 @@ api.interceptors.response.use(
       processQueue(refreshError, null);
       setAccessToken('');
 
+      // End timing for dev metrics on refresh failure
+      if (originalRequest?.metadata) {
+        const { requestId } = originalRequest.metadata;
+        devMetrics.endRequest(
+          requestId,
+          originalRequest.method?.toUpperCase() || 'GET',
+          originalRequest.url || '',
+          401,
+        );
+      }
+
       // Call the auth failure callback if it exists (clears auth context)
       if (authFailureCallback) {
         authFailureCallback();
       }
 
-      // Only redirect if we're not already on auth pages
+      // Only redirect if we're not already on auth or public pages
       const currentPath = window.location.pathname;
-      if (!currentPath.includes('/login') && !currentPath.includes('/register')) {
-        console.log('Session expired, redirecting to login');
-        window.location.href = '/login';
+      if (
+        !currentPath.includes('/login') &&
+        !currentPath.includes('/register') &&
+        !currentPath.includes('/public')
+      ) {
+        console.log('Session expired, redirecting to public home');
+        window.location.href = '/public';
       }
 
       return Promise.reject(refreshError);
@@ -122,5 +202,13 @@ api.interceptors.response.use(
     }
   },
 );
+
+// Event System Metrics API functions
+export const eventSystemMetricsApi = {
+  getMetrics: () => api.get('/api/monitoring/metrics/events'),
+  resetMetrics: () => api.post('/api/monitoring/metrics/events/reset'),
+  startMonitoring: () => api.post('/api/monitoring/monitoring/start'),
+  stopMonitoring: () => api.post('/api/monitoring/monitoring/stop'),
+};
 
 export default api;

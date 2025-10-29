@@ -1,51 +1,259 @@
-# Logs
+# ══════════════════════════════════════════════════════════════════════════════
+# ElonMuskSucks .gitignore
+# ══════════════════════════════════════════════════════════════════════════════
+# This repository is PUBLIC on GitHub
+# Ensure no production secrets, credentials, or sensitive data is committed
+# Last updated: 2025-10-11
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ─── Logs ─────────────────────────────────────────────────────────────────────
 logs
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+lerna-debug.log*
+pnpm-debug.log*
 
-# Runtime data
+# ─── Runtime Data ─────────────────────────────────────────────────────────────
 pids
 *.pid
 *.seed
 *.pid.lock
 
-# Dependency directories
+# ─── Dependency Directories ───────────────────────────────────────────────────
 node_modules/
+jspm_packages/
 apps/*/node_modules/
+packages/*/node_modules/
 
-# Build output
+# ─── Build Output ─────────────────────────────────────────────────────────────
 dist/
 build/
+out/
+.next/
 apps/**/dist/
 apps/**/build/
+apps/**/out/
+packages/**/dist/
+packages/**/build/
 
-# Production
+# ─── Environment Variables (CRITICAL - Never Commit) ──────────────────────────
+# Root environment files
 .env
+.env.local
 .env.*.local
-apps/**/.env
-apps/**/.env.local
-
-# Prisma
-prisma/dev.db
-prisma/*.sqlite
-
-# VS Code
-.vscode/
-
-# OS metadata
-.DS_Store
-Thumbs.db
-
-# IDE
-.idea/
-*.iml
-
-# Misc
-*.local
-.cache/
-.eslintcache
+.env.production
+.env.production.local
+.env.staging
+.env.staging.local
 .env.test
 .env.docker
+
+# App-specific environment files
+apps/**/.env
+apps/**/.env.local
+apps/**/.env.production
+apps/**/.env.production.local
+apps/**/.env.staging
+apps/**/.env.staging.local
+
+# Packages environment files
+packages/**/.env
+packages/**/.env.local
+
+# IMPORTANT: .env.example files ARE committed (templates only)
+!.env.example
+!apps/**/.env.example
+!packages/**/.env.example
+
+# ─── Database Files & Dumps (CRITICAL - Contains User Data) ──────────────────
+# SQLite databases
+*.sqlite
+*.sqlite3
+*.db
+prisma/dev.db
+prisma/*.sqlite
+prisma/*.db
+
+# Database dumps (PostgreSQL, MySQL, etc.)
+*.sql
+*.dump
+*.bak.sql
+*.backup.sql
+db-backup/
+database-dumps/
+backups/
+backup/
+
+# ─── SSL/TLS Certificates & Private Keys (CRITICAL - Never Commit) ───────────
+*.key
+*.pem
+*.crt
+*.cer
+*.p12
+*.pfx
+*.p7b
+*.der
+ssl/
+certs/
+certificates/
+private-keys/
+
+# ─── Fly.io Deployment Files ──────────────────────────────────────────────────
+.fly/                    # Fly.io CLI state directory
+fly-*.toml              # Temporary fly configs
+fly-secrets.txt         # Never commit secrets!
+
+# Note: fly.toml files ARE committed (infrastructure-as-code, no secrets)
+# Secrets are managed via: flyctl secrets set
+
+# ─── Production Infrastructure (CRITICAL - Never Commit) ──────────────────────
+# These files contain production app names and deployment details that could
+# help attackers target your production environment
+
+# Production environment configs with deployment details
+apps/client/.env.production
+apps/*/fly.local.toml
+
+# Redis deployment infrastructure
+fly-redis/
+
+# ─── Docker ───────────────────────────────────────────────────────────────────
+# Docker override files (may contain local credentials)
+docker-compose.override.yml
+docker-compose.production.yml
+docker-compose.staging.yml
+docker-compose.*.local.yml
+.dockerignore.local
+
+# ─── Prisma ───────────────────────────────────────────────────────────────────
+prisma/dev.db
+prisma/*.sqlite
+.env.test
+
+# ─── Secrets & Credentials (CRITICAL - Never Commit) ──────────────────────────
+secrets/
+.secrets/
+secrets.json
+*.secrets
+*.secret
+credentials.json
+service-account.json
+gcp-key.json
+aws-credentials
+.aws/
+.gcp/
+.secrets.production.txt
+
+# ─── Backup & Temporary Files ─────────────────────────────────────────────────
+*.bak
+*.backup
+*.tmp
+*.temp
+*~
+.*.swp
+.*.swo
+*.orig
+*.rej
+
+# ─── IDE & Editor Files ───────────────────────────────────────────────────────
+# VS Code
+.vscode/
+*.code-workspace
+
+# JetBrains IDEs (WebStorm, IntelliJ, etc.)
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+.*.sw?
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# ─── OS Metadata ──────────────────────────────────────────────────────────────
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+.directory
+.Trash-*
+
+# ─── Testing & Coverage ───────────────────────────────────────────────────────
+coverage/
+*.lcov
+.nyc_output/
+.coverage
+.pytest_cache/
+junit.xml
+test-results/
+scripts/load-tests/results
+
+# ─── Cache & Build Files ──────────────────────────────────────────────────────
+.cache/
+.eslintcache
+.stylelintcache
+*.tsbuildinfo
+.turbo/
+.parcel-cache/
+
+# ─── Miscellaneous ────────────────────────────────────────────────────────────
+*.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# AI Assistant context (contains internal notes, not for public)
 CLAUDE.md
+
+# MacOS service store
+.DS_Store
+
+# Storybook
+storybook-static/
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SAFE TO COMMIT (These files do NOT contain secrets)
+# ══════════════════════════════════════════════════════════════════════════════
+# ✅ .env.example (template with placeholder values)
+# ✅ fly.toml (infrastructure config, secrets managed via CLI)
+# ✅ Dockerfile, Dockerfile.local (build instructions)
+# ✅ nginx.conf, supervisord.conf (configuration files)
+# ✅ All documentation in docs/
+# ✅ package.json, package-lock.json (dependency manifests)
+# ✅ Source code (TypeScript, JavaScript, React components)
+# ✅ Prisma schema (database structure, no data)
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CRITICAL: If You Accidentally Commit Secrets
+# ══════════════════════════════════════════════════════════════════════════════
+# 1. Rotate all exposed credentials IMMEDIATELY
+# 2. Use BFG Repo-Cleaner to remove from git history:
+#    https://rtyley.github.io/bfg-repo-cleaner/
+# 3. Force push to rewrite history (coordinate with team)
+# 4. Enable GitHub secret scanning for alerts
+# ══════════════════════════════════════════════════════════════════════════════

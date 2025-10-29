@@ -1,6 +1,6 @@
 // apps/client/src/theme/components/LightDarkToggle.tsx
 import React from 'react';
-import { FaSun, FaMoon, FaAdjust } from 'react-icons/fa';
+import { FaSun, FaMoon } from 'react-icons/fa';
 import { useLightDark } from '../hooks/useUnifiedTheme';
 
 interface LightDarkToggleProps {
