@@ -1,10 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, startTransition } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useEventBusCore } from '../../contexts/EventBusCoreContext';
 import { formatMuskBucks } from '../../utils/formatting';
 import BaseModal from '../BaseModal';
 import EloPredictionCard from './EloPredictionCard';
-import { PONG_PAYOUT_CONSTANTS, PONG_WAGER_LIMITS, AI_PLAYER_IDS } from '@ems/types';
-import type { AIDifficulty } from '@ems/types';
+import {
+  PONG_PAYOUT_CONSTANTS,
+  PONG_WAGER_LIMITS,
+  AI_PLAYER_IDS,
+  REDIS_CHANNELS,
+} from '@ems/types';
+import type { AIDifficulty, BalanceUpdatePayload } from '@ems/types';
 import api from '../../api/axios';
 
 // Helper to convert string/number to number
@@ -30,7 +36,8 @@ export function PongMatchCreatorModal({
   variant,
 }: PongMatchCreatorModalProps) {
   const { user } = useAuth();
-  const balance = asNum(user?.muskBucks || 0);
+  const { subscribe } = useEventBusCore();
+  const [balance, setBalance] = useState(() => asNum(user?.muskBucks || 0));
 
   // AI player data from database
   const [aiPlayers, setAiPlayers] = useState<Record<AIDifficulty, AIPlayerData>>({
@@ -119,13 +126,45 @@ export function PongMatchCreatorModal({
     }
   }, [isOpen]);
 
-  // Update defaults when balance changes
+  // Fetch fresh balance from API when modal opens (lightweight endpoint - same pattern as PongGame Elo fetch)
   useEffect(() => {
-    if (balance > 0) {
-      setAiWager(getSmartDefaultWager());
-      setPvpWager(Math.max(getSmartDefaultWager(), 100));
+    const fetchUserBalance = async () => {
+      try {
+        const response = await api.get('/api/auth/balance');
+        const freshBalance = asNum(response.data.muskBucks);
+        console.log('[Modal] Fresh balance fetched from API:', freshBalance);
+        setBalance(freshBalance);
+      } catch (error) {
+        console.error('Failed to fetch user balance:', error);
+        // Fallback to user object if API fails
+        if (user?.muskBucks !== undefined) {
+          setBalance(asNum(user.muskBucks));
+        }
+      }
+    };
+
+    if (isOpen && user?.id) {
+      fetchUserBalance();
     }
-  }, [balance]);
+  }, [isOpen, user?.id, user?.muskBucks]);
+
+  // Subscribe to real-time balance updates
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const unsubscribe = subscribe(
+      REDIS_CHANNELS.BALANCE_UPDATE,
+      (payload: BalanceUpdatePayload) => {
+        if (payload.userId === user.id) {
+          startTransition(() => {
+            setBalance(payload.newBalance);
+          });
+        }
+      },
+    );
+
+    return unsubscribe;
+  }, [user?.id, subscribe]);
 
   // Save difficulty preference
   useEffect(() => {
