@@ -1,8 +1,8 @@
-import { PrismaClient } from '@prisma/client';
+import prisma from '../db';
 import { eventBus } from '../lib/EventBus';
 import type { IEventBus } from '@ems/types';
 
-const prisma = new PrismaClient();
+// Using shared prisma from db.ts
 
 /**
  * EventCorrelator Service

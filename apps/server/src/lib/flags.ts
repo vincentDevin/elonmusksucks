@@ -3,7 +3,7 @@
 // Feature Flag Management - Server-side Configuration
 // -----------------------------------------------------------------------------
 
-import type { FeatureFlag, FeatureFlagConfig } from '@ems/types';
+import type { FeatureFlagConfig } from '@ems/types';
 
 // Default feature flag configuration from environment variables
 const defaultFlags: FeatureFlagConfig = {
@@ -19,7 +19,7 @@ let runtimeFlags: Partial<FeatureFlagConfig> = {};
 /**
  * Check if a feature flag is enabled
  */
-export function isFeatureEnabled(flag: FeatureFlag): boolean {
+export function isFeatureEnabled(flag: string): boolean {
   // Runtime overrides take precedence (for kill switches)
   if (runtimeFlags[flag] !== undefined) {
     return runtimeFlags[flag]!;
@@ -48,7 +48,7 @@ export function getAllFeatureFlags(): FeatureFlagConfig {
 /**
  * Emergency kill switch - disable a feature at runtime
  */
-export function disableFeature(flag: FeatureFlag): void {
+export function disableFeature(flag: string): void {
   runtimeFlags[flag] = false;
   console.warn(`[feature-flags] Emergency kill switch activated for ${flag}`);
 }

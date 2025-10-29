@@ -1,10 +1,10 @@
-import { PrismaClient } from '@prisma/client';
 import { unifiedActivityService } from '../unifiedActivity.service';
 import { AchievementRepository } from '../../repositories/AchievementRepository';
 import type { IAchievementRepository } from '../../repositories/interfaces/IAchievementRepository';
+import { withCache, CacheKeys, CACHE_TTL } from '../../utils/analyticsCache';
 
-const prisma = new PrismaClient();
-const achievementRepository = new AchievementRepository(prisma);
+// Using shared prisma from db.ts
+const achievementRepository = new AchievementRepository();
 
 export interface CreateAchievementData {
   name: string;
@@ -33,6 +33,7 @@ export interface AchievementWithStats {
   title: string;
   description: string;
   category: string;
+  rarity: string;
   targetValue: number;
   iconUrl: string | null;
   isActive: boolean;
@@ -83,25 +84,21 @@ class AdminAchievementService {
   private achievementRepository: IAchievementRepository;
 
   constructor(achievementRepository?: IAchievementRepository) {
-    this.achievementRepository = achievementRepository || new AchievementRepository(prisma);
+    this.achievementRepository = achievementRepository || new AchievementRepository();
   }
 
   /**
    * Get all achievements with statistics
    */
   async getAllAchievements(): Promise<AchievementWithStats[]> {
-    const achievements = await this.achievementRepository.findMany({
-      orderBy: [{ category: 'asc' }, { sortOrder: 'asc' }],
-    });
+    const achievements = await this.achievementRepository.findMany({});
 
     const achievementsWithStats = await Promise.all(
       achievements.map(async (achievement) => {
         const userProgress = await this.achievementRepository.findUserAchievementsByAchievementId(
           achievement.id,
           {
-            include: { user: true },
-            orderBy: { completedAt: 'desc' },
-            take: 5,
+            limit: 5,
           },
         );
 
@@ -114,10 +111,10 @@ class AdminAchievementService {
           completedUsers,
           completionRate: totalUsers > 0 ? (completedUsers / totalUsers) * 100 : 0,
           recentUnlocks: userProgress
-            .filter((p) => p.completedAt)
+            .filter((p) => p.completedAt && p.user)
             .map((p) => ({
               userId: p.userId,
-              userName: p.user.name,
+              userName: p.user!.name,
               completedAt: p.completedAt!,
             })),
         };
@@ -137,10 +134,7 @@ class AdminAchievementService {
 
     const userProgress = await this.achievementRepository.findUserAchievementsByAchievementId(
       achievementId,
-      {
-        include: { user: true },
-        orderBy: { completedAt: 'desc' },
-      },
+      {},
     );
 
     const totalUsers = userProgress.length;
@@ -152,11 +146,11 @@ class AdminAchievementService {
       completedUsers,
       completionRate: totalUsers > 0 ? (completedUsers / totalUsers) * 100 : 0,
       recentUnlocks: userProgress
-        .filter((p) => p.completedAt)
+        .filter((p) => p.completedAt && p.user)
         .slice(0, 10)
         .map((p) => ({
           userId: p.userId,
-          userName: p.user.name,
+          userName: p.user!.name,
           completedAt: p.completedAt!,
         })),
     };
@@ -179,7 +173,7 @@ class AdminAchievementService {
       description: data.description,
       category: data.category,
       targetValue: data.targetValue,
-      iconUrl: data.iconUrl || null,
+      iconUrl: data.iconUrl,
       isActive: data.isActive ?? true,
       sortOrder: data.sortOrder ?? 999,
     });
@@ -221,7 +215,6 @@ class AdminAchievementService {
       iconUrl: data.iconUrl,
       isActive: data.isActive,
       sortOrder: data.sortOrder,
-      updatedAt: new Date(),
     });
 
     return this.getAchievementById(achievementId) as Promise<AchievementWithStats>;
@@ -266,22 +259,10 @@ class AdminAchievementService {
 
     // Grant the achievement
     await achievementRepository.updateUserAchievement({
-      where: {
-        userId_achievementId: {
-          userId,
-          achievementId,
-        },
-      },
-      create: {
-        userId,
-        achievementId,
-        progress: achievement.targetValue,
-        completedAt: new Date(),
-      },
-      update: {
-        progress: achievement.targetValue,
-        completedAt: new Date(),
-      },
+      userId,
+      achievementId,
+      progress: achievement.targetValue,
+      completedAt: new Date(),
     });
 
     // Create activity for manual grant
@@ -316,22 +297,10 @@ class AdminAchievementService {
 
     // Reset progress and completion
     await achievementRepository.updateUserAchievement({
-      where: {
-        userId_achievementId: {
-          userId,
-          achievementId,
-        },
-      },
-      create: {
-        userId,
-        achievementId,
-        progress: 0,
-        completedAt: null,
-      },
-      update: {
-        progress: 0,
-        completedAt: null,
-      },
+      userId,
+      achievementId,
+      progress: 0,
+      completedAt: null,
     });
   }
 
@@ -385,18 +354,17 @@ class AdminAchievementService {
   > {
     const userProgress = await achievementRepository.findUserAchievementsByAchievementId(
       achievementId,
-      {
-        include: { user: true },
-        orderBy: { completedAt: 'desc' },
-      },
+      {},
     );
 
-    return userProgress.map((p: any) => ({
-      userId: p.userId,
-      userName: p.user.name,
-      progress: p.progress,
-      completedAt: p.completedAt,
-    }));
+    return userProgress
+      .filter((p) => p.user)
+      .map((p) => ({
+        userId: p.userId,
+        userName: p.user!.name,
+        progress: p.progress,
+        completedAt: p.completedAt,
+      }));
   }
 
   /**
@@ -461,13 +429,14 @@ class AdminAchievementService {
 
     // Recent activity
     const recentActivity = completedAchievements
+      .filter((ua) => ua.user)
       .sort((a, b) => b.completedAt!.getTime() - a.completedAt!.getTime())
       .slice(0, 20)
       .map((ua) => ({
         achievementId: ua.achievementId,
         achievementTitle: ua.achievement.title,
         userId: ua.userId,
-        userName: ua.user.name,
+        userName: ua.user!.name,
         completedAt: ua.completedAt!,
       }));
 
@@ -515,13 +484,15 @@ class AdminAchievementService {
       category: ua.achievement.category,
       rarity: ua.achievement.rarity || 'common',
       iconUrl: ua.achievement.iconUrl,
-      completedAt: ua.completedAt!.toISOString(),
+      completedAt:
+        typeof ua.completedAt === 'string' ? ua.completedAt : ua.completedAt!.toISOString(),
     }));
   }
 
   /**
    * Get user's achievement progress
    * Returns all achievements with user's current progress
+   * Issue #3: Two-level caching (global achievements + user progress)
    */
   async getUserAchievementProgress(userId: number): Promise<
     {
@@ -538,13 +509,25 @@ class AdminAchievementService {
       completedAt?: string;
     }[]
   > {
-    // Get all achievements and user's progress
-    const [allAchievements, userAchievements] = await Promise.all([
-      achievementRepository.findAllAchievements(),
-      achievementRepository.findUserAchievements(userId),
-    ]);
+    // Level 1 Cache: All achievements (global, shared across users, 1 hour TTL)
+    const allAchievements = await withCache(
+      CacheKeys.ACHIEVEMENTS_ALL(),
+      CACHE_TTL.ACHIEVEMENTS_GLOBAL,
+      async () => {
+        return achievementRepository.findAllAchievements();
+      },
+    );
 
-    // Create a map of user achievements for quick lookup
+    // Level 2 Cache: User-specific progress (30 second TTL)
+    const userAchievements = await withCache(
+      CacheKeys.USER_ACHIEVEMENTS_PROGRESS(userId),
+      CACHE_TTL.ACHIEVEMENTS_USER,
+      async () => {
+        return achievementRepository.findUserAchievements(userId);
+      },
+    );
+
+    // Create a map of user achievements for quick lookup (fast in-memory operation)
     const userAchievementMap = new Map(userAchievements.map((ua) => [ua.achievementId, ua]));
 
     // Return all achievements with user progress (0 if not started)
@@ -562,7 +545,11 @@ class AdminAchievementService {
         progress: userAchievement?.progress || 0,
         targetValue: achievement.targetValue,
         isCompleted: !!userAchievement?.completedAt,
-        completedAt: userAchievement?.completedAt?.toISOString(),
+        completedAt: userAchievement?.completedAt
+          ? userAchievement.completedAt instanceof Date
+            ? userAchievement.completedAt.toISOString()
+            : userAchievement.completedAt
+          : undefined,
       };
     });
   }

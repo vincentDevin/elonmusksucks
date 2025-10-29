@@ -1,5 +1,5 @@
 // apps/server/src/repositories/IBettingRepository.ts
-import type { DbBet, DbParlay } from '@ems/types';
+import type { PrismaBet, PrismaParlay, PrismaUser } from '@ems/types';
 
 /**
  * Betting data access contract: service validates inputs,
@@ -24,12 +24,13 @@ export interface IBettingRepository {
   findUserById(
     userId: number,
   ): Promise<Pick<
-    import('@prisma/client').User,
+    PrismaUser,
     'id' | 'muskBucks' | 'name' | 'avatarUrl' | 'profilePictureKey'
   > | null>;
 
   /**
    * Persist a single bet and all related updates in one transaction.
+   * Returns the bet and balance change information for event emission.
    */
   // Rollback: Remove idempotencyKey parameter
   placeBet(
@@ -41,10 +42,11 @@ export interface IBettingRepository {
     potentialPayout: bigint,
     wasAllIn: boolean,
     idempotencyKey?: string,
-  ): Promise<DbBet>;
+  ): Promise<{ bet: PrismaBet; balanceChange: { previous: bigint; new: bigint } }>;
 
   /**
    * Persist a parlay and all related updates in one transaction.
+   * Returns the parlay and balance change information for event emission.
    */
   placeParlay(
     userId: number,
@@ -52,7 +54,7 @@ export interface IBettingRepository {
     amount: number,
     potentialPayout: bigint,
     idempotencyKey?: string,
-  ): Promise<DbParlay>;
+  ): Promise<{ parlay: PrismaParlay; balanceChange: { previous: bigint; new: bigint } }>;
 
   /**
    * Recalculate odds for a resolved prediction.
@@ -88,17 +90,17 @@ export interface IBettingRepository {
     },
   ): Promise<
     Array<
-      DbBet & {
+      PrismaBet & {
         prediction: {
           id: number;
           title: string;
-          category: string;
+          category: string | null;
           resolved: boolean;
         };
         option: {
           id: number;
           label: string;
-        };
+        } | null;
       }
     >
   >;

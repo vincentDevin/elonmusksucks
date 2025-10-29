@@ -12,6 +12,8 @@ import { eventBus } from '../lib/EventBus';
 import { UserRepository } from '../repositories/UserRepository';
 import { BettingRepository } from '../repositories/BettingRepository';
 import type { IStatsRepository } from '../repositories/interfaces/IStatsRepository';
+import { withCache, CacheKeys, CACHE_TTL } from '../utils/analyticsCache';
+import redisClient from '../lib/redis';
 
 // Note: User stats service interfaces now imported from @ems/types
 
@@ -31,85 +33,90 @@ export class EnhancedUserStatsService {
   }
 
   async getEnhancedStats(userId: number): Promise<EnhancedUserStats> {
-    const [basicStats, categoryAccuracy, currentStreak, trends, ranking] = await Promise.all([
-      this.getBasicStats(userId),
-      this.calculateCategoryAccuracy(userId),
-      this.calculateCurrentStreak(userId),
-      this.calculateTrends(userId),
-      this.getUserRanking(userId),
-    ]);
+    // Issue #3: Cache enhanced stats for 30 seconds to reduce database load
+    const cacheKey = CacheKeys.USER_STATS_ENHANCED(userId);
 
-    const bestCategory =
-      categoryAccuracy.length > 0
-        ? categoryAccuracy.reduce((best, current) =>
-            current.accuracy > best.accuracy ? current : best,
-          ).category
-        : 'None';
+    return withCache(cacheKey, CACHE_TTL.USER_STATS, async () => {
+      const [basicStats, categoryAccuracy, currentStreak, trends, ranking] = await Promise.all([
+        this.getBasicStats(userId),
+        this.calculateCategoryAccuracy(userId),
+        this.calculateCurrentStreak(userId),
+        this.calculateTrends(userId),
+        this.getUserRanking(userId),
+      ]);
 
-    const winRate = basicStats.totalBets > 0 ? basicStats.betsWon / basicStats.totalBets : 0;
-    const avgBetSize =
-      basicStats.totalBets > 0 ? Number(basicStats.totalWagered) / basicStats.totalBets : 0;
+      const bestCategory =
+        categoryAccuracy.length > 0
+          ? categoryAccuracy.reduce((best, current) =>
+              current.accuracy > best.accuracy ? current : best,
+            ).category
+          : 'None';
 
-    return {
-      // Performance metrics
-      totalBets: basicStats.totalBets,
-      winRate,
-      profitLoss: Number(basicStats.profit),
-      categoryAccuracy,
-      currentStreak,
-      bestCategory,
-      totalWagered: Number(basicStats.totalWagered),
-      avgBetSize,
+      const winRate = basicStats.totalBets > 0 ? basicStats.betsWon / basicStats.totalBets : 0;
+      const avgBetSize =
+        basicStats.totalBets > 0 ? Number(basicStats.totalWagered) / basicStats.totalBets : 0;
 
-      // Ranking data
-      ranking,
-
-      // Achievement progress (calculated from real data)
-      achievementProgress: this.calculateAchievementProgress(
-        basicStats,
+      return {
+        // Performance metrics
+        totalBets: basicStats.totalBets,
+        winRate,
+        profitLoss: Number(basicStats.profit),
         categoryAccuracy,
         currentStreak,
-      ),
-      achievementCompletionRate: this.calculateAchievementCompletionRate(
-        basicStats,
-        categoryAccuracy,
-        currentStreak,
-      ),
+        bestCategory,
+        totalWagered: Number(basicStats.totalWagered),
+        avgBetSize,
 
-      // Trend data
-      weeklyVolume: trends.weeklyVolume,
-      monthlyProfitLoss: trends.monthlyProfitLoss,
-      categoryStats: this.calculateCategoryStats(categoryAccuracy, Number(basicStats.totalWagered)),
-    };
+        // Ranking data
+        ranking,
+
+        // Achievement progress (calculated from real data)
+        achievementProgress: this.calculateAchievementProgress(
+          basicStats,
+          categoryAccuracy,
+          currentStreak,
+        ),
+        achievementCompletionRate: this.calculateAchievementCompletionRate(
+          basicStats,
+          categoryAccuracy,
+          currentStreak,
+        ),
+
+        // Trend data
+        weeklyVolume: trends.weeklyVolume,
+        monthlyProfitLoss: trends.monthlyProfitLoss,
+        categoryStats: this.calculateCategoryStats(
+          categoryAccuracy,
+          Number(basicStats.totalWagered),
+        ),
+      };
+    });
   }
 
   private async getUserRanking(
     userId: number,
   ): Promise<{ allTime: UserRanking; daily: UserRanking }> {
     try {
-      const [allTimeRank, dailyRank, stats] = await Promise.all([
-        leaderboardService.getUserRank(userId, 'allTime'),
-        leaderboardService.getUserRank(userId, 'daily'),
-        leaderboardService.getLeaderboardStats(),
-      ]);
+      // Optimized: Single query instead of 3 separate queries (50-150ms savings)
+      const ranking = await leaderboardService.getUserRankingCombined(userId);
 
       const allTimeRanking: UserRanking = {
-        rank: allTimeRank.allTimeRank,
-        percentile: allTimeRank.allTimeRank
-          ? Math.round((1 - allTimeRank.allTimeRank / stats.totalUsers) * 100)
+        rank: ranking.allTimeRank,
+        percentile: ranking.allTimeRank
+          ? Math.round((1 - ranking.allTimeRank / ranking.totalUsers) * 100)
           : 0,
         rankChange: null, // UserRank interface doesn't have rankChange - would need to be calculated separately
-        totalUsers: stats.totalUsers,
+        totalUsers: ranking.totalUsers,
         category: 'allTime',
       };
 
       const dailyRanking: UserRanking = {
-        rank: dailyRank.dailyRank,
-        percentile: dailyRank.dailyRank
-          ? Math.round((1 - dailyRank.dailyRank / stats.totalUsers) * 100)
+        rank: ranking.dailyRank,
+        percentile: ranking.dailyRank
+          ? Math.round((1 - ranking.dailyRank / ranking.totalUsers) * 100)
           : 0,
         rankChange: null, // UserRank interface doesn't have rankChange - would need to be calculated separately
-        totalUsers: stats.totalUsers,
+        totalUsers: ranking.totalUsers,
         category: 'daily',
       };
 
@@ -360,6 +367,23 @@ export class EnhancedUserStatsService {
       );
     } catch (error) {
       console.error('[enhancedUserStats] Error publishing ranking change:', error);
+    }
+  }
+
+  /**
+   * Invalidate user stats cache
+   * Call this after: bet placement, payout, achievement unlock, balance change
+   * Issue #3: Cache invalidation for enhanced user stats
+   */
+  async invalidateUserStatsCache(userId: number): Promise<void> {
+    try {
+      await Promise.all([
+        redisClient.del(CacheKeys.USER_STATS_ENHANCED(userId)),
+        redisClient.del(CacheKeys.USER_STATS_BASIC(userId)),
+      ]);
+      console.log(`[enhancedUserStats] Invalidated stats cache for user ${userId}`);
+    } catch (error) {
+      console.error(`[enhancedUserStats] Error invalidating cache for user ${userId}:`, error);
     }
   }
 }

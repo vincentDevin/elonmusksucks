@@ -1,39 +1,55 @@
 import { Server, Socket } from 'socket.io';
+import {
+  SOCKET_EVENTS,
+  SOCKET_ROOMS,
+  ROOM_PATTERNS,
+  type JoinRoomResponse,
+  type LeaveRoomResponse,
+} from '@ems/types';
 import type { AuthenticatedSocket } from '../middleware/socketAuthMiddleware';
 
 /**
- * Room authorization patterns and their access rules
+ * Public rooms accessible to all authenticated users
  */
-const ROOM_PATTERNS = {
-  // Public rooms - accessible to all authenticated users
-  PUBLIC: [
-    'predictions',
-    'betting',
-    'leaderboard',
-    'achievements',
-    'chat',
-    'timeline',
-    'leaderboard:daily',
-    'leaderboard:allTime',
-    'stats:global',
-    'pong:lobby',
-    'pong:matches',
-  ],
+const PUBLIC_ROOMS = [
+  SOCKET_ROOMS.PREDICTIONS,
+  SOCKET_ROOMS.BETTING,
+  SOCKET_ROOMS.LEADERBOARD,
+  SOCKET_ROOMS.ACHIEVEMENTS,
+  SOCKET_ROOMS.CHAT,
+  SOCKET_ROOMS.TIMELINE,
+  SOCKET_ROOMS.LEADERBOARD_DAILY,
+  SOCKET_ROOMS.LEADERBOARD_ALL_TIME,
+  SOCKET_ROOMS.STATS_GLOBAL,
+  SOCKET_ROOMS.PONG_LOBBY,
+  SOCKET_ROOMS.PONG_MATCHES,
+] as const;
 
-  // User-specific rooms - only accessible by the specific user
-  USER_SPECIFIC: /^user:(\d+)$/,
-  USER_STATS: /^stats:user:(\d+)$/,
-  USER_ACTIVITY: /^activity:user:(\d+)$/,
-  PONG_USER: /^pong:user:(\d+)$/,
+/**
+ * Admin-only rooms
+ */
+const ADMIN_ROOMS = [
+  SOCKET_ROOMS.ADMIN,
+  SOCKET_ROOMS.ADMIN_METRICS,
+  SOCKET_ROOMS.ADMIN_MODERATION,
+  SOCKET_ROOMS.ADMIN_FEEDS,
+  SOCKET_ROOMS.ADMIN_EVENTS,
+  SOCKET_ROOMS.ADMIN_PREDICTIONS,
+] as const;
 
-  // Admin-only rooms - only accessible by admin users
-  ADMIN: ['admin', 'admin:metrics', 'admin:moderation', 'admin:feeds', 'admin:events'],
+/**
+ * Type guard to check if room is in PUBLIC_ROOMS
+ */
+function isPublicRoom(room: string): boolean {
+  return PUBLIC_ROOMS.includes(room as (typeof PUBLIC_ROOMS)[number]);
+}
 
-  // Game-specific rooms (require additional validation)
-  PONG_GAME: /^pong:game:([a-zA-Z0-9]+)$/,
-  PREDICTION_GAME: /^prediction:(\d+)$/,
-  CHAT_ROOM: /^chat:room:([a-zA-Z0-9]+)$/,
-} as const;
+/**
+ * Type guard to check if room is in ADMIN_ROOMS
+ */
+function isAdminRoom(room: string): boolean {
+  return ADMIN_ROOMS.includes(room as (typeof ADMIN_ROOMS)[number]);
+}
 
 /**
  * Authorizes room access based on user permissions and room type
@@ -56,12 +72,12 @@ function authorizeRoomAccess(
   }
 
   // Check public rooms first
-  if (ROOM_PATTERNS.PUBLIC.includes(roomName as any)) {
+  if (isPublicRoom(roomName)) {
     return { authorized: true };
   }
 
   // Check admin rooms
-  if (ROOM_PATTERNS.ADMIN.includes(roomName as any)) {
+  if (isAdminRoom(roomName)) {
     if (user.role !== 'ADMIN') {
       return {
         authorized: false,
@@ -72,7 +88,7 @@ function authorizeRoomAccess(
   }
 
   // Check user-specific rooms
-  const userMatch = roomName.match(ROOM_PATTERNS.USER_SPECIFIC);
+  const userMatch = roomName.match(ROOM_PATTERNS.USER);
   if (userMatch) {
     const requestedUserId = parseInt(userMatch[1], 10);
     if (requestedUserId !== user.id && user.role !== 'ADMIN') {
@@ -131,7 +147,7 @@ function authorizeRoomAccess(
   }
 
   // Check prediction-specific rooms
-  const predictionMatch = roomName.match(ROOM_PATTERNS.PREDICTION_GAME);
+  const predictionMatch = roomName.match(ROOM_PATTERNS.PREDICTION);
   if (predictionMatch) {
     // Allow any authenticated user to join prediction rooms
     return { authorized: true };
@@ -195,7 +211,7 @@ export function registerRoomHandlers(_io: Server, socket: Socket) {
   const authSocket = socket as AuthenticatedSocket;
 
   // Handle both 'join' and 'joinRoom' events for compatibility
-  const handleJoinRoom = (room: string, callback?: (response: any) => void) => {
+  const handleJoinRoom = (room: string, callback?: (response: JoinRoomResponse) => void) => {
     const validation = validateRoomName(room);
     if (!validation.valid) {
       const error = `Room validation failed: ${validation.reason}`;
@@ -221,26 +237,41 @@ export function registerRoomHandlers(_io: Server, socket: Socket) {
     callback?.({ success: true, room });
   };
 
-  const handleLeaveRoom = (room: string, callback?: (response: any) => void) => {
+  const handleLeaveRoom = (room: string, callback?: (response: LeaveRoomResponse) => void) => {
     socket.leave(room);
     console.log(
       `[room-auth] User ${authSocket.user?.id} left room: ${room} - socket: ${socket.id}`,
     );
-    callback?.({ success: true, room });
+    callback?.({ success: true });
   };
 
   // Support both event names for backward compatibility
-  socket.on('join', handleJoinRoom);
-  socket.on('joinRoom', handleJoinRoom);
-  socket.on('leave', handleLeaveRoom);
-  socket.on('leaveRoom', handleLeaveRoom);
+  socket.on(SOCKET_EVENTS.JOIN, handleJoinRoom);
+  socket.on(SOCKET_EVENTS.JOIN_ROOM, handleJoinRoom);
+  socket.on(SOCKET_EVENTS.LEAVE, handleLeaveRoom);
+  socket.on(SOCKET_EVENTS.LEAVE_ROOM, handleLeaveRoom);
 
   // Debug endpoint for development
-  socket.on('rooms', (callback?: (rooms: string[]) => void) => {
+  socket.on(SOCKET_EVENTS.ROOMS, (callback?: (rooms: string[]) => void) => {
     if (process.env.NODE_ENV === 'development') {
       const rooms = Array.from(socket.rooms);
       console.log(`[room-debug] Socket ${socket.id} is in rooms:`, rooms);
       callback?.(rooms);
+    }
+  });
+
+  // Keep-alive heartbeat handler
+  // Client sends periodic heartbeat to prevent idle disconnection
+  // Activity is already tracked by socket.onAny() in socket.ts, this is just for redundancy
+  socket.on('heartbeat', (data?: { timestamp?: number }) => {
+    // No-op handler - activity tracking happens in socket.ts via socket.onAny()
+    // This ensures the event is registered and doesn't cause errors
+    // Optional debug logging (disabled by default to reduce noise)
+    if (process.env.DEBUG_HEARTBEAT === 'true') {
+      console.log(
+        `[heartbeat] Received from user ${authSocket.user?.id} (socket ${socket.id})`,
+        data,
+      );
     }
   });
 }

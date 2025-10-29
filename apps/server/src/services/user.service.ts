@@ -4,14 +4,15 @@ import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { IUserRepository } from '../repositories/interfaces/IUserRepository';
 import { UserRepository } from '../repositories/UserRepository';
-import type { DbUser, DbUserBadge, DbBadge, DbUserStats, DbUserPost } from '@ems/types';
+import { StatsRepository } from '../repositories/StatsRepository';
+import type { DbUser, DbUserBadge, DbBadge, DbUserStats, DbUserFeedContent } from '@ems/types';
 // TODO: Branded types available: UserId, PredictionId, ISODateString, TimestampMs
-import type { PublicUserProfile, UserFeedPost, UserStatsDTO } from '@ems/types';
-import { PostService } from './post.service';
-import { unifiedActivityService } from './unifiedActivity.service';
+import type { UserProfileView, UserStatsView } from '@ems/types';
 import { ImageProcessingService, ProcessedImageSizes } from './imageProcessing.service';
 import { DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { eventBus } from '../lib/EventBus';
+import { activeUserCacheService } from './activeUserCache.service';
+import { withCache, CacheKeys, CACHE_TTL } from '../utils/analyticsCache';
 
 // Define a minimal file interface matching Multer's in-memory buffer
 export type UploadedFile = {
@@ -22,13 +23,13 @@ export type UploadedFile = {
 
 export class UserService {
   private repo: IUserRepository;
-  private postService: PostService;
+  private statsRepo: StatsRepository;
   private s3: S3Client;
   private bucket: string;
 
   constructor(repo: IUserRepository = new UserRepository()) {
     this.repo = repo;
-    this.postService = new PostService();
+    this.statsRepo = new StatsRepository();
     this.s3 = new S3Client({
       region: 'auto',
       endpoint: process.env.TIGRIS_S3_ENDPOINT,
@@ -55,6 +56,9 @@ export class UserService {
   }> {
     // Clear cached URLs
     await redisClient.del(CACHE_KEYS.PROFILE_IMAGE_URL(userId));
+
+    // Invalidate active user cache (profile picture changed)
+    await activeUserCacheService.invalidateUser(userId);
 
     // Get current user to check for existing profile picture
     const user = await this.repo.findById(userId);
@@ -108,6 +112,140 @@ export class UserService {
         full: fullUrl,
       },
     };
+  }
+
+  /**
+   * Admin-only method to upload profile image for any user (including AI users)
+   * Bypasses auth checks and logs admin action
+   */
+  async adminUploadUserProfileImage(
+    adminId: number,
+    targetUserId: number,
+    file: UploadedFile,
+  ): Promise<{
+    avatarUrl: string;
+    sizes: {
+      thumbnail: string;
+      profile: string;
+      full: string;
+    };
+  }> {
+    console.log(`[admin-avatar] Admin ${adminId} uploading profile image for user ${targetUserId}`);
+
+    // Use the same upload logic as regular users
+    const result = await this.uploadUserProfileImage(targetUserId, file);
+
+    // Log the admin action (can be extended to ModerationLog table if needed)
+    console.log(
+      `[admin-avatar] ✅ Admin ${adminId} successfully uploaded avatar for user ${targetUserId}`,
+    );
+
+    return result;
+  }
+
+  /**
+   * Delete user's profile image and revert to default avatar
+   * Clears S3 storage and resets database fields
+   */
+  async deleteUserProfileImage(userId: number): Promise<void> {
+    // Clear cached URLs
+    await redisClient.del(CACHE_KEYS.PROFILE_IMAGE_URL(userId));
+
+    // Invalidate active user cache
+    await activeUserCacheService.invalidateUser(userId);
+
+    // Get current user to check for existing profile picture
+    const user = await this.repo.findById(userId);
+    if (!user) throw new Error('User not found');
+
+    // Clean up S3 storage if profile picture exists
+    if (user.profilePictureKey) {
+      await this.cleanupOldProfileImages(user.profilePictureKey);
+    }
+
+    // Clear the profilePictureKey to revert to default avatar
+    await this.repo.updateProfile(userId, {
+      profilePictureKey: null,
+    });
+
+    console.log(`[user-avatar] Profile image deleted for user ${userId}`);
+  }
+
+  // --- DEFAULT AVATAR MANAGEMENT ---
+
+  /**
+   * Get the default avatar URL (if one is set)
+   * Returns a signed URL for the default avatar, or null if not set
+   */
+  async getDefaultAvatarUrl(): Promise<string | null> {
+    const defaultKey = 'defaults/avatar.webp';
+
+    try {
+      // Try to get a signed URL - if file doesn't exist, AWS will error
+      const url = await this.getSignedAvatarUrl(defaultKey, 3600);
+      return url;
+    } catch (error) {
+      // File doesn't exist
+      return null;
+    }
+  }
+
+  /**
+   * Upload a new default avatar image for the site
+   * Replaces any existing default avatar
+   */
+  async uploadDefaultAvatar(file: UploadedFile): Promise<{ avatarUrl: string }> {
+    console.log('[default-avatar] Uploading new default avatar');
+
+    // Validate and process the image
+    const isValidImage = await ImageProcessingService.validateImage(file.buffer);
+    if (!isValidImage) {
+      throw new Error('Invalid image file. Please upload a valid JPEG, PNG, or WebP image.');
+    }
+
+    // Process image into a single size (profile size is fine for default)
+    const processedImages: ProcessedImageSizes = await ImageProcessingService.processProfileImage(
+      file.buffer,
+      0, // userId 0 for default avatar
+    );
+
+    // Upload to fixed location
+    const defaultKey = 'defaults/avatar.webp';
+    await this.s3.send(
+      new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: defaultKey,
+        Body: processedImages.profile.buffer,
+        ContentType: processedImages.profile.contentType,
+        CacheControl: 'public, max-age=2592000', // 30 days
+        Metadata: {
+          'uploaded-at': new Date().toISOString(),
+          'is-default-avatar': 'true',
+        },
+      }),
+    );
+
+    // Get signed URL
+    const avatarUrl = await this.getSignedAvatarUrl(defaultKey, 60 * 60 * 24 * 7); // 7 days
+
+    console.log('[default-avatar] ✅ Default avatar uploaded successfully');
+
+    return { avatarUrl };
+  }
+
+  /**
+   * Delete the default avatar
+   */
+  async deleteDefaultAvatar(): Promise<void> {
+    const defaultKey = 'defaults/avatar.webp';
+
+    try {
+      await this.s3.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: defaultKey }));
+      console.log('[default-avatar] Default avatar deleted successfully');
+    } catch (error) {
+      console.warn('[default-avatar] Failed to delete default avatar:', error);
+      throw new Error('Failed to delete default avatar');
+    }
   }
 
   /**
@@ -192,11 +330,44 @@ export class UserService {
     expiresInSeconds = 3600,
   ): Promise<string> {
     const redisKey = CACHE_KEYS.PROFILE_IMAGE_URL(userId);
+
     // Try Redis first
     const cached = await redisClient.get(redisKey);
-    if (cached) return cached;
+    if (cached) {
+      // Validate the cached URL isn't expired by checking the X-Amz-Date parameter
+      try {
+        const url = new URL(cached);
+        const amzDate = url.searchParams.get('X-Amz-Date');
+        const expires = url.searchParams.get('X-Amz-Expires');
 
-    // Not cached: generate signed URL
+        if (amzDate && expires) {
+          // Parse the date: format is YYYYMMDDTHHmmssZ
+          const year = parseInt(amzDate.substring(0, 4));
+          const month = parseInt(amzDate.substring(4, 6)) - 1;
+          const day = parseInt(amzDate.substring(6, 8));
+          const hour = parseInt(amzDate.substring(9, 11));
+          const minute = parseInt(amzDate.substring(11, 13));
+          const second = parseInt(amzDate.substring(13, 15));
+
+          const signedDate = new Date(Date.UTC(year, month, day, hour, minute, second));
+          const expiryDate = new Date(signedDate.getTime() + parseInt(expires) * 1000);
+
+          // If URL is expired or will expire in the next 5 minutes, regenerate
+          if (expiryDate.getTime() > Date.now() + 5 * 60 * 1000) {
+            return cached;
+          }
+
+          // Delete expired cache - regenerate below
+          await redisClient.del(redisKey);
+        }
+      } catch (error) {
+        console.warn(`Failed to validate cached URL for user ${userId}:`, error);
+        // If validation fails, delete the cache and regenerate
+        await redisClient.del(redisKey);
+      }
+    }
+
+    // Not cached or expired: generate signed URL
     const url = await this.getSignedAvatarUrl(profilePictureKey, expiresInSeconds);
 
     // Store in Redis with intelligent TTL based on signature expiry
@@ -228,7 +399,7 @@ export class UserService {
   }
 
   // --- PROFILE (with signed URL fallback) ---
-  async getUserProfile(userId: number, viewerId?: number): Promise<PublicUserProfile> {
+  async getUserProfile(userId: number, viewerId?: number): Promise<UserProfileView> {
     const user = await this.repo.findById(userId);
     if (!user) throw new Error('User not found');
 
@@ -242,14 +413,10 @@ export class UserService {
     const rank = await this.repo.getUserRank(userId);
     const isFollowing = viewerId ? await this.repo.existsFollow(viewerId, userId) : false;
 
-    // Generate signed avatar URL if we have a storage key
+    // Generate signed avatar URL if we have a storage key (use cached version)
     const avatarUrl = user.profilePictureKey
-      ? await getSignedUrl(
-          this.s3,
-          new GetObjectCommand({ Bucket: this.bucket, Key: user.profilePictureKey }),
-          { expiresIn: 60 * 60 },
-        )
-      : user.avatarUrl;
+      ? await this.getCachedProfileImageUrl(user.id, user.profilePictureKey, 3600)
+      : user.avatarUrl || (await this.getDefaultAvatarUrl());
 
     return {
       id: user.id,
@@ -283,27 +450,16 @@ export class UserService {
         awardedAt: typeof ub.awardedAt === 'string' ? ub.awardedAt : ub.awardedAt.toISOString(),
       })),
       achievements: userAchievements.map((ua: any) => ({
-        id: ua.achievement.id,
-        name: ua.achievement.name,
+        id: ua.achievement.id.toString(),
         title: ua.achievement.title || ua.achievement.name,
         description: ua.achievement.description,
-        category: ua.achievement.category || 'general',
-        rarity: ua.achievement.rarity || 'common',
-        iconUrl: ua.achievement.iconUrl || null,
-        completedAt: ua.completedAt
-          ? typeof ua.completedAt === 'string'
-            ? ua.completedAt
-            : ua.completedAt.toISOString()
-          : null,
-        awardedAt: ua.completedAt
-          ? typeof ua.completedAt === 'string'
-            ? ua.completedAt
-            : ua.completedAt.toISOString()
-          : null,
+        isUnlocked: ua.completedAt !== null,
       })),
       followersCount,
       followingCount,
       isFollowing,
+      createdAt: typeof user.createdAt === 'string' ? user.createdAt : user.createdAt.toISOString(),
+      updatedAt: typeof user.createdAt === 'string' ? user.createdAt : user.createdAt.toISOString(),
     };
   }
   async followUser(followerId: number, followingId: number): Promise<void> {
@@ -329,19 +485,230 @@ export class UserService {
         | 'profileComplete'
       >
     >,
-  ): Promise<PublicUserProfile> {
+  ): Promise<UserProfileView> {
     await this.repo.updateProfile(userId, data);
+
+    // Invalidate active user cache (profile data changed)
+    await activeUserCacheService.invalidateUser(userId);
+
     return this.getUserProfile(userId, userId);
   }
 
   // --- FEED ---
 
-  async getUserFeed(userId: number, viewerId?: number): Promise<UserFeedPost[]> {
+  /**
+   * Enrich a user object with a signed avatar URL.
+   * This is the centralized method for transforming user data with proper avatar URLs.
+   *
+   * @param user - User object with id, name, avatarUrl, and optionally profilePictureKey
+   * @returns User object with signed avatar URL if profilePictureKey exists
+   */
+  async enrichUserWithAvatar<
+    T extends { id: number; avatarUrl?: string | null; profilePictureKey?: string | null },
+  >(user: T): Promise<T & { avatarUrl: string | null }> {
+    if (!user) return user;
+
+    let avatarUrl: string | null = null;
+
+    if (user.profilePictureKey) {
+      try {
+        avatarUrl = await this.getCachedProfileImageUrl(user.id, user.profilePictureKey, 3600);
+      } catch (error) {
+        console.warn(`Failed to get signed URL for user ${user.id}:`, error);
+        avatarUrl = user.avatarUrl || null;
+      }
+    } else {
+      // No profile picture key - fall back to default avatar or user's avatarUrl
+      avatarUrl = user.avatarUrl || (await this.getDefaultAvatarUrl());
+    }
+
+    return {
+      ...user,
+      avatarUrl,
+    };
+  }
+
+  /**
+   * Enrich multiple users with signed avatar URLs.
+   * Batch processing for performance using getBatchedAvatarUrls.
+   */
+  async enrichUsersWithAvatars<
+    T extends { id: number; avatarUrl?: string | null; profilePictureKey?: string | null },
+  >(users: T[]): Promise<(T & { avatarUrl: string | null })[]> {
+    if (users.length === 0) {
+      return [];
+    }
+
+    // Use batch method to get all avatar URLs at once
+    const avatarMap = await this.getBatchedAvatarUrls(
+      users.map((u) => ({
+        id: u.id,
+        profilePictureKey: u.profilePictureKey ?? null,
+        avatarUrl: u.avatarUrl,
+      })),
+    );
+
+    // Map results back to users
+    return users.map((user) => ({
+      ...user,
+      avatarUrl: avatarMap.get(user.id) ?? null,
+    }));
+  }
+
+  /**
+   * Get avatar URLs for multiple users in a single batch operation
+   * Uses Redis MGET for efficient cache lookup and parallel S3 URL generation
+   *
+   * This method is optimized to replace N sequential avatar lookups with:
+   * 1. Single MGET for all cached URLs
+   * 2. Parallel S3 signed URL generation for cache misses
+   * 3. Batch cache write for new URLs
+   *
+   * @param users - Array of users with id and profilePictureKey
+   * @returns Map of userId to avatarUrl (null if no avatar)
+   */
+  async getBatchedAvatarUrls(
+    users: Array<{ id: number; profilePictureKey: string | null; avatarUrl?: string | null }>,
+  ): Promise<Map<number, string | null>> {
+    if (users.length === 0) {
+      return new Map();
+    }
+
+    // Deduplicate users by ID
+    const uniqueUsers = Array.from(new Map(users.map((user) => [user.id, user])).values());
+
+    const result = new Map<number, string | null>();
+
+    // Separate users with profilePictureKey from those without
+    const usersWithKeys = uniqueUsers.filter((u) => u.profilePictureKey);
+    const usersWithoutKeys = uniqueUsers.filter((u) => !u.profilePictureKey);
+
+    // Get default avatar URL once for all users without keys
+    const defaultAvatarUrl = usersWithoutKeys.length > 0 ? await this.getDefaultAvatarUrl() : null;
+
+    // Handle users without keys (use avatarUrl or default)
+    for (const user of usersWithoutKeys) {
+      result.set(user.id, user.avatarUrl || defaultAvatarUrl);
+    }
+
+    if (usersWithKeys.length === 0) {
+      return result;
+    }
+
+    // Batch cache lookup with MGET
+    const cacheKeys = usersWithKeys.map((u) => CACHE_KEYS.PROFILE_IMAGE_URL(u.id));
+    let cachedValues: Array<string | null> = [];
+
+    try {
+      cachedValues = await redisClient.mget(...cacheKeys);
+    } catch (error) {
+      console.warn('[user] Batch avatar cache lookup failed:', error);
+      cachedValues = new Array(cacheKeys.length).fill(null);
+    }
+
+    const missingUsers: Array<{ id: number; profilePictureKey: string }> = [];
+
+    // Process cached results
+    for (let i = 0; i < usersWithKeys.length; i++) {
+      const user = usersWithKeys[i];
+      const cached = cachedValues[i];
+
+      if (cached) {
+        // Validate cached URL (check if expired)
+        try {
+          const url = new URL(cached);
+          const amzDate = url.searchParams.get('X-Amz-Date');
+          const expires = url.searchParams.get('X-Amz-Expires');
+
+          if (amzDate && expires) {
+            const year = parseInt(amzDate.substring(0, 4));
+            const month = parseInt(amzDate.substring(4, 6)) - 1;
+            const day = parseInt(amzDate.substring(6, 8));
+            const hour = parseInt(amzDate.substring(9, 11));
+            const minute = parseInt(amzDate.substring(11, 13));
+            const second = parseInt(amzDate.substring(13, 15));
+
+            const signedDate = new Date(Date.UTC(year, month, day, hour, minute, second));
+            const expiryDate = new Date(signedDate.getTime() + parseInt(expires) * 1000);
+
+            // If URL is still valid (expires in more than 5 minutes)
+            if (expiryDate.getTime() > Date.now() + 5 * 60 * 1000) {
+              result.set(user.id, cached);
+              continue;
+            }
+          }
+        } catch (error) {
+          // Invalid cached URL - will regenerate
+        }
+      }
+
+      // Cache miss or expired - need to generate new URL
+      missingUsers.push({
+        id: user.id,
+        profilePictureKey: user.profilePictureKey!,
+      });
+    }
+
+    // Generate signed URLs in parallel for cache misses
+    if (missingUsers.length > 0) {
+      const urlPromises = missingUsers.map(async (user) => {
+        try {
+          const url = await this.getSignedAvatarUrl(user.profilePictureKey, 3600);
+          return { userId: user.id, url };
+        } catch (error) {
+          console.warn(`[user] Failed to generate avatar URL for user ${user.id}:`, error);
+          return { userId: user.id, url: null };
+        }
+      });
+
+      const generatedUrls = await Promise.all(urlPromises);
+
+      // Cache newly generated URLs (fire and forget)
+      const cachePromises = generatedUrls
+        .filter((item) => item.url !== null)
+        .map(async (item) => {
+          const cacheTTL = getProfileImageTTL(3600);
+          try {
+            await redisClient.setex(CACHE_KEYS.PROFILE_IMAGE_URL(item.userId), cacheTTL, item.url!);
+          } catch (error) {
+            console.warn(`[user] Failed to cache avatar URL for user ${item.userId}:`, error);
+          }
+        });
+
+      // Don't await cache writes - fire and forget
+      Promise.all(cachePromises).catch((error) => {
+        console.warn('[user] Batch avatar cache write failed:', error);
+      });
+
+      // Add generated URLs to result
+      for (const item of generatedUrls) {
+        result.set(item.userId, item.url);
+      }
+    }
+
+    return result;
+  }
+
+  async getUserFeed(userId: number, viewerId?: number): Promise<DbUserFeedContent[]> {
     const user = await this.repo.findById(userId);
     if (!user) throw new Error('User not found');
     if (user.feedPrivate && user.id !== viewerId) throw new Error('Feed is private');
-    const posts: DbUserPost[] = await this.repo.getUserFeed(userId); // no { parentId: null }
-    return posts.map(toFeedPostDTO);
+    const posts: DbUserFeedContent[] = await this.repo.getUserFeed(userId); // no { parentId: null }
+
+    // Collect all unique authors
+    const authors = posts.filter((post: any) => post.author).map((post: any) => post.author);
+
+    // Batch enrich all authors at once
+    const enrichedAuthors = await this.enrichUsersWithAvatars(authors);
+    const avatarMap = new Map(enrichedAuthors.map((author) => [author.id, author.avatarUrl]));
+
+    // Map avatar URLs back to posts
+    const enrichedPosts = posts.map((post: any) => ({
+      ...post,
+      authorAvatar: post.author ? (avatarMap.get(post.author.id) ?? null) : null,
+    }));
+
+    return enrichedPosts;
   }
 
   async createUserPost(
@@ -349,72 +716,93 @@ export class UserService {
     content: string,
     parentId?: number | null,
     _profileOwnerId?: number, // Legacy parameter for backward compatibility
-  ): Promise<UserFeedPost> {
-    // Always use the new PostService for consistency
-    const post = await this.postService.createPost(authorId, {
+  ): Promise<DbUserFeedContent> {
+    // Use repository directly to avoid circular dependency
+    const post = await this.repo.createUserPost({
+      authorId,
       content,
-      visibility: 'PUBLIC', // Default to public for user feed posts
       parentId: parentId || null,
     });
 
-    // Create unified activity event
-    const author = await this.getPublicSocketUser(authorId);
-    if (author) {
-      await unifiedActivityService.createPostActivity(
-        {
-          id: author.id,
-          name: author.name || 'Unknown User',
-          avatarUrl: author.avatarUrl || null,
-        },
-        {
-          id: post.id,
-          content,
-          isComment: !!parentId,
-        },
-      );
-    }
-
+    // Repository already returns DbUserFeedContent with author included
     return post;
   }
 
   async getUserPostThread(
     postId: number,
-  ): Promise<(UserFeedPost & { children: UserFeedPost[] }) | null> {
+  ): Promise<(DbUserFeedContent & { children: DbUserFeedContent[] }) | null> {
     const thread = await this.repo.getUserPostThread(postId);
     if (!thread) return null;
-    return {
-      ...toFeedPostDTO(thread),
-      children: (thread.children ?? []).map(toFeedPostDTO),
+
+    // Collect all unique authors from thread and children recursively
+    const collectAuthors = (post: any): any[] => {
+      const authors = post.author ? [post.author] : [];
+      if (post.children && post.children.length > 0) {
+        for (const child of post.children) {
+          authors.push(...collectAuthors(child));
+        }
+      }
+      return authors;
     };
+
+    const allAuthors = collectAuthors(thread);
+
+    // Batch enrich all authors at once
+    const enrichedAuthors = await this.enrichUsersWithAvatars(allAuthors);
+    const avatarMap = new Map(enrichedAuthors.map((author) => [author.id, author.avatarUrl]));
+
+    // Map avatars back to posts recursively
+    const enrichThread = (post: any): any => {
+      const enrichedPost = {
+        ...post,
+        authorAvatar: post.author ? (avatarMap.get(post.author.id) ?? null) : null,
+      };
+
+      if (post.children && post.children.length > 0) {
+        enrichedPost.children = post.children.map((child: any) => enrichThread(child));
+      }
+
+      return enrichedPost;
+    };
+
+    const enrichedThread = enrichThread(thread);
+
+    return enrichedThread;
   }
 
   // --- ACTIVITY (Legacy methods removed - use unifiedActivityService instead) ---
 
   // --- STATS ---
 
-  async getUserStats(userId: number): Promise<UserStatsDTO | null> {
-    const stats = await this.repo.getUserStats(userId);
-    if (!stats) return null;
-    return {
-      totalBets: stats.totalBets,
-      betsWon: stats.betsWon,
-      betsLost: stats.betsLost,
-      totalParlays: stats.totalParlays,
-      parlaysWon: stats.parlaysWon,
-      parlaysLost: stats.parlaysLost,
-      totalParlayLegs: stats.totalParlayLegs,
-      parlayLegsWon: stats.parlayLegsWon,
-      parlayLegsLost: stats.parlayLegsLost,
-      totalWagered: stats.totalWagered.toString(),
-      totalWon: stats.totalWon.toString(),
-      profit: stats.profit.toString(),
-      roi: stats.roi,
-      currentStreak: stats.currentStreak,
-      longestStreak: stats.longestStreak,
-      mostCommonBet: stats.mostCommonBet ?? null,
-      biggestWin: stats.biggestWin.toString(),
-      updatedAt: stats.updatedAt instanceof Date ? stats.updatedAt.toISOString() : stats.updatedAt,
-    };
+  async getUserStats(userId: number): Promise<UserStatsView | null> {
+    // Issue #3: Cache basic user stats for 30 seconds to reduce database load
+    const cacheKey = CacheKeys.USER_STATS_BASIC(userId);
+
+    return withCache(cacheKey, CACHE_TTL.USER_STATS, async () => {
+      const stats = await this.repo.getUserStats(userId);
+      if (!stats) return null;
+      return {
+        totalBets: stats.totalBets,
+        betsWon: stats.betsWon,
+        betsLost: stats.betsLost,
+        totalParlays: stats.totalParlays,
+        parlaysWon: stats.parlaysWon,
+        parlaysLost: stats.parlaysLost,
+        totalParlayLegs: stats.totalParlayLegs,
+        parlayLegsWon: stats.parlayLegsWon,
+        parlayLegsLost: stats.parlayLegsLost,
+        totalWagered: stats.totalWagered.toString(),
+        totalWon: stats.totalWon.toString(),
+        profit: stats.profit.toString(),
+        roi: stats.roi,
+        currentStreak: stats.currentStreak,
+        longestStreak: stats.longestStreak,
+        mostCommonBet: stats.mostCommonBet ?? null,
+        biggestWin: stats.biggestWin.toString(),
+        updatedAt:
+          stats.updatedAt instanceof Date ? stats.updatedAt.toISOString() : stats.updatedAt,
+      };
+    });
   }
 
   async updateUserStats(
@@ -635,61 +1023,37 @@ export class UserService {
       };
     }
   }
+
+  // ===============================================
+  // Social Features Methods
+  // ===============================================
+
+  async getUserFollowers(
+    userId: number,
+    params: {
+      limit: number;
+      cursor?: string;
+    },
+  ) {
+    return this.repo.getUserFollowers(userId, params);
+  }
+
+  async getUserFollowing(
+    userId: number,
+    params: {
+      limit: number;
+      cursor?: string;
+    },
+  ) {
+    return this.repo.getUserFollowing(userId, params);
+  }
+
+  /**
+   * Get aggregated activity stats for a user
+   * @param userId - ID of the user
+   * @returns Aggregated stats for today, week, and all time
+   */
+  async getUserActivityStats(userId: number) {
+    return this.statsRepo.getUserActivityStats(userId);
+  }
 }
-
-// --- Helpers: always map DB types to DTOs used on frontend ---
-
-function calculateReactionCounts(reactions: any[]): Record<any, number> {
-  const counts: Record<any, number> = {
-    LIKE: 0,
-    LOVE: 0,
-    LAUGH: 0,
-    WOW: 0,
-    SAD: 0,
-    ANGRY: 0,
-  };
-
-  reactions.forEach((reaction: any) => {
-    if (reaction.type && reaction.type in counts) {
-      counts[reaction.type]++;
-    }
-  });
-
-  return counts;
-}
-
-function toFeedPostDTO(
-  post: DbUserPost & { children?: DbUserPost[]; authorName?: string; reactions?: any[] },
-): UserFeedPost {
-  return {
-    id: post.id,
-    authorId: post.authorId,
-    content: post.content,
-    contentType: post.contentType,
-    visibility: post.visibility,
-    parentId: post.parentId,
-    threadDepth: post.threadDepth,
-    likesCount: post.likesCount,
-    commentsCount: post.commentsCount,
-    sharesCount: post.sharesCount,
-    viewsCount: post.viewsCount.toString(),
-    reactionCounts: calculateReactionCounts(post.reactions || []),
-    userReaction: undefined, // TODO: Pass viewerId to calculate user reaction
-    isDeleted: post.isDeleted,
-    isFlagged: post.isFlagged,
-    createdAt: post.createdAt instanceof Date ? post.createdAt.toISOString() : post.createdAt,
-    updatedAt: post.updatedAt instanceof Date ? post.updatedAt.toISOString() : post.updatedAt,
-    editedAt: post.editedAt
-      ? post.editedAt instanceof Date
-        ? post.editedAt.toISOString()
-        : post.editedAt
-      : undefined,
-    children: post.children ? post.children.map(toFeedPostDTO) : undefined,
-    authorName: post.authorName,
-  };
-}
-
-// Legacy ticker publishing removed - now handled by unified activity system
-// const TICKER_CHANNEL = 'activity:newsflash';
-// const TICKER_LIST = 'activity:ticker';
-// const TICKER_MAX = 100;

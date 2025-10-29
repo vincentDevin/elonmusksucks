@@ -1,13 +1,8 @@
-import { useState, useEffect } from 'react';
-import {
-  ChartBarIcon,
-  TrophyIcon,
-  CurrencyDollarIcon,
-  FireIcon,
-  StarIcon,
-  ClockIcon,
-} from '@heroicons/react/24/outline';
+import { useState, useEffect, memo } from 'react';
+import { TrophyIcon, CurrencyDollarIcon, FireIcon } from '@heroicons/react/24/outline';
 import api from '../../api/axios';
+import BaseCard from '../BaseCard';
+import { formatMuskBucks } from '../../utils/formatting';
 
 interface PongStatsCardProps {
   userId: number;
@@ -53,11 +48,7 @@ interface PongStats {
   roi: number;
 }
 
-export default function PongStatsCard({
-  userId,
-  className = '',
-  compact = false,
-}: PongStatsCardProps) {
+function PongStatsCardComponent({ userId, className = '', compact = false }: PongStatsCardProps) {
   const [stats, setStats] = useState<PongStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -78,13 +69,6 @@ export default function PongStatsCard({
 
     fetchStats();
   }, [userId]);
-
-  const formatCurrency = (amount: bigint): string => {
-    const num = Number(amount);
-    if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
-    if (num >= 1000) return `${(num / 1000).toFixed(1)}k`;
-    return num.toString();
-  };
 
   const formatDuration = (seconds: number): string => {
     const minutes = Math.floor(seconds / 60);
@@ -119,11 +103,7 @@ export default function PongStatsCard({
 
   if (compact) {
     return (
-      <div className={`bg-surface rounded-xl shadow-sm border border-accent/20 p-4 ${className}`}>
-        <div className="flex items-center space-x-3 mb-3">
-          <ChartBarIcon className="w-5 h-5 text-primary" />
-          <span className="font-semibold text-content">Pong Stats</span>
-        </div>
+      <BaseCard variant="compact" className={className} title="📊 Pong Stats">
         <div className="grid grid-cols-2 gap-3 text-sm">
           <div className="text-center">
             <div className="font-bold text-primary">{stats.wins}</div>
@@ -134,7 +114,7 @@ export default function PongStatsCard({
             <div className="text-tertiary">Win Rate</div>
           </div>
           <div className="text-center">
-            <div className="font-bold text-success">{formatCurrency(stats.totalWon)}</div>
+            <div className="font-bold text-success">{formatMuskBucks(stats.totalWon)}</div>
             <div className="text-tertiary">Earned</div>
           </div>
           <div className="text-center">
@@ -142,22 +122,20 @@ export default function PongStatsCard({
             <div className="text-tertiary">Streak</div>
           </div>
         </div>
-      </div>
+      </BaseCard>
     );
   }
 
   return (
-    <div className={`bg-surface rounded-xl shadow-sm border border-accent/20 p-6 ${className}`}>
-      {/* Header */}
-      <div className="flex items-center space-x-3 mb-6">
-        <ChartBarIcon className="w-6 h-6 text-primary" />
-        <span className="font-semibold text-content text-lg">Pong Statistics</span>
-        {stats.riskTaker && (
+    <BaseCard variant="full" className={className} title="📊 Pong Statistics">
+      {/* High Roller Badge */}
+      {stats.riskTaker && (
+        <div className="mb-4">
           <span className="px-2 py-1 bg-warning/10 text-warning rounded-full text-xs font-medium">
             🎲 High Roller
           </span>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Core Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -178,7 +156,7 @@ export default function PongStatsCard({
         </div>
         <div className="text-center p-3 bg-muted/30 rounded-lg">
           <CurrencyDollarIcon className="w-6 h-6 text-success mx-auto mb-1" />
-          <div className="font-bold text-lg text-content">{formatCurrency(stats.totalWon)}</div>
+          <div className="font-bold text-lg text-content">{formatMuskBucks(stats.totalWon)}</div>
           <div className="text-sm text-tertiary">Total Earned</div>
         </div>
       </div>
@@ -214,13 +192,15 @@ export default function PongStatsCard({
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div className="flex justify-between">
               <span className="text-tertiary">Total Wagered</span>
-              <span className="font-medium text-content">{formatCurrency(stats.totalWagered)}</span>
+              <span className="font-medium text-content">
+                {formatMuskBucks(stats.totalWagered)}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-tertiary">Profit/Loss</span>
               <span className={`font-medium ${stats.profit >= 0n ? 'text-success' : 'text-error'}`}>
                 {stats.profit >= 0n ? '+' : ''}
-                {formatCurrency(stats.profit)}
+                {formatMuskBucks(stats.profit)}
               </span>
             </div>
             <div className="flex justify-between">
@@ -233,7 +213,7 @@ export default function PongStatsCard({
             </div>
             <div className="flex justify-between">
               <span className="text-tertiary">Biggest Win</span>
-              <span className="font-medium text-success">{formatCurrency(stats.biggestWin)}</span>
+              <span className="font-medium text-success">{formatMuskBucks(stats.biggestWin)}</span>
             </div>
           </div>
         </div>
@@ -278,6 +258,15 @@ export default function PongStatsCard({
           </div>
         </div>
       </div>
-    </div>
+    </BaseCard>
   );
 }
+
+// Memoize to prevent re-fetching stats when parent re-renders
+export default memo(PongStatsCardComponent, (prevProps, nextProps) => {
+  return (
+    prevProps.userId === nextProps.userId &&
+    prevProps.className === nextProps.className &&
+    prevProps.compact === nextProps.compact
+  );
+});

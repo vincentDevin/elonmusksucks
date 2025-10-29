@@ -62,6 +62,16 @@ export interface ILeaderboardRepository {
   getUserRank(userId: number, period: 'allTime' | 'daily'): Promise<UserRank>;
 
   /**
+   * Get combined user ranking data in a single optimized query
+   * Replaces multiple getUserRank + getLeaderboardStats calls
+   */
+  getUserRankingCombined(userId: number): Promise<{
+    allTimeRank: number | null;
+    dailyRank: number | null;
+    totalUsers: number;
+  }>;
+
+  /**
    * Get overall leaderboard statistics
    */
   getLeaderboardStats(): Promise<LeaderboardStats>;

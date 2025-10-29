@@ -1,13 +1,13 @@
 // apps/server/src/services/moderation.service.ts
-import { PrismaClient } from '@prisma/client';
 import { ModerationRepository } from '../repositories/ModerationRepository';
 import type { IModerationRepository } from '../repositories/interfaces/IModerationRepository';
-import type { BanType, ModerationAction } from '@prisma/client';
+import type { ModerationAction } from '@prisma/client';
 import { REDIS_CHANNELS } from '@ems/types';
+import type { BanType, RedisChannel } from '@ems/types';
 import { eventBus } from '../lib/EventBus';
 
-const prisma = new PrismaClient();
-const moderationRepo: IModerationRepository = new ModerationRepository(prisma);
+// Using shared prisma from db.ts
+const moderationRepo: IModerationRepository = new ModerationRepository();
 
 interface BanUserParams {
   userId: number;
@@ -32,7 +32,10 @@ interface ModerationEventData {
 }
 
 // Publish moderation events to Redis
-async function publishModerationEvent(channel: string, data: ModerationEventData): Promise<void> {
+async function publishModerationEvent(
+  channel: RedisChannel,
+  data: ModerationEventData,
+): Promise<void> {
   try {
     await eventBus.publish(channel, data);
   } catch (error) {
@@ -44,7 +47,7 @@ async function publishModerationEvent(channel: string, data: ModerationEventData
 async function logAndPublishAction(
   action: ModerationAction,
   moderatorId: number,
-  channel: string,
+  channel: RedisChannel,
   targetUserId?: number,
   details?: any,
   ipAddress?: string,
@@ -88,7 +91,7 @@ export const moderationService = {
 
     // Calculate expiration for temporary bans
     const expiresAt =
-      banType === 'TEMPORARY' && duration ? new Date(Date.now() + duration * 60 * 1000) : undefined;
+      banType === 'temporary' && duration ? new Date(Date.now() + duration * 60 * 1000) : undefined;
 
     // Create ban
     const ban = await moderationRepo.createBan({
@@ -154,7 +157,7 @@ export const moderationService = {
     // Create temporary ban
     const ban = await moderationRepo.createBan({
       userId,
-      banType: 'TEMPORARY',
+      banType: 'temporary' as BanType,
       reason: `MUTE: ${reason}`,
       expiresAt: new Date(Date.now() + duration * 60 * 1000),
     });
@@ -195,6 +198,18 @@ export const moderationService = {
     return true;
   },
 
+  // Get message info (for including in deletion events)
+  async getMessageInfo(messageId: number): Promise<{ userId: number; userName: string }> {
+    const message = await moderationRepo.getMessage(messageId);
+    if (!message) {
+      throw new Error('Message not found');
+    }
+    return {
+      userId: message.userId,
+      userName: message.user?.name || `User ${message.userId}`,
+    };
+  },
+
   // Delete message
   async deleteMessage(
     messageId: number,
@@ -213,16 +228,16 @@ export const moderationService = {
       throw new Error('Failed to delete message');
     }
 
-    // Log and publish
-    await logAndPublishAction(
-      'MESSAGE_DELETE',
+    // Log moderation action (don't publish here - controller/handler will publish with full user details)
+    await moderationRepo.createModerationLog({
+      action: 'MESSAGE_DELETE',
       moderatorId,
-      REDIS_CHANNELS.MODERATION_MESSAGE_DELETE,
-      message.userId,
-      { messageId, reason, content: message.content },
+      targetUserId: message.userId,
+      reason,
+      details: { messageId, content: message.content },
       ipAddress,
       userAgent,
-    );
+    });
 
     return true;
   },
@@ -251,7 +266,7 @@ export const moderationService = {
       moderatorId,
       REDIS_CHANNELS.MODERATION_POST_DELETE,
       post.authorId,
-      { postId, reason, content: post.content },
+      { postId, reason, content: post.body },
       ipAddress,
       userAgent,
     );

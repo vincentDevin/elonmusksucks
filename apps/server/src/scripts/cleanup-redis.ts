@@ -6,7 +6,7 @@
 // -----------------------------------------------------------------------------
 
 import 'dotenv/config';
-import { cleanupAllQueues, cleanupStaleJobs } from '../lib/bullmqConfig';
+import { cleanupAllQueues } from '../lib/bullmqConfig';
 import redisClient from '../lib/redis';
 
 async function main() {

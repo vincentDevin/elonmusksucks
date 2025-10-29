@@ -1,13 +1,25 @@
 // apps/client/src/api/axios.ts
 // Rollback: Remove metrics imports and interceptors, restore original axios config
 import axios from 'axios';
-import { requestManager } from '../lib/requestManager';
 import { devMetrics } from '../lib/metrics';
+import env from '../config/env';
 // CSRF Note: SPA uses JWT Bearer tokens for authentication, providing equivalent CSRF protection
 
+/**
+ * Axios instance for API requests
+ *
+ * SECURITY: Authentication using JWT Bearer tokens
+ * - Access tokens sent in Authorization header (not cookies)
+ * - Refresh tokens stored in HTTP-only cookies by server
+ * - Bearer tokens provide CSRF protection (cannot be sent by malicious sites)
+ *
+ * ENVIRONMENT CONFIGURATION:
+ * - Development: baseURL = '' (uses Vite proxy at localhost:3000)
+ * - Production: baseURL = VITE_API_BASE_URL (e.g., https://api.elonmusksucks.net)
+ */
 const api = axios.create({
-  baseURL: '', // ← purely relative
-  withCredentials: true, // ← still send cookies along
+  baseURL: env.API_BASE_URL, // Development: '' (Vite proxy), Production: full URL
+  withCredentials: true, // ← still send cookies along (for refresh token)
   headers: { 'Content-Type': 'application/json' },
 });
 
@@ -64,28 +76,6 @@ api.interceptors.request.use((config) => {
   // as they cannot be sent by malicious sites via simple form submissions
   return config;
 });
-
-// Add request deduplication interceptor (before response interceptor)
-api.interceptors.request.use(
-  (config) => {
-    // Skip deduplication for non-GET requests to avoid side effects
-    if (config.method?.toLowerCase() !== 'get') {
-      return config;
-    }
-
-    // Mark this request for potential deduplication
-    (config as any).metadata = { ...(config as any).metadata, shouldDedupe: true };
-    return config;
-  },
-  (error) => Promise.reject(error),
-);
-
-// Create deduplicated version of axios instance with AbortController support
-// Rollback: Remove AbortController integration and revert to original axios methods
-const originalGet = api.get.bind(api);
-api.get = function (url, config = {}) {
-  return requestManager.dedupe('get', url, () => originalGet(url, config), config.params);
-};
 
 // Helper to create requests with AbortController support
 export const createAbortableRequest = () => {
@@ -212,5 +202,13 @@ api.interceptors.response.use(
     }
   },
 );
+
+// Event System Metrics API functions
+export const eventSystemMetricsApi = {
+  getMetrics: () => api.get('/api/monitoring/metrics/events'),
+  resetMetrics: () => api.post('/api/monitoring/metrics/events/reset'),
+  startMonitoring: () => api.post('/api/monitoring/monitoring/start'),
+  stopMonitoring: () => api.post('/api/monitoring/monitoring/stop'),
+};
 
 export default api;

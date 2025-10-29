@@ -1,8 +1,5 @@
 // apps/server/src/utils/opml.ts
 import { parseString } from 'xml2js';
-import { promisify } from 'util';
-
-const parseXml = promisify(parseString);
 
 /**
  * OPML Parser and Generator utilities
@@ -26,13 +23,22 @@ export interface OPMLDocument {
  */
 export async function parseOpmlString(opmlXml: string): Promise<OPMLFeed[]> {
   try {
-    const result = await parseXml(opmlXml, {
-      explicitArray: false,
-      ignoreAttrs: false,
-      mergeAttrs: true,
+    const result = await new Promise<any>((resolve, reject) => {
+      parseString(
+        opmlXml,
+        {
+          explicitArray: false,
+          ignoreAttrs: false,
+          mergeAttrs: true,
+        },
+        (err: any, result: any) => {
+          if (err) reject(err);
+          else resolve(result);
+        },
+      );
     });
 
-    if (!result.opml || !result.opml.body || !result.opml.body.outline) {
+    if (!result?.opml || !result.opml.body || !result.opml.body.outline) {
       throw new Error('Invalid OPML structure');
     }
 

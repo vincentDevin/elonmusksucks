@@ -4,10 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
-  ArrowPathIcon,
-  ChartBarIcon,
   TrophyIcon,
-  CalendarIcon,
   ExclamationTriangleIcon,
   PuzzlePieceIcon,
 } from '@heroicons/react/24/outline';
@@ -20,11 +17,12 @@ import {
 import type { PongLeaderboardView } from '@ems/types';
 import { getShameWall, getShameWallStats } from '../api/shameWall';
 import type { ShameWallEntry, ShameWallStats } from '../api/shameWall';
+import { getPongLeaderboard } from '../api/leaderboard';
+import PageContainer from '../components/PageContainer';
 
 // New unified components
-import { LeaderboardHeader } from '../components/leaderboard/LeaderboardHeader';
 import { LeaderboardEntry } from '../components/leaderboard/LeaderboardEntry';
-import { CompactControlBar } from '../components/leaderboard/CompactControlBar';
+import { CompactLeaderboardHeader } from '../components/leaderboard/CompactLeaderboardHeader';
 import AchievementNotification from '../components/leaderboard/AchievementNotification';
 import {
   transformBettingEntry,
@@ -34,7 +32,11 @@ import {
   transformPongHeaderStats,
   transformShameHeaderStats,
 } from '../components/leaderboard/dataTransformers';
-import type { LeaderboardVariant, ControlBarConfig } from '../components/leaderboard/types';
+import type {
+  LeaderboardVariant,
+  ControlBarConfig,
+  FilterGroup,
+} from '../components/leaderboard/types';
 
 type TabType = 'betting' | 'pong' | 'shame';
 
@@ -106,14 +108,11 @@ export default function Leaderboard() {
         setPongLoading(true);
         setPongError(null);
         try {
-          const response = await fetch(`/api/leaderboard/pong/${pongMetric}?limit=50`);
-          if (!response.ok) {
-            throw new Error('Failed to fetch Pong leaderboard');
-          }
-          const data = await response.json();
+          const data = await getPongLeaderboard(pongMetric, 50);
           setPongLeaderboard(data);
         } catch (err) {
           setPongError(err instanceof Error ? err.message : 'Failed to load Pong leaderboard');
+          console.error('[Pong Leaderboard] Fetch error:', err);
         } finally {
           setPongLoading(false);
         }
@@ -150,7 +149,7 @@ export default function Leaderboard() {
   const headerStats = useMemo(() => {
     switch (activeTab) {
       case 'betting':
-        return transformBettingHeaderStats(stats, userRank);
+        return transformBettingHeaderStats(stats);
       case 'pong':
         return transformPongHeaderStats(pongLeaderboard);
       case 'shame':
@@ -164,57 +163,17 @@ export default function Leaderboard() {
   const controlBarConfig: ControlBarConfig = useMemo(() => {
     const variant = activeTab as LeaderboardVariant;
 
-    const baseConfig = {
+    let filterGroups: FilterGroup[] = [];
+
+    const baseConfig: ControlBarConfig = {
       variant,
-      filterGroups: [],
-      actions: [
-        {
-          label: 'Refresh',
-          icon: ArrowPathIcon,
-          onClick: () => {
-            if (activeTab === 'betting') refresh();
-            else if (activeTab === 'pong') {
-              const fetchPong = async () => {
-                setPongLoading(true);
-                try {
-                  const response = await fetch(`/api/leaderboard/pong/${pongMetric}?limit=50`);
-                  const data = await response.json();
-                  setPongLeaderboard(data);
-                } catch (err) {
-                  setPongError(err instanceof Error ? err.message : 'Failed to refresh');
-                } finally {
-                  setPongLoading(false);
-                }
-              };
-              fetchPong();
-            } else if (activeTab === 'shame') {
-              const fetchShame = async () => {
-                setShameWallLoading(true);
-                try {
-                  const [wallData, statsData] = await Promise.all([
-                    getShameWall(),
-                    getShameWallStats(),
-                  ]);
-                  setShameWall(wallData);
-                  setShameWallStats(statsData);
-                } catch (err) {
-                  setShameWallError(err instanceof Error ? err.message : 'Failed to refresh');
-                } finally {
-                  setShameWallLoading(false);
-                }
-              };
-              fetchShame();
-            }
-          },
-          loading: loading || pongLoading || shameWallLoading,
-          variant: 'secondary' as const,
-        },
-      ],
+      filterGroups,
+      actions: [],
     };
 
     // Add tab-specific filters
     if (activeTab === 'betting') {
-      baseConfig.filterGroups = [
+      filterGroups = [
         {
           label: 'Period',
           options: [
@@ -222,7 +181,7 @@ export default function Leaderboard() {
             { key: 'daily', label: 'Daily', description: 'Today only' },
           ],
           value: period,
-          onChange: (value) => setPeriod(value as LeaderboardPeriod),
+          onChange: (value: string) => setPeriod(value as LeaderboardPeriod),
         },
         {
           label: 'Metric',
@@ -233,11 +192,11 @@ export default function Leaderboard() {
             { key: 'roi', label: 'ROI', description: 'Return on investment' },
           ],
           value: metric,
-          onChange: (value) => setMetric(value as LeaderboardMetric),
+          onChange: (value: string) => setMetric(value as LeaderboardMetric),
         },
       ];
     } else if (activeTab === 'pong') {
-      baseConfig.filterGroups = [
+      filterGroups = [
         {
           label: 'Metric',
           options: [
@@ -249,12 +208,15 @@ export default function Leaderboard() {
             { key: 'perfectGames', label: 'Perfect Games', description: '11-0 victories' },
           ],
           value: pongMetric,
-          onChange: (value) => setPongMetric(value),
+          onChange: (value: string) => setPongMetric(value),
         },
       ];
     }
 
-    return baseConfig;
+    return {
+      ...baseConfig,
+      filterGroups,
+    };
   }, [activeTab, period, metric, pongMetric, refresh, loading, pongLoading, shameWallLoading]);
 
   // Handle initial loading states for all tabs
@@ -273,7 +235,7 @@ export default function Leaderboard() {
 
   if (isInitialLoading) {
     return (
-      <div className="p-6 max-w-6xl mx-auto">
+      <PageContainer>
         <div className="text-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-tertiary">
@@ -286,40 +248,78 @@ export default function Leaderboard() {
             …
           </p>
         </div>
-      </div>
+      </PageContainer>
     );
   }
 
   if (hasError) {
+    // Determine the retry function based on active tab
+    const handleRetry = () => {
+      if (activeTab === 'betting') {
+        refresh();
+      } else if (activeTab === 'pong') {
+        // Retry pong leaderboard fetch
+        const fetchPongLeaderboard = async () => {
+          setPongLoading(true);
+          setPongError(null);
+          try {
+            const data = await getPongLeaderboard(pongMetric, 50);
+            setPongLeaderboard(data);
+          } catch (err) {
+            setPongError(err instanceof Error ? err.message : 'Failed to load Pong leaderboard');
+          } finally {
+            setPongLoading(false);
+          }
+        };
+        fetchPongLeaderboard();
+      } else if (activeTab === 'shame') {
+        // Retry shame wall fetch
+        const fetchShameWall = async () => {
+          setShameWallLoading(true);
+          setShameWallError(null);
+          try {
+            const [wallData, statsData] = await Promise.all([getShameWall(), getShameWallStats()]);
+            setShameWall(wallData);
+            setShameWallStats(statsData);
+          } catch (err) {
+            setShameWallError(err instanceof Error ? err.message : 'Failed to load shame wall');
+          } finally {
+            setShameWallLoading(false);
+          }
+        };
+        fetchShameWall();
+      }
+    };
+
     return (
-      <div className="p-6 max-w-6xl mx-auto">
+      <PageContainer>
         <div className="text-center py-12">
           <p className="text-red-500 mb-4">
             Error: {hasError instanceof Error ? hasError.message : hasError}
           </p>
           <button
-            onClick={() => controlBarConfig.actions[0].onClick()}
+            onClick={handleRetry}
             className="bg-primary text-surface px-4 py-2 rounded-lg hover:bg-primary/80 transition-colors"
           >
             Try Again
           </button>
         </div>
-      </div>
+      </PageContainer>
     );
   }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
-      {/* Achievement Notifications */}
-      <AchievementNotification achievements={achievements} onClear={clearAchievements} />
+    <PageContainer>
+      <div className="space-y-6">
+        {/* Achievement Notifications */}
+        <AchievementNotification achievements={achievements} onClear={clearAchievements} />
 
-      {/* Unified Header with Tab Navigation */}
-      <div className="space-y-4">
-        <LeaderboardHeader
+        {/* Consolidated Header with Navigation and Controls */}
+        <CompactLeaderboardHeader
           variant={activeTab as LeaderboardVariant}
           title={
             activeTab === 'betting'
-              ? 'Live Leaderboard'
+              ? 'Market Leaderboard'
               : activeTab === 'pong'
                 ? 'Pong Champions'
                 : 'Wall of Shame'
@@ -340,156 +340,125 @@ export default function Leaderboard() {
           }
           stats={headerStats}
           isLoading={currentLoading}
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabChange={(tabId: string) => setActiveTab(tabId as TabType)}
+          controlBarConfig={controlBarConfig}
         />
 
-        {/* Tab Navigation */}
-        <div className="flex justify-center space-x-4">
-          {tabs.map((tab) => {
-            const isActive = activeTab === tab.id;
-            let activeStyle = 'bg-primary text-white shadow-xl scale-105';
-            let hoverStyle = 'bg-surface text-content hover:bg-accent hover:scale-105';
+        {/* User Rank for betting leaderboard - integrated into header stats now */}
 
-            if (tab.id === 'pong') {
-              activeStyle = 'bg-blue-500 text-white shadow-xl scale-105';
-              hoverStyle =
-                'bg-surface text-content hover:bg-blue-500/10 hover:text-blue-500 hover:scale-105';
-            } else if (tab.id === 'shame') {
-              activeStyle = 'bg-red-500 text-white shadow-xl scale-105';
-              hoverStyle =
-                'bg-surface text-content hover:bg-red-50 hover:text-red-600 hover:scale-105';
-            }
-
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center space-x-3 px-6 py-3 rounded-xl font-bold text-lg transition-all duration-200 ${
-                  isActive ? activeStyle : hoverStyle
-                }`}
-              >
-                <tab.icon className="w-6 h-6" />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Unified Control Bar - Combined for all tabs */}
-      <CompactControlBar config={controlBarConfig} />
-
-      {/* User Rank for betting leaderboard - integrated into header stats now */}
-
-      {/* Unified Entries List */}
-      {unifiedEntries.length > 0 ? (
-        <ul className="space-y-4">
-          {unifiedEntries.map((entry, idx) => {
-            const rank = activeTab === 'betting' ? (currentPage - 1) * 25 + idx + 1 : idx + 1;
-            const recentChange =
-              activeTab === 'betting'
-                ? recentChanges.find((change) => change.userId === entry.id)
-                : undefined;
-            const isCurrentUser = user?.id === entry.id;
-
-            return (
-              <LeaderboardEntry
-                key={`${activeTab}-${entry.id}`}
-                entry={entry}
-                rank={rank}
-                isCurrentUser={isCurrentUser}
-                showAnimation={!!recentChange}
-              />
-            );
-          })}
-        </ul>
-      ) : (
-        <div className="text-center py-12">
-          <div className="text-6xl mb-4">
-            {activeTab === 'betting' ? '📊' : activeTab === 'pong' ? '🏓' : '🎉'}
-          </div>
-          <h3 className="text-xl font-semibold text-content mb-2">
-            {activeTab === 'betting'
-              ? 'No leaderboard entries yet.'
-              : activeTab === 'pong'
-                ? 'No Pong champions yet!'
-                : 'No one is currently banned!'}
-          </h3>
-          <p className="text-tertiary">
-            {activeTab === 'betting'
-              ? 'Be the first to place some bets!'
-              : activeTab === 'pong'
-                ? 'Be the first to dominate the Pong leaderboard.'
-                : 'Everyone is behaving themselves... for now.'}
-          </p>
-        </div>
-      )}
-
-      {/* Pagination - Only for Betting Leaderboard */}
-      {activeTab === 'betting' && pagination.totalPages > 1 && (
-        <div className="flex items-center justify-center space-x-4 py-6">
-          <button
-            onClick={prevPage}
-            disabled={!pagination.hasPrevPage || loading}
-            className="flex items-center space-x-2 px-4 py-2 bg-surface rounded-lg hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <ChevronLeftIcon className="w-4 h-4" />
-            <span>Previous</span>
-          </button>
-
-          <div className="flex items-center space-x-2">
-            {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
-              const page = Math.max(1, currentPage - 2) + i;
-              if (page > pagination.totalPages) return null;
+        {/* Unified Entries List */}
+        {unifiedEntries.length > 0 ? (
+          <ul className="space-y-3">
+            {unifiedEntries.map((entry, idx) => {
+              const rank = activeTab === 'betting' ? (currentPage - 1) * 25 + idx + 1 : idx + 1;
+              const recentChange =
+                activeTab === 'betting'
+                  ? recentChanges.find((change) => change.userId === entry.id)
+                  : undefined;
+              const isCurrentUser = user?.id === entry.id;
 
               return (
-                <button
-                  key={page}
-                  onClick={() => goToPage(page)}
-                  className={`
-                    w-10 h-10 rounded-lg font-medium transition-colors
-                    ${
-                      page === currentPage
-                        ? 'bg-primary text-surface'
-                        : 'bg-surface hover:bg-accent text-content'
-                    }
-                  `}
-                >
-                  {page}
-                </button>
+                <LeaderboardEntry
+                  key={`${activeTab}-${entry.id}`}
+                  entry={entry}
+                  rank={rank}
+                  isCurrentUser={isCurrentUser}
+                  showAnimation={!!recentChange}
+                />
               );
             })}
+          </ul>
+        ) : (
+          <div className="text-center py-16">
+            <div className="text-6xl mb-6">
+              {activeTab === 'betting' ? '📊' : activeTab === 'pong' ? '🏓' : '🎉'}
+            </div>
+            <h3 className="text-2xl font-bold text-content mb-3">
+              {activeTab === 'betting'
+                ? 'No leaderboard entries yet.'
+                : activeTab === 'pong'
+                  ? 'No Pong champions yet!'
+                  : 'No one is currently banned!'}
+            </h3>
+            <p className="text-base text-tertiary">
+              {activeTab === 'betting'
+                ? 'Be the first to place some bets!'
+                : activeTab === 'pong'
+                  ? 'Be the first to dominate the Pong leaderboard.'
+                  : 'Everyone is behaving themselves... for now.'}
+            </p>
           </div>
+        )}
 
-          <button
-            onClick={nextPage}
-            disabled={!pagination.hasNextPage || loading}
-            className="flex items-center space-x-2 px-4 py-2 bg-surface rounded-lg hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <span>Next</span>
-            <ChevronRightIcon className="w-4 h-4" />
-          </button>
-        </div>
-      )}
+        {/* Pagination - Only for Betting Leaderboard */}
+        {activeTab === 'betting' && pagination.totalPages > 1 && (
+          <div className="flex items-center justify-center space-x-4 py-8">
+            <button
+              onClick={prevPage}
+              disabled={!pagination.hasPrevPage || loading}
+              className="flex items-center space-x-2 px-4 py-3 bg-surface rounded-lg hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-base font-medium"
+            >
+              <ChevronLeftIcon className="w-5 h-5" />
+              <span>Previous</span>
+            </button>
 
-      {/* Loading overlay */}
-      {currentLoading && unifiedEntries.length > 0 && (
-        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-40">
-          <div className="bg-surface rounded-lg p-4 shadow-lg">
-            <div className="flex items-center space-x-3">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-              <span>
-                Updating{' '}
-                {activeTab === 'betting'
-                  ? 'leaderboard'
-                  : activeTab === 'pong'
-                    ? 'Pong leaderboard'
-                    : 'shame wall'}
-                ...
-              </span>
+            <div className="flex items-center space-x-2">
+              {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                const page = Math.max(1, currentPage - 2) + i;
+                if (page > pagination.totalPages) return null;
+
+                return (
+                  <button
+                    key={page}
+                    onClick={() => goToPage(page)}
+                    className={`
+                      w-12 h-12 rounded-lg font-semibold transition-colors text-base
+                      ${
+                        page === currentPage
+                          ? 'bg-primary text-surface'
+                          : 'bg-surface hover:bg-accent text-content'
+                      }
+                    `}
+                  >
+                    {page}
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              onClick={nextPage}
+              disabled={!pagination.hasNextPage || loading}
+              className="flex items-center space-x-2 px-4 py-3 bg-surface rounded-lg hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-base font-medium"
+            >
+              <span>Next</span>
+              <ChevronRightIcon className="w-5 h-5" />
+            </button>
+          </div>
+        )}
+
+        {/* Loading overlay */}
+        {currentLoading && unifiedEntries.length > 0 && (
+          <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-40">
+            <div className="bg-surface rounded-lg p-4 shadow-lg">
+              <div className="flex items-center space-x-3">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                <span>
+                  Updating{' '}
+                  {activeTab === 'betting'
+                    ? 'leaderboard'
+                    : activeTab === 'pong'
+                      ? 'Pong leaderboard'
+                      : 'shame wall'}
+                  ...
+                </span>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </PageContainer>
   );
 }

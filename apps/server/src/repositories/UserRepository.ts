@@ -1,18 +1,43 @@
 // apps/server/src/repositories/UserRepository.ts
 
-import { PrismaClient, Prisma } from '@prisma/client';
+import prisma from '../db';
+import { Prisma } from '@prisma/client';
 import type { IUserRepository } from './interfaces/IUserRepository';
+import type {
+  PrismaUser,
+  PrismaUserBadge,
+  PrismaBadge,
+  DbUserStats,
+  DetailedUserAchievement,
+  DbUserFeedContent,
+} from '@ems/types';
 
 export type { IUserRepository };
-import type { DbUser, DbUserBadge, DbBadge, DbUserStats, DbUserPost } from '@ems/types';
 
-const prisma = new PrismaClient();
-
+/**
+ * User Repository Implementation
+ * Handles user profiles, stats, follows, feed, and social features
+ */
 export class UserRepository implements IUserRepository {
-  async findById(id: number): Promise<DbUser | null> {
-    return prisma.user.findUnique({ where: { id } }) as Promise<DbUser | null>;
+  /**
+   * Find user by ID
+   */
+  async findById(id: number): Promise<PrismaUser | null> {
+    return prisma.user.findUnique({ where: { id } }) as Promise<PrismaUser | null>;
   }
 
+  /**
+   * Find user by username (exact match, case-sensitive)
+   */
+  async findByUsername(username: string): Promise<PrismaUser | null> {
+    return prisma.user.findFirst({
+      where: { name: username },
+    }) as Promise<PrismaUser | null>;
+  }
+
+  /**
+   * Find basic user info by ID (id and name only)
+   */
   async findUserBasicById(id: number): Promise<{ id: number; name: string } | null> {
     return prisma.user.findUnique({
       where: { id },
@@ -20,35 +45,62 @@ export class UserRepository implements IUserRepository {
     });
   }
 
+  /**
+   * Get user statistics
+   */
   async getUserStats(userId: number): Promise<DbUserStats | null> {
     return prisma.userStats.findUnique({ where: { userId } }) as Promise<DbUserStats | null>;
   }
 
+  /**
+   * Get count of user's followers
+   */
   async getFollowersCount(userId: number): Promise<number> {
     return prisma.follow.count({ where: { followingId: userId } });
   }
 
+  /**
+   * Get count of users this user is following
+   */
   async getFollowingCount(userId: number): Promise<number> {
     return prisma.follow.count({ where: { followerId: userId } });
   }
 
-  async findUserBadges(userId: number): Promise<Array<DbUserBadge & { badge: DbBadge }>> {
+  /**
+   * Find user's badges with badge details
+   */
+  async findUserBadges(userId: number): Promise<Array<PrismaUserBadge & { badge: PrismaBadge }>> {
     return prisma.userBadge.findMany({
       where: { userId },
       include: { badge: true },
-    }) as Promise<Array<DbUserBadge & { badge: DbBadge }>>;
+    }) as Promise<Array<PrismaUserBadge & { badge: PrismaBadge }>>;
   }
 
-  async findUserAchievements(userId: number): Promise<any[]> {
-    return prisma.userAchievement.findMany({
+  /**
+   * Find user's completed achievements with percentage calculation
+   */
+  async findUserAchievements(userId: number): Promise<DetailedUserAchievement[]> {
+    const achievements = await prisma.userAchievement.findMany({
       where: { userId, completedAt: { not: null } },
       include: {
         achievement: true,
       },
       orderBy: [{ achievement: { category: 'asc' } }, { achievement: { sortOrder: 'asc' } }],
     });
+
+    return achievements.map((ua) => ({
+      ...ua,
+      achievement: ua.achievement,
+      percentComplete:
+        ua.achievement.targetValue > 0
+          ? Math.min(100, (ua.progress / ua.achievement.targetValue) * 100)
+          : 0,
+    })) as DetailedUserAchievement[];
   }
 
+  /**
+   * Check if follow relationship exists
+   */
   async existsFollow(followerId: number, followingId: number): Promise<boolean> {
     const follow = await prisma.follow.findUnique({
       where: { followerId_followingId: { followerId, followingId } },
@@ -56,21 +108,30 @@ export class UserRepository implements IUserRepository {
     return Boolean(follow);
   }
 
+  /**
+   * Create a follow relationship
+   */
   async createFollow(followerId: number, followingId: number): Promise<void> {
     await prisma.follow.create({ data: { followerId, followingId } });
   }
 
+  /**
+   * Delete a follow relationship
+   */
   async deleteFollow(followerId: number, followingId: number): Promise<void> {
     await prisma.follow.delete({
       where: { followerId_followingId: { followerId, followingId } },
     });
   }
 
+  /**
+   * Update user profile
+   */
   async updateProfile(
     userId: number,
     data: Partial<
       Pick<
-        DbUser,
+        PrismaUser,
         | 'bio'
         | 'avatarUrl'
         | 'location'
@@ -86,106 +147,211 @@ export class UserRepository implements IUserRepository {
     await prisma.user.update({ where: { id: userId }, data });
   }
 
-  async getUserFeed(userId: number, options?: { parentId: number | null }): Promise<DbUserPost[]> {
-    const where: any = { authorId: userId };
+  /**
+   * Get user's feed content (posts using Content model)
+   * @param userId - User ID
+   * @param options - Optional filter for parentId
+   */
+  async getUserFeed(
+    userId: number,
+    options?: { parentId: number | null },
+  ): Promise<DbUserFeedContent[]> {
+    const where: Prisma.ContentWhereInput = {
+      authorId: userId,
+      type: 'POST',
+      isDeleted: false,
+    };
+
     if (options && 'parentId' in options) {
       where.parentId = options.parentId;
     }
 
-    const posts = await prisma.userPost.findMany({
+    const posts = await prisma.content.findMany({
       where,
       orderBy: { createdAt: 'desc' },
       include: {
-        author: true,
-        reactions: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                avatarUrl: true,
-              },
-            },
+        author: {
+          select: {
+            id: true,
+            name: true,
+            avatarUrl: true,
+          },
+        },
+        parent: {
+          select: {
+            id: true,
+            body: true,
+            authorId: true,
           },
         },
       },
     });
 
-    // Nest into a tree
-    const flat = posts.map((post) => ({
-      ...mapUserPost(post),
-      authorName: post.author?.name ?? `User #${post.authorId}`,
+    // Transform Content to DbUserFeedContent format
+    return posts.map((post) => ({
+      id: post.id,
+      authorId: post.authorId,
+      type: post.type,
+      body: post.body,
+      parentId: post.parentId,
+      threadDepth: post.threadDepth,
+      reactionsCount: post.reactionsCount,
+      repliesCount: post.repliesCount,
+      createdAt: post.createdAt,
+      author: {
+        id: post.author.id,
+        name: post.author.name,
+        avatarUrl: post.author.avatarUrl,
+      },
+      parent: post.parent
+        ? {
+            id: post.parent.id,
+            body: post.parent.body,
+            authorId: post.parent.authorId,
+          }
+        : null,
     }));
-    const byId: Record<number, any> = {};
-    flat.forEach((p) => (byId[p.id] = { ...p, children: [] }));
-    const tree: typeof flat = [];
-    flat.forEach((p) => {
-      if (p.parentId != null) byId[p.parentId]?.children.push(byId[p.id]);
-      else tree.push(byId[p.id]);
-    });
-    return tree;
   }
 
+  /**
+   * Create a new user post using Content model
+   */
   async createUserPost(data: {
     authorId: number;
     content: string;
     parentId: number | null;
-  }): Promise<DbUserPost> {
-    // Legacy method - now redirects to new PostRepository for consistency
-    return prisma.userPost.create({
+  }): Promise<DbUserFeedContent> {
+    // Calculate thread depth if this is a reply
+    let threadDepth = 0;
+    if (data.parentId) {
+      const parent = await prisma.content.findUnique({
+        where: { id: data.parentId },
+        select: { threadDepth: true },
+      });
+      threadDepth = parent ? parent.threadDepth + 1 : 0;
+    }
+
+    const post = await prisma.content.create({
       data: {
         authorId: data.authorId,
-        content: data.content,
-        parentId: data.parentId,
+        type: 'POST',
+        body: data.content,
         contentType: 'TEXT',
         visibility: 'PUBLIC',
-        threadDepth: 0, // Will be calculated properly in new PostRepository
-        likesCount: 0,
-        commentsCount: 0,
-        sharesCount: 0,
-        viewsCount: 0,
-        isDeleted: false,
-        isFlagged: false,
+        parentId: data.parentId,
+        threadDepth,
       },
-    }) as Promise<DbUserPost>;
-  }
-
-  async getUserPostThread(
-    postId: number,
-  ): Promise<(DbUserPost & { children: DbUserPost[] }) | null> {
-    const post = await prisma.userPost.findUnique({
-      where: { id: postId },
-      include: { children: true },
+      include: {
+        author: {
+          select: {
+            id: true,
+            name: true,
+            avatarUrl: true,
+          },
+        },
+      },
     });
-    if (!post) return null;
-    return { ...post, children: post.children ?? [] };
+
+    return {
+      id: post.id,
+      authorId: post.authorId,
+      type: post.type,
+      body: post.body,
+      parentId: post.parentId,
+      threadDepth: post.threadDepth,
+      reactionsCount: post.reactionsCount,
+      repliesCount: post.repliesCount,
+      createdAt: post.createdAt,
+      author: post.author,
+      parent: null,
+    };
   }
 
+  /**
+   * Get user post thread with children using Content model
+   */
+  async getUserPostThread(postId: number): Promise<DbUserFeedContent | null> {
+    const post = await prisma.content.findUnique({
+      where: { id: postId },
+      include: {
+        author: {
+          select: {
+            id: true,
+            name: true,
+            avatarUrl: true,
+          },
+        },
+        parent: {
+          select: {
+            id: true,
+            body: true,
+            authorId: true,
+          },
+        },
+      },
+    });
+
+    if (!post) return null;
+
+    return {
+      id: post.id,
+      authorId: post.authorId,
+      type: post.type,
+      body: post.body,
+      parentId: post.parentId,
+      threadDepth: post.threadDepth,
+      reactionsCount: post.reactionsCount,
+      repliesCount: post.repliesCount,
+      createdAt: post.createdAt,
+      author: {
+        id: post.author.id,
+        name: post.author.name,
+        avatarUrl: post.author.avatarUrl,
+      },
+      parent: post.parent
+        ? {
+            id: post.parent.id,
+            body: post.parent.body,
+            authorId: post.parent.authorId,
+          }
+        : null,
+    };
+  }
+
+  /**
+   * Update user statistics
+   */
   async updateUserStats(
     userId: number,
     data: Partial<Omit<DbUserStats, 'id' | 'userId'>>,
   ): Promise<void> {
     // Convert string BigInt fields back to BigInt for Prisma
-    const prismaData: any = { ...data };
+    const prismaData: Prisma.UserStatsUpdateInput = { ...data };
     if (data.totalWagered && typeof data.totalWagered === 'string') {
-      prismaData.totalWagered = BigInt(data.totalWagered);
+      (prismaData as Record<string, unknown>).totalWagered = BigInt(data.totalWagered);
     }
     if (data.totalWon && typeof data.totalWon === 'string') {
-      prismaData.totalWon = BigInt(data.totalWon);
+      (prismaData as Record<string, unknown>).totalWon = BigInt(data.totalWon);
     }
     if (data.profit && typeof data.profit === 'string') {
-      prismaData.profit = BigInt(data.profit);
+      (prismaData as Record<string, unknown>).profit = BigInt(data.profit);
     }
     if (data.biggestWin && typeof data.biggestWin === 'string') {
-      prismaData.biggestWin = BigInt(data.biggestWin);
+      (prismaData as Record<string, unknown>).biggestWin = BigInt(data.biggestWin);
+    }
+    if (data.biggestLoss && typeof data.biggestLoss === 'string') {
+      (prismaData as Record<string, unknown>).biggestLoss = BigInt(data.biggestLoss);
     }
     await prisma.userStats.update({ where: { userId }, data: prismaData });
   }
 
+  /**
+   * Atomically increment user stats fields
+   */
   async incrementUserStats(userId: number, data: Prisma.UserStatsUpdateInput): Promise<void> {
     try {
       await prisma.userStats.update({ where: { userId }, data });
-    } catch (e: any) {
+    } catch (e: unknown) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2025') {
         const createData: Prisma.UserStatsUncheckedCreateInput = { userId };
         for (const [key, val] of Object.entries(data)) {
@@ -193,23 +359,30 @@ export class UserRepository implements IUserRepository {
             val &&
             typeof val === 'object' &&
             'increment' in val &&
-            typeof (val as any).increment === 'number'
+            typeof (val as Record<string, unknown>).increment === 'number'
           ) {
-            // @ts-ignore
-            createData[key] = (val as any).increment;
+            (createData as Record<string, unknown>)[key] = (
+              val as Record<string, unknown>
+            ).increment;
           }
         }
-        await prisma.userStats.create({ data: createData as Prisma.UserStatsUncheckedCreateInput });
+        await prisma.userStats.create({ data: createData });
         return;
       }
       throw e;
     }
   }
 
+  /**
+   * Set user feed privacy setting
+   */
   async setFeedPrivacy(userId: number, feedPrivate: boolean): Promise<void> {
     await prisma.user.update({ where: { id: userId }, data: { feedPrivate } });
   }
 
+  /**
+   * Get user's rank based on muskBucks
+   */
   async getUserRank(userId: number): Promise<number | undefined> {
     const rawRank = (await prisma.$queryRawUnsafe(
       `SELECT rank FROM (
@@ -221,6 +394,9 @@ export class UserRepository implements IUserRepository {
     return Array.isArray(rawRank) && rawRank.length > 0 ? Number(rawRank[0].rank) : undefined;
   }
 
+  /**
+   * Get user's active bets (pending status)
+   */
   async getUserActiveBets(userId: number): Promise<
     Array<{
       id: number;
@@ -255,6 +431,9 @@ export class UserRepository implements IUserRepository {
     }));
   }
 
+  /**
+   * Get user's active parlays (pending status)
+   */
   async getUserActiveParlays(userId: number): Promise<
     Array<{
       id: number;
@@ -292,13 +471,16 @@ export class UserRepository implements IUserRepository {
       legCount: parlay.legs.length,
       status: parlay.status,
       createdAt: parlay.createdAt.toISOString(),
-      legs: parlay.legs.map((leg: any) => ({
+      legs: parlay.legs.map((leg) => ({
         predictionTitle: leg.option.prediction.title,
         optionLabel: leg.option.label,
       })),
     }));
   }
 
+  /**
+   * Get user's created predictions with category name
+   */
   async getUserPredictions(userId: number): Promise<
     Array<{
       id: number;
@@ -314,7 +496,10 @@ export class UserRepository implements IUserRepository {
   > {
     const predictions = await prisma.prediction.findMany({
       where: { creatorId: userId },
-      include: { _count: { select: { bets: true } } },
+      include: {
+        _count: { select: { bets: true } },
+        category: { select: { name: true } },
+      },
       orderBy: { createdAt: 'desc' },
       take: 10,
     });
@@ -322,7 +507,7 @@ export class UserRepository implements IUserRepository {
     return predictions.map((prediction) => ({
       id: prediction.id,
       title: prediction.title,
-      category: prediction.category,
+      category: prediction.category?.name ?? 'Uncategorized',
       type: prediction.type,
       approved: prediction.approved,
       resolved: prediction.resolved,
@@ -332,27 +517,42 @@ export class UserRepository implements IUserRepository {
     }));
   }
 
-  // Achievement-related methods
+  /**
+   * Get total count of user's bets
+   */
   async getUserTotalBetsCount(userId: number): Promise<number> {
     return prisma.bet.count({ where: { userId } });
   }
 
+  /**
+   * Get count of user's wins in a specific category (using category relation)
+   */
   async getUserCategoryWinsCount(userId: number, category: string): Promise<number> {
     return prisma.bet.count({
       where: {
         userId,
         status: 'WON',
-        prediction: { category },
+        prediction: {
+          category: {
+            name: category,
+          },
+        },
       },
     });
   }
 
+  /**
+   * Get count of user's parlay wins
+   */
   async getUserParlayWinsCount(userId: number): Promise<number> {
     return prisma.parlay.count({
       where: { userId, status: 'WON' },
     });
   }
 
+  /**
+   * Search users by name (for mentions)
+   */
   async searchUsersByName(
     query: string,
   ): Promise<{ id: number; name: string; avatarUrl?: string }[]> {
@@ -380,13 +580,118 @@ export class UserRepository implements IUserRepository {
       avatarUrl: user.avatarUrl || undefined,
     }));
   }
-}
 
-function mapUserPost(post: any): DbUserPost {
-  return {
-    ...post,
-    createdAt: post.createdAt.toISOString(),
-    updatedAt: post.updatedAt.toISOString(),
-    authorName: post.author?.name,
-  };
+  /**
+   * Get user's followers with pagination
+   */
+  async getUserFollowers(
+    userId: number,
+    params: { limit: number; cursor?: string },
+  ): Promise<{
+    followers: Array<{ id: number; name: string; avatarUrl?: string; followedAt: string }>;
+    pagination: { cursor?: string; hasMore: boolean; total?: number };
+  }> {
+    const pageLimit = Math.min(params.limit || 20, 100);
+    const where: Prisma.FollowWhereInput = { followingId: userId };
+
+    if (params.cursor) {
+      const cursorDate = new Date(params.cursor);
+      if (!isNaN(cursorDate.getTime())) {
+        where.createdAt = { lt: cursorDate };
+      }
+    }
+
+    const follows = await prisma.follow.findMany({
+      where,
+      include: {
+        follower: {
+          select: {
+            id: true,
+            name: true,
+            avatarUrl: true,
+            profilePictureKey: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: pageLimit + 1,
+    });
+
+    const hasMore = follows.length > pageLimit;
+    const items = follows.slice(0, pageLimit);
+
+    const nextCursor =
+      hasMore && items.length > 0 ? items[items.length - 1].createdAt.toISOString() : undefined;
+
+    return {
+      followers: items.map((follow) => ({
+        id: follow.follower.id,
+        name: follow.follower.name,
+        avatarUrl: follow.follower.avatarUrl || undefined,
+        followedAt: follow.createdAt.toISOString(),
+      })),
+      pagination: {
+        cursor: nextCursor,
+        hasMore,
+        total: undefined,
+      },
+    };
+  }
+
+  /**
+   * Get users this user is following with pagination
+   */
+  async getUserFollowing(
+    userId: number,
+    params: { limit: number; cursor?: string },
+  ): Promise<{
+    following: Array<{ id: number; name: string; avatarUrl?: string; followedAt: string }>;
+    pagination: { cursor?: string; hasMore: boolean; total?: number };
+  }> {
+    const pageLimit = Math.min(params.limit || 20, 100);
+    const where: Prisma.FollowWhereInput = { followerId: userId };
+
+    if (params.cursor) {
+      const cursorDate = new Date(params.cursor);
+      if (!isNaN(cursorDate.getTime())) {
+        where.createdAt = { lt: cursorDate };
+      }
+    }
+
+    const follows = await prisma.follow.findMany({
+      where,
+      include: {
+        following: {
+          select: {
+            id: true,
+            name: true,
+            avatarUrl: true,
+            profilePictureKey: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: pageLimit + 1,
+    });
+
+    const hasMore = follows.length > pageLimit;
+    const items = follows.slice(0, pageLimit);
+
+    const nextCursor =
+      hasMore && items.length > 0 ? items[items.length - 1].createdAt.toISOString() : undefined;
+
+    return {
+      following: items.map((follow) => ({
+        id: follow.following.id,
+        name: follow.following.name,
+        avatarUrl: follow.following.avatarUrl || undefined,
+        followedAt: follow.createdAt.toISOString(),
+      })),
+      pagination: {
+        cursor: nextCursor,
+        hasMore,
+        total: undefined,
+      },
+    };
+  }
 }

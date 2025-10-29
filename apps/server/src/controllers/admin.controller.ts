@@ -5,8 +5,10 @@ import { payoutService } from '../services/payout.service';
 import { adminAchievementService } from '../services/achievements/adminAchievement.service';
 import { shameWallService } from '../services/shameWall.service';
 import { RuleSimulationService } from '../services/achievements/ruleSimulation.service';
+import { UserService } from '../services/user.service';
 
 const ruleSimulationService = new RuleSimulationService();
+const userService = new UserService();
 import { serializeBigInt } from '../utils/bigintSerializer';
 import {
   toAdminUserView,
@@ -31,11 +33,9 @@ import type {
   PublicTransaction,
   PublicBadge,
   PublicUserBadge,
-  PublicAITweet,
-  AdminTransaction,
+  AdminTransactionView,
   AdminUserView,
   AdminBetView,
-  AdminTransactionView,
   AdminUserSearchResponse,
   AdminFinancialDataResponse,
   AdminFinancialAnalyticsResponse,
@@ -45,7 +45,6 @@ import type {
   AdminUserAchievementView,
   AdminAchievementAnalyticsResponse,
   AdminBanHistoryView,
-  ResolvePredictionPayload,
 } from '@ems/types';
 import type { Role } from '@prisma/client';
 import type {
@@ -112,7 +111,7 @@ export async function getUserDetails(
       return;
     }
 
-    res.json(user);
+    res.json(serializeBigInt(user));
   } catch (err) {
     next(err);
   }
@@ -154,7 +153,7 @@ export async function updateUserRole(
     const userId = Number(req.params.id);
     const { role } = req.body as { role: Role };
     const updated: PublicUser = await adminService.changeUserRole(userId, role);
-    res.json(updated);
+    res.json(serializeBigInt(updated));
   } catch (err) {
     next(err);
   }
@@ -165,7 +164,7 @@ export async function activateUser(req: Request, res: Response, next: NextFuncti
     const userId = Number(req.params.id);
     const { active } = req.body as { active: boolean };
     const updated: PublicUser = await adminService.setUserActive(userId, active);
-    res.json(updated);
+    res.json(serializeBigInt(updated));
   } catch (err) {
     next(err);
   }
@@ -180,8 +179,130 @@ export async function updateUserBalance(
     const userId = Number(req.params.id);
     const { amount } = req.body as { amount: number };
     const updated: PublicUser = await adminService.adjustUserBalance(userId, amount);
-    res.json(updated);
+    res.json(serializeBigInt(updated));
   } catch (err) {
+    next(err);
+  }
+}
+
+// -- Admin Avatar Management --
+export async function uploadUserProfileImage(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const targetUserId = Number(req.params.userId);
+    const adminId = (req as any).user?.id;
+    const file = (req as any).file;
+
+    if (!adminId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    if (!file) {
+      res.status(400).json({ error: 'No file uploaded' });
+      return;
+    }
+
+    console.log(`[admin-avatar] Admin ${adminId} uploading profile image for user ${targetUserId}`);
+
+    const result = await userService.adminUploadUserProfileImage(adminId, targetUserId, file);
+    res.json(result);
+  } catch (err) {
+    console.error('[admin-avatar] Upload error:', err);
+    next(err);
+  }
+}
+
+export async function deleteUserProfileImage(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const targetUserId = Number(req.params.userId);
+    const adminId = (req as any).user?.id;
+
+    if (!adminId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    console.log(`[admin-avatar] Admin ${adminId} deleting profile image for user ${targetUserId}`);
+
+    await userService.deleteUserProfileImage(targetUserId);
+    res.status(204).send();
+  } catch (err) {
+    console.error('[admin-avatar] Delete error:', err);
+    next(err);
+  }
+}
+
+// -- Site Default Avatar Management --
+export async function getDefaultAvatar(
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const defaultAvatarUrl = await userService.getDefaultAvatarUrl();
+    res.json({ avatarUrl: defaultAvatarUrl });
+  } catch (err) {
+    console.error('[admin-default-avatar] Get error:', err);
+    next(err);
+  }
+}
+
+export async function uploadDefaultAvatar(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const adminId = (req as any).user?.id;
+    const file = (req as any).file;
+
+    if (!adminId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    if (!file) {
+      res.status(400).json({ error: 'No file uploaded' });
+      return;
+    }
+
+    console.log(`[admin-default-avatar] Admin ${adminId} uploading default avatar`);
+
+    const result = await userService.uploadDefaultAvatar(file);
+    res.json(result);
+  } catch (err) {
+    console.error('[admin-default-avatar] Upload error:', err);
+    next(err);
+  }
+}
+
+export async function deleteDefaultAvatar(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const adminId = (req as any).user?.id;
+
+    if (!adminId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    console.log(`[admin-default-avatar] Admin ${adminId} deleting default avatar`);
+
+    await userService.deleteDefaultAvatar();
+    res.status(204).send();
+  } catch (err) {
+    console.error('[admin-default-avatar] Delete error:', err);
     next(err);
   }
 }
@@ -195,7 +316,7 @@ export async function getPredictions(
   try {
     const filters = req.query as unknown as QueryParams;
     const preds: PublicPrediction[] = await adminService.listPredictions(filters);
-    res.json(preds);
+    res.json(serializeBigInt(preds));
   } catch (err) {
     next(err);
   }
@@ -262,7 +383,7 @@ export async function getPredictionDetails(
       return;
     }
 
-    res.json(prediction);
+    res.json(serializeBigInt(prediction));
   } catch (err) {
     next(err);
   }
@@ -307,7 +428,7 @@ export async function approvePrediction(
   try {
     const id = Number(req.params.id);
     const updated: PublicPrediction = await adminService.setPredictionStatus(id, 'approved');
-    res.json(updated);
+    res.json(serializeBigInt(updated));
   } catch (err) {
     next(err);
   }
@@ -321,7 +442,7 @@ export async function rejectPrediction(
   try {
     const id = Number(req.params.id);
     const updated: PublicPrediction = await adminService.setPredictionStatus(id, 'rejected');
-    res.json(updated);
+    res.json(serializeBigInt(updated));
   } catch (err) {
     next(err);
   }
@@ -338,7 +459,7 @@ export async function resolvePrediction(
     );
 
     const id = Number(req.params.id);
-    const { winningOptionId } = req.body as ResolvePredictionPayload;
+    const { winningOptionId } = req.body as { winningOptionId: number };
     // enqueue the payout job (no return value)
     await payoutService.resolvePrediction(id, winningOptionId);
     // 202 Accepted indicates "we got it, working in background"
@@ -368,7 +489,7 @@ export async function refundBet(req: Request, res: Response, next: NextFunction)
   try {
     const id = Number(req.params.id);
     const updated: PublicBet = await adminService.refundBet(id);
-    res.json(updated);
+    res.json(serializeBigInt(updated));
   } catch (err) {
     next(err);
   }
@@ -384,12 +505,12 @@ export async function getTransactions(
     const txns: PublicTransaction[] = await adminService.listTransactions(filters);
     const users: PublicUser[] = await adminService.listUsers();
 
-    const detailedTxns: AdminTransaction[] = txns.map((t) => ({
-      ...t,
-      userName: users.find((u) => u.id === t.userId)?.name ?? 'Unknown',
-    }));
-
-    const payload = detailedTxns.map(toAdminTransactionView) satisfies AdminTransactionView[];
+    const payload = txns.map((t) =>
+      toAdminTransactionView({
+        ...t,
+        userName: users.find((u) => u.id === t.userId)?.name ?? 'Unknown',
+      }),
+    ) satisfies AdminTransactionView[];
     res.json(payload);
   } catch (err) {
     next(err);
@@ -403,7 +524,40 @@ export async function searchFinancialData(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const params = req.query as unknown as any; // Will be typed properly in service
+    // Map query parameters to typed FinancialSearchParams
+    const params = {
+      search: req.query.search as string,
+      userId: req.query.userId ? parseInt(req.query.userId as string) : undefined,
+      predictionId: req.query.predictionId ? parseInt(req.query.predictionId as string) : undefined,
+      betType: req.query.betType
+        ? ((Array.isArray(req.query.betType) ? req.query.betType : [req.query.betType]) as any)
+        : undefined,
+      status: req.query.status
+        ? ((Array.isArray(req.query.status) ? req.query.status : [req.query.status]) as any)
+        : undefined,
+      transactionType: req.query.transactionType
+        ? ((Array.isArray(req.query.transactionType)
+            ? req.query.transactionType
+            : [req.query.transactionType]) as any)
+        : undefined,
+      transactionSubtype: req.query.transactionSubtype
+        ? ((Array.isArray(req.query.transactionSubtype)
+            ? req.query.transactionSubtype
+            : [req.query.transactionSubtype]) as any)
+        : undefined,
+      includePongTransactions: req.query.includePongTransactions === 'true',
+      includeMetadata: req.query.includeMetadata === 'true',
+      minAmount: req.query.minAmount ? parseFloat(req.query.minAmount as string) : undefined,
+      maxAmount: req.query.maxAmount ? parseFloat(req.query.maxAmount as string) : undefined,
+      startDate: req.query.startDate as string,
+      endDate: req.query.endDate as string,
+      suspiciousOnly: req.query.suspiciousOnly === 'true',
+      page: parseInt(req.query.page as string) || 0,
+      limit: parseInt(req.query.limit as string) || 25,
+      sortBy: (req.query.sortBy as any) || 'createdAt',
+      sortOrder: (req.query.sortOrder as any) || 'desc',
+    };
+
     const data = await adminService.searchFinancialData(params);
     const payload = toAdminFinancialDataResponse(data) satisfies AdminFinancialDataResponse;
     res.json(payload);
@@ -424,6 +578,31 @@ export async function getFinancialAnalytics(
       analytics,
     ) satisfies AdminFinancialAnalyticsResponse;
     res.json(payload);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// NEW: Unified Analytics endpoint for cross-transaction insights
+export async function getUnifiedAnalytics(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { startDate, endDate, includeHourlyTrends, includeRiskMetrics, topUsersLimit } =
+      req.query;
+
+    const params = {
+      startDate: startDate as string | undefined,
+      endDate: endDate as string | undefined,
+      includeHourlyTrends: includeHourlyTrends === 'true',
+      includeRiskMetrics: includeRiskMetrics === 'true',
+      topUsersLimit: topUsersLimit ? parseInt(topUsersLimit as string) : 10,
+    };
+
+    const analytics = await adminService.getUnifiedAnalytics(params);
+    res.json(analytics); // Return directly as the repository already formats it correctly
   } catch (err) {
     next(err);
   }
@@ -801,20 +980,6 @@ export async function revokeBadge(req: Request, res: Response, next: NextFunctio
   }
 }
 
-// -- Leaderboard & Stats --
-export async function refreshLeaderboard(
-  _req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> {
-  try {
-    await adminService.refreshLeaderboard();
-    res.status(204).end();
-  } catch (err) {
-    next(err);
-  }
-}
-
 export async function getUserStats(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const userId = Number(req.params.userId);
@@ -827,18 +992,6 @@ export async function getUserStats(req: Request, res: Response, next: NextFuncti
 }
 
 // -- Miscellaneous --
-export async function triggerAITweet(
-  _req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> {
-  try {
-    const tweet: PublicAITweet = await adminService.generateAITweet();
-    res.status(201).json(tweet);
-  } catch (err) {
-    next(err);
-  }
-}
 
 // -- Achievement Management System --
 
@@ -1212,3 +1365,7 @@ export const quickSimulate = async (
     next(err);
   }
 };
+
+// ——————————————————————————————————————————————————————————————————————————————
+// Unified Content Management Endpoints (Deprecated - service removed)
+// ——————————————————————————————————————————————————————————————————————————————

@@ -4,6 +4,19 @@ import type { IAuthRepository } from './interfaces/IAuthRepository';
 
 export class PrismaAuthRepository implements IAuthRepository {
   // --- Users ---
+  /**
+   * Calculate starting balance based on total user count
+   * - First 100 users: 100,000 MuskBucks
+   * - Users 101-1,000: 10,000 MuskBucks
+   * - Users 1,000+: 5,000 MuskBucks
+   */
+  private async calculateStartingBalance(): Promise<bigint> {
+    const userCount = await prisma.user.count();
+    if (userCount < 100) return BigInt(100000);
+    if (userCount < 1000) return BigInt(10000);
+    return BigInt(5000);
+  }
+
   async findByEmail(email: string): Promise<User | null> {
     return prisma.user.findUnique({ where: { email } });
   }
@@ -26,12 +39,16 @@ export class PrismaAuthRepository implements IAuthRepository {
     emailVerified: boolean;
   }): Promise<User> {
     try {
+      // Calculate tiered starting balance based on user count
+      const startingBalance = await this.calculateStartingBalance();
+
       return await prisma.user.create({
         data: {
           name: data.name,
           email: data.email,
           passwordHash: data.passwordHash,
           emailVerified: data.emailVerified,
+          muskBucks: startingBalance,
         },
       });
     } catch (err: any) {

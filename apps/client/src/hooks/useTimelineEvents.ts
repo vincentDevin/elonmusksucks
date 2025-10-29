@@ -7,7 +7,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useEventBusCore } from '../contexts/EventBusCoreContext';
 import { useAuth } from '../contexts/AuthContext';
-import { REDIS_CHANNELS } from '../types/events';
+import { REDIS_CHANNELS } from '@ems/types';
 
 // Timeline article interface
 export interface TimelineArticle {

@@ -9,7 +9,7 @@ import type { StructuredError } from '@ems/types';
  * Global Express error handler middleware
  * Converts all errors to structured format with PII redaction
  */
-export function errorHandler(error: any, req: Request, res: Response, next: NextFunction): void {
+export function errorHandler(error: any, req: Request, res: Response, _next: NextFunction): void {
   // Convert to structured error
   const structuredError: StructuredError = mapToStructuredError(error);
 
@@ -23,7 +23,7 @@ export function errorHandler(error: any, req: Request, res: Response, next: Next
   });
 
   // Send client-safe response
-  res.status(structuredError.statusCode).json({
+  res.status(structuredError.statusCode || 500).json({
     error: structuredError.message,
     code: structuredError.code,
     timestamp: structuredError.timestamp,
@@ -33,7 +33,7 @@ export function errorHandler(error: any, req: Request, res: Response, next: Next
 /**
  * Handle 404 not found errors
  */
-export function notFoundHandler(req: Request, res: Response): void {
+export function notFoundHandler(_req: Request, res: Response): void {
   res.status(404).json({
     error: 'Not found',
     code: 'NOT_FOUND',

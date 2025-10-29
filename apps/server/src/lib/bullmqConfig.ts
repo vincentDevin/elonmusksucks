@@ -70,7 +70,7 @@ export const QUEUE_CONFIGURATIONS = {
     },
   },
 
-  [QUEUE_NAMES.FEED]: {
+  [QUEUE_NAMES.FEED_FETCH]: {
     removeOnComplete: 10, // Keep feed processing history
     removeOnFail: 5,
     attempts: 3,
@@ -88,7 +88,9 @@ export function createQueueOptions(
   queueName: keyof typeof QUEUE_NAMES,
   overrides?: Partial<DefaultJobOptions>,
 ): QueueOptions {
-  const queueSpecificOptions = QUEUE_CONFIGURATIONS[QUEUE_NAMES[queueName]];
+  const queueValue = QUEUE_NAMES[queueName];
+  const queueSpecificOptions =
+    QUEUE_CONFIGURATIONS[queueValue as keyof typeof QUEUE_CONFIGURATIONS];
 
   return {
     connection: redisClient,
@@ -120,7 +122,7 @@ export const QUEUE_HEALTH_THRESHOLDS = {
     [QUEUE_NAMES.PONG_PAYOUTS]: 100, // Gaming can handle more backlog
     [QUEUE_NAMES.LEADERBOARD_REFRESH]: 5, // Should process quickly
     [QUEUE_NAMES.LEADERBOARD_EVENTS]: 20,
-    [QUEUE_NAMES.FEED]: 30,
+    [QUEUE_NAMES.FEED_FETCH]: 30,
   },
 
   // Maximum age of oldest waiting job (in milliseconds)
@@ -129,7 +131,7 @@ export const QUEUE_HEALTH_THRESHOLDS = {
     [QUEUE_NAMES.PONG_PAYOUTS]: 10 * 60 * 1000, // 10 minutes
     [QUEUE_NAMES.LEADERBOARD_REFRESH]: 15 * 60 * 1000, // 15 minutes
     [QUEUE_NAMES.LEADERBOARD_EVENTS]: 30 * 60 * 1000, // 30 minutes
-    [QUEUE_NAMES.FEED]: 60 * 60 * 1000, // 1 hour
+    [QUEUE_NAMES.FEED_FETCH]: 60 * 60 * 1000, // 1 hour
   },
 } as const;
 

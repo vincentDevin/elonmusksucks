@@ -16,6 +16,12 @@ export const toLeaderboardEntryView = (
     profitPeriod: string;
     roi: number;
     longestStreak: number;
+    currentStreak?: number;
+    parlaysStarted?: number;
+    parlaysWon?: number;
+    totalParlayLegs?: number;
+    parlayLegsWon?: number;
+    rankChange?: number | null;
   },
   rank: number,
 ): LeaderboardEntryView => ({
@@ -29,5 +35,11 @@ export const toLeaderboardEntryView = (
   profitPeriod: entry.profitPeriod,
   roi: entry.roi,
   longestStreak: entry.longestStreak,
+  currentStreak: entry.currentStreak ?? 0,
+  parlaysStarted: entry.parlaysStarted ?? 0,
+  parlaysWon: entry.parlaysWon ?? 0,
+  totalParlayLegs: entry.totalParlayLegs ?? 0,
+  parlayLegsWon: entry.parlayLegsWon ?? 0,
   rank: rank,
+  rankChange: entry.rankChange ?? null,
 });

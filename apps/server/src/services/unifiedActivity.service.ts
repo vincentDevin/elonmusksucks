@@ -122,6 +122,10 @@ export class UnifiedActivityService {
    */
   async getRecentActivities(limit = 50): Promise<UnifiedActivityEvent[]> {
     const items = await this.redis.lrange(this.ACTIVITY_LIST, 0, limit - 1);
+    console.log(`[unified-activity-service] Redis returned ${items.length} items from cache`);
+    if (items.length > 0) {
+      console.log(`[unified-activity-service] First item sample:`, items[0].substring(0, 100));
+    }
     return items.map((item) => JSON.parse(item) as UnifiedActivityEvent);
   }
 
@@ -162,30 +166,46 @@ export class UnifiedActivityService {
     });
   }
 
-  // ===== Activity Creation Helpers =====
-
   /**
-   * Create a post/comment activity
+   * Get activities for a specific user
+   * @param userId - ID of the user
+   * @param limit - Maximum number of activities to return (default 50)
+   * @returns Array of unified activity events for the user
    */
-  async createPostActivity(
-    user: { id: number; name: string; avatarUrl?: string | null },
-    post: { id: number; content: string; isComment: boolean },
-  ): Promise<UnifiedActivityEvent> {
-    const preview = post.content.length > 50 ? post.content.substring(0, 47) + '...' : post.content;
+  async getUserActivities(userId: number, limit = 50): Promise<UnifiedActivityEvent[]> {
+    const activities = await this.repo.getUserActivities(userId, limit);
 
-    return this.publishActivity({
-      type: post.isComment ? 'comment_created' : 'post_created',
-      userId: user.id,
-      userName: user.name,
-      userAvatar: user.avatarUrl || undefined,
-      title: `${user.name} ${post.isComment ? 'commented' : 'posted'}`,
-      description: preview,
-      icon: post.isComment ? '💬' : '📝',
-      isPersonal: false,
-      isHighValue: false,
-      priority: 'low',
+    // Transform to unified Redis format for consistency
+    return activities.map((activity) => {
+      const details = (activity.details as any) || {};
+      return {
+        id: activity.id.toString(),
+        type: activity.type as any,
+        timestamp: activity.createdAt.toISOString(),
+        priority: activity.priority as 'high' | 'medium' | 'low',
+        userId: activity.user.id,
+        userName: activity.user.name,
+        userAvatar: activity.user.avatarUrl || undefined,
+        title: activity.title || details.title || '',
+        description: activity.description || details.description || '',
+        icon: details.icon || '•',
+        color: details.color,
+        amount: details.amount,
+        odds: details.odds,
+        predictionId: activity.prediction?.id || details.predictionId,
+        predictionTitle: activity.prediction?.title || details.predictionTitle,
+        category: activity.prediction?.category || details.category,
+        optionLabel: details.optionLabel,
+        isPersonal: activity.isPersonal,
+        isHighValue: details.isHighValue || (details.amount && details.amount >= 1000),
+        isWin: details.isWin,
+        streak: details.streak,
+        meta: details,
+      } as UnifiedActivityEvent;
     });
   }
+
+  // ===== Activity Creation Helpers =====
 
   /**
    * Create a bet placed activity
@@ -301,8 +321,8 @@ export class UnifiedActivityService {
       userId: resolver.id,
       userName: resolver.name,
       userAvatar: resolver.avatarUrl || undefined,
-      title: 'Prediction resolved',
-      description: `"${prediction.title}" → ${prediction.winningOption}`,
+      title: prediction.title, // Frontend displays: "${title}" resolved
+      description: `Winner: ${prediction.winningOption}`,
       icon: '✅',
       predictionId: prediction.id,
       predictionTitle: prediction.title,
@@ -363,8 +383,8 @@ export class UnifiedActivityService {
       userId: user.id,
       userName: user.name,
       userAvatar: user.avatarUrl || undefined,
-      title: `${user.name} unlocked an achievement`,
-      description: achievement.name,
+      title: achievement.name, // Frontend displays: ${userName} unlocked "${title}"
+      description: achievement.description || achievement.name,
       icon: '🏅',
       isPersonal: false,
       isHighValue: true,
@@ -385,12 +405,118 @@ export class UnifiedActivityService {
       userName: follower.name,
       userAvatar: follower.avatarUrl || undefined,
       title: `${follower.name} followed ${followed.name}`,
-      description: 'New connection in the prediction community',
+      description: followed.name, // Frontend displays: ${userName} followed ${description}
       icon: '👥',
       isPersonal: false,
       isHighValue: false,
       priority: 'low',
     });
+  }
+
+  /**
+   * Create a pong tier promotion activity
+   */
+  async createPongTierPromotionActivity(
+    user: { id: number; name: string; avatarUrl?: string | null },
+    tierChange: {
+      oldTier: string;
+      newTier: string;
+      newElo: number;
+    },
+  ): Promise<UnifiedActivityEvent> {
+    return this.publishActivity({
+      type: 'pong_tier_promotion',
+      userId: user.id,
+      userName: user.name,
+      userAvatar: user.avatarUrl || undefined,
+      title: `${user.name} promoted to ${tierChange.newTier}`,
+      description: `Achieved ${tierChange.newElo} Elo (from ${tierChange.oldTier})`,
+      icon: '🏅',
+      color: 'text-purple-400',
+      isPersonal: false,
+      isHighValue: true,
+      priority: 'high',
+      meta: {
+        oldTier: tierChange.oldTier,
+        newTier: tierChange.newTier,
+        newElo: tierChange.newElo,
+      },
+    });
+  }
+
+  /**
+   * Create a pong IMPOSSIBLE AI victory activity
+   */
+  async createPongImpossibleVictoryActivity(
+    user: { id: number; name: string; avatarUrl?: string | null },
+    victory: {
+      matchId: string;
+      score: string;
+      wagerAmount: number;
+      eloGained?: number;
+    },
+  ): Promise<UnifiedActivityEvent> {
+    return this.publishActivity({
+      type: 'pong_impossible_victory',
+      userId: user.id,
+      userName: user.name,
+      userAvatar: user.avatarUrl || undefined,
+      title: `${user.name} defeated the IMPOSSIBLE AI!`,
+      description: `Victory ${victory.score}${victory.wagerAmount > 0 ? ` for ${victory.wagerAmount}🪙` : ''}`,
+      icon: '🎯',
+      color: 'text-red-400',
+      isPersonal: false,
+      isHighValue: true,
+      priority: 'high',
+      meta: {
+        matchId: victory.matchId,
+        score: victory.score,
+        wagerAmount: victory.wagerAmount,
+        eloGained: victory.eloGained,
+        aiDifficulty: 'IMPOSSIBLE',
+      },
+    });
+  }
+
+  /**
+   * Seed test activities into Redis (for debugging/testing)
+   */
+  async seedTestActivities(): Promise<void> {
+    console.log('[unified-activity] Seeding test activities into Redis...');
+
+    const testActivities = [
+      await this.publishActivity({
+        type: 'bet_placed',
+        userId: 1,
+        userName: 'Test User',
+        userAvatar: undefined,
+        title: 'Test User placed a bet',
+        description: '100🪙 on "Tesla Stock" @2.5x',
+        icon: '💰',
+        amount: 100,
+        odds: 2.5,
+        predictionTitle: 'Tesla Stock Prediction',
+        isPersonal: false,
+        isHighValue: false,
+        priority: 'low',
+      }),
+      await this.publishActivity({
+        type: 'big_win',
+        userId: 2,
+        userName: 'Winner',
+        userAvatar: undefined,
+        title: 'Winner hit a big win!',
+        description: 'Won 5000🪙 on "SpaceX Launch"',
+        icon: '🏆',
+        amount: 5000,
+        predictionTitle: 'SpaceX Launch Success',
+        isPersonal: false,
+        isHighValue: true,
+        priority: 'high',
+      }),
+    ];
+
+    console.log(`[unified-activity] Seeded ${testActivities.length} test activities`);
   }
 }
 

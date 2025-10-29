@@ -4,10 +4,10 @@ import jwt from 'jsonwebtoken';
 
 // TEMP: Re-export shared auth payload types for backwards compatibility during migration
 export type {
-  RegisterPayload,
-  LoginPayload,
-  PasswordResetRequestPayload,
-  PasswordResetPayload,
+  RegisterRequest as RegisterPayload,
+  LoginRequest as LoginPayload,
+  PasswordResetRequestRequest as PasswordResetRequestPayload,
+  PasswordResetRequest as PasswordResetPayload,
 } from '@ems/types';
 
 import type { User } from '@prisma/client';
@@ -16,10 +16,11 @@ import { PrismaAuthRepository } from '../repositories/AuthRepository';
 import type { IUserRepository } from '../repositories/interfaces/IUserRepository';
 import { UserRepository } from '../repositories/UserRepository';
 import { userCache } from '../utils/userCache';
+import env from '../config/env';
 
-const SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS) || 12;
+const SALT_ROUNDS = env.BCRYPT_SALT_ROUNDS;
 const DUMMY_HASH = '$2b$10$KIXh1g4myh5j9hFSUVjdaeQXG7q3NDy4W8P4Y8XxYQCEhiqbz0R4e';
-const skipEmailFlow = process.env.SKIP_EMAIL_FLOW === 'true';
+const skipEmailFlow = env.SKIP_EMAIL_FLOW;
 
 const repo: IAuthRepository = new PrismaAuthRepository();
 const userRepo: IUserRepository = new UserRepository();
@@ -43,7 +44,7 @@ export async function createUser(name: string, email: string, password: string):
     name,
     email: normalized,
     passwordHash,
-    emailVerified: skipEmailFlow,
+    emailVerified: skipEmailFlow ?? false,
   });
 }
 

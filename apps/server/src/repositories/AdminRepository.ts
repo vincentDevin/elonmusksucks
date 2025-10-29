@@ -1,6 +1,6 @@
 // apps/server/src/repositories/PrismaAdminRepository.ts
+import prisma from '../db';
 import {
-  PrismaClient,
   Role,
   User,
   Prediction,
@@ -9,8 +9,7 @@ import {
   Badge,
   UserBadge,
   UserStats,
-  AITweet,
-  UserPost,
+  Content,
 } from '@prisma/client';
 import type {
   QueryParams,
@@ -53,7 +52,7 @@ import type {
 } from './interfaces/IAdminRepository';
 
 export class PrismaAdminRepository implements IAdminRepository {
-  private prisma = new PrismaClient();
+  private prisma = prisma;
 
   // -- Enhanced User Management --
   async findAllUsers(): Promise<User[]> {
@@ -121,6 +120,7 @@ export class PrismaAdminRepository implements IAdminRepository {
               badge: true,
             },
           },
+          stats: true,
         },
       }),
       this.prisma.user.count({ where: whereClause }),
@@ -131,21 +131,7 @@ export class PrismaAdminRepository implements IAdminRepository {
       const detailedUser: DetailedUser = {
         ...user,
         badges: user.userBadges?.map((ub: any) => ub.badge) || [],
-        stats: {
-          totalBets: 0,
-          totalWagered: 0,
-          totalWon: 0,
-          winRate: 0,
-        },
-        recentActivity: {
-          totalLogins: 0, // Would need to track this separately
-        },
-        banStatus: {
-          isBanned: false, // Would need UserBan table integration
-          banType: undefined,
-          reason: undefined,
-          expiresAt: undefined,
-        },
+        stats: user.stats || undefined,
       };
 
       return detailedUser;
@@ -172,6 +158,7 @@ export class PrismaAdminRepository implements IAdminRepository {
             badge: true,
           },
         },
+        stats: true,
       },
     });
 
@@ -180,18 +167,7 @@ export class PrismaAdminRepository implements IAdminRepository {
     const detailedUser: DetailedUser = {
       ...user,
       badges: user.userBadges?.map((ub: any) => ub.badge) || [],
-      stats: {
-        totalBets: 0,
-        totalWagered: 0,
-        totalWon: 0,
-        winRate: 0,
-      },
-      recentActivity: {
-        totalLogins: 0, // Would need login tracking
-      },
-      banStatus: {
-        isBanned: false, // Would need UserBan integration
-      },
+      stats: user.stats || undefined,
     };
 
     return detailedUser;
@@ -281,9 +257,43 @@ export class PrismaAdminRepository implements IAdminRepository {
   }
 
   async updateUserBalance(userId: number, amount: number): Promise<User> {
-    return this.prisma.user.update({
-      where: { id: userId },
-      data: { muskBucks: amount },
+    return await this.prisma.$transaction(async (tx) => {
+      // Get current user balance
+      const currentUser = await tx.user.findUnique({ where: { id: userId } });
+      if (!currentUser) {
+        throw new Error('User not found');
+      }
+
+      const currentBalance = currentUser.muskBucks;
+      const newBalance = BigInt(amount);
+      const changeAmount = newBalance - currentBalance;
+
+      // Update user balance
+      const updatedUser = await tx.user.update({
+        where: { id: userId },
+        data: { muskBucks: newBalance },
+      });
+
+      // Create transaction record to track the balance change
+      await tx.transaction.create({
+        data: {
+          userId,
+          type: changeAmount >= 0 ? 'CREDIT' : 'DEBIT',
+          subtype: 'ADMIN_ADJUSTMENT',
+          amount: changeAmount >= 0 ? changeAmount : -changeAmount, // Store absolute value
+          balanceAfter: newBalance,
+          description: `Admin balance adjustment: ${changeAmount >= 0 ? '+' : ''}${changeAmount.toString()} MuskBucks`,
+          metadata: {
+            previousBalance: Number(currentBalance),
+            newBalance: Number(newBalance),
+            changeAmount: Number(changeAmount),
+            adjustmentType: 'manual_admin_adjustment',
+            processedBy: 'admin', // Could be enhanced with actual admin user ID
+          },
+        },
+      });
+
+      return updatedUser;
     });
   }
 
@@ -416,6 +426,9 @@ export class PrismaAdminRepository implements IAdminRepository {
 
       return {
         ...prediction,
+        createdAt: prediction.createdAt.toISOString(),
+        expiresAt: prediction.expiresAt.toISOString(),
+        resolvedAt: prediction.resolvedAt?.toISOString() || null,
         analytics: {
           totalBets: bets.length,
           totalVolume,
@@ -478,6 +491,9 @@ export class PrismaAdminRepository implements IAdminRepository {
 
     return {
       ...prediction,
+      createdAt: prediction.createdAt.toISOString(),
+      expiresAt: prediction.expiresAt.toISOString(),
+      resolvedAt: prediction.resolvedAt?.toISOString() || null,
       analytics: {
         totalBets: bets.length,
         totalVolume,
@@ -510,7 +526,7 @@ export class PrismaAdminRepository implements IAdminRepository {
 
       for (const predictionId of batch) {
         try {
-          let updatedPrediction: Prediction | null = null;
+          let updatedPrediction: Prediction | DetailedPrediction | null = null;
 
           switch (op) {
             case 'approve':
@@ -706,6 +722,8 @@ export class PrismaAdminRepository implements IAdminRepository {
       betType,
       status,
       transactionType,
+      transactionSubtype,
+      includeMetadata = false,
       minAmount,
       maxAmount,
       startDate,
@@ -785,6 +803,15 @@ export class PrismaAdminRepository implements IAdminRepository {
       transactionWhere.type = { in: transactionType };
     }
 
+    // New subtype filtering
+    if (transactionSubtype && transactionSubtype.length > 0) {
+      transactionWhere.subtype = { in: transactionSubtype };
+    }
+
+    // Handle pong transaction filtering
+    // If specific pong subtypes are requested, include only those
+    // Otherwise, include all transactions (including pong) by default
+
     // Search across user names and prediction titles
     if (search && search.trim()) {
       const searchTerm = search.trim();
@@ -807,7 +834,9 @@ export class PrismaAdminRepository implements IAdminRepository {
         skip: offset,
         take: limit,
         include: {
-          user: { select: { name: true, email: true } },
+          user: {
+            select: { id: true, name: true, email: true, profilePictureKey: true, avatarUrl: true },
+          },
           prediction: { select: { id: true, title: true, category: true, resolved: true } },
           optionOption: { select: { id: true, label: true } },
         },
@@ -819,7 +848,9 @@ export class PrismaAdminRepository implements IAdminRepository {
         skip: offset,
         take: limit,
         include: {
-          user: { select: { name: true, email: true } },
+          user: {
+            select: { id: true, name: true, email: true, profilePictureKey: true, avatarUrl: true },
+          },
         },
       }),
       this.prisma.transaction.count({ where: transactionWhere }),
@@ -834,7 +865,7 @@ export class PrismaAdminRepository implements IAdminRepository {
         ? {
             id: bet.prediction.id,
             title: bet.prediction.title,
-            category: bet.prediction.category,
+            category: bet.prediction.category?.name || 'Uncategorized',
             resolved: bet.prediction.resolved,
           }
         : undefined,
@@ -851,11 +882,21 @@ export class PrismaAdminRepository implements IAdminRepository {
       },
     }));
 
-    const detailedTransactions: DetailedTransaction[] = transactions.map((tx) => ({
-      ...tx,
-      userName: tx.user.name,
-      userEmail: tx.user.email,
-    }));
+    const detailedTransactions: DetailedTransaction[] = transactions.map((tx) => {
+      return {
+        ...tx,
+        userName: tx.user.name,
+        userEmail: tx.user.email,
+        // Always include essential fields for proper categorization
+        subtype: tx.subtype,
+        description: tx.description,
+        relatedPongMatchId: tx.relatedPongMatchId,
+        // Include metadata when requested
+        ...(includeMetadata && {
+          metadata: tx.metadata,
+        }),
+      };
+    });
 
     const totalPages = Math.ceil(Math.max(totalBets, totalTransactions) / limit);
 
@@ -868,6 +909,7 @@ export class PrismaAdminRepository implements IAdminRepository {
       currentPage: page,
       hasNextPage: page < totalPages - 1,
       hasPreviousPage: page > 0,
+      pageSize: limit,
     };
   }
 
@@ -890,7 +932,13 @@ export class PrismaAdminRepository implements IAdminRepository {
     const [bets, transactions] = await Promise.all([
       this.prisma.bet.findMany({
         where: dateFilter,
-        include: { prediction: true },
+        include: {
+          prediction: {
+            include: {
+              category: true,
+            },
+          },
+        },
       }),
       this.prisma.transaction.findMany({
         where: dateFilter,
@@ -908,7 +956,7 @@ export class PrismaAdminRepository implements IAdminRepository {
     // Category breakdown
     const categoryMap = new Map();
     bets.forEach((bet) => {
-      const cat = bet.prediction?.category || 'Unknown';
+      const cat = bet.prediction?.category?.name || 'Unknown';
       if (!categoryMap.has(cat)) {
         categoryMap.set(cat, { volume: 0, betCount: 0 });
       }
@@ -950,6 +998,425 @@ export class PrismaAdminRepository implements IAdminRepository {
     return analytics;
   }
 
+  // NEW: Unified Analytics with enhanced transaction insights
+  async getUnifiedAnalytics(params?: any): Promise<any> {
+    const {
+      startDate,
+      endDate,
+      includeHourlyTrends = false,
+      includeRiskMetrics = false,
+      topUsersLimit = 10,
+    } = params || {};
+
+    const dateFilter = this.buildDateFilter(startDate, endDate);
+    const generatedAt = new Date().toISOString();
+
+    // Get all transactions with enhanced categorization
+    const [transactions, users] = await Promise.all([
+      this.prisma.transaction.findMany({
+        where: dateFilter,
+        include: {
+          user: { select: { id: true, name: true, email: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.user.findMany({
+        where: {
+          transactions: {
+            some: dateFilter,
+          },
+        },
+        select: { id: true, name: true },
+      }),
+    ]);
+
+    // Categorize transactions by subtype
+    const bettingTransactions = transactions.filter(
+      (tx) => tx.subtype?.includes('BET') && !tx.subtype?.includes('PARLAY'),
+    );
+    const parlayTransactions = transactions.filter((tx) => tx.subtype?.includes('PARLAY'));
+    const pongTransactions = transactions.filter((tx) => tx.subtype?.includes('PONG'));
+
+    // Calculate overview metrics
+    const totalVolume = transactions.reduce((sum, tx) => sum + Math.abs(Number(tx.amount)), 0);
+    const totalWagers = transactions
+      .filter((tx) => tx.subtype?.includes('WAGER'))
+      .reduce((sum, tx) => sum + Math.abs(Number(tx.amount)), 0);
+    const totalPayouts = transactions
+      .filter((tx) => tx.subtype?.includes('PAYOUT'))
+      .reduce((sum, tx) => sum + Number(tx.amount), 0);
+    const platformRevenue = totalWagers - totalPayouts;
+
+    // Calculate metrics by transaction type
+    const calculateMetrics = (
+      txs: typeof transactions,
+      wagerSubtype: string,
+      payoutSubtype: string,
+    ) => {
+      const wagers = txs.filter((tx) => tx.subtype === wagerSubtype);
+      const payouts = txs.filter((tx) => tx.subtype === payoutSubtype);
+
+      const totalWagers = wagers.reduce((sum, tx) => sum + Math.abs(Number(tx.amount)), 0);
+      const totalPayouts = payouts.reduce((sum, tx) => sum + Number(tx.amount), 0);
+      const netRevenue = totalWagers - totalPayouts;
+      const avgWagerSize = wagers.length > 0 ? totalWagers / wagers.length : 0;
+      const winRate = wagers.length > 0 ? payouts.length / wagers.length : 0;
+
+      return {
+        totalWagers: totalWagers.toString(),
+        totalPayouts: totalPayouts.toString(),
+        netRevenue: netRevenue.toString(),
+        transactionCount: wagers.length + payouts.length,
+        avgWagerSize: avgWagerSize.toString(),
+        winRate,
+      };
+    };
+
+    const bettingMetrics = calculateMetrics(bettingTransactions, 'BET_WAGER', 'BET_PAYOUT');
+    const parlayMetrics = calculateMetrics(parlayTransactions, 'PARLAY_WAGER', 'PARLAY_PAYOUT');
+    const pongMetrics = calculateMetrics(pongTransactions, 'PONG_WAGER', 'PONG_PAYOUT');
+
+    // Pong-specific breakdown (PVP vs PVE)
+    const pongPvpTxs = pongTransactions.filter(
+      (tx) =>
+        tx.metadata &&
+        typeof tx.metadata === 'object' &&
+        'matchType' in tx.metadata &&
+        (tx.metadata as any).matchType === 'PVP',
+    );
+    const pongPveTxs = pongTransactions.filter(
+      (tx) =>
+        tx.metadata &&
+        typeof tx.metadata === 'object' &&
+        'matchType' in tx.metadata &&
+        (tx.metadata as any).matchType === 'PVE_AI',
+    );
+
+    const pvpVsPveBreakdown = {
+      pvp: {
+        wagers: pongPvpTxs
+          .filter((tx) => tx.subtype === 'PONG_WAGER')
+          .reduce((sum, tx) => sum + Math.abs(Number(tx.amount)), 0)
+          .toString(),
+        payouts: pongPvpTxs
+          .filter((tx) => tx.subtype === 'PONG_PAYOUT')
+          .reduce((sum, tx) => sum + Number(tx.amount), 0)
+          .toString(),
+        matches: Math.floor(pongPvpTxs.filter((tx) => tx.subtype === 'PONG_WAGER').length),
+      },
+      pve: {
+        wagers: pongPveTxs
+          .filter((tx) => tx.subtype === 'PONG_WAGER')
+          .reduce((sum, tx) => sum + Math.abs(Number(tx.amount)), 0)
+          .toString(),
+        payouts: pongPveTxs
+          .filter((tx) => tx.subtype === 'PONG_PAYOUT')
+          .reduce((sum, tx) => sum + Number(tx.amount), 0)
+          .toString(),
+        matches: Math.floor(pongPveTxs.filter((tx) => tx.subtype === 'PONG_WAGER').length),
+      },
+    };
+
+    // Daily trends
+    const dailyTrends = this.calculateDailyTrends(transactions);
+
+    // Hourly trends (if requested)
+    let hourlyTrends: any[] = [];
+    if (includeHourlyTrends) {
+      hourlyTrends = this.calculateHourlyTrends(transactions);
+    }
+
+    // User insights
+    const userInsights = this.calculateUserInsights(transactions, topUsersLimit);
+
+    // Risk metrics (if requested)
+    let riskMetrics: any = {
+      largeTransactions: [],
+      suspitiousPatterns: {
+        rapidTransactions: 0,
+        unusualAmounts: 0,
+        potentialArbitrage: 0,
+      },
+    };
+    if (includeRiskMetrics) {
+      riskMetrics = this.calculateRiskMetrics(transactions);
+    }
+
+    return {
+      overview: {
+        totalVolume: totalVolume.toString(),
+        totalTransactions: transactions.length,
+        totalUsers: users.length,
+        platformRevenue: platformRevenue.toString(),
+        generatedAt,
+      },
+      byTransactionType: {
+        betting: bettingMetrics,
+        parlays: parlayMetrics,
+        pong: {
+          ...pongMetrics,
+          pvpVsPveBreakdown,
+        },
+      },
+      trends: {
+        daily: dailyTrends,
+        hourly: hourlyTrends,
+      },
+      userInsights,
+      riskMetrics,
+    };
+  }
+
+  private buildDateFilter(startDate?: string, endDate?: string) {
+    if (!startDate && !endDate) return {};
+
+    return {
+      createdAt: {
+        ...(startDate && { gte: new Date(startDate) }),
+        ...(endDate && { lte: new Date(endDate) }),
+      },
+    };
+  }
+
+  private calculateDailyTrends(transactions: any[]) {
+    const dailyMap = new Map();
+
+    transactions.forEach((tx) => {
+      const date = tx.createdAt.toISOString().split('T')[0];
+      if (!dailyMap.has(date)) {
+        dailyMap.set(date, {
+          date,
+          betting: { volume: 0, transactions: 0 },
+          parlays: { volume: 0, transactions: 0 },
+          pong: { volume: 0, transactions: 0 },
+        });
+      }
+
+      const day = dailyMap.get(date);
+      const amount = Math.abs(Number(tx.amount));
+
+      if (tx.subtype?.includes('BET') && !tx.subtype?.includes('PARLAY')) {
+        day.betting.volume += amount;
+        day.betting.transactions += 1;
+      } else if (tx.subtype?.includes('PARLAY')) {
+        day.parlays.volume += amount;
+        day.parlays.transactions += 1;
+      } else if (tx.subtype?.includes('PONG')) {
+        day.pong.volume += amount;
+        day.pong.transactions += 1;
+      }
+    });
+
+    return Array.from(dailyMap.values())
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map((day) => ({
+        ...day,
+        betting: {
+          volume: day.betting.volume.toString(),
+          transactions: day.betting.transactions,
+        },
+        parlays: {
+          volume: day.parlays.volume.toString(),
+          transactions: day.parlays.transactions,
+        },
+        pong: {
+          volume: day.pong.volume.toString(),
+          transactions: day.pong.transactions,
+        },
+      }));
+  }
+
+  private calculateHourlyTrends(transactions: any[]) {
+    const hourlyMap = new Map();
+
+    for (let hour = 0; hour < 24; hour++) {
+      hourlyMap.set(hour, { hour, volume: 0, transactionCount: 0 });
+    }
+
+    transactions.forEach((tx) => {
+      const hour = tx.createdAt.getHours();
+      const hourData = hourlyMap.get(hour);
+      hourData.volume += Math.abs(Number(tx.amount));
+      hourData.transactionCount += 1;
+    });
+
+    return Array.from(hourlyMap.values()).map((hour) => ({
+      ...hour,
+      volume: hour.volume.toString(),
+    }));
+  }
+
+  private calculateUserInsights(transactions: any[], limit: number) {
+    const userMap = new Map();
+
+    transactions.forEach((tx) => {
+      const userId = tx.userId;
+      if (!userMap.has(userId)) {
+        userMap.set(userId, {
+          userId,
+          userName: tx.user?.name || 'Unknown',
+          totalSpent: 0,
+          totalWon: 0,
+          betting: 0,
+          parlays: 0,
+          pong: 0,
+        });
+      }
+
+      const user = userMap.get(userId);
+      const amount = Math.abs(Number(tx.amount));
+
+      if (tx.subtype?.includes('WAGER')) {
+        user.totalSpent += amount;
+      } else if (tx.subtype?.includes('PAYOUT')) {
+        user.totalWon += amount;
+      }
+
+      // Categorize spending by activity
+      if (tx.subtype?.includes('BET') && !tx.subtype?.includes('PARLAY')) {
+        user.betting += amount;
+      } else if (tx.subtype?.includes('PARLAY')) {
+        user.parlays += amount;
+      } else if (tx.subtype?.includes('PONG')) {
+        user.pong += amount;
+      }
+    });
+
+    const users = Array.from(userMap.values());
+
+    // Top spenders
+    const topSpenders = users
+      .sort((a, b) => b.totalSpent - a.totalSpent)
+      .slice(0, limit)
+      .map((user) => {
+        const preferredActivity =
+          user.betting >= user.parlays && user.betting >= user.pong
+            ? 'betting'
+            : user.parlays >= user.pong
+              ? 'parlays'
+              : 'pong';
+
+        return {
+          userId: user.userId,
+          userName: user.userName,
+          totalSpent: user.totalSpent.toString(),
+          preferredActivity: preferredActivity as 'betting' | 'parlays' | 'pong',
+          activityBreakdown: {
+            betting: user.betting.toString(),
+            parlays: user.parlays.toString(),
+            pong: user.pong.toString(),
+          },
+        };
+      });
+
+    // Top winners
+    const topWinners = users
+      .map((user) => ({
+        ...user,
+        netProfit: user.totalWon - user.totalSpent,
+      }))
+      .sort((a, b) => b.totalWon - a.totalWon)
+      .slice(0, limit)
+      .map((user) => {
+        const primarySource =
+          user.betting >= user.parlays && user.betting >= user.pong
+            ? 'betting'
+            : user.parlays >= user.pong
+              ? 'parlays'
+              : 'pong';
+
+        return {
+          userId: user.userId,
+          userName: user.userName,
+          totalWon: user.totalWon.toString(),
+          netProfit: user.netProfit.toString(),
+          primarySource: primarySource as 'betting' | 'parlays' | 'pong',
+        };
+      });
+
+    return { topSpenders, topWinners };
+  }
+
+  private calculateRiskMetrics(transactions: any[]) {
+    // Large transactions (>1000 MuskBucks)
+    const largeTransactions = transactions
+      .filter((tx) => Math.abs(Number(tx.amount)) > 1000)
+      .map((tx) => ({
+        transactionId: tx.id.toString(),
+        userId: tx.userId,
+        amount: tx.amount.toString(),
+        type: tx.type,
+        subtype: tx.subtype || 'unknown',
+        riskScore: this.calculateRiskScore(tx),
+        flags: this.generateRiskFlags(tx),
+      }))
+      .sort((a, b) => b.riskScore - a.riskScore)
+      .slice(0, 20);
+
+    // Suspicious patterns
+    const userTransactionCounts = new Map();
+    const unusualAmounts = new Set();
+
+    transactions.forEach((tx) => {
+      const userId = tx.userId;
+      const count = userTransactionCounts.get(userId) || 0;
+      userTransactionCounts.set(userId, count + 1);
+
+      // Flag unusual amounts (multiples of 9999, very round numbers)
+      const amount = Math.abs(Number(tx.amount));
+      if (amount % 9999 === 0 || amount % 10000 === 0) {
+        unusualAmounts.add(tx.id);
+      }
+    });
+
+    const rapidTransactions = Array.from(userTransactionCounts.values()).filter(
+      (count) => count > 50,
+    ).length;
+
+    return {
+      largeTransactions,
+      suspitiousPatterns: {
+        rapidTransactions,
+        unusualAmounts: unusualAmounts.size,
+        potentialArbitrage: 0, // Would implement arbitrage detection
+      },
+    };
+  }
+
+  private calculateRiskScore(transaction: any): number {
+    let score = 0;
+    const amount = Math.abs(Number(transaction.amount));
+
+    // Amount-based risk
+    if (amount > 10000) score += 3;
+    else if (amount > 5000) score += 2;
+    else if (amount > 1000) score += 1;
+
+    // Pattern-based risk
+    if (amount % 9999 === 0) score += 2;
+    if (amount % 10000 === 0) score += 1;
+
+    // Time-based risk (transactions at unusual hours)
+    const hour = transaction.createdAt.getHours();
+    if (hour < 6 || hour > 23) score += 1;
+
+    return Math.min(score, 10); // Cap at 10
+  }
+
+  private generateRiskFlags(transaction: any): string[] {
+    const flags: string[] = [];
+    const amount = Math.abs(Number(transaction.amount));
+
+    if (amount > 10000) flags.push('LARGE_AMOUNT');
+    if (amount % 9999 === 0) flags.push('SUSPICIOUS_PATTERN');
+    if (amount % 10000 === 0) flags.push('ROUND_NUMBER');
+
+    const hour = transaction.createdAt.getHours();
+    if (hour < 6 || hour > 23) flags.push('OFF_HOURS');
+
+    return flags;
+  }
+
   async bulkFinancialOperation(operation: BulkFinancialOperation): Promise<BulkFinancialResult> {
     const { betIds = [], userIds = [], operation: op } = operation;
 
@@ -977,13 +1444,27 @@ export class PrismaAdminRepository implements IAdminRepository {
                 data: { status: 'REFUNDED' },
               });
 
-              // Create refund transaction
+              // Get current user balance and calculate new balance
+              const user = await tx.user.findUnique({ where: { id: bet.userId } });
+              if (!user) throw new Error('User not found');
+
+              const newBalance = user.muskBucks + bet.amount;
+
+              // Create refund transaction with enhanced fields
               await tx.transaction.create({
                 data: {
                   userId: bet.userId,
-                  type: 'CREDIT', // Using CREDIT for refunds
+                  type: 'CREDIT',
+                  subtype: 'BET_REFUND',
                   amount: bet.amount,
-                  balanceAfter: 0, // Would calculate properly
+                  balanceAfter: newBalance,
+                  description: `Admin refund for bet ${betId}`,
+                  metadata: {
+                    betId,
+                    originalAmount: Number(bet.amount),
+                    refundReason: 'admin_refund',
+                    processedBy: 'admin', // Could be enhanced with actual admin user ID
+                  },
                   relatedBetId: betId,
                 },
               });
@@ -992,7 +1473,7 @@ export class PrismaAdminRepository implements IAdminRepository {
               await tx.user.update({
                 where: { id: bet.userId },
                 data: {
-                  muskBucks: { increment: bet.amount },
+                  muskBucks: newBalance,
                 },
               });
             });
@@ -1527,12 +2008,19 @@ export class PrismaAdminRepository implements IAdminRepository {
   }
 
   // -- Legacy Badge & Content Moderation (deprecated) --
-  async findPosts(_filters?: QueryParams): Promise<UserPost[]> {
-    return this.prisma.userPost.findMany();
+  async findPosts(_filters?: QueryParams): Promise<Content[]> {
+    return this.prisma.content.findMany({
+      where: {
+        isDeleted: false,
+      },
+    });
   }
 
   async deletePost(postId: number): Promise<void> {
-    await this.prisma.userPost.delete({ where: { id: postId } });
+    await this.prisma.content.update({
+      where: { id: postId },
+      data: { isDeleted: true },
+    });
   }
 
   async findAllBadges(): Promise<Badge[]> {
@@ -1604,45 +2092,19 @@ export class PrismaAdminRepository implements IAdminRepository {
     const avgUserValue = totalUsers > 0 ? Number(totalRevenue._sum.amount || 0) / totalUsers : 0;
     const netProfit = Number(totalRevenue._sum.amount || 0) - Number(totalPayouts._sum.payout || 0);
 
-    // Current period metrics
-    const currentNewUsers = await this.prisma.user.count({
-      where: { createdAt: { gte: currentPeriodStart, lte: currentPeriodEnd } },
-    });
+    // Current and previous period metrics for growth rate calculation
+    const [currentNewUsers, previousNewUsers] = await Promise.all([
+      this.prisma.user.count({
+        where: { createdAt: { gte: currentPeriodStart, lte: currentPeriodEnd } },
+      }),
+      this.prisma.user.count({
+        where: { createdAt: { gte: previousPeriodStart, lte: previousPeriodEnd } },
+      }),
+    ]);
 
-    const currentRevenue = await this.prisma.bet.aggregate({
-      where: { createdAt: { gte: currentPeriodStart, lte: currentPeriodEnd } },
-      _sum: { amount: true },
-    });
-
-    const currentBets = await this.prisma.bet.count({
-      where: { createdAt: { gte: currentPeriodStart, lte: currentPeriodEnd } },
-    });
-
-    // Previous period metrics for comparison
-    const previousNewUsers = await this.prisma.user.count({
-      where: { createdAt: { gte: previousPeriodStart, lte: previousPeriodEnd } },
-    });
-
-    const previousRevenue = await this.prisma.bet.aggregate({
-      where: { createdAt: { gte: previousPeriodStart, lte: previousPeriodEnd } },
-      _sum: { amount: true },
-    });
-
-    const previousBets = await this.prisma.bet.count({
-      where: { createdAt: { gte: previousPeriodStart, lte: previousPeriodEnd } },
-    });
-
-    // Calculate growth rates
+    // Calculate user growth rate
     const userGrowthRate =
       previousNewUsers > 0 ? ((currentNewUsers - previousNewUsers) / previousNewUsers) * 100 : 0;
-    const revenueGrowthRate =
-      Number(previousRevenue._sum.amount || 0) > 0
-        ? ((Number(currentRevenue._sum.amount || 0) - Number(previousRevenue._sum.amount || 0)) /
-            Number(previousRevenue._sum.amount || 0)) *
-          100
-        : 0;
-    const engagementGrowthRate =
-      previousBets > 0 ? ((currentBets - previousBets) / previousBets) * 100 : 0;
 
     // Retention rate (simplified - users who bet in current period and existed before)
     const retainedUsers = await this.prisma.user.count({
@@ -1666,45 +2128,70 @@ export class PrismaAdminRepository implements IAdminRepository {
 
     const retentionRate = eligibleUsers > 0 ? (retainedUsers / eligibleUsers) * 100 : 0;
 
+    // Additional metrics needed for ExecutiveDashboardData
+    const activePredictions = await this.prisma.prediction.count({
+      where: { resolved: false },
+    });
+    const resolvedPredictions = await this.prisma.prediction.count({
+      where: { resolved: true },
+    });
+    const resolutionRate =
+      totalPredictions > 0 ? (resolvedPredictions / totalPredictions) * 100 : 0;
+    const avgBetsPerPrediction = totalPredictions > 0 ? totalBets / totalPredictions : 0;
+
+    const totalComments = await this.prisma.content.count({
+      where: { type: 'COMMENT', isDeleted: false },
+    });
+    const totalReactions = await this.prisma.reaction.count();
+    const pongMatches = await this.prisma.pongMatch.count();
+
+    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    const activeUsers24h = await this.prisma.user.count({
+      where: {
+        bets: {
+          some: { createdAt: { gte: oneDayAgo } },
+        },
+      },
+    });
+
+    const activeUsers7d = await this.prisma.user.count({
+      where: {
+        bets: {
+          some: { createdAt: { gte: sevenDaysAgo } },
+        },
+      },
+    });
+
     return {
-      overview: {
-        totalUsers,
-        activeUsers,
-        totalPredictions,
-        totalBets,
+      platformHealth: {
+        activeUsers24h,
+        activeUsers7d,
+        activeUsers30d: activeUsers,
+        userGrowthRate,
+        retentionRate,
+      },
+      financialMetrics: {
         totalRevenue: Number(totalRevenue._sum.amount || 0),
         totalPayouts: Number(totalPayouts._sum.payout || 0),
         netProfit,
-        avgUserValue,
+        avgTransactionValue: avgUserValue,
+        totalVolume: Number(totalRevenue._sum.amount || 0),
       },
-      growthMetrics: {
-        userGrowthRate,
-        revenueGrowthRate,
-        engagementGrowthRate,
-        retentionRate,
+      contentMetrics: {
+        totalPredictions,
+        activePredictions,
+        resolutionRate,
+        avgBetsPerPrediction,
       },
-      currentPeriodComparison: {
-        newUsers: {
-          current: currentNewUsers,
-          previous: previousNewUsers,
-          change: userGrowthRate,
-        },
-        revenue: {
-          current: Number(currentRevenue._sum.amount || 0),
-          previous: Number(previousRevenue._sum.amount || 0),
-          change: revenueGrowthRate,
-        },
-        bets: {
-          current: currentBets,
-          previous: previousBets,
-          change: engagementGrowthRate,
-        },
-        engagement: {
-          current: currentBets,
-          previous: previousBets,
-          change: engagementGrowthRate,
-        },
+      engagementMetrics: {
+        totalComments,
+        totalReactions,
+        avgSessionDuration: 0, // Simplified - would need session tracking
+        pongMatchesPlayed: pongMatches,
       },
+      alerts: [], // Would be populated based on system health checks
     };
   }
 
@@ -1732,7 +2219,12 @@ export class PrismaAdminRepository implements IAdminRepository {
       },
       include: {
         prediction: {
-          select: { category: true },
+          select: {
+            categoryId: true,
+            category: {
+              select: { name: true },
+            },
+          },
         },
       },
     });
@@ -1740,7 +2232,7 @@ export class PrismaAdminRepository implements IAdminRepository {
     // Group by category and calculate stats
     const categoryMap = new Map<string, { count: number; volume: number }>();
     betsWithPredictions.forEach((bet) => {
-      const category = bet.prediction.category;
+      const category = bet.prediction.category?.name || 'Uncategorized';
       const existing = categoryMap.get(category) || { count: 0, volume: 0 };
       categoryMap.set(category, {
         count: existing.count + 1,
@@ -1952,12 +2444,18 @@ export class PrismaAdminRepository implements IAdminRepository {
 
     return {
       reportId,
-      title: `${reportType.replace('_', ' ').toUpperCase()} Report`,
+      reportType,
+      generatedAt: new Date(),
+      parameters: params,
       data,
+      summary: {
+        title: `${reportType.replace('_', ' ').toUpperCase()} Report`,
+        recordCount: data.length,
+      },
       metadata: {
-        totalRows: data.length,
-        generatedAt: new Date().toISOString(),
-        parameters: params,
+        totalRecords: data.length,
+        processingTime: 0, // Simplified - would measure actual time
+        dataSource: 'database',
       },
     };
   }
@@ -2025,23 +2523,13 @@ export class PrismaAdminRepository implements IAdminRepository {
     return [csvHeaders, ...csvRows].join('\n');
   }
 
-  // -- Leaderboard & Stats --
   async recalculateLeaderboard(): Promise<void> {
-    // Note: leaderboard_view is now a regular table updated by triggers
-    // No need to refresh materialized view anymore
-    // The table is automatically updated via database triggers on bet/payout events
+    // This would trigger a leaderboard recalculation job
+    // For now, it's a no-op placeholder
+    return Promise.resolve();
   }
 
   async findUserStats(userId: number): Promise<UserStats | null> {
     return this.prisma.userStats.findUnique({ where: { userId } });
-  }
-
-  // -- Miscellaneous --
-  async triggerAITweet(): Promise<AITweet> {
-    return this.prisma.aITweet.create({
-      data: {
-        content: 'Placeholder AI tweet',
-      },
-    });
   }
 }

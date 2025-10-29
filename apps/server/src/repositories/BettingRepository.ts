@@ -1,10 +1,8 @@
 // apps/server/src/repositories/BettingRepository.ts
-import { PrismaClient } from '@prisma/client';
+import prisma from '../db';
 import type { IBettingRepository, OptionWithPrediction } from './interfaces/IBettingRepository';
 import type { DbBet, DbParlay } from '@ems/types';
 import { eventBus } from '../lib/EventBus';
-
-const prisma = new PrismaClient();
 
 export class BettingRepository implements IBettingRepository {
   async findOptionWithPrediction(optionId: number): Promise<OptionWithPrediction | null> {
@@ -36,27 +34,39 @@ export class BettingRepository implements IBettingRepository {
     potentialPayout: bigint,
     wasAllIn: boolean,
     idempotencyKey?: string,
-  ): Promise<DbBet> {
+  ): Promise<{ bet: DbBet; balanceChange: { previous: bigint; new: bigint } }> {
     // Critical transaction: only financial operations to reduce lock contention
-    const bet = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       const user = await tx.user.update({
         where: { id: userId },
         data: { muskBucks: { decrement: amount } },
       });
 
+      // Capture balance change for event emission
+      const newBalance = user.muskBucks;
+      const previousBalance = newBalance + BigInt(amount);
+
       await tx.transaction.create({
         data: {
           userId,
           type: 'DEBIT',
+          subtype: 'BET_WAGER',
           amount: BigInt(amount),
           balanceAfter: user.muskBucks,
-          relatedBetId: null,
+          description: `Bet wager on prediction ${predictionId}`,
+          metadata: {
+            predictionId,
+            optionId,
+            oddsAtPlacement,
+            wasAllIn,
+          },
+          relatedBetId: null, // Will be updated after bet creation
           relatedParlayId: null,
           idempotencyKey: idempotencyKey ? `${idempotencyKey}-debit` : undefined,
         },
       });
 
-      return await tx.bet.create({
+      const bet = await tx.bet.create({
         data: {
           userId,
           predictionId,
@@ -68,7 +78,11 @@ export class BettingRepository implements IBettingRepository {
           idempotencyKey,
         },
       });
+
+      return { bet, balanceChange: { previous: previousBalance, new: newBalance } };
     });
+
+    const { bet } = result;
 
     // Update stats outside transaction to reduce lock scope
     await prisma.userStats.upsert({
@@ -143,7 +157,7 @@ export class BettingRepository implements IBettingRepository {
       // Don't fail the bet placement if achievement event fails
     }
 
-    return bet;
+    return result;
   }
 
   async placeParlay(
@@ -152,7 +166,7 @@ export class BettingRepository implements IBettingRepository {
     amount: number,
     potentialPayout: bigint,
     idempotencyKey?: string,
-  ): Promise<DbParlay> {
+  ): Promise<{ parlay: DbParlay; balanceChange: { previous: bigint; new: bigint } }> {
     const legCount = legs.length;
 
     return await prisma.$transaction(async (tx) => {
@@ -161,14 +175,28 @@ export class BettingRepository implements IBettingRepository {
         data: { muskBucks: { decrement: amount } },
       });
 
+      // Capture balance change for event emission
+      const newBalance = user.muskBucks;
+      const previousBalance = newBalance + BigInt(amount);
+
       await tx.transaction.create({
         data: {
           userId,
           type: 'DEBIT',
+          subtype: 'PARLAY_WAGER',
           amount: BigInt(amount),
           balanceAfter: user.muskBucks,
+          description: `Parlay wager with ${legCount} legs`,
+          metadata: {
+            legCount,
+            legs: legs.map((l) => ({
+              predictionId: l.predictionId,
+              optionId: l.optionId,
+              oddsAtPlacement: l.oddsAtPlacement,
+            })),
+          },
           relatedBetId: null,
-          relatedParlayId: null,
+          relatedParlayId: null, // Will be updated after parlay creation
           idempotencyKey: idempotencyKey ? `${idempotencyKey}-debit` : undefined,
         },
       });
@@ -221,7 +249,7 @@ export class BettingRepository implements IBettingRepository {
         },
       });
 
-      return parlay;
+      return { parlay, balanceChange: { previous: previousBalance, new: newBalance } };
     });
   }
 
@@ -413,13 +441,13 @@ export class BettingRepository implements IBettingRepository {
         prediction: {
           id: number;
           title: string;
-          category: string;
+          category: string | null;
           resolved: boolean;
         };
         option: {
           id: number;
           label: string;
-        };
+        } | null;
       }
     >
   > {
@@ -469,6 +497,12 @@ export class BettingRepository implements IBettingRepository {
     // Map the results to match the expected interface
     return bets.map((bet) => ({
       ...bet,
+      prediction: {
+        id: bet.prediction.id,
+        title: bet.prediction.title,
+        category: bet.prediction.category?.name ?? null,
+        resolved: bet.prediction.resolved,
+      },
       option: bet.optionOption
         ? {
             id: bet.optionOption.id,
@@ -480,13 +514,13 @@ export class BettingRepository implements IBettingRepository {
         prediction: {
           id: number;
           title: string;
-          category: string;
+          category: string | null;
           resolved: boolean;
         };
         option: {
           id: number;
           label: string;
-        };
+        } | null;
       }
     >;
   }

@@ -16,17 +16,40 @@ import {
 } from 'react';
 import { useSocket } from './SocketContext';
 import { hydrationWatermark } from '../lib/hydrationWatermark';
-import {
-  REDIS_CHANNELS,
-  EVENT_SYSTEM_CONFIG,
-  getEventPriority,
-  type RedisChannel,
-  type EventPayload,
-  type EventPriority,
-  type EventSubscriptionOptions,
-  type EventHandler,
-  type EventUnsubscriber,
-} from '../types/events';
+import type {
+  RedisChannel,
+  EventPayload,
+  EventPriority,
+  EventSubscriptionOptions,
+  EventHandler,
+  EventUnsubscriber,
+} from '@ems/types';
+
+// Helper function to determine event priority based on channel name
+function getEventPriority(channel: RedisChannel): EventPriority {
+  const channelStr = channel as string;
+
+  // High priority: critical real-time events
+  if (
+    channelStr.includes('balance:') ||
+    channelStr.includes('error') ||
+    channelStr.includes('pong:')
+  ) {
+    return 'high';
+  }
+
+  // Low priority: analytics, metrics, non-critical updates
+  if (
+    channelStr.includes('analytics') ||
+    channelStr.includes('metrics') ||
+    channelStr.includes('leaderboard')
+  ) {
+    return 'low';
+  }
+
+  // Default: normal priority
+  return 'normal';
+}
 
 /* ---------- Types ---------- */
 
@@ -52,6 +75,9 @@ interface EventBusCoreContextType {
 
   // Connection status (stable)
   isConnected: boolean;
+
+  // Raw socket access for non-typed events (SOCKET_EVENTS)
+  socket: ReturnType<typeof useSocket>;
 
   // Batch subscription
   subscribeBatch: <T extends RedisChannel>(
@@ -129,7 +155,7 @@ export function EventBusCoreProvider({ children }: { children: ReactNode }) {
 
           // Sort handlers by priority (this is where React 19 startTransition will help)
           const sortedHandlers = Array.from(handlers).sort((a, b) => {
-            const priorityOrder = { high: 0, normal: 1, low: 2 };
+            const priorityOrder: Record<EventPriority, number> = { high: 0, normal: 1, low: 2 };
             return priorityOrder[a.priority] - priorityOrder[b.priority];
           });
 
@@ -183,7 +209,7 @@ export function EventBusCoreProvider({ children }: { children: ReactNode }) {
             if (handlers.size === 0) {
               const storedListener = socketListenersRef.current.get(event);
               if (storedListener) {
-                socket.off(event, storedListener);
+                socket.off(event, storedListener as any);
                 socketListenersRef.current.delete(event);
               }
               handlersRef.current.delete(event);
@@ -192,7 +218,7 @@ export function EventBusCoreProvider({ children }: { children: ReactNode }) {
         };
 
         // Register with socket - CORRECT: Listening for server broadcasts (from Redis)
-        socket.on(event, socketListener);
+        socket.on(event, socketListener as any);
         socketListenersRef.current.set(event, socketListener);
       }
 
@@ -209,7 +235,7 @@ export function EventBusCoreProvider({ children }: { children: ReactNode }) {
           if (currentHandlers.size === 0) {
             const socketListener = socketListenersRef.current.get(event);
             if (socketListener) {
-              socket.off(event, socketListener);
+              socket.off(event, socketListener as any);
               socketListenersRef.current.delete(event);
             }
             handlersRef.current.delete(event);
@@ -279,11 +305,12 @@ export function EventBusCoreProvider({ children }: { children: ReactNode }) {
       subscribe,
       emit,
       isConnected,
+      socket,
       subscribeBatch,
       getActiveEvents,
       getHandlerCount,
     }),
-    [subscribe, emit, isConnected, subscribeBatch, getActiveEvents, getHandlerCount],
+    [subscribe, emit, isConnected, socket, subscribeBatch, getActiveEvents, getHandlerCount],
   );
 
   return <EventBusCoreContext.Provider value={value}>{children}</EventBusCoreContext.Provider>;

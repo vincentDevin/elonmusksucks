@@ -1,0 +1,129 @@
+{
+  "testName": "Bet Placement Load Test",
+  "totalRequests": 50,
+  "successfulRequests": 5,
+  "failedRequests": 36,
+  "requestDurations": [
+    81,
+    78,
+    81,
+    77,
+    64
+  ],
+  "errors": [
+    {
+      "error": "INSUFFICIENT_FUNDS"
+    },
+    {
+      "error": "INSUFFICIENT_FUNDS"
+    },
+    {
+      "error": "INSUFFICIENT_FUNDS"
+    },
+    {
+      "error": "INSUFFICIENT_FUNDS"
+    },
+    {
+      "error": "INSUFFICIENT_FUNDS"
+    },
+    {
+      "error": "INSUFFICIENT_FUNDS"
+    },
+    {
+      "error": "INSUFFICIENT_FUNDS"
+    },
+    {
+      "error": "INSUFFICIENT_FUNDS"
+    },
+    {
+      "error": "INSUFFICIENT_FUNDS"
+    },
+    {
+      "error": "INSUFFICIENT_FUNDS"
+    },
+    {
+      "error": "INSUFFICIENT_FUNDS"
+    },
+    {
+      "error": "INSUFFICIENT_FUNDS"
+    },
+    {
+      "error": "INSUFFICIENT_FUNDS"
+    },
+    {
+      "error": "INSUFFICIENT_FUNDS"
+    },
+    {
+      "error": "INSUFFICIENT_FUNDS"
+    },
+    {
+      "error": "INSUFFICIENT_FUNDS"
+    },
+    {
+      "error": "INSUFFICIENT_FUNDS"
+    },
+    {
+      "error": "INSUFFICIENT_FUNDS"
+    },
+    {
+      "error": "INSUFFICIENT_FUNDS"
+    },
+    {
+      "error": "INSUFFICIENT_FUNDS"
+    },
+    {
+      "error": "INSUFFICIENT_FUNDS"
+    },
+    {
+      "error": "INSUFFICIENT_FUNDS"
+    },
+    {
+      "error": "INSUFFICIENT_FUNDS"
+    },
+    {
+      "error": "INSUFFICIENT_FUNDS"
+    },
+    {
+      "error": "INSUFFICIENT_FUNDS"
+    },
+    {
+      "error": "INSUFFICIENT_FUNDS"
+    },
+    {
+      "error": "INSUFFICIENT_FUNDS"
+    },
+    {
+      "error": "INSUFFICIENT_FUNDS"
+    },
+    {
+      "error": "INSUFFICIENT_FUNDS"
+    },
+    {
+      "error": "INSUFFICIENT_FUNDS"
+    },
+    {
+      "error": "INSUFFICIENT_FUNDS"
+    },
+    {
+      "error": "INSUFFICIENT_FUNDS"
+    },
+    {
+      "error": "INSUFFICIENT_FUNDS"
+    },
+    {
+      "error": "INSUFFICIENT_FUNDS"
+    },
+    {
+      "error": "INSUFFICIENT_FUNDS"
+    },
+    {
+      "error": "INSUFFICIENT_FUNDS"
+    }
+  ],
+  "metadata": {
+    "numBets": 50,
+    "concurrency": 5,
+    "userCount": 5
+  },
+  "duration": 2769
+}

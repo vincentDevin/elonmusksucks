@@ -1,6 +1,6 @@
 // AchievementContext with hydration guard to prevent redundant API calls on navigation
 // PERFORMANCE FIX: Prevents /api/users/{id}/achievements API call on every mount
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useMemo, type ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { useEventBusCore } from './EventBusCoreContext';
 import api from '../api/axios';
@@ -159,8 +159,8 @@ export function AchievementProvider({ children }: AchievementProviderProps) {
           isCompleted: true,
           completedAt: new Date().toISOString(),
           progress: payload.progress.current,
-          targetValue: payload.progress.current, // Since it's unlocked, current = target
-          iconUrl: null, // No icon in unlock payload
+          targetValue: payload.progress.target,
+          iconUrl: payload.achievement.iconUrl || null,
         };
 
         // Update achievements list with the newly unlocked achievement
@@ -197,7 +197,7 @@ export function AchievementProvider({ children }: AchievementProviderProps) {
           description: payload.achievement.description,
           category: payload.achievement.category,
           rarity: 'common', // Default rarity
-          iconUrl: null,
+          iconUrl: payload.achievement.iconUrl || null,
           completedAt: new Date().toISOString(),
         };
 
@@ -214,18 +214,32 @@ export function AchievementProvider({ children }: AchievementProviderProps) {
   const totalAvailable = allAchievements.length;
   const completionRate = totalAvailable > 0 ? totalBadges / totalAvailable : 0;
 
-  const value: AchievementContextType = {
-    achievements,
-    recentAchievements,
-    allAchievements,
-    totalBadges,
-    totalAvailable,
-    completionRate,
-    loading,
-    error,
-    isHydrated,
-    refreshAchievements: fetchAchievements,
-  };
+  const value = useMemo<AchievementContextType>(
+    () => ({
+      achievements,
+      recentAchievements,
+      allAchievements,
+      totalBadges,
+      totalAvailable,
+      completionRate,
+      loading,
+      error,
+      isHydrated,
+      refreshAchievements: fetchAchievements,
+    }),
+    [
+      achievements,
+      recentAchievements,
+      allAchievements,
+      totalBadges,
+      totalAvailable,
+      completionRate,
+      loading,
+      error,
+      isHydrated,
+      fetchAchievements,
+    ],
+  );
 
   return <AchievementContext.Provider value={value}>{children}</AchievementContext.Provider>;
 }

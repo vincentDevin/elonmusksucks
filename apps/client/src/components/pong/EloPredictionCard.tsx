@@ -8,6 +8,7 @@ import {
   LockOpenIcon,
 } from '@heroicons/react/24/outline';
 import api from '../../api/axios';
+import { formatMuskBucks } from '../../utils/formatting';
 import { ClientEloCalculator } from '../../utils/eloCalculations';
 
 interface EloPredictionCardProps {
@@ -19,6 +20,8 @@ interface EloPredictionCardProps {
   className?: string;
   onWagerLocked?: (isLocked: boolean, wager: number) => void;
   autoLock?: boolean; // Auto-lock when wager is set
+  hideInfoFooter?: boolean; // Hide the info footer section
+  hideLockButton?: boolean; // Hide the lock button
 }
 
 interface EloPredictionResult {
@@ -44,6 +47,8 @@ export default function EloPredictionCard({
   className = '',
   onWagerLocked,
   autoLock = false,
+  hideInfoFooter = false,
+  hideLockButton = false,
 }: EloPredictionCardProps) {
   const [playerElo, setPlayerElo] = useState<number>(propPlayerElo || 1200);
   const [isWagerLocked, setIsWagerLocked] = useState(false);
@@ -151,7 +156,7 @@ export default function EloPredictionCard({
   }
 
   // Show lock button for wagers
-  const showLockButton = wagerAmount > 0 && !autoLock;
+  const showLockButton = wagerAmount > 0 && !autoLock && !hideLockButton;
 
   if (loading && !clientPrediction) {
     return (
@@ -208,7 +213,7 @@ export default function EloPredictionCard({
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center space-x-2">
           <TrophyIcon className="w-5 h-5 text-primary" />
-          <span className="font-medium text-content text-sm">
+          <span className="font-semibold text-content text-lg">
             Elo Impact Preview{' '}
             {isWagerLocked && <span className="text-xs text-success">(Locked)</span>}
           </span>
@@ -243,7 +248,7 @@ export default function EloPredictionCard({
       </div>
 
       {/* Current Stats */}
-      <div className="grid grid-cols-3 gap-3 mb-4 text-center text-xs">
+      <div className="grid grid-cols-3 gap-3 mb-4 text-center text-sm">
         <div>
           <div className="text-tertiary">Your Elo</div>
           <div className="font-bold text-primary">{playerElo}</div>
@@ -257,7 +262,7 @@ export default function EloPredictionCard({
         <div>
           <div className="text-tertiary">Wager</div>
           <div className="font-bold text-accent">
-            {isWagerLocked ? lockedWager : wagerAmount}
+            {formatMuskBucks(isWagerLocked ? lockedWager : wagerAmount)}
             {isWagerLocked && ' 🔒'}
           </div>
         </div>
@@ -292,27 +297,31 @@ export default function EloPredictionCard({
         </div>
       </div>
 
-      {/* Info Footer */}
-      <div className="mt-3 pt-3 border-t border-accent/20">
-        <div className="text-xs text-tertiary text-center">
-          💡 Elo changes are based on skill difference and wager size
+      {/* Info Footer - 2 Column Layout */}
+      {!hideInfoFooter && (
+        <div className="mt-3 pt-3 border-t border-accent/20">
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            {/* Left Column */}
+            <div className="space-y-1">
+              <div className="text-tertiary">
+                💡 Elo changes are based on skill difference and wager size
+              </div>
+              {!isWagerLocked && showLockButton && (
+                <div className="text-info">🔐 Lock your wager to confirm the match stakes</div>
+              )}
+            </div>
+            {/* Right Column */}
+            <div className="space-y-1">
+              {opponentType === 'pvp' && !opponentElo && (
+                <div className="text-warning">⚠️ Opponent Elo unknown - using estimated values</div>
+              )}
+              {!serverPrediction && clientPrediction && (
+                <div className="text-tertiary">📊 Using client-side prediction</div>
+              )}
+            </div>
+          </div>
         </div>
-        {!isWagerLocked && showLockButton && (
-          <div className="text-xs text-info text-center mt-1">
-            🔐 Lock your wager to confirm the match stakes
-          </div>
-        )}
-        {opponentType === 'pvp' && !opponentElo && (
-          <div className="text-xs text-warning text-center mt-1">
-            ⚠️ Opponent Elo unknown - using estimated values
-          </div>
-        )}
-        {!serverPrediction && clientPrediction && (
-          <div className="text-xs text-tertiary text-center mt-1">
-            📊 Using client-side prediction
-          </div>
-        )}
-      </div>
+      )}
     </div>
   );
 }

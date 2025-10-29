@@ -1,13 +1,13 @@
+import prisma from '../db';
 // apps/server/src/workers/leaderboard-snapshot.worker.ts
 import 'dotenv/config';
 import { Worker, Queue } from 'bullmq';
-import { PrismaClient } from '@prisma/client';
 import { LeaderboardRepository } from '../repositories/LeaderboardRepository';
 import { eventBus } from '../lib/EventBus';
 import redisClient from '../lib/redis';
 import type { Job } from 'bullmq';
 
-const prisma = new PrismaClient();
+// Using shared prisma from db.ts
 const leaderboardRepo = new LeaderboardRepository();
 
 interface SnapshotJobData {

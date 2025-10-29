@@ -1,15 +1,16 @@
 // apps/server/src/repositories/PongRepository.ts
 
-import { PrismaClient } from '@prisma/client';
+import prisma from '../db';
+import type { IPongRepository } from './interfaces/IPongRepository';
 import type {
-  IPongRepository,
   PongStatsData,
   PongMatchData,
+  PongMatchUpdateData,
   PongStatsWithUser,
   PongMatchWithPlayers,
-} from './interfaces/IPongRepository';
-
-const prisma = new PrismaClient();
+} from '@ems/types';
+import { REDIS_CHANNELS } from '@ems/types';
+import { eventBus } from '../lib/EventBus';
 
 export class PongRepository implements IPongRepository {
   // PongStats operations
@@ -20,27 +21,45 @@ export class PongRepository implements IPongRepository {
     return stats ? this.mapPongStats(stats) : null;
   }
 
+  async findEloByUserId(userId: number): Promise<{ eloRating: number; tier: string } | null> {
+    const stats = await prisma.pongStats.findUnique({
+      where: { userId },
+      select: {
+        eloRating: true,
+        tier: true,
+      },
+    });
+    return stats;
+  }
+
   async createStats(data: Partial<PongStatsData>): Promise<PongStatsData> {
+    const { id, eloHistory, createdAt, updatedAt, ...createData } = data;
     const stats = await prisma.pongStats.create({
       data: {
         userId: data.userId!,
         eloRating: data.eloRating || 1200,
         peakElo: data.peakElo || 1200,
         tier: data.tier || 'SILVER',
-        ...data,
+        ...createData,
+        eloHistory: eloHistory ? (eloHistory as any) : undefined,
       },
     });
     return this.mapPongStats(stats);
   }
 
   async updateStats(userId: number, data: Partial<PongStatsData>): Promise<void> {
+    const { id, eloHistory, createdAt, updatedAt, userId: _userId, ...updateData } = data;
     await prisma.pongStats.update({
       where: { userId },
-      data,
+      data: {
+        ...updateData,
+        eloHistory: eloHistory ? (eloHistory as any) : undefined,
+      },
     });
   }
 
   async upsertStats(userId: number, data: Partial<PongStatsData>): Promise<PongStatsData> {
+    const { id, eloHistory, createdAt, updatedAt, userId: _userId, ...cleanData } = data;
     const stats = await prisma.pongStats.upsert({
       where: { userId },
       create: {
@@ -48,9 +67,13 @@ export class PongRepository implements IPongRepository {
         eloRating: data.eloRating || 1200,
         peakElo: data.peakElo || 1200,
         tier: data.tier || 'SILVER',
-        ...data,
+        ...cleanData,
+        eloHistory: eloHistory ? (eloHistory as any) : undefined,
       },
-      update: data,
+      update: {
+        ...cleanData,
+        eloHistory: eloHistory ? (eloHistory as any) : undefined,
+      },
     });
     return this.mapPongStats(stats);
   }
@@ -92,10 +115,36 @@ export class PongRepository implements IPongRepository {
     return this.mapPongMatch(match);
   }
 
-  async updateMatch(matchId: string, data: Partial<PongMatchData>): Promise<void> {
+  async updateMatch(matchId: string, data: PongMatchUpdateData): Promise<void> {
     await prisma.pongMatch.update({
       where: { id: matchId },
-      data,
+      data: {
+        ...(data.playerTwoId !== undefined && { playerTwoId: data.playerTwoId }),
+        ...(data.winnerId !== undefined && { winnerId: data.winnerId }),
+        ...(data.aiDifficulty !== undefined && { aiDifficulty: data.aiDifficulty }),
+        ...(data.playerOneScore !== undefined && { playerOneScore: data.playerOneScore }),
+        ...(data.playerTwoScore !== undefined && { playerTwoScore: data.playerTwoScore }),
+        ...(data.status !== undefined && { status: data.status }),
+        ...(data.startedAt !== undefined && { startedAt: data.startedAt }),
+        ...(data.completedAt !== undefined && { completedAt: data.completedAt }),
+        ...(data.gameDuration !== undefined && { gameDuration: data.gameDuration }),
+        ...(data.playerOnePing !== undefined && { playerOnePing: data.playerOnePing }),
+        ...(data.playerTwoPing !== undefined && { playerTwoPing: data.playerTwoPing }),
+        ...(data.player1EloStart !== undefined && { player1EloStart: data.player1EloStart }),
+        ...(data.player2EloStart !== undefined && { player2EloStart: data.player2EloStart }),
+        ...(data.player1EloEnd !== undefined && { player1EloEnd: data.player1EloEnd }),
+        ...(data.player2EloEnd !== undefined && { player2EloEnd: data.player2EloEnd }),
+        ...(data.eloChange !== undefined && { eloChange: data.eloChange }),
+        ...(data.skillComponent !== undefined && { skillComponent: data.skillComponent }),
+        ...(data.economyComponent !== undefined && { economyComponent: data.economyComponent }),
+        ...(data.mode !== undefined && { mode: data.mode }),
+        ...(data.rated !== undefined && { rated: data.rated }),
+        ...(data.joinerUserId !== undefined && { joinerUserId: data.joinerUserId }),
+        ...(data.aiUserId !== undefined && { aiUserId: data.aiUserId }),
+        ...(data.hostDisplayName !== undefined && { hostDisplayName: data.hostDisplayName }),
+        ...(data.joinerDisplayName !== undefined && { joinerDisplayName: data.joinerDisplayName }),
+        ...(data.aiDisplayName !== undefined && { aiDisplayName: data.aiDisplayName }),
+      },
     });
   }
 
@@ -141,6 +190,7 @@ export class PongRepository implements IPongRepository {
             id: true,
             name: true,
             avatarUrl: true,
+            profilePictureKey: true,
           },
         },
       },
@@ -162,6 +212,7 @@ export class PongRepository implements IPongRepository {
             id: true,
             name: true,
             avatarUrl: true,
+            profilePictureKey: true,
           },
         },
       },
@@ -183,6 +234,7 @@ export class PongRepository implements IPongRepository {
             id: true,
             name: true,
             avatarUrl: true,
+            profilePictureKey: true,
           },
         },
       },
@@ -204,6 +256,7 @@ export class PongRepository implements IPongRepository {
             id: true,
             name: true,
             avatarUrl: true,
+            profilePictureKey: true,
           },
         },
       },
@@ -225,6 +278,7 @@ export class PongRepository implements IPongRepository {
             id: true,
             name: true,
             avatarUrl: true,
+            profilePictureKey: true,
           },
         },
       },
@@ -246,6 +300,7 @@ export class PongRepository implements IPongRepository {
             id: true,
             name: true,
             avatarUrl: true,
+            profilePictureKey: true,
           },
         },
       },
@@ -420,25 +475,25 @@ export class PongRepository implements IPongRepository {
 
       if (isAIMatch) {
         // In AI matches, we need to properly identify the human and AI
-        const humanId = matchData.hostUserId || matchData.playerOneId;
-        const aiId = matchData.aiUserId || matchData.playerTwoId;
+        const humanId = matchData.hostUserId ?? matchData.playerOneId;
+        const aiId = matchData.aiUserId ?? matchData.playerTwoId;
 
         // Winner is already determined by game server
         if (actualWinnerId === humanId) {
           // Human won
-          actualLoserId = aiId;
+          actualLoserId = aiId ?? undefined;
         } else {
           // AI won (actualWinnerId is the AI's negative ID)
           actualLoserId = humanId;
         }
       } else {
         // PVP match - use canonical roles
-        const hostId = matchData.hostUserId || matchData.playerOneId;
-        const joinerId = matchData.joinerUserId || matchData.playerTwoId;
+        const hostId = matchData.hostUserId ?? matchData.playerOneId;
+        const joinerId = matchData.joinerUserId ?? matchData.playerTwoId;
 
         // Winner is already determined by game server
         if (actualWinnerId === hostId) {
-          actualLoserId = joinerId;
+          actualLoserId = joinerId ?? undefined;
         } else if (actualWinnerId === joinerId) {
           actualLoserId = hostId;
         }
@@ -549,6 +604,37 @@ export class PongRepository implements IPongRepository {
 
       // Payout processing is now handled by the dedicated payout worker
       // The caller should enqueue a payout job after this method completes successfully
+
+      // Link wager transactions to this match for better traceability
+      const humanPlayerId1 = matchData.playerOneId > 0 ? matchData.playerOneId : null;
+      const humanPlayerId2 =
+        matchData.playerTwoId && matchData.playerTwoId > 0 ? matchData.playerTwoId : null;
+
+      if (humanPlayerId1) {
+        await tx.transaction.updateMany({
+          where: {
+            userId: humanPlayerId1,
+            type: 'DEBIT',
+            subtype: 'PONG_WAGER',
+            relatedPongMatchId: null,
+            createdAt: { gte: new Date(Date.now() - 10 * 60 * 1000) }, // Last 10 minutes
+          },
+          data: { relatedPongMatchId: matchData.id },
+        });
+      }
+
+      if (humanPlayerId2) {
+        await tx.transaction.updateMany({
+          where: {
+            userId: humanPlayerId2,
+            type: 'DEBIT',
+            subtype: 'PONG_WAGER',
+            relatedPongMatchId: null,
+            createdAt: { gte: new Date(Date.now() - 10 * 60 * 1000) }, // Last 10 minutes
+          },
+          data: { relatedPongMatchId: matchData.id },
+        });
+      }
 
       return {
         isLossOnly: false,
@@ -677,6 +763,12 @@ export class PongRepository implements IPongRepository {
     isAI: boolean,
   ): Promise<{ transactionId: string }> {
     return await this.executeInTransaction(async (tx) => {
+      // Get player one's balance before deduction
+      const playerOneBefore = await tx.user.findUnique({
+        where: { id: playerOneId },
+        select: { muskBucks: true },
+      });
+
       // Deduct from player one
       const playerOneUpdate = await tx.user.update({
         where: { id: playerOneId },
@@ -688,8 +780,24 @@ export class PongRepository implements IPongRepository {
         throw new Error('Insufficient funds for player one');
       }
 
+      // ✅ Emit balance update event for player one (wager deduction)
+      await eventBus.publish(REDIS_CHANNELS.BALANCE_UPDATE, {
+        userId: playerOneId,
+        newBalance: Number(playerOneUpdate.muskBucks),
+        previousBalance: Number(playerOneBefore?.muskBucks || 0),
+        change: -wagerAmount,
+        reason: `Pong match wager${isAI ? ' vs AI' : ' vs player'}`,
+        timestamp: new Date().toISOString(),
+      });
+
       // Deduct from player two if not AI
       if (!isAI && playerTwoId) {
+        // Get player two's balance before deduction
+        const playerTwoBefore = await tx.user.findUnique({
+          where: { id: playerTwoId },
+          select: { muskBucks: true },
+        });
+
         const playerTwoUpdate = await tx.user.update({
           where: { id: playerTwoId },
           data: { muskBucks: { decrement: BigInt(wagerAmount) } },
@@ -699,6 +807,16 @@ export class PongRepository implements IPongRepository {
         if (playerTwoUpdate.muskBucks < 0) {
           throw new Error('Insufficient funds for player two');
         }
+
+        // ✅ Emit balance update event for player two (wager deduction)
+        await eventBus.publish(REDIS_CHANNELS.BALANCE_UPDATE, {
+          userId: playerTwoId,
+          newBalance: Number(playerTwoUpdate.muskBucks),
+          previousBalance: Number(playerTwoBefore?.muskBucks || 0),
+          change: -wagerAmount,
+          reason: 'Pong match wager vs player',
+          timestamp: new Date().toISOString(),
+        });
       }
 
       // Create transaction record
@@ -706,8 +824,16 @@ export class PongRepository implements IPongRepository {
         data: {
           userId: playerOneId,
           type: 'DEBIT',
+          subtype: 'PONG_WAGER',
           amount: BigInt(-wagerAmount),
           balanceAfter: playerOneUpdate.muskBucks,
+          description: `Pong match wager${isAI ? ' vs AI' : ' vs player'}`,
+          metadata: {
+            wagerAmount,
+            isAI,
+            playerTwoId,
+            matchType: isAI ? 'PVE_AI' : 'PVP',
+          },
         },
       });
 
@@ -716,13 +842,57 @@ export class PongRepository implements IPongRepository {
           data: {
             userId: playerTwoId,
             type: 'DEBIT',
+            subtype: 'PONG_WAGER',
             amount: BigInt(-wagerAmount),
             balanceAfter: BigInt(0), // Will be updated with actual balance
+            description: 'Pong match wager vs player',
+            metadata: {
+              wagerAmount,
+              isAI: false,
+              playerOneId,
+              matchType: 'PVP',
+            },
           },
         });
       }
 
       return { transactionId: transaction.id };
+    });
+  }
+
+  async linkTransactionsToMatch(
+    matchId: string,
+    playerOneId: number,
+    playerTwoId?: number | null,
+  ): Promise<void> {
+    await this.executeInTransaction(async (tx) => {
+      // Link player one wager transaction
+      await tx.transaction.updateMany({
+        where: {
+          userId: playerOneId,
+          type: 'DEBIT',
+          subtype: 'PONG_WAGER',
+          relatedPongMatchId: null,
+        },
+        data: {
+          relatedPongMatchId: matchId,
+        },
+      });
+
+      // Link player two wager transaction if it exists
+      if (playerTwoId && playerTwoId > 0) {
+        await tx.transaction.updateMany({
+          where: {
+            userId: playerTwoId,
+            type: 'DEBIT',
+            subtype: 'PONG_WAGER',
+            relatedPongMatchId: null,
+          },
+          data: {
+            relatedPongMatchId: matchId,
+          },
+        });
+      }
     });
   }
 
@@ -735,5 +905,249 @@ export class PongRepository implements IPongRepository {
 
   async healthCheck(): Promise<void> {
     await prisma.$queryRaw`SELECT 1`;
+  }
+
+  // Payout operations
+
+  /**
+   * Process PVP payout (winner vs loser)
+   */
+  async processPVPPayout(
+    matchId: string,
+    winnerId: number,
+    loserId: number | null,
+    payoutAmount: bigint,
+    houseRake: bigint,
+    idempotencyKey: string,
+  ): Promise<{
+    matchId: string;
+    winnerId: number;
+    payout: string;
+    houseRake: string;
+    netPayout: string;
+    loserLoss?: string;
+    vsAI: boolean;
+    timestamp: Date;
+    winnerPreviousBalance: string;
+    winnerNewBalance: string;
+    loserPreviousBalance?: string;
+    loserNewBalance?: string;
+  }> {
+    const netPayout = payoutAmount - houseRake;
+
+    return await this.executeInTransaction(async (tx) => {
+      // Get winner's balance before update
+      const winnerBefore = await tx.user.findUnique({
+        where: { id: winnerId },
+        select: { muskBucks: true },
+      });
+
+      if (!winnerBefore) {
+        throw new Error(`Winner ${winnerId} not found for payout`);
+      }
+
+      const winnerPreviousBalance = winnerBefore.muskBucks;
+
+      // Get loser's balance if available (loser already had wager deducted)
+      let loserPreviousBalance: bigint | undefined;
+      let loserNewBalance: bigint | undefined;
+      if (loserId) {
+        const loserUser = await tx.user.findUnique({
+          where: { id: loserId },
+          select: { muskBucks: true },
+        });
+        if (loserUser) {
+          loserPreviousBalance = loserUser.muskBucks;
+          loserNewBalance = loserUser.muskBucks; // No change on payout (wager already deducted)
+        }
+      }
+
+      // Credit winner with net payout
+      const updatedUser = await tx.user.update({
+        where: { id: winnerId },
+        data: { muskBucks: { increment: netPayout } },
+        select: { muskBucks: true },
+      });
+
+      // Create transaction record with idempotency key
+      await tx.transaction.create({
+        data: {
+          userId: winnerId,
+          type: 'CREDIT',
+          subtype: 'PONG_PAYOUT',
+          amount: netPayout,
+          balanceAfter: updatedUser.muskBucks,
+          description: 'Pong match payout (PVP victory)',
+          metadata: {
+            matchType: 'PVP',
+            payout: payoutAmount.toString(),
+            houseRake: houseRake.toString(),
+            netPayout: netPayout.toString(),
+            matchId,
+            loserId,
+            vsAI: false,
+          },
+          relatedPongMatchId: matchId,
+          idempotencyKey,
+        },
+      });
+
+      return {
+        matchId,
+        winnerId,
+        payout: payoutAmount.toString(),
+        houseRake: houseRake.toString(),
+        netPayout: netPayout.toString(),
+        loserLoss: loserId ? payoutAmount.toString() : undefined,
+        vsAI: false,
+        timestamp: new Date(),
+        winnerPreviousBalance: winnerPreviousBalance.toString(),
+        winnerNewBalance: updatedUser.muskBucks.toString(),
+        loserPreviousBalance: loserPreviousBalance?.toString(),
+        loserNewBalance: loserNewBalance?.toString(),
+      };
+    });
+  }
+
+  /**
+   * Process PVE payout (winner vs AI)
+   */
+  async processPVEPayout(
+    matchId: string,
+    winnerId: number,
+    payoutAmount: bigint,
+    houseRake: bigint,
+    idempotencyKey: string,
+  ): Promise<{
+    matchId: string;
+    winnerId: number;
+    payout: string;
+    houseRake: string;
+    netPayout: string;
+    vsAI: boolean;
+    timestamp: Date;
+    winnerPreviousBalance: string;
+    winnerNewBalance: string;
+  }> {
+    // Only human players get payouts (AI wins don't trigger payouts)
+    if (winnerId < 0) {
+      return {
+        matchId,
+        winnerId,
+        payout: '0',
+        houseRake: '0',
+        netPayout: '0',
+        vsAI: true,
+        timestamp: new Date(),
+        winnerPreviousBalance: '0',
+        winnerNewBalance: '0',
+      };
+    }
+
+    const netPayout = payoutAmount - houseRake;
+
+    return await this.executeInTransaction(async (tx) => {
+      // Get user's current balance before update
+      const userBefore = await tx.user.findUnique({
+        where: { id: winnerId },
+        select: { muskBucks: true },
+      });
+
+      if (!userBefore) {
+        throw new Error(`User ${winnerId} not found for payout`);
+      }
+
+      const previousBalance = userBefore.muskBucks;
+
+      // Credit human winner with net payout
+      const updatedUser = await tx.user.update({
+        where: { id: winnerId },
+        data: { muskBucks: { increment: netPayout } },
+        select: { muskBucks: true },
+      });
+
+      // Create transaction record with idempotency key
+      await tx.transaction.create({
+        data: {
+          userId: winnerId,
+          type: 'CREDIT',
+          subtype: 'PONG_PAYOUT',
+          amount: netPayout,
+          balanceAfter: updatedUser.muskBucks,
+          description: 'Pong match payout (PVE_AI victory)',
+          metadata: {
+            matchType: 'PVE_AI',
+            payout: payoutAmount.toString(),
+            houseRake: houseRake.toString(),
+            netPayout: netPayout.toString(),
+            matchId,
+            vsAI: true,
+          },
+          relatedPongMatchId: matchId,
+          idempotencyKey,
+        },
+      });
+
+      return {
+        matchId,
+        winnerId,
+        payout: payoutAmount.toString(),
+        houseRake: houseRake.toString(),
+        netPayout: netPayout.toString(),
+        vsAI: true,
+        timestamp: new Date(),
+        winnerPreviousBalance: previousBalance.toString(),
+        winnerNewBalance: updatedUser.muskBucks.toString(),
+      };
+    });
+  }
+
+  /**
+   * Check if payout has already been processed (idempotency)
+   */
+  async findExistingPayout(
+    matchId: string,
+    idempotencyKey: string,
+  ): Promise<{
+    matchId: string;
+    winnerId: number;
+    payout: string;
+    houseRake: string;
+    netPayout: string;
+    vsAI: boolean;
+    timestamp: Date;
+  } | null> {
+    const existing = await prisma.transaction.findUnique({
+      where: { idempotencyKey },
+      include: { user: true },
+    });
+
+    if (existing && existing.metadata) {
+      const metadata = existing.metadata as any;
+      return {
+        matchId,
+        winnerId: existing.userId,
+        payout: existing.amount.toString(),
+        houseRake: metadata.houseRake || '0',
+        netPayout: existing.amount.toString(),
+        vsAI: metadata.vsAI || false,
+        timestamp: existing.createdAt,
+      };
+    }
+
+    return null;
+  }
+
+  /**
+   * Get AI player basic info (id, name, avatarUrl)
+   * Used by pong-server to fetch AI player data from database
+   */
+  async getAIPlayerById(
+    userId: number,
+  ): Promise<{ id: number; name: string; avatarUrl: string | null } | null> {
+    return await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, name: true, avatarUrl: true },
+    });
   }
 }

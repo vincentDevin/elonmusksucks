@@ -129,7 +129,7 @@ export const ConditionBuilder: React.FC<ConditionBuilderProps> = ({
   };
 
   return (
-    <div className="border border-border rounded-lg p-4 space-y-4">
+    <div className="border border-muted rounded-lg p-4 space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -212,7 +212,7 @@ export const ConditionBuilder: React.FC<ConditionBuilderProps> = ({
                 onChange={(e) => handleConditionTextChange(e.target.value)}
                 disabled={disabled}
                 placeholder={`Enter condition in JSON format, e.g.:\n${getDefaultCondition(type) ? JSON.stringify(getDefaultCondition(type), null, 2) : '{}'}`}
-                className="w-full h-32 px-3 py-2 border border-border rounded-lg bg-background text-content font-mono text-sm placeholder-tertiary focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed resize-none"
+                className="w-full h-32 px-3 py-2 border border-muted rounded-lg bg-background text-content font-mono text-sm placeholder-tertiary focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed resize-none"
               />
             </div>
           )}

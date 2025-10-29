@@ -4,6 +4,7 @@
 
 import { useOptimistic, useCallback, useRef, useEffect } from 'react';
 import { useEventBusCore } from '../contexts/EventBusCoreContext';
+import type { RedisChannel } from '@ems/types';
 
 interface OptimisticOptions<T> {
   // Unique identifier for this optimistic update
@@ -11,9 +12,9 @@ interface OptimisticOptions<T> {
   // Timeout in ms before considering the update failed
   timeout?: number;
   // Event channel to listen for success confirmation
-  successEvent?: string;
+  successEvent?: RedisChannel;
   // Event channel to listen for failure
-  failureEvent?: string;
+  failureEvent?: RedisChannel;
   // Whether to automatically rollback on timeout
   autoRollback?: boolean;
   // Custom rollback handler
@@ -22,44 +23,25 @@ interface OptimisticOptions<T> {
   onSuccess?: (finalValue: T) => void;
 }
 
-interface OptimisticState<T> {
-  value: T;
-  isPending: boolean;
-  error?: Error;
-}
-
 /**
  * Enhanced optimistic update hook for React 19
  * Provides instant UI updates with automatic rollback on failure
  */
 export function useOptimisticUpdate<T>(initialValue: T, options: OptimisticOptions<T> = {}) {
-  const {
-    timeout = 5000,
-    successEvent,
-    failureEvent,
-    autoRollback = true,
-    onRollback,
-    onSuccess,
-  } = options;
+  const { successEvent, failureEvent, onRollback, onSuccess } = options;
 
   const { subscribe } = useEventBusCore();
-  const timeoutRef = useRef<NodeJS.Timeout>();
-  const updateIdRef = useRef<string>();
+  const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+  const updateIdRef = useRef<string | undefined>(undefined);
 
   // Use React 19's useOptimistic hook
-  const [optimisticValue, setOptimisticValue] = useOptimistic(
-    initialValue,
-    (currentValue: T, optimisticValue: T) => optimisticValue,
-  );
+  const [optimisticValue, setOptimisticValue] = useOptimistic(initialValue);
 
   // Track pending state
-  const [isPending, setIsPending] = useOptimistic(
-    false,
-    (_current: boolean, pending: boolean) => pending,
-  );
+  const [isPending, setIsPending] = useOptimistic(false);
 
   // Track error state
-  const [error, setError] = useOptimistic<Error | undefined>(undefined, (_current, error) => error);
+  const [error, setError] = useOptimistic<Error | undefined>(undefined);
 
   /**
    * Perform an optimistic update

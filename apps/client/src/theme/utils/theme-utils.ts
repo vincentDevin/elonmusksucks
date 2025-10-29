@@ -13,6 +13,16 @@ export const applyThemeToDocument = (theme: UnifiedTheme): void => {
     root.style.setProperty(`--theme-${key}`, value); // For compatibility
   });
 
+  // Calculate and apply foreground colors for semantic colors
+  const semanticColors = ['primary', 'secondary', 'accent', 'success', 'error', 'warning', 'info'];
+  semanticColors.forEach((colorKey) => {
+    const backgroundColor = theme.colors[colorKey as keyof typeof theme.colors];
+    if (backgroundColor) {
+      const foregroundColor = getContrastColor(backgroundColor);
+      root.style.setProperty(`--color-${colorKey}-foreground`, foregroundColor);
+    }
+  });
+
   // Apply theme class for CSS-based styling
   document.body.className = document.body.className.replace(/theme-\w+/g, '');
   document.body.classList.add(`theme-${theme.id}`);

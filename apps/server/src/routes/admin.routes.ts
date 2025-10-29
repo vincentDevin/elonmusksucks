@@ -3,7 +3,9 @@ import { Router } from 'express';
 import { requireAuth, requireAdmin } from '../middleware/auth.middleware';
 import * as adminController from '../controllers/admin.controller';
 import feedsRoutes from './feeds.routes';
+import unifiedContentRoutes from './unified-content.routes';
 import { AdminActions } from '@ems/types';
+import { uploadConfig, validateFileContent } from '../middleware/fileValidation.middleware';
 
 const router = Router();
 
@@ -29,6 +31,25 @@ router.patch('/users/:id/role', adminController.updateUserRole);
 router.patch('/users/:id/activate', adminController.activateUser);
 router.patch('/users/:id/balance', adminController.updateUserBalance);
 
+// — Admin Avatar Management —
+router.post(
+  '/users/:userId/profile-picture',
+  uploadConfig.single('image'),
+  validateFileContent,
+  adminController.uploadUserProfileImage,
+);
+router.delete('/users/:userId/profile-picture', adminController.deleteUserProfileImage);
+
+// — Site Default Avatar Management —
+router.get('/settings/default-avatar', adminController.getDefaultAvatar);
+router.post(
+  '/settings/default-avatar',
+  uploadConfig.single('image'),
+  validateFileContent,
+  adminController.uploadDefaultAvatar,
+);
+router.delete('/settings/default-avatar', adminController.deleteDefaultAvatar);
+
 // — Enhanced Prediction Management —
 router.get('/predictions', adminController.getPredictions); // Legacy endpoint
 router.get('/predictions/search', adminController.searchPredictions); // New enhanced search
@@ -45,6 +66,7 @@ router.patch(
 // — Enhanced Financial Operations Dashboard —
 router.get('/financial/search', adminController.searchFinancialData);
 router.get('/financial/analytics', adminController.getFinancialAnalytics);
+router.get('/financial/unified-analytics', adminController.getUnifiedAnalytics); // NEW: Unified analytics endpoint
 router.post('/financial/bulk', adminController.bulkFinancialOperation);
 router.get('/financial/export', adminController.exportFinancialData);
 
@@ -104,15 +126,15 @@ router.patch('/users/:id/badges', adminController.assignBadge);
 router.delete('/users/:id/badges/:badgeId', adminController.revokeBadge);
 
 // — Leaderboard & Stats —
-router.post('/leaderboard/refresh', adminController.refreshLeaderboard);
 router.get('/stats/:userId', adminController.getUserStats);
-
-// — Miscellaneous —
-router.post('/aitweet', adminController.triggerAITweet);
 
 // — RSS Feeds Management —
 // Mount the feeds routes under /feeds (so they become /api/admin/feeds/*)
 router.use('/feeds', feedsRoutes);
+
+// — Unified Content Management —
+// Mount the unified content routes under /unified-content (so they become /api/admin/unified-content/*)
+router.use('/unified-content', unifiedContentRoutes);
 
 // RBAC Audit Note: All routes currently require ADMIN role via requireAdmin middleware
 // Future enhancement: Implement granular permissions per action type

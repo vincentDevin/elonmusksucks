@@ -32,6 +32,15 @@ export interface UnifiedTheme {
     info: string;
   };
 
+  // Prediction option colors
+  predictionOptions: {
+    // Core palette - 8 distinct colors that don't conflict with semantic UI colors
+    palette: string[];
+    // Type-specific overrides
+    binary: [string, string]; // [yes/true, no/false]
+    overUnder: [string, string]; // [over, under]
+  };
+
   // Visual effects
   effects: {
     animations: boolean;

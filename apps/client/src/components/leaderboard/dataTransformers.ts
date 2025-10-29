@@ -1,4 +1,5 @@
 // Data transformers to convert different entry types to unified format
+import { formatMuskBucks } from '../../utils/formatting';
 import type { PublicLeaderboardEntry, PongLeaderboardView } from '@ems/types';
 import type { ShameWallEntry } from '../../api/shameWall';
 import type { UnifiedLeaderboardEntry, LeaderboardHeaderStats } from './types';
@@ -18,11 +19,11 @@ export function transformBettingEntry(
   return {
     id: entry.userId,
     userName: entry.userName,
-    avatarUrl: entry.avatarUrl,
+    avatarUrl: entry.avatarUrl ?? undefined,
     variant: 'betting',
     primaryStat: {
       label: 'Balance',
-      value: `${entry.balance} 🪙`,
+      value: `${formatMuskBucks(entry.balance)} 🪙`,
       highlight: asNum(entry.balance) > 10000,
       color: asNum(entry.balance) > 10000 ? 'text-primary' : undefined,
     },
@@ -41,7 +42,7 @@ export function transformBettingEntry(
       },
       {
         label: period === 'all-time' ? 'Total Profit' : 'Daily Profit',
-        value: `${profit} 🏦`,
+        value: `${formatMuskBucks(profit)} 🏦`,
         highlight: profit > (period === 'all-time' ? 1000 : 100),
         color: profit > 0 ? 'text-green-400' : 'text-red-400',
       },
@@ -58,15 +59,27 @@ export function transformBettingEntry(
         color: entry.currentStreak >= 5 ? 'text-orange-400' : undefined,
       },
     ],
-    badges:
-      entry.currentStreak >= 5
-        ? [
-            {
-              text: `🔥 ${entry.currentStreak} streak`,
-              color: 'bg-orange-500/20 text-orange-400',
-            },
-          ]
-        : undefined,
+    badges: (() => {
+      const badges = [];
+
+      // Add BOT badge for AI players (negative userId)
+      if (entry.userId < 0) {
+        badges.push({
+          text: '🤖 BOT',
+          color: 'bg-info/20 text-info dark:bg-info/30',
+        });
+      }
+
+      // Add streak badge for high performers
+      if (entry.currentStreak >= 5) {
+        badges.push({
+          text: `🔥 ${entry.currentStreak} streak`,
+          color: 'bg-warning/20 text-warning dark:bg-warning/30',
+        });
+      }
+
+      return badges.length > 0 ? badges : undefined;
+    })(),
     rawData: entry,
   };
 }
@@ -105,14 +118,14 @@ export function transformPongEntry(
     case 'totalWon':
       primaryStat = {
         label: 'Earnings',
-        value: `${(asNum(entry.totalWon) / 1000).toFixed(1)}k`,
+        value: formatMuskBucks(entry.totalWon),
         highlight: asNum(entry.totalWon) > 10000,
       };
       break;
     case 'totalWagered':
       primaryStat = {
         label: 'Volume',
-        value: `${(asNum(entry.totalWagered) / 1000).toFixed(1)}k`,
+        value: formatMuskBucks(entry.totalWagered ?? 0),
         highlight: asNum(entry.totalWagered) > 50000,
       };
       break;
@@ -132,57 +145,87 @@ export function transformPongEntry(
 
   // Generate badges
   const badges = [];
+
+  // Add BOT badge for AI players (negative userId)
+  if (entry.userId < 0) {
+    badges.push({
+      text: '🤖 BOT',
+      color: 'bg-info/20 text-info dark:bg-info/30',
+    });
+  }
+
   if (entry.tier) {
     const tierColors = {
-      GRANDMASTER: 'bg-purple-100 text-purple-800',
-      MASTER: 'bg-red-100 text-red-800',
-      DIAMOND: 'bg-blue-100 text-blue-800',
-      PLATINUM: 'bg-green-100 text-green-800',
-      GOLD: 'bg-yellow-100 text-yellow-800',
-      SILVER: 'bg-gray-100 text-gray-800',
-      BRONZE: 'bg-orange-100 text-orange-800',
+      GRANDMASTER: 'bg-primary/20 text-primary dark:bg-primary/30',
+      MASTER: 'bg-error/20 text-error dark:bg-error/30',
+      DIAMOND: 'bg-info/20 text-info dark:bg-info/30',
+      PLATINUM: 'bg-success/20 text-success dark:bg-success/30',
+      GOLD: 'bg-warning/20 text-warning dark:bg-warning/30',
+      SILVER: 'bg-muted/50 text-tertiary dark:bg-muted/70',
+      BRONZE: 'bg-warning/15 text-warning dark:bg-warning/25',
     };
     badges.push({
       text: entry.tier,
-      color: tierColors[entry.tier] || 'bg-gray-100 text-gray-800',
+      color: tierColors[entry.tier as keyof typeof tierColors] || 'bg-muted/50 text-tertiary',
     });
   }
 
   if (entry.riskTaker) {
     badges.push({
       text: '🎲 High Roller',
-      color: 'bg-red-100 text-red-600',
+      color: 'bg-error/20 text-error dark:bg-error/30',
     });
   }
+
+  // Build secondary stats array, avoiding duplication with primary stat
+  const allSecondaryStats = [
+    {
+      label: 'Elo Rating',
+      value: entry.eloRating?.toString() || '1200',
+      color: 'text-primary',
+    },
+    {
+      label: 'Wins',
+      value: entry.wins?.toString() || '0',
+      color: 'text-green-400',
+    },
+    {
+      label: 'Win Rate',
+      value: `${entry.winRate?.toFixed(1) || '0.0'}%`,
+      color: 'text-blue-400',
+    },
+    {
+      label: 'Earnings',
+      value: formatMuskBucks(entry.totalWon),
+      color: 'text-accent',
+    },
+    {
+      label: 'Win Streak',
+      value: entry.winStreak?.toString() || '0',
+      color: 'text-orange-400',
+    },
+    {
+      label: 'Perfect Games',
+      value: entry.perfectGames?.toString() || '0',
+      color: 'text-purple-400',
+    },
+    {
+      label: 'Volume',
+      value: formatMuskBucks(entry.totalWagered || 0),
+      color: 'text-cyan-400',
+    },
+  ];
+
+  // Filter out the primary stat from secondary stats to avoid duplication
+  const secondaryStats = allSecondaryStats.filter((stat) => stat.label !== primaryStat.label);
 
   return {
     id: entry.userId,
     userName: entry.userName,
-    avatarUrl: undefined, // PongLeaderboardView doesn't include avatarUrl
+    avatarUrl: entry.avatarUrl ?? undefined,
     variant: 'pong',
     primaryStat,
-    secondaryStats: [
-      {
-        label: 'Elo',
-        value: entry.eloRating?.toString() || '1200',
-        color: 'text-primary',
-      },
-      {
-        label: 'Wins',
-        value: entry.wins?.toString() || '0',
-        color: 'text-green-400',
-      },
-      {
-        label: 'Win Rate',
-        value: `${entry.winRate?.toFixed(1) || '0.0'}%`,
-        color: 'text-blue-400',
-      },
-      {
-        label: 'Earnings',
-        value: `${(asNum(entry.totalWon) / 1000).toFixed(1)}k`,
-        color: 'text-accent',
-      },
-    ],
+    secondaryStats,
     badges,
     rawData: entry,
   };
@@ -193,11 +236,12 @@ export function transformPongEntry(
  */
 export function transformShameEntry(entry: ShameWallEntry): UnifiedLeaderboardEntry {
   const isPermanent = !entry.endDate;
+  const banCount = entry.banCount ?? 1; // Default to 1 if undefined
 
   return {
     id: entry.userId,
     userName: entry.userName,
-    avatarUrl: entry.avatarUrl,
+    avatarUrl: entry.avatarUrl ?? undefined,
     variant: 'shame',
     primaryStat: {
       label: 'Ban Type',
@@ -207,8 +251,8 @@ export function transformShameEntry(entry: ShameWallEntry): UnifiedLeaderboardEn
     secondaryStats: [
       {
         label: 'Ban Count',
-        value: entry.banCount.toString(),
-        highlight: entry.banCount > 1,
+        value: banCount.toString(),
+        highlight: banCount > 1,
       },
       {
         label: 'Banned Since',
@@ -231,13 +275,15 @@ export function transformShameEntry(entry: ShameWallEntry): UnifiedLeaderboardEn
     badges: [
       {
         text: isPermanent ? 'Permanent Ban' : 'Temporary Ban',
-        color: isPermanent ? 'bg-red-100 text-red-800' : 'bg-orange-100 text-orange-800',
+        color: isPermanent
+          ? 'bg-error/20 text-error dark:bg-error/30'
+          : 'bg-warning/20 text-warning dark:bg-warning/30',
       },
-      ...(entry.banCount > 1
+      ...(banCount > 1
         ? [
             {
-              text: `${entry.banCount} bans`,
-              color: 'bg-gray-100 text-gray-600',
+              text: `${banCount} bans`,
+              color: 'bg-muted/50 text-tertiary dark:bg-muted/70',
             },
           ]
         : []),
@@ -249,7 +295,7 @@ export function transformShameEntry(entry: ShameWallEntry): UnifiedLeaderboardEn
 /**
  * Transform stats for leaderboard headers
  */
-export function transformBettingHeaderStats(stats: any, userRank?: any): LeaderboardHeaderStats {
+export function transformBettingHeaderStats(stats: any): LeaderboardHeaderStats {
   return {
     primary: {
       value: stats?.totalUsers?.toLocaleString() || '0',
@@ -265,7 +311,7 @@ export function transformBettingHeaderStats(stats: any, userRank?: any): Leaderb
         label: 'Total Bets',
       },
       {
-        value: stats?.totalVolume?.toLocaleString() || '0',
+        value: formatMuskBucks(stats?.totalVolume || 0),
         label: 'Total Volume',
       },
       ...(stats?.lastRefresh

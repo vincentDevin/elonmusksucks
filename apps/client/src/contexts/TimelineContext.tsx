@@ -1,13 +1,19 @@
 // apps/client/src/contexts/TimelineContext.tsx
 // Rollback: Remove AbortController integration and revert to original fetch calls
 // Rollback: Remove sessionStorage caching and restore direct API fetching
-import React, { createContext, useContext, useReducer, useEffect, useRef } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useReducer,
+  useEffect,
+  useRef,
+  useMemo,
+  startTransition,
+} from 'react';
 import type { TimelineItem, TimelineResponse } from '@ems/types';
 import { useSocket } from './SocketContext';
 import { useEventBusCore } from './EventBusCoreContext';
-import { REDIS_CHANNELS } from '../types/events';
-import { sessionCache } from '../lib/sessionCache';
-
+import { REDIS_CHANNELS } from '@ems/types';
 // State interface
 interface TimelineState {
   // Articles
@@ -181,16 +187,6 @@ export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const socket = useSocket();
   const { subscribe } = useEventBusCore();
 
-  // Cache keys for timeline data
-  const getCacheKey = (type: 'articles' | 'tweets', filters: any) => {
-    const filterStr = JSON.stringify({
-      tags: filters.tags?.sort() || [],
-      sort: filters.sort || 'newest',
-      search: filters.search || '',
-    });
-    return `timeline_${type}_${filterStr}`;
-  };
-
   // AbortController refs for cancelling requests
   const articlesAbortController = useRef<AbortController | null>(null);
   const tweetsAbortController = useRef<AbortController | null>(null);
@@ -198,20 +194,6 @@ export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   // Actions
   const loadArticles = async (reset = false) => {
     if (state.articlesLoading) return;
-
-    // Try to load from cache first (only on reset/initial load)
-    if (reset) {
-      const cacheKey = getCacheKey('articles', state.filters);
-      const cachedData = sessionCache.get<{
-        items: TimelineItem[];
-        cursor?: string;
-        hasMore: boolean;
-      }>(cacheKey);
-      if (cachedData) {
-        dispatch({ type: 'LOAD_ARTICLES_SUCCESS', payload: { ...cachedData, reset: true } });
-        return;
-      }
-    }
 
     // Abort any pending articles request
     if (articlesAbortController.current) {
@@ -245,24 +227,17 @@ export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
       const data: TimelineResponse = await response.json();
 
-      // Cache the successful response (only for reset loads)
-      if (reset) {
-        const cacheKey = getCacheKey('articles', state.filters);
-        sessionCache.set(
-          cacheKey,
-          { items: data.items, cursor: data.pagination.cursor, hasMore: data.pagination.hasMore },
-          300000,
-        );
-      }
-
-      dispatch({
-        type: 'LOAD_ARTICLES_SUCCESS',
-        payload: {
-          items: data.items,
-          cursor: data.pagination.cursor,
-          hasMore: data.pagination.hasMore,
-          reset,
-        },
+      // Use startTransition for non-urgent list updates (React 19 optimization)
+      startTransition(() => {
+        dispatch({
+          type: 'LOAD_ARTICLES_SUCCESS',
+          payload: {
+            items: data.items,
+            cursor: data.pagination.cursor,
+            hasMore: data.pagination.hasMore,
+            reset,
+          },
+        });
       });
     } catch (error) {
       // Don't set error state if request was aborted
@@ -284,20 +259,6 @@ export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const loadTweets = async (reset = false) => {
     if (state.tweetsLoading) return;
-
-    // Try to load from cache first (only on reset/initial load)
-    if (reset) {
-      const cacheKey = getCacheKey('tweets', {});
-      const cachedData = sessionCache.get<{
-        items: TimelineItem[];
-        cursor?: string;
-        hasMore: boolean;
-      }>(cacheKey);
-      if (cachedData) {
-        dispatch({ type: 'LOAD_TWEETS_SUCCESS', payload: { ...cachedData, reset: true } });
-        return;
-      }
-    }
 
     // Abort any pending tweets request
     if (tweetsAbortController.current) {
@@ -327,24 +288,17 @@ export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
       const data: TimelineResponse = await response.json();
 
-      // Cache the successful response (only for reset loads)
-      if (reset) {
-        const cacheKey = getCacheKey('tweets', {});
-        sessionCache.set(
-          cacheKey,
-          { items: data.items, cursor: data.pagination.cursor, hasMore: data.pagination.hasMore },
-          300000,
-        );
-      }
-
-      dispatch({
-        type: 'LOAD_TWEETS_SUCCESS',
-        payload: {
-          items: data.items,
-          cursor: data.pagination.cursor,
-          hasMore: data.pagination.hasMore,
-          reset,
-        },
+      // Use startTransition for non-urgent list updates (React 19 optimization)
+      startTransition(() => {
+        dispatch({
+          type: 'LOAD_TWEETS_SUCCESS',
+          payload: {
+            items: data.items,
+            cursor: data.pagination.cursor,
+            hasMore: data.pagination.hasMore,
+            reset,
+          },
+        });
       });
     } catch (error) {
       // Don't set error state if request was aborted
@@ -376,10 +330,6 @@ export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const updateFilters = (filters: Partial<TimelineState['filters']>) => {
     dispatch({ type: 'UPDATE_FILTERS', payload: filters });
 
-    // Clear cache when filters change
-    const oldCacheKey = getCacheKey('articles', state.filters);
-    sessionCache.delete(oldCacheKey);
-
     // Reload current tab with new filters
     if (state.activeTab === 'articles') {
       loadArticles(true);
@@ -402,10 +352,10 @@ export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     dispatch({ type: 'SET_USE_AS_SOURCE_ITEM', payload: undefined });
   };
 
-  // Initial load
-  useEffect(() => {
-    loadArticles(true);
-  }, []);
+  // Initial load removed - using unified timeline via TimelineWithPosts instead
+  // useEffect(() => {
+  //   loadArticles(true);
+  // }, []);
 
   // Socket.IO integration for real-time updates
   useEffect(() => {
@@ -435,9 +385,11 @@ export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         tags: data.tags || [],
       };
 
-      // Add to timeline if user is viewing articles
+      // Add to timeline if user is viewing articles (use startTransition for non-blocking update)
       if (state.activeTab === 'articles') {
-        dispatch({ type: 'ADD_NEW_ITEM', payload: { item: timelineItem, type: 'articles' } });
+        startTransition(() => {
+          dispatch({ type: 'ADD_NEW_ITEM', payload: { item: timelineItem, type: 'articles' } });
+        });
       }
     };
 
@@ -462,9 +414,11 @@ export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         tags: [],
       };
 
-      // Add to timeline if user is viewing tweets
+      // Add to timeline if user is viewing tweets (use startTransition for non-blocking update)
       if (state.activeTab === 'tweets') {
-        dispatch({ type: 'ADD_NEW_ITEM', payload: { item: timelineItem, type: 'tweets' } });
+        startTransition(() => {
+          dispatch({ type: 'ADD_NEW_ITEM', payload: { item: timelineItem, type: 'tweets' } });
+        });
       }
     };
 
@@ -491,24 +445,35 @@ export const TimelineProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     };
   }, []);
 
-  return (
-    <TimelineContext.Provider
-      value={{
-        state,
-        dispatch,
-        loadArticles,
-        loadTweets,
-        setActiveTab,
-        updateFilters,
-        openArticle,
-        closeArticle,
-        openUseAsSource,
-        closeUseAsSource,
-      }}
-    >
-      {children}
-    </TimelineContext.Provider>
+  // Memoize context value to prevent unnecessary re-renders
+  // Note: Functions are recreated when state changes, which is intentional
+  const contextValue = useMemo(
+    () => ({
+      state,
+      dispatch,
+      loadArticles,
+      loadTweets,
+      setActiveTab,
+      updateFilters,
+      openArticle,
+      closeArticle,
+      openUseAsSource,
+      closeUseAsSource,
+    }),
+    [
+      state,
+      loadArticles,
+      loadTweets,
+      setActiveTab,
+      updateFilters,
+      openArticle,
+      closeArticle,
+      openUseAsSource,
+      closeUseAsSource,
+    ],
   );
+
+  return <TimelineContext.Provider value={contextValue}>{children}</TimelineContext.Provider>;
 };
 
 // Hook

@@ -9,14 +9,8 @@ import type {
   IBettingRepository,
   OptionWithPrediction,
 } from '../repositories/interfaces/IBettingRepository';
-import type {
-  DbBet,
-  DbParlay,
-  BetWithUser,
-  ParlayLegWithUser,
-  IEventBus,
-  IEventCoalescer,
-} from '@ems/types';
+import type { DbBet, DbParlay, ParlayLegWithUser, IEventBus, IEventCoalescer } from '@ems/types';
+import { REDIS_CHANNELS } from '@ems/types';
 import { BettingRepository } from '../repositories/BettingRepository';
 import { eventBus } from '../lib/EventBus';
 import { EventCoalescer } from '../lib/EventCoalescer';
@@ -26,6 +20,7 @@ import { broadcastRealtimeMetrics } from './admin.service';
 import { tracingCollector } from '../lib/tracing';
 import { streakManager } from './StreakManager.service';
 import { financialTracker } from './FinancialTracker.service';
+import { CacheInvalidation } from '../utils/cacheInvalidation';
 
 export class BettingService {
   private userService = new UserService();
@@ -50,32 +45,17 @@ export class BettingService {
   }
 
   /**
-   * Calculate enhanced parlay odds with exciting leg bonuses
+   * Calculate traditional parlay odds (simple multiplication)
    */
-  private calculateEnhancedParlayOdds(individualOdds: number[]): {
+  private calculateParlayOdds(individualOdds: number[]): {
     baseCombinedOdds: number;
-    bonusMultiplier: number;
-    finalOdds: number;
     legCount: number;
   } {
     const legCount = individualOdds.length;
     const baseCombinedOdds = individualOdds.reduce((prod, odds) => prod * odds, 1);
 
-    // Exciting bonus multipliers for more legs!
-    // 2 legs: 15% bonus, 3 legs: 32% bonus, 4 legs: 52% bonus, 5+ legs: 75% bonus
-    let bonusMultiplier = 1;
-    if (legCount >= 2) {
-      bonusMultiplier = Math.pow(1.15, legCount - 1);
-      // Cap the bonus at 2.0x for balance (10+ legs would be wild otherwise)
-      bonusMultiplier = Math.min(bonusMultiplier, 2.0);
-    }
-
-    const finalOdds = baseCombinedOdds * bonusMultiplier;
-
     return {
       baseCombinedOdds,
-      bonusMultiplier,
-      finalOdds,
       legCount,
     };
   }
@@ -109,7 +89,7 @@ export class BettingService {
         const potentialPayout = BigInt(Math.floor(amount * finalOdds));
 
         // 3) Execute all money operations atomically
-        const bet = await this.repo.placeBet(
+        const { bet, balanceChange } = await this.repo.placeBet(
           userId,
           opt.prediction.id,
           optionId,
@@ -126,23 +106,42 @@ export class BettingService {
             ? await this.userService.getCachedProfileImageUrl(user.id, user.profilePictureKey, 3600)
             : user.avatarUrl;
 
-          // Compose bet event payload
-          const betWithUser: BetWithUser = {
+          // Get activity metrics for the prediction
+          const { PredictionService } = require('./predictions.service');
+          const predictionService = new PredictionService();
+          const activityMetrics = await predictionService.getActivityMetrics(opt.prediction.id);
+          const difficulty = await predictionService.calculateDifficulty(opt.prediction.id);
+          const viewStats = await predictionService.getPredictionViewStats(opt.prediction.id);
+
+          // Compose enhanced bet event payload
+          const betWithUser: any = {
             ...bet,
-            amount: bet.amount.toString(),
-            potentialPayout: bet.potentialPayout?.toString() || null,
-            payout: bet.payout?.toString() || null,
             user: {
               id: user.id,
               name: user.name,
               avatarUrl,
+              profilePictureKey: user.profilePictureKey,
             },
             optionLabel: opt.label,
             predictionTitle: opt.prediction.title,
+            // Enhanced with activity metrics
+            activityMetrics,
+            difficulty,
+            viewStats,
           };
 
           // Execute all post-transaction operations in parallel for performance
           await Promise.allSettled([
+            // Emit balance update event for real-time UI updates
+            this.eventBus.publish(REDIS_CHANNELS.BALANCE_UPDATE, {
+              userId,
+              newBalance: Number(balanceChange.new),
+              previousBalance: Number(balanceChange.previous),
+              change: -amount,
+              reason: `Bet wager on prediction ${opt.prediction.id}`,
+              timestamp: new Date().toISOString(),
+            }),
+
             // Publish real‑time event
             this.eventBus.publish('bet:place', betWithUser),
 
@@ -228,6 +227,10 @@ export class BettingService {
 
             // Broadcast real-time metrics
             broadcastRealtimeMetrics(),
+
+            // Issue #3: Invalidate caches after bet placement
+            CacheInvalidation.invalidateUser(userId),
+            CacheInvalidation.invalidatePrediction(opt.prediction.id),
           ]);
         } catch (error) {
           console.error('[betting] Error in post-transaction operations for bet:', bet.id, error);
@@ -255,6 +258,13 @@ export class BettingService {
     const validLegs = detailed.filter((opt): opt is OptionWithPrediction => opt !== null);
     if (validLegs.length !== legs.length) throw new Error('OPTION_NOT_FOUND');
 
+    // Validate all legs have odds > 1.0 (no break-even or losing bets in parlays)
+    for (const opt of validLegs) {
+      if (opt.odds <= 1.0) {
+        throw new Error(`INVALID_ODDS_${opt.id}: Parlay legs must have odds greater than 1.0x`);
+      }
+    }
+
     // Ensure none closed
     for (const opt of validLegs) {
       if (opt.prediction.resolved || opt.prediction.expiresAt < new Date()) {
@@ -265,18 +275,18 @@ export class BettingService {
     const user = await this.repo.findUserById(userId);
     if (!user || Number(user.muskBucks) < amount) throw new Error('INSUFFICIENT_FUNDS');
 
-    // 2) Calculate enhanced odds matching frontend exactly (before transaction)
-    const oddsCalculation = this.calculateEnhancedParlayOdds(validLegs.map((o) => o.odds));
-    const basePayout = Math.floor(amount * oddsCalculation.finalOdds);
+    // 2) Calculate traditional parlay odds (before transaction)
+    const oddsCalculation = this.calculateParlayOdds(validLegs.map((o) => o.odds));
+    const basePayout = Math.floor(amount * oddsCalculation.baseCombinedOdds);
 
-    // 🚀 ALL-IN bonus detection for parlays (matching frontend logic)
+    // 🚀 ALL-IN bonus detection for parlays (50% bonus for betting ≥95% of balance)
     const isAllIn = amount >= Number(user.muskBucks) * 0.95;
     const allInMultiplier = isAllIn ? 1.5 : 1.0; // Extra 50% bonus for all-in parlays
-    const finalPayout = isAllIn ? Math.floor(basePayout * allInMultiplier) : basePayout;
+    const finalPayout = Math.floor(basePayout * allInMultiplier);
     const potentialPayout = BigInt(finalPayout);
 
     // 3) Execute all money operations atomically
-    const parlay = await this.repo.placeParlay(
+    const { parlay, balanceChange } = await this.repo.placeParlay(
       userId,
       validLegs.map((o) => ({
         predictionId: o.prediction.id,
@@ -294,23 +304,49 @@ export class BettingService {
         ? await this.userService.getCachedProfileImageUrl(user.id, user.profilePictureKey, 3600)
         : user.avatarUrl;
 
-      // Prepare leg events payload
-      const legsPayload: ParlayLegWithUser[] = validLegs.map((o) => ({
-        parlayId: parlay.id,
-        user: { id: user.id, name: user.name, avatarUrl },
-        stake: amount.toString(),
-        optionId: o.id,
-        createdAt: parlay.createdAt,
-        predictionId: o.prediction.id,
-        optionLabel: o.label,
-        predictionTitle: o.prediction.title,
-      }));
+      // Get activity metrics for each prediction in the parlay
+      const { PredictionService } = require('./predictions.service');
+      const predictionService = new PredictionService();
+
+      // Prepare enhanced leg events payload with activity metrics
+      const legsPayload: ParlayLegWithUser[] = await Promise.all(
+        validLegs.map(async (o) => {
+          const activityMetrics = await predictionService.getActivityMetrics(o.prediction.id);
+          const difficulty = await predictionService.calculateDifficulty(o.prediction.id);
+          const viewStats = await predictionService.getPredictionViewStats(o.prediction.id);
+
+          return {
+            parlayId: parlay.id,
+            user: { id: user.id, name: user.name, avatarUrl },
+            stake: amount.toString(),
+            optionId: o.id,
+            createdAt: parlay.createdAt,
+            predictionId: o.prediction.id,
+            optionLabel: o.label,
+            predictionTitle: o.prediction.title,
+            // Enhanced with activity metrics
+            activityMetrics,
+            difficulty,
+            viewStats,
+          };
+        }),
+      );
 
       // Get affected predictions for odds recalculation
       const affectedPredictions = Array.from(new Set(validLegs.map((leg) => leg.prediction.id)));
 
       // Execute all post-transaction operations in parallel for performance
       await Promise.allSettled([
+        // Emit balance update event for real-time UI updates
+        this.eventBus.publish(REDIS_CHANNELS.BALANCE_UPDATE, {
+          userId,
+          newBalance: Number(balanceChange.new),
+          previousBalance: Number(balanceChange.previous),
+          change: -amount,
+          reason: `Parlay wager with ${validLegs.length} legs`,
+          timestamp: new Date().toISOString(),
+        }),
+
         // Publish legacy leg events
         ...legsPayload.map((leg) => this.eventBus.publish('parlay:place', leg)),
 
@@ -328,7 +364,7 @@ export class BettingService {
             id: parlay.id,
             amount,
             legCount: oddsCalculation.legCount,
-            combinedOdds: oddsCalculation.finalOdds,
+            combinedOdds: oddsCalculation.baseCombinedOdds,
           },
         ),
 
@@ -342,7 +378,7 @@ export class BettingService {
             parlayId: parlay.id,
             amount, // Amount is already a number here (validated input), not BigInt
             legCount: oddsCalculation.legCount,
-            combinedOdds: oddsCalculation.finalOdds,
+            combinedOdds: oddsCalculation.baseCombinedOdds,
             predictions: validLegs.map((leg) => ({
               id: leg.prediction.id,
               title: leg.prediction.title,
@@ -372,6 +408,11 @@ export class BettingService {
 
         // Broadcast real-time metrics
         broadcastRealtimeMetrics(),
+
+        // Issue #3: Invalidate caches after parlay placement
+        CacheInvalidation.invalidateUser(userId),
+        // Invalidate all predictions in the parlay
+        ...affectedPredictions.map((predId) => CacheInvalidation.invalidatePrediction(predId)),
       ]);
     } catch (error) {
       console.error('[betting] Error in post-transaction operations for parlay:', parlay.id, error);
@@ -402,12 +443,23 @@ export class BettingService {
       return change > 0.1; // 10%+ change is significant
     });
 
-    // 🔥 Broadcast enhanced odds update with excitement data
+    // Get current activity metrics for the prediction
+    const { PredictionService } = require('./predictions.service');
+    const predictionService = new PredictionService();
+    const activityMetrics = await predictionService.getActivityMetrics(predictionId);
+    const difficulty = await predictionService.calculateDifficulty(predictionId);
+    const viewStats = await predictionService.getPredictionViewStats(predictionId);
+
+    // 🔥 Broadcast enhanced odds update with excitement data and activity metrics
     await this.eventBus.publish('odds:update:enhanced', {
       predictionId,
       timestamp: new Date().toISOString(),
       significantChanges: significantChanges.length,
       hotMarket: significantChanges.length >= 2, // Multiple options changed significantly
+      // Enhanced with activity metrics
+      activityMetrics,
+      difficulty,
+      viewStats,
       options: afterOdds.map((option, index) => {
         const before = beforeOdds[index];
         return {

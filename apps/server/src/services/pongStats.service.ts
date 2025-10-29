@@ -13,7 +13,7 @@ const processedStats = new Set<IdempotencyKey>();
  * Returns true if processed, false if duplicate
  */
 export function processPongStats(matchId: string, userId: number, _stats: any): boolean {
-  const idempotencyKey = `${matchId}|${userId}`;
+  const idempotencyKey: IdempotencyKey = `${matchId}|${userId}` as IdempotencyKey;
 
   if (processedStats.has(idempotencyKey)) {
     console.log(`[pong-stats] Duplicate stats submission ignored: ${idempotencyKey}`);
@@ -25,16 +25,25 @@ export function processPongStats(matchId: string, userId: number, _stats: any): 
   return true;
 }
 
-// PongDifficulty now handled via 'any' type in shared interfaces
-import { PongMatchResult, PongStatsUpdate, EloChangeComponents, PongPayoutData } from '@ems/types';
+// Import all required types from @ems/types
+import {
+  PongMatchResult,
+  EloChangeComponents,
+  PongStatsUpdate,
+  PongPayoutJobData,
+  PongStatsData,
+} from '@ems/types';
+import { PongDifficulty } from '@prisma/client';
 import { PongEloService } from './pongElo.service';
 import { PureEloService } from './pureElo.service';
 import { SYSTEM_AI_USER_ID } from '@ems/types';
-import type { PongStatsData } from '../repositories/interfaces/IPongRepository';
 import { pongPayoutQueueService } from './pongPayoutQueue.service';
 import { eventBus } from '../lib/EventBus';
 import { streakManager } from './StreakManager.service';
 import { eventCorrelator } from './EventCorrelator.service';
+import { unifiedActivityService } from './unifiedActivity.service';
+import { UserService } from './user.service';
+import { toBigInt } from '../utils/bigintSerializer';
 
 // Note: Pong service interfaces now imported from @ems/types
 // MatchResult -> PongMatchResult, other interfaces imported directly
@@ -241,8 +250,8 @@ export class PongStatsService {
         loserId: loserId || undefined,
         winnerScore: winnerScore || 5, // Use actual winner score
         loserScore: loserScore || 0, // Use actual loser score
-        wagerAmount: BigInt(wagerAmount),
-        payoutAmount: BigInt(payoutAmount),
+        wagerAmount: toBigInt(wagerAmount),
+        payoutAmount: toBigInt(payoutAmount),
         aiDifficulty: isAIMatch
           ? this.getAIDifficultyFromId(winnerId < 0 ? winnerId : loserId)
           : undefined,
@@ -426,11 +435,20 @@ export class PongStatsService {
 
     // 10. Enqueue payout if there's a human winner and wager amount > 0
     if (winnerId && winnerId > 0 && wagerAmount > 0) {
-      const payoutData: PongPayoutData = {
+      const payoutData: PongPayoutJobData = {
         matchId,
         winnerId,
-        mode: isAIMatch ? 'PVE_AI' : 'PVP',
-        stakeAmount: wagerAmount, // Keep as number for JSON serialization
+        loserId: loserId || null,
+        wager: wagerAmount,
+        payout: payoutAmount.toString(),
+        houseRake: '0', // Calculate in worker
+        vsAI: isAIMatch,
+        aiDifficulty: isAIMatch ? this.getAIDifficultyFromId(aiPlayerId) : undefined,
+        winnerScore: winnerScore || 5,
+        loserScore: loserScore || 0,
+        duration,
+        eloChange: calculations?.winnerEloChange?.totalChange || 0,
+        newElo: calculations?.winnerEloChange?.newRating || 0,
       };
 
       try {
@@ -465,6 +483,31 @@ export class PongStatsService {
           calculations.socketEvents.winnerTierChange.newTier,
           calculations.socketEvents.winnerTierChange.newElo,
         );
+
+        // Add tier promotion to activity feed
+        try {
+          const userService = new UserService();
+          const user = await userService.getPublicSocketUser(
+            calculations.socketEvents.winnerTierChange.userId,
+          );
+          if (user) {
+            await unifiedActivityService.createPongTierPromotionActivity(
+              {
+                id: user.id,
+                name: user.name,
+                avatarUrl: user.avatarUrl || undefined,
+              },
+              {
+                oldTier: calculations.socketEvents.winnerTierChange.oldTier,
+                newTier: calculations.socketEvents.winnerTierChange.newTier,
+                newElo: calculations.socketEvents.winnerTierChange.newElo,
+              },
+            );
+            console.log('[pongStats] ✅ Tier promotion activity created');
+          }
+        } catch (activityError) {
+          console.error('[pongStats] Error creating tier promotion activity:', activityError);
+        }
       }
 
       if (calculations.socketEvents.loserElo) {
@@ -522,6 +565,35 @@ export class PongStatsService {
 
         await eventBus.publish('pong:match:completed', achievementPayload);
         console.log(`[PongStats] Achievement event emitted for winner ${winnerId}`);
+
+        // Check if this is an IMPOSSIBLE AI victory for activity feed
+        const aiDifficulty = isAIMatch
+          ? PongStatsService.getAIDifficultyFromId(loserId)
+          : undefined;
+        if (isAIMatch && aiDifficulty === 'IMPOSSIBLE') {
+          try {
+            const userService = new UserService();
+            const user = await userService.getPublicSocketUser(winnerId);
+            if (user) {
+              await unifiedActivityService.createPongImpossibleVictoryActivity(
+                {
+                  id: user.id,
+                  name: user.name,
+                  avatarUrl: user.avatarUrl || undefined,
+                },
+                {
+                  matchId,
+                  score: `${winnerScore || 5}-${loserScore || 0}`,
+                  wagerAmount,
+                  eloGained: calculations?.winnerEloChange?.totalChange,
+                },
+              );
+              console.log('[pongStats] ✅ IMPOSSIBLE AI victory activity created');
+            }
+          } catch (activityError) {
+            console.error('[pongStats] Error creating IMPOSSIBLE victory activity:', activityError);
+          }
+        }
       } catch (error) {
         console.error(`[PongStats] Failed to emit achievement event for winner:`, error);
       }
@@ -908,7 +980,7 @@ export class PongStatsService {
           ? difficultyRank[newHardestAiBeaten as keyof typeof difficultyRank]
           : 0;
         if (difficultyRank[aiDifficulty as keyof typeof difficultyRank] > currentRank) {
-          newHardestAiBeaten = aiDifficulty;
+          newHardestAiBeaten = aiDifficulty.toUpperCase() as PongDifficulty;
         }
       } else {
         newAiLosses++;

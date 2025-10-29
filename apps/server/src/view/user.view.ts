@@ -113,10 +113,13 @@ export const toUserEnhancedStatsView = (stats: {
   categoryAccuracy: Array<{
     category: string;
     accuracy: number;
+    totalBets?: number;
+    wins?: number;
   }>;
   currentStreak: {
     count: number;
     type: 'win' | 'lose';
+    isActive?: boolean;
   };
   bestCategory: string;
   totalWagered: number;
@@ -139,42 +142,31 @@ export const toUserEnhancedStatsView = (stats: {
   };
 }): UserEnhancedStatsView => ({
   totalBets: stats.totalBets,
-  totalWon: Math.round(stats.totalBets * stats.winRate), // Calculate from available data
-  totalAmount: stats.totalWagered.toString(),
-  totalPayout: (stats.totalWagered + stats.profitLoss).toString(),
   winRate: stats.winRate,
-  accuracy: {
-    overall: stats.winRate,
-    categories: stats.categoryAccuracy.reduce(
-      (acc, cat) => {
-        acc[cat.category] = cat.accuracy;
-        return acc;
-      },
-      {} as Record<string, number>,
-    ),
+  profitLoss: stats.profitLoss,
+  categoryAccuracy: stats.categoryAccuracy.map((cat) => ({
+    category: cat.category,
+    accuracy: cat.accuracy,
+    totalBets: cat.totalBets || 0,
+    wins: cat.wins || Math.round((cat.totalBets || 0) * cat.accuracy),
+  })),
+  currentStreak: {
+    type: stats.currentStreak.type,
+    count: stats.currentStreak.count,
+    isActive: stats.currentStreak.isActive ?? true,
   },
-  streak: {
-    current: stats.currentStreak.count,
-    type: stats.currentStreak.type === 'lose' ? 'loss' : stats.currentStreak.type,
-    best: stats.currentStreak.count, // Use current as best for now
-  },
-  trends: {
-    winRate: {
-      current: stats.winRate,
-      change: 0, // Would need historical data
-      period: '30d',
-    },
-    volume: {
-      current: stats.totalWagered,
-      change: 0, // Would need historical data
-      period: '30d',
-    },
-  },
+  bestCategory: stats.bestCategory,
+  totalWagered: stats.totalWagered,
+  avgBetSize: stats.avgBetSize,
   ranking: {
-    overall: stats.ranking.allTime.rank || 0,
-    percentile: stats.ranking.allTime.percentile,
-    tier: 'bronze', // Default tier since UserRanking doesn't have tier
+    allTime: stats.ranking.allTime,
+    daily: stats.ranking.daily,
   },
+  achievementProgress: [], // Empty array - would need to be populated from achievements service
+  achievementCompletionRate: 0, // Default - would need to be calculated
+  weeklyVolume: [], // Empty array - would need historical data
+  monthlyProfitLoss: [], // Empty array - would need historical data
+  categoryStats: [], // Empty array - would need to be populated
 });
 
 /**

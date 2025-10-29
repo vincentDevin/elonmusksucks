@@ -19,6 +19,7 @@ import {
 } from 'react';
 import {
   getPredictions,
+  getPredictionById,
   createPrediction as createPredictionApi,
   type PredictionView,
   type CreatePredictionPayload,
@@ -31,6 +32,7 @@ import type {
   PredictionCreatedPayload,
   PredictionResolvedPayload,
   BetPlacedPayload,
+  ParlayPlacedPayload,
 } from '@ems/types';
 
 // Extended option type with client-side properties
@@ -39,6 +41,24 @@ type ExtendedOption = PublicPredictionOption & {
   totalBets?: number;
 };
 import { useAuth } from './AuthContext';
+
+// ---- Source data type for modal ----
+export interface PredictionSourceData {
+  type: 'article' | 'tweet';
+  id: string;
+  title: string;
+  url: string;
+  publisher: string;
+}
+
+// ---- Filters type ----
+export interface PredictionFilters {
+  search: string;
+  categoryId?: number;
+  timeRemaining?: '1h' | '1d' | '1w';
+  activity?: 'high' | 'medium' | 'low';
+  status: 'all' | 'open' | 'pending' | 'expired' | 'resolved';
+}
 
 // ---- Context shape ----
 interface Ctx {
@@ -53,6 +73,29 @@ interface Ctx {
   placeParlay: (payload: { legs: { optionId: number }[]; amount: number }) => Promise<void>;
   latestBet: BetWithUser | null;
   latestParlay: ParlayLegWithUser | null;
+
+  /* Pagination */
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    hasMore: boolean;
+    totalPages: number;
+  };
+  goToPage: (page: number) => Promise<void>;
+  nextPage: () => Promise<void>;
+  prevPage: () => Promise<void>;
+
+  /* Filters */
+  filters: PredictionFilters;
+  updateFilters: (newFilters: Partial<PredictionFilters>) => void;
+  clearFilters: () => void;
+
+  /* Create Modal State */
+  createModalOpen: boolean;
+  createModalSourceData: PredictionSourceData | null;
+  openCreateModal: (sourceData?: PredictionSourceData) => void;
+  closeCreateModal: () => void;
 }
 
 const PredictionCtx = createContext<Ctx | undefined>(undefined);
@@ -107,16 +150,18 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
           }));
         case 'placeParlay':
           // Optimistically update all prediction legs with parlay data
+          // Note: PredictionView doesn't have parlayLegs, this is client-side UI state only
           const { parlay } = action.payload;
           return current.map((pred) => {
-            const hasLegInPrediction = parlay.legs.some((leg: any) =>
+            const hasLegInPrediction = parlay.legs.some((leg: { optionId: number }) =>
               pred.options?.some((opt) => opt.id === leg.optionId),
             );
             if (hasLegInPrediction) {
               return {
                 ...pred,
-                parlayLegs: [...(pred.parlayLegs ?? []), parlay],
-              };
+                // Adding parlayLegs as client-side extension
+                parlayLegs: [...((pred as any).parlayLegs ?? []), parlay],
+              } as any;
             }
             return pred;
           });
@@ -124,7 +169,7 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
           // Remove optimistic parlay legs on error
           return current.map((pred) => ({
             ...pred,
-            parlayLegs: pred.parlayLegs?.filter((leg) => !(leg as any).isOptimistic) ?? [],
+            parlayLegs: (pred as any).parlayLegs?.filter((leg: any) => !leg.isOptimistic) ?? [],
           }));
         case 'createPrediction':
           // Add optimistic prediction to the beginning of the list
@@ -142,75 +187,181 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
-  const [latestBet, setLatestBet] = useState<BetWithUser | null>(null);
+  const [latestBet] = useState<BetWithUser | null>(null);
   const [latestParlay, setLatestParlay] = useState<ParlayLegWithUser | null>(null);
 
-  // ── Initial fetch ─────────────────────────────────────────────────────────
-  const fetchAll = useCallback(async () => {
-    console.log('[PredictionContext] Starting predictions fetch...');
-    setLoading(true);
-    setError(null);
+  // ── Pagination State ──────────────────────────────────────────────────────
+  const [page, setPage] = useState(1);
+  const [limit] = useState(15);
+  const [total, setTotal] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
 
-    // Add timeout to prevent infinite loading
-    const timeoutId = setTimeout(() => {
-      console.warn('[PredictionContext] Fetch timeout after 10s, using empty predictions');
-      setBasePredictions([]);
-      setLoading(false);
-      setError(new Error('Request timeout - predictions may be temporarily unavailable'));
-    }, 10000);
+  // Calculate total pages
+  const totalPages = Math.ceil(total / limit);
 
-    try {
-      const data = await getPredictions();
-      clearTimeout(timeoutId);
-      console.log('[PredictionContext] Fetched predictions:', data?.length || 0);
-      setBasePredictions(data || []);
-      setError(null);
-    } catch (err: any) {
-      clearTimeout(timeoutId);
-      console.error('[PredictionContext] Failed to fetch predictions:', err);
-      setError(err);
-      setBasePredictions([]); // Set empty array on error to prevent infinite loading
-    } finally {
-      setLoading(false);
-    }
+  // ── Filters State ─────────────────────────────────────────────────────────
+  const [filters, setFilters] = useState<PredictionFilters>({
+    search: '',
+    categoryId: undefined,
+    timeRemaining: undefined,
+    activity: undefined,
+    status: 'open',
+  });
+
+  // ── Create Modal State ────────────────────────────────────────────────────
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [createModalSourceData, setCreateModalSourceData] = useState<PredictionSourceData | null>(
+    null,
+  );
+
+  const openCreateModal = useCallback((sourceData?: PredictionSourceData) => {
+    setCreateModalSourceData(sourceData || null);
+    setCreateModalOpen(true);
   }, []);
 
+  const closeCreateModal = useCallback(() => {
+    setCreateModalOpen(false);
+    setCreateModalSourceData(null);
+  }, []);
+
+  // ── Fetch deduplication ───────────────────────────────────────────────────
+  const fetchInProgressRef = useRef(false);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // ── Initial fetch ─────────────────────────────────────────────────────────
+  const fetchAll = useCallback(
+    async (options?: { debounce?: boolean; targetPage?: number }) => {
+      // Debounce if requested (for rapid socket events)
+      if (options?.debounce) {
+        if (debounceTimerRef.current) {
+          clearTimeout(debounceTimerRef.current);
+        }
+        return new Promise<void>((resolve) => {
+          debounceTimerRef.current = setTimeout(async () => {
+            await fetchAll({ debounce: false, targetPage: options.targetPage });
+            resolve();
+          }, 300);
+        });
+      }
+
+      // Prevent duplicate fetches
+      if (fetchInProgressRef.current) {
+        console.log('[PredictionContext] Fetch already in progress, skipping duplicate call');
+        return;
+      }
+
+      // Mark fetch as in progress
+      fetchInProgressRef.current = true;
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        // Use targetPage if provided, otherwise use current page state
+        const fetchPage = options?.targetPage ?? page;
+        const offset = (fetchPage - 1) * limit;
+
+        console.log(
+          `[PredictionContext] Fetching predictions: page=${fetchPage}, limit=${limit}, offset=${offset}, filters=`,
+          filters,
+        );
+
+        // Fetch predictions with all filters and pagination
+        const response = await getPredictions({
+          status: filters.status,
+          limit,
+          offset,
+          search: filters.search || undefined,
+          categoryId: filters.categoryId,
+          timeRemaining: filters.timeRemaining,
+          activity: filters.activity,
+        });
+
+        setBasePredictions(response.predictions || []);
+        setTotal(response.pagination.total);
+        setHasMore(response.pagination.hasMore);
+        setError(null);
+      } catch (err: any) {
+        console.error('[PredictionContext] Failed to fetch predictions:', err);
+        setError(err);
+        // Keep existing predictions on error
+      } finally {
+        setLoading(false);
+        fetchInProgressRef.current = false;
+      }
+    },
+    [page, limit, filters],
+  );
+
+  // Initial fetch on mount ONLY (not when fetchAll changes)
+  // We explicitly call fetchAll in navigation functions (goToPage, etc.)
+  // so we don't want this effect to re-run when fetchAll callback changes
   useEffect(() => {
     fetchAll();
-  }, [fetchAll]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty deps = only run on mount
+
+  // Cleanup on unmount: clear timers
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
+
+  // ── Refresh specific prediction ──────────────────────────────────────────
+  const refreshPrediction = useCallback(async (predictionId: number) => {
+    try {
+      const updatedPrediction = await getPredictionById(predictionId);
+
+      // Update the specific prediction in state
+      setBasePredictions((prev) =>
+        prev.map((p) => (p.id === predictionId ? updatedPrediction : p)),
+      );
+    } catch (err) {
+      console.error('[PredictionContext] Failed to refresh prediction:', predictionId, err);
+      // Don't throw - this is a non-critical enhancement
+    }
+  }, []);
 
   // ── Live EventBusCore updates ─────────────────────────────────────────────
   useEffect(() => {
     const unsubscribers = [
       // Prediction created events
       subscribe(REDIS_CHANNELS.PREDICTION_CREATED, (p: PredictionCreatedPayload) => {
-        // Convert payload to PredictionView format (might need server updates)
-        setBasePredictions((prev) => [p as any, ...prev]);
+        // Debounced refresh to get full prediction data from server
+        // This is necessary because we need the full prediction object with all relationships
+        fetchAll({ debounce: true });
       }),
 
       // Prediction resolved events
       subscribe(REDIS_CHANNELS.PREDICTION_RESOLVE, (p: PredictionResolvedPayload) => {
-        // Convert payload to PredictionView format (might need server updates)
         setBasePredictions((prev) =>
-          prev.map((x) => (x.id === p.predictionId ? ({ ...x, ...p } as any) : x)),
+          prev.map((x) =>
+            x.id === p.predictionId
+              ? {
+                  ...x,
+                  resolvedAt: p.resolvedAt,
+                  winningOptionId: p.winningOptionId,
+                }
+              : x,
+          ),
         );
       }),
 
-      // Bet placed events
+      // Bet placed events - NO REFETCH, optimistic updates handle this
       subscribe(REDIS_CHANNELS.BET_PLACED, (betPayload: BetPlacedPayload) => {
-        // Note: BetPlacedPayload doesn't match BetWithUser structure
-        // Need server updates to provide proper payload structure
-        console.log('🎯 Bet placed event received:', betPayload);
-        // For now, refresh predictions to get updated data
-        fetchAll();
+        // Optimistic updates already handle bet placement via useOptimistic
+        // No need to refetch all predictions for a single bet
+        // The ODDS_UPDATE_ENHANCED event will handle odds changes if needed
       }),
 
-      // Parlay placed events
-      subscribe(REDIS_CHANNELS.PARLAY_PLACED, (parlayPayload: any) => {
-        // Note: Need proper payload type definition
-        console.log('🎯 Parlay placed event received:', parlayPayload);
-        // For now, refresh predictions to get updated data
-        fetchAll();
+      // Parlay placed events - NO REFETCH, optimistic updates handle this
+      subscribe(REDIS_CHANNELS.PARLAY_PLACED, (parlayPayload: ParlayPlacedPayload) => {
+        // Optimistic updates already handle parlay placement via useOptimistic
+        // No need to refetch all predictions for a single parlay
+        // The ODDS_UPDATE_ENHANCED event will handle odds changes if needed
       }),
 
       // Enhanced odds updates
@@ -227,8 +378,6 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
             changePercent: number;
           }>;
         }) => {
-          console.log('🎯 Enhanced odds updated for prediction:', data.predictionId, data);
-
           // Update the specific prediction with new odds and market status
           setBasePredictions((prev) =>
             prev.map((p) => {
@@ -254,17 +403,18 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
   // ── Create prediction via REST (admin tool) ───────────────────────────────
   const createPrediction = useCallback(
     async (input: CreatePredictionPayload) => {
-      console.log('[PredictionContext] Creating prediction:', input);
       setLoading(true);
 
       // Create optimistic prediction for immediate UI feedback
       const optimisticPredictionId = Math.floor(Date.now() / 1000); // Temporary ID
 
       // Determine final options based on type (matching server logic)
+      // Note: CreatePredictionPayload.type could be lowercase or uppercase
       let finalOptions: Array<{ label: string }> = [];
-      if (input.type === 'binary') {
+      const typeUpper = (input.type as string).toUpperCase();
+      if (typeUpper === 'BINARY') {
         finalOptions = [{ label: 'Yes' }, { label: 'No' }];
-      } else if (input.type === 'over_under') {
+      } else if (typeUpper === 'OVER_UNDER') {
         if (input.threshold != null) {
           finalOptions = [
             { label: `Over ${input.threshold}` },
@@ -272,41 +422,37 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
           ];
         }
       } else {
-        // For 'multiple' type, use provided options
+        // For 'MULTIPLE' type, use provided options
         finalOptions = input.options || [];
       }
-
-      console.log('[PredictionContext] Final options for prediction:', finalOptions);
 
       const optimisticPrediction: PredictionView = {
         id: optimisticPredictionId,
         title: input.title,
         description: input.description,
-        category: input.category,
-        type: input.type,
+        categoryId: (input as any).categoryId || null,
+        categoryName: (input as any).category,
+        status: 'pending',
+        type: input.type as string,
         threshold: input.threshold,
-        expiresAt: input.expiresAt,
-        resolved: false,
-        approved: false,
+        expiresAt:
+          typeof input.expiresAt === 'string'
+            ? input.expiresAt
+            : new Date(input.expiresAt).toISOString(),
         resolvedAt: null,
+        creatorUserId: 0, // Will be set by server
         winningOptionId: null,
-        viewCount: 0,
-        firstCorrectBetUserId: null,
-        resolvedWithinHour: null,
-        createdAt: new Date(),
-        creatorId: 0, // Will be set by server
+        createdAt: new Date().toISOString(),
         options: finalOptions.map((opt, index) => ({
           id: optimisticPredictionId * 10 + index, // Temporary ID
           label: opt.label,
           odds: 2.0, // Default odds
           predictionId: optimisticPredictionId,
-          createdAt: new Date(),
         })),
         bets: [],
-        parlayLegs: [],
         sourceLinks: [],
         isOptimistic: true, // Mark as optimistic for potential rollback
-      };
+      } as any;
 
       // Apply optimistic update within startTransition
       startTransition(() => {
@@ -320,7 +466,8 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
 
       try {
         await createPredictionApi(input);
-        await fetchAll(); // This will replace optimistic prediction with real data
+        // Use non-debounced fetch for immediate feedback on user action
+        await fetchAll({ debounce: false }); // This will replace optimistic prediction with real data
       } catch (err: any) {
         setError(err);
         // Revert optimistic prediction on error
@@ -342,7 +489,10 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
   // ── Bet/parlay helpers via socketRequest ──────────────────────────────────
   const placeBet = useCallback(
     async (payload: { optionId: number; amount: number }) => {
-      console.log('PredictionContext placeBet called', payload);
+      // Find the predictionId for this option so we can refresh it after bet placement
+      const predictionId = basePredictions
+        .flatMap((p) => p.options?.map((opt) => ({ predictionId: p.id, optionId: opt.id })) || [])
+        .find((mapping) => mapping.optionId === payload.optionId)?.predictionId;
 
       // Create optimistic bet for immediate UI feedback using React 19 useOptimistic
       const optimisticBetId = `optimistic_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -368,11 +518,9 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
 
       try {
         const result = await socketRequest(REDIS_CHANNELS.BET_PLACE, payload);
-        console.log('PredictionContext placeBet success', result);
 
         // Replace optimistic bet with real bet data if available
         if (result && typeof result === 'object' && 'bet' in result) {
-          console.log('Updating with real bet data from server:', result.bet);
           setBasePredictions((prev) =>
             prev.map((pred) => ({
               ...pred,
@@ -382,9 +530,14 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
                 ) || [],
             })),
           );
-        } else {
-          console.log('Server response does not contain bet data, keeping optimistic state');
-          // The optimistic bet will be replaced when socket events arrive
+        }
+        // Otherwise the optimistic bet will be replaced when socket events arrive
+
+        // Refresh the specific prediction to show the new bet and updated data
+        if (predictionId) {
+          startTransition(() => {
+            refreshPrediction(predictionId);
+          });
         }
 
         // React 19 Optimization: Use startTransition for non-blocking user refresh
@@ -408,11 +561,26 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
         throw error;
       }
     },
-    [refreshUser, optimisticUpdatePredictions],
+    [refreshUser, optimisticUpdatePredictions, basePredictions, refreshPrediction],
   );
 
   const placeParlay = useCallback(
     async (payload: { legs: { optionId: number }[]; amount: number }) => {
+      // Find all predictionIds for parlay legs so we can refresh them after placement
+      const affectedPredictionIds = Array.from(
+        new Set(
+          payload.legs
+            .map((leg) => {
+              return basePredictions
+                .flatMap(
+                  (p) => p.options?.map((opt) => ({ predictionId: p.id, optionId: opt.id })) || [],
+                )
+                .find((mapping) => mapping.optionId === leg.optionId)?.predictionId;
+            })
+            .filter((id): id is number => id !== undefined),
+        ),
+      );
+
       // Create optimistic parlay for immediate UI feedback
       const optimisticParlayId = `optimistic_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       const optimisticParlay = {
@@ -445,6 +613,15 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
           setLatestParlay((result as any).parlay);
         }
 
+        // Refresh all affected predictions to show the new parlay and updated data
+        if (affectedPredictionIds.length > 0) {
+          startTransition(() => {
+            affectedPredictionIds.forEach((predictionId) => {
+              refreshPrediction(predictionId);
+            });
+          });
+        }
+
         // React 19 Optimization: Use startTransition for non-blocking user refresh
         // Note: AuthContext already handles optimistic updates via Socket.IO events
         startTransition(() => {
@@ -465,8 +642,62 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
         throw error;
       }
     },
-    [refreshUser, optimisticUpdatePredictions],
+    [refreshUser, optimisticUpdatePredictions, basePredictions, refreshPrediction],
   );
+
+  // ── Pagination navigation functions ──────────────────────────────────────
+  const goToPage = useCallback(
+    async (targetPage: number) => {
+      if (targetPage < 1 || targetPage > totalPages) {
+        console.warn('[PredictionContext] Invalid page number:', targetPage);
+        return;
+      }
+      setPage(targetPage);
+      await fetchAll({ targetPage });
+    },
+    [totalPages, fetchAll],
+  );
+
+  const nextPage = useCallback(async () => {
+    if (hasMore && page < totalPages) {
+      await goToPage(page + 1);
+    }
+  }, [hasMore, page, totalPages, goToPage]);
+
+  const prevPage = useCallback(async () => {
+    if (page > 1) {
+      await goToPage(page - 1);
+    }
+  }, [page, goToPage]);
+
+  // ── Filter management functions ───────────────────────────────────────────
+  const updateFilters = useCallback((newFilters: Partial<PredictionFilters>) => {
+    setFilters((prev) => ({ ...prev, ...newFilters }));
+    // Reset to page 1 when filters change
+    setPage(1);
+  }, []);
+
+  const clearFilters = useCallback(() => {
+    setFilters({
+      search: '',
+      categoryId: undefined,
+      timeRemaining: undefined,
+      activity: undefined,
+      status: 'open',
+    });
+    // Reset to page 1
+    setPage(1);
+  }, []);
+
+  // Refetch when filters change
+  useEffect(() => {
+    // Don't fetch on initial mount (handled by initial fetch effect)
+    // Only fetch when filters change
+    if (filters) {
+      fetchAll({ targetPage: page });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters]);
 
   const value = useMemo<Ctx>(
     () => ({
@@ -479,6 +710,23 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
       placeParlay,
       latestBet,
       latestParlay,
+      pagination: {
+        page,
+        limit,
+        total,
+        hasMore,
+        totalPages,
+      },
+      goToPage,
+      nextPage,
+      prevPage,
+      filters,
+      updateFilters,
+      clearFilters,
+      createModalOpen,
+      createModalSourceData,
+      openCreateModal,
+      closeCreateModal,
     }),
     [
       predictions,
@@ -490,6 +738,21 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
       placeParlay,
       latestBet,
       latestParlay,
+      page,
+      limit,
+      total,
+      hasMore,
+      totalPages,
+      goToPage,
+      nextPage,
+      prevPage,
+      filters,
+      updateFilters,
+      clearFilters,
+      createModalOpen,
+      createModalSourceData,
+      openCreateModal,
+      closeCreateModal,
     ],
   );
 

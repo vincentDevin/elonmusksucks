@@ -5,6 +5,7 @@ import { PongEloService } from '../services/pongElo.service';
 import { PongRepository } from '../repositories/PongRepository';
 import { PongSocketEmitter } from '../handlers/pongSocketHandlers';
 import { eventBus } from '../lib/EventBus';
+import { UserService } from '../services/user.service';
 import {
   toUserPongStatsView,
   toPongMatchHistoryView,
@@ -20,6 +21,7 @@ import type {
 
 const pongRepository = new PongRepository();
 const pongStatsService = new PongStatsService(pongRepository);
+const userService = new UserService();
 
 /**
  * POST /api/pong/record-match
@@ -177,12 +179,31 @@ export const getEloLeaderboard = async (
     const offset = parseInt(req.query.offset as string) || 0;
 
     const stats = await pongRepository.getEloLeaderboard(limit, offset);
-    const leaderboard = PongStatsService.calculateLeaderboardMetrics(
-      stats.map((s) => (s.user ? { ...s, user: s.user } : s)),
-      offset,
-    );
 
-    const payload = leaderboard.map((entry, index) =>
+    // Batch enrich user avatars with signed URLs before calculating metrics
+    const users = stats.filter((stat) => stat.user).map((stat) => stat.user);
+    const enrichedUsers = await userService.enrichUsersWithAvatars(users);
+    const userMap = new Map(enrichedUsers.map((user) => [user.id, user]));
+
+    const enrichedStats = stats.map((stat) => {
+      if (stat.user) {
+        return {
+          ...stat,
+          user: userMap.get(stat.user.id) || stat.user,
+        };
+      }
+      return stat;
+    });
+
+    const leaderboard = PongStatsService.calculateLeaderboardMetrics(enrichedStats, offset);
+
+    // Add user data back to leaderboard entries
+    const enrichedLeaderboard = leaderboard.map((entry, index) => ({
+      ...entry,
+      user: enrichedStats[index]?.user,
+    }));
+
+    const payload = enrichedLeaderboard.map((entry, index) =>
       toPongLeaderboardView(entry, offset + index + 1),
     ) satisfies PongLeaderboardView[];
     res.json(payload);
@@ -227,8 +248,30 @@ export const getLeaderboardByMetric = async (
         return;
     }
 
-    const leaderboard = PongStatsService.calculateLeaderboardMetrics(stats, offset);
-    const payload = leaderboard.map((entry, index) =>
+    // Batch enrich user avatars with signed URLs before calculating metrics
+    const users = stats.filter((stat) => stat.user).map((stat) => stat.user);
+    const enrichedUsers = await userService.enrichUsersWithAvatars(users);
+    const userMap = new Map(enrichedUsers.map((user) => [user.id, user]));
+
+    const enrichedStats = stats.map((stat) => {
+      if (stat.user) {
+        return {
+          ...stat,
+          user: userMap.get(stat.user.id) || stat.user,
+        };
+      }
+      return stat;
+    });
+
+    const leaderboard = PongStatsService.calculateLeaderboardMetrics(enrichedStats, offset);
+
+    // Add user data back to leaderboard entries
+    const enrichedLeaderboard = leaderboard.map((entry, index) => ({
+      ...entry,
+      user: enrichedStats[index]?.user,
+    }));
+
+    const payload = enrichedLeaderboard.map((entry, index) =>
       toPongLeaderboardView(entry, offset + index + 1),
     ) satisfies PongLeaderboardView[];
     res.json(payload);
@@ -269,6 +312,30 @@ export const getUserPongStats = async (
     res.json(payload);
   } catch (error) {
     console.error('Get user Pong stats error:', error);
+    next(error);
+  }
+};
+
+export const getUserElo = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+
+    const elo = await pongRepository.findEloByUserId(req.user.id);
+
+    // Return defaults if no stats exist yet
+    res.json({
+      eloRating: elo?.eloRating || 1200,
+      tier: elo?.tier || 'SILVER',
+    });
+  } catch (error) {
+    console.error('Get user Elo error:', error);
     next(error);
   }
 };
@@ -493,6 +560,85 @@ export const authenticateUser = async (req: AuthRequest, res: Response) => {
     });
   } catch (error) {
     console.error('Pong auth error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// AI Player cache - refresh every 5 minutes
+const AI_PLAYER_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+let aiPlayerCache: {
+  data: Array<{ id: number; name: string; avatarUrl: string | null }> | null;
+  timestamp: number;
+} = {
+  data: null,
+  timestamp: 0,
+};
+
+/**
+ * GET /api/pong/ai-players
+ * Fetch all AI players (cached, public endpoint)
+ */
+export const getAllAIPlayers = async (_req: Request, res: Response) => {
+  try {
+    // Check cache
+    const now = Date.now();
+    if (aiPlayerCache.data && now - aiPlayerCache.timestamp < AI_PLAYER_CACHE_TTL) {
+      res.json(aiPlayerCache.data);
+      return;
+    }
+
+    // Fetch all AI players (ids -1 to -4)
+    const aiPlayerIds = [-1, -2, -3, -4];
+    const playerPromises = aiPlayerIds.map((id) => pongRepository.getAIPlayerById(id));
+    const players = await Promise.all(playerPromises);
+
+    const validPlayers = players.filter((p) => p !== null) as Array<{
+      id: number;
+      name: string;
+      avatarUrl: string | null;
+    }>;
+
+    // Update cache
+    aiPlayerCache = {
+      data: validPlayers,
+      timestamp: now,
+    };
+
+    res.json(validPlayers);
+  } catch (error) {
+    console.error('Error fetching AI players:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+/**
+ * GET /api/pong/ai-players/:id
+ * Fetch AI player basic info (id, name, avatarUrl)
+ * Used by pong-server to get AI player data from database
+ */
+export const getAIPlayerById = async (req: Request, res: Response) => {
+  try {
+    const userId = parseInt(req.params.id);
+
+    if (isNaN(userId)) {
+      res.status(400).json({ error: 'Invalid user ID' });
+      return;
+    }
+
+    const aiPlayer = await pongRepository.getAIPlayerById(userId);
+
+    if (!aiPlayer) {
+      res.status(404).json({ error: 'AI player not found' });
+      return;
+    }
+
+    res.json({
+      id: aiPlayer.id,
+      name: aiPlayer.name,
+      avatarUrl: aiPlayer.avatarUrl,
+    });
+  } catch (error) {
+    console.error('Error fetching AI player:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };

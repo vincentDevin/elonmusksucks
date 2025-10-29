@@ -15,7 +15,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useEventBusCore } from './EventBusCoreContext';
-import type { EventMetrics } from '../types/events';
+import type { EventMetrics, RedisChannel } from '@ems/types';
 
 /* ---------- Types ---------- */
 
@@ -33,8 +33,8 @@ interface EventBusMetricsContextType {
   getAverageLatency: () => number;
 
   // Core EventBus data access
-  getActiveEvents: () => string[];
-  getHandlerCount: (event?: string) => number;
+  getActiveEvents: () => RedisChannel[];
+  getHandlerCount: (event?: RedisChannel) => number;
 }
 
 const EventBusMetricsContext = createContext<EventBusMetricsContextType | undefined>(undefined);
@@ -106,7 +106,7 @@ export function EventBusMetricsProvider({ children }: { children: ReactNode }) {
     activeEvents.forEach((event) => {
       const unsubscribe = subscribe(
         event,
-        (payload: any) => {
+        (_payload: any) => {
           const startTime = performance.now();
 
           // Update received count
@@ -184,7 +184,7 @@ export function EventBusMetricsProvider({ children }: { children: ReactNode }) {
   }, [coreGetActiveEvents]);
 
   const getHandlerCountForMetrics = useCallback(
-    (event?: string) => {
+    (event?: RedisChannel) => {
       return coreGetHandlerCount(event);
     },
     [coreGetHandlerCount],

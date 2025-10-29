@@ -4,14 +4,14 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { FaBars, FaTimes } from 'react-icons/fa';
 import { useAuth } from '../contexts/AuthContext';
 import { LightDarkToggle } from '../theme';
-import { formatMuskBucks, getMuskBucksColorClasses } from '../utils/formatting';
+import { UserBalance } from './UserBalance';
 
 /**
  * Updated NavBar component using the unified theme system
  * Replaces the old NavBar with conflicting theme toggle
  */
 export default function NavBar() {
-  const { accessToken, logout, user } = useAuth();
+  const { logout, user } = useAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
@@ -23,127 +23,119 @@ export default function NavBar() {
   };
 
   const linkClasses = (path: string) =>
-    `px-3 py-2 rounded ${
-      loc.pathname === path ? 'bg-primary text-white' : 'hover:bg-muted transition-colors'
+    `px-2.5 py-1.5 rounded text-sm ${
+      loc.pathname === path
+        ? 'bg-primary text-primary-foreground'
+        : 'hover:bg-muted transition-colors'
     }`;
 
   const mobileLinkClasses = (path: string) =>
     `block px-4 py-3 rounded-lg ${
-      loc.pathname === path ? 'bg-primary text-white' : 'hover:bg-muted transition-colors'
+      loc.pathname === path
+        ? 'bg-primary text-primary-foreground'
+        : 'hover:bg-muted transition-colors'
     }`;
 
   return (
     <header className="relative z-60 border-b border-muted bg-surface text-content">
-      <div className="container mx-auto flex items-center justify-between p-4">
-        <Link to="/" className="text-xl font-bold">
+      <div className="container mx-auto flex items-center justify-between px-4 py-2.5">
+        <Link to="/" className="text-lg font-bold">
           🚀 ElonMuskSucks
         </Link>
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center space-x-2">
-          {accessToken ? (
-            user ? (
-              <>
-                <Link to="/dashboard" className={linkClasses('/dashboard')}>
-                  Dashboard
-                </Link>
-                <Link to="/timeline" className={linkClasses('/timeline')}>
-                  Timeline
-                </Link>
-                <Link to="/predictions" className={linkClasses('/predictions')}>
-                  Predictions
-                </Link>
-                <Link to="/leaderboard" className={linkClasses('/leaderboard')}>
-                  Leaderboard
-                </Link>
-                <Link to="/pong" className={linkClasses('/pong')}>
-                  🏓 Pong
-                </Link>
-                <div className="relative">
-                  <button
-                    onClick={() => setDropdownOpen(!dropdownOpen)}
-                    className="flex items-center space-x-3 px-3 py-2 rounded hover:bg-muted transition-colors"
-                  >
-                    <span className="font-medium">{user.name}</span>
-                    <div
-                      className={`flex items-center space-x-1 px-3 py-1.5 rounded-full text-xs font-bold transition-all hover:scale-105 ${getMuskBucksColorClasses(user.muskBucks)}`}
-                    >
-                      <span>{formatMuskBucks(user.muskBucks)}</span>
-                      <span>🪙</span>
-                    </div>
-                  </button>
-                  {dropdownOpen && (
-                    <ul
-                      className="
+          {user ? (
+            <>
+              <Link to="/timeline" className={linkClasses('/timeline')}>
+                Timeline
+              </Link>
+              <Link to="/predictions" className={linkClasses('/predictions')}>
+                Predictions
+              </Link>
+              <Link to="/leaderboard" className={linkClasses('/leaderboard')}>
+                Leaderboard
+              </Link>
+              <Link to="/pong" className={linkClasses('/pong')}>
+                🏓 Pong
+              </Link>
+              <div className="relative">
+                <button
+                  onClick={() => setDropdownOpen(!dropdownOpen)}
+                  className="flex items-center space-x-2 px-2.5 py-1.5 rounded hover:bg-muted transition-colors cursor-pointer text-sm"
+                >
+                  <span className="font-medium">{user.name}</span>
+                  <UserBalance />
+                </button>
+                {dropdownOpen && (
+                  <ul
+                    className="
                         absolute right-0 mt-2 z-[100]
                         bg-surface text-content
                         border border-muted rounded shadow-xl
                         space-y-1 p-2 w-40
                         transition-colors
                       "
-                    >
-                      {user.role === 'ADMIN' && (
-                        <li>
-                          <Link
-                            to="/admin"
-                            className="block px-3 py-2 rounded hover:bg-muted transition-colors"
-                            onClick={() => setDropdownOpen(false)}
-                          >
-                            Admin
-                          </Link>
-                        </li>
-                      )}
+                  >
+                    {user.role === 'ADMIN' && (
                       <li>
                         <Link
-                          to={`/profile/${user.id}`}
-                          className="block px-3 py-2 rounded hover:bg-muted transition-colors"
+                          to="/admin"
+                          className="block px-2.5 py-1.5 rounded hover:bg-muted transition-colors cursor-pointer text-sm"
                           onClick={() => setDropdownOpen(false)}
                         >
-                          Profile
+                          Admin
                         </Link>
                       </li>
-                      <li>
-                        <button
-                          onClick={handleLogout}
-                          className="
-                            w-full text-left px-3 py-2 rounded
+                    )}
+                    <li>
+                      <Link
+                        to={`/profile/${user.id}`}
+                        className="block px-2.5 py-1.5 rounded hover:bg-muted transition-colors cursor-pointer text-sm"
+                        onClick={() => setDropdownOpen(false)}
+                      >
+                        Profile
+                      </Link>
+                    </li>
+                    <li>
+                      <button
+                        onClick={handleLogout}
+                        className="
+                            w-full text-left px-2.5 py-1.5 rounded text-sm
                             hover:bg-error hover:text-white
-                            transition-colors
+                            transition-colors cursor-pointer
                           "
-                        >
-                          Logout
-                        </button>
-                      </li>
-                    </ul>
-                  )}
-                </div>
-              </>
-            ) : (
-              <div className="px-3 py-2">Loading...</div>
-            )
+                      >
+                        Logout
+                      </button>
+                    </li>
+                  </ul>
+                )}
+              </div>
+            </>
           ) : (
             <>
               <a
-                href="http://127.0.0.1:5173"
-                className="px-3 py-2 rounded hover:bg-muted transition-colors"
+                href={import.meta.env.VITE_PUBLIC_SITE_URL}
+                className="px-2.5 py-1.5 rounded hover:bg-muted transition-colors text-sm"
               >
                 Home
               </a>
               <a
-                href="http://127.0.0.1:5173/predictions"
-                className="px-3 py-2 rounded hover:bg-muted transition-colors"
+                href={`${import.meta.env.VITE_PUBLIC_SITE_URL}/predictions`}
+                className="px-2.5 py-1.5 rounded hover:bg-muted transition-colors text-sm"
               >
                 Predictions
               </a>
               <a
-                href="http://127.0.0.1:5173/leaderboard"
-                className="px-3 py-2 rounded hover:bg-muted transition-colors"
+                href={`${import.meta.env.VITE_PUBLIC_SITE_URL}/leaderboard`}
+                className="px-2.5 py-1.5 rounded hover:bg-muted transition-colors text-sm"
               >
                 Leaderboard
               </a>
               <a
-                href="http://127.0.0.1:5173/timeline"
-                className="px-3 py-2 rounded hover:bg-muted transition-colors"
+                href={`${import.meta.env.VITE_PUBLIC_SITE_URL}/timeline`}
+                className="px-2.5 py-1.5 rounded hover:bg-muted transition-colors text-sm"
               >
                 Timeline
               </a>
@@ -168,9 +160,9 @@ export default function NavBar() {
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-label="Toggle mobile menu"
-            className="p-2 rounded hover:bg-muted transition-colors"
+            className="p-1.5 rounded hover:bg-muted transition-colors cursor-pointer"
           >
-            {mobileMenuOpen ? <FaTimes className="text-lg" /> : <FaBars className="text-lg" />}
+            {mobileMenuOpen ? <FaTimes className="text-base" /> : <FaBars className="text-base" />}
           </button>
         </div>
       </div>
@@ -179,113 +171,104 @@ export default function NavBar() {
       {mobileMenuOpen && (
         <div className="md:hidden absolute top-full left-0 right-0 bg-surface border-b border-muted shadow-lg">
           <div className="container mx-auto p-4 space-y-2">
-            {accessToken ? (
-              user ? (
-                <>
-                  <Link
-                    to="/dashboard"
-                    className={mobileLinkClasses('/dashboard')}
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    Dashboard
-                  </Link>
-                  <Link
-                    to="/timeline"
-                    className={mobileLinkClasses('/timeline')}
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    Timeline
-                  </Link>
-                  <Link
-                    to="/predictions"
-                    className={mobileLinkClasses('/predictions')}
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    Predictions
-                  </Link>
-                  <Link
-                    to="/leaderboard"
-                    className={mobileLinkClasses('/leaderboard')}
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    Leaderboard
-                  </Link>
-                  <Link
-                    to="/pong"
-                    className={mobileLinkClasses('/pong')}
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    🏓 Pong
-                  </Link>
+            {user ? (
+              <>
+                <Link
+                  to="/dashboard"
+                  className={mobileLinkClasses('/dashboard')}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Dashboard
+                </Link>
+                <Link
+                  to="/timeline"
+                  className={mobileLinkClasses('/timeline')}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Timeline
+                </Link>
+                <Link
+                  to="/predictions"
+                  className={mobileLinkClasses('/predictions')}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Predictions
+                </Link>
+                <Link
+                  to="/leaderboard"
+                  className={mobileLinkClasses('/leaderboard')}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Leaderboard
+                </Link>
+                <Link
+                  to="/pong"
+                  className={mobileLinkClasses('/pong')}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  🏓 Pong
+                </Link>
 
-                  <div className="border-t border-muted pt-2 mt-2">
-                    <div className="flex items-center space-x-3 px-4 py-3">
-                      <span className="font-medium">{user.name}</span>
-                      <div
-                        className={`flex items-center space-x-1 px-3 py-1.5 rounded-full text-xs font-bold ${getMuskBucksColorClasses(user.muskBucks)}`}
-                      >
-                        <span>{formatMuskBucks(user.muskBucks)}</span>
-                        <span>🪙</span>
-                      </div>
-                    </div>
+                <div className="border-t border-muted pt-2 mt-2">
+                  <div className="flex items-center space-x-3 px-4 py-3">
+                    <span className="font-medium">{user.name}</span>
+                    <UserBalance />
+                  </div>
 
-                    {user.role === 'ADMIN' && (
-                      <Link
-                        to="/admin"
-                        className={mobileLinkClasses('/admin')}
-                        onClick={() => setMobileMenuOpen(false)}
-                      >
-                        Admin
-                      </Link>
-                    )}
-
+                  {user.role === 'ADMIN' && (
                     <Link
-                      to={`/profile/${user.id}`}
-                      className={mobileLinkClasses(`/profile/${user.id}`)}
+                      to="/admin"
+                      className={mobileLinkClasses('/admin')}
                       onClick={() => setMobileMenuOpen(false)}
                     >
-                      Profile
+                      Admin
                     </Link>
+                  )}
 
-                    <button
-                      onClick={() => {
-                        handleLogout();
-                        setMobileMenuOpen(false);
-                      }}
-                      className="w-full text-left px-4 py-3 rounded-lg hover:bg-error hover:text-white transition-colors"
-                    >
-                      Logout
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <div className="px-4 py-3 text-tertiary">Loading...</div>
-              )
+                  <Link
+                    to={`/profile/${user.id}`}
+                    className={mobileLinkClasses(`/profile/${user.id}`)}
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Profile
+                  </Link>
+
+                  <button
+                    onClick={() => {
+                      handleLogout();
+                      setMobileMenuOpen(false);
+                    }}
+                    className="w-full text-left px-4 py-3 rounded-lg hover:bg-error hover:text-white transition-colors cursor-pointer"
+                  >
+                    Logout
+                  </button>
+                </div>
+              </>
             ) : (
               <>
                 <a
-                  href="http://127.0.0.1:5173"
+                  href={import.meta.env.VITE_PUBLIC_SITE_URL}
                   className="block px-4 py-3 rounded-lg hover:bg-muted transition-colors"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Home
                 </a>
                 <a
-                  href="http://127.0.0.1:5173/predictions"
+                  href={`${import.meta.env.VITE_PUBLIC_SITE_URL}/predictions`}
                   className="block px-4 py-3 rounded-lg hover:bg-muted transition-colors"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Predictions
                 </a>
                 <a
-                  href="http://127.0.0.1:5173/leaderboard"
+                  href={`${import.meta.env.VITE_PUBLIC_SITE_URL}/leaderboard`}
                   className="block px-4 py-3 rounded-lg hover:bg-muted transition-colors"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Leaderboard
                 </a>
                 <a
-                  href="http://127.0.0.1:5173/timeline"
+                  href={`${import.meta.env.VITE_PUBLIC_SITE_URL}/timeline`}
                   className="block px-4 py-3 rounded-lg hover:bg-muted transition-colors"
                   onClick={() => setMobileMenuOpen(false)}
                 >

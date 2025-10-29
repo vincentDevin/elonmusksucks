@@ -29,6 +29,47 @@ const defaultRotationConfig: JWTRotationConfig = {
 
 let rotationConfig: JWTRotationConfig = defaultRotationConfig;
 
+// ==========================================
+// Token Validation Cache
+// ==========================================
+// Cache validated tokens to avoid redundant JWT verification
+// Note: auth.middleware.ts already caches user lookups, this caches the JWT verification itself
+interface TokenCacheEntry {
+  userId: number;
+  expiresAt: number;
+}
+
+const tokenValidationCache = new Map<string, TokenCacheEntry>();
+const TOKEN_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes (well before token expiry)
+const MAX_CACHE_SIZE = 500; // Prevent memory leaks
+
+// Clean up expired cache entries periodically
+setInterval(() => {
+  const now = Date.now();
+  let deletedCount = 0;
+
+  // Convert iterator to array for compatibility
+  const entries = Array.from(tokenValidationCache.entries());
+  for (const [token, entry] of entries) {
+    if (entry.expiresAt < now) {
+      tokenValidationCache.delete(token);
+      deletedCount++;
+    }
+  }
+
+  // Also enforce max size
+  if (tokenValidationCache.size > MAX_CACHE_SIZE) {
+    const toDelete = tokenValidationCache.size - MAX_CACHE_SIZE;
+    const keys = Array.from(tokenValidationCache.keys()).slice(0, toDelete);
+    keys.forEach((key) => tokenValidationCache.delete(key));
+    deletedCount += toDelete;
+  }
+
+  if (deletedCount > 0) {
+    console.log(`[jwt] Cleaned up ${deletedCount} cached token validations`);
+  }
+}, 60 * 1000); // Clean every minute
+
 // Key rotation utilities
 export function getCurrentKey(): JWTKeyConfig {
   return rotationConfig.keys[rotationConfig.currentKeyId];
@@ -108,9 +149,16 @@ export function verifyRefreshToken(token: string): { userId: number } {
 /**
  * Verifies an access token's signature & expiration,
  * returning its payload ({ userId }) or throwing.
+ * Uses in-memory cache to avoid redundant JWT verification.
  */
 export function verifyAccessToken(token: string): { userId: number } {
-  // Attempt validation with multiple keys during rotation overlap
+  // Check cache first
+  const cached = tokenValidationCache.get(token);
+  if (cached && cached.expiresAt > Date.now()) {
+    return { userId: cached.userId };
+  }
+
+  // Cache miss or expired - validate token
   const validationKeys = getValidationKeys();
   let lastError: Error | null = null;
 
@@ -120,7 +168,16 @@ export function verifyAccessToken(token: string): { userId: number } {
       if (!payload || typeof payload !== 'object' || typeof payload.userId !== 'number') {
         throw new Error('Invalid access token payload');
       }
+
+      // Log only on first validation (cache miss)
       console.log(`[jwt] Token validated with key ${keyConfig.keyId}`);
+
+      // Cache the successful validation
+      tokenValidationCache.set(token, {
+        userId: payload.userId,
+        expiresAt: Date.now() + TOKEN_CACHE_TTL_MS,
+      });
+
       return { userId: payload.userId };
     } catch (err) {
       lastError = err as Error;

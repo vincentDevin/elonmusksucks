@@ -1,10 +1,12 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x", "linux-musl", "debian-openssl-3.0.x"]
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  // directUrl only needed for local migrations, not production runtime
 }
 
 enum Role {
@@ -37,10 +39,13 @@ enum TransactionType {
   CREDIT
 }
 
-
 enum BanType {
   TEMPORARY
   PERMANENT
+  SHADOW           // User can post but content is hidden
+  CHAT_ONLY        // Can't chat but can use other features
+  BETTING_RESTRICTED // Can't place bets
+  FULL             // Complete platform ban
 }
 
 enum ModerationAction {
@@ -95,69 +100,71 @@ enum ReportStatus {
 }
 
 model User {
-  id                 Int                 @id @default(autoincrement())
-  email              String              @unique
-  name               String
-  passwordHash       String
-  emailVerified      Boolean             @default(false)
-  emailVerifications EmailVerification[]
-  passwordResets     PasswordReset[]
-  profileComplete    Boolean             @default(false)
-  role               Role                @default(USER)
-  active             Boolean             @default(true)
-  muskBucks          BigInt              @default(1000) // Rollback: remove @@map constraint reference
-  isSystemAccount    Boolean             @default(false)
-  bets               Bet[]
-  refreshTokens      RefreshToken[]
-  userBadges         UserBadge[]         @relation("UserToUserBadge")
-  followers          Follow[]            @relation("userFollowers")
-  following          Follow[]            @relation("userFollowing")
-  bio                String? // optional user bio
-  avatarUrl          String? // URL to profile image
-  profilePictureKey    String?
-  location           String? // user-provided location
-  timezone           String? // IANA timezone string
+  id                     Int                     @id @default(autoincrement())
+  email                  String                  @unique
+  name                   String
+  passwordHash           String
+  emailVerified          Boolean                 @default(false)
+  emailVerifications     EmailVerification[]
+  passwordResets         PasswordReset[]
+  profileComplete        Boolean                 @default(false)
+  role                   Role                    @default(USER)
+  active                 Boolean                 @default(true)
+  muskBucks              BigInt                  @default(1000) // Rollback: remove @@map constraint reference
+  isSystemAccount        Boolean                 @default(false)
+  bets                   Bet[]
+  refreshTokens          RefreshToken[]
+  userBadges             UserBadge[]             @relation("UserToUserBadge")
+  followers              Follow[]                @relation("userFollowers")
+  following              Follow[]                @relation("userFollowing")
+  bio                    String? // optional user bio
+  avatarUrl              String? // URL to profile image
+  profilePictureKey      String?
+  location               String? // user-provided location
+  timezone               String? // IANA timezone string
   // statistics (can be updated via triggers or backend logic)
-  successRate        Float               @default(0.0)
-  totalPredictions   Int                 @default(0)
-  currentStreak      Int                 @default(0)
-  longestStreak      Int                 @default(0)
+  successRate            Float                   @default(0.0)
+  totalPredictions       Int                     @default(0)
+  currentStreak          Int                     @default(0)
+  longestStreak          Int                     @default(0)
   // user settings
-  notifyOnResolve    Boolean             @default(true)
-  theme              String              @default("light-clean")  // Unified theme system ID
-  twoFactorEnabled   Boolean             @default(false)
-  createdAt          DateTime            @default(now())
-  parlayes           Parlay[]
-  transactions       Transaction[]
-  feedPrivate        Boolean             @default(false)
-  posts              UserPost[]          @relation("AuthorToPost")
-  postReactions      PostReaction[]
-  postReports        PostReport[]
-  postMentions       PostMention[]
-  activities         UserActivity[]
-  activityLogs       UserActivityLog[]
-  streaks            UserStreak[]
-  emojiUsage         UserEmojiUsage[]
-  leaderboardHistory LeaderboardHistory[]
-  relatedActivities  UserActivity[] @relation("RelatedUserActivity")
-  achievements       UserAchievement[]
-  stats              UserStats?
-  Prediction         Prediction[]
-  firstCorrectBets   Prediction[] @relation("FirstCorrectBet")
-  messages           Message[]
-  bans               UserBan[]
-  moderationActions  ModerationLog[] @relation("ModeratorActions")
-  moderationReceived ModerationLog[] @relation("ModeratedUser")
-  articleReactions   ArticleReaction[]
-  articleComments    ArticleComment[]
+  notifyOnResolve        Boolean                 @default(true)
+  theme                  String                  @default("light-clean") // Unified theme system ID
+  twoFactorEnabled       Boolean                 @default(false)
+  createdAt              DateTime                @default(now())
+  parlayes               Parlay[]
+  transactions           Transaction[]
+  feedPrivate            Boolean                 @default(false)
+  contents               Content[]               @relation("AuthorToContent")
+  reactions              Reaction[]              @relation("UserReactions")
+  reports                ContentReport[]         @relation("UserReports")
+  mentions               ContentMention[]        @relation("UserMentions")
+  activities             UserActivity[]
+  activityLogs           UserActivityLog[]
+  streaks                UserStreak[]
+  emojiUsage             UserEmojiUsage[]
+  leaderboardHistory     LeaderboardHistory[]
+  relatedActivities      UserActivity[]          @relation("RelatedUserActivity")
+  achievements           UserAchievement[]
+  stats                  UserStats?
+  Prediction             Prediction[]
+  firstCorrectBets       Prediction[]            @relation("FirstCorrectBet")
+  messages               Message[]
+  bans                   UserBan[]
+  moderationActions      ModerationLog[]         @relation("ModeratorActions")
+  moderationReceived     ModerationLog[]         @relation("ModeratedUser")
   // Pong relations
-  pongMatchesAsP1    PongMatch[]     @relation("PlayerOne")
-  pongMatchesAsP2    PongMatch[]     @relation("PlayerTwo")
-  pongWins           PongMatch[]     @relation("PongWinner")
-  pongMatchesAsHost  PongMatch[]     @relation("PongHost")
-  pongMatchesAsJoiner PongMatch[]    @relation("PongJoiner")
-  pongMatchesAsAI    PongMatch[]     @relation("PongAI")
-  pongStats          PongStats?
+  pongMatchesAsP1        PongMatch[]             @relation("PlayerOne")
+  pongMatchesAsP2        PongMatch[]             @relation("PlayerTwo")
+  pongWins               PongMatch[]             @relation("PongWinner")
+  pongMatchesAsHost      PongMatch[]             @relation("PongHost")
+  pongMatchesAsJoiner    PongMatch[]             @relation("PongJoiner")
+  pongMatchesAsAI        PongMatch[]             @relation("PongAI")
+  pongStats              PongStats?
+  // Bookmark and Social relations
+  bookmarkCollections    BookmarkCollection[]
+  articleBookmarks       ArticleBookmark[]
+  articleShares          ArticleShare[]
 }
 
 model ChatRoom {
@@ -167,14 +174,14 @@ model ChatRoom {
 }
 
 model Message {
-  id         Int      @id @default(autoincrement())
-  roomId     Int
-  userId     Int
-  content    String
-  timestamp  DateTime @default(now())
+  id        Int      @id @default(autoincrement())
+  roomId    Int
+  userId    Int
+  content   String
+  timestamp DateTime @default(now())
   // Relations
-  user       User     @relation(fields: [userId], references: [id])
-  room       ChatRoom @relation(fields: [roomId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+  room      ChatRoom @relation(fields: [roomId], references: [id])
 }
 
 model EmailVerification {
@@ -195,38 +202,86 @@ model PasswordReset {
   createdAt DateTime @default(now())
 }
 
+// ============================================
+// NORMALIZED TAXONOMY MODELS
+// ============================================
+
+model Category {
+  id          Int          @id @default(autoincrement())
+  name        String       @unique
+  slug        String       @unique
+  description String?
+  icon        String? // Icon name or emoji
+  color       String? // Hex color for UI
+  sortOrder   Int          @default(0)
+  isActive    Boolean      @default(true)
+  predictions Prediction[]
+  createdAt   DateTime     @default(now())
+
+  @@index([slug])
+  @@index([isActive, sortOrder])
+}
+
+model Tag {
+  id          Int              @id @default(autoincrement())
+  name        String           @unique
+  slug        String           @unique
+  description String?
+  usageCount  Int              @default(0)
+  articles    ArticleTag[]
+  createdAt   DateTime         @default(now())
+
+  @@index([slug])
+  @@index([usageCount(sort: Desc)])
+}
+
+model ArticleTag {
+  id        Int     @id @default(autoincrement())
+  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  articleId Int
+  tag       Tag     @relation(fields: [tagId], references: [id])
+  tagId     Int
+
+  @@unique([articleId, tagId])
+  @@index([tagId])
+}
+
 model Prediction {
-  id              Int                @id @default(autoincrement())
-  title           String
-  description     String
-  category        String
-  type            PredictionType     @default(MULTIPLE)
-  threshold       Float?
-  expiresAt       DateTime
-  resolved        Boolean            @default(false)
-  approved        Boolean            @default(false)
-  resolvedAt          DateTime?
-  winningOptionId     Int?
-  viewCount           Int       @default(0)
+  id                    Int                    @id @default(autoincrement())
+  title                 String
+  description           String
+  categoryId            Int? // Made optional for migration - will be required after data migration
+  category              Category?              @relation(fields: [categoryId], references: [id])
+  type                  PredictionType         @default(MULTIPLE)
+  threshold             Float?
+  expiresAt             DateTime
+  resolved              Boolean                @default(false)
+  approved              Boolean                @default(false)
+  resolvedAt            DateTime?
+  winningOptionId       Int?
+  viewCount             Int                    @default(0)
   firstCorrectBetUserId Int?
-  firstCorrectBetUser User?     @relation("FirstCorrectBet", fields: [firstCorrectBetUserId], references: [id])
-  resolvedWithinHour  Boolean   @default(false)
-  bets                Bet[]
-  options         PredictionOption[]
-  createdAt       DateTime           @default(now())
-  creatorId       Int
-  creator         User                   @relation(fields: [creatorId], references: [id])
-  activities      UserActivity[]
-  sourceLinks     PredictionSourceLink[]
+  firstCorrectBetUser   User?                  @relation("FirstCorrectBet", fields: [firstCorrectBetUserId], references: [id])
+  resolvedWithinHour    Boolean                @default(false)
+  bets                  Bet[]
+  options               PredictionOption[]
+  createdAt             DateTime               @default(now())
+  creatorId             Int
+  creator               User                   @relation(fields: [creatorId], references: [id])
+  activities            UserActivity[]
+  sourceLinks           PredictionSourceLink[]
+  comments              Content[]              @relation("PredictionComments")
+  reactions             Reaction[]             @relation("PredictionReactions")
 
   @@index([expiresAt, resolved])
   @@index([creatorId, createdAt(sort: Desc)])
-  @@index([category, createdAt(sort: Desc)])
+  @@index([categoryId, createdAt(sort: Desc)])
   @@index([approved, resolved, createdAt(sort: Desc)])
   @@index([viewCount(sort: Desc)], name: "idx_prediction_popularity")
   @@index([firstCorrectBetUserId], name: "idx_prediction_first_correct")
   @@index([resolvedWithinHour, resolvedAt], name: "idx_prediction_speed")
-  @@index([category, approved])
+  @@index([categoryId, approved])
+  @@index([categoryId, resolved, createdAt(sort: Desc)], name: "idx_prediction_category_status")
 }
 
 model PredictionOption {
@@ -270,12 +325,6 @@ model Bet {
   @@index([userId, status, createdAt(sort: Desc)]) // Optimize user bet history queries with status filter
 }
 
-model AITweet {
-  id        Int      @id @default(autoincrement())
-  content   String
-  createdAt DateTime @default(now())
-}
-
 model RefreshToken {
   id        Int      @id @default(autoincrement())
   token     String   @unique
@@ -285,7 +334,6 @@ model RefreshToken {
   updatedAt DateTime @default(now()) @updatedAt
   expiresAt DateTime
 }
-
 
 model Badge {
   id          Int         @id @default(autoincrement())
@@ -297,30 +345,30 @@ model Badge {
 }
 
 model Achievement {
-  id                    Int                 @id @default(autoincrement())
-  name                  String              @unique
-  slug                  String?             @unique // Kebab-case unique identifier for seeds/lookups
-  title                 String              // Display title
-  description           String              // Achievement description
-  category              String              // Category: betting, prediction, chat, leaderboard, event, secret, participation, shame
-  rarity                String              @default("common") // common, uncommon, rare, legendary, secret, shame
-  targetValue           Int                 // Target value to achieve (e.g., 10 for "Win 10 bets")
-  iconUrl               String?             // Icon URL for display
-  isActive              Boolean             @default(true) // Whether this achievement is currently active
-  autoAward             Boolean             @default(true) // Whether this achievement is auto-awarded via triggers
-  manualOnly            Boolean             @default(false) // Whether this achievement can only be manually granted
-  isShame               Boolean             @default(false) // Whether this is a shame achievement for banned users
-  sortOrder             Int                 @default(0) // Display order
-  ruleData              Json?               // JSON rules for event-driven achievement evaluation
-  ruleComplexity        Int                 @default(0) // Rule complexity score (0-100)
-  rulePerformanceScore  Int                 @default(0) // Rule performance score (0-100)
-  lastRuleValidation    DateTime?           // Last time rule was validated
-  createdAt             DateTime            @default(now())
-  updatedAt             DateTime            @default(now()) @updatedAt
-  
+  id                   Int       @id @default(autoincrement())
+  name                 String    @unique
+  slug                 String?   @unique // Kebab-case unique identifier for seeds/lookups
+  title                String // Display title
+  description          String // Achievement description
+  category             String // Category: betting, prediction, chat, leaderboard, event, secret, participation, shame
+  rarity               String    @default("common") // common, uncommon, rare, legendary, secret, shame
+  targetValue          Int // Target value to achieve (e.g., 10 for "Win 10 bets")
+  iconUrl              String? // Icon URL for display
+  isActive             Boolean   @default(true) // Whether this achievement is currently active
+  autoAward            Boolean   @default(true) // Whether this achievement is auto-awarded via triggers
+  manualOnly           Boolean   @default(false) // Whether this achievement can only be manually granted
+  isShame              Boolean   @default(false) // Whether this is a shame achievement for banned users
+  sortOrder            Int       @default(0) // Display order
+  ruleData             Json? // JSON rules for event-driven achievement evaluation
+  ruleComplexity       Int       @default(0) // Rule complexity score (0-100)
+  rulePerformanceScore Int       @default(0) // Rule performance score (0-100)
+  lastRuleValidation   DateTime? // Last time rule was validated
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @default(now()) @updatedAt
+
   // Relations
-  userProgress  UserAchievement[]
-  
+  userProgress UserAchievement[]
+
   @@index([category, sortOrder])
   @@index([isActive, category])
   @@index([rarity])
@@ -340,21 +388,22 @@ model UserAchievement {
   achievement   Achievement @relation(fields: [achievementId], references: [id])
   achievementId Int
   progress      Int         @default(0) // Current progress towards target
-  completedAt   DateTime?   // When achievement was completed (null if not completed)
+  completedAt   DateTime? // When achievement was completed (null if not completed)
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @default(now()) @updatedAt
-  
+
   @@unique([userId, achievementId])
   @@index([userId, progress])
   @@index([achievementId, completedAt])
+  @@index([userId, completedAt], name: "idx_user_achievement_completion")
 }
 
 model AchievementEventLog {
   idempotencyKey String   @id // Unique per event to prevent duplicates
   userId         Int
-  eventKey       String   // Achievement event type
+  eventKey       String // Achievement event type
   createdAt      DateTime @default(now())
-  
+
   @@index([userId, eventKey])
   @@index([createdAt])
 }
@@ -410,98 +459,137 @@ model ParlayLeg {
 }
 
 model Transaction {
-  id              Int             @id @default(autoincrement())
-  user            User            @relation(fields: [userId], references: [id])
-  userId          Int
-  type            TransactionType
-  amount          BigInt
-  balanceAfter    BigInt
-  relatedBetId    Int? // single bet
-  relatedParlayId Int? // parlay bet
-  createdAt       DateTime        @default(now())
+  id                 Int             @id @default(autoincrement())
+  user               User            @relation(fields: [userId], references: [id])
+  userId             Int
+  type               TransactionType
+  subtype            String? // "BET_WAGER" | "BET_PAYOUT" | "PARLAY_WAGER" | "PARLAY_PAYOUT" | "PONG_WAGER" | "PONG_PAYOUT"
+  amount             BigInt
+  balanceAfter       BigInt
+  description        String? // Human-readable description
+  metadata           Json? // Additional context
+  relatedBetId       Int? // single bet
+  relatedParlayId    Int? // parlay bet
+  relatedPongMatchId String? // NEW: Link to pong matches
+  createdAt          DateTime        @default(now())
   // Pong relations
-  pongEscrowMatches PongMatch[]    @relation("PongEscrowTransaction")
-  pongPayoutMatches PongMatch[]    @relation("PongPayoutTransaction")
+  pongEscrowMatches  PongMatch[]     @relation("PongEscrowTransaction")
+  pongPayoutMatches  PongMatch[]     @relation("PongPayoutTransaction")
   // Rollback: Remove idempotencyKey field and unique constraint
-  idempotencyKey  String?         @unique // Client-provided key to prevent duplicate transactions
+  idempotencyKey     String?         @unique // Client-provided key to prevent duplicate transactions
 
   @@index([userId, createdAt(sort: Desc)])
   @@index([type, createdAt(sort: Desc)])
+  @@index([subtype])
   @@index([relatedBetId])
   @@index([relatedParlayId])
+  @@index([relatedPongMatchId])
 }
 
-model UserPost {
-  id            Int                @id @default(autoincrement())
-  author        User               @relation("AuthorToPost", fields: [authorId], references: [id])
-  authorId      Int
-  
-  // Content
-  content       String             @db.Text
-  contentType   PostContentType    @default(TEXT)
-  mediaUrls     Json?              // Array of media URLs
-  linkPreview   Json?              // OG tags for link previews
-  
+// ============================================
+// UNIFIED CONTENT MODEL - Comments & Posts
+// ============================================
+// This model replaces UserPost, ArticleComment, PredictionComment
+// Supports threading, reactions, mentions, hashtags for ALL content types
+
+enum ContentType {
+  POST           // Standalone user post (was UserPost)
+  COMMENT        // Comment (was ArticleComment/PredictionComment)
+}
+
+enum ContentVisibility {
+  PUBLIC
+  PRIVATE
+  FOLLOWERS
+  MENTIONED_ONLY
+}
+
+model Content {
+  id       Int  @id @default(autoincrement())
+  author   User @relation("AuthorToContent", fields: [authorId], references: [id])
+  authorId Int
+
+  // Content Type & Body
+  type        ContentType        @default(POST)
+  contentType PostContentType    @default(TEXT)
+  body        String              @db.Text
+  mediaUrls   Json?               // Array of media URLs
+  linkPreview Json?               // OG tags for link previews
+
+  // Polymorphic Parent - What is this content attached to?
+  // For COMMENT: articleId OR predictionId is set (parent content is the article/prediction)
+  // For POST: all nulls (standalone post)
+  articleId    Int?
+  article      Article?    @relation("ArticleComments", fields: [articleId], references: [id], onDelete: Cascade)
+  predictionId Int?
+  prediction   Prediction? @relation("PredictionComments", fields: [predictionId], references: [id], onDelete: Cascade)
+
+  // Threading - Comments can reply to other comments/posts
+  parent      Content?  @relation("ContentThread", fields: [parentId], references: [id], onDelete: Cascade)
+  parentId    Int?
+  children    Content[] @relation("ContentThread")
+  threadDepth Int       @default(0)
+
   // Privacy & Visibility
-  visibility    PostVisibility     @default(PUBLIC)
-  isDeleted     Boolean            @default(false)
-  deletedAt     DateTime?
-  deletedBy     Int?               // User ID who deleted (author or admin)
-  
+  visibility PostVisibility @default(PUBLIC)
+  isDeleted  Boolean        @default(false)
+  deletedAt  DateTime?
+  deletedBy  Int? // User ID who deleted (author or admin)
+
   // Engagement Metrics
-  likesCount    Int                @default(0)
-  commentsCount Int                @default(0)
-  sharesCount   Int                @default(0)
-  viewsCount    BigInt             @default(0)
-  
-  // Threading
-  parent        UserPost?          @relation("PostParent", fields: [parentId], references: [id])
-  parentId      Int?
-  children      UserPost[]         @relation("PostParent")
-  threadDepth   Int                @default(0)
-  
+  reactionsCount Int    @default(0)
+  repliesCount   Int    @default(0)
+  sharesCount    Int    @default(0)
+  viewsCount     BigInt @default(0)
+
   // Moderation
-  reportCount   Int                @default(0)
-  isFlagged     Boolean            @default(false)
+  reportCount    Int     @default(0)
+  isFlagged      Boolean @default(false)
   moderationNote String?
-  
+
+  // Edit tracking
+  isEdited  Boolean   @default(false)
+  editedAt  DateTime?
+
   // Timestamps
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
-  editedAt      DateTime?
-  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Relations
-  reactions     PostReaction[]
-  reports       PostReport[]
-  mentions      PostMention[]
-  hashtags      PostHashtag[]
-  
+  reactions Reaction[]
+  reports   ContentReport[]
+  mentions  ContentMention[]
+  hashtags  ContentHashtag[]
+
   @@index([authorId, visibility, createdAt])
   @@index([visibility, createdAt])
-  @@index([parentId])
+  @@index([parentId, createdAt])
+  @@index([articleId, createdAt])
+  @@index([predictionId, createdAt])
+  @@index([type, visibility, createdAt])
 }
 
 model UserActivity {
-  id               Int         @id @default(autoincrement())
-  user             User        @relation(fields: [userId], references: [id])
-  userId           Int
-  type             String // e.g. "BET_PLACED", "BET_WON", "POST_CREATED", etc.
-  title            String? // Activity title for display
-  description      String? // Activity description for display
-  details          Json? // Store event metadata (e.g., betId, predictionId, badgeId, postId)
-  isPersonal       Boolean     @default(false) @map("is_personal") // Whether this is personal or public activity
-  priority         String      @default("medium") // Priority level: low, medium, high
-  relatedUserId    Int?        @map("related_user_id") // Reference to another user involved
-  predictionId     Int?        @map("prediction_id") // Reference to related prediction
-  betId            Int?        @map("bet_id") // Reference to related bet
-  createdAt        DateTime    @default(now())
-  
+  id            Int      @id @default(autoincrement())
+  user          User     @relation(fields: [userId], references: [id])
+  userId        Int
+  type          String // e.g. "BET_PLACED", "BET_WON", "POST_CREATED", etc.
+  title         String? // Activity title for display
+  description   String? // Activity description for display
+  details       Json? // Store event metadata (e.g., betId, predictionId, badgeId, postId)
+  isPersonal    Boolean  @default(false) @map("is_personal") // Whether this is personal or public activity
+  priority      String   @default("medium") // Priority level: low, medium, high
+  relatedUserId Int?     @map("related_user_id") // Reference to another user involved
+  predictionId  Int?     @map("prediction_id") // Reference to related prediction
+  betId         Int?     @map("bet_id") // Reference to related bet
+  createdAt     DateTime @default(now())
+
   // Relations
-  relatedUser      User?       @relation("RelatedUserActivity", fields: [relatedUserId], references: [id])
-  prediction       Prediction? @relation(fields: [predictionId], references: [id])
-  bet              Bet?        @relation(fields: [betId], references: [id])
-  pongMatch        PongMatch?  @relation(fields: [pongMatchId], references: [id])
-  pongMatchId      String?     @map("pong_match_id")
+  relatedUser User?       @relation("RelatedUserActivity", fields: [relatedUserId], references: [id])
+  prediction  Prediction? @relation(fields: [predictionId], references: [id])
+  bet         Bet?        @relation(fields: [betId], references: [id])
+  pongMatch   PongMatch?  @relation(fields: [pongMatchId], references: [id])
+  pongMatchId String?     @map("pong_match_id")
 
   // Indexes for optimal query performance
   @@index([userId, createdAt(sort: Desc)], name: "idx_user_activities_user_time")
@@ -519,7 +607,7 @@ model UserActivityLog {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId       Int
   activityType String   @db.VarChar(50) // 'chat_message', 'bet_placed', 'login', 'pong_match', etc.
-  metadata     Json?    // Additional context data for the activity
+  metadata     Json? // Additional context data for the activity
   occurredAt   DateTime @default(now())
   dateKey      String   @db.VarChar(10) // '2024-01-15' format for efficient daily aggregation
 
@@ -531,15 +619,15 @@ model UserActivityLog {
 }
 
 model UserStreak {
-  id            Int      @id @default(autoincrement())
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id            Int       @id @default(autoincrement())
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId        Int
-  streakType    String   @db.VarChar(50) // 'bet_win', 'pong_win', 'daily_login', 'parlay_win', etc.
-  currentStreak Int      @default(0)
-  bestStreak    Int      @default(0)
+  streakType    String    @db.VarChar(50) // 'bet_win', 'pong_win', 'daily_login', 'parlay_win', etc.
+  currentStreak Int       @default(0)
+  bestStreak    Int       @default(0)
   lastActionAt  DateTime?
   startedAt     DateTime?
-  updatedAt     DateTime @default(now()) @updatedAt
+  updatedAt     DateTime  @default(now()) @updatedAt
 
   // Ensure one streak record per user per streak type
   @@unique([userId, streakType], name: "unique_user_streak_type")
@@ -548,7 +636,7 @@ model UserStreak {
 }
 
 model UserEmojiUsage {
-  userId     Int      
+  userId     Int
   emoji      String   @db.VarChar(10)
   useCount   Int      @default(1)
   lastUsedAt DateTime @default(now()) @updatedAt
@@ -567,9 +655,9 @@ model LeaderboardHistory {
   userId          Int
   leaderboardType String   @db.VarChar(20) // 'daily', 'weekly', 'monthly', 'allTime'
   position        Int
-  score           BigInt   // User's score at snapshot time
+  score           BigInt // User's score at snapshot time
   snapshotDate    DateTime @db.Date // Date of the snapshot
-  metadata        Json?    // Additional context (category, etc.)
+  metadata        Json? // Additional context (category, etc.)
   createdAt       DateTime @default(now())
 
   // Unique constraint: one record per user per leaderboard type per date
@@ -602,16 +690,19 @@ model UserStats {
   totalWagered BigInt @default(0) // bets+parlays
   totalWon     BigInt @default(0) // sum of payouts
   profit       BigInt @default(0) // totalWon – totalWagered
-  roi          Float @default(0) // profit / totalWagered
-  winRate      Float @default(0) // (betsWon + parlaysWon) / (totalBets + totalParlays)
+  roi          Float  @default(0) // profit / totalWagered
+  winRate      Float  @default(0) // (betsWon + parlaysWon) / (totalBets + totalParlays)
 
   // streak tracking
-  currentStreak Int @default(0)
-  longestStreak Int @default(0)
+  currentStreak     Int @default(0)
+  longestStreak     Int @default(0)
+  longestLoseStreak Int @default(0)
 
   // extras
   mostCommonBet String?
   biggestWin    BigInt  @default(0)
+  biggestLoss   BigInt  @default(0)
+  averageOdds   Float   @default(0) // Average odds of all bets placed
 
   updatedAt DateTime @default(now()) @updatedAt
 
@@ -622,32 +713,32 @@ model UserStats {
 }
 
 model UserBan {
-  id          Int       @id @default(autoincrement())
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId      Int
-  banType     BanType
-  reason      String
-  expiresAt   DateTime? // null for permanent bans
-  isActive    Boolean   @default(true)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @default(now()) @updatedAt
+  id        Int       @id @default(autoincrement())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int
+  banType   BanType
+  reason    String
+  expiresAt DateTime? // null for permanent bans
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now()) @updatedAt
 
   @@index([userId, isActive])
   @@index([expiresAt])
 }
 
 model ModerationLog {
-  id            Int              @id @default(autoincrement())
-  moderator     User             @relation("ModeratorActions", fields: [moderatorId], references: [id])
-  moderatorId   Int
-  targetUser    User?            @relation("ModeratedUser", fields: [targetUserId], references: [id])
-  targetUserId  Int?
-  action        ModerationAction
-  reason        String?
-  details       Json? // Additional context (messageId, postId, duration, etc.)
-  ipAddress     String?
-  userAgent     String?
-  createdAt     DateTime         @default(now())
+  id           Int              @id @default(autoincrement())
+  moderator    User             @relation("ModeratorActions", fields: [moderatorId], references: [id])
+  moderatorId  Int
+  targetUser   User?            @relation("ModeratedUser", fields: [targetUserId], references: [id])
+  targetUserId Int?
+  action       ModerationAction
+  reason       String?
+  details      Json? // Additional context (messageId, postId, duration, etc.)
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime         @default(now())
 
   @@index([moderatorId])
   @@index([targetUserId])
@@ -687,34 +778,37 @@ model FeedSource {
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
   articles      Article[]
-  
+
   @@index([status])
   @@index([lastFetchedAt])
 }
 
 model Article {
-  id                   Int                    @id @default(autoincrement())
-  feedId               Int
-  guid                 String?
-  url                  String                 @unique
-  canonicalUrl         String?
-  title                String
-  excerpt              String?                @db.Text
-  leadImageUrl         String?
-  publishedAt          DateTime?
-  fetchedAt            DateTime               @default(now())
-  hash                 String                 @unique
-  status               ArticleStatus          @default(PENDING)
-  tags                 String[]               @default([])
-  modNotes             String?
-  reactions            Int                    @default(0)
-  comments             Int                    @default(0)
-  createdAt            DateTime               @default(now())
-  updatedAt            DateTime               @updatedAt
-  feed                 FeedSource             @relation(fields: [feedId], references: [id], onDelete: Cascade)
-  sourceLinks          PredictionSourceLink[]
-  articleReactions     ArticleReaction[]
-  articleComments      ArticleComment[]
+  id               Int                    @id @default(autoincrement())
+  feedId           Int
+  guid             String?
+  url              String                 @unique
+  canonicalUrl     String?
+  title            String
+  excerpt          String?                @db.Text
+  leadImageUrl     String?
+  publishedAt      DateTime?
+  fetchedAt        DateTime               @default(now())
+  hash             String                 @unique
+  status           ArticleStatus          @default(PENDING)
+  modNotes         String?
+  reactionsCount   Int                    @default(0)
+  commentsCount    Int                    @default(0)
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+  feed             FeedSource             @relation(fields: [feedId], references: [id], onDelete: Cascade)
+  tags             ArticleTag[]
+  sourceLinks      PredictionSourceLink[]
+  comments         Content[]              @relation("ArticleComments")
+  reactions        Reaction[]             @relation("ArticleReactions")
+  // Bookmark and Social relations
+  bookmarks        ArticleBookmark[]
+  shares           ArticleShare[]
 
   @@index([status, publishedAt(sort: Desc)])
   @@index([hash])
@@ -724,66 +818,18 @@ model Article {
   @@index([status, feedId, publishedAt(sort: Desc)], name: "idx_articles_timeline_covering") // Covering index for timeline loads
 }
 
-model ArticleReaction {
-  id        Int      @id @default(autoincrement())
-  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
-  articleId Int
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId    Int
-  type      String   @default("like") // "like", "dislike", "love", "laugh", "angry", etc.
-  createdAt DateTime @default(now())
-
-  @@unique([articleId, userId, type])
-  @@index([articleId, type])
-  @@index([userId])
-}
-
-model ArticleComment {
-  id        Int      @id @default(autoincrement())
-  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
-  articleId Int
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId    Int
-  content   String   @db.Text
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([articleId, createdAt])
-  @@index([userId])
-}
-
-model Tweet {
-  id                   String                 @id // Twitter snowflake ID
-  postedAt             DateTime
-  text                 String                 @db.Text
-  permalink            String                 @unique
-  authorHandle         String
-  likeCount            Int                    @default(0)
-  replyCount           Int                    @default(0)
-  repostCount          Int                    @default(0)
-  quotesCount          Int                    @default(0)
-  status               String                 @default("VISIBLE")
-  fetchedAt            DateTime               @default(now())
-  sourceLinks          PredictionSourceLink[]
-
-  @@index([postedAt(sort: Desc)])
-  @@index([authorHandle])
-  @@index([status])
-}
-
 model PredictionSourceLink {
-  id           Int         @id @default(autoincrement())
+  id           Int        @id @default(autoincrement())
   predictionId Int
   articleId    Int?
   tweetId      String?
   url          String
   title        String?
   publisher    String?
-  capturedAt   DateTime    @default(now())
-  prediction   Prediction  @relation(fields: [predictionId], references: [id], onDelete: Cascade)
-  article      Article?    @relation(fields: [articleId], references: [id], onDelete: Cascade)
-  tweet        Tweet?      @relation(fields: [tweetId], references: [id], onDelete: Cascade)
-  
+  capturedAt   DateTime   @default(now())
+  prediction   Prediction @relation(fields: [predictionId], references: [id], onDelete: Cascade)
+  article      Article?   @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
   @@index([predictionId])
   @@index([articleId])
   @@index([tweetId])
@@ -794,11 +840,11 @@ model PredictionSourceLink {
 // ============================================
 
 enum PongMatchStatus {
-  WAITING     // Waiting for opponent
-  ACTIVE      // Game in progress
-  COMPLETED   // Game finished normally
-  ABANDONED   // Player disconnected
-  DISPUTED    // Under admin review
+  WAITING // Waiting for opponent
+  ACTIVE // Game in progress
+  COMPLETED // Game finished normally
+  ABANDONED // Player disconnected
+  DISPUTED // Under admin review
 }
 
 enum PongDifficulty {
@@ -809,67 +855,67 @@ enum PongDifficulty {
 }
 
 model PongMatch {
-  id              String          @id @default(cuid())
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-  status          PongMatchStatus @default(WAITING)
-  
+  id        String          @id @default(cuid())
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  status    PongMatchStatus @default(WAITING)
+
   // Players (legacy - keep for backward compatibility)
-  playerOneId     Int
-  playerOne       User            @relation("PlayerOne", fields: [playerOneId], references: [id])
-  playerTwoId     Int?            // NULL for AI matches
-  playerTwo       User?           @relation("PlayerTwo", fields: [playerTwoId], references: [id])
-  aiDifficulty    PongDifficulty? // Set when playing against AI
-  
+  playerOneId  Int
+  playerOne    User            @relation("PlayerOne", fields: [playerOneId], references: [id])
+  playerTwoId  Int? // NULL for AI matches
+  playerTwo    User?           @relation("PlayerTwo", fields: [playerTwoId], references: [id])
+  aiDifficulty PongDifficulty? // Set when playing against AI
+
   // Canonical participant fields
-  mode            String          @default("PVP") // PVP or PVE_AI
-  rated           Boolean         @default(false) // true if wagerAmount > 0
-  hostUserId      Int?            // Made optional for migration
-  hostUser        User?           @relation("PongHost", fields: [hostUserId], references: [id])
-  joinerUserId    Int?           // Human joiner for PVP
-  joinerUser      User?          @relation("PongJoiner", fields: [joinerUserId], references: [id])
-  aiUserId        Int?           // AI opponent for PVE_AI (always -1)
-  aiUser          User?          @relation("PongAI", fields: [aiUserId], references: [id])
-  
+  mode         String  @default("PVP") // PVP or PVE_AI
+  rated        Boolean @default(false) // true if wagerAmount > 0
+  hostUserId   Int? // Made optional for migration
+  hostUser     User?   @relation("PongHost", fields: [hostUserId], references: [id])
+  joinerUserId Int? // Human joiner for PVP
+  joinerUser   User?   @relation("PongJoiner", fields: [joinerUserId], references: [id])
+  aiUserId     Int? // AI opponent for PVE_AI (always -1)
+  aiUser       User?   @relation("PongAI", fields: [aiUserId], references: [id])
+
   // Display name snapshots (captured at match start)
   hostDisplayName   String?
   joinerDisplayName String?
-  aiDisplayName     String?       @default("Elon AI")
-  
+  aiDisplayName     String? @default("Elon AI")
+
   // Wager & Economy
-  wagerAmount     BigInt          @default(0) // 0 for practice matches; Rollback: remove constraint reference
-  escrowTxId      Int?            // Reference to escrow transaction
-  escrowTx        Transaction?    @relation("PongEscrowTransaction", fields: [escrowTxId], references: [id])
-  payoutTxId      Int?            // Reference to payout transaction
-  payoutTx        Transaction?    @relation("PongPayoutTransaction", fields: [payoutTxId], references: [id])
-  
+  wagerAmount BigInt       @default(0) // 0 for practice matches; Rollback: remove constraint reference
+  escrowTxId  Int? // Reference to escrow transaction
+  escrowTx    Transaction? @relation("PongEscrowTransaction", fields: [escrowTxId], references: [id])
+  payoutTxId  Int? // Reference to payout transaction
+  payoutTx    Transaction? @relation("PongPayoutTransaction", fields: [payoutTxId], references: [id])
+
   // Game State
-  playerOneScore  Int             @default(0)
-  playerTwoScore  Int             @default(0)
-  winnerId        Int?
-  winner          User?           @relation("PongWinner", fields: [winnerId], references: [id])
-  winningScore    Int             @default(11) // First to 11
-  
+  playerOneScore Int   @default(0)
+  playerTwoScore Int   @default(0)
+  winnerId       Int?
+  winner         User? @relation("PongWinner", fields: [winnerId], references: [id])
+  winningScore   Int   @default(11) // First to 11
+
   // Performance & Anti-cheat
-  startedAt       DateTime?
-  completedAt     DateTime?
-  gameDuration    Int?            // Seconds
-  tickLog         Json?           // Compressed replay data for disputes
-  playerOnePing   Int             @default(0) // Average ping in ms
-  playerTwoPing   Int             @default(0)
-  
+  startedAt     DateTime?
+  completedAt   DateTime?
+  gameDuration  Int? // Seconds
+  tickLog       Json? // Compressed replay data for disputes
+  playerOnePing Int       @default(0) // Average ping in ms
+  playerTwoPing Int       @default(0)
+
   // Elo Tracking per Match
-  player1EloStart Int?
-  player2EloStart Int?
-  player1EloEnd   Int?
-  player2EloEnd   Int?
-  eloChange       Int?            // Absolute change amount
-  skillComponent  Int?            // Skill portion of Elo change
-  economyComponent Int?           // Economy portion of Elo change
-  
+  player1EloStart  Int?
+  player2EloStart  Int?
+  player1EloEnd    Int?
+  player2EloEnd    Int?
+  eloChange        Int? // Absolute change amount
+  skillComponent   Int? // Skill portion of Elo change
+  economyComponent Int? // Economy portion of Elo change
+
   // Integration Points
-  activities      UserActivity[]
-  
+  activities UserActivity[]
+
   @@index([status, createdAt(sort: Desc)])
   @@index([playerOneId, status])
   @@index([playerTwoId, status])
@@ -880,52 +926,52 @@ model PongMatch {
 }
 
 model PongStats {
-  id              Int      @id @default(autoincrement())
-  userId          Int      @unique
-  user            User     @relation(fields: [userId], references: [id])
-  
+  id     Int  @id @default(autoincrement())
+  userId Int  @unique
+  user   User @relation(fields: [userId], references: [id])
+
   // Hybrid Elo Rating System
-  eloRating       Int      @default(1200)
-  peakElo         Int      @default(1200)
-  eloHistory      Json?    // Array of {date, rating, matchId, change}
-  tier            String   @default("SILVER") // BRONZE|SILVER|GOLD|PLATINUM|DIAMOND|MASTER|GRANDMASTER
-  
+  eloRating  Int    @default(1200)
+  peakElo    Int    @default(1200)
+  eloHistory Json? // Array of {date, rating, matchId, change}
+  tier       String @default("SILVER") // BRONZE|SILVER|GOLD|PLATINUM|DIAMOND|MASTER|GRANDMASTER
+
   // Elo Economy Tracking
-  lastEloChange   Int      @default(0)
-  totalEloGained  Int      @default(0)
-  totalEloLost    Int      @default(0)
-  highestWagerWin BigInt   @default(0) // Biggest single win amount
-  riskTaker       Boolean  @default(false) // Flags players who bet >1k regularly
-  
+  lastEloChange   Int     @default(0)
+  totalEloGained  Int     @default(0)
+  totalEloLost    Int     @default(0)
+  highestWagerWin BigInt  @default(0) // Biggest single win amount
+  riskTaker       Boolean @default(false) // Flags players who bet >1k regularly
+
   // Match Statistics
-  totalMatches    Int      @default(0)
-  wins            Int      @default(0)
-  losses          Int      @default(0)
-  draws           Int      @default(0)
-  winStreak       Int      @default(0)
-  bestWinStreak   Int      @default(0)
-  
+  totalMatches  Int @default(0)
+  wins          Int @default(0)
+  losses        Int @default(0)
+  draws         Int @default(0)
+  winStreak     Int @default(0)
+  bestWinStreak Int @default(0)
+
   // Economy Statistics
-  totalWagered    BigInt   @default(0)
-  totalWon        BigInt   @default(0)
-  totalLost       BigInt   @default(0)
-  biggestWin      BigInt   @default(0)
-  biggestLoss     BigInt   @default(0)
-  
+  totalWagered BigInt @default(0)
+  totalWon     BigInt @default(0)
+  totalLost    BigInt @default(0)
+  biggestWin   BigInt @default(0)
+  biggestLoss  BigInt @default(0)
+
   // Performance Statistics
-  avgPing         Float    @default(0)
-  avgGameDuration Int      @default(0) // Seconds
-  perfectGames    Int      @default(0) // Won 11-0
-  comebacks       Int      @default(0) // Won after being down 5+ points
-  
+  avgPing         Float @default(0)
+  avgGameDuration Int   @default(0) // Seconds
+  perfectGames    Int   @default(0) // Won 11-0
+  comebacks       Int   @default(0) // Won after being down 5+ points
+
   // AI Statistics
-  aiWins          Int      @default(0)
-  aiLosses        Int      @default(0)
+  aiWins          Int             @default(0)
+  aiLosses        Int             @default(0)
   hardestAiBeaten PongDifficulty?
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([eloRating(sort: Desc)])
   @@index([tier, eloRating(sort: Desc)])
   @@index([wins(sort: Desc)])
@@ -936,68 +982,142 @@ model PongStats {
   @@index([perfectGames(sort: Desc)]) // Optimize perfect games leaderboard
 }
 
-model PostReaction {
-  id         Int       @id @default(autoincrement())
-  post       UserPost  @relation(fields: [postId], references: [id], onDelete: Cascade)
-  postId     Int
-  user       User      @relation(fields: [userId], references: [id])
-  userId     Int
-  type       ReactionType
-  createdAt  DateTime  @default(now())
-  
-  @@unique([postId, userId, type])
-  @@index([postId])
+// ============================================
+// UNIFIED REACTION MODEL
+// ============================================
+// Replaces PostReaction, ArticleReaction, PredictionCommentLike
+// Can react to Content (posts/comments), Articles, or Predictions
+
+model Reaction {
+  id     Int  @id @default(autoincrement())
+  user   User @relation("UserReactions", fields: [userId], references: [id], onDelete: Cascade)
+  userId Int
+
+  type ReactionType @default(LIKE)
+
+  // Polymorphic target - what is being reacted to?
+  contentId    Int?
+  content      Content?    @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  articleId    Int?
+  article      Article?    @relation("ArticleReactions", fields: [articleId], references: [id], onDelete: Cascade)
+  predictionId Int?
+  prediction   Prediction? @relation("PredictionReactions", fields: [predictionId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  // Ensure one reaction type per user per target
+  @@unique([userId, contentId, type])
+  @@unique([userId, articleId, type])
+  @@unique([userId, predictionId, type])
+  @@index([contentId, type])
+  @@index([articleId, type])
+  @@index([predictionId, type])
   @@index([userId])
 }
 
-model PostReport {
-  id         Int       @id @default(autoincrement())
-  post       UserPost  @relation(fields: [postId], references: [id], onDelete: Cascade)
-  postId     Int
-  reporter   User      @relation(fields: [reporterId], references: [id])
+model ContentReport {
+  id         Int          @id @default(autoincrement())
+  content    Content      @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  contentId  Int
+  reporter   User         @relation("UserReports", fields: [reporterId], references: [id])
   reporterId Int
   reason     ReportReason
   details    String?
   status     ReportStatus @default(PENDING)
   reviewedBy Int?
   reviewNote String?
-  createdAt  DateTime  @default(now())
+  createdAt  DateTime     @default(now())
   reviewedAt DateTime?
-  
-  @@index([postId, status])
+
+  @@index([contentId, status])
   @@index([reporterId])
+  @@index([status, createdAt])
 }
 
-model PostMention {
-  id           Int      @id @default(autoincrement())
-  post         UserPost @relation(fields: [postId], references: [id], onDelete: Cascade)
-  postId       Int
-  mentionedUser User    @relation(fields: [userId], references: [id])
-  userId       Int
-  startIndex   Int      // Position in content where mention starts
-  endIndex     Int      // Position where mention ends
-  
-  @@index([postId])
-  @@index([userId])
+model ContentMention {
+  id            Int      @id @default(autoincrement())
+  content       Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  contentId     Int
+  mentionedUser User     @relation("UserMentions", fields: [userId], references: [id])
+  userId        Int
+  startIndex    Int // Position in content where mention starts
+  endIndex      Int // Position where mention ends
+  createdAt     DateTime @default(now())
+
+  @@index([contentId])
+  @@index([userId, createdAt])
+  @@unique([contentId, userId, startIndex]) // Prevent duplicate mentions in same position
 }
 
-model PostHashtag {
-  id       Int      @id @default(autoincrement())
-  post     UserPost @relation(fields: [postId], references: [id], onDelete: Cascade)
-  postId   Int
-  hashtag  Hashtag  @relation(fields: [hashtagId], references: [id])
+model ContentHashtag {
+  id        Int     @id @default(autoincrement())
+  content   Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  contentId Int
+  hashtag   Hashtag @relation(fields: [hashtagId], references: [id])
   hashtagId Int
-  
-  @@unique([postId, hashtagId])
-  @@index([hashtagId])
+
+  @@unique([contentId, hashtagId])
+  @@index([hashtagId, id])
 }
 
 model Hashtag {
-  id        Int           @id @default(autoincrement())
-  tag       String        @unique
-  usageCount Int          @default(0)
-  posts     PostHashtag[]
-  createdAt DateTime      @default(now())
-  
-  @@index([usageCount])
+  id         Int              @id @default(autoincrement())
+  tag        String           @unique
+  usageCount Int              @default(0)
+  contents   ContentHashtag[]
+  createdAt  DateTime         @default(now())
+
+  @@index([usageCount(sort: Desc)])
+  @@index([tag])
+}
+
+// ===============================================
+// Bookmark and Social Features Models
+// ===============================================
+
+model BookmarkCollection {
+  id          Int               @id @default(autoincrement())
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      Int
+  name        String
+  description String?
+  isPrivate   Boolean           @default(false)
+  bookmarks   ArticleBookmark[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([userId])
+}
+
+model ArticleBookmark {
+  id           Int                 @id @default(autoincrement())
+  article      Article             @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  articleId    Int
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       Int
+  collection   BookmarkCollection? @relation(fields: [collectionId], references: [id], onDelete: SetNull)
+  collectionId Int?
+  createdAt    DateTime            @default(now())
+
+  @@unique([articleId, userId, collectionId])
+  @@index([userId])
+  @@index([articleId])
+  @@index([collectionId])
+}
+
+model ArticleShare {
+  id          Int      @id @default(autoincrement())
+  article     Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  articleId   Int
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      Int
+  platform    String // 'internal', 'twitter', 'facebook', 'linkedin', 'email', 'copy_link'
+  message     String?
+  targetUsers Int[]    @default([])
+  createdAt   DateTime @default(now())
+
+  @@index([articleId])
+  @@index([userId])
+  @@index([platform])
+  @@index([createdAt])
 }

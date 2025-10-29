@@ -1,5 +1,12 @@
 import api from './axios';
-import type { PublicUserProfile, UserFeedPost, UserActivity, UserStatsDTO } from '@ems/types';
+import type {
+  PublicUserProfile,
+  UserFeedPost,
+  UserActivity,
+  UserActivityStats,
+  UserStatsDTO,
+  SearchUserResult,
+} from '@ems/types';
 
 export type UserProfile = PublicUserProfile;
 
@@ -22,14 +29,7 @@ export async function unfollowUser(userId: number): Promise<void> {
 /** Update profile for the authenticated user */
 export type UpdateProfilePayload = Pick<
   PublicUserProfile,
-  | 'bio'
-  | 'avatarUrl'
-  | 'location'
-  | 'timezone'
-  | 'notifyOnResolve'
-  | 'theme'
-  | 'twoFactorEnabled'
-  | 'profileComplete'
+  'bio' | 'avatarUrl' | 'notifyOnResolve' | 'theme' | 'twoFactorEnabled' | 'profileComplete'
 >;
 
 export async function updateUserProfile(
@@ -41,21 +41,34 @@ export async function updateUserProfile(
 }
 
 /** Upload a new profile image */
-export async function uploadProfileImage(userId: number, file: File): Promise<string> {
+export async function uploadProfileImage(
+  userId: number,
+  file: File,
+): Promise<{
+  avatarUrl: string;
+  sizes: {
+    thumbnail: string;
+    profile: string;
+    full: string;
+  };
+}> {
   const formData = new FormData();
   formData.append('image', file);
 
-  const res = await api.post<{ imageUrl: string }>(
-    `/api/users/${userId}/profile-picture`,
-    formData,
-    {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+  const res = await api.post<{
+    avatarUrl: string;
+    sizes: {
+      thumbnail: string;
+      profile: string;
+      full: string;
+    };
+  }>(`/api/users/${userId}/profile-picture`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
     },
-  );
+  });
 
-  return res.data.imageUrl;
+  return res.data;
 }
 
 /** ----------- FEED/POSTS ----------- */
@@ -89,13 +102,12 @@ export async function getUserStats(userId: number): Promise<UserStatsDTO> {
   return res.data;
 }
 
-/** ----------- SEARCH ----------- */
-export interface SearchUserResult {
-  id: number;
-  name: string;
-  avatarUrl?: string;
+export async function getUserActivityStats(userId: number): Promise<UserActivityStats> {
+  const res = await api.get<UserActivityStats>(`/api/users/${userId}/activity-stats`);
+  return res.data;
 }
 
+/** ----------- SEARCH ----------- */
 export async function searchUsers(query: string): Promise<SearchUserResult[]> {
   if (!query || query.trim().length === 0) {
     return [];

@@ -13,28 +13,26 @@ import {
   useMemo,
   type ReactNode,
 } from 'react';
-import { useSocketEvent, useEventBusCore } from './EventBusCoreContext';
+import { useSocketEvent } from './EventBusCoreContext';
 import { useSocket } from './SocketContext';
 import { useAuth } from './AuthContext';
-import { REDIS_CHANNELS } from '../types/events';
+import { REDIS_CHANNELS, SOCKET_EVENTS, type ChatErrorPayload } from '@ems/types';
+import type {
+  ChatMessageDTO,
+  ChatTypingPayload,
+  ChatStopTypingPayload,
+  ChatUserOnlineInfo,
+  ChatUsersOnlinePayload,
+  ChatJoinPayload,
+  ChatLeavePayload,
+  ModerationMessageDeletePayload,
+} from '@ems/types';
 
 /* ---------- Types ---------- */
-export interface ChatMessage {
-  user: { id: number; name: string; role: string; avatarUrl: string | null };
-  message: string;
-  timestamp: string | number;
-  id?: number;
-}
-export interface TypingUser {
-  id: number;
-  name: string;
-}
-export interface OnlineUser {
-  id: number;
-  name: string;
-  avatarUrl: string | null;
-  role: string;
-}
+// Type aliases for backwards compatibility
+export type ChatMessage = ChatMessageDTO;
+export type TypingUser = ChatTypingPayload;
+export type OnlineUser = ChatUserOnlineInfo;
 
 interface ChatCtx {
   messages: ChatMessage[];
@@ -72,43 +70,78 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   /* 1. History bootstrap                                                   */
   /* ---------------------------------------------------------------------- */
   const handleHistory = useCallback((hist: ChatMessage[]) => {
+    console.log('[ChatContext] Received chat history:', hist.length, 'messages');
     setMessages(hist.sort((a, b) => +new Date(a.timestamp) - +new Date(b.timestamp)));
     setLoading(false);
   }, []);
 
-  // Migrated to EventBusCore: Chat history loading
-  useSocketEvent(REDIS_CHANNELS.CHAT_HISTORY, handleHistory);
-
+  // CRITICAL FIX: Use direct socket listener to bypass hydration watermark
+  // Chat history is request-response, not broadcast, so it should process immediately
   useEffect(() => {
-    if (!socket || !user) return;
+    if (!socket) return;
 
-    // Request chat history when socket is connected
-    if (socket.connected) {
+    console.log('[ChatContext] Setting up chat history direct listener and request');
+
+    // 1. Set up direct socket listener FIRST (bypasses EventBusCore hydration queue)
+    socket.on(SOCKET_EVENTS.CHAT_HISTORY_RESPONSE, handleHistory);
+
+    // 2. Request history AFTER listener is set up
+    const requestHistory = () => {
       console.log('[ChatContext] Requesting chat history...');
-      socket.emit('chat:history', {});
-    } else {
-      // Wait for connection - keeping this direct socket listener as it's Socket.IO internal
-      const onConnect = () => {
-        console.log('[ChatContext] Socket connected, requesting chat history...');
-        socket.emit('chat:history', {});
-      };
-      socket.on('connect', onConnect);
+      socket.emit(SOCKET_EVENTS.CHAT_HISTORY_REQUEST, {});
+    };
 
-      return () => {
-        socket.off('connect', onConnect);
+    let connectHandler: (() => void) | null = null;
+
+    if (socket.connected) {
+      // Socket already connected - request with small delay to avoid race condition
+      // CRITICAL: Server needs ~15-20ms to register all socket handlers after connection
+      // If we emit immediately, the event arrives before handlers are ready and is lost
+      console.log('[ChatContext] Socket already connected, requesting history with 50ms delay');
+      setTimeout(() => {
+        requestHistory();
+      }, 50);
+    } else {
+      // Socket not connected - wait for connection then request
+      console.log('[ChatContext] Socket not connected, waiting for connection...');
+      connectHandler = () => {
+        console.log('[ChatContext] Socket connected, requesting chat history...');
+        // CRITICAL: Add delay to avoid race condition where client emits before server finishes registering handlers
+        // Server takes ~15-20ms to register all handlers after connection, so 50ms is safe
+        setTimeout(() => {
+          socket.emit(SOCKET_EVENTS.CHAT_HISTORY_REQUEST, {});
+        }, 50);
       };
+      socket.once('connect', connectHandler);
     }
-  }, [socket, user]);
+
+    // 3. Cleanup - remove direct listener AND connect handler
+    return () => {
+      console.log('[ChatContext] Cleaning up chat history listeners');
+      socket.off(SOCKET_EVENTS.CHAT_HISTORY_RESPONSE, handleHistory);
+      // Remove connect handler if it was registered but hasn't fired yet
+      if (connectHandler) {
+        socket.off('connect', connectHandler);
+      }
+    };
+  }, [socket, handleHistory]);
 
   /* ---------------------------------------------------------------------- */
   /* 2. Live message stream                                                 */
   /* ---------------------------------------------------------------------- */
   const handleMessage = useCallback((m: ChatMessage) => {
-    setMessages((prev) => [...prev, m]);
+    setMessages((prev) => {
+      // Prevent duplicate messages (deduplicate by message ID)
+      if (m.id && prev.some((msg) => msg.id === m.id)) {
+        console.warn('[ChatContext] Duplicate message detected, skipping:', m.id);
+        return prev;
+      }
+      return [...prev, m];
+    });
   }, []);
 
-  const handleChatError = useCallback((e: any) => {
-    setError(e.message || 'Chat error');
+  const handleChatError = useCallback((e: ChatErrorPayload) => {
+    setError(e.error || 'Chat error');
   }, []);
 
   // Set up direct socket listener for chat errors (not a Redis channel)
@@ -121,12 +154,16 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   /* ---------------------------------------------------------------------- */
   /* 3. Typing indicators                                                   */
   /* ---------------------------------------------------------------------- */
-  const addTyper = useCallback(({ id, name }: TypingUser) => {
-    setTypingUsers((prev) => (prev.some((u) => u.id === id) ? prev : [...prev, { id, name }]));
+  const addTyper = useCallback((payload: ChatTypingPayload) => {
+    setTypingUsers((prev) =>
+      prev.some((u) => u.id === payload.id)
+        ? prev
+        : [...prev, { id: payload.id, name: payload.name }],
+    );
   }, []);
 
-  const removeTyper = useCallback(({ id }: { id: number }) => {
-    setTypingUsers((prev) => prev.filter((u) => u.id !== id));
+  const removeTyper = useCallback((payload: ChatStopTypingPayload) => {
+    setTypingUsers((prev) => prev.filter((u) => u.id !== payload.id));
   }, []);
 
   useSocketEvent(REDIS_CHANNELS.CHAT_TYPING, addTyper);
@@ -135,7 +172,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   /* ---------------------------------------------------------------------- */
   /* 4. Online-users list                                                   */
   /* ---------------------------------------------------------------------- */
-  const updateOnlineUsers = useCallback((users: OnlineUser[]) => {
+  const updateOnlineUsers = useCallback((users: ChatUsersOnlinePayload) => {
     setOnlineUsers(users);
   }, []);
 
@@ -148,24 +185,30 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const seenEventsRef = useRef<Set<string>>(new Set());
 
   const handleUserJoined = useCallback(
-    ({ id, name }: { id: number; name: string }) => {
-      const key = `joined-${id}`;
+    (payload: ChatJoinPayload) => {
+      const key = `joined-${payload.id}`;
       if (seenEventsRef.current.has(key)) return;
       seenEventsRef.current.add(key);
-      if (!user || id !== user.id) {
-        setUserEvents((prev) => [...prev, { type: 'joined', id, name, timestamp: Date.now() }]);
+      if (!user || payload.id !== user.id) {
+        setUserEvents((prev) => [
+          ...prev,
+          { type: 'joined', id: payload.id, name: payload.name, timestamp: Date.now() },
+        ]);
       }
     },
     [user],
   );
 
   const handleUserLeft = useCallback(
-    ({ id, name }: { id: number; name: string }) => {
-      const key = `left-${id}`;
+    (payload: ChatLeavePayload) => {
+      const key = `left-${payload.id}`;
       if (seenEventsRef.current.has(key)) return;
       seenEventsRef.current.add(key);
-      if (!user || id !== user.id) {
-        setUserEvents((prev) => [...prev, { type: 'left', id, name, timestamp: Date.now() }]);
+      if (!user || payload.id !== user.id) {
+        setUserEvents((prev) => [
+          ...prev,
+          { type: 'left', id: payload.id, name: payload.name, timestamp: Date.now() },
+        ]);
       }
     },
     [user],
@@ -175,32 +218,44 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   useSocketEvent(REDIS_CHANNELS.CHAT_LEAVE, handleUserLeft);
 
   /* ---------------------------------------------------------------------- */
-  /* 6. Emit helpers                                                        */
+  /* 6. Message deletion (moderation)                                       */
+  /* ---------------------------------------------------------------------- */
+  const handleMessageDelete = useCallback((payload: ModerationMessageDeletePayload) => {
+    setMessages((prev) => prev.filter((msg) => msg.id !== payload.messageId));
+  }, []);
+
+  useSocketEvent(REDIS_CHANNELS.MODERATION_MESSAGE_DELETE, handleMessageDelete);
+
+  /* ---------------------------------------------------------------------- */
+  /* 7. Emit helpers                                                        */
   /* ---------------------------------------------------------------------- */
   const sendTyping = useCallback(() => {
     if (!socket) return;
-    socket.emit('chat:typing', {});
+    socket.emit(SOCKET_EVENTS.CHAT_TYPING_SEND, {});
     if (localStopTimer.current) clearTimeout(localStopTimer.current);
-    localStopTimer.current = setTimeout(() => socket.emit('chat:stopTyping', {}), 3000);
+    localStopTimer.current = setTimeout(
+      () => socket.emit(SOCKET_EVENTS.CHAT_STOP_TYPING_SEND, {}),
+      3000,
+    );
   }, [socket]);
 
   const sendStopTyping = useCallback(() => {
     if (!socket) return;
-    socket.emit('chat:stopTyping', {});
+    socket.emit(SOCKET_EVENTS.CHAT_STOP_TYPING_SEND, {});
     if (localStopTimer.current) clearTimeout(localStopTimer.current);
   }, [socket]);
 
   const sendMessage = useCallback(
     (msg: string) => {
       if (!msg.trim() || !socket) return;
-      socket.emit('chat:message', { message: msg });
+      socket.emit(SOCKET_EVENTS.CHAT_MESSAGE_SEND, { message: msg });
       sendStopTyping(); // stop indicator for myself immediately
     },
     [socket, sendStopTyping],
   );
 
   /* ---------------------------------------------------------------------- */
-  /* 7. Context value                                                       */
+  /* 8. Context value                                                       */
   /* ---------------------------------------------------------------------- */
   const value = useMemo<ChatCtx>(
     () => ({

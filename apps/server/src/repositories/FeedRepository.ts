@@ -1,10 +1,12 @@
-import { PrismaClient, FeedStatus, ArticleStatus } from '@prisma/client';
+import prisma from '../db';
+import { FeedStatus, ArticleStatus } from '@prisma/client';
+import type { IFeedRepository } from './interfaces/IFeedRepository';
 
 // TEMP: Re-export shared types for backwards compatibility during migration
 export type { PageQuery, CursorPage, SortOrder, DateRange } from '@ems/types';
 
-export class FeedRepository {
-  constructor(private prisma: PrismaClient) {}
+export class FeedRepository implements IFeedRepository {
+  private prisma = prisma;
 
   async findMany() {
     return this.prisma.feedSource.findMany({
@@ -103,11 +105,75 @@ export class FeedRepository {
     });
   }
 
-  async updateArticleTags(id: number, tags: string[]) {
-    return this.prisma.article.update({
-      where: { id },
-      data: { tags },
+  async updateArticleTags(id: number, tagIds: number[]) {
+    // First, delete existing tags for this article
+    await this.prisma.articleTag.deleteMany({
+      where: { articleId: id },
     });
+
+    // Then create new tag associations
+    if (tagIds.length > 0) {
+      await this.prisma.articleTag.createMany({
+        data: tagIds.map((tagId) => ({
+          articleId: id,
+          tagId,
+        })),
+      });
+    }
+
+    // Return the updated article with its tags
+    return this.prisma.article.findUnique({
+      where: { id },
+      include: {
+        tags: {
+          include: {
+            tag: true,
+          },
+        },
+      },
+    });
+  }
+
+  /**
+   * Bulk update article tags - optimized for performance
+   * Updates tags for multiple articles in batched operations
+   */
+  async bulkUpdateArticleTags(
+    updates: Array<{ articleId: number; tagIds: number[] }>,
+  ): Promise<{ updated: number }> {
+    if (updates.length === 0) {
+      return { updated: 0 };
+    }
+
+    const articleIds = updates.map((u) => u.articleId);
+
+    // Step 1: Delete all existing tags for these articles (single query)
+    await this.prisma.articleTag.deleteMany({
+      where: {
+        articleId: { in: articleIds },
+      },
+    });
+
+    // Step 2: Prepare all new tag associations
+    const allTagAssociations: Array<{ articleId: number; tagId: number }> = [];
+    for (const update of updates) {
+      for (const tagId of update.tagIds) {
+        allTagAssociations.push({
+          articleId: update.articleId,
+          tagId,
+        });
+      }
+    }
+
+    // Step 3: Create all new tag associations (single query)
+    if (allTagAssociations.length > 0) {
+      await this.prisma.articleTag.createMany({
+        data: allTagAssociations,
+        skipDuplicates: true, // Prevent errors if duplicate associations exist
+      });
+    }
+
+    return { updated: updates.length };
   }
 
   async getArticleCountWithFilters(where: any) {
@@ -130,5 +196,142 @@ export class FeedRepository {
       take,
       skip,
     });
+  }
+
+  /**
+   * Create article with tags (for feed worker)
+   */
+  async createArticleWithTags(data: {
+    feedId: number;
+    guid: string | null;
+    url: string;
+    canonicalUrl?: string;
+    title: string;
+    excerpt?: string;
+    leadImageUrl?: string;
+    publishedAt: Date;
+    hash: string;
+    status: 'PENDING' | 'APPROVED' | 'REJECTED';
+    tags: {
+      create: Array<{
+        tag: {
+          connectOrCreate: {
+            where: { name: string };
+            create: { name: string; slug: string };
+          };
+        };
+      }>;
+    };
+  }) {
+    return this.prisma.article.create({
+      data,
+    });
+  }
+
+  /**
+   * Find article by hash for deduplication
+   */
+  async findArticleByHash(hash: string) {
+    return this.prisma.article.findUnique({
+      where: { hash },
+    });
+  }
+
+  /**
+   * Update article with enrichment data
+   */
+  async updateArticleEnrichment(
+    articleId: number,
+    data: {
+      leadImageUrl?: string;
+      excerpt?: string;
+      canonicalUrl?: string;
+      tags?: {
+        create: Array<{
+          tag: {
+            connectOrCreate: {
+              where: { name: string };
+              create: { name: string; slug: string };
+            };
+          };
+        }>;
+      };
+    },
+  ) {
+    return this.prisma.article.update({
+      where: { id: articleId },
+      data,
+    });
+  }
+
+  /**
+   * Get article with tags and feed (for enrichment worker)
+   */
+  async findArticleWithTagsAndFeed(articleId: number) {
+    return this.prisma.article.findUnique({
+      where: { id: articleId },
+      include: {
+        feed: true,
+        tags: {
+          include: {
+            tag: true,
+          },
+        },
+      },
+    });
+  }
+
+  // ============================================
+  // ARTICLE MODERATION
+  // ============================================
+
+  /**
+   * Get count of pending articles
+   */
+  async getPendingArticlesCount(): Promise<number> {
+    return this.prisma.article.count({
+      where: { status: 'PENDING' },
+    });
+  }
+
+  /**
+   * Get count of rejected articles
+   */
+  async getRejectedArticlesCount(): Promise<number> {
+    return this.prisma.article.count({
+      where: { status: 'REJECTED' },
+    });
+  }
+
+  /**
+   * Update article status and moderation notes
+   */
+  async updateArticleStatus(
+    articleId: number,
+    status: 'PENDING' | 'APPROVED' | 'REJECTED',
+    modNotes?: string | null,
+  ) {
+    return this.prisma.article.update({
+      where: { id: articleId },
+      data: {
+        status,
+        modNotes: modNotes || undefined,
+      },
+    });
+  }
+
+  /**
+   * Delete article
+   */
+  async deleteArticle(articleId: number): Promise<boolean> {
+    try {
+      await this.prisma.article.delete({
+        where: { id: articleId },
+      });
+      return true;
+    } catch (error) {
+      console.error('[FeedRepository] Error deleting article:', error);
+      return false;
+    }
   }
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { TrophyIcon, ChartBarIcon, ClockIcon, PuzzlePieceIcon } from '@heroicons/react/24/outline';
 import api from '../../api/axios';
 import PongEloCard from '../pong/PongEloCard';
@@ -27,8 +27,9 @@ interface PongOverviewData {
   riskTaker: boolean;
 }
 
-export default function ProfilePongStats({ userId, isOwn, userName }: ProfilePongStatsProps) {
+function ProfilePongStatsComponent({ userId, isOwn, userName }: ProfilePongStatsProps) {
   const [activeTab, setActiveTab] = useState<PongTab>('overview');
+  const [visitedTabs, setVisitedTabs] = useState<Set<PongTab>>(new Set(['overview']));
   const [overviewData, setOverviewData] = useState<PongOverviewData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -216,7 +217,10 @@ export default function ProfilePongStats({ userId, isOwn, userName }: ProfilePon
         {tabs.map(({ key, label, icon: Icon, description }) => (
           <button
             key={key}
-            onClick={() => setActiveTab(key)}
+            onClick={() => {
+              setActiveTab(key);
+              setVisitedTabs((prev) => new Set(prev).add(key));
+            }}
             title={description}
             className={`
               flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-all duration-200
@@ -233,10 +237,12 @@ export default function ProfilePongStats({ userId, isOwn, userName }: ProfilePon
         ))}
       </div>
 
-      {/* Tab Content */}
-      <div className="min-h-[300px]">
-        {activeTab === 'overview' && (
-          <div className="grid md:grid-cols-2 gap-6">
+      {/* Tab Content - Lazy mount on first visit, then keep mounted */}
+      <div className="min-h-[300px] relative">
+        {visitedTabs.has('overview') && (
+          <div
+            className={`grid md:grid-cols-2 gap-6 ${activeTab === 'overview' ? '' : 'absolute inset-0 invisible pointer-events-none opacity-0'}`}
+          >
             <PongEloCard
               userId={userId}
               eloRating={overviewData.eloRating}
@@ -249,12 +255,52 @@ export default function ProfilePongStats({ userId, isOwn, userName }: ProfilePon
           </div>
         )}
 
-        {activeTab === 'stats' && <PongStatsCard userId={userId} compact={false} />}
+        {visitedTabs.has('stats') && (
+          <div
+            className={
+              activeTab === 'stats'
+                ? ''
+                : 'absolute inset-0 invisible pointer-events-none opacity-0'
+            }
+          >
+            <PongStatsCard userId={userId} compact={false} />
+          </div>
+        )}
 
-        {activeTab === 'history' && <PongMatchHistory userId={userId} />}
+        {visitedTabs.has('history') && (
+          <div
+            className={
+              activeTab === 'history'
+                ? ''
+                : 'absolute inset-0 invisible pointer-events-none opacity-0'
+            }
+          >
+            <PongMatchHistory userId={userId} />
+          </div>
+        )}
 
-        {activeTab === 'elo-chart' && <EloChart userId={userId} />}
+        {visitedTabs.has('elo-chart') && (
+          <div
+            className={
+              activeTab === 'elo-chart'
+                ? ''
+                : 'absolute inset-0 invisible pointer-events-none opacity-0'
+            }
+          >
+            <EloChart userId={userId} />
+          </div>
+        )}
       </div>
     </div>
   );
 }
+
+// Memoize to prevent re-renders when parent re-renders
+// Only re-render if userId, isOwn, or userName actually changes
+export default memo(ProfilePongStatsComponent, (prevProps, nextProps) => {
+  return (
+    prevProps.userId === nextProps.userId &&
+    prevProps.isOwn === nextProps.isOwn &&
+    prevProps.userName === nextProps.userName
+  );
+});

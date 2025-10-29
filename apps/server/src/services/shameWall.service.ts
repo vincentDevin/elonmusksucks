@@ -1,21 +1,18 @@
 // Shame Wall Service
 // Manages banned users and shame achievements
-
-import { PrismaClient, BanType } from '@prisma/client';
 import { adminAchievementService } from './achievements/adminAchievement.service';
 import { UserRepository } from '../repositories/UserRepository';
 import { ModerationRepository } from '../repositories/ModerationRepository';
 import { AchievementRepository } from '../repositories/AchievementRepository';
+import { UserService } from './user.service';
 import type { IAchievementRepository } from '../repositories/interfaces/IAchievementRepository';
-import type { BanRequest } from '@ems/types';
+import type { BanUserRequest, BanType } from '@ems/types';
 
-const prisma = new PrismaClient();
+// Using shared prisma from db.ts
 const userRepository = new UserRepository();
-const moderationRepository = new ModerationRepository(prisma);
-const achievementRepository = new AchievementRepository(prisma);
-
-// TEMP: Re-export for backwards compatibility during migration
-export type { BanRequest } from '@ems/types';
+const moderationRepository = new ModerationRepository();
+const achievementRepository = new AchievementRepository();
+const userService = new UserService();
 
 export interface ShameWallEntry {
   userId: number;
@@ -38,7 +35,7 @@ export interface BanHistory {
   id: number;
   userId: number;
   userName: string;
-  banType: BanType;
+  banType: BanType; // Using @ems/types BanType (lowercase values)
   reason: string;
   startDate: string;
   endDate?: string;
@@ -48,12 +45,12 @@ export interface BanHistory {
 }
 
 class ShameWallService {
-  private achievementRepository: IAchievementRepository = new AchievementRepository(prisma);
-  private moderationRepository = new ModerationRepository(prisma);
+  private achievementRepository: IAchievementRepository = new AchievementRepository();
+  private moderationRepository = new ModerationRepository();
   /**
    * Issue a ban and award appropriate shame achievements
    */
-  async issueBan(request: BanRequest): Promise<BanHistory> {
+  async issueBan(request: BanUserRequest): Promise<BanHistory> {
     const { userId, reason, durationDays, moderatorId } = request;
 
     const user = await userRepository.findUserBasicById(userId);
@@ -69,7 +66,7 @@ class ShameWallService {
     }
 
     const isPermanent = !durationDays;
-    const banType = isPermanent ? BanType.PERMANENT : BanType.TEMPORARY;
+    const banType: BanType = isPermanent ? 'permanent' : 'temporary';
     const expiresAt = isPermanent
       ? null
       : new Date(Date.now() + durationDays! * 24 * 60 * 60 * 1000);
@@ -188,6 +185,14 @@ class ShameWallService {
     );
     const banCountMap = Object.fromEntries(banCounts.map((bc) => [bc.userId, bc.count]));
 
+    // Batch fetch signed avatar URLs (same pattern as leaderboard)
+    const usersForAvatars = activeBans.map((ban) => ({
+      id: ban.user.id,
+      profilePictureKey: ban.user.profilePictureKey,
+      avatarUrl: ban.user.avatarUrl,
+    }));
+    const avatarUrlMap = await userService.getBatchedAvatarUrls(usersForAvatars);
+
     // Get shame achievements for each banned user
     const shameWallEntries = await Promise.all(
       activeBans.map(async (ban) => {
@@ -197,7 +202,7 @@ class ShameWallService {
         return {
           userId: ban.user.id,
           userName: ban.user.name,
-          avatarUrl: ban.user.avatarUrl || undefined,
+          avatarUrl: avatarUrlMap.get(ban.user.id) || undefined, // Use signed Tigris URL
           reason: ban.reason,
           startDate: ban.createdAt.toISOString(),
           endDate: ban.expiresAt?.toISOString(),
@@ -223,6 +228,7 @@ class ShameWallService {
     const history = await moderationRepository.getBanHistoryWithModerator(limit);
     return history.map((ban) => ({
       ...ban,
+      banType: ban.banType.toLowerCase() as BanType, // Convert Prisma's uppercase to lowercase
       endDate: ban.endDate || undefined,
       shameAchievementsAwarded: [], // Would need to track this separately
     }));

@@ -7,11 +7,10 @@ import { useAuth } from '../contexts/AuthContext';
 import { useVisibilityGuard } from '../lib/visibilityGuard';
 import { useSocket } from '../contexts/SocketContext';
 import { useEventBusCore } from '../contexts/EventBusCoreContext';
-import { REDIS_CHANNELS } from '../types/events';
+import { REDIS_CHANNELS } from '@ems/types';
 import { useMyBets, useMyParlays, useMyPredictions } from './useMeStubs';
 import { useLeaderboard } from './useLeaderboard';
 import { createAbortableRequest } from '../api/axios';
-import { cache, CACHE_KEYS, CACHE_TTL } from '../utils/cache';
 
 export interface CategoryAccuracy {
   category: string;
@@ -165,17 +164,6 @@ export function useUserStats() {
         abortControllerRef.current.abort();
       }
 
-      // Check cache first unless forcing refresh
-      const cacheKey = CACHE_KEYS.USER_STATS(user.id);
-      if (!force) {
-        const cachedStats = cache.get<UserStats>(cacheKey);
-        if (cachedStats) {
-          setStats(cachedStats);
-          setLoading(false);
-          return;
-        }
-      }
-
       setLoading(true);
       setError(null);
 
@@ -228,8 +216,7 @@ export function useUserStats() {
         const potentialWinnings =
           myParlays.data?.reduce((sum, parlay) => sum + Number(parlay.potentialPayout || 0), 0) ||
           0;
-        const pendingPredictions =
-          myPredictions.data?.filter((p) => p.status === 'PENDING').length || 0;
+        const pendingPredictions = myPredictions.data?.filter((p) => !p.approved).length || 0;
         const approvalRate = calculateApprovalRate(myPredictions.data || []);
 
         // Extract performance data from enhanced stats or calculate from current data
@@ -325,21 +312,6 @@ export function useUserStats() {
           },
         };
 
-        // Cache the stats with appropriate TTL
-        cache.set(cacheKey, enhancedStats, CACHE_TTL.SHORT);
-
-        // Also cache individual components with longer TTLs
-        cache.set(
-          CACHE_KEYS.USER_ACHIEVEMENTS(user.id),
-          achievementsResponse.data || [],
-          CACHE_TTL.MEDIUM,
-        );
-        cache.set(
-          CACHE_KEYS.USER_RECENT_ACHIEVEMENTS(user.id),
-          recentAchievementsResponse.data || [],
-          CACHE_TTL.MEDIUM,
-        );
-
         setStats(enhancedStats);
         setRecentActivity(activityResponse.data || []);
         updateLastFetch();
@@ -380,8 +352,7 @@ export function useUserStats() {
       myBets.data?.reduce((sum, bet) => sum + Number(bet.amount || 0), 0) || 0;
     const activeParlaysValue =
       myParlays.data?.reduce((sum, parlay) => sum + Number(parlay.amount || 0), 0) || 0;
-    const pendingPredictions =
-      myPredictions.data?.filter((p) => p.status === 'PENDING').length || 0;
+    const pendingPredictions = myPredictions.data?.filter((p) => !p.approved).length || 0;
 
     return {
       performance: {
@@ -618,18 +589,10 @@ export function useUserStats() {
     handleBetEvent,
   ]);
 
-  // Initial fetch with cache check
+  // Initial fetch
   useEffect(() => {
     if (!user?.id) return;
-
-    // Check if we already have cached data
-    const cachedStats = cache.get<UserStats>(CACHE_KEYS.USER_STATS(user.id));
-    if (!cachedStats) {
-      fetchEnhancedStats();
-    } else {
-      setStats(cachedStats);
-      setLoading(false);
-    }
+    fetchEnhancedStats();
   }, [user?.id, fetchEnhancedStats]);
 
   // Cleanup: abort any pending requests on unmount
@@ -654,12 +617,10 @@ export function useUserStats() {
 }
 
 // Helper functions
-function calculateApprovalRate(predictions: { status: string }[]): number {
+function calculateApprovalRate(predictions: { approved: boolean }[]): number {
   if (predictions.length === 0) return 0;
-  const approved = predictions.filter(
-    (p) => p.status === 'APPROVED' || p.status === 'RESOLVED',
-  ).length;
-  return approved / predictions.length;
+  const approvedCount = predictions.filter((p) => p.approved).length;
+  return approvedCount / predictions.length;
 }
 
 function calculatePercentile(rank: number, totalUsers: number): number {

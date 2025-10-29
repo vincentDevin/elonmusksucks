@@ -1,0 +1,418 @@
+#!/usr/bin/env node
+// scripts/load-tests/helpers/pong.cjs
+// Pong load testing utilities - Socket.IO client connections and game operations
+
+const { io } = require('socket.io-client');
+
+const PONG_SERVER_URL = process.env.PONG_SERVER_URL || 'http://localhost:5001';
+const DEFAULT_TIMEOUT = 10000; // 10 seconds
+
+/**
+ * Create authenticated socket connection to pong server
+ * @param {string} accessToken - JWT access token
+ * @param {Object} options - Socket.IO options
+ * @returns {Promise<{socket, player}>} Connected socket and player info
+ */
+async function createPongConnection(accessToken, options = {}) {
+  return new Promise((resolve, reject) => {
+    const socket = io(PONG_SERVER_URL, {
+      transports: ['websocket', 'polling'],
+      timeout: 5000,
+      autoConnect: true,
+      forceNew: true,
+      ...options,
+    });
+
+    const timeoutId = setTimeout(() => {
+      socket.disconnect();
+      reject(new Error('Connection timeout'));
+    }, options.timeout || DEFAULT_TIMEOUT);
+
+    let authenticated = false;
+
+    socket.on('connect', () => {
+      // Send authentication immediately
+      socket.emit('auth', { token: accessToken });
+    });
+
+    socket.on('auth_result', (data) => {
+      if (data.success && data.player) {
+        authenticated = true;
+        clearTimeout(timeoutId);
+        resolve({ socket, player: data.player });
+      } else {
+        clearTimeout(timeoutId);
+        socket.disconnect();
+        reject(new Error(data.error || 'Authentication failed'));
+      }
+    });
+
+    socket.on('connect_error', (error) => {
+      if (!authenticated) {
+        clearTimeout(timeoutId);
+        reject(new Error(`Connection failed: ${error.message}`));
+      }
+    });
+
+    socket.on('error', (error) => {
+      if (!authenticated) {
+        clearTimeout(timeoutId);
+        socket.disconnect();
+        reject(new Error(`Socket error: ${error.message || JSON.stringify(error)}`));
+      }
+    });
+  });
+}
+
+/**
+ * Create multiple authenticated connections concurrently
+ * @param {Array<{accessToken, userId, username}>} users - Array of user auth data
+ * @returns {Promise<Array<{socket, player, userId, username}>>} Array of connections
+ */
+async function createMultipleConnections(users) {
+  const connectionPromises = users.map(async (user) => {
+    try {
+      const { socket, player } = await createPongConnection(user.accessToken);
+      return {
+        socket,
+        player,
+        userId: user.userId,
+        username: user.username,
+        success: true,
+      };
+    } catch (error) {
+      console.error(`Failed to connect user ${user.username}:`, error.message);
+      return {
+        socket: null,
+        player: null,
+        userId: user.userId,
+        username: user.username,
+        success: false,
+        error: error.message,
+      };
+    }
+  });
+
+  return await Promise.all(connectionPromises);
+}
+
+/**
+ * Join lobby and wait for lobby state
+ * @param {Socket} socket - Connected socket
+ * @param {number} timeout - Timeout in ms
+ * @returns {Promise<{lobbies}>} Lobby state
+ */
+async function joinLobby(socket, timeout = 5000) {
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      socket.off('lobby_state');
+      reject(new Error('Join lobby timeout'));
+    }, timeout);
+
+    socket.once('lobby_state', (data) => {
+      clearTimeout(timeoutId);
+      resolve(data);
+    });
+
+    socket.emit('join_lobby');
+  });
+}
+
+/**
+ * Create AI match
+ * @param {Socket} socket - Connected socket
+ * @param {number} wager - Wager amount
+ * @param {string} aiDifficulty - AI difficulty (EASY, MEDIUM, HARD, IMPOSSIBLE)
+ * @param {number} timeout - Timeout in ms
+ * @returns {Promise<{gameId, playerSlot, opponent, wager, pot}>} Match info
+ */
+async function createAIMatch(socket, wager, aiDifficulty = 'MEDIUM', timeout = 5000) {
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      socket.off('match_joined');
+      socket.off('error');
+      reject(new Error('Create AI match timeout'));
+    }, timeout);
+
+    socket.once('match_joined', (data) => {
+      clearTimeout(timeoutId);
+      socket.off('error');
+      resolve(data);
+    });
+
+    socket.once('error', (error) => {
+      clearTimeout(timeoutId);
+      socket.off('match_joined');
+      reject(new Error(error.message || 'Match creation failed'));
+    });
+
+    socket.emit('create_match', {
+      wager,
+      type: 'ai',
+      aiDifficulty,
+    });
+  });
+}
+
+/**
+ * Create PVP match (lobby)
+ * @param {Socket} socket - Connected socket
+ * @param {number} wager - Wager amount
+ * @param {number} timeout - Timeout in ms
+ * @returns {Promise<{gameId, playerSlot, wager}>} Match info
+ */
+async function createPVPMatch(socket, wager, timeout = 5000) {
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      socket.off('match_joined');
+      socket.off('error');
+      reject(new Error('Create PVP match timeout'));
+    }, timeout);
+
+    socket.once('match_joined', (data) => {
+      clearTimeout(timeoutId);
+      socket.off('error');
+      resolve(data);
+    });
+
+    socket.once('error', (error) => {
+      clearTimeout(timeoutId);
+      socket.off('match_joined');
+      reject(new Error(error.message || 'Match creation failed'));
+    });
+
+    socket.emit('create_match', {
+      wager,
+      type: 'pvp',
+    });
+  });
+}
+
+/**
+ * Join existing match
+ * @param {Socket} socket - Connected socket
+ * @param {string} matchId - Match ID to join
+ * @param {number} timeout - Timeout in ms
+ * @returns {Promise<{gameId, playerSlot, opponent, wager, pot}>} Match info
+ */
+async function joinMatch(socket, matchId, timeout = 5000) {
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      socket.off('match_joined');
+      socket.off('error');
+      reject(new Error('Join match timeout'));
+    }, timeout);
+
+    socket.once('match_joined', (data) => {
+      clearTimeout(timeoutId);
+      socket.off('error');
+      resolve(data);
+    });
+
+    socket.once('error', (error) => {
+      clearTimeout(timeoutId);
+      socket.off('match_joined');
+      reject(new Error(error.message || 'Join match failed'));
+    });
+
+    socket.emit('join_match', { matchId });
+  });
+}
+
+/**
+ * Set player ready state
+ * @param {Socket} socket - Connected socket
+ * @param {boolean} ready - Ready state
+ */
+function setReady(socket, ready = true) {
+  socket.emit('player_ready', { ready });
+}
+
+/**
+ * Send player input (paddle movement)
+ * @param {Socket} socket - Connected socket
+ * @param {number} paddleY - Paddle Y position (0-600)
+ */
+function sendInput(socket, paddleY) {
+  socket.emit('player_input', {
+    paddleY: paddleY,
+    timestamp: Date.now(),
+  });
+}
+
+/**
+ * Leave current match
+ * @param {Socket} socket - Connected socket
+ */
+function leaveMatch(socket) {
+  socket.emit('leave_match');
+}
+
+/**
+ * Spectate a match
+ * @param {Socket} socket - Connected socket
+ * @param {string} gameId - Game ID to spectate
+ * @param {number} timeout - Timeout in ms
+ * @returns {Promise<{gameId, spectatorCount}>} Resolves when spectating starts
+ */
+async function spectateMatch(socket, gameId, timeout = 5000) {
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      socket.off('spectator_joined');
+      socket.off('error');
+      reject(new Error('Spectate timeout'));
+    }, timeout);
+
+    socket.once('spectator_joined', (data) => {
+      clearTimeout(timeoutId);
+      socket.off('error');
+      resolve(data);
+    });
+
+    socket.once('error', (error) => {
+      clearTimeout(timeoutId);
+      socket.off('spectator_joined');
+      reject(new Error(error.message || 'Spectate failed'));
+    });
+
+    socket.emit('spectate_match', { gameId });
+  });
+}
+
+/**
+ * Monitor game state updates
+ * @param {Socket} socket - Connected socket
+ * @param {Function} callback - Called with each game state update
+ * @returns {Function} Cleanup function
+ */
+function monitorGameState(socket, callback) {
+  socket.on('game_state', callback);
+  return () => socket.off('game_state', callback);
+}
+
+/**
+ * Wait for game to end
+ * @param {Socket} socket - Connected socket
+ * @param {number} timeout - Timeout in ms (default 2 minutes)
+ * @returns {Promise<{winner, scores, payout}>} Game result
+ */
+async function waitForGameEnd(socket, timeout = 120000) {
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      socket.off('match_end');
+      reject(new Error('Game end timeout'));
+    }, timeout);
+
+    socket.once('match_end', (data) => {
+      clearTimeout(timeoutId);
+      resolve(data);
+    });
+  });
+}
+
+/**
+ * Measure ping to pong server
+ * @param {Socket} socket - Connected socket
+ * @returns {Promise<number>} Ping in milliseconds
+ */
+async function measurePing(socket) {
+  return new Promise((resolve, reject) => {
+    const startTime = Date.now();
+    const timeoutId = setTimeout(() => {
+      socket.off('pong');
+      reject(new Error('Ping timeout'));
+    }, 5000);
+
+    socket.once('pong', () => {
+      clearTimeout(timeoutId);
+      resolve(Date.now() - startTime);
+    });
+
+    socket.emit('ping_request', { timestamp: startTime });
+  });
+}
+
+/**
+ * Disconnect socket cleanly
+ * @param {Socket} socket - Socket to disconnect
+ */
+function disconnect(socket) {
+  if (socket && socket.connected) {
+    socket.disconnect();
+  }
+}
+
+/**
+ * Disconnect multiple sockets
+ * @param {Array<Socket>} sockets - Sockets to disconnect
+ */
+function disconnectAll(sockets) {
+  sockets.forEach((socket) => {
+    if (socket && socket.connected) {
+      socket.disconnect();
+    }
+  });
+}
+
+/**
+ * Simulate realistic player input (for load testing)
+ * Sends random paddle movements at realistic frequency
+ * @param {Socket} socket - Connected socket
+ * @param {number} duration - Duration in ms
+ * @param {number} inputsPerSecond - Input frequency (default 60)
+ * @returns {Function} Stop function
+ */
+function simulatePlayerInput(socket, duration = 60000, inputsPerSecond = 60) {
+  const interval = 1000 / inputsPerSecond;
+  let inputCount = 0;
+
+  // Game field dimensions (from PONG_PHYSICS)
+  const FIELD_HEIGHT = 600;
+  const PADDLE_HEIGHT = 100;
+  const MIN_Y = 0;
+  const MAX_Y = FIELD_HEIGHT - PADDLE_HEIGHT;
+
+  // Start paddle in the middle
+  let currentPaddleY = (FIELD_HEIGHT - PADDLE_HEIGHT) / 2;
+
+  const intervalId = setInterval(() => {
+    // Simulate realistic paddle movement
+    // Move paddle randomly up/down by small amounts
+    const movement = (Math.random() - 0.5) * 20; // -10 to +10 pixels per update
+    currentPaddleY = Math.max(MIN_Y, Math.min(MAX_Y, currentPaddleY + movement));
+
+    sendInput(socket, currentPaddleY);
+    inputCount++;
+  }, interval);
+
+  // Auto-stop after duration
+  setTimeout(() => {
+    clearInterval(intervalId);
+  }, duration);
+
+  // Return manual stop function
+  return () => {
+    clearInterval(intervalId);
+    return inputCount;
+  };
+}
+
+module.exports = {
+  createPongConnection,
+  createMultipleConnections,
+  joinLobby,
+  createAIMatch,
+  createPVPMatch,
+  joinMatch,
+  setReady,
+  sendInput,
+  leaveMatch,
+  spectateMatch,
+  monitorGameState,
+  waitForGameEnd,
+  measurePing,
+  disconnect,
+  disconnectAll,
+  simulatePlayerInput,
+  PONG_SERVER_URL,
+};

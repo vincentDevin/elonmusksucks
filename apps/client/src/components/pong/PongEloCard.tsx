@@ -1,10 +1,7 @@
-import { useState, useEffect } from 'react';
-import {
-  TrophyIcon,
-  ArrowTrendingUpIcon,
-  ArrowTrendingDownIcon,
-} from '@heroicons/react/24/outline';
+import { useState, useEffect, memo } from 'react';
+import { ArrowTrendingUpIcon, ArrowTrendingDownIcon } from '@heroicons/react/24/outline';
 import api from '../../api/axios';
+import BaseCard from '../BaseCard';
 
 interface PongEloCardProps {
   userId: number;
@@ -36,7 +33,7 @@ const TIER_REQUIREMENTS = {
   GRANDMASTER: { min: 3000, max: 10000 },
 };
 
-export default function PongEloCard({
+function PongEloCardComponent({
   userId,
   eloRating = 1200,
   tier = 'SILVER',
@@ -91,14 +88,10 @@ export default function PongEloCard({
   const pointsToNextTier = nextTierName && tierData ? tierData.max + 1 - eloRating : 0;
 
   return (
-    <div className={`bg-surface rounded-xl shadow-sm border border-accent/20 p-6 ${className}`}>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center space-x-3">
-          <TrophyIcon className="w-6 h-6 text-primary" />
-          <span className="font-semibold text-content">Elo Rating</span>
-        </div>
-        {lastEloChange !== 0 && (
+    <BaseCard variant="full" className={className} title="🏆 Elo Rating">
+      {/* Recent ELO Change Badge */}
+      {lastEloChange !== 0 && (
+        <div className="mb-3 flex justify-end">
           <div
             className={`flex items-center space-x-1 px-2 py-1 rounded-full text-sm font-medium ${
               lastEloChange > 0 ? 'bg-success/10 text-success' : 'bg-error/10 text-error'
@@ -114,8 +107,8 @@ export default function PongEloCard({
               {lastEloChange}
             </span>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Main Elo Display */}
       <div className="text-center mb-4">
@@ -183,6 +176,19 @@ export default function PongEloCard({
           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mx-auto"></div>
         </div>
       )}
-    </div>
+    </BaseCard>
   );
 }
+
+// Memoize to prevent unnecessary re-renders
+export default memo(PongEloCardComponent, (prevProps, nextProps) => {
+  return (
+    prevProps.userId === nextProps.userId &&
+    prevProps.eloRating === nextProps.eloRating &&
+    prevProps.tier === nextProps.tier &&
+    prevProps.peakElo === nextProps.peakElo &&
+    prevProps.lastEloChange === nextProps.lastEloChange &&
+    prevProps.showDetails === nextProps.showDetails &&
+    prevProps.className === nextProps.className
+  );
+});

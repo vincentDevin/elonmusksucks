@@ -31,7 +31,7 @@ export class MarketRepository implements IMarketRepository {
     Array<{
       id: number;
       title: string;
-      category: string;
+      category: string | null;
       betCount: number;
       expiresAt: Date;
     }>
@@ -42,7 +42,10 @@ export class MarketRepository implements IMarketRepository {
         approved: true,
         expiresAt: { gt: new Date() },
       },
-      include: { _count: { select: { bets: true } } },
+      include: {
+        _count: { select: { bets: true } },
+        category: true,
+      },
       orderBy: { bets: { _count: 'desc' } },
       take: limit,
     });
@@ -50,7 +53,7 @@ export class MarketRepository implements IMarketRepository {
     return trending.map((p) => ({
       id: p.id,
       title: p.title,
-      category: p.category,
+      category: p.category?.name ?? null,
       betCount: p._count.bets,
       expiresAt: p.expiresAt,
     }));

@@ -55,7 +55,7 @@ export const ProgressTypeSelector: React.FC<ProgressTypeSelectorProps> = ({
           className={`cursor-pointer rounded-lg border-2 p-4 transition-all ${
             selectedType === type.kind
               ? 'border-primary bg-primary/5'
-              : 'border-border hover:border-primary/50'
+              : 'border-muted hover:border-primary/50'
           } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
           onClick={() => !disabled && onTypeChange(type.kind)}
         >
@@ -83,7 +83,7 @@ export const ProgressTypeSelector: React.FC<ProgressTypeSelectorProps> = ({
           </div>
 
           {selectedType === type.kind && (
-            <div className="mt-4 pt-4 border-t border-border">
+            <div className="mt-4 pt-4 border-t border-muted">
               <div className="text-xs text-primary font-medium">
                 ✓ Selected - Configure conditions below
               </div>

@@ -3,13 +3,48 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* 
+/* ============================================================================
+ * Global Scrollbar Hiding
+ * Hides scrollbars site-wide for a cleaner UI while maintaining functionality
+ * ============================================================================ */
+
+/* Hide scrollbar for Webkit browsers (Chrome, Safari, Edge, Opera) */
+* {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+*::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+  width: 0;
+  height: 0;
+}
+
+/* Ensure body and html don't show scrollbars */
+html,
+body {
+  overflow-x: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/*
  * NOTE: Theme variables are now managed by the UnifiedThemeProvider
- * These are fallback values only. The JavaScript theme system will 
+ * These are fallback values only. The JavaScript theme system will
  * override these with proper theme colors.
  */
 @theme {
   --color-primary: #3b82f6; /* Blue 500 - fallback */
+  --color-primary-foreground: #ffffff; /* White text on primary */
+  --color-primary-hover: #2563eb; /* Blue 600 - hover state */
+  --color-border: #e2e8f0; /* Slate 200 - borders */
   --color-muted: #e2e8f0; /* Slate 200 - fallback */
   --color-tertiary: #64748b; /* Slate 500 - fallback */
   --color-surface: #ffffff; /* White - fallback */
@@ -28,6 +63,9 @@
 /* Legacy dark mode support (will be replaced by theme system) */
 .dark {
   --color-primary: #10b981;
+  --color-primary-foreground: #ffffff; /* White text on primary */
+  --color-primary-hover: #059669; /* Darker green for hover */
+  --color-border: #374151; /* Gray 700 - dark borders */
   --color-muted: #374151;
   --color-tertiary: #9ca3af;
   --color-surface: #1f2937;
@@ -68,4 +106,67 @@
 
 .high-priority-pulse {
   animation: priority-pulse 2s ease-in-out infinite;
+}
+
+/* Range Slider Styles */
+.slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 8px;
+  border-radius: 4px;
+  outline: none;
+  transition: all 0.2s ease-in-out;
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  cursor: pointer;
+  border: 2px solid var(--color-background);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease-in-out;
+}
+
+.slider::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.slider::-webkit-slider-thumb:active {
+  transform: scale(1.05);
+}
+
+.slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  cursor: pointer;
+  border: 2px solid var(--color-background);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease-in-out;
+}
+
+.slider::-moz-range-thumb:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.slider:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.slider:disabled::-webkit-slider-thumb {
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+.slider:disabled::-moz-range-thumb {
+  cursor: not-allowed;
+  transform: none !important;
 }

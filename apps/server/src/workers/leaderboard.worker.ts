@@ -14,7 +14,6 @@ const REFRESH_CONCURRENCY = parseInt(process.env.WORKER_LEADERBOARD_REFRESH_CONC
 const EVENT_CONCURRENCY = parseInt(process.env.WORKER_LEADERBOARD_EVENT_CONCURRENCY || '3');
 import { LeaderboardRepository } from '../repositories/LeaderboardRepository';
 import type { Job } from 'bullmq';
-import type { LeaderboardMetrics } from '@ems/types';
 import { metricsCollector } from '../lib/metrics';
 import { eventBus } from '../lib/EventBus';
 
@@ -31,12 +30,12 @@ const leaderboardQueue = new Queue('leaderboard-refresh', { connection: redisCli
 const refreshWorker = new Worker(
   'leaderboard-refresh',
   async (job: Job<RefreshJobData>) => {
-    const { trigger, batchData, config } = job.data;
+    const { type, limit, force } = job.data;
 
     console.log('[leaderboard] Processing refresh job:', {
-      trigger: trigger?.event,
-      batchSize: batchData ? Object.keys(batchData).length : 0,
-      scheduled: !!config,
+      type,
+      limit,
+      force,
     });
 
     const startTime = Date.now();
@@ -129,7 +128,7 @@ const refreshWorker = new Worker(
         JSON.stringify({
           timestamp: new Date().toISOString(),
           duration,
-          trigger: trigger?.event || 'manual',
+          type: type || 'manual',
           entriesUpdated: Math.max(topAllTime.length, topDaily.length),
         }),
       );
@@ -177,8 +176,8 @@ const eventWorker = new Worker(
  * Handle incremental update for a single user
  */
 async function handleIncrementalUpdate(data: IncrementalUpdateData): Promise<void> {
-  const { userId, metrics } = data;
-  console.log(`[leaderboard] Incremental update for user ${userId}:`, metrics);
+  const { userId, metrics, trigger } = data;
+  console.log(`[leaderboard] Incremental update for user ${userId}:`, { metrics, trigger });
 
   // For now, we'll trigger a full refresh if the user is in top positions
   // In a future enhancement, we could implement true incremental updates
@@ -195,6 +194,7 @@ async function handleIncrementalUpdate(data: IncrementalUpdateData): Promise<voi
       reason: 'top_user_update',
       userId,
       metrics,
+      trigger,
     });
   }
 }
@@ -203,24 +203,17 @@ async function handleIncrementalUpdate(data: IncrementalUpdateData): Promise<voi
  * Handle batch update for multiple user events
  */
 async function handleBatchUserUpdate(data: BatchUserUpdateData): Promise<void> {
-  const { userId, triggers } = data;
-  console.log(`[leaderboard] Batch update for user ${userId} with ${triggers.length} events`);
+  const { userIds, metrics } = data;
+  console.log(`[leaderboard] Batch update for ${userIds.length} users with metrics:`, metrics);
 
-  // Aggregate the effects of all triggers
-  const aggregatedMetrics: Partial<LeaderboardMetrics> = {};
-
-  for (const trigger of triggers) {
-    // This would contain logic to calculate metric changes based on trigger type
-    // For now, we'll just log the events
-    console.log(`[leaderboard] Processing trigger: ${trigger.event} for user ${userId}`);
+  // Process each user in the batch
+  for (const userId of userIds) {
+    await handleIncrementalUpdate({
+      userId,
+      metrics: metrics || [],
+      trigger: 'batch_update',
+    });
   }
-
-  // Apply incremental update
-  await handleIncrementalUpdate({
-    userId,
-    metrics: aggregatedMetrics,
-    timestamp: data.timestamp,
-  });
 }
 
 // Log configured concurrency on startup

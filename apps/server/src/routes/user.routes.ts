@@ -9,7 +9,9 @@ import {
   createUserPostHandler,
   getUserActivityHandler,
   getUserStatsHandler,
+  getUserActivityStatsHandler,
   uploadProfileImageHandler,
+  deleteProfileImageHandler,
   getUserBetsHandler,
   getUserParlaysHandler,
   getUserPredictionsHandler,
@@ -18,15 +20,18 @@ import {
   getRecentAchievementsHandler,
   getAllAchievementsHandler,
   searchUsersHandler,
+  getUserFollowersHandler,
+  getUserFollowingHandler,
 } from '../controllers/user.controller';
 import { getUserPosts as getUserPostsHandler } from '../controllers/post.controller';
 import { requireAuth } from '../middleware/auth.middleware';
 import { uploadConfig, validateFileContent } from '../middleware/fileValidation.middleware';
-import { getUserPongStats, getUserPongHistory } from '../controllers/pong.controller';
+import { getUserPongStats, getUserPongHistory, getUserElo } from '../controllers/pong.controller';
 
 const router = Router();
 
 // IMPORTANT: All /me routes MUST come first before any /:userId routes
+router.get('/me/pong-elo', requireAuth, getUserElo);
 router.get('/me/pong-stats', requireAuth, getUserPongStats);
 
 // User search for mentions - MUST come before /:userId routes
@@ -47,6 +52,9 @@ router.post(
   uploadProfileImageHandler,
 );
 
+// Delete profile picture (revert to default)
+router.delete('/:userId/profile-picture', requireAuth, deleteProfileImageHandler);
+
 // User feed endpoints (legacy - will be deprecated)
 router.get('/:userId/feed', requireAuth, getUserFeedHandler);
 router.post('/:userId/feed', requireAuth, createUserPostHandler);
@@ -61,8 +69,13 @@ router.get('/:userId/activity', requireAuth, getUserActivityHandler);
 router.post('/:userId/follow', requireAuth, followUserHandler);
 router.delete('/:userId/follow', requireAuth, unfollowUserHandler);
 
+// Get followers/following lists
+router.get('/:userId/followers', getUserFollowersHandler);
+router.get('/:userId/following', getUserFollowingHandler);
+
 // User stats
 router.get('/:userId/stats', requireAuth, getUserStatsHandler);
+router.get('/:userId/activity-stats', requireAuth, getUserActivityStatsHandler);
 router.get('/:userId/enhanced-stats', requireAuth, getEnhancedUserStatsHandler);
 router.get('/:userId/achievements', requireAuth, getUserAchievementsHandler);
 router.get('/:userId/achievements/recent', requireAuth, getRecentAchievementsHandler);

@@ -32,7 +32,10 @@ export function calculateRetryDelay(config: ACKTimeoutConfig, attempt: number): 
 /**
  * Create retry policy for current attempt
  */
-export function createRetryPolicy(config: ACKTimeoutConfig, attempt: number): ACKRetryPolicy {
+export function createRetryPolicy(
+  config: ACKTimeoutConfig,
+  attempt: number,
+): Partial<ACKRetryPolicy> {
   return {
     attempt,
     nextRetryDelayMs: calculateRetryDelay(config, attempt + 1),

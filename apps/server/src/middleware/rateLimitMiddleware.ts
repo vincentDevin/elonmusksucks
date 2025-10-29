@@ -3,19 +3,32 @@
 // Socket.IO rate limiting middleware with Redis-backed sliding window
 // -----------------------------------------------------------------------------
 
-import type { IRateLimiter, RateLimitConfig } from '@ems/types';
 import redisClient from '../lib/redis';
 
-export class SocketRateLimiter implements IRateLimiter {
-  private config: RateLimitConfig;
+// Socket-specific rate limit configuration
+export interface SocketRateLimitConfig {
+  windowMs: number; // Time window in milliseconds
+  maxRequests: number; // Maximum requests per window
+  skipSuccessfulRequests?: boolean; // Skip successful requests from counting
+  keyGenerator?: (userId: number, eventName: string) => string; // Custom key generator
+}
+
+// Socket-specific rate limiter interface (simpler than service-layer IRateLimiter)
+export interface ISocketRateLimiter {
+  checkLimit(userId: number, eventName: string): Promise<{ allowed: boolean; resetTime?: number }>;
+  reset(userId: number, eventName: string): Promise<void>;
+}
+
+export class SocketRateLimiter implements ISocketRateLimiter {
+  private config: SocketRateLimitConfig;
   private keyPrefix = 'rate_limit:socket';
 
-  constructor(config: RateLimitConfig) {
+  constructor(config: SocketRateLimitConfig) {
     this.config = {
       windowMs: config.windowMs || 60000, // 1 minute default
       maxRequests: config.maxRequests || 10,
       skipSuccessfulRequests: config.skipSuccessfulRequests || false,
-      keyGenerator: config.keyGenerator || this.defaultKeyGenerator,
+      keyGenerator: config.keyGenerator || this.defaultKeyGenerator.bind(this),
     };
   }
 
@@ -27,7 +40,8 @@ export class SocketRateLimiter implements IRateLimiter {
     userId: number,
     eventName: string,
   ): Promise<{ allowed: boolean; resetTime?: number }> {
-    const key = this.config.keyGenerator!(userId, eventName);
+    const keyGenerator = this.config.keyGenerator ?? this.defaultKeyGenerator.bind(this);
+    const key = keyGenerator(userId, eventName);
     const now = Date.now();
     const windowStart = now - this.config.windowMs;
 
@@ -75,7 +89,8 @@ export class SocketRateLimiter implements IRateLimiter {
   }
 
   async reset(userId: number, eventName: string): Promise<void> {
-    const key = this.config.keyGenerator!(userId, eventName);
+    const keyGenerator = this.config.keyGenerator ?? this.defaultKeyGenerator.bind(this);
+    const key = keyGenerator(userId, eventName);
     try {
       await redisClient.del(key);
     } catch (error) {
@@ -101,7 +116,7 @@ export const generalRateLimiter = new SocketRateLimiter({
 });
 
 // Middleware factory for socket event rate limiting
-export function createRateLimitMiddleware(limiter: IRateLimiter, eventName: string) {
+export function createRateLimitMiddleware(limiter: ISocketRateLimiter, eventName: string) {
   return async function rateLimitHandler(
     userId: number,
     next: (error?: string) => void,

@@ -1,102 +1,18 @@
 // apps/server/src/repositories/IPongRepository.ts
 
-import type { PongDifficulty, PongMatchStatus } from '@prisma/client';
-
-export interface PongStatsData {
-  id?: number;
-  userId: number;
-  eloRating: number;
-  peakElo: number;
-  eloHistory?: any[];
-  tier: string;
-  lastEloChange: number;
-  totalEloGained: number;
-  totalEloLost: number;
-  highestWagerWin: bigint;
-  riskTaker: boolean;
-  totalMatches: number;
-  wins: number;
-  losses: number;
-  draws: number;
-  winStreak: number;
-  bestWinStreak: number;
-  totalWagered: bigint;
-  totalWon: bigint;
-  totalLost: bigint;
-  biggestWin: bigint;
-  biggestLoss: bigint;
-  avgPing: number;
-  avgGameDuration: number;
-  perfectGames: number;
-  comebacks: number;
-  aiWins: number;
-  aiLosses: number;
-  hardestAiBeaten?: PongDifficulty;
-  createdAt?: Date;
-  updatedAt?: Date;
-}
-
-export interface PongMatchData {
-  id: string;
-  playerOneId: number;
-  playerTwoId?: number;
-  winnerId?: number;
-  wagerAmount: bigint;
-  aiDifficulty?: PongDifficulty;
-  playerOneScore: number;
-  playerTwoScore: number;
-  status: PongMatchStatus;
-  startedAt?: Date;
-  completedAt?: Date;
-  gameDuration?: number;
-  playerOnePing: number;
-  playerTwoPing: number;
-  player1EloStart?: number;
-  player2EloStart?: number;
-  player1EloEnd?: number;
-  player2EloEnd?: number;
-  eloChange?: number;
-  skillComponent?: number;
-  economyComponent?: number;
-  // Canonical fields
-  mode?: string;
-  rated?: boolean;
-  hostUserId?: number;
-  joinerUserId?: number;
-  aiUserId?: number;
-  hostDisplayName?: string;
-  joinerDisplayName?: string;
-  aiDisplayName?: string;
-}
-
-export interface PongStatsWithUser extends PongStatsData {
-  user: {
-    id: number;
-    name: string;
-    avatarUrl: string | null;
-  };
-}
-
-export interface PongMatchWithPlayers extends PongMatchData {
-  playerOne: {
-    id: number;
-    name: string;
-    avatarUrl: string | null;
-  };
-  playerTwo?: {
-    id: number;
-    name: string;
-    avatarUrl: string | null;
-  };
-  winner?: {
-    id: number;
-    name: string;
-  };
-}
+import type {
+  DbPrismaTransaction,
+  PongStatsData,
+  PongMatchData,
+  PongMatchUpdateData,
+  PongStatsWithUser,
+  PongMatchWithPlayers,
+} from '@ems/types';
 
 export interface IPongRepository {
   // PongStats operations
   findStatsByUserId(userId: number): Promise<PongStatsData | null>;
+  findEloByUserId(userId: number): Promise<{ eloRating: number; tier: string } | null>;
   createStats(data: Partial<PongStatsData>): Promise<PongStatsData>;
   updateStats(userId: number, data: Partial<PongStatsData>): Promise<void>;
   upsertStats(userId: number, data: Partial<PongStatsData>): Promise<PongStatsData>;
@@ -104,7 +20,7 @@ export interface IPongRepository {
   // PongMatch operations
   findMatchById(matchId: string): Promise<PongMatchData | null>;
   createMatch(data: PongMatchData): Promise<PongMatchData>;
-  updateMatch(matchId: string, data: Partial<PongMatchData>): Promise<void>;
+  updateMatch(matchId: string, data: PongMatchUpdateData): Promise<void>;
   setMatchActive(
     matchId: string,
     hostUserId: number,
@@ -142,6 +58,59 @@ export interface IPongRepository {
     loserStatsData?: Partial<PongStatsData>,
   ): Promise<{ isLossOnly: boolean; winnerId?: number; loserId?: number }>;
 
+  // Payout operations
+  processPVPPayout(
+    matchId: string,
+    winnerId: number,
+    loserId: number | null,
+    payoutAmount: bigint,
+    houseRake: bigint,
+    idempotencyKey: string,
+  ): Promise<{
+    matchId: string;
+    winnerId: number;
+    payout: string;
+    houseRake: string;
+    netPayout: string;
+    loserLoss?: string;
+    vsAI: boolean;
+    timestamp: Date;
+  }>;
+
+  processPVEPayout(
+    matchId: string,
+    winnerId: number,
+    payoutAmount: bigint,
+    houseRake: bigint,
+    idempotencyKey: string,
+  ): Promise<{
+    matchId: string;
+    winnerId: number;
+    payout: string;
+    houseRake: string;
+    netPayout: string;
+    vsAI: boolean;
+    timestamp: Date;
+  }>;
+
+  findExistingPayout(
+    matchId: string,
+    idempotencyKey: string,
+  ): Promise<{
+    matchId: string;
+    winnerId: number;
+    payout: string;
+    houseRake: string;
+    netPayout: string;
+    vsAI: boolean;
+    timestamp: Date;
+  } | null>;
+
   // Utility operations
-  executeInTransaction<T>(callback: (tx: any) => Promise<T>): Promise<T>;
+  executeInTransaction<T>(callback: (tx: DbPrismaTransaction) => Promise<T>): Promise<T>;
+
+  // AI player operations
+  getAIPlayerById(
+    userId: number,
+  ): Promise<{ id: number; name: string; avatarUrl: string | null } | null>;
 }

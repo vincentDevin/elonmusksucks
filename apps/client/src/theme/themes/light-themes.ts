@@ -22,6 +22,24 @@ export const lightThemes: UnifiedTheme[] = [
       error: '#EF4444', // Red 500
       info: '#3B82F6', // Blue 500
     },
+    predictionOptions: {
+      // Core palette - 8 distinct colors that don't conflict with semantic UI colors
+      // Uses indigo, violet, yellow, orange, pink, cyan, purple, lime
+      // Can cycle for predictions with more than 8 options
+      palette: [
+        '#6366F1', // indigo-500 (distinct from info blue #3B82F6)
+        '#8B5CF6', // violet-500
+        '#FACC15', // yellow-400 (bright yellow, distinct from warning amber #F59E0B)
+        '#F97316', // orange-500 (distinct from warning amber #F59E0B)
+        '#EC4899', // pink-500 (distinct from error red #EF4444)
+        '#06B6D4', // cyan-500
+        '#A855F7', // purple-500
+        '#84CC16', // lime-500
+      ],
+      // Type-specific overrides
+      binary: ['#10B981', '#EF4444'], // yellow (yes/true), pink (no/false)
+      overUnder: ['#6366F1', '#F97316'], // indigo (over), orange (under)
+    },
     effects: {
       animations: false,
       particles: false,
@@ -121,6 +139,20 @@ export const lightThemes: UnifiedTheme[] = [
       error: '#DC2626', // Red 600
       info: '#2563EB', // Blue 600
     },
+    predictionOptions: {
+      palette: [
+        '#6366F1', // indigo-500
+        '#8B5CF6', // violet-500
+        '#FACC15', // yellow-400
+        '#F97316', // orange-500
+        '#EC4899', // pink-500
+        '#06B6D4', // cyan-500
+        '#A855F7', // purple-500
+        '#84CC16', // lime-500
+      ],
+      binary: ['#10B981', '#DC2626'], // emerald-500 (yes), red-600 (no)
+      overUnder: ['#6366F1', '#F97316'], // indigo (over), orange (under)
+    },
     effects: {
       animations: true,
       particles: false,
@@ -219,6 +251,20 @@ export const lightThemes: UnifiedTheme[] = [
       warning: '#F59E0B', // Amber 500
       error: '#DC2626', // Red 600
       info: '#0EA5E9', // Sky 500
+    },
+    predictionOptions: {
+      palette: [
+        '#6366F1', // indigo-500
+        '#8B5CF6', // violet-500
+        '#FACC15', // yellow-400
+        '#F97316', // orange-500
+        '#EC4899', // pink-505
+        '#06B6D4', // cyan-500
+        '#A855F7', // purple-500
+        '#84CC16', // lime-500
+      ],
+      binary: ['#10B981', '#DC2626'], // emerald-500 (yes), red-600 (no)
+      overUnder: ['#6366F1', '#F97316'], // indigo (over), orange (under)
     },
     effects: {
       animations: true,

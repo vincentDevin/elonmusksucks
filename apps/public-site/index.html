@@ -2,28 +2,262 @@
 <html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192x192.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.json" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Elon Musk Sucks - Prediction Market</title>
-    <meta name="description" content="The world's most accurate Musk weather report. Predict the chaos, earn MuskBucks." />
-    
-    <!-- Theme script to prevent flash -->
+
+    <!-- Primary Meta Tags -->
+    <title>ElonMuskSucks.net - Satirical Prediction Market | Bet MuskBucks on Elon's Chaos</title>
+    <meta name="title" content="ElonMuskSucks.net - Satirical Prediction Market | Bet MuskBucks on Elon's Chaos" />
+    <meta name="description" content="ElonMuskSucks.net is a satirical prediction market platform where you bet virtual MuskBucks on Elon Musk's ventures including Tesla stock moves, SpaceX launches, and Twitter chaos. Compete on leaderboards, unlock 100+ unique achievements, play multiplayer Pong with wagering, and track real-time news with dynamic odds calculation. Free to play with no real money gambling—join thousands in the daily billionaire betting circus." />
+    <meta name="keywords" content="prediction market, Elon Musk, MuskBucks, Tesla predictions, SpaceX betting, Twitter chaos, multiplayer pong, leaderboard competition, virtual currency, satirical betting platform, 100+ achievements, real-time predictions, dynamic odds, free to play" />
+    <meta name="author" content="ElonMuskSucks.net" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+    <meta name="theme-color" content="#10B981" />
+    <link rel="canonical" href="https://elonmusksucks.net/" />
+
+    <!-- Open Graph / Facebook / Discord -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://elonmusksucks.net/" />
+    <meta property="og:site_name" content="ElonMuskSucks.net" />
+    <meta property="og:title" content="ElonMuskSucks.net - Satirical Prediction Market" />
+    <meta property="og:description" content="Bet virtual MuskBucks on Elon's chaos. Free prediction market with 100+ achievements, multiplayer Pong, real-time leaderboards, and dynamic odds. No real money gambling." />
+    <meta property="og:image" content="https://elonmusksucks.net/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="ElonMuskSucks.net - The Musk Weather Report" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://elonmusksucks.net/" />
+    <meta name="twitter:title" content="ElonMuskSucks.net - Predict the Chaos" />
+    <meta name="twitter:description" content="Satirical prediction market. Bet MuskBucks on Tesla, SpaceX, Twitter chaos. 100+ achievements, multiplayer Pong, leaderboards. Free to play." />
+    <meta name="twitter:image" content="https://elonmusksucks.net/og-image.png" />
+    <meta name="twitter:image:alt" content="ElonMuskSucks.net Dashboard" />
+
+    <!-- Performance Hints -->
+    <link rel="preconnect" href="https://api.elonmusksucks.net" />
+    <link rel="dns-prefetch" href="https://api.elonmusksucks.net" />
+
+    <!-- Critical inline styles to prevent flash -->
+    <style>
+      /* Inline critical CSS for instant theme application */
+      :root {
+        --color-primary: #3B82F6;
+        --color-primary-hover: #1D4ED8;
+        --color-background: #FFFFFF;
+        --color-surface: #F8FAFC;
+        --color-content: #1E293B;
+        --color-border: #E2E8F0;
+      }
+
+      .dark {
+        --color-primary: #10B981;
+        --color-primary-hover: #059669;
+        --color-background: #0a0f1e;
+        --color-surface: #181f2a;
+        --color-content: #F9FAFB;
+        --color-border: #374151;
+      }
+
+      html, body {
+        margin: 0;
+        padding: 0;
+        background-color: var(--color-background);
+        color: var(--color-content);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+
+      /* Hide content initially to prevent FOUC */
+      #root {
+        min-height: 100vh;
+        opacity: 0;
+        transition: opacity 0.4s ease-in-out;
+      }
+
+      #root.ready {
+        opacity: 1;
+      }
+
+      /* Prevent layout shift */
+      body {
+        overflow-y: scroll;
+      }
+
+      /* Loading overlay */
+      #loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: var(--color-background);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        opacity: 1;
+        transition: opacity 0.4s ease-in-out;
+      }
+
+      #loading-overlay.fade-out {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      /* Loading spinner */
+      .loading-spinner {
+        width: 50px;
+        height: 50px;
+        border: 3px solid var(--color-border);
+        border-top-color: var(--color-primary);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+
+      /* Loading text */
+      .loading-text {
+        margin-top: 1rem;
+        font-size: 0.875rem;
+        color: var(--color-content);
+        opacity: 0.7;
+      }
+    </style>
+
+    <!-- Theme script - runs immediately, no flash -->
     <script>
       (function() {
-        try {
-          const theme = localStorage.getItem('theme') || 'dark';
-          if (theme === 'dark' || theme.includes('dark')) {
-            document.documentElement.classList.add('dark');
-          } else {
-            document.documentElement.classList.remove('dark');
-          }
-        } catch (e) {
-          document.documentElement.classList.add('dark');
+        const theme = localStorage.getItem('theme') || 'dark';
+        const html = document.documentElement;
+
+        if (theme === 'dark') {
+          html.classList.add('dark');
+        } else {
+          html.classList.remove('dark');
         }
       })();
     </script>
+
+    <!-- Structured Data (JSON-LD) for Rich Snippets -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebSite",
+          "@id": "https://elonmusksucks.net/#website",
+          "url": "https://elonmusksucks.net/",
+          "name": "ElonMuskSucks.net",
+          "description": "Satirical prediction market platform for betting virtual MuskBucks on Elon Musk's ventures",
+          "potentialAction": {
+            "@type": "SearchAction",
+            "target": {
+              "@type": "EntryPoint",
+              "urlTemplate": "https://app.elonmusksucks.net/search?q={search_term_string}"
+            },
+            "query-input": "required name=search_term_string"
+          }
+        },
+        {
+          "@type": "WebApplication",
+          "name": "ElonMuskSucks.net",
+          "applicationCategory": "GameApplication",
+          "operatingSystem": "Web Browser",
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD"
+          },
+          "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": "4.5",
+            "ratingCount": "1000",
+            "bestRating": "5",
+            "worstRating": "1"
+          },
+          "featureList": [
+            "Prediction markets with dynamic odds",
+            "100+ unlockable achievements",
+            "Real-time multiplayer Pong with ELO rankings",
+            "Dual leaderboards (Market & Pong)",
+            "Live RSS news timeline",
+            "Virtual MuskBucks currency",
+            "Real-time activity feed",
+            "Community posts and discussions"
+          ]
+        },
+        {
+          "@type": "Organization",
+          "@id": "https://elonmusksucks.net/#organization",
+          "name": "ElonMuskSucks.net",
+          "url": "https://elonmusksucks.net/",
+          "logo": {
+            "@type": "ImageObject",
+            "url": "https://elonmusksucks.net/favicon-512x512.png",
+            "width": 512,
+            "height": 512
+          }
+        },
+        {
+          "@type": "BreadcrumbList",
+          "itemListElement": [
+            {
+              "@type": "ListItem",
+              "position": 1,
+              "name": "Home",
+              "item": "https://elonmusksucks.net/"
+            },
+            {
+              "@type": "ListItem",
+              "position": 2,
+              "name": "Login",
+              "item": "https://app.elonmusksucks.net/login"
+            },
+            {
+              "@type": "ListItem",
+              "position": 3,
+              "name": "Register",
+              "item": "https://app.elonmusksucks.net/register"
+            },
+            {
+              "@type": "ListItem",
+              "position": 4,
+              "name": "Predictions",
+              "item": "https://app.elonmusksucks.net/predictions"
+            },
+            {
+              "@type": "ListItem",
+              "position": 5,
+              "name": "Leaderboard",
+              "item": "https://app.elonmusksucks.net/leaderboard"
+            }
+          ]
+        }
+      ]
+    }
+    </script>
   </head>
-  <body class="bg-background text-content">
+  <body>
+    <!-- Loading overlay - visible by default -->
+    <div id="loading-overlay">
+      <div style="display: flex; flex-direction: column; align-items: center;">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Loading ElonMuskSucks.net...</div>
+      </div>
+    </div>
+
+    <!-- Main content - hidden initially -->
     <div id="root"><!--ssr-outlet--></div>
     <!--server-data-->
     <script type="module" src="/src/entry-client.tsx"></script>

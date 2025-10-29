@@ -8,27 +8,18 @@ import type {
   PublicBadge,
   PublicUserBadge,
   UserStatsDTO,
-  PublicAITweet,
   Role,
   AdminFinancialAnalyticsResponse,
+  UserSearchParams,
+  AdminUserView,
+  AdminUserSearchResponse,
+  AdminFinancialDataResponse,
 } from '@ems/types';
 
 /** — Enhanced User Management — **/
-export async function listUsers(): Promise<PublicUser[]> {
-  const res = await api.get<PublicUser[]>('/api/admin/users');
+export async function listUsers(): Promise<AdminUserView[]> {
+  const res = await api.get<AdminUserView[]>('/api/admin/users');
   return res.data;
-}
-
-// Enhanced search and pagination types
-export interface UserSearchParams {
-  search?: string;
-  role?: string[];
-  active?: boolean;
-  bannedOnly?: boolean;
-  page: number;
-  limit: number;
-  sortBy?: 'name' | 'email' | 'createdAt' | 'muskBucks' | 'role';
-  sortOrder?: 'asc' | 'desc';
 }
 
 export interface PaginatedUsers {
@@ -47,17 +38,7 @@ export interface DetailedUser extends PublicUser {
     reason?: string;
     expiresAt?: string;
   };
-  stats?: {
-    totalBets: number;
-    totalWagered: number;
-    totalWon: number;
-    winRate: number;
-  };
-  recentActivity?: {
-    lastLogin?: string;
-    lastBet?: string;
-    totalLogins: number;
-  };
+  stats?: UserStatsDTO;
   badges?: PublicBadge[];
 }
 
@@ -85,7 +66,7 @@ export interface BulkOperationResult {
 }
 
 // Enhanced user search with pagination
-export async function searchUsers(params: UserSearchParams): Promise<PaginatedUsers> {
+export async function searchUsers(params: UserSearchParams): Promise<AdminUserSearchResponse> {
   const queryParams = new URLSearchParams();
 
   if (params.search) queryParams.append('search', params.search);
@@ -97,7 +78,7 @@ export async function searchUsers(params: UserSearchParams): Promise<PaginatedUs
   if (params.sortBy) queryParams.append('sortBy', params.sortBy);
   if (params.sortOrder) queryParams.append('sortOrder', params.sortOrder);
 
-  const res = await api.get<PaginatedUsers>(`/api/admin/users/search?${queryParams}`);
+  const res = await api.get<AdminUserSearchResponse>(`/api/admin/users/search?${queryParams}`);
   return res.data;
 }
 
@@ -113,19 +94,59 @@ export async function bulkUpdateUsers(operation: BulkUserOperation): Promise<Bul
   return res.data;
 }
 
-export async function updateUserRole(userId: number, role: Role): Promise<PublicUser> {
-  const res = await api.patch<PublicUser>(`/api/admin/users/${userId}/role`, { role });
+export async function updateUserRole(userId: number, role: Role): Promise<AdminUserView> {
+  const res = await api.patch<AdminUserView>(`/api/admin/users/${userId}/role`, { role });
   return res.data;
 }
 
-export async function activateUser(userId: number, active: boolean): Promise<PublicUser> {
-  const res = await api.patch<PublicUser>(`/api/admin/users/${userId}/activate`, { active });
+export async function activateUser(userId: number, active: boolean): Promise<AdminUserView> {
+  const res = await api.patch<AdminUserView>(`/api/admin/users/${userId}/activate`, { active });
   return res.data;
 }
 
-export async function updateUserBalance(userId: number, amount: number): Promise<PublicUser> {
-  const res = await api.patch<PublicUser>(`/api/admin/users/${userId}/balance`, { amount });
+export async function updateUserBalance(userId: number, amount: number): Promise<AdminUserView> {
+  const res = await api.patch<AdminUserView>(`/api/admin/users/${userId}/balance`, { amount });
   return res.data;
+}
+
+/** — Admin Avatar Management — **/
+export async function uploadUserProfileImage(
+  userId: number,
+  file: File,
+): Promise<{ avatarUrl: string; sizes: { thumbnail: string; profile: string; full: string } }> {
+  const formData = new FormData();
+  formData.append('image', file);
+  const res = await api.post(`/api/admin/users/${userId}/profile-picture`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return res.data;
+}
+
+export async function deleteUserProfileImage(userId: number): Promise<void> {
+  await api.delete(`/api/admin/users/${userId}/profile-picture`);
+}
+
+/** — Site Default Avatar Management — **/
+export async function getDefaultAvatar(): Promise<{ avatarUrl: string | null }> {
+  const res = await api.get<{ avatarUrl: string | null }>('/api/admin/settings/default-avatar');
+  return res.data;
+}
+
+export async function uploadDefaultAvatar(file: File): Promise<{ avatarUrl: string }> {
+  const formData = new FormData();
+  formData.append('image', file);
+  const res = await api.post<{ avatarUrl: string }>(
+    '/api/admin/settings/default-avatar',
+    formData,
+    {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    },
+  );
+  return res.data;
+}
+
+export async function deleteDefaultAvatar(): Promise<void> {
+  await api.delete('/api/admin/settings/default-avatar');
 }
 
 /** — Enhanced Prediction Management — **/
@@ -286,6 +307,16 @@ export interface FinancialSearchParams {
   betType?: ('single' | 'parlay')[];
   status?: ('pending' | 'won' | 'lost' | 'refunded')[];
   transactionType?: ('DEBIT' | 'CREDIT')[];
+  transactionSubtype?: (
+    | 'BET_WAGER'
+    | 'BET_PAYOUT'
+    | 'PARLAY_WAGER'
+    | 'PARLAY_PAYOUT'
+    | 'PONG_WAGER'
+    | 'PONG_PAYOUT'
+  )[];
+  includePongTransactions?: boolean;
+  includeMetadata?: boolean;
   minAmount?: number;
   maxAmount?: number;
   startDate?: string;
@@ -326,6 +357,10 @@ export interface DetailedBet extends PublicBet {
 export interface DetailedTransaction extends PublicTransaction {
   userName?: string;
   userEmail?: string;
+  userAvatarUrl?: string | null;
+  subtype?: string;
+  description?: string;
+  metadata?: any;
   relatedBet?: {
     id: number;
     predictionTitle: string;
@@ -335,6 +370,15 @@ export interface DetailedTransaction extends PublicTransaction {
     id: number;
     legsCount: number;
     amount: number;
+  };
+  relatedPongMatch?: {
+    id: string;
+    wagerAmount: number;
+    payoutAmount?: number;
+    status: string;
+    playerOneId: number;
+    playerTwoId?: number;
+    winnerId?: number;
   };
 }
 
@@ -347,6 +391,7 @@ export interface PaginatedFinancialData {
   currentPage: number;
   hasNextPage: boolean;
   hasPreviousPage: boolean;
+  pageSize?: number;
 }
 
 export interface BulkFinancialOperation {
@@ -371,7 +416,7 @@ export interface BulkFinancialResult {
 // Enhanced financial data endpoints
 export async function searchFinancialData(
   params: FinancialSearchParams,
-): Promise<PaginatedFinancialData> {
+): Promise<AdminFinancialDataResponse> {
   const queryParams = new URLSearchParams();
 
   if (params.search) queryParams.append('search', params.search);
@@ -381,6 +426,10 @@ export async function searchFinancialData(
   if (params.status) params.status.forEach((s) => queryParams.append('status', s));
   if (params.transactionType)
     params.transactionType.forEach((t) => queryParams.append('transactionType', t));
+  if (params.transactionSubtype)
+    params.transactionSubtype.forEach((s) => queryParams.append('transactionSubtype', s));
+  if (params.includePongTransactions) queryParams.append('includePongTransactions', 'true');
+  if (params.includeMetadata) queryParams.append('includeMetadata', 'true');
   if (params.minAmount) queryParams.append('minAmount', params.minAmount.toString());
   if (params.maxAmount) queryParams.append('maxAmount', params.maxAmount.toString());
   if (params.startDate) queryParams.append('startDate', params.startDate);
@@ -391,7 +440,9 @@ export async function searchFinancialData(
   if (params.sortBy) queryParams.append('sortBy', params.sortBy);
   if (params.sortOrder) queryParams.append('sortOrder', params.sortOrder);
 
-  const res = await api.get<PaginatedFinancialData>(`/api/admin/financial/search?${queryParams}`);
+  const res = await api.get<AdminFinancialDataResponse>(
+    `/api/admin/financial/search?${queryParams}`,
+  );
   return res.data;
 }
 
@@ -407,6 +458,27 @@ export async function getFinancialAnalytics(params?: {
 
   const res = await api.get<AdminFinancialAnalyticsResponse>(
     `/api/admin/financial/analytics?${queryParams}`,
+  );
+  return res.data;
+}
+
+// NEW: Unified analytics endpoint for cross-transaction insights
+export async function getUnifiedAnalytics(params?: {
+  startDate?: string;
+  endDate?: string;
+  includeHourlyTrends?: boolean;
+  includeRiskMetrics?: boolean;
+  topUsersLimit?: number;
+}): Promise<import('@ems/types').UnifiedAnalyticsResponse> {
+  const queryParams = new URLSearchParams();
+  if (params?.startDate) queryParams.append('startDate', params.startDate);
+  if (params?.endDate) queryParams.append('endDate', params.endDate);
+  if (params?.includeHourlyTrends) queryParams.append('includeHourlyTrends', 'true');
+  if (params?.includeRiskMetrics) queryParams.append('includeRiskMetrics', 'true');
+  if (params?.topUsersLimit) queryParams.append('topUsersLimit', params.topUsersLimit.toString());
+
+  const res = await api.get<import('@ems/types').UnifiedAnalyticsResponse>(
+    `/api/admin/financial/unified-analytics?${queryParams}`,
   );
   return res.data;
 }
@@ -716,12 +788,6 @@ export async function refreshLeaderboard(): Promise<void> {
 
 export async function getUserStats(userId: number): Promise<UserStatsDTO | null> {
   const res = await api.get<UserStatsDTO>(`/api/admin/stats/${userId}`);
-  return res.data;
-}
-
-/** — Miscellaneous — **/
-export async function triggerAITweet(): Promise<PublicAITweet> {
-  const res = await api.post<PublicAITweet>('/api/admin/aitweet');
   return res.data;
 }
 

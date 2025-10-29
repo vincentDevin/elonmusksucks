@@ -1,30 +1,28 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-export default defineConfig(({ command }) => {
-  return {
-    plugins: [react()],
-    server: {
-      host: '127.0.0.1',
-      port: 5173,
-      proxy: {
-        '/api': {
-          target: 'http://127.0.0.1:5000',
-          changeOrigin: true,
-          secure: false,
-        },
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    host: '127.0.0.1',
+    port: 5173,
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:5000',
+        changeOrigin: true,
+        secure: false,
       },
     },
-    build: {
-      rollupOptions: {
-        input: {
-          client: './src/entry-client.tsx',
-          server: './src/entry-server.tsx',
-        },
+  },
+  build: {
+    emptyOutDir: false, // Don't clear dist folder between builds
+    rollupOptions: {
+      output: {
+        format: 'esm',
       },
     },
-    ssr: {
-      noExternal: ['tailwindcss'],
-    },
-  };
+  },
+  ssr: {
+    noExternal: ['tailwindcss'],
+  },
 });

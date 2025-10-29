@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useAdvancedThemes } from '../hooks/useUnifiedTheme';
 import { themeCategories } from '../themes';
-import type { ThemeCategory, UnifiedTheme } from '../types';
+import type { ThemeCategory } from '../types';
 
 interface AdvancedThemeSelectorProps {
   className?: string;

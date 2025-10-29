@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { Suspense, lazy } from 'react';
 import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import env from '../config/env';
 import Login from '../pages/Login';
 import Register from '../pages/Register';
 import ForgotPassword from '../pages/ForgotPassword';
@@ -13,7 +14,6 @@ import RequireAdmin from '../components/admin/RequireAdmin';
 import MainLayout from '../components/MainLayout';
 
 // Lazy-loaded authenticated routes for code splitting
-const Dashboard = lazy(() => import('../pages/Dashboard'));
 const Timeline = lazy(() => import('../pages/Timeline'));
 const AuthPredictions = lazy(() => import('../pages/Predictions'));
 const AuthLeaderboard = lazy(() => import('../pages/Leaderboard'));
@@ -21,12 +21,10 @@ const Profile = lazy(() => import('../pages/Profile'));
 const AdminDashboard = lazy(() => import('../pages/AdminDashboard'));
 const Pong = lazy(() => import('../pages/Pong'));
 
-import HashtagFeed from '../components/posts/HashtagFeed';
-
 // Redirect to public site component
 const PublicSiteRedirect = () => {
   React.useEffect(() => {
-    window.location.href = 'http://127.0.0.1:5173';
+    window.location.href = env.PUBLIC_SITE_URL || '/login';
   }, []);
 
   return (
@@ -44,7 +42,7 @@ const RouteFallback = () => (
 );
 
 export default function AppRoutes() {
-  const { accessToken } = useAuth();
+  const { user } = useAuth();
 
   return (
     <Routes>
@@ -96,16 +94,6 @@ export default function AppRoutes() {
       {/* Protected authenticated routes */}
       <Route element={<PrivateRoute />}>
         <Route
-          path="/dashboard"
-          element={
-            <MainLayout>
-              <Suspense fallback={<RouteFallback />}>
-                <Dashboard />
-              </Suspense>
-            </MainLayout>
-          }
-        />
-        <Route
           path="/timeline"
           element={
             <MainLayout>
@@ -117,6 +105,16 @@ export default function AppRoutes() {
         />
         <Route
           path="/predictions"
+          element={
+            <MainLayout>
+              <Suspense fallback={<RouteFallback />}>
+                <AuthPredictions />
+              </Suspense>
+            </MainLayout>
+          }
+        />
+        <Route
+          path="/predictions/:id"
           element={
             <MainLayout>
               <Suspense fallback={<RouteFallback />}>
@@ -142,16 +140,6 @@ export default function AppRoutes() {
               <Suspense fallback={<RouteFallback />}>
                 <Profile />
               </Suspense>
-            </MainLayout>
-          }
-        />
-
-        {/* Hashtag feed route */}
-        <Route
-          path="/hashtag/:tag"
-          element={
-            <MainLayout>
-              <HashtagFeed />
             </MainLayout>
           }
         />
@@ -186,7 +174,7 @@ export default function AppRoutes() {
       {/* Fallback - redirect unknown routes */}
       <Route
         path="*"
-        element={accessToken ? <Navigate to="/dashboard" replace /> : <PublicSiteRedirect />}
+        element={user ? <Navigate to="/timeline" replace /> : <PublicSiteRedirect />}
       />
     </Routes>
   );

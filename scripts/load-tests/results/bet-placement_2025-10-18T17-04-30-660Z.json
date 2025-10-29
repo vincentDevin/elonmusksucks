@@ -1,0 +1,165 @@
+{
+  "testName": "Bet Placement Load Test",
+  "totalRequests": 50,
+  "successfulRequests": 0,
+  "failedRequests": 50,
+  "requestDurations": [],
+  "errors": [
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    },
+    {
+      "error": "startTime is not defined"
+    }
+  ],
+  "metadata": {
+    "numBets": 50,
+    "concurrency": 5,
+    "userCount": 5
+  },
+  "duration": 2350
+}

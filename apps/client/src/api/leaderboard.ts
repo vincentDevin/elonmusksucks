@@ -1,40 +1,14 @@
 // apps/client/src/api/leaderboard.ts
 
 import api from './axios';
-import type { PublicLeaderboardEntry } from '@ems/types';
-
-// Enhanced interfaces for Phase 3 functionality
-export interface PaginatedLeaderboard {
-  entries: PublicLeaderboardEntry[];
-  totalCount: number;
-  hasNextPage: boolean;
-  hasPrevPage: boolean;
-  currentPage: number;
-  totalPages: number;
-}
-
-export interface UserRank {
-  userId: number;
-  allTimeRank: number | null;
-  dailyRank: number | null;
-  weeklyRank?: number | null;
-  monthlyRank?: number | null;
-}
-
-export interface LeaderboardStats {
-  totalUsers: number;
-  activeUsers: number;
-  totalBets: number;
-  totalVolume: number;
-  lastRefresh: Date | null;
-}
-
-export interface LeaderboardQuery {
-  limit?: number;
-  offset?: number;
-  period?: string;
-  metric?: 'profit' | 'winRate' | 'volume' | 'roi';
-}
+import type {
+  PublicLeaderboardEntry,
+  PaginatedLeaderboardResponse,
+  UserRankResponse,
+  LeaderboardStatsResponse,
+  LeaderboardQueryParams,
+  PongLeaderboardView,
+} from '@ems/types';
 
 /**
  * Fetch the all-time leaderboard.
@@ -60,8 +34,8 @@ export async function getTopDaily(limit?: number): Promise<PublicLeaderboardEntr
  * Fetch paginated all-time leaderboard with advanced options.
  */
 export async function getTopAllTimePaginated(
-  params: LeaderboardQuery = {},
-): Promise<PaginatedLeaderboard> {
+  params: LeaderboardQueryParams = {},
+): Promise<PaginatedLeaderboardResponse> {
   const queryParams = new URLSearchParams();
   if (params.limit) queryParams.set('limit', params.limit.toString());
   if (params.offset) queryParams.set('offset', params.offset.toString());
@@ -71,7 +45,7 @@ export async function getTopAllTimePaginated(
     ? `/api/leaderboard/all-time/paginated?${queryParams}`
     : '/api/leaderboard/all-time/paginated';
 
-  const { data } = await api.get<PaginatedLeaderboard>(url);
+  const { data } = await api.get<PaginatedLeaderboardResponse>(url);
   return data;
 }
 
@@ -79,8 +53,8 @@ export async function getTopAllTimePaginated(
  * Fetch paginated daily leaderboard with advanced options.
  */
 export async function getTopDailyPaginated(
-  params: LeaderboardQuery = {},
-): Promise<PaginatedLeaderboard> {
+  params: LeaderboardQueryParams = {},
+): Promise<PaginatedLeaderboardResponse> {
   const queryParams = new URLSearchParams();
   if (params.limit) queryParams.set('limit', params.limit.toString());
   if (params.offset) queryParams.set('offset', params.offset.toString());
@@ -90,7 +64,7 @@ export async function getTopDailyPaginated(
     ? `/api/leaderboard/daily/paginated?${queryParams}`
     : '/api/leaderboard/daily/paginated';
 
-  const { data } = await api.get<PaginatedLeaderboard>(url);
+  const { data } = await api.get<PaginatedLeaderboardResponse>(url);
   return data;
 }
 
@@ -100,16 +74,18 @@ export async function getTopDailyPaginated(
 export async function getUserRank(
   userId: number,
   period: 'allTime' | 'daily' = 'allTime',
-): Promise<UserRank> {
-  const { data } = await api.get<UserRank>(`/api/leaderboard/user/${userId}/rank?period=${period}`);
+): Promise<UserRankResponse> {
+  const { data } = await api.get<UserRankResponse>(
+    `/api/leaderboard/user/${userId}/rank?period=${period}`,
+  );
   return data;
 }
 
 /**
  * Get leaderboard statistics.
  */
-export async function getLeaderboardStats(): Promise<LeaderboardStats> {
-  const { data } = await api.get<LeaderboardStats>('/api/leaderboard/stats');
+export async function getLeaderboardStats(): Promise<LeaderboardStatsResponse> {
+  const { data } = await api.get<LeaderboardStatsResponse>('/api/leaderboard/stats');
   return data;
 }
 
@@ -118,5 +94,20 @@ export async function getLeaderboardStats(): Promise<LeaderboardStats> {
  */
 export async function refreshLeaderboard(): Promise<{ message: string }> {
   const { data } = await api.post<{ message: string }>('/api/leaderboard/refresh');
+  return data;
+}
+
+/**
+ * Fetch Pong leaderboard by metric.
+ * @param metric The metric to sort by (elo, wins, winStreak, totalWon, totalWagered, perfectGames)
+ * @param limit Number of entries to return (default: 50)
+ */
+export async function getPongLeaderboard(
+  metric: string = 'elo',
+  limit: number = 50,
+): Promise<PongLeaderboardView[]> {
+  const { data } = await api.get<PongLeaderboardView[]>(
+    `/api/leaderboard/pong/${metric}?limit=${limit}`,
+  );
   return data;
 }

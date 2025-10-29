@@ -1,13 +1,13 @@
 import { Queue } from 'bullmq';
-import { PongPayoutData, QUEUE_NAMES } from '@ems/types';
+import { PongPayoutJobData, QUEUE_NAMES } from '@ems/types';
 import { createQueueOptions } from '../lib/bullmqConfig';
 
 export class PongPayoutQueueService {
   private static instance: PongPayoutQueueService;
-  private queue: Queue<PongPayoutData>;
+  private queue: Queue<PongPayoutJobData>;
 
   constructor() {
-    this.queue = new Queue<PongPayoutData>(
+    this.queue = new Queue<PongPayoutJobData>(
       QUEUE_NAMES.PONG_PAYOUTS,
       createQueueOptions('PONG_PAYOUTS'),
     );
@@ -23,8 +23,9 @@ export class PongPayoutQueueService {
   /**
    * Enqueue a Pong payout job with idempotency
    */
-  async enqueuePayout(data: PongPayoutData): Promise<void> {
-    const jobId = `payout_v1:${data.matchId}`;
+  async enqueuePayout(data: PongPayoutJobData): Promise<void> {
+    // ✅ Use underscore instead of colon (BullMQ doesn't allow colons in job IDs)
+    const jobId = `payout_v1_${data.matchId}`;
 
     await this.queue.add('pong-payout', data, {
       jobId, // Use matchId as job ID for idempotency
@@ -37,7 +38,8 @@ export class PongPayoutQueueService {
    * Check if a payout job is already queued or completed
    */
   async isPayoutQueued(matchId: string): Promise<boolean> {
-    const jobId = `payout_v1:${matchId}`;
+    // ✅ Use underscore instead of colon (BullMQ doesn't allow colons in job IDs)
+    const jobId = `payout_v1_${matchId}`;
     const job = await this.queue.getJob(jobId);
     return job !== null;
   }

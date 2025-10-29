@@ -25,8 +25,15 @@ export const toAdminUserView = (user: {
   muskBucks: bigint;
   role: string;
   isEmailVerified?: boolean;
+  active?: boolean;
+  avatarUrl?: string | null;
   createdAt: Date;
   updatedAt?: Date;
+  banStatus?: {
+    isBanned: boolean;
+    reason?: string;
+    expiresAt?: Date | string;
+  } | null;
 }): AdminUserView => ({
   id: user.id,
   name: user.name,
@@ -34,8 +41,20 @@ export const toAdminUserView = (user: {
   muskBucks: user.muskBucks.toString(),
   role: user.role,
   isEmailVerified: user.isEmailVerified ?? false,
+  active: user.active ?? true,
+  avatarUrl: user.avatarUrl ?? null,
   createdAt: user.createdAt.toISOString(),
   updatedAt: user.updatedAt ? user.updatedAt.toISOString() : user.createdAt.toISOString(),
+  banStatus: user.banStatus
+    ? {
+        isBanned: user.banStatus.isBanned,
+        reason: user.banStatus.reason,
+        expiresAt:
+          user.banStatus.expiresAt instanceof Date
+            ? user.banStatus.expiresAt.toISOString()
+            : user.banStatus.expiresAt,
+      }
+    : null,
 });
 
 /**
@@ -46,6 +65,7 @@ export const toAdminBetView = (bet: {
   id: number;
   userId: number;
   userName?: string;
+  user?: { name: string; email: string; avatarUrl?: string | null };
   predictionId: number;
   optionId: number | null;
   amount: bigint;
@@ -59,7 +79,9 @@ export const toAdminBetView = (bet: {
 }): AdminBetView => ({
   id: bet.id,
   userId: bet.userId,
-  userName: bet.userName || 'Unknown',
+  userName: bet.userName || bet.user?.name || 'Unknown',
+  userEmail: bet.user?.email,
+  userAvatarUrl: bet.user?.avatarUrl || null,
   predictionId: bet.predictionId,
   predictionTitle: bet.prediction?.title || 'Unknown',
   optionId: bet.optionId,
@@ -79,16 +101,24 @@ export const toAdminTransactionView = (transaction: {
   id: number;
   userId: number;
   userName?: string;
+  user?: { name: string; email: string; avatarUrl?: string | null };
   type: string;
   amount: bigint | string;
   balanceAfter: bigint | string;
   relatedBetId: number | null;
   relatedParlayId: number | null;
   createdAt: Date;
+  // Enhanced fields for proper categorization
+  subtype?: string | null;
+  description?: string | null;
+  relatedPongMatchId?: string | null;
+  metadata?: any;
 }): AdminTransactionView => ({
   id: transaction.id,
   userId: transaction.userId,
-  userName: transaction.userName || 'Unknown',
+  userName: transaction.userName || transaction.user?.name || 'Unknown',
+  userEmail: transaction.user?.email,
+  userAvatarUrl: transaction.user?.avatarUrl || null,
   type: transaction.type,
   amount:
     typeof transaction.amount === 'bigint' ? transaction.amount.toString() : transaction.amount,
@@ -99,6 +129,11 @@ export const toAdminTransactionView = (transaction: {
   relatedBetId: transaction.relatedBetId,
   relatedParlayId: transaction.relatedParlayId,
   createdAt: transaction.createdAt.toISOString(),
+  // Enhanced fields for proper categorization
+  subtype: transaction.subtype || null,
+  description: transaction.description || null,
+  relatedPongMatchId: transaction.relatedPongMatchId || null,
+  ...(transaction.metadata && { metadata: transaction.metadata }),
 });
 
 /**
@@ -134,6 +169,7 @@ export const toAdminFinancialDataResponse = (financialData: {
   currentPage: number;
   hasNextPage: boolean;
   hasPreviousPage: boolean;
+  pageSize?: number;
 }): AdminFinancialDataResponse => {
   // Calculate summary data from the transactions and bets
   const totalVolume = financialData.bets.reduce((sum, bet) => {
@@ -148,9 +184,24 @@ export const toAdminFinancialDataResponse = (financialData: {
 
   const netRevenue = totalVolume - totalPayouts;
 
+  const pageSize =
+    financialData.pageSize ??
+    (financialData.totalPages > 0
+      ? Math.ceil(
+          Math.max(financialData.totalBets, financialData.totalTransactions) /
+            financialData.totalPages,
+        )
+      : undefined);
+
   return {
     transactions: financialData.transactions.map(toAdminTransactionView),
     bets: financialData.bets.map(toAdminBetView),
+    totalTransactions: financialData.totalTransactions,
+    totalBets: financialData.totalBets,
+    totalPages: financialData.totalPages,
+    currentPage: financialData.currentPage,
+    hasNextPage: financialData.hasNextPage,
+    hasPreviousPage: financialData.hasPreviousPage,
     summary: {
       totalTransactions: financialData.totalTransactions,
       totalBets: financialData.totalBets,
@@ -158,12 +209,14 @@ export const toAdminFinancialDataResponse = (financialData: {
       totalPayouts: totalPayouts.toString(),
       netRevenue: netRevenue.toString(),
     },
-    pagination: {
-      page: financialData.currentPage,
-      limit: Math.ceil(financialData.totalBets / financialData.totalPages) || 25,
-      totalPages: financialData.totalPages,
-      hasMore: financialData.hasNextPage,
-    },
+    pagination: pageSize
+      ? {
+          page: financialData.currentPage,
+          limit: pageSize,
+          totalPages: financialData.totalPages,
+          hasMore: financialData.hasNextPage,
+        }
+      : undefined,
   };
 };
 
@@ -277,6 +330,7 @@ export const toAdminAchievementView = (achievement: {
   title: string;
   description: string;
   category: string;
+  rarity: string;
   targetValue: number;
   iconUrl: string | null;
   isActive: boolean;
@@ -297,6 +351,7 @@ export const toAdminAchievementView = (achievement: {
   title: achievement.title,
   description: achievement.description,
   category: achievement.category,
+  rarity: achievement.rarity,
   targetValue: achievement.targetValue,
   iconUrl: achievement.iconUrl,
   isActive: achievement.isActive,

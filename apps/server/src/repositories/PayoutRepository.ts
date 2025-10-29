@@ -1,12 +1,11 @@
 // apps/server/src/repositories/PayoutRepository.ts
-import { PrismaClient, Prisma } from '@prisma/client';
+import prisma from '../db';
+import { Prisma } from '@prisma/client';
 import type { IPayoutRepository } from './interfaces/IPayoutRepository';
 import type { PublicPrediction, DbUserStats } from '@ems/types';
 import { REDIS_CHANNELS } from '@ems/types';
 import { serializeBigInt } from '../utils/bigintSerializer';
 import { eventBus } from '../lib/EventBus';
-
-const prisma = new PrismaClient();
 
 export class PayoutRepository implements IPayoutRepository {
   private eventBus = eventBus;
@@ -41,7 +40,10 @@ export class PayoutRepository implements IPayoutRepository {
             winningOptionId,
             resolvedAt: new Date(),
           },
-          include: { options: true },
+          include: {
+            options: true,
+            category: true,
+          },
         });
 
         // --- STEP 2: process single bets ---
@@ -90,8 +92,20 @@ export class PayoutRepository implements IPayoutRepository {
                 data: {
                   userId: user.id,
                   type: 'CREDIT',
+                  subtype: 'BET_PAYOUT',
                   amount: payoutAmount,
                   balanceAfter: newBal,
+                  description: `Bet payout: "${updatedPrediction.title}"`,
+                  metadata: {
+                    predictionId,
+                    predictionTitle: updatedPrediction.title,
+                    predictionCategory: updatedPrediction.category?.name ?? null,
+                    betId: b.id,
+                    winningOptionId,
+                    originalAmount: Number(b.amount),
+                    payoutAmount: Number(payoutAmount),
+                    odds: Number(b.oddsAtPlacement),
+                  },
                   relatedBetId: b.id,
                   relatedParlayId: null,
                 },
@@ -225,7 +239,7 @@ export class PayoutRepository implements IPayoutRepository {
                 amount: Number(b.amount),
                 payout: Number(payoutAmount),
                 won: isWinner,
-                category: updatedPrediction.category,
+                category: updatedPrediction.category?.name ?? null,
                 odds: Number(b.oddsAtPlacement),
                 wasAllIn: b.wasAllIn,
               },
@@ -246,7 +260,15 @@ export class PayoutRepository implements IPayoutRepository {
           const legs = await tx.parlayLeg.findMany({
             where: { parlayId },
             include: {
-              option: { include: { prediction: true } },
+              option: {
+                include: {
+                  prediction: {
+                    include: {
+                      category: true,
+                    },
+                  },
+                },
+              },
               parlay: { include: { user: true } },
             },
           });
@@ -291,12 +313,36 @@ export class PayoutRepository implements IPayoutRepository {
           if (!lost) {
             const newBal = parlay.user.muskBucks + BigInt(payoutAmount);
             await tx.user.update({ where: { id: parlay.userId }, data: { muskBucks: newBal } });
+            // Get prediction titles for description
+            const predictionTitles = legs.map((leg) => leg.option.prediction.title);
+            const shortDescription =
+              predictionTitles.length <= 2
+                ? predictionTitles.join(' + ')
+                : `${predictionTitles[0]} + ${predictionTitles.length - 1} others`;
+
             await tx.transaction.create({
               data: {
                 userId: parlay.userId,
                 type: 'CREDIT',
+                subtype: 'PARLAY_PAYOUT',
                 amount: BigInt(payoutAmount),
                 balanceAfter: newBal,
+                description: `Parlay payout (${legsWon}/${legCount}): ${shortDescription}`,
+                metadata: {
+                  parlayId: parlay.id,
+                  legCount,
+                  legsWon,
+                  legsLost: legCount - legsWon,
+                  originalAmount: Number(parlay.amount),
+                  payoutAmount: Number(payoutAmount),
+                  combinedOdds: Number(parlay.potentialPayout || BigInt(0)) / Number(parlay.amount),
+                  predictions: legs.map((leg) => ({
+                    id: leg.option.prediction.id,
+                    title: leg.option.prediction.title,
+                    category: leg.option.prediction.category?.name ?? null,
+                    won: leg.optionId === leg.option.prediction.winningOptionId,
+                  })),
+                },
                 relatedBetId: null,
                 relatedParlayId: parlay.id,
               },

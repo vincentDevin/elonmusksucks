@@ -2,13 +2,13 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { usePredictionMarket } from '../contexts/PredictionContext';
 import { useAuth } from '../contexts/AuthContext';
-import type { PredictionFull } from '../api/predictions';
+import type { PredictionView } from '@ems/types';
+import type { Category } from '../api/predictions';
+import { useCategories } from './useCategories';
 
 export interface PredictionFilter {
-  categories: string[];
-  difficulties: ('easy' | 'medium' | 'hard' | 'expert')[];
+  categories: number[]; // Category IDs
   timeRemaining: 'all' | '1h' | '1d' | '1w';
-  activity: 'all' | 'high' | 'medium' | 'low';
   status: 'all' | 'open' | 'pending' | 'expired' | 'resolved';
   search: string;
 }
@@ -29,11 +29,22 @@ export interface PredictionRecommendation {
   };
 }
 
-export interface EnhancedPrediction extends PredictionFull {
+export interface EnhancedPrediction extends Omit<PredictionView, 'options'> {
   recommendation?: PredictionRecommendation;
   section: 'trending' | 'ending_soon' | 'personalized' | 'hot' | 'all';
   isNew?: boolean;
-  isFavorited?: boolean;
+  // Computed properties for compatibility with PredictionFull
+  resolved: boolean;
+  approved: boolean;
+  creatorId: number;
+  // Override options to include createdAt for PredictionFull compatibility
+  options: Array<{
+    id: number;
+    label: string;
+    odds: number;
+    predictionId: number;
+    createdAt: string;
+  }>;
 }
 
 export interface PredictionSection {
@@ -44,39 +55,34 @@ export interface PredictionSection {
   count: number;
 }
 
-const DIFFICULTY_THRESHOLDS = {
-  easy: { minOdds: 1.2, maxOdds: 2.0 },
-  medium: { minOdds: 2.0, maxOdds: 4.0 },
-  hard: { minOdds: 4.0, maxOdds: 8.0 },
-  expert: { minOdds: 8.0, maxOdds: 100.0 },
-};
-
 export function usePredictionDiscovery() {
-  const { predictions, loading, error } = usePredictionMarket();
+  const {
+    predictions,
+    loading,
+    error,
+    filters: contextFilters,
+    updateFilters: contextUpdateFilters,
+    clearFilters: contextClearFilters,
+  } = usePredictionMarket();
   const { user } = useAuth();
 
-  const [filters, setFilters] = useState<PredictionFilter>({
-    categories: [],
-    difficulties: [],
-    timeRemaining: 'all',
-    activity: 'all',
-    status: 'open',
-    search: '',
-  });
+  // Expose context filters directly
+  const filters: PredictionFilter = {
+    categories: contextFilters.categoryId !== undefined ? [contextFilters.categoryId] : [],
+    timeRemaining: contextFilters.timeRemaining || 'all',
+    status: contextFilters.status,
+    search: contextFilters.search,
+  };
 
-  const [favorites, setFavorites] = useState<Set<number>>(new Set());
   const [_viewedPredictions, setViewedPredictions] = useState<Set<number>>(new Set());
   const [userBettingHistory, setUserBettingHistory] = useState<string[]>([]);
 
-  // Load user preferences and favorites
+  // Fetch categories with caching
+  const { categories } = useCategories();
+
+  // Load user preferences
   useEffect(() => {
     if (user?.id) {
-      // Load favorites from localStorage or API
-      const savedFavorites = localStorage.getItem(`favorites_${user.id}`);
-      if (savedFavorites) {
-        setFavorites(new Set(JSON.parse(savedFavorites)));
-      }
-
       // Load viewed predictions
       const savedViewed = localStorage.getItem(`viewed_${user.id}`);
       if (savedViewed) {
@@ -91,41 +97,22 @@ export function usePredictionDiscovery() {
     }
   }, [user?.id]);
 
-  // Calculate difficulty based on prediction characteristics
-  const calculateDifficulty = useCallback(
-    (prediction: PredictionFull): 'easy' | 'medium' | 'hard' | 'expert' => {
-      if (!prediction.options || prediction.options.length === 0) return 'medium';
-
-      // Find the most favorable odds (highest probability outcome)
-      const bestOdds = Math.min(...prediction.options.map((opt) => opt.odds));
-
-      for (const [difficulty, { minOdds, maxOdds }] of Object.entries(DIFFICULTY_THRESHOLDS)) {
-        if (bestOdds >= minOdds && bestOdds < maxOdds) {
-          return difficulty as 'easy' | 'medium' | 'hard' | 'expert';
-        }
-      }
-
-      return 'medium';
-    },
-    [],
-  );
-
   // Calculate recommendation score for personalization
   const calculateRecommendationScore = useCallback(
-    (prediction: PredictionFull): PredictionRecommendation => {
+    (prediction: PredictionView): PredictionRecommendation => {
       let score = 0;
       const reasons: string[] = [];
 
-      // Category preference scoring
-      if (userBettingHistory.includes(prediction.category)) {
+      // Category preference scoring (using category name if available, otherwise categoryId)
+      const categoryIdentifier = prediction.category?.name || String(prediction.categoryId);
+      if (userBettingHistory.includes(categoryIdentifier)) {
         score += 30;
-        reasons.push(`You often bet on ${prediction.category}`);
+        reasons.push(`You often bet on ${categoryIdentifier}`);
       }
 
-      // Activity level scoring
+      // Activity level scoring (PredictionView doesn't have parlayLegs)
       const betCount = prediction.bets?.length || 0;
-      const parlayCount = prediction.parlayLegs?.length || 0;
-      const totalActivity = betCount + parlayCount;
+      const totalActivity = betCount;
 
       let popularityScore = 0;
       let bettingVelocity = 0;
@@ -171,15 +158,6 @@ export function usePredictionDiscovery() {
         urgency = 'low';
       }
 
-      // Difficulty preference (assume users prefer medium difficulty)
-      const difficulty = calculateDifficulty(prediction);
-      if (difficulty === 'medium') {
-        score += 10;
-        reasons.push('Good difficulty level');
-      } else if (difficulty === 'easy') {
-        score += 5;
-      }
-
       // Hot market bonus
       if ((prediction as any).hotMarket) {
         score += 15;
@@ -212,8 +190,8 @@ export function usePredictionDiscovery() {
       return {
         score: Math.min(100, score),
         reasons: reasons.slice(0, 3), // Limit to top 3 reasons
-        category: prediction.category,
-        difficulty,
+        category: categoryIdentifier,
+        difficulty: 'medium' as const, // Default difficulty (no longer calculated)
         socialProof: {
           popularityScore,
           bettingVelocity,
@@ -225,105 +203,13 @@ export function usePredictionDiscovery() {
         },
       };
     },
-    [userBettingHistory, calculateDifficulty],
+    [userBettingHistory],
   );
 
-  // Filter predictions based on current filters
+  // All filtering now happens server-side - no client-side filtering needed
   const filteredPredictions = useMemo(() => {
-    if (!predictions) return [];
-
-    return predictions.filter((prediction) => {
-      const now = Date.now();
-      const expires = new Date(prediction.expiresAt).getTime();
-
-      // Status filter logic
-      if (filters.status !== 'all') {
-        switch (filters.status) {
-          case 'pending':
-            if (prediction.status !== 'PENDING') return false;
-            break;
-          case 'open':
-            if (prediction.status !== 'APPROVED' || now > expires) return false;
-            break;
-          case 'expired':
-            if (prediction.status !== 'APPROVED' || now <= expires || prediction.resolved)
-              return false;
-            break;
-          case 'resolved':
-            if (!prediction.resolved) return false;
-            break;
-        }
-      } else {
-        // Default: show approved, non-resolved predictions that haven't expired (unless filtering by status)
-        if (prediction.status === 'PENDING') {
-          // Only show pending predictions if user is the creator
-          if (prediction.creatorUserId !== user?.id) {
-            return false;
-          }
-        }
-      }
-
-      // Category filter
-      if (filters.categories.length > 0 && !filters.categories.includes(prediction.category)) {
-        return false;
-      }
-
-      // Difficulty filter
-      if (filters.difficulties.length > 0) {
-        const difficulty = calculateDifficulty(prediction);
-        if (!filters.difficulties.includes(difficulty)) {
-          return false;
-        }
-      }
-
-      // Time remaining filter
-      if (filters.timeRemaining !== 'all') {
-        const timeLeft = expires - now;
-        const hoursLeft = timeLeft / (1000 * 60 * 60);
-
-        switch (filters.timeRemaining) {
-          case '1h':
-            if (hoursLeft > 1) return false;
-            break;
-          case '1d':
-            if (hoursLeft > 24) return false;
-            break;
-          case '1w':
-            if (hoursLeft > 168) return false;
-            break;
-        }
-      }
-
-      // Activity filter
-      if (filters.activity !== 'all') {
-        const totalActivity = (prediction.bets?.length || 0) + (prediction.parlayLegs?.length || 0);
-
-        switch (filters.activity) {
-          case 'high':
-            if (totalActivity < 15) return false;
-            break;
-          case 'medium':
-            if (totalActivity < 5 || totalActivity >= 15) return false;
-            break;
-          case 'low':
-            if (totalActivity >= 5) return false;
-            break;
-        }
-      }
-
-      // Search filter
-      if (filters.search) {
-        const searchLower = filters.search.toLowerCase();
-        return (
-          prediction.title.toLowerCase().includes(searchLower) ||
-          prediction.category.toLowerCase().includes(searchLower) ||
-          prediction.description?.toLowerCase().includes(searchLower)
-        );
-      }
-
-      return true;
-    });
-  }, [predictions, filters, calculateDifficulty, user?.id]);
+    return predictions || [];
+  }, [predictions]);
 
   // Enhance predictions with recommendations and metadata
   const enhancedPredictions = useMemo((): EnhancedPrediction[] => {
@@ -352,10 +238,18 @@ export function usePredictionDiscovery() {
         recommendation,
         section,
         isNew: createdHoursAgo <= 2,
-        isFavorited: favorites.has(prediction.id),
+        // Computed properties for compatibility with PredictionFull
+        resolved: prediction.resolvedAt !== null,
+        approved: prediction.status === 'APPROVED' || prediction.status === 'RESOLVED',
+        creatorId: prediction.creatorUserId,
+        // Add createdAt to options for PredictionFull compatibility
+        options: prediction.options.map((opt) => ({
+          ...opt,
+          createdAt: prediction.createdAt, // Use prediction's createdAt as fallback
+        })),
       };
     });
-  }, [filteredPredictions, calculateRecommendationScore, favorites]);
+  }, [filteredPredictions, calculateRecommendationScore]);
 
   // Organize predictions into sections
   const predictionSections = useMemo((): PredictionSection[] => {
@@ -384,8 +278,8 @@ export function usePredictionDiscovery() {
 
     // Sort 'all' by a combination of factors
     sections.all.sort((a, b) => {
-      const scoreA = (a.recommendation?.score || 0) + (a.isNew ? 10 : 0) + (a.isFavorited ? 20 : 0);
-      const scoreB = (b.recommendation?.score || 0) + (b.isNew ? 10 : 0) + (b.isFavorited ? 20 : 0);
+      const scoreA = (a.recommendation?.score || 0) + (a.isNew ? 10 : 0);
+      const scoreB = (b.recommendation?.score || 0) + (b.isNew ? 10 : 0);
       return scoreB - scoreA;
     });
 
@@ -428,32 +322,10 @@ export function usePredictionDiscovery() {
     ].filter((section) => section.count > 0);
   }, [enhancedPredictions]);
 
-  // Get available filter options
+  // Get available filter options - use fetched categories instead of deriving from predictions
   const availableCategories = useMemo(() => {
-    const categories = new Set(predictions?.map((p) => p.category) || []);
-    return Array.from(categories).sort();
-  }, [predictions]);
-
-  // Favorite/unfavorite functions
-  const toggleFavorite = useCallback(
-    (predictionId: number) => {
-      setFavorites((prev) => {
-        const newFavorites = new Set(prev);
-        if (newFavorites.has(predictionId)) {
-          newFavorites.delete(predictionId);
-        } else {
-          newFavorites.add(predictionId);
-        }
-
-        if (user?.id) {
-          localStorage.setItem(`favorites_${user.id}`, JSON.stringify(Array.from(newFavorites)));
-        }
-
-        return newFavorites;
-      });
-    },
-    [user?.id],
-  );
+    return categories.sort((a, b) => a.sortOrder - b.sortOrder);
+  }, [categories]);
 
   // Mark prediction as viewed
   const markAsViewed = useCallback(
@@ -472,22 +344,37 @@ export function usePredictionDiscovery() {
     [user?.id],
   );
 
-  // Update filters
-  const updateFilters = useCallback((newFilters: Partial<PredictionFilter>) => {
-    setFilters((prev) => ({ ...prev, ...newFilters }));
-  }, []);
+  // Update filters - all server-side now
+  const updateFilters = useCallback(
+    (newFilters: Partial<PredictionFilter>) => {
+      const serverFilters: any = {};
+
+      if (newFilters.categories !== undefined) {
+        serverFilters.categoryId = newFilters.categories[0] || undefined;
+      }
+      if (newFilters.timeRemaining !== undefined) {
+        serverFilters.timeRemaining =
+          newFilters.timeRemaining === 'all' ? undefined : newFilters.timeRemaining;
+      }
+      if (newFilters.status !== undefined) {
+        serverFilters.status = newFilters.status;
+      }
+      if (newFilters.search !== undefined) {
+        serverFilters.search = newFilters.search;
+      }
+
+      // Update context filters
+      if (Object.keys(serverFilters).length > 0) {
+        contextUpdateFilters(serverFilters);
+      }
+    },
+    [contextUpdateFilters],
+  );
 
   // Clear all filters
   const clearFilters = useCallback(() => {
-    setFilters({
-      categories: [],
-      difficulties: [],
-      timeRemaining: 'all',
-      activity: 'all',
-      status: 'open',
-      search: '',
-    });
-  }, []);
+    contextClearFilters();
+  }, [contextClearFilters]);
 
   return {
     predictionSections,
@@ -498,8 +385,6 @@ export function usePredictionDiscovery() {
     error,
     updateFilters,
     clearFilters,
-    toggleFavorite,
     markAsViewed,
-    favorites: Array.from(favorites),
   };
 }

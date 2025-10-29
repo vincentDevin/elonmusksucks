@@ -12,8 +12,8 @@ export const darkThemes: UnifiedTheme[] = [
       primary: '#10B981', // Emerald 500
       secondary: '#059669', // Emerald 600
       accent: '#34D399', // Emerald 400
-      background: '#111827', // Gray 900
-      surface: '#1F2937', // Gray 800
+      background: '#0a0f1e',
+      surface: '#181f2aff', // Gray 800
       muted: '#374151', // Gray 700
       content: '#F9FAFB', // Gray 50
       tertiary: '#9CA3AF', // Gray 400
@@ -21,6 +21,24 @@ export const darkThemes: UnifiedTheme[] = [
       warning: '#F59E0B', // Amber 500
       error: '#EF4444', // Red 500
       info: '#3B82F6', // Blue 500
+    },
+    predictionOptions: {
+      // Core palette - 8 distinct colors that don't conflict with semantic UI colors
+      // Uses indigo, violet, yellow, orange, pink, cyan, purple, lime
+      // Can cycle for predictions with more than 8 options
+      palette: [
+        '#6366F1', // indigo-500 (distinct from info blue #3B82F6)
+        '#8B5CF6', // violet-500
+        '#FACC15', // yellow-400 (bright yellow, distinct from warning amber #F59E0B)
+        '#F97316', // orange-500 (distinct from warning amber #F59E0B)
+        '#EC4899', // pink-500 (distinct from error red #EF4444)
+        '#06B6D4', // cyan-500
+        '#A855F7', // purple-500
+        '#84CC16', // lime-500
+      ],
+      // Type-specific overrides
+      binary: ['#10B981', '#EF4444'], // yellow (yes/true), pink (no/false)
+      overUnder: ['#6366F1', '#F97316'], // indigo (over), orange (under)
     },
     effects: {
       animations: true,
@@ -121,6 +139,20 @@ export const darkThemes: UnifiedTheme[] = [
       error: '#FF3366', // Bright red
       info: '#00AAFF', // Bright blue
     },
+    predictionOptions: {
+      palette: [
+        '#6366F1', // indigo-500
+        '#8B5CF6', // violet-500
+        '#FACC15', // yellow-400
+        '#F97316', // orange-500
+        '#EC4899', // pink-500
+        '#06B6D4', // cyan-500
+        '#A855F7', // purple-500
+        '#84CC16', // lime-500
+      ],
+      binary: ['#00FF88', '#FF3366'], // bright green (yes), bright red (no)
+      overUnder: ['#6366F1', '#F97316'], // indigo (over), orange (under)
+    },
     effects: {
       animations: true,
       particles: true,
@@ -220,6 +252,20 @@ export const darkThemes: UnifiedTheme[] = [
       error: '#F87171', // Red 400
       info: '#60A5FA', // Blue 400
     },
+    predictionOptions: {
+      palette: [
+        '#6366F1', // indigo-500
+        '#8B5CF6', // violet-500
+        '#FACC15', // yellow-400
+        '#F97316', // orange-500
+        '#EC4899', // pink-500
+        '#06B6D4', // cyan-500
+        '#A855F7', // purple-500
+        '#84CC16', // lime-500
+      ],
+      binary: ['#10B981', '#F87171'], // emerald (yes), red-400 (no)
+      overUnder: ['#6366F1', '#F97316'], // indigo (over), orange (under)
+    },
     effects: {
       animations: true,
       particles: false,
@@ -318,6 +364,20 @@ export const darkThemes: UnifiedTheme[] = [
       warning: '#EAB308', // Yellow 500
       error: '#DC2626', // Red 600
       info: '#0EA5E9', // Sky 500
+    },
+    predictionOptions: {
+      palette: [
+        '#6366F1', // indigo-500
+        '#8B5CF6', // violet-500
+        '#FACC15', // yellow-400
+        '#F97316', // orange-500
+        '#EC4899', // pink-500
+        '#06B6D4', // cyan-500
+        '#A855F7', // purple-500
+        '#84CC16', // lime-500
+      ],
+      binary: ['#22C55E', '#DC2626'], // green-500 (yes), red-600 (no)
+      overUnder: ['#6366F1', '#F97316'], // indigo (over), orange (under)
     },
     effects: {
       animations: true,

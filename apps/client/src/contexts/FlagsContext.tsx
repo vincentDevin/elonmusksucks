@@ -3,7 +3,7 @@
 // Feature Flag Context - Client-side Feature Control
 // -----------------------------------------------------------------------------
 
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useMemo, type ReactNode } from 'react';
 import type { FeatureFlagConfig } from '@ems/types';
 
 interface FlagsContextType {
@@ -51,7 +51,10 @@ export function FlagsProvider({ children }: FlagsProviderProps) {
     return flags[flag] || false;
   };
 
-  const value: FlagsContextType = { flags, isFeatureEnabled, refreshFlags };
+  const value = useMemo<FlagsContextType>(
+    () => ({ flags, isFeatureEnabled, refreshFlags }),
+    [flags, isFeatureEnabled, refreshFlags],
+  );
 
   if (loading) return <div>Loading features...</div>;
   return <FlagsContext.Provider value={value}>{children}</FlagsContext.Provider>;

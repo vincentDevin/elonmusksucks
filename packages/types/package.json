@@ -13,9 +13,7 @@
     "schema": "prisma/schema.prisma"
   },
   "dependencies": {
-    "@esbuild/darwin-arm64": "^0.25.9",
     "@prisma/client": "^6.10.1",
-    "@rollup/rollup-darwin-arm64": "^4.50.0",
     "destroy": "^1.2.0"
   },
   "devDependencies": {

@@ -1,0 +1,23 @@
+# robots.txt for ElonMuskSucks.net
+# Allow all search engines to crawl the public site
+
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /admin/
+
+# Sitemap location
+Sitemap: https://elonmusksucks.net/sitemap.xml
+
+# Crawl delay (be nice to our servers)
+Crawl-delay: 1
+
+# Additional user agents
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: Slurp
+Allow: /

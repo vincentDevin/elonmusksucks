@@ -112,11 +112,11 @@ export class RedisHealthMonitor {
       const responseTime = Date.now() - startTime;
 
       // Get Redis info
-      const [memoryInfo, statsInfo, keyspaceInfo, slowlog] = await Promise.all([
+      const [memoryInfo, statsInfo, keyspaceInfo, slowlogResult] = await Promise.all([
         redisClient.info('memory'),
         redisClient.info('stats'),
         redisClient.info('keyspace'),
-        redisClient.slowlog('len'),
+        redisClient.call('SLOWLOG', 'LEN'),
       ]);
 
       // Parse memory info
@@ -124,13 +124,13 @@ export class RedisHealthMonitor {
 
       // Parse connection and command stats
       const connectionStats = this.parseConnectionStats(statsInfo);
-      const commandStats = this.parseCommandStats(statsInfo, slowlog);
+      const commandStats = this.parseCommandStats(statsInfo, Number(slowlogResult) || 0);
 
       // Parse keyspace stats
       const keyspaceStats = this.parseKeyspaceStats(keyspaceInfo, statsInfo);
 
-      // Get pool stats if available
-      const poolStats = this.eventBus.getPoolStats();
+      // Get pool stats if available (optional method)
+      const poolStats = (this.eventBus as any).getPoolStats?.();
 
       return {
         isConnected: true,

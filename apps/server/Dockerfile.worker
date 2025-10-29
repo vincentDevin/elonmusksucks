@@ -1,0 +1,49 @@
+# Dockerfile for BullMQ workers
+FROM node:24-alpine AS base
+
+# Install dependencies only when needed
+FROM base AS deps
+WORKDIR /app
+
+COPY package*.json ./
+COPY packages/types/package.json ./packages/types/
+COPY apps/server/package.json ./apps/server/
+
+RUN npm ci --workspace=apps/server
+
+# Build stage
+FROM base AS builder
+WORKDIR /app
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/packages/types/node_modules ./packages/types/node_modules
+COPY --from=deps /app/apps/server/node_modules ./apps/server/node_modules
+
+COPY packages/types ./packages/types
+COPY apps/server ./apps/server
+COPY prisma ./prisma
+COPY tsconfig.json ./
+
+RUN npm run prisma:generate
+RUN cd packages/types && npm run build
+RUN cd apps/server && npm run build
+
+# Production stage
+FROM base AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 worker
+
+COPY --from=builder --chown=worker:nodejs /app/apps/server/dist ./apps/server/dist
+COPY --from=builder --chown=worker:nodejs /app/packages/types/dist ./packages/types/dist
+COPY --from=builder --chown=worker:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=worker:nodejs /app/apps/server/node_modules ./apps/server/node_modules
+COPY --from=builder --chown=worker:nodejs /app/prisma ./prisma
+
+USER worker
+
+# Start all workers using concurrently (from package.json worker script)
+CMD ["node", "-e", "require('child_process').spawn('npm', ['run', 'worker'], {stdio: 'inherit', cwd: 'apps/server'})"]

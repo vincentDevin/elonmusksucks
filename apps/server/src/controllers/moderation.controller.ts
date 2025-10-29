@@ -1,12 +1,19 @@
 // apps/server/src/controllers/moderation.controller.ts
 import { Request, Response, NextFunction } from 'express';
 import { moderationService } from '../services/moderation.service';
-import type { BanType } from '@prisma/client';
+import type {
+  BanType,
+  ModerationMessageDeletePayload,
+  ModerationPostDeletePayload,
+} from '@ems/types';
+import { REDIS_CHANNELS } from '@ems/types';
+import { eventBus } from '../lib/EventBus';
 
 interface AuthenticatedRequest extends Request {
   user?: {
     id: number;
     role: string;
+    name?: string;
   };
 }
 
@@ -144,7 +151,8 @@ export async function deleteMessage(
 ): Promise<void> {
   try {
     const messageId = Number(req.params.messageId);
-    const { reason } = req.body as { reason: string };
+    // Handle case where req.body might be undefined (common for DELETE requests)
+    const reason = req.body?.reason || 'Deleted by moderator';
 
     if (!req.user?.id) {
       res.status(401).json({ error: 'Unauthorized' });
@@ -153,7 +161,22 @@ export async function deleteMessage(
 
     const { ipAddress, userAgent } = getRequestMetadata(req);
 
+    // Fetch message info before deletion to include author details in event
+    const messageInfo = await moderationService.getMessageInfo(messageId);
+
     await moderationService.deleteMessage(messageId, req.user.id, reason, ipAddress, userAgent);
+
+    // Publish Redis event for real-time message deletion across all clients
+    const deletePayload: ModerationMessageDeletePayload = {
+      messageId,
+      deletedBy: req.user.id,
+      deletedByName: req.user.name || 'Admin',
+      messageAuthorId: messageInfo.userId,
+      messageAuthorName: messageInfo.userName,
+      reason,
+      timestamp: new Date().toISOString(),
+    };
+    await eventBus.publish(REDIS_CHANNELS.MODERATION_MESSAGE_DELETE, deletePayload);
 
     res.status(204).end();
   } catch (err) {
@@ -168,7 +191,8 @@ export async function deletePost(
 ): Promise<void> {
   try {
     const postId = Number(req.params.postId);
-    const { reason } = req.body as { reason: string };
+    // Handle case where req.body might be undefined (common for DELETE requests)
+    const reason = req.body?.reason || 'Deleted by moderator';
 
     if (!req.user?.id) {
       res.status(401).json({ error: 'Unauthorized' });
@@ -178,6 +202,15 @@ export async function deletePost(
     const { ipAddress, userAgent } = getRequestMetadata(req);
 
     await moderationService.deletePost(postId, req.user.id, reason, ipAddress, userAgent);
+
+    // Publish Redis event for real-time post deletion across all clients
+    const deletePayload: ModerationPostDeletePayload = {
+      postId,
+      deletedBy: req.user.id,
+      reason,
+      timestamp: new Date().toISOString(),
+    };
+    await eventBus.publish(REDIS_CHANNELS.MODERATION_POST_DELETE, deletePayload);
 
     res.status(204).end();
   } catch (err) {

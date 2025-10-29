@@ -25,7 +25,8 @@ import {
   resetPassword,
   getUserBalance,
 } from '../services/auth.service';
-import { sendEmail } from '../services/email.service';
+import { UserService } from '../services/user.service';
+import { sendVerificationEmail, sendPasswordResetEmail } from '../services/email.service';
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '../utils/jwtHelpers';
 
 // Standardize error payloads using shared types
@@ -50,14 +51,9 @@ export const registerUser: RequestHandler = async (req, res) => {
     // Fire-and-forget email
     void (async () => {
       try {
-        const host = process.env.SERVER_URL ?? `${req.protocol}://${req.get('host')}`;
+        const host = process.env.BASE_URL_SERVER ?? `${req.protocol}://${req.get('host')}`;
         const verifyUrl = `${host}/api/auth/verify-email?token=${verificationToken}`;
-        await sendEmail(
-          user.email,
-          'Please verify your email address',
-          `<p>Hi ${user.name},</p>
-           <p>Click <a href="${verifyUrl}">here</a> to verify your email.</p>`,
-        );
+        await sendVerificationEmail(user.email, user.name, verifyUrl);
       } catch (mailErr) {
         console.error('Verification email error:', mailErr);
       }
@@ -124,7 +120,11 @@ export const me: RequestHandler = async (req, res, next) => {
       return sendError(res, 404, 'User not found');
     }
 
-    const payload = toAuthUserView(user) satisfies AuthUserView;
+    // Create UserService instance to enrich user with fresh avatar URL
+    const userService = new UserService();
+    const enrichedUser = await userService.enrichUserWithAvatar(user);
+
+    const payload = toAuthUserView(enrichedUser) satisfies AuthUserView;
     return res.json(payload);
   } catch (err) {
     next(err);
@@ -248,7 +248,8 @@ export const verifyEmail: RequestHandler = async (req, res) => {
   if (!ok) {
     return sendError(res, 400, 'Invalid or expired token');
   }
-  const redirectUrl = (process.env.CLIENT_URL ?? 'http://localhost:3000') + '/login?verified=true';
+  const redirectUrl =
+    (process.env.CLIENT_APP_URL ?? 'http://localhost:3000') + '/login?verified=true';
   return res.redirect(redirectUrl);
 };
 
@@ -267,13 +268,8 @@ export const requestPasswordReset: RequestHandler = async (req, res) => {
     void (async () => {
       try {
         const token = await createPasswordReset(user.id);
-        const url = `${process.env.CLIENT_URL}/reset-password?token=${token}`;
-        await sendEmail(
-          user.email,
-          'Password Reset',
-          `<p>Hi ${user.name},</p>
-           <p>Click <a href="${url}">here</a> to reset password (1h expiry).</p>`,
-        );
+        const url = `${process.env.CLIENT_APP_URL}/reset-password?token=${token}`;
+        await sendPasswordResetEmail(user.email, user.name, url);
       } catch (mailErr) {
         console.error('Reset email error:', mailErr);
       }
