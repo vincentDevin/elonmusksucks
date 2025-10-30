@@ -228,6 +228,12 @@ export interface ClientEvents {
   player_ready: { ready: boolean };
   leave_match: {};
   spectate_match: { gameId: string };
+  // Wager negotiation events
+  propose_wager: { gameId: string; amount: number };
+  accept_wager: { gameId: string };
+  reject_wager: { gameId: string };
+  // Game chat events
+  game_chat_message: { gameId: string; message: string };
 }
 
 export interface ServerEvents {
@@ -241,9 +247,17 @@ export interface ServerEvents {
     opponent?: import('../../database/pong').Player;
     wager: number;
     pot: number;
+    currentWagerOffer?: number;
+    chatHistory?: import('../../database/pong').GameChatMessage[];
+    wagerNegotiation?: import('../../database/pong').WagerNegotiation | null;
   };
   match_waiting: { gameId: string; message: string };
-  opponent_joined: { opponent: import('../../database/pong').Player };
+  opponent_joined: {
+    opponent: import('../../database/pong').Player;
+    currentWagerOffer?: number;
+    wagerNegotiation?: import('../../database/pong').WagerNegotiation | null;
+    chatMessages?: import('../../database/pong').GameChatMessage[];
+  };
   ready_state_update: { readyStates: [boolean, boolean] };
   countdown: { seconds: number; message?: string };
   spectator_joined: {
@@ -254,6 +268,11 @@ export interface ServerEvents {
     wager: number;
     pot: number;
     status: import('../../shared/enums').GameStatus;
+    chatHistory?: import('../../database/pong').GameChatMessage[];
+    chatMessages?: import('../../database/pong').GameChatMessage[]; // Alias for chatHistory
+    wagerNegotiation?: import('../../database/pong').WagerNegotiation | null;
+    currentWagerOffer?: number;
+    negotiationStartedAt?: number | null;
   };
   game_state: {
     gameId: string; // Game identifier to prevent cross-game contamination
@@ -275,7 +294,47 @@ export interface ServerEvents {
     duration: number;
     payout?: number;
   };
-  player_disconnected: { playerSlot: 0 | 1; reconnectTime: number };
+  player_disconnected: {
+    playerId: number;
+    playerSlot?: 0 | 1;
+    message?: string;
+    reconnectTime?: number;
+  };
+  player_reconnected: {
+    playerId: number;
+    playerSlot: 0 | 1;
+    message?: string;
+  };
+  // Wager negotiation events
+  wager_proposed: {
+    amount: number;
+    proposedBy: 0 | 1;
+    proposer: {
+      id: number;
+      username: string;
+      elo: number;
+    };
+    roundCount: number;
+  };
+  wager_accepted: {
+    playerId: number;
+    acceptedBy: (0 | 1)[];
+  };
+  wager_rejected: {
+    rejectedBy: number;
+  };
+  wager_locked: {
+    finalWager: number;
+    pot: number;
+  };
+  negotiation_timeout: {
+    message: string;
+  };
+  match_cancelled: {
+    reason: string;
+  };
+  // Game chat events
+  game_chat_message: import('../../database/pong').GameChatMessage;
   error: { code: string; message: string };
 }
 
@@ -1232,6 +1291,15 @@ export interface EventPayloadMap {
   'pong:payout': PongPayoutPayload;
   'pong:elo:update': any; // PongEloUpdatePayload
   'pong:tier:change': any; // PongTierChangePayload
+  'pong:wager:proposed': ServerEvents['wager_proposed'];
+  'pong:wager:accepted': ServerEvents['wager_accepted'];
+  'pong:wager:rejected': ServerEvents['wager_rejected'];
+  'pong:wager:locked': ServerEvents['wager_locked'];
+  'pong:negotiation:timeout': ServerEvents['negotiation_timeout'];
+  'pong:match:cancelled': ServerEvents['match_cancelled'];
+  'pong:player:disconnected': ServerEvents['player_disconnected'];
+  'pong:player:reconnected': ServerEvents['player_reconnected'];
+  'pong:chat:message': import('../../database/pong').GameChatMessage;
 
   // Reaction events
   'post:reaction:update': ReactionUpdatePayload;

@@ -752,7 +752,16 @@ export class PongRepository implements IPongRepository {
   async findUserForAuth(userId: number) {
     return prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, name: true, muskBucks: true },
+      select: {
+        id: true,
+        name: true,
+        muskBucks: true,
+        pongStats: {
+          select: {
+            eloRating: true,
+          },
+        },
+      },
     });
   }
 

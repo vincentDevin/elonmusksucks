@@ -38,11 +38,21 @@ import {
   MatchType,
   PONG_PAYOUT_CONSTANTS,
   PONG_WAGER_LIMITS,
+  WagerNegotiation,
+  GameChatMessage,
 } from '@ems/types';
 
 // AI Player ID mapping - matches our database seed
 // Note: AI_PLAYER_IDS now imported from @ems/types for consistency
 // AI player names are fetched from the database (see createAIPlayer function)
+
+// AI Player ELO ratings - matches our database seed
+const AI_PLAYER_ELOS = {
+  EASY: 800,
+  MEDIUM: 1200,
+  HARD: 1600,
+  IMPOSSIBLE: 2200,
+} as const;
 
 // AI Player cache - refresh every 5 minutes to match server cache
 const AI_PLAYER_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
@@ -110,6 +120,7 @@ async function createAIPlayer(difficulty: AIDifficulty, apiClient: PongApiClient
     score: 0,
     ping: 0,
     lastInputTime: Date.now(),
+    elo: AI_PLAYER_ELOS[difficulty],
   };
 }
 
@@ -164,6 +175,7 @@ class DatabaseManager {
         score: 0,
         ping: 0,
         lastInputTime: Date.now(),
+        elo: userData.pongElo,
       };
     } catch (error) {
       console.error('Auth error:', error);
@@ -382,6 +394,143 @@ class StatisticsManager {
 }
 
 // ——————————————————————————————————————————————————————————————————————————————————
+// CHAT MANAGER (Game room chat with rate limiting)
+// ——————————————————————————————————————————————————————————————————————————————————
+
+class ChatManager {
+  private gameChats = new Map<string, GameChatMessage[]>();
+  private userRateLimits = new Map<string, number[]>(); // userId → timestamps
+  private readonly MAX_MESSAGES_PER_GAME = 100;
+  private readonly RATE_LIMIT_WINDOW = 5000; // 5 seconds
+  private readonly RATE_LIMIT_MAX_MESSAGES = 3; // 3 messages per window
+
+  // Basic profanity filter (can be expanded)
+  private readonly PROFANITY_PATTERNS = [
+    /\bf+u+c+k+/gi,
+    /\bs+h+i+t+/gi,
+    /\bc+u+n+t+/gi,
+    /\bd+a+m+n+/gi,
+    /\ba+s+s+h+o+l+e+/gi,
+  ];
+
+  /**
+   * Add a message to a game chat
+   * Returns the message if successful, null if rate limited
+   */
+  addMessage(
+    gameId: string,
+    userId: number,
+    username: string,
+    message: string,
+    userRole: 'player1' | 'player2' | 'spectator',
+    isSystem = false,
+  ): GameChatMessage | null {
+    // Rate limiting check (skip for system messages)
+    if (!isSystem && !this.checkRateLimit(userId)) {
+      return null;
+    }
+
+    // Apply profanity filter
+    const filtered = this.filterProfanity(message);
+
+    const chatMsg: GameChatMessage = {
+      userId,
+      username,
+      message: filtered,
+      timestamp: Date.now(),
+      isSystem,
+      userRole,
+    };
+
+    // Get or create chat array for this game
+    if (!this.gameChats.has(gameId)) {
+      this.gameChats.set(gameId, []);
+    }
+
+    const messages = this.gameChats.get(gameId)!;
+    messages.push(chatMsg);
+
+    // Trim to max messages (keep most recent)
+    if (messages.length > this.MAX_MESSAGES_PER_GAME) {
+      messages.shift(); // Remove oldest message
+    }
+
+    return chatMsg;
+  }
+
+  /**
+   * Check if user is within rate limit
+   * 3 messages per 5 seconds
+   */
+  checkRateLimit(userId: number): boolean {
+    const now = Date.now();
+    const key = userId.toString();
+    const timestamps = this.userRateLimits.get(key) || [];
+
+    // Remove old timestamps (older than window)
+    const recent = timestamps.filter((ts) => now - ts < this.RATE_LIMIT_WINDOW);
+
+    if (recent.length >= this.RATE_LIMIT_MAX_MESSAGES) {
+      return false; // Rate limit exceeded
+    }
+
+    // Add new timestamp
+    recent.push(now);
+    this.userRateLimits.set(key, recent);
+    return true;
+  }
+
+  /**
+   * Apply basic profanity filter
+   */
+  filterProfanity(message: string): string {
+    let filtered = message;
+
+    for (const pattern of this.PROFANITY_PATTERNS) {
+      filtered = filtered.replace(pattern, (match) => '*'.repeat(match.length));
+    }
+
+    return filtered;
+  }
+
+  /**
+   * Clear chat for a specific game
+   */
+  clearGameChat(gameId: string): void {
+    this.gameChats.delete(gameId);
+  }
+
+  /**
+   * Get all messages for a game (for spectators joining late)
+   */
+  getMessages(gameId: string): GameChatMessage[] {
+    return this.gameChats.get(gameId) || [];
+  }
+
+  /**
+   * Clean up rate limit data for disconnected users
+   */
+  cleanupRateLimits(validUserIds: Set<number>): number {
+    let cleanedCount = 0;
+    const keysToDelete: string[] = [];
+
+    for (const key of this.userRateLimits.keys()) {
+      const userId = parseInt(key, 10);
+      if (!validUserIds.has(userId)) {
+        keysToDelete.push(key);
+      }
+    }
+
+    for (const key of keysToDelete) {
+      this.userRateLimits.delete(key);
+      cleanedCount++;
+    }
+
+    return cleanedCount;
+  }
+}
+
+// ——————————————————————————————————————————————————————————————————————————————————
 // LOBBY MANAGER (In-memory lobby state)
 // ——————————————————————————————————————————————————————————————————————————————————
 
@@ -509,6 +658,7 @@ class GameManager {
     private db: DatabaseManager,
     private auth: AuthManager,
     private stats: StatisticsManager,
+    private chat: ChatManager,
   ) {}
 
   async startGame(
@@ -542,6 +692,29 @@ class GameManager {
       );
     }
 
+    const now = Date.now();
+    const isPVP = !isAI;
+    const hasSecondPlayer = players[1] !== null;
+
+    // Initialize wager negotiation for PVP games without second player
+    const wagerNegotiation: WagerNegotiation | null =
+      isPVP && !hasSecondPlayer
+        ? {
+            currentOffer: wager,
+            proposedBy: 0, // Creator is always player 0
+            acceptedBy: [],
+            history: [
+              {
+                amount: wager,
+                proposedBy: 0,
+                timestamp: now,
+              },
+            ],
+            roundCount: 0,
+            lockedIn: false,
+          }
+        : null;
+
     const gameState: GameState = {
       id: gameId,
       players,
@@ -568,7 +741,13 @@ class GameManager {
           }
         : undefined,
       readyStates: isAI ? [false, true] : [false, false], // AI is always ready
-      startTime: Date.now(),
+      startTime: now,
+      // New fields for lobby negotiation and chat
+      wagerNegotiation,
+      chatMessages: [],
+      lobbyCreatedAt: now,
+      negotiationStartedAt: null,
+      wagerChargedAt: isPVP && !hasSecondPlayer ? null : now, // For AI/full PVP, wager charged immediately
     };
 
     this.games.set(gameId, gameState);
@@ -723,6 +902,54 @@ class GameManager {
   private cleanupGameTracking(gameId: string): void {
     this.lastEmitTime.delete(gameId);
     this.droppedFrames.delete(gameId);
+  }
+
+  /**
+   * Remove a game from memory (used for cancelled/timed-out lobbies)
+   * Does not process match results or payouts - just cleans up state
+   */
+  removeGame(gameId: string): void {
+    const game = this.games.get(gameId);
+    if (!game) {
+      console.warn(`⚠️ Attempted to remove non-existent game ${gameId}`);
+      return;
+    }
+
+    console.log(`🗑️ Removing game ${gameId} (status: ${game.status})`);
+
+    // Clear game loop interval if exists
+    const interval = this.gameIntervals.get(gameId);
+    if (interval) {
+      clearInterval(interval);
+      this.gameIntervals.delete(gameId);
+    }
+
+    // Clean up tracking
+    this.cleanupGameTracking(gameId);
+    this.countdownInProgress.delete(gameId);
+
+    // Remove spectators from game room
+    const spectators = this.gameSpectators.get(gameId);
+    if (spectators && spectators.size > 0) {
+      spectators.forEach((socketId) => {
+        const socket = this.io.sockets.sockets.get(socketId);
+        if (socket) {
+          socket.leave(`game:${gameId}`);
+        }
+        this.spectatorGames.delete(socketId);
+      });
+      this.gameSpectators.delete(gameId);
+    }
+
+    // Cleanup player-to-game mappings
+    this.playerGames.delete(game.players[0].id);
+    if (game.players[1]) {
+      this.playerGames.delete(game.players[1].id);
+    }
+
+    // Delete the game
+    this.games.delete(gameId);
+    console.log(`✅ Game ${gameId} removed from memory`);
   }
 
   private updateGame(game: GameState): void {
@@ -1275,32 +1502,73 @@ class GameManager {
   }
 
   /**
-   * Handle player reconnection during grace period
-   * Returns true if player was reconnecting and game was resumed
+   * Handle player reconnection during grace period OR lobby phase
+   * Returns true if player was reconnecting and game was resumed/rejoined
    */
   handlePlayerReconnection(playerId: number): boolean {
+    // Check for active game grace period reconnection
     const graceInfo = this.disconnectionGracePeriods.get(playerId);
-    if (!graceInfo) return false;
+    if (graceInfo) {
+      console.log(`🔄 Player ${playerId} reconnected during grace period!`);
 
-    console.log(`🔄 Player ${playerId} reconnected during grace period!`);
+      // Clear the grace period timer
+      clearTimeout(graceInfo.timer);
+      this.disconnectionGracePeriods.delete(playerId);
 
-    // Clear the grace period timer
-    clearTimeout(graceInfo.timer);
-    this.disconnectionGracePeriods.delete(playerId);
+      // Resume the game if it was paused
+      const game = this.games.get(graceInfo.gameId);
+      if (game && game.status === 'paused') {
+        console.log(`▶️ Resuming game ${graceInfo.gameId} after reconnection`);
+        game.status = 'active';
 
-    // Resume the game if it was paused
-    const game = this.games.get(graceInfo.gameId);
-    if (game && game.status === 'paused') {
-      console.log(`▶️ Resuming game ${graceInfo.gameId} after reconnection`);
-      game.status = 'active';
+        // Notify all players that the game has resumed
+        this.io.to(`game:${graceInfo.gameId}`).emit('game_resumed', {
+          message: 'Player reconnected, game resumed',
+        });
+      }
 
-      // Notify all players that the game has resumed
-      this.io.to(`game:${graceInfo.gameId}`).emit('game_resumed', {
-        message: 'Player reconnected, game resumed',
-      });
+      return true;
     }
 
-    return true;
+    // Check for lobby phase reconnection (waiting_for_opponent or lobby_negotiation)
+    const gameId = this.playerGames.get(playerId);
+    if (gameId) {
+      const game = this.games.get(gameId);
+      if (game && (game.status === 'waiting_for_opponent' || game.status === 'lobby_negotiation')) {
+        const playerSlot = game.players[0]?.id === playerId ? 0 : 1;
+        const player = game.players[playerSlot];
+
+        console.log(
+          `🔄 Player ${playerId} reconnected to lobby phase game ${gameId} (status: ${game.status})`,
+        );
+
+        // Notify other player of reconnection
+        this.io.to(`game:${gameId}`).emit('player_reconnected', {
+          playerId,
+          playerSlot,
+          message: 'Opponent reconnected',
+        });
+
+        // Add system chat message
+        if (player && this.chat) {
+          const reconnectMsg = this.chat.addMessage(
+            gameId,
+            0,
+            'System',
+            `${player.name} reconnected`,
+            'spectator',
+            true,
+          );
+          if (reconnectMsg) {
+            this.io.to(`game:${gameId}`).emit('game_chat_message', reconnectMsg);
+          }
+        }
+
+        return true;
+      }
+    }
+
+    return false;
   }
 
   forfeitGame(playerId: number, immediate: boolean = false): void {
@@ -1310,7 +1578,46 @@ class GameManager {
     const game = this.games.get(gameId);
     if (!game) return;
 
-    // ✅ RECONNECTION GRACE PERIOD: Don't immediately forfeit
+    // ✅ LOBBY PHASE DISCONNECT: Don't forfeit, just notify
+    // For waiting_for_opponent and lobby_negotiation, keep lobby open
+    if (
+      !immediate &&
+      (game.status === 'waiting_for_opponent' || game.status === 'lobby_negotiation') &&
+      !game.isAI
+    ) {
+      const playerSlot = game.players[0]?.id === playerId ? 0 : 1;
+      console.log(
+        `🔌 Player ${playerId} disconnected during ${game.status} - notifying other player`,
+      );
+
+      // Notify other player (if present)
+      this.io.to(`game:${gameId}`).emit('player_disconnected', {
+        playerId,
+        playerSlot,
+        message: 'Opponent disconnected - waiting for reconnection...',
+      });
+
+      // Add system chat message
+      const player = game.players[playerSlot];
+      if (player) {
+        const disconnectMsg = this.chat?.addMessage(
+          gameId,
+          0,
+          'System',
+          `${player.name} disconnected`,
+          'spectator',
+          true,
+        );
+        if (disconnectMsg) {
+          this.io.to(`game:${gameId}`).emit('game_chat_message', disconnectMsg);
+        }
+      }
+
+      // DON'T set a timer - lobby stays open until other player leaves or timeout
+      return;
+    }
+
+    // ✅ RECONNECTION GRACE PERIOD: Don't immediately forfeit active games
     // Give player 10 seconds to reconnect for temporary network issues
     if (!immediate && game.status === 'active' && !game.isAI) {
       // Only apply grace period for active PVP games (not AI games)
@@ -1722,7 +2029,8 @@ export class PongGameServer {
   private auth = new AuthManager(this.db);
   private lobby = new LobbyManager();
   private stats = new StatisticsManager();
-  private game = new GameManager(this.io, this.db, this.auth, this.stats);
+  private chat = new ChatManager();
+  private game = new GameManager(this.io, this.db, this.auth, this.stats, this.chat);
   private rateLimiter = new SocketRateLimiter();
   private statsInterval: NodeJS.Timeout | null = null;
   private cleanupInterval: NodeJS.Timeout | null = null;
@@ -1887,7 +2195,7 @@ export class PongGameServer {
         if (player) {
           console.log(`✅ Player ${player.name} (${player.id}) authenticated`);
 
-          // ✅ RECONNECTION GRACE PERIOD: Check if player is reconnecting
+          // ✅ RECONNECTION HANDLING: Check if player is reconnecting
           const wasReconnecting = this.game.handlePlayerReconnection(player.id);
           if (wasReconnecting) {
             console.log(`🔄 Player ${player.name} (${player.id}) reconnected to ongoing game`);
@@ -1899,13 +2207,23 @@ export class PongGameServer {
               if (game) {
                 // Send current game state to reconnected player
                 const playerSlot = game.players[0].id === player.id ? 0 : 1;
-                socket.emit('match_joined', {
+                const matchJoinedPayload: any = {
                   gameId,
                   playerSlot,
                   opponent: game.players[playerSlot === 0 ? 1 : 0],
                   wager: game.wager,
                   pot: game.isAI ? game.wager : game.wager * 2,
-                });
+                };
+
+                // If in lobby phase, include negotiation state and chat history
+                if (game.status === 'waiting_for_opponent' || game.status === 'lobby_negotiation') {
+                  matchJoinedPayload.currentWagerOffer =
+                    game.wagerNegotiation?.currentOffer || game.wager;
+                  matchJoinedPayload.chatHistory = this.chat.getMessages(gameId);
+                  matchJoinedPayload.wagerNegotiation = game.wagerNegotiation;
+                }
+
+                socket.emit('match_joined', matchJoinedPayload);
               }
             }
           }
@@ -2096,6 +2414,19 @@ export class PongGameServer {
             return;
           }
 
+          // Add system welcome message to chat
+          const welcomeMsg = this.chat.addMessage(
+            gameId,
+            0,
+            'System',
+            `${player.name} created the lobby with ${data.wager} MuskBucks wager`,
+            'player1',
+            true,
+          );
+          if (welcomeMsg) {
+            this.io.to(`game:${gameId}`).emit('game_chat_message', welcomeMsg);
+          }
+
           // Keep lobby available for others to join
           const availableLobbies = this.lobby.getAvailableLobbies();
           // Only log in development (verbose)
@@ -2185,7 +2516,7 @@ export class PongGameServer {
           return;
         }
 
-        // Don't process wager yet - wait until both players are ready
+        // Don't process wager yet - wait until negotiation completes
 
         // Join the existing game
         socket.join(`game:${existingGameId}`);
@@ -2198,10 +2529,25 @@ export class PongGameServer {
         game.players[0].score = 0;
         game.players[1].score = 0;
 
-        game.status = 'waiting_for_ready';
+        // Transition to lobby_negotiation phase
+        game.status = 'lobby_negotiation';
+        game.negotiationStartedAt = Date.now();
         this.game['playerGames'].set(player.id, existingGameId);
 
-        // Notify joiner
+        // Add system chat message announcing player joined
+        const joinMsg = this.chat.addMessage(
+          existingGameId,
+          0,
+          'System',
+          `${player.name} joined the lobby`,
+          'spectator',
+          true,
+        );
+        if (joinMsg) {
+          this.io.to(`game:${existingGameId}`).emit('game_chat_message', joinMsg);
+        }
+
+        // Notify joiner with current wager offer and chat history
         const pot = lobby.wager * 2;
         socket.emit('match_joined', {
           gameId: existingGameId,
@@ -2209,12 +2555,25 @@ export class PongGameServer {
           opponent: creator,
           wager: lobby.wager,
           pot,
+          currentWagerOffer: game.wagerNegotiation?.currentOffer || lobby.wager,
+          chatHistory: this.chat.getMessages(existingGameId),
+          wagerNegotiation: game.wagerNegotiation,
         });
 
         // Notify creator that opponent joined (but NOT the joiner themselves!)
-        socket.to(`game:${existingGameId}`).emit('opponent_joined', { opponent: player });
+        socket.to(`game:${existingGameId}`).emit('opponent_joined', {
+          opponent: player,
+          currentWagerOffer: game.wagerNegotiation?.currentOffer || lobby.wager,
+          wagerNegotiation: game.wagerNegotiation,
+          chatMessages: this.chat.getMessages(existingGameId),
+        });
 
-        // Remove lobby and update lobby list
+        // Start 2-minute negotiation timeout
+        setTimeout(() => {
+          this.handleNegotiationTimeout(existingGameId);
+        }, 120000); // 2 minutes
+
+        // Remove lobby from available list (mark as full)
         this.lobby.deleteLobby(data.matchId);
         this.io.to('lobby').emit('lobby_state', { lobbies: this.lobby.getAvailableLobbies() });
       });
@@ -2300,6 +2659,392 @@ export class PongGameServer {
         });
       });
 
+      // Game chat message
+      socket.on('game_chat_message', async (data: unknown) => {
+        // Rate limiting (handled by ChatManager, but also apply socket rate limit)
+        if (!this.rateLimiter.checkLimit(socket.id, 'game_chat_message')) {
+          socket.emit('error', {
+            code: 'RATE_LIMIT',
+            message: 'You are sending messages too quickly',
+          });
+          return;
+        }
+
+        const player = this.auth.getPlayer(socket.id);
+        if (!player) {
+          socket.emit('error', { code: 'UNAUTHORIZED', message: 'Not authenticated' });
+          return;
+        }
+
+        // Type guard for payload
+        if (
+          !data ||
+          typeof data !== 'object' ||
+          !('gameId' in data) ||
+          typeof data.gameId !== 'string' ||
+          !('message' in data) ||
+          typeof data.message !== 'string'
+        ) {
+          socket.emit('error', { code: 'INVALID_PAYLOAD', message: 'Invalid chat message format' });
+          return;
+        }
+
+        const { gameId, message } = data as { gameId: string; message: string };
+
+        // Validate message content
+        if (!message.trim() || message.length > 500) {
+          socket.emit('error', {
+            code: 'INVALID_MESSAGE',
+            message: 'Message must be between 1-500 characters',
+          });
+          return;
+        }
+
+        // Check if player/spectator is in the game room
+        const game = this.game.getGame(gameId);
+        if (!game) {
+          socket.emit('error', { code: 'GAME_NOT_FOUND', message: 'Game not found' });
+          return;
+        }
+
+        // Determine user role (player1, player2, or spectator)
+        let userRole: 'player1' | 'player2' | 'spectator';
+        if (game.players[0]?.id === player.id) {
+          userRole = 'player1';
+        } else if (game.players[1]?.id === player.id) {
+          userRole = 'player2';
+        } else {
+          // Check if spectating this game
+          const spectatorGameId = this.game.getSpectatorGameId(socket.id);
+          if (spectatorGameId === gameId) {
+            userRole = 'spectator';
+          } else {
+            socket.emit('error', { code: 'NOT_IN_GAME', message: 'You are not in this game' });
+            return;
+          }
+        }
+
+        // Add message via ChatManager (includes rate limiting & profanity filter)
+        const chatMessage = this.chat.addMessage(
+          gameId,
+          player.id,
+          player.name,
+          message.trim(),
+          userRole,
+          false, // Not a system message
+        );
+
+        if (!chatMessage) {
+          socket.emit('error', {
+            code: 'RATE_LIMIT',
+            message: 'You are sending messages too quickly (3 per 5 seconds)',
+          });
+          return;
+        }
+
+        // Broadcast message to entire game room (players + spectators)
+        this.io.to(`game:${gameId}`).emit('game_chat_message', chatMessage);
+
+        // Log chat message in development
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`💬 [${userRole}] ${player.name} in game ${gameId}: ${chatMessage.message}`);
+        }
+      });
+
+      // Propose wager
+      socket.on('propose_wager', async (data: unknown) => {
+        // Rate limiting
+        if (!this.rateLimiter.checkLimit(socket.id, 'propose_wager')) {
+          socket.emit('error', { code: 'RATE_LIMIT', message: 'Too many wager proposals' });
+          return;
+        }
+
+        const player = this.auth.getPlayer(socket.id);
+        if (!player) {
+          socket.emit('error', { code: 'UNAUTHORIZED', message: 'Not authenticated' });
+          return;
+        }
+
+        // Type guard
+        if (
+          !data ||
+          typeof data !== 'object' ||
+          !('gameId' in data) ||
+          typeof data.gameId !== 'string' ||
+          !('amount' in data) ||
+          typeof data.amount !== 'number'
+        ) {
+          socket.emit('error', { code: 'INVALID_PAYLOAD', message: 'Invalid proposal format' });
+          return;
+        }
+
+        const { gameId, amount } = data as { gameId: string; amount: number };
+
+        // Get game and validate
+        const game = this.game.getGame(gameId);
+        if (!game) {
+          socket.emit('error', { code: 'GAME_NOT_FOUND', message: 'Game not found' });
+          return;
+        }
+
+        // Only allow during lobby_negotiation phase
+        if (game.status !== 'lobby_negotiation') {
+          socket.emit('error', {
+            code: 'INVALID_STATE',
+            message: 'Wager can only be proposed during negotiation',
+          });
+          return;
+        }
+
+        // Only players (not spectators) can propose wagers
+        const playerSlot =
+          game.players[0]?.id === player.id ? 0 : game.players[1]?.id === player.id ? 1 : null;
+        if (playerSlot === null) {
+          socket.emit('error', {
+            code: 'NOT_A_PLAYER',
+            message: 'Only players can propose wagers',
+          });
+          return;
+        }
+
+        // Validate wager amount
+        const validationError = validateWager(amount, 'pvp');
+        if (validationError) {
+          socket.emit('error', { code: 'INVALID_WAGER', message: validationError });
+          return;
+        }
+
+        // Check both players have sufficient balance
+        const balance1Valid = await this.db.validateWager(game.players[0]!.id, amount);
+        const balance2Valid =
+          game.players[1] && (await this.db.validateWager(game.players[1].id, amount));
+
+        if (!balance1Valid || !balance2Valid) {
+          socket.emit('error', {
+            code: 'INSUFFICIENT_BALANCE',
+            message: 'One or both players lack sufficient balance for this wager',
+          });
+          return;
+        }
+
+        // Check negotiation round limit
+        if (game.wagerNegotiation && game.wagerNegotiation.roundCount >= 5) {
+          socket.emit('error', {
+            code: 'NEGOTIATION_LIMIT',
+            message: 'Maximum 5 negotiation rounds reached',
+          });
+          return;
+        }
+
+        // Update wager negotiation
+        if (game.wagerNegotiation) {
+          game.wagerNegotiation.currentOffer = amount;
+          game.wagerNegotiation.proposedBy = playerSlot;
+          game.wagerNegotiation.acceptedBy = []; // Reset acceptances
+          game.wagerNegotiation.roundCount++;
+          game.wagerNegotiation.history.push({
+            amount,
+            proposedBy: playerSlot,
+            timestamp: Date.now(),
+          });
+        }
+
+        // Update game wager
+        game.wager = amount;
+
+        // Add system chat message
+        const systemMsg = this.chat.addMessage(
+          gameId,
+          0,
+          'System',
+          `${player.name} proposed ${amount} MuskBucks wager`,
+          'spectator',
+          true,
+        );
+        if (systemMsg) {
+          this.io.to(`game:${gameId}`).emit('game_chat_message', systemMsg);
+        }
+
+        // Broadcast wager proposal to game room
+        this.io.to(`game:${gameId}`).emit('wager_proposed', {
+          amount,
+          proposedBy: playerSlot,
+          proposer: {
+            id: player.id,
+            username: player.name,
+            elo: 0, // TODO: Fetch actual ELO if needed
+          },
+          roundCount: game.wagerNegotiation?.roundCount || 0,
+        });
+
+        console.log(
+          `💰 ${player.name} proposed ${amount} MB wager in game ${gameId} (round ${game.wagerNegotiation?.roundCount})`,
+        );
+      });
+
+      // Accept wager
+      socket.on('accept_wager', async (data: unknown) => {
+        // Rate limiting
+        if (!this.rateLimiter.checkLimit(socket.id, 'accept_wager')) {
+          socket.emit('error', { code: 'RATE_LIMIT', message: 'Too many accept attempts' });
+          return;
+        }
+
+        const player = this.auth.getPlayer(socket.id);
+        if (!player) {
+          socket.emit('error', { code: 'UNAUTHORIZED', message: 'Not authenticated' });
+          return;
+        }
+
+        // Type guard
+        if (
+          !data ||
+          typeof data !== 'object' ||
+          !('gameId' in data) ||
+          typeof data.gameId !== 'string'
+        ) {
+          socket.emit('error', { code: 'INVALID_PAYLOAD', message: 'Invalid accept format' });
+          return;
+        }
+
+        const { gameId } = data as { gameId: string };
+
+        // Get game
+        const game = this.game.getGame(gameId);
+        if (!game) {
+          socket.emit('error', { code: 'GAME_NOT_FOUND', message: 'Game not found' });
+          return;
+        }
+
+        // Only allow during lobby_negotiation
+        if (game.status !== 'lobby_negotiation') {
+          socket.emit('error', {
+            code: 'INVALID_STATE',
+            message: 'Can only accept during negotiation',
+          });
+          return;
+        }
+
+        // Get player slot
+        const playerSlot =
+          game.players[0]?.id === player.id ? 0 : game.players[1]?.id === player.id ? 1 : null;
+        if (playerSlot === null) {
+          socket.emit('error', { code: 'NOT_A_PLAYER', message: 'Only players can accept wagers' });
+          return;
+        }
+
+        // Add player to acceptedBy list if not already there
+        if (game.wagerNegotiation && !game.wagerNegotiation.acceptedBy.includes(playerSlot)) {
+          game.wagerNegotiation.acceptedBy.push(playerSlot);
+
+          // Broadcast acceptance
+          this.io.to(`game:${gameId}`).emit('wager_accepted', {
+            playerId: player.id,
+            acceptedBy: game.wagerNegotiation.acceptedBy,
+          });
+
+          // Add system chat message
+          const systemMsg = this.chat.addMessage(
+            gameId,
+            0,
+            'System',
+            `${player.name} accepted the wager`,
+            'spectator',
+            true,
+          );
+          if (systemMsg) {
+            this.io.to(`game:${gameId}`).emit('game_chat_message', systemMsg);
+          }
+
+          console.log(
+            `✅ ${player.name} accepted wager in game ${gameId}. Accepted by: ${game.wagerNegotiation.acceptedBy}`,
+          );
+
+          // Check if BOTH players have accepted
+          if (game.wagerNegotiation.acceptedBy.length === 2) {
+            // Lock wager and process transactions
+            await this.lockWagerAndProceed(gameId, game);
+          }
+        }
+      });
+
+      // Reject wager (clears acceptances for new proposals)
+      socket.on('reject_wager', async (data: unknown) => {
+        // Rate limiting
+        if (!this.rateLimiter.checkLimit(socket.id, 'reject_wager')) {
+          socket.emit('error', { code: 'RATE_LIMIT', message: 'Too many reject attempts' });
+          return;
+        }
+
+        const player = this.auth.getPlayer(socket.id);
+        if (!player) {
+          socket.emit('error', { code: 'UNAUTHORIZED', message: 'Not authenticated' });
+          return;
+        }
+
+        // Type guard
+        if (
+          !data ||
+          typeof data !== 'object' ||
+          !('gameId' in data) ||
+          typeof data.gameId !== 'string'
+        ) {
+          socket.emit('error', { code: 'INVALID_PAYLOAD', message: 'Invalid reject format' });
+          return;
+        }
+
+        const { gameId } = data as { gameId: string };
+
+        // Get game
+        const game = this.game.getGame(gameId);
+        if (!game) {
+          socket.emit('error', { code: 'GAME_NOT_FOUND', message: 'Game not found' });
+          return;
+        }
+
+        // Only allow during lobby_negotiation
+        if (game.status !== 'lobby_negotiation') {
+          socket.emit('error', {
+            code: 'INVALID_STATE',
+            message: 'Can only reject during negotiation',
+          });
+          return;
+        }
+
+        // Get player slot
+        const playerSlot =
+          game.players[0]?.id === player.id ? 0 : game.players[1]?.id === player.id ? 1 : null;
+        if (playerSlot === null) {
+          socket.emit('error', { code: 'NOT_A_PLAYER', message: 'Only players can reject wagers' });
+          return;
+        }
+
+        // Clear acceptances for new proposal
+        if (game.wagerNegotiation) {
+          game.wagerNegotiation.acceptedBy = [];
+
+          // Broadcast rejection
+          this.io.to(`game:${gameId}`).emit('wager_rejected', {
+            rejectedBy: player.id,
+          });
+
+          // Add system chat message
+          const systemMsg = this.chat.addMessage(
+            gameId,
+            0,
+            'System',
+            `${player.name} rejected the wager`,
+            'spectator',
+            true,
+          );
+          if (systemMsg) {
+            this.io.to(`game:${gameId}`).emit('game_chat_message', systemMsg);
+          }
+
+          console.log(`❌ ${player.name} rejected wager in game ${gameId}`);
+        }
+      });
+
       // Leave match
       socket.on('leave_match', () => {
         const player = this.auth.getPlayer(socket.id);
@@ -2358,7 +3103,7 @@ export class PongGameServer {
             socket.join(`game:${gameId}`);
             console.log(`👁️ Spectator ${socket.id} joined room game:${gameId}`);
 
-            socket.emit('spectator_joined', {
+            const spectatorPayload: any = {
               gameId,
               spectatorCount: this.game.getSpectatorCount(gameId),
               player1: game.players[0]
@@ -2382,7 +3127,20 @@ export class PongGameServer {
                       : 1)
                 : game.wager * 2,
               status: game.status,
-            });
+            };
+
+            // Include chat history and negotiation state for lobby phase
+            if (game.status === 'waiting_for_opponent' || game.status === 'lobby_negotiation') {
+              const chatMessages = this.chat.getMessages(gameId);
+              spectatorPayload.chatHistory = chatMessages;
+              spectatorPayload.chatMessages = chatMessages; // Alias for consistency
+              spectatorPayload.wagerNegotiation = game.wagerNegotiation;
+              spectatorPayload.currentWagerOffer =
+                game.wagerNegotiation?.currentOffer || game.wager;
+              spectatorPayload.negotiationStartedAt = game.negotiationStartedAt;
+            }
+
+            socket.emit('spectator_joined', spectatorPayload);
 
             // Send initial game state for spectators immediately
             if (
@@ -2439,6 +3197,161 @@ export class PongGameServer {
         }
       });
     });
+  }
+
+  /**
+   * Lock wager and proceed to waiting_for_ready phase
+   * Called when both players have accepted the wager
+   */
+  private async lockWagerAndProceed(gameId: string, game: GameState): Promise<void> {
+    const wager = game.wagerNegotiation?.currentOffer || game.wager;
+
+    console.log(`🔒 Locking wager for game ${gameId}: ${wager} MB`);
+
+    // Validate both players still have sufficient balance
+    if (!game.players[0] || !game.players[1]) {
+      this.io.to(`game:${gameId}`).emit('error', {
+        code: 'INVALID_STATE',
+        message: 'Both players required to lock wager',
+      });
+      return;
+    }
+
+    const balance1Valid = await this.db.validateWager(game.players[0].id, wager);
+    const balance2Valid = await this.db.validateWager(game.players[1].id, wager);
+
+    if (!balance1Valid || !balance2Valid) {
+      // Insufficient funds - cancel match
+      this.io.to(`game:${gameId}`).emit('match_cancelled', {
+        reason: 'Insufficient balance for agreed wager',
+      });
+
+      // Add system message
+      const cancelMsg = this.chat.addMessage(
+        gameId,
+        0,
+        'System',
+        'Match cancelled - insufficient balance',
+        'spectator',
+        true,
+      );
+      if (cancelMsg) {
+        this.io.to(`game:${gameId}`).emit('game_chat_message', cancelMsg);
+      }
+
+      // Clean up game
+      setTimeout(() => {
+        this.game.removeGame(gameId);
+        this.chat.clearGameChat(gameId);
+      }, 3000);
+
+      return;
+    }
+
+    // Process wager transaction
+    const transaction = await this.db.processWagerTransaction(
+      game.players[0].id,
+      game.players[1].id,
+      wager,
+    );
+
+    if (!transaction.success) {
+      console.error(`💸 Wager transaction failed for game ${gameId}: ${transaction.error}`);
+
+      this.io.to(`game:${gameId}`).emit('match_cancelled', {
+        reason: transaction.error || 'Wager transaction failed',
+      });
+
+      // Add system message
+      const errorMsg = this.chat.addMessage(
+        gameId,
+        0,
+        'System',
+        `Match cancelled - ${transaction.error}`,
+        'spectator',
+        true,
+      );
+      if (errorMsg) {
+        this.io.to(`game:${gameId}`).emit('game_chat_message', errorMsg);
+      }
+
+      // Clean up game
+      setTimeout(() => {
+        this.game.removeGame(gameId);
+        this.chat.clearGameChat(gameId);
+      }, 3000);
+
+      return;
+    }
+
+    // Success - lock wager and proceed to waiting_for_ready
+    if (game.wagerNegotiation) {
+      game.wagerNegotiation.lockedIn = true;
+    }
+    game.wagerChargedAt = Date.now();
+    game.status = 'waiting_for_ready';
+    game.wager = wager; // Update final wager
+
+    // Add system message
+    const lockMsg = this.chat.addMessage(
+      gameId,
+      0,
+      'System',
+      `Wager locked: ${wager} MuskBucks each (${wager * 2} MB pot). Ready up to start!`,
+      'spectator',
+      true,
+    );
+    if (lockMsg) {
+      this.io.to(`game:${gameId}`).emit('game_chat_message', lockMsg);
+    }
+
+    // Broadcast wager lock event
+    this.io.to(`game:${gameId}`).emit('wager_locked', {
+      finalWager: wager,
+      pot: wager * 2,
+    });
+
+    console.log(`✅ Wager locked for game ${gameId}: ${wager} MB per player`);
+  }
+
+  /**
+   * Handle negotiation timeout (2 minutes expired)
+   * Called when negotiation phase times out
+   */
+  private handleNegotiationTimeout(gameId: string): void {
+    const game = this.game.getGame(gameId);
+
+    // Only timeout if still in negotiation phase
+    if (!game || game.status !== 'lobby_negotiation') {
+      return; // Already progressed or game ended
+    }
+
+    console.log(`⏱️ Negotiation timeout for game ${gameId}`);
+
+    // Add system message
+    const timeoutMsg = this.chat.addMessage(
+      gameId,
+      0,
+      'System',
+      'Negotiation timeout - match cancelled',
+      'spectator',
+      true,
+    );
+    if (timeoutMsg) {
+      this.io.to(`game:${gameId}`).emit('game_chat_message', timeoutMsg);
+    }
+
+    // Notify players
+    this.io.to(`game:${gameId}`).emit('negotiation_timeout', {
+      message: 'Negotiation timeout - match cancelled',
+    });
+
+    // Clean up after 3 seconds (give time for message to be received)
+    setTimeout(() => {
+      this.game.removeGame(gameId);
+      this.chat.clearGameChat(gameId);
+      console.log(`🧹 Cleaned up timed-out game ${gameId}`);
+    }, 3000);
   }
 
   private setupStatsBroadcasting(): void {

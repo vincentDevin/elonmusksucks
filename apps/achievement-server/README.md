@@ -24,6 +24,7 @@
 The **achievement-server** is a standalone microservice that monitors Redis pub/sub channels for user activity events and processes achievement unlocks in real-time.
 
 **Key Features:**
+
 - **Event-driven architecture** - Subscribes to 75+ Redis channels
 - **Async processing** - Non-blocking achievement checks
 - **Decoupled from API** - Isolated crashes don't affect main server
@@ -32,6 +33,7 @@ The **achievement-server** is a standalone microservice that monitors Redis pub/
 - **Prometheus metrics** - Monitor processing times & unlock rates
 
 **Why a Dedicated Server?**
+
 - **Isolation** - Achievement processing crashes don't affect API
 - **Scalability** - Can scale independently based on event load
 - **Performance** - Offload CPU-intensive achievement checks from API server
@@ -113,21 +115,26 @@ The **achievement-server** is a standalone microservice that monitors Redis pub/
 ## Technology Stack
 
 ### Core Runtime
+
 - **Node.js ≥24.0.0** - Strict requirement
 - **TypeScript 5.8.3** - Type safety
 
 ### Database & ORM
+
 - **Prisma Client 6.10.1** - Type-safe database access
 - **PostgreSQL 16** - Primary database
 
 ### Event System
+
 - **IORedis 5.6.1** - Redis client with pub/sub
 - **Redis 7+** - Event pub/sub broker
 
 ### Monitoring
+
 - **prom-client 15.1.3** - Prometheus metrics
 
 ### Development Tools
+
 - **dotenv 16.5.0** - Environment variables
 - **nodemon 3.1.10** - Hot reload
 - **ts-node 10.9.2** - TypeScript execution
@@ -295,7 +302,7 @@ export class AchievementEngine {
   constructor(
     private achievementRepo: AchievementRepository,
     private statsRepo: StatsRepository,
-    private activityRepo: ActivityRepository
+    private activityRepo: ActivityRepository,
   ) {}
 
   async processBetPlaced(payload: BetPlacedEvent) {
@@ -366,7 +373,7 @@ export class AchievementEngine {
     await redisPublish(REDIS_CHANNELS.ACHIEVEMENT_UNLOCKED, {
       userId,
       achievementId,
-      timestamp: new Date()
+      timestamp: new Date(),
     });
 
     console.log(`[AchievementEngine] Unlocked achievement ${achievementId} for user ${userId}`);
@@ -379,6 +386,7 @@ export class AchievementEngine {
 ### 77 Achievements (8 Categories)
 
 #### **1. Betting Achievements (15)**
+
 - `FIRST_BET` - Place first bet
 - `FIRST_10_BETS` - Place 10 bets
 - `VETERAN_BETTOR` - Place 50 bets
@@ -396,6 +404,7 @@ export class AchievementEngine {
 - `PROFIT_100000` - Earn 100000 MuskBucks profit
 
 #### **2. Parlay Achievements (8)**
+
 - `FIRST_PARLAY` - Place first parlay
 - `PARLAY_MASTER` - Place 10 parlays
 - `PARLAY_LEGEND` - Place 50 parlays
@@ -406,6 +415,7 @@ export class AchievementEngine {
 - `PARLAY_BONUS_50X` - Win parlay with ≥50x bonus
 
 #### **3. Pong Achievements (12)**
+
 - `PONG_FIRST_WIN` - Win first Pong match
 - `PONG_10_WINS` - Win 10 Pong matches
 - `PONG_100_WINS` - Win 100 Pong matches
@@ -420,6 +430,7 @@ export class AchievementEngine {
 - `PONG_STREAK_10` - Win 10 Pong matches in a row
 
 #### **4. Financial Achievements (10)**
+
 - `BALANCE_1000` - Reach 1000 MuskBucks balance
 - `BALANCE_10000` - Reach 10000 MuskBucks balance
 - `BALANCE_100000` - Reach 100000 MuskBucks balance
@@ -432,6 +443,7 @@ export class AchievementEngine {
 - `WEEKLY_PROFIT_5000` - Earn 5000 MuskBucks in one week
 
 #### **5. Leaderboard Achievements (8)**
+
 - `LEADERBOARD_TOP_10` - Reach top 10 on daily leaderboard
 - `LEADERBOARD_TOP_5` - Reach top 5 on daily leaderboard
 - `LEADERBOARD_TOP_1` - Reach #1 on daily leaderboard
@@ -442,6 +454,7 @@ export class AchievementEngine {
 - `PONG_LEADERBOARD_TOP_10` - Reach top 10 on Pong ELO leaderboard
 
 #### **6. Social Achievements (10)**
+
 - `FIRST_POST` - Create first post
 - `SOCIAL_BUTTERFLY` - Create 10 posts
 - `INFLUENCER` - Create 50 posts
@@ -454,6 +467,7 @@ export class AchievementEngine {
 - `MEGASTAR` - Get 1000 followers
 
 #### **7. Timeline Achievements (7)**
+
 - `TIMELINE_READER` - Read 10 articles
 - `TIMELINE_ADDICT` - Read 100 articles
 - `FIRST_BOOKMARK` - Bookmark first article
@@ -463,6 +477,7 @@ export class AchievementEngine {
 - `NIGHT_OWL` - Read article between 12am-6am
 
 #### **8. Special Achievements (7)**
+
 - `ACCOUNT_VERIFIED` - Verify email address
 - `PROFILE_COMPLETE` - Complete profile setup
 - `AVATAR_UPLOADED` - Upload custom avatar
@@ -476,9 +491,11 @@ export class AchievementEngine {
 ## Repositories
 
 ### **AchievementRepository**
+
 Achievement data access.
 
 **Methods:**
+
 ```typescript
 isAchievementUnlocked(userId: number, achievementId: string): Promise<boolean>
 unlockAchievement(userId: number, achievementId: string): Promise<void>
@@ -489,9 +506,11 @@ updateAchievementProgress(userId: number, achievementId: string, progress: numbe
 ---
 
 ### **StatsRepository**
+
 User statistics queries.
 
 **Methods:**
+
 ```typescript
 getUserBettingStats(userId: number): Promise<UserBettingStats>
 getUserPongStats(userId: number): Promise<UserPongStats>
@@ -502,9 +521,11 @@ getUserFinancialStats(userId: number): Promise<UserFinancialStats>
 ---
 
 ### **ActivityRepository**
+
 Activity logging.
 
 **Methods:**
+
 ```typescript
 logAchievementUnlock(userId: number, achievementId: string): Promise<void>
 getUserActivityLog(userId: number, limit: number): Promise<Activity[]>
@@ -529,7 +550,7 @@ export class EventBus {
   constructor() {
     this.subscriber = new Redis({
       host: process.env.REDIS_HOST,
-      port: parseInt(process.env.REDIS_PORT || '6379')
+      port: parseInt(process.env.REDIS_PORT || '6379'),
     });
 
     this.subscriber.on('message', (channel, message) => {
@@ -675,6 +696,7 @@ npm -w apps/achievement-server run build
 ### Docker Deployment
 
 **Dockerfile:**
+
 ```dockerfile
 FROM node:24-alpine
 WORKDIR /app
@@ -705,6 +727,7 @@ primary_region = "sjc"
 **Endpoint:** `GET /health`
 
 **Response:**
+
 ```json
 {
   "status": "healthy",
@@ -722,6 +745,7 @@ primary_region = "sjc"
 **Endpoint:** `GET /metrics`
 
 **Metrics:**
+
 - `achievement_unlocks_total` - Total achievements unlocked
 - `achievement_processing_duration_seconds` - Event processing time
 - `achievement_queue_size` - Event queue size
@@ -733,6 +757,7 @@ primary_region = "sjc"
 ### Issue: Events not processing
 
 **Solution:**
+
 1. Check Redis connection: `redis-cli ping`
 2. Check API server is publishing events
 3. Check achievement server logs for errors
@@ -742,6 +767,7 @@ primary_region = "sjc"
 ### Issue: Duplicate achievement unlocks
 
 **Solution:**
+
 1. Check database constraints (unique index on userId + achievementId)
 2. Check achievement unlock logic has `isAchievementUnlocked` check
 

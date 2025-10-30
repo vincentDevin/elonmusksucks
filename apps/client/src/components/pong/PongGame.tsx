@@ -6,8 +6,10 @@ import { PongCanvas } from './PongCanvas';
 import { PongGamesList } from './PongGamesList';
 import { PongHeader } from './PongHeader';
 import { PongMatchCreatorModal } from './PongMatchCreatorModal';
+import PongLobbyScreen from './PongLobbyScreen';
 import { PONG_PHYSICS } from '@ems/types';
 import { PongClientPhysics } from '../../utils/pongClientPhysics';
+import { useAuth } from '../../contexts/AuthContext';
 import api from '../../api/axios';
 
 export function PongGame() {
@@ -25,6 +27,8 @@ export function PongGame() {
     spectatingGameId,
     spectatorGameState,
     shouldReturnToLobby,
+    opponentDisconnected,
+    negotiationTimeRemaining,
     connect,
     disconnect,
     joinLobby,
@@ -35,7 +39,13 @@ export function PongGame() {
     leaveMatch,
     spectateGame,
     leaveSpectating,
+    proposeWager,
+    acceptWager,
+    rejectWager,
+    sendChatMessage,
   } = usePongSocket();
+
+  const { user } = useAuth();
 
   // Subscribe to Elo update events
   const { metrics } = usePongEvents();
@@ -265,26 +275,27 @@ export function PongGame() {
       : currentGame;
 
   return (
-    <div className="min-h-screen bg-background p-4">
-      <div className="max-w-6xl mx-auto">
-        {/* Unified Header */}
-        <div className="mb-6">
-          <PongHeader
-            mode={headerMode}
-            isConnected={isConnected}
-            isAuthenticated={isAuthenticated}
-            connectionError={connectionError}
-            stats={stats}
-            onConnect={connect}
-            userElo={userElo}
-            userTier={userTier}
-            currentGame={displayGame}
-            lastPing={lastPing}
-            onBackToLobby={handleBackToLobby}
-            spectatingGameId={spectatingGameId}
-          />
-        </div>
+    <div className="min-h-screen bg-background">
+      {/* Unified Header - always in container */}
+      <div className="container mx-auto px-4 py-6">
+        <PongHeader
+          mode={headerMode}
+          isConnected={isConnected}
+          isAuthenticated={isAuthenticated}
+          connectionError={connectionError}
+          stats={stats}
+          onConnect={connect}
+          userElo={userElo}
+          userTier={userTier}
+          currentGame={displayGame}
+          lastPing={lastPing}
+          onBackToLobby={handleBackToLobby}
+          spectatingGameId={spectatingGameId}
+        />
+      </div>
 
+      {/* Main Content - always in container with consistent max-width */}
+      <div className="container mx-auto px-4 pb-32">
         {/* Show spectator if spectating */}
         {spectatingGameId && spectatorGameState ? (
           <div className="space-y-6">
@@ -376,6 +387,26 @@ export function PongGame() {
               <p className="text-secondary">Joining game as spectator...</p>
             </div>
           </div>
+        ) : currentGame &&
+          (currentGame.status === 'waiting_for_opponent' ||
+            currentGame.status === 'lobby_negotiation') ? (
+          /* Lobby/Negotiation Screen */
+          <PongLobbyScreen
+            gameId={currentGame.gameId}
+            playerSlot={currentGame.playerSlot}
+            players={currentGame.players}
+            status={currentGame.status}
+            wagerNegotiation={currentGame.wagerNegotiation || null}
+            chatMessages={currentGame.chatMessages || []}
+            negotiationTimeRemaining={negotiationTimeRemaining}
+            balance={Number(user?.muskBucks || 0)}
+            opponentDisconnected={opponentDisconnected}
+            onProposeWager={proposeWager}
+            onAcceptWager={acceptWager}
+            onRejectWager={rejectWager}
+            onSendChatMessage={sendChatMessage}
+            onCancelMatch={leaveMatch}
+          />
         ) : currentGame ? (
           <div className="space-y-6">
             {/* Game Canvas */}
@@ -443,19 +474,9 @@ export function PongGame() {
           </div>
         )}
 
-        {/* Match Creation Modal */}
-        {modalVariant && (
-          <PongMatchCreatorModal
-            isOpen={showCreateModal}
-            onClose={handleCloseModal}
-            onCreateMatch={handleCreateMatch}
-            variant={modalVariant}
-          />
-        )}
-
         {/* Debug Info (development only) */}
         {process.env.NODE_ENV === 'development' && (
-          <div className="mt-6 p-4 bg-muted/20 border border-muted rounded-lg">
+          <div className="mt-6 p-4 bg-muted/20 border border-muted rounded-lg max-w-4xl mx-auto">
             <h3 className="font-semibold text-content mb-2">Debug Info</h3>
             <div className="text-xs text-tertiary space-y-1">
               <div>Connected: {isConnected ? '✅' : '❌'}</div>
@@ -471,6 +492,16 @@ export function PongGame() {
           </div>
         )}
       </div>
+
+      {/* Match Creation Modal */}
+      {modalVariant && (
+        <PongMatchCreatorModal
+          isOpen={showCreateModal}
+          onClose={handleCloseModal}
+          onCreateMatch={handleCreateMatch}
+          variant={modalVariant}
+        />
+      )}
     </div>
   );
 }

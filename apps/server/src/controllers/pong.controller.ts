@@ -557,6 +557,7 @@ export const authenticateUser = async (req: AuthRequest, res: Response) => {
       id: user.id,
       name: user.name,
       muskBucks: Number(user.muskBucks),
+      pongElo: user.pongStats?.eloRating || 1200, // Default to 1200 if no stats yet
     });
   } catch (error) {
     console.error('Pong auth error:', error);

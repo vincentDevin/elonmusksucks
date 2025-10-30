@@ -144,6 +144,7 @@ export type ActivityPriority = (typeof ActivityPriority)[keyof typeof ActivityPr
 export type GameStatus =
   | 'waiting'
   | 'waiting_for_opponent'
+  | 'lobby_negotiation'
   | 'waiting_for_ready'
   | 'countdown'
   | 'active'

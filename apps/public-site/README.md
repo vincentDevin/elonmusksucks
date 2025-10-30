@@ -35,6 +35,7 @@ The **public-site** is a server-side rendered (SSR) React application that provi
 - **No authentication** required
 
 **Key Features:**
+
 - Server-side rendering with Vite SSR
 - Automatic hydration with React 19
 - Shared theme system with client app
@@ -43,6 +44,7 @@ The **public-site** is a server-side rendered (SSR) React application that provi
 - Redis-backed caching
 
 **Purpose:**
+
 - Drive user acquisition through SEO
 - Showcase platform activity (predictions, leaderboards)
 - Provide preview without requiring login
@@ -109,16 +111,17 @@ The **public-site** is a server-side rendered (SSR) React application that provi
 
 **Benefits over Client-Side Rendering (CSR):**
 
-| Metric | SSR (Public Site) | CSR (Client App) |
-|--------|-------------------|------------------|
-| **Initial Load** | ~200ms (HTML ready) | ~1000ms (fetch + render) |
-| **SEO** | ✅ Crawlable HTML | ❌ Requires JS execution |
-| **Time to Interactive (TTI)** | ~500ms | ~1500ms |
-| **First Contentful Paint (FCP)** | ~200ms | ~800ms |
-| **Server Load** | Higher (rendering on server) | Lower (client-side only) |
-| **Best For** | Public content, SEO, landing pages | Authenticated apps, dashboards |
+| Metric                           | SSR (Public Site)                  | CSR (Client App)               |
+| -------------------------------- | ---------------------------------- | ------------------------------ |
+| **Initial Load**                 | ~200ms (HTML ready)                | ~1000ms (fetch + render)       |
+| **SEO**                          | ✅ Crawlable HTML                  | ❌ Requires JS execution       |
+| **Time to Interactive (TTI)**    | ~500ms                             | ~1500ms                        |
+| **First Contentful Paint (FCP)** | ~200ms                             | ~800ms                         |
+| **Server Load**                  | Higher (rendering on server)       | Lower (client-side only)       |
+| **Best For**                     | Public content, SEO, landing pages | Authenticated apps, dashboards |
 
 **Trade-offs:**
+
 - ✅ **SEO**: Search engines get fully rendered HTML
 - ✅ **Performance**: Faster initial page load (pre-rendered)
 - ✅ **Accessibility**: Works without JavaScript
@@ -130,22 +133,26 @@ The **public-site** is a server-side rendered (SSR) React application that provi
 ## Technology Stack
 
 ### Core Runtime
+
 - **Node.js ≥24.0.0** - Strict requirement
 - **Express 5.1.0** - Web server
 - **TypeScript 5.8.3** - Type safety
 
 ### React SSR
+
 - **React 19.1.0** - SSR with `renderToString` / `hydrateRoot`
 - **React DOM 19.1.0** - Server & client rendering
 - **Vite 7.1.9** - SSR bundler with HMR
 - **@vitejs/plugin-react 5.0.4** - React plugin for Vite
 
 ### Styling
+
 - **TailwindCSS 3.4.16** - Utility-first CSS (shared with client app)
 - **PostCSS 8.5.4** - CSS processing
 - **Autoprefixer 10.4.21** - Vendor prefixes
 
 ### Security & Performance
+
 - **Helmet 7.2.0** - Security headers
 - **cors 2.8.5** - CORS configuration
 - **express-rate-limit 7.5.1** - Rate limiting
@@ -155,6 +162,7 @@ The **public-site** is a server-side rendered (SSR) React application that provi
 - **sirv 3.0.0** - Static file server (production)
 
 ### Development Tools
+
 - **tsx 4.19.2** - TypeScript execution
 - **nodemon** (inherited from root) - Hot reload
 
@@ -331,6 +339,7 @@ initializeApp();
 **Used by:** Browser to make pre-rendered HTML interactive
 
 **Key Features:**
+
 - Loading animation (fade out after hydration)
 - Force show timeout (5s max to prevent infinite loading)
 - Graceful error handling (show content even if hydration fails)
@@ -366,6 +375,7 @@ function App({ serverData: propServerData }: { serverData?: ServerData }) {
 ```
 
 **Key Features:**
+
 - **Server-side:** Receives data via props
 - **Client-side:** Reads data from `window.__SERVER_DATA__`
 - **Fallback:** Minimal fallback if SSR fails
@@ -377,6 +387,7 @@ function App({ serverData: propServerData }: { serverData?: ServerData }) {
 ### Server-Side Data Fetching
 
 **Pattern:**
+
 ```typescript
 // server.ts
 async function fetchServerData(req: Request): Promise<ServerData> {
@@ -386,21 +397,16 @@ async function fetchServerData(req: Request): Promise<ServerData> {
   const [trendingRes, leaderboardRes, articlesRes] = await Promise.allSettled([
     fetch(`${apiBaseUrl}/api/predictions/trending?limit=6`),
     fetch(`${apiBaseUrl}/api/leaderboard/daily?limit=10`),
-    fetch(`${apiBaseUrl}/api/timeline/articles?limit=5`)
+    fetch(`${apiBaseUrl}/api/timeline/articles?limit=5`),
   ]);
 
   // Extract data (handle errors gracefully)
-  const trendingData = trendingRes.status === 'fulfilled'
-    ? await trendingRes.value.json()
-    : null;
+  const trendingData = trendingRes.status === 'fulfilled' ? await trendingRes.value.json() : null;
 
-  const leaderboardData = leaderboardRes.status === 'fulfilled'
-    ? await leaderboardRes.value.json()
-    : null;
+  const leaderboardData =
+    leaderboardRes.status === 'fulfilled' ? await leaderboardRes.value.json() : null;
 
-  const articlesData = articlesRes.status === 'fulfilled'
-    ? await articlesRes.value.json()
-    : null;
+  const articlesData = articlesRes.status === 'fulfilled' ? await articlesRes.value.json() : null;
 
   return {
     trendingData,
@@ -408,12 +414,13 @@ async function fetchServerData(req: Request): Promise<ServerData> {
     articlesData,
     clientAppUrl: env.CLIENT_APP_URL,
     currentPath: req.path,
-    is404: false
+    is404: false,
   };
 }
 ```
 
 **Benefits:**
+
 - **Parallel fetching** - All API calls happen simultaneously
 - **Graceful degradation** - If one API fails, others still render
 - **Type-safe** - ServerData interface ensures consistency
@@ -423,6 +430,7 @@ async function fetchServerData(req: Request): Promise<ServerData> {
 ### Client-Side Data (Hydration)
 
 **Pattern:**
+
 ```typescript
 // App.tsx (client-side)
 const serverData = window.__SERVER_DATA__;
@@ -432,6 +440,7 @@ const serverData = window.__SERVER_DATA__;
 ```
 
 **Benefits:**
+
 - **Zero additional requests** - Data embedded in HTML
 - **Instant rendering** - No loading spinners
 - **Consistent state** - Same data on server and client
@@ -441,9 +450,11 @@ const serverData = window.__SERVER_DATA__;
 ## Components
 
 ### **LandingPage.tsx**
+
 Main landing page component.
 
 **Sections:**
+
 - Hero banner with CTA
 - Trending predictions preview
 - Leaderboard preview (top 10)
@@ -452,6 +463,7 @@ Main landing page component.
 - Footer with links
 
 **Props:**
+
 ```typescript
 interface LandingPageProps {
   trendingData: PredictionView[] | null;
@@ -464,9 +476,11 @@ interface LandingPageProps {
 ---
 
 ### **NotFound.tsx**
+
 404 error page.
 
 **Features:**
+
 - Friendly error message
 - Link to homepage
 - Link to client app login
@@ -474,9 +488,11 @@ interface LandingPageProps {
 ---
 
 ### **ThemeToggle.tsx**
+
 Dark/light mode toggle button.
 
 **Features:**
+
 - Shared theme system with client app
 - localStorage persistence
 - No flash on page load
@@ -484,9 +500,11 @@ Dark/light mode toggle button.
 ---
 
 ### **MaintenancePage.tsx**
+
 Maintenance mode page.
 
 **Usage:**
+
 ```typescript
 // server.ts
 if (env.MAINTENANCE_MODE === 'true') {
@@ -553,7 +571,7 @@ const html = template.replace(
     })();
   </script>
   </head>
-  `
+  `,
 );
 ```
 
@@ -599,21 +617,21 @@ const html = template.replace('</head>', `${metaTags}</head>`);
 
 ```typescript
 const structuredData = {
-  "@context": "https://schema.org",
-  "@type": "WebSite",
-  "name": "ElonMuskSucks.net",
-  "url": "https://elonmusksucks.net/",
-  "description": "Prediction market platform",
-  "potentialAction": {
-    "@type": "SearchAction",
-    "target": "https://elonmusksucks.net/search?q={search_term_string}",
-    "query-input": "required name=search_term_string"
-  }
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  name: 'ElonMuskSucks.net',
+  url: 'https://elonmusksucks.net/',
+  description: 'Prediction market platform',
+  potentialAction: {
+    '@type': 'SearchAction',
+    target: 'https://elonmusksucks.net/search?q={search_term_string}',
+    'query-input': 'required name=search_term_string',
+  },
 };
 
 const html = template.replace(
   '</head>',
-  `<script type="application/ld+json">${JSON.stringify(structuredData)}</script></head>`
+  `<script type="application/ld+json">${JSON.stringify(structuredData)}</script></head>`,
 );
 ```
 
@@ -622,6 +640,7 @@ const html = template.replace(
 ### Sitemap & Robots
 
 **robots.txt:**
+
 ```
 User-agent: *
 Allow: /
@@ -629,6 +648,7 @@ Sitemap: https://elonmusksucks.net/sitemap.xml
 ```
 
 **sitemap.xml:**
+
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
@@ -647,29 +667,32 @@ Sitemap: https://elonmusksucks.net/sitemap.xml
 ### Security Headers (Helmet)
 
 **Configuration:**
+
 ```typescript
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"], // SSR requires inline styles
-      scriptSrc: ["'self'", "'unsafe-inline'"], // SSR requires inline scripts
-      imgSrc: ["'self'", "data:", "https:"],    // Allow external images
-      connectSrc: ["'self'", env.API_BASE_URL],
-      fontSrc: ["'self'"],
-      objectSrc: ["'none'"],
-      frameSrc: ["'none'"]
-    }
-  },
-  hsts: {
-    maxAge: 31536000,  // 1 year
-    includeSubDomains: true,
-    preload: true
-  },
-  frameguard: { action: 'deny' },
-  noSniff: true,
-  xssFilter: true
-}));
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"], // SSR requires inline styles
+        scriptSrc: ["'self'", "'unsafe-inline'"], // SSR requires inline scripts
+        imgSrc: ["'self'", 'data:', 'https:'], // Allow external images
+        connectSrc: ["'self'", env.API_BASE_URL],
+        fontSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        frameSrc: ["'none'"],
+      },
+    },
+    hsts: {
+      maxAge: 31536000, // 1 year
+      includeSubDomains: true,
+      preload: true,
+    },
+    frameguard: { action: 'deny' },
+    noSniff: true,
+    xssFilter: true,
+  }),
+);
 ```
 
 ---
@@ -714,10 +737,10 @@ app.use(async (req, res, next) => {
 // server.ts
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100,                  // 100 requests per window
+  max: 100, // 100 requests per window
   message: 'Too many requests, please try again later.',
   standardHeaders: true,
-  legacyHeaders: false
+  legacyHeaders: false,
 });
 
 app.use(limiter);
@@ -799,11 +822,13 @@ npm -w apps/public-site run preview
 ### Development Workflow
 
 1. **Start API server** (required for data fetching):
+
    ```bash
    npm -w apps/server run dev
    ```
 
 2. **Start public-site dev server**:
+
    ```bash
    npm -w apps/public-site run dev
    ```
@@ -842,13 +867,13 @@ export default defineConfig({
     emptyOutDir: false, // Don't clear dist between SSR + client builds
     rollupOptions: {
       output: {
-        format: 'esm' // ES modules
-      }
-    }
+        format: 'esm', // ES modules
+      },
+    },
   },
   ssr: {
-    noExternal: ['tailwindcss'] // Bundle TailwindCSS in SSR
-  }
+    noExternal: ['tailwindcss'], // Bundle TailwindCSS in SSR
+  },
 });
 ```
 
@@ -959,10 +984,13 @@ app.get('*', async (req, res) => {
 
 ```typescript
 // server.ts (production)
-app.use('/assets', sirv('dist/client/assets', {
-  maxAge: 31536000, // 1 year
-  immutable: true
-}));
+app.use(
+  '/assets',
+  sirv('dist/client/assets', {
+    maxAge: 31536000, // 1 year
+    immutable: true,
+  }),
+);
 ```
 
 ---
@@ -986,7 +1014,7 @@ app.use(compression());
 const [trending, leaderboard, articles] = await Promise.all([
   fetchTrending(),
   fetchLeaderboard(),
-  fetchArticles()
+  fetchArticles(),
 ]);
 ```
 
@@ -997,12 +1025,14 @@ const [trending, leaderboard, articles] = await Promise.all([
 ### Issue: Hydration mismatch error
 
 **Symptoms:**
+
 ```
 Warning: Text content did not match. Server: "..." Client: "..."
 ```
 
 **Solution:**
-1. Ensure server and client use same data (window.__SERVER_DATA__)
+
+1. Ensure server and client use same data (window.**SERVER_DATA**)
 2. Avoid using `Date.now()` or `Math.random()` (different on server/client)
 3. Check for browser-only code running on server (`typeof window !== 'undefined'`)
 
@@ -1014,7 +1044,9 @@ Warning: Text content did not match. Server: "..." Client: "..."
 Ensure theme script is in HTML before React hydration:
 
 ```typescript
-const html = template.replace('</head>', `
+const html = template.replace(
+  '</head>',
+  `
   <script>
     (function() {
       const theme = localStorage.getItem('theme') || 'dark';
@@ -1022,7 +1054,8 @@ const html = template.replace('</head>', `
     })();
   </script>
   </head>
-`);
+`,
+);
 ```
 
 ---
@@ -1030,6 +1063,7 @@ const html = template.replace('</head>', `
 ### Issue: API data not loading
 
 **Solution:**
+
 1. Check API server is running on port 5000
 2. Check `API_BASE_URL` environment variable
 3. Check server logs for fetch errors
@@ -1039,6 +1073,7 @@ const html = template.replace('</head>', `
 ### Issue: Build fails on Vite SSR
 
 **Solution:**
+
 ```bash
 # Clear dist folder
 rm -rf apps/public-site/dist

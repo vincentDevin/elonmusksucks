@@ -39,6 +39,7 @@ The **server app** is the unified backend serving both the client SPA and public
 - **SendGrid** for transactional emails
 
 **Key Features:**
+
 - Strict layered architecture (Routes → Controllers → Services → Repositories)
 - 75+ Redis channels for real-time updates
 - 6 background workers for async processing
@@ -105,14 +106,17 @@ The **server app** is the unified backend serving both the client SPA and public
 ### Layer Responsibilities
 
 #### **1. Routes** (`src/routes/`)
+
 **Purpose:** Define API endpoints and apply middleware.
 
 **Responsibilities:**
+
 - Map HTTP methods to controller actions
 - Apply route-specific middleware (auth, rate limiting)
 - **NO business logic, NO Prisma, NO Socket.IO**
 
 **Example:**
+
 ```typescript
 // routes/predictions.routes.ts
 import { Router } from 'express';
@@ -135,9 +139,11 @@ export default router;
 ---
 
 #### **2. Controllers** (`src/controllers/`)
+
 **Purpose:** Handle HTTP request/response cycle.
 
 **Responsibilities:**
+
 - Extract and validate request data
 - Call appropriate service methods
 - Format responses with proper HTTP status codes
@@ -145,6 +151,7 @@ export default router;
 - **NO business logic, NO Prisma, NO direct Socket.IO**
 
 **Example:**
+
 ```typescript
 // controllers/predictions.controller.ts
 import { Request, Response } from 'express';
@@ -164,7 +171,7 @@ export async function createPrediction(req: Request, res: Response) {
     await redisPublish(REDIS_CHANNELS.PREDICTION_CREATED, {
       predictionId: prediction.id,
       userId,
-      prediction
+      prediction,
     });
 
     res.status(201).json({ success: true, prediction });
@@ -178,9 +185,11 @@ export async function createPrediction(req: Request, res: Response) {
 ---
 
 #### **3. Services** (`src/services/`)
+
 **Purpose:** Implement business logic and orchestration.
 
 **Responsibilities:**
+
 - **Core business logic** (odds calculation, bet validation, etc.)
 - **Orchestration** between multiple repositories
 - **Transaction management** (Prisma transactions)
@@ -189,6 +198,7 @@ export async function createPrediction(req: Request, res: Response) {
 - **NO Socket.IO/Redis direct access** - Infrastructure injected by controllers
 
 **Example:**
+
 ```typescript
 // services/predictions.service.ts
 import * as predictionRepository from '../repositories/PredictionRepository';
@@ -202,7 +212,7 @@ export async function placeBet(
   userId: number,
   predictionId: number,
   optionId: number,
-  amount: number
+  amount: number,
 ) {
   // Business logic: Validate prediction state
   const prediction = await predictionRepository.findById(predictionId);
@@ -218,16 +228,9 @@ export async function placeBet(
 
   // Transaction management: Atomic bet placement + balance deduction
   return await prisma.$transaction(async (tx) => {
-    const bet = await bettingRepository.createBet(
-      { userId, predictionId, optionId, amount },
-      tx
-    );
+    const bet = await bettingRepository.createBet({ userId, predictionId, optionId, amount }, tx);
 
-    await userRepository.updateBalance(
-      userId,
-      { decrement: amount },
-      tx
-    );
+    await userRepository.updateBalance(userId, { decrement: amount }, tx);
 
     return bet;
   });
@@ -237,15 +240,18 @@ export async function placeBet(
 ---
 
 #### **4. Repositories** (`src/repositories/`)
+
 **Purpose:** Data access layer - Prisma operations only.
 
 **Responsibilities:**
+
 - **Prisma CRUD operations** (create, read, update, delete)
 - **Query optimization** (select, include, orderBy)
 - **Transaction support** (accept Prisma transaction client)
 - **NO business logic** - Pure data access
 
 **Example:**
+
 ```typescript
 // repositories/PredictionRepository.ts
 import { PrismaClient } from '@prisma/client';
@@ -259,14 +265,14 @@ export async function findById(id: number) {
     include: {
       options: true,
       category: true,
-      user: { select: { id: true, username: true } }
-    }
+      user: { select: { id: true, username: true } },
+    },
   });
 }
 
 export async function createBet(
   data: { userId: number; predictionId: number; optionId: number; amount: number },
-  tx?: Prisma.TransactionClient
+  tx?: Prisma.TransactionClient,
 ) {
   const client = tx || prisma;
 
@@ -275,8 +281,8 @@ export async function createBet(
       userId: data.userId,
       optionId: data.optionId,
       amount: data.amount,
-      status: 'PENDING'
-    }
+      status: 'PENDING',
+    },
   });
 }
 
@@ -285,7 +291,7 @@ export async function findAllOpen(limit: number = 50) {
     where: { status: 'OPEN' },
     include: { options: true },
     orderBy: { createdAt: 'desc' },
-    take: limit
+    take: limit,
   });
 }
 ```
@@ -293,9 +299,11 @@ export async function findAllOpen(limit: number = 50) {
 ---
 
 #### **5. Socket.IO Handlers** (`src/handlers/`)
+
 **Purpose:** Handle real-time Socket.IO events.
 
 **Responsibilities:**
+
 - Listen to client events
 - Validate event data
 - **Delegate to services** (same as controllers)
@@ -303,6 +311,7 @@ export async function findAllOpen(limit: number = 50) {
 - **NO business logic, NO Prisma**
 
 **Example:**
+
 ```typescript
 // handlers/betSocketHandlers.ts
 import { Socket } from 'socket.io';
@@ -320,14 +329,14 @@ export function registerBetHandlers(socket: Socket) {
         userId,
         data.predictionId,
         data.optionId,
-        data.amount
+        data.amount,
       );
 
       // Publish to Redis (will broadcast to all clients)
       await redisPublish(REDIS_CHANNELS.BET_PLACED, {
         bet,
         userId,
-        predictionId: data.predictionId
+        predictionId: data.predictionId,
       });
 
       callback({ success: true, bet });
@@ -344,6 +353,7 @@ export function registerBetHandlers(socket: Socket) {
 ### Architectural Rules
 
 #### ✅ **DO:**
+
 - Keep layers strictly separated
 - Use repositories for all Prisma operations
 - Inject infrastructure (Redis, Socket.IO) at controller/handler level
@@ -352,6 +362,7 @@ export function registerBetHandlers(socket: Socket) {
 - Handle errors at controller level
 
 #### ❌ **DON'T:**
+
 - Use Prisma in routes, controllers, or services
 - Access Socket.IO directly in services
 - Put business logic in repositories
@@ -363,25 +374,30 @@ export function registerBetHandlers(socket: Socket) {
 ## Technology Stack
 
 ### Core Runtime
+
 - **Node.js ≥24.0.0** - Strict requirement
 - **Express 5.1.0** - Web framework
 - **TypeScript 5.8.3** - Type safety
 
 ### Database & ORM
+
 - **PostgreSQL 16** - Primary database
 - **Prisma 6.10.1** - Type-safe ORM
 - **@prisma/client 6.10.1** - Generated Prisma client
 
 ### Real-time & Caching
+
 - **Socket.IO 4.8.1** - WebSocket server
 - **@socket.io/redis-adapter 8.3.0** - Multi-instance Socket.IO sync
 - **IORedis 5.6.1** - Redis client
 - **Redis** - Pub/sub + caching
 
 ### Background Jobs
+
 - **BullMQ 5.56.4** - Redis-based job queue
 
 ### Authentication & Security
+
 - **jsonwebtoken 9.0.2** - JWT tokens
 - **bcrypt 6.0.0** - Password hashing
 - **helmet 7.2.0** - Security headers
@@ -389,25 +405,30 @@ export function registerBetHandlers(socket: Socket) {
 - **express-rate-limit 7.5.1** - Rate limiting
 
 ### File Storage & Processing
+
 - **@aws-sdk/client-s3 3.844.0** - S3-compatible API
 - **@tigrisdata/core 1.3.0** - Tigris object storage
 - **multer 2.0.1** - File upload middleware
 - **sharp 0.34.3** - Image processing (resize, crop)
 
 ### Email
+
 - **@sendgrid/mail 8.1.5** - Transactional emails
 
 ### Content Processing
+
 - **rss-parser 3.13.0** - RSS/Atom feed parsing
 - **xml2js 0.6.2** - XML parsing
 - **open-graph-scraper 6.8.2** - Open Graph metadata extraction
 - **isomorphic-dompurify 2.28.0** - HTML sanitization
 
 ### Performance & Monitoring
+
 - **compression 1.8.1** - gzip compression
 - **prom-client 15.1.3** - Prometheus metrics
 
 ### Development Tools
+
 - **nodemon 3.1.10** - Auto-restart dev server
 - **ts-node 10.9.2** - TypeScript execution
 - **dotenv 16.5.0** - Environment variables
@@ -593,9 +614,11 @@ apps/server/
 ## Controllers (16)
 
 ### **1. auth.controller.ts**
+
 Authentication endpoints.
 
 **Endpoints:**
+
 - `POST /api/auth/register` - User registration
 - `POST /api/auth/login` - User login
 - `POST /api/auth/refresh` - Refresh access token
@@ -607,9 +630,11 @@ Authentication endpoints.
 ---
 
 ### **2. predictions.controller.ts**
+
 Prediction market operations.
 
 **Endpoints:**
+
 - `GET /api/predictions` - List all predictions
 - `GET /api/predictions/:id` - Get prediction details
 - `POST /api/predictions` - Create prediction (ADMIN)
@@ -622,9 +647,11 @@ Prediction market operations.
 ---
 
 ### **3. user.controller.ts**
+
 User profile and statistics.
 
 **Endpoints:**
+
 - `GET /api/users/me` - Current user profile
 - `GET /api/users/:id` - User profile by ID
 - `PUT /api/users/me` - Update profile
@@ -638,9 +665,11 @@ User profile and statistics.
 ---
 
 ### **4. admin.controller.ts**
+
 Admin operations.
 
 **Endpoints:**
+
 - `GET /api/admin/users` - List all users
 - `GET /api/admin/users/:id` - User details
 - `PUT /api/admin/users/:id/ban` - Ban user
@@ -653,9 +682,11 @@ Admin operations.
 ---
 
 ### **5. leaderboard.controller.ts**
+
 Leaderboard rankings.
 
 **Endpoints:**
+
 - `GET /api/leaderboard/daily` - Daily leaderboard
 - `GET /api/leaderboard/weekly` - Weekly leaderboard
 - `GET /api/leaderboard/all-time` - All-time leaderboard
@@ -664,9 +695,11 @@ Leaderboard rankings.
 ---
 
 ### **6. timeline.controller.ts**
+
 Timeline & RSS articles.
 
 **Endpoints:**
+
 - `GET /api/timeline/articles` - Get articles
 - `GET /api/timeline/articles/:id` - Article details
 - `POST /api/timeline/articles/:id/bookmark` - Bookmark article
@@ -676,9 +709,11 @@ Timeline & RSS articles.
 ---
 
 ### **7. post.controller.ts**
+
 Social posts.
 
 **Endpoints:**
+
 - `GET /api/posts` - List posts (feed)
 - `GET /api/posts/:id` - Post details
 - `POST /api/posts` - Create post
@@ -691,9 +726,11 @@ Social posts.
 ---
 
 ### **8. pong.controller.ts**
+
 Pong game endpoints.
 
 **Endpoints:**
+
 - `GET /api/pong/stats` - User Pong stats
 - `GET /api/pong/matches` - Match history
 - `GET /api/pong/leaderboard` - Pong ELO leaderboard
@@ -701,9 +738,11 @@ Pong game endpoints.
 ---
 
 ### **9. feeds.controller.ts**
+
 RSS feed management.
 
 **Endpoints:**
+
 - `GET /api/feeds` - List feeds (ADMIN)
 - `POST /api/feeds` - Add feed (ADMIN)
 - `PUT /api/feeds/:id` - Update feed (ADMIN)
@@ -713,9 +752,11 @@ RSS feed management.
 ---
 
 ### **10. market.controller.ts**
+
 Market analytics.
 
 **Endpoints:**
+
 - `GET /api/market/overview` - Market overview
 - `GET /api/market/volume` - Trading volume
 - `GET /api/market/trending` - Trending predictions
@@ -723,9 +764,11 @@ Market analytics.
 ---
 
 ### **11. moderation.controller.ts**
+
 Content moderation.
 
 **Endpoints:**
+
 - `GET /api/moderation/queue` - Moderation queue (ADMIN)
 - `POST /api/moderation/articles/:id/approve` - Approve article (ADMIN)
 - `POST /api/moderation/articles/:id/reject` - Reject article (ADMIN)
@@ -734,18 +777,22 @@ Content moderation.
 ---
 
 ### **12. payout.controller.ts**
+
 Payout operations.
 
 **Endpoints:**
+
 - `GET /api/payouts` - List payouts (ADMIN)
 - `POST /api/payouts/process` - Process pending payouts (ADMIN)
 
 ---
 
 ### **13. dashboardAnalytics.controller.ts**
+
 Analytics dashboard.
 
 **Endpoints:**
+
 - `GET /api/analytics/overview` - Dashboard overview (ADMIN)
 - `GET /api/analytics/users` - User analytics (ADMIN)
 - `GET /api/analytics/revenue` - Revenue analytics (ADMIN)
@@ -753,9 +800,11 @@ Analytics dashboard.
 ---
 
 ### **14. monitoring.controller.ts**
+
 System monitoring.
 
 **Endpoints:**
+
 - `GET /api/monitoring/health` - Health check
 - `GET /api/monitoring/metrics` - System metrics (ADMIN)
 - `GET /api/monitoring/database` - Database stats (ADMIN)
@@ -763,17 +812,21 @@ System monitoring.
 ---
 
 ### **15. shameWall.controller.ts**
+
 Shame wall (banned users).
 
 **Endpoints:**
+
 - `GET /api/shame-wall` - List banned users
 
 ---
 
 ### **16. opml.controller.ts**
+
 OPML import/export.
 
 **Endpoints:**
+
 - `GET /api/opml/export` - Export feeds as OPML (ADMIN)
 - `POST /api/opml/import` - Import OPML feed list (ADMIN)
 
@@ -784,9 +837,11 @@ OPML import/export.
 ### Core Business Services
 
 #### **1. auth.service.ts**
+
 Authentication business logic.
 
 **Responsibilities:**
+
 - User registration with email verification
 - Login with bcrypt password verification
 - JWT access token generation (15min expiry)
@@ -795,6 +850,7 @@ Authentication business logic.
 - Refresh token storage in Redis
 
 **Key Methods:**
+
 ```typescript
 register(email, password, username): Promise<User>
 login(email, password): Promise<{ accessToken, refreshToken, user }>
@@ -807,9 +863,11 @@ resetPassword(token, newPassword): Promise<void>
 ---
 
 #### **2. predictions.service.ts**
+
 Prediction market business logic.
 
 **Responsibilities:**
+
 - Prediction CRUD operations
 - Prediction state validation (OPEN, CLOSED, RESOLVED)
 - Odds calculation (6-factor dynamic odds)
@@ -819,6 +877,7 @@ Prediction market business logic.
 - Payout calculation
 
 **Key Methods:**
+
 ```typescript
 createPrediction(userId, data): Promise<Prediction>
 placeBet(userId, predictionId, optionId, amount): Promise<Bet>
@@ -828,6 +887,7 @@ calculateOdds(predictionId): Promise<number[]>
 ```
 
 **Odds Calculation Algorithm (6 factors):**
+
 1. Total bet volume
 2. Option-specific volume
 3. Number of bettors
@@ -838,9 +898,11 @@ calculateOdds(predictionId): Promise<number[]>
 ---
 
 #### **3. betting.service.ts**
+
 Betting business logic.
 
 **Responsibilities:**
+
 - Bet validation (balance, minimum bet)
 - Parlay validation (minimum 2 predictions)
 - Parlay multiplier calculation
@@ -850,9 +912,11 @@ Betting business logic.
 ---
 
 #### **4. user.service.ts**
+
 User management business logic.
 
 **Responsibilities:**
+
 - User profile updates
 - Avatar upload & processing
 - User statistics calculation
@@ -862,9 +926,11 @@ User management business logic.
 ---
 
 #### **5. leaderboard.service.ts**
+
 Leaderboard calculation business logic.
 
 **Responsibilities:**
+
 - Daily/weekly/all-time leaderboard calculation
 - ROI calculation
 - Win rate calculation
@@ -872,6 +938,7 @@ Leaderboard calculation business logic.
 - Pong ELO ranking
 
 **Leaderboard Metrics:**
+
 - Total profit
 - ROI (return on investment)
 - Win rate
@@ -882,25 +949,30 @@ Leaderboard calculation business logic.
 ---
 
 #### **6. payout.service.ts**
+
 Payout processing business logic.
 
 **Responsibilities:**
-- Bet payout calculation (amount * odds)
-- Parlay payout calculation (amount * combined odds)
+
+- Bet payout calculation (amount \* odds)
+- Parlay payout calculation (amount \* combined odds)
 - Balance updates
 - Transaction creation
 - Payout job queueing (BullMQ)
 
 **Payout Formula:**
+
 - Single bet: `amount * odds`
 - Parlay: `amount * (odds1 * odds2 * ... * bonus)`
 
 ---
 
 #### **7. feed.service.ts**
+
 RSS feed fetching business logic.
 
 **Responsibilities:**
+
 - RSS/Atom feed parsing
 - Article deduplication (by URL)
 - Article content extraction
@@ -910,9 +982,11 @@ RSS feed fetching business logic.
 ---
 
 #### **8. email.service.ts**
+
 Email sending business logic.
 
 **Responsibilities:**
+
 - Email verification emails
 - Password reset emails
 - Achievement unlock notifications
@@ -921,9 +995,11 @@ Email sending business logic.
 ---
 
 #### **9. imageProcessing.service.ts**
+
 Image processing business logic.
 
 **Responsibilities:**
+
 - Avatar resizing (200x200)
 - Image compression (JPEG quality 80%)
 - Image format conversion
@@ -932,14 +1008,17 @@ Image processing business logic.
 ---
 
 #### **10. pongElo.service.ts**
+
 Pong ELO rating business logic.
 
 **Responsibilities:**
+
 - ELO rating calculation (K-factor: 32)
 - Match outcome recording
 - ELO history tracking
 
 **ELO Formula:**
+
 ```
 newRating = oldRating + K * (actualScore - expectedScore)
 expectedScore = 1 / (1 + 10^((opponentRating - playerRating) / 400))
@@ -950,9 +1029,11 @@ expectedScore = 1 / (1 + 10^((opponentRating - playerRating) / 400))
 ### Infrastructure Services
 
 #### **11. activeUserCache.service.ts**
+
 Active user tracking.
 
 **Redis Cache:**
+
 - Track online users (Socket.IO connections)
 - 5-minute expiry per user
 - Used for "Active Users" count
@@ -960,9 +1041,11 @@ Active user tracking.
 ---
 
 #### **12. eventSystemMetrics.service.ts**
+
 Event system monitoring.
 
 **Metrics:**
+
 - Event emit count (per channel)
 - Event processing time
 - Socket.IO connection count
@@ -971,9 +1054,11 @@ Event system monitoring.
 ---
 
 #### **13. StreakManager.service.ts**
+
 Streak tracking service.
 
 **Responsibilities:**
+
 - Track consecutive wins/losses
 - Reset streaks on opposite outcome
 - Streak achievement unlocks
@@ -981,9 +1066,11 @@ Streak tracking service.
 ---
 
 #### **14. FinancialTracker.service.ts**
+
 Financial analytics service.
 
 **Responsibilities:**
+
 - Revenue tracking
 - Volume tracking
 - Profit/loss calculations
@@ -1021,6 +1108,7 @@ export async function deleteById(id: number, tx?: Prisma.TransactionClient) {
 ```
 
 **Key Repositories:**
+
 1. **AuthRepository** - User authentication data
 2. **PredictionRepository** - Prediction data
 3. **BettingRepository** - Bet & parlay data
@@ -1051,36 +1139,44 @@ export async function deleteById(id: number, tx?: Prisma.TransactionClient) {
 ### Real-time Event Handlers
 
 #### **1. betSocketHandlers.ts**
+
 Betting events.
 
 **Events:**
+
 - `bet:place` - Place single bet
 - `parlay:place` - Place parlay bet
 
 ---
 
 #### **2. chatHandlers.ts**
+
 Chat events.
 
 **Events:**
+
 - `chat:send` - Send chat message
 - `chat:typing` - User typing indicator
 
 ---
 
 #### **3. roomHandlers.ts**
+
 Room management.
 
 **Events:**
+
 - `join-room` - Join Socket.IO room
 - `leave-room` - Leave Socket.IO room
 
 ---
 
 #### **4. pongSocketHandlers.ts**
+
 Pong game events.
 
 **Events:**
+
 - `pong:create-match` - Create match
 - `pong:join-match` - Join match
 - `pong:spectate` - Spectate match
@@ -1089,53 +1185,65 @@ Pong game events.
 ---
 
 #### **5. postHandlers.ts**
+
 Post events.
 
 **Events:**
+
 - `post:create` - Create post
 - `post:react` - React to post
 
 ---
 
 #### **6. timelineHandlers.ts**
+
 Timeline events.
 
 **Events:**
+
 - `timeline:fetch` - Fetch articles
 
 ---
 
 #### **7. moderationHandlers.ts**
+
 Moderation events.
 
 **Events:**
+
 - `moderation:action` - Moderation action (ADMIN)
 
 ---
 
 #### **8. statisticsSocketHandlers.ts**
+
 Statistics events.
 
 **Events:**
+
 - `stats:request` - Request statistics
 
 ---
 
 #### **9. unifiedActivityHandlers.ts**
+
 Activity stream events.
 
 **Events:**
+
 - `activity:fetch` - Fetch activity stream
 
 ---
 
 #### **10. redisEventHandlers.ts**
+
 Redis → Socket.IO relay.
 
 **Purpose:**
 Listens to Redis pub/sub channels and broadcasts to Socket.IO rooms.
 
 **Pattern:**
+
 ```typescript
 // Listen to Redis
 redisSubscribe(REDIS_CHANNELS.BET_PLACED, (payload) => {
@@ -1147,6 +1255,7 @@ redisSubscribe(REDIS_CHANNELS.BET_PLACED, (payload) => {
 ---
 
 #### **11. postRedisEventHandlers.ts**
+
 Post Redis events relay.
 
 **Purpose:**
@@ -1157,14 +1266,17 @@ Relay post-specific Redis events to Socket.IO.
 ## Middleware (10)
 
 ### **1. auth.middleware.ts**
+
 JWT authentication middleware.
 
 **Usage:**
+
 ```typescript
 router.post('/predictions', authenticate, predictionController.create);
 ```
 
 **Logic:**
+
 1. Extract JWT from `Authorization: Bearer <token>` header
 2. Verify JWT signature & expiry
 3. Attach `req.user` with user data
@@ -1173,9 +1285,11 @@ router.post('/predictions', authenticate, predictionController.create);
 ---
 
 ### **2. socketAuthMiddleware.ts**
+
 Socket.IO authentication middleware.
 
 **Logic:**
+
 1. Extract JWT from `socket.handshake.auth.token`
 2. Verify JWT
 3. Attach `socket.data.user` with user data
@@ -1184,9 +1298,11 @@ Socket.IO authentication middleware.
 ---
 
 ### **3. errorHandler.ts**
+
 Global error handling middleware.
 
 **Logic:**
+
 - Catch all errors
 - Log errors
 - Return JSON error response
@@ -1195,9 +1311,11 @@ Global error handling middleware.
 ---
 
 ### **4. rateLimitMiddleware.ts**
+
 Rate limiting middleware.
 
 **Limits:**
+
 - Auth endpoints: 5 requests / 15 minutes
 - General endpoints: 100 requests / 15 minutes
 - Admin endpoints: 200 requests / 15 minutes
@@ -1205,18 +1323,22 @@ Rate limiting middleware.
 ---
 
 ### **5. payloadSizeGuard.ts**
+
 Request payload size limit.
 
 **Limits:**
+
 - JSON: 10MB
 - File upload: 5MB
 
 ---
 
 ### **6. fileValidation.middleware.ts**
+
 File upload validation.
 
 **Validation:**
+
 - File type: JPEG, PNG only
 - File size: Max 5MB
 - Dimensions: Min 100x100, Max 2000x2000
@@ -1224,6 +1346,7 @@ File upload validation.
 ---
 
 ### **7. timeout.middleware.ts**
+
 Request timeout middleware.
 
 **Timeout:** 30 seconds
@@ -1231,9 +1354,11 @@ Request timeout middleware.
 ---
 
 ### **8. prometheusMiddleware.ts**
+
 Prometheus metrics collection.
 
 **Metrics:**
+
 - HTTP request count
 - HTTP request duration
 - HTTP response size
@@ -1241,22 +1366,26 @@ Prometheus metrics collection.
 ---
 
 ### **9. betaCohort.ts**
+
 Beta feature gating.
 
 **Logic:**
+
 - Check user's beta flag
 - Allow/deny access to beta features
 
 ---
 
 ### **10. rateLimiter.ts**
+
 Rate limiter factory.
 
 **Usage:**
+
 ```typescript
 const limiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
-  max: 100
+  max: 100,
 });
 
 router.use('/api/', limiter);
@@ -1267,11 +1396,13 @@ router.use('/api/', limiter);
 ## BullMQ Workers (6)
 
 ### **1. payout.worker.ts**
+
 Process bet payouts when predictions are resolved.
 
 **Trigger:** Prediction resolved (via admin)
 
 **Job Data:**
+
 ```typescript
 {
   predictionId: number;
@@ -1280,8 +1411,9 @@ Process bet payouts when predictions are resolved.
 ```
 
 **Logic:**
+
 1. Fetch all winning bets for prediction
-2. Calculate payout (amount * odds)
+2. Calculate payout (amount \* odds)
 3. Update user balances (transaction)
 4. Create transaction records
 5. Update bet status to 'WON' or 'LOST'
@@ -1292,11 +1424,13 @@ Process bet payouts when predictions are resolved.
 ---
 
 ### **2. pong-payout.worker.ts**
+
 Process Pong game payouts.
 
 **Trigger:** Pong match ends
 
 **Job Data:**
+
 ```typescript
 {
   matchId: number;
@@ -1307,6 +1441,7 @@ Process Pong game payouts.
 ```
 
 **Logic:**
+
 1. Transfer wager from loser to winner
 2. Update user balances (transaction)
 3. Create transaction records
@@ -1317,11 +1452,13 @@ Process Pong game payouts.
 ---
 
 ### **3. leaderboard.worker.ts**
+
 Recalculate leaderboards.
 
 **Job Data:** None (recalculates all leaderboards)
 
 **Logic:**
+
 1. Calculate daily leaderboard (last 24h)
 2. Calculate weekly leaderboard (last 7d)
 3. Calculate all-time leaderboard
@@ -1333,11 +1470,13 @@ Recalculate leaderboards.
 ---
 
 ### **4. leaderboard-snapshot.worker.ts**
+
 Take daily leaderboard snapshots.
 
 **Job Data:** None
 
 **Logic:**
+
 1. Snapshot current daily leaderboard
 2. Store in `LeaderboardSnapshot` table
 3. Reset daily leaderboard counters
@@ -1347,9 +1486,11 @@ Take daily leaderboard snapshots.
 ---
 
 ### **5. feed.worker.ts**
+
 Fetch RSS/Atom feeds.
 
 **Job Data:**
+
 ```typescript
 {
   feedId: number;
@@ -1358,6 +1499,7 @@ Fetch RSS/Atom feeds.
 ```
 
 **Logic:**
+
 1. Fetch feed via HTTP
 2. Parse RSS/Atom XML
 3. Extract articles (title, URL, content, pubDate)
@@ -1368,9 +1510,11 @@ Fetch RSS/Atom feeds.
 ---
 
 ### **6. article.worker.ts**
+
 Process fetched articles.
 
 **Job Data:**
+
 ```typescript
 {
   feedId: number;
@@ -1379,11 +1523,12 @@ Process fetched articles.
     url: string;
     content: string;
     pubDate: Date;
-  };
+  }
 }
 ```
 
 **Logic:**
+
 1. Check for duplicates (by URL)
 2. Extract Open Graph metadata
 3. Sanitize HTML content
@@ -1427,6 +1572,7 @@ Process fetched articles.
 ### Redis Channels (75+)
 
 **Categories:**
+
 - Betting: `bet:placed`, `bet:won`, `bet:lost`, `parlay:*`
 - Predictions: `prediction:created`, `prediction:updated`, `prediction:resolved`
 - Financial: `balance:updated`, `transaction:created`
@@ -1441,6 +1587,7 @@ Process fetched articles.
 ### Publishing Events
 
 **Pattern:**
+
 ```typescript
 // services/predictions.service.ts
 import { redisPublish } from '../config/redis';
@@ -1450,14 +1597,14 @@ export async function resolvePrediction(predictionId: number, winningOptionId: n
   // Business logic
   const prediction = await predictionRepository.update(predictionId, {
     status: 'RESOLVED',
-    winningOptionId
+    winningOptionId,
   });
 
   // Publish event to Redis
   await redisPublish(REDIS_CHANNELS.PREDICTION_RESOLVED, {
     predictionId,
     winningOptionId,
-    prediction
+    prediction,
   });
 
   // Queue payout job
@@ -1470,6 +1617,7 @@ export async function resolvePrediction(predictionId: number, winningOptionId: n
 ### Subscribing to Events (Server-side)
 
 **Pattern:**
+
 ```typescript
 // handlers/redisEventHandlers.ts
 import { redisSubscribe } from '../config/redis';
@@ -1493,16 +1641,19 @@ redisSubscribe(REDIS_CHANNELS.PREDICTION_RESOLVED, (payload) => {
 ### JWT Authentication
 
 **Access Token:**
+
 - Expiry: 15 minutes
 - Payload: `{ userId, email, role }`
 - Stored: Client-side (memory only, no localStorage)
 
 **Refresh Token:**
+
 - Expiry: 7 days
 - Payload: `{ userId, tokenId }`
 - Stored: Server-side (Redis), client-side (httpOnly cookie)
 
 **Token Refresh Flow:**
+
 ```
 Client sends refresh token
   ↓
@@ -1520,16 +1671,19 @@ Server returns new access token
 ### Password Security
 
 **Hashing:**
+
 - Algorithm: bcrypt
 - Salt rounds: 12 (configurable via `BCRYPT_SALT_ROUNDS`)
 
 **Password Requirements:**
+
 - Minimum 8 characters
 - Must contain uppercase, lowercase, number
 
 ### CORS
 
 **Allowed Origins:**
+
 - `CLIENT_APP_URL` (client SPA)
 - `BASE_URL_CLIENT` (client production URL)
 - `BASE_URL_PUBLIC` (public-site production URL)
@@ -1538,6 +1692,7 @@ Server returns new access token
 ### Rate Limiting
 
 **Limits:**
+
 - Auth endpoints: 5 requests / 15 minutes (prevent brute force)
 - General endpoints: 100 requests / 15 minutes
 - Admin endpoints: 200 requests / 15 minutes
@@ -1545,6 +1700,7 @@ Server returns new access token
 ### Security Headers (Helmet)
 
 **Headers:**
+
 - Content-Security-Policy
 - X-Frame-Options: DENY
 - X-Content-Type-Options: nosniff
@@ -1558,6 +1714,7 @@ Server returns new access token
 ### Redis
 
 **Usage:**
+
 - Pub/sub for real-time events (75+ channels)
 - Refresh token storage (7-day TTL)
 - Active user cache (5-minute TTL)
@@ -1565,6 +1722,7 @@ Server returns new access token
 - Session storage
 
 **Configuration:**
+
 ```typescript
 // config/redis.ts
 import Redis from 'ioredis';
@@ -1574,7 +1732,7 @@ export const redis = new Redis({
   port: parseInt(process.env.REDIS_PORT || '6379'),
   maxRetriesPerRequest: 3,
   enableReadyCheck: true,
-  lazyConnect: false
+  lazyConnect: false,
 });
 
 // Pub/sub clients (separate connections)
@@ -1587,6 +1745,7 @@ export const redisSub = redis.duplicate();
 ### BullMQ
 
 **Queue Configuration:**
+
 ```typescript
 // config/bullmq.ts
 import { Queue } from 'bullmq';
@@ -1598,11 +1757,11 @@ export const payoutQueue = new Queue('payouts', {
     attempts: 3,
     backoff: {
       type: 'exponential',
-      delay: 2000
+      delay: 2000,
     },
     removeOnComplete: 100,
-    removeOnFail: 1000
-  }
+    removeOnFail: 1000,
+  },
 });
 ```
 
@@ -1611,11 +1770,13 @@ export const payoutQueue = new Queue('payouts', {
 ### Tigris S3
 
 **Storage:**
+
 - Bucket: `elonmusksucks-uploads`
 - Region: `auto` (global)
 - Files: User avatars, images
 
 **Upload Pattern:**
+
 ```typescript
 // services/imageProcessing.service.ts
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
@@ -1625,19 +1786,21 @@ const s3 = new S3Client({
   region: 'auto',
   credentials: {
     accessKeyId: process.env.TIGRIS_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.TIGRIS_SECRET_ACCESS_KEY!
-  }
+    secretAccessKey: process.env.TIGRIS_SECRET_ACCESS_KEY!,
+  },
 });
 
 export async function uploadAvatar(buffer: Buffer, userId: number) {
   const key = `avatars/${userId}-${Date.now()}.jpg`;
 
-  await s3.send(new PutObjectCommand({
-    Bucket: process.env.TIGRIS_S3_BUCKET!,
-    Key: key,
-    Body: buffer,
-    ContentType: 'image/jpeg'
-  }));
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: process.env.TIGRIS_S3_BUCKET!,
+      Key: key,
+      Body: buffer,
+      ContentType: 'image/jpeg',
+    }),
+  );
 
   return `https://${process.env.TIGRIS_S3_BUCKET}.fly.storage.tigris.dev/${key}`;
 }
@@ -1648,11 +1811,13 @@ export async function uploadAvatar(buffer: Buffer, userId: number) {
 ### SendGrid
 
 **Email Templates:**
+
 - Email verification
 - Password reset
 - Achievement unlocked
 
 **Sending Pattern:**
+
 ```typescript
 // services/email.service.ts
 import sgMail from '@sendgrid/mail';
@@ -1664,7 +1829,7 @@ export async function sendVerificationEmail(email: string, token: string) {
     to: email,
     from: process.env.FROM_EMAIL!,
     subject: 'Verify your email',
-    html: `<p>Click <a href="${process.env.CLIENT_APP_URL}/verify?token=${token}">here</a> to verify your email.</p>`
+    html: `<p>Click <a href="${process.env.CLIENT_APP_URL}/verify?token=${token}">here</a> to verify your email.</p>`,
   });
 }
 ```
@@ -1748,6 +1913,7 @@ npm -w apps/server run tsc -- --noEmit
 ### Development Workflow
 
 1. **Start PostgreSQL & Redis:**
+
    ```bash
    # PostgreSQL
    psql -U postgres -d elonmusksucks
@@ -1757,17 +1923,20 @@ npm -w apps/server run tsc -- --noEmit
    ```
 
 2. **Run migrations & seed:**
+
    ```bash
    npm -w apps/server run prisma:migrate:dev
    npm -w apps/server run seed:dev
    ```
 
 3. **Start dev server:**
+
    ```bash
    npm -w apps/server run dev
    ```
 
 4. **Start workers (separate terminal):**
+
    ```bash
    npm -w apps/server run worker
    ```
@@ -1909,6 +2078,7 @@ fly deploy
 ### Standard Response Format
 
 **Success:**
+
 ```json
 {
   "success": true,
@@ -1917,6 +2087,7 @@ fly deploy
 ```
 
 **Error:**
+
 ```json
 {
   "success": false,
@@ -1927,10 +2098,12 @@ fly deploy
 ### Pagination
 
 **Query Parameters:**
+
 - `page` (default: 1)
 - `limit` (default: 20, max: 100)
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -1947,6 +2120,7 @@ fly deploy
 ### Filtering
 
 **Query Parameters:**
+
 - `status` (OPEN, CLOSED, RESOLVED)
 - `category` (POLITICS, TECHNOLOGY, etc.)
 - `sortBy` (createdAt, volume, etc.)
@@ -1961,6 +2135,7 @@ fly deploy
 **Endpoint:** `GET /metrics`
 
 **Metrics:**
+
 - `http_requests_total` - Total HTTP requests
 - `http_request_duration_seconds` - Request duration histogram
 - `http_response_size_bytes` - Response size histogram
@@ -1972,6 +2147,7 @@ fly deploy
 **Endpoint:** `GET /health`
 
 **Response:**
+
 ```json
 {
   "status": "ok",
@@ -1989,6 +2165,7 @@ fly deploy
 **Production:** JSON logs for structured logging
 
 **Pattern:**
+
 ```typescript
 console.log('[service] Action completed', { userId, predictionId });
 console.error('[service] Error occurred', { error: error.message });
@@ -2001,6 +2178,7 @@ console.error('[service] Error occurred', { error: error.message });
 ### Issue: Prisma client not found
 
 **Solution:**
+
 ```bash
 npm -w apps/server run prisma:generate
 ```
@@ -2010,6 +2188,7 @@ npm -w apps/server run prisma:generate
 ### Issue: Redis connection failed
 
 **Solution:**
+
 1. Check Redis is running: `redis-cli ping`
 2. Check `REDIS_URL` environment variable
 3. Restart Redis: `redis-server`
@@ -2019,6 +2198,7 @@ npm -w apps/server run prisma:generate
 ### Issue: Database migration failed
 
 **Solution:**
+
 ```bash
 # Reset database and apply all migrations
 npm -w apps/server run prisma:migrate:dev
@@ -2029,6 +2209,7 @@ npm -w apps/server run prisma:migrate:dev
 ### Issue: Socket.IO not connecting
 
 **Solution:**
+
 1. Check server is running on port 5000
 2. Check Redis adapter is configured
 3. Check CORS origins include client URL

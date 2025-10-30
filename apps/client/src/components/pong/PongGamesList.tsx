@@ -41,6 +41,8 @@ export function PongGamesList({
         return { text: 'LIVE', color: 'text-error', bg: 'bg-error/20', icon: '🔴' };
       case 'countdown':
         return { text: 'STARTING', color: 'text-warning', bg: 'bg-warning/20', icon: '⏰' };
+      case 'lobby_negotiation':
+        return { text: 'NEGOTIATING', color: 'text-info', bg: 'bg-info/20', icon: '🤝' };
       case 'waiting_for_ready':
         return { text: 'READY UP', color: 'text-accent', bg: 'bg-accent/20', icon: '⚡' };
       case 'waiting':

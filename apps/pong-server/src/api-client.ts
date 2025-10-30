@@ -10,6 +10,7 @@ interface AuthResponse {
   id: number;
   name: string;
   muskBucks: number;
+  pongElo: number;
 }
 
 interface ValidateWagerRequest {
