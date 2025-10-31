@@ -103,6 +103,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     isConnecting: false,
   });
 
+  // Track when pong-related events occur to allow balance refresh on /pong page
+  const pongEventOccurredRef = useRef(false);
+
   // Refresh token and load current user on mount
   useEffect(() => {
     (async () => {
@@ -295,9 +298,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     // Only refresh balance when user navigates back to the app (not during gameplay)
     const handleVisibilityChange = () => {
-      if (!document.hidden && !window.location.pathname.includes('/pong')) {
-        // User returned to the app and is NOT on pong page, safe to refresh balance
-        setTimeout(() => refreshUserBalance(), 1000); // Small delay to ensure any transactions are complete
+      const onPongPage = window.location.pathname.includes('/pong');
+      const allowPongRefresh = pongEventOccurredRef.current;
+
+      if (!document.hidden && (!onPongPage || allowPongRefresh)) {
+        // User returned to the app and either:
+        // 1. NOT on pong page, OR
+        // 2. On pong page but a pong event (wager/payout) recently occurred
+        setTimeout(() => {
+          refreshUserBalance();
+          // Reset the flag after refreshing
+          pongEventOccurredRef.current = false;
+        }, 1000); // Small delay to ensure any transactions are complete
       }
     };
 
@@ -370,6 +382,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       subscribe(REDIS_CHANNELS.PONG_WAGER, (data: PongWagerPayload) => {
         if (data.userId === user.id) {
           console.log('[Auth] Pong wager placed by user');
+          pongEventOccurredRef.current = true; // Allow balance refresh on /pong page
           startTransition(() => {
             optimisticUpdateUser({
               type: 'bet',
@@ -384,6 +397,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       subscribe(REDIS_CHANNELS.PONG_PAYOUT, (data: PongPayoutPayload) => {
         if (data.userId === user.id) {
           console.log('[Auth] Pong payout received by user');
+          pongEventOccurredRef.current = true; // Allow balance refresh on /pong page
           startTransition(() => {
             optimisticUpdateUser({
               type: 'payout',

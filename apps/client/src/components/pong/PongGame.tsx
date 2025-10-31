@@ -7,9 +7,10 @@ import { PongGamesList } from './PongGamesList';
 import { PongHeader } from './PongHeader';
 import { PongMatchCreatorModal } from './PongMatchCreatorModal';
 import PongLobbyScreen from './PongLobbyScreen';
-import { PONG_PHYSICS } from '@ems/types';
+import { PONG_PHYSICS, REDIS_CHANNELS } from '@ems/types';
 import { PongClientPhysics } from '../../utils/pongClientPhysics';
 import { useAuth } from '../../contexts/AuthContext';
+import { useEventBusCore } from '../../contexts/EventBusCoreContext';
 import api from '../../api/axios';
 
 export function PongGame() {
@@ -46,9 +47,13 @@ export function PongGame() {
   } = usePongSocket();
 
   const { user } = useAuth();
+  const { subscribe } = useEventBusCore();
 
   // Subscribe to Elo update events
   const { metrics } = usePongEvents();
+
+  // Local state for user balance (updated in real-time via EventBusCore)
+  const [userBalance, setUserBalance] = useState<number>(Number(user?.muskBucks || 0));
 
   // Local state for match creation modal and user stats
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -110,6 +115,27 @@ export function PongGame() {
     // Note: Don't include userElo/userTier in deps to avoid update loops
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [metrics.currentElo, metrics.currentTier]);
+
+  // Subscribe to real-time balance updates
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const unsubscribe = subscribe(REDIS_CHANNELS.BALANCE_UPDATE, (payload: any) => {
+      if (payload.userId === user.id) {
+        setUserBalance(payload.newBalance);
+        console.log('[PongGame] Balance updated via EventBusCore:', payload.newBalance);
+      }
+    });
+
+    return unsubscribe;
+  }, [user?.id, subscribe]);
+
+  // Sync userBalance with user.muskBucks when user object changes (e.g., on initial load)
+  useEffect(() => {
+    if (user?.muskBucks !== undefined) {
+      setUserBalance(Number(user.muskBucks));
+    }
+  }, [user?.muskBucks]);
 
   // Cleanup on unmount - only disconnect when component actually unmounts (user leaves page)
   // NOT when user object updates (e.g., balance changes)
@@ -399,7 +425,7 @@ export function PongGame() {
             wagerNegotiation={currentGame.wagerNegotiation || null}
             chatMessages={currentGame.chatMessages || []}
             negotiationTimeRemaining={negotiationTimeRemaining}
-            balance={Number(user?.muskBucks || 0)}
+            balance={userBalance}
             opponentDisconnected={opponentDisconnected}
             onProposeWager={proposeWager}
             onAcceptWager={acceptWager}

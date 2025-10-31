@@ -121,6 +121,7 @@ async function createAIPlayer(difficulty: AIDifficulty, apiClient: PongApiClient
     ping: 0,
     lastInputTime: Date.now(),
     elo: AI_PLAYER_ELOS[difficulty],
+    balance: 0, // AI players don't have real balances
   };
 }
 
@@ -176,6 +177,7 @@ class DatabaseManager {
         ping: 0,
         lastInputTime: Date.now(),
         elo: userData.pongElo,
+        balance: userData.muskBucks,
       };
     } catch (error) {
       console.error('Auth error:', error);
@@ -404,15 +406,6 @@ class ChatManager {
   private readonly RATE_LIMIT_WINDOW = 5000; // 5 seconds
   private readonly RATE_LIMIT_MAX_MESSAGES = 3; // 3 messages per window
 
-  // Basic profanity filter (can be expanded)
-  private readonly PROFANITY_PATTERNS = [
-    /\bf+u+c+k+/gi,
-    /\bs+h+i+t+/gi,
-    /\bc+u+n+t+/gi,
-    /\bd+a+m+n+/gi,
-    /\ba+s+s+h+o+l+e+/gi,
-  ];
-
   /**
    * Add a message to a game chat
    * Returns the message if successful, null if rate limited
@@ -430,13 +423,10 @@ class ChatManager {
       return null;
     }
 
-    // Apply profanity filter
-    const filtered = this.filterProfanity(message);
-
     const chatMsg: GameChatMessage = {
       userId,
       username,
-      message: filtered,
+      message,
       timestamp: Date.now(),
       isSystem,
       userRole,
@@ -478,19 +468,6 @@ class ChatManager {
     recent.push(now);
     this.userRateLimits.set(key, recent);
     return true;
-  }
-
-  /**
-   * Apply basic profanity filter
-   */
-  filterProfanity(message: string): string {
-    let filtered = message;
-
-    for (const pattern of this.PROFANITY_PATTERNS) {
-      filtered = filtered.replace(pattern, (match) => '*'.repeat(match.length));
-    }
-
-    return filtered;
   }
 
   /**
@@ -756,11 +733,8 @@ class GameManager {
       this.playerGames.set(players[1].id, gameId);
     }
 
-    // Track active game in statistics (add to stats when created)
-    this.stats.addActiveGame(gameId);
-
-    // Broadcast active games update when game is created
-    this.broadcastActiveGamesUpdate();
+    // Note: Active game tracking happens when opponent joins and status → lobby_negotiation
+    // This prevents counting games in waiting_for_opponent status
 
     return { success: true };
   }
@@ -916,6 +890,14 @@ class GameManager {
     }
 
     console.log(`🗑️ Removing game ${gameId} (status: ${game.status})`);
+
+    // Remove from active games tracking if it was counted as active
+    // Games are counted as active if status is NOT 'waiting_for_opponent' and NOT 'ended'
+    if (game.status !== 'waiting_for_opponent' && game.status !== 'ended') {
+      this.stats.removeActiveGame(gameId);
+      this.broadcastActiveGamesUpdate();
+      console.log(`📊 Removed ${gameId} from active games tracking`);
+    }
 
     // Clear game loop interval if exists
     const interval = this.gameIntervals.get(gameId);
@@ -1751,7 +1733,7 @@ class GameManager {
   // SPECTATOR FUNCTIONALITY
   // ——————————————————————————————————————————————————————————————————————————————————
 
-  private broadcastActiveGamesUpdate(): void {
+  broadcastActiveGamesUpdate(): void {
     const activeGames = this.getActiveGames();
     this.io.to('lobby').emit('active_games', { games: activeGames });
 
@@ -2533,6 +2515,10 @@ export class PongGameServer {
         game.status = 'lobby_negotiation';
         game.negotiationStartedAt = Date.now();
         this.game['playerGames'].set(player.id, existingGameId);
+
+        // Track as active game now that lobby has both players
+        this.stats.addActiveGame(existingGameId);
+        this.game.broadcastActiveGamesUpdate();
 
         // Add system chat message announcing player joined
         const joinMsg = this.chat.addMessage(

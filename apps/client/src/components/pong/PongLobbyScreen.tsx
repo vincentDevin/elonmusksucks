@@ -1,11 +1,10 @@
 // apps/client/src/components/pong/PongLobbyScreen.tsx
 // -----------------------------------------------------------------------------
 // Main lobby screen container for PVP pong matches
-// Integrates: PongCanvas (warmup), WagerNegotiationPanel, GameRoomChat, LobbyEloPreview
+// Integrates: WagerNegotiationPanel, GameRoomChat, LobbyEloPreview
 // Handles: waiting for opponent, negotiation phase, disconnect states
 // -----------------------------------------------------------------------------
 
-import { PongCanvas } from './PongCanvas';
 import WagerNegotiationPanel from './WagerNegotiationPanel';
 import GameRoomChat from './GameRoomChat';
 import LobbyEloPreview from './LobbyEloPreview';
@@ -65,60 +64,16 @@ export default function PongLobbyScreen({
 
       {/* Desktop layout: Simple two-column fractional grid */}
       <div className="hidden lg:grid lg:grid-cols-[7fr_5fr] xl:grid-cols-[2fr_1fr] gap-6 items-stretch">
-        {/* Left column: Canvas + Chat (flexbox to fill height) */}
-        <div className="flex flex-col h-full">
-          {/* Canvas container - clean minimal wrapper with 4:3 aspect ratio */}
-          <div
-            className="relative w-full rounded-t-lg overflow-hidden flex-shrink-0"
-            style={{ aspectRatio: '4/3' }}
-          >
-            {/* Waiting overlay */}
-            {isWaitingForOpponent && (
-              <div className="absolute inset-0 flex items-center justify-center bg-background/90 backdrop-blur-sm z-10">
-                <div className="text-center space-y-4 px-4">
-                  <div className="text-2xl font-bold text-content animate-pulse">
-                    Waiting for opponent...
-                  </div>
-                  <div className="text-sm text-tertiary">
-                    Your lobby is open and ready for players to join
-                  </div>
-                  <button
-                    onClick={onCancelMatch}
-                    className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition"
-                  >
-                    Cancel Match
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Canvas for paddle warmup */}
-            <PongCanvas
-              gameState={{
-                gameId,
-                playerSlot,
-                players,
-                ball: { x: 400, y: 300, vx: 0, vy: 0 },
-                scores: [0, 0],
-                status: 'waiting',
-                tick: 0,
-                timestamp: Date.now(),
-              }}
-              isSpectating={false}
-            />
-          </div>
-
-          {/* Chat panel - grows to fill remaining space, anchored to canvas */}
-          <GameRoomChat
-            messages={chatMessages}
-            onSendMessage={(message) => onSendChatMessage(gameId, message)}
-            gameId={gameId}
-            className="flex-1 rounded-b-lg"
-          />
-        </div>
+        {/* Left column: Chat only */}
+        <GameRoomChat
+          messages={chatMessages}
+          onSendMessage={(message) => onSendChatMessage(gameId, message)}
+          gameId={gameId}
+          className="rounded-lg"
+        />
 
         {/* Right column: Responsive sidebar */}
-        <div className="space-y-4">
+        <div className="flex flex-col space-y-4 self-stretch">
           {/* Waiting state info */}
           {isWaitingForOpponent && (
             <div className="bg-surface border border-border rounded-lg p-6">
@@ -156,6 +111,7 @@ export default function PongLobbyScreen({
               negotiation={wagerNegotiation}
               playerSlot={playerSlot}
               balance={balance}
+              opponentBalance={(playerSlot === 0 ? player2?.balance : player1?.balance) || 0}
               timeRemaining={negotiationTimeRemaining}
               onPropose={(amount) => onProposeWager(gameId, amount)}
               onAccept={() => onAcceptWager(gameId)}
@@ -195,6 +151,7 @@ export default function PongLobbyScreen({
               negotiation={wagerNegotiation}
               playerSlot={playerSlot}
               balance={balance}
+              opponentBalance={(playerSlot === 0 ? player2?.balance : player1?.balance) || 0}
               timeRemaining={negotiationTimeRemaining}
               onPropose={(amount) => onProposeWager(gameId, amount)}
               onAccept={() => onAcceptWager(gameId)}

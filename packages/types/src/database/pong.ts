@@ -16,6 +16,7 @@ export interface Player {
   ping: number;
   lastInputTime: number;
   elo: number;
+  balance: number; // Player's current MuskBucks balance
 }
 
 export interface Ball {

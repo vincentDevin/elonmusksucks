@@ -117,6 +117,58 @@ export default function GameRoomChat({
     return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
   };
 
+  /**
+   * Determine message type from content and return appropriate CSS classes
+   * Returns { bg, text } classes for color-coded system messages
+   */
+  const getSystemMessageStyle = (message: string): { bg: string; text: string } => {
+    const lowerMsg = message.toLowerCase();
+
+    // Wager accepted (green)
+    if (lowerMsg.includes('accepted') || lowerMsg.includes('locked')) {
+      return { bg: 'bg-green-500/20', text: 'text-green-400' };
+    }
+
+    // Wager rejected or lobby cancelled (red)
+    if (
+      lowerMsg.includes('rejected') ||
+      lowerMsg.includes('declined') ||
+      lowerMsg.includes('cancelled') ||
+      lowerMsg.includes('canceled') ||
+      lowerMsg.includes('closed')
+    ) {
+      return { bg: 'bg-red-500/20', text: 'text-red-400' };
+    }
+
+    // Wager proposed (amber/yellow)
+    if (lowerMsg.includes('proposed') || lowerMsg.includes('muskbucks')) {
+      return { bg: 'bg-amber-500/20', text: 'text-amber-400' };
+    }
+
+    // Timer warnings (orange)
+    if (lowerMsg.includes('seconds remaining') || lowerMsg.includes('time')) {
+      return { bg: 'bg-orange-500/20', text: 'text-orange-400' };
+    }
+
+    // Player joined (blue)
+    if (lowerMsg.includes('joined')) {
+      return { bg: 'bg-blue-500/20', text: 'text-blue-400' };
+    }
+
+    // Player reconnected (green)
+    if (lowerMsg.includes('reconnected')) {
+      return { bg: 'bg-green-500/20', text: 'text-green-400' };
+    }
+
+    // Player disconnected (orange)
+    if (lowerMsg.includes('disconnected') || lowerMsg.includes('left')) {
+      return { bg: 'bg-orange-500/20', text: 'text-orange-400' };
+    }
+
+    // Default system message (grey)
+    return { bg: 'bg-muted', text: 'text-tertiary' };
+  };
+
   return (
     <div
       className={`flex flex-col h-full bg-surface border border-border ${className || 'rounded-lg'}`}
@@ -140,9 +192,12 @@ export default function GameRoomChat({
         {grouped.map((g, groupIndex) => {
           // System messages (negotiation updates, joins, etc.)
           if (g.isSystem) {
+            const style = getSystemMessageStyle(g.msgs[0].message);
             return (
               <div key={`system-${groupIndex}`} className="flex justify-center">
-                <div className="text-xs text-tertiary italic bg-muted px-3 py-1.5 rounded-full max-w-md text-center">
+                <div
+                  className={`text-xs italic ${style.bg} ${style.text} px-3 py-1.5 rounded-full max-w-md text-center font-medium`}
+                >
                   {g.msgs[0].message}
                 </div>
               </div>

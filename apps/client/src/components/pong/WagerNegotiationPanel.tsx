@@ -12,6 +12,7 @@ interface WagerNegotiationPanelProps {
   negotiation: WagerNegotiation;
   playerSlot: 0 | 1;
   balance: number;
+  opponentBalance: number;
   timeRemaining: number | null; // in seconds
   onPropose: (amount: number) => void;
   onAccept: () => void;
@@ -33,6 +34,7 @@ export default function WagerNegotiationPanel({
   negotiation,
   playerSlot,
   balance,
+  opponentBalance,
   timeRemaining,
   onPropose,
   onAccept,
@@ -50,17 +52,16 @@ export default function WagerNegotiationPanel({
 
   // Risk level calculation
   const getRiskLevel = (amount: number) => {
-    if (amount === 0) return { level: 'FREE PLAY', bgColor: 'bg-gray-100', color: 'text-gray-800' };
+    if (amount === 0) return { level: 'FREE PLAY', bgColor: 'bg-surface', color: 'text-content' };
     const percentage = (amount / balance) * 100;
     if (percentage < 5)
-      return { level: 'Conservative', bgColor: 'bg-green-100', color: 'text-green-800' };
-    if (percentage < 15)
-      return { level: 'Moderate', bgColor: 'bg-blue-100', color: 'text-blue-800' };
+      return { level: 'Conservative', bgColor: 'bg-success/20', color: 'text-success' };
+    if (percentage < 15) return { level: 'Moderate', bgColor: 'bg-info/20', color: 'text-info' };
     if (percentage < 35)
-      return { level: 'Aggressive', bgColor: 'bg-yellow-100', color: 'text-yellow-800' };
+      return { level: 'Aggressive', bgColor: 'bg-warning/20', color: 'text-warning' };
     if (percentage < 60)
-      return { level: 'High Roller', bgColor: 'bg-orange-100', color: 'text-orange-800' };
-    return { level: 'YOLO', bgColor: 'bg-red-100', color: 'text-red-800' };
+      return { level: 'High Roller', bgColor: 'bg-warning/30', color: 'text-warning' };
+    return { level: 'YOLO', bgColor: 'bg-error/20', color: 'text-error' };
   };
 
   const riskLevel = getRiskLevel(proposedAmount);
@@ -122,8 +123,8 @@ export default function WagerNegotiationPanel({
           <div
             className={`flex-1 px-3 py-2 rounded border text-xs font-medium text-center ${
               haveIAccepted
-                ? 'bg-green-500/20 border-green-500/40 text-green-400'
-                : 'bg-muted/20 border-muted text-tertiary'
+                ? 'bg-success/20 border-success/40 text-success'
+                : 'bg-info/10 border-info/30 text-info'
             }`}
           >
             {haveIAccepted ? '✓ You Accepted' : 'You: Pending'}
@@ -131,8 +132,8 @@ export default function WagerNegotiationPanel({
           <div
             className={`flex-1 px-3 py-2 rounded border text-xs font-medium text-center ${
               hasOpponentAccepted
-                ? 'bg-green-500/20 border-green-500/40 text-green-400'
-                : 'bg-muted/20 border-muted text-tertiary'
+                ? 'bg-success/20 border-success/40 text-success'
+                : 'bg-warning/10 border-warning/30 text-warning'
             }`}
           >
             {hasOpponentAccepted ? '✓ Opponent Accepted' : 'Opponent: Pending'}
@@ -182,7 +183,14 @@ export default function WagerNegotiationPanel({
         <div className="px-4 py-3 border-t border-border space-y-3">
           <div className="flex items-center justify-between">
             <h4 className="text-sm font-semibold text-content">Make Counter-Offer</h4>
-            <span className="text-xs text-tertiary">Balance: {formatMuskBucks(balance)} 🪙</span>
+            <div className="flex flex-col items-end gap-1">
+              <span className="text-xs text-tertiary">
+                Your Balance: {formatMuskBucks(balance)} 🪙
+              </span>
+              <span className="text-xs text-secondary">
+                Opponent: {formatMuskBucks(opponentBalance)} 🪙
+              </span>
+            </div>
           </div>
 
           {maxRoundsReached && (
@@ -218,7 +226,7 @@ export default function WagerNegotiationPanel({
                 max={balance}
                 step="50"
                 disabled={maxRoundsReached}
-                className="w-32 px-3 py-2 bg-background border border-muted rounded text-right font-bold text-content focus:ring-2 focus:ring-accent focus:border-accent disabled:opacity-50"
+                className="w-32 px-3 py-2 bg-background border border-border rounded text-right font-bold text-content focus:ring-2 focus:ring-accent focus:border-accent disabled:opacity-50"
               />
               <span className="font-bold text-content">🪙</span>
             </div>
@@ -234,9 +242,9 @@ export default function WagerNegotiationPanel({
               value={proposedAmount}
               onChange={(e) => setProposedAmount(parseInt(e.target.value))}
               disabled={maxRoundsReached}
-              className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer slider disabled:opacity-50"
+              className="w-full h-2 bg-border rounded-lg appearance-none cursor-pointer slider disabled:opacity-50"
               style={{
-                background: `linear-gradient(to right, var(--color-accent) 0%, var(--color-accent) ${(proposedAmount / balance) * 100}%, var(--color-muted) ${(proposedAmount / balance) * 100}%, var(--color-muted) 100%)`,
+                background: `linear-gradient(to right, var(--color-accent) 0%, var(--color-accent) ${(proposedAmount / balance) * 100}%, var(--color-border) ${(proposedAmount / balance) * 100}%, var(--color-border) 100%)`,
               }}
             />
             <div className="flex justify-between text-xs text-tertiary mt-1">
@@ -257,10 +265,10 @@ export default function WagerNegotiationPanel({
                   disabled={isDisabled}
                   className={`px-2 py-1 text-xs rounded transition-all ${
                     isDisabled
-                      ? 'opacity-60 cursor-not-allowed bg-muted/20 text-tertiary'
+                      ? 'opacity-60 cursor-not-allowed bg-surface text-tertiary'
                       : proposedAmount === amount
                         ? 'bg-accent text-white'
-                        : 'bg-muted/20 text-content hover:bg-accent hover:text-white hover:shadow-lg hover:shadow-accent/50 cursor-pointer'
+                        : 'bg-surface text-content hover:bg-accent hover:text-white hover:shadow-lg hover:shadow-accent/50 cursor-pointer'
                   }`}
                 >
                   {formatMuskBucks(amount)}

@@ -246,9 +246,6 @@ export function PongMatchCreatorModal({
     },
   };
 
-  // Get current wager
-  const currentWager = variant === 'ai' ? aiWager : pvpWager;
-
   // Percentage buttons for quick wager selection
   const renderWagerButtons = (
     wager: number,
