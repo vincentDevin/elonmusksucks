@@ -73,7 +73,7 @@ export function usePongInput(): PongInputHook {
       if (hasActiveInput && sendInputRef.current) {
         sendInputRef.current(currentState);
       }
-    }, 10); // ✅ Send input at ~100fps (1000/10 = 100fps) - Good balance of responsiveness and performance
+    }, 16.67); // ✅ Send input at ~60fps (1000/16.67 = 60fps) - Optimized for client-side prediction architecture
 
     return () => clearInterval(interval);
   }, []);

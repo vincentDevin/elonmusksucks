@@ -46,7 +46,6 @@ export interface AuthPayload {
  */
 export function validateCreateMatch(data: unknown): data is CreateMatchPayload {
   if (typeof data !== 'object' || !data) {
-    console.warn('[VALIDATION] create_match: payload is not an object');
     return false;
   }
 
@@ -54,25 +53,21 @@ export function validateCreateMatch(data: unknown): data is CreateMatchPayload {
 
   // Validate type (required)
   if (payload.type !== 'ai' && payload.type !== 'pvp') {
-    console.warn('[VALIDATION] create_match: invalid match type', payload.type);
     return false;
   }
 
   // Validate wager (required, must be number)
   if (typeof payload.wager !== 'number' || !Number.isFinite(payload.wager)) {
-    console.warn('[VALIDATION] create_match: invalid wager', payload.wager);
     return false;
   }
 
   // Wager must be non-negative
   if (payload.wager < 0) {
-    console.warn('[VALIDATION] create_match: negative wager', payload.wager);
     return false;
   }
 
   // Wager must be an integer (no fractional MuskBucks)
   if (!Number.isInteger(payload.wager)) {
-    console.warn('[VALIDATION] create_match: fractional wager', payload.wager);
     return false;
   }
 
@@ -80,7 +75,6 @@ export function validateCreateMatch(data: unknown): data is CreateMatchPayload {
   if (payload.type === 'ai') {
     const validDifficulties = ['EASY', 'MEDIUM', 'HARD', 'IMPOSSIBLE'];
     if (!payload.aiDifficulty || !validDifficulties.includes(payload.aiDifficulty)) {
-      console.warn('[VALIDATION] create_match: invalid AI difficulty', payload.aiDifficulty);
       return false;
     }
   }
@@ -93,7 +87,6 @@ export function validateCreateMatch(data: unknown): data is CreateMatchPayload {
  */
 export function validateJoinMatch(data: unknown): data is JoinMatchPayload {
   if (typeof data !== 'object' || !data) {
-    console.warn('[VALIDATION] join_match: payload is not an object');
     return false;
   }
 
@@ -101,19 +94,16 @@ export function validateJoinMatch(data: unknown): data is JoinMatchPayload {
 
   // Validate matchId (required, must be string)
   if (typeof payload.matchId !== 'string') {
-    console.warn('[VALIDATION] join_match: invalid matchId type');
     return false;
   }
 
   // MatchId should not be empty
   if (payload.matchId.trim().length === 0) {
-    console.warn('[VALIDATION] join_match: empty matchId');
     return false;
   }
 
   // MatchId should have reasonable length (prevent overflow attacks)
   if (payload.matchId.length > 100) {
-    console.warn('[VALIDATION] join_match: matchId too long', payload.matchId.length);
     return false;
   }
 
@@ -125,7 +115,6 @@ export function validateJoinMatch(data: unknown): data is JoinMatchPayload {
  */
 export function validatePlayerInput(data: unknown): data is PlayerInputPayload {
   if (typeof data !== 'object' || !data) {
-    console.warn('[VALIDATION] player_input: payload is not an object');
     return false;
   }
 
@@ -133,25 +122,21 @@ export function validatePlayerInput(data: unknown): data is PlayerInputPayload {
 
   // Validate paddleY (required, must be number)
   if (typeof payload.paddleY !== 'number' || !Number.isFinite(payload.paddleY)) {
-    console.warn('[VALIDATION] player_input: invalid paddleY', payload.paddleY);
     return false;
   }
 
   // PaddleY must be non-negative (bounds checking done in game logic)
   if (payload.paddleY < 0) {
-    console.warn('[VALIDATION] player_input: negative paddleY', payload.paddleY);
     return false;
   }
 
   // PaddleY should be reasonable (max field height is typically 600)
   if (payload.paddleY > 10000) {
-    console.warn('[VALIDATION] player_input: paddleY too large', payload.paddleY);
     return false;
   }
 
   // Validate timestamp (required, must be number)
   if (typeof payload.timestamp !== 'number' || !Number.isFinite(payload.timestamp)) {
-    console.warn('[VALIDATION] player_input: invalid timestamp', payload.timestamp);
     return false;
   }
 
@@ -159,22 +144,12 @@ export function validatePlayerInput(data: unknown): data is PlayerInputPayload {
   const now = Date.now();
   const MAX_FUTURE_OFFSET = 5000; // 5 seconds
   if (payload.timestamp > now + MAX_FUTURE_OFFSET) {
-    console.warn('[VALIDATION] player_input: timestamp in future', {
-      timestamp: payload.timestamp,
-      now,
-      diff: payload.timestamp - now,
-    });
     return false;
   }
 
   // Timestamp should not be too old (more than 10 seconds)
   const MAX_AGE = 10000; // 10 seconds
   if (payload.timestamp < now - MAX_AGE) {
-    console.warn('[VALIDATION] player_input: timestamp too old', {
-      timestamp: payload.timestamp,
-      now,
-      age: now - payload.timestamp,
-    });
     return false;
   }
 
@@ -186,7 +161,6 @@ export function validatePlayerInput(data: unknown): data is PlayerInputPayload {
  */
 export function validatePlayerReady(data: unknown): data is PlayerReadyPayload {
   if (typeof data !== 'object' || !data) {
-    console.warn('[VALIDATION] player_ready: payload is not an object');
     return false;
   }
 
@@ -194,7 +168,6 @@ export function validatePlayerReady(data: unknown): data is PlayerReadyPayload {
 
   // Validate ready (required, must be boolean)
   if (typeof payload.ready !== 'boolean') {
-    console.warn('[VALIDATION] player_ready: invalid ready type', typeof payload.ready);
     return false;
   }
 
@@ -206,7 +179,6 @@ export function validatePlayerReady(data: unknown): data is PlayerReadyPayload {
  */
 export function validateSpectateMatch(data: unknown): data is SpectateMatchPayload {
   if (typeof data !== 'object' || !data) {
-    console.warn('[VALIDATION] spectate_match: payload is not an object');
     return false;
   }
 
@@ -214,19 +186,16 @@ export function validateSpectateMatch(data: unknown): data is SpectateMatchPaylo
 
   // Validate gameId (required, must be string)
   if (typeof payload.gameId !== 'string') {
-    console.warn('[VALIDATION] spectate_match: invalid gameId type');
     return false;
   }
 
   // GameId should not be empty
   if (payload.gameId.trim().length === 0) {
-    console.warn('[VALIDATION] spectate_match: empty gameId');
     return false;
   }
 
   // GameId should have reasonable length
   if (payload.gameId.length > 100) {
-    console.warn('[VALIDATION] spectate_match: gameId too long', payload.gameId.length);
     return false;
   }
 
