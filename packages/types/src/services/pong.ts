@@ -468,3 +468,28 @@ export const PONG_WAGER_LIMITS = {
     IMPOSSIBLE: null,  // No limit - prove you can beat it!
   },
 } as const;
+
+/**
+ * Economy Modifier by Tier
+ *
+ * Scales the economy component of Elo calculation based on player tier
+ * to prevent high-elo players from farming bots with large bets.
+ *
+ * Formula: economyChange *= ECONOMY_MODIFIER_BY_TIER[playerTier]
+ *
+ * Examples:
+ * - Bronze/Silver: 100% economy rewards
+ * - Gold: 75% economy rewards
+ * - Platinum: 50% economy rewards
+ * - Diamond: 25% economy rewards
+ * - Master/Grandmaster: 0% economy rewards (skill-based only)
+ */
+export const ECONOMY_MODIFIER_BY_TIER = {
+  BRONZE: 1.0,
+  SILVER: 1.0,
+  GOLD: 0.75,
+  PLATINUM: 0.5,
+  DIAMOND: 0.25,
+  MASTER: 0.0,
+  GRANDMASTER: 0.0,
+} as const;

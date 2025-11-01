@@ -1287,18 +1287,21 @@ class GameManager {
     let payoutAmount = 0;
     if (winnerId) {
       if (game.isAI) {
-        // AI match: difficulty-based payout multipliers
-        // Winner gets: wager + (wager * multiplier)
+        // AI match: Both AI and human bet real money
+        // Winner gets full pot + house bonus (for human winners based on difficulty)
         if (winnerId > 0 && game.aiDifficulty) {
-          // Human won - apply difficulty multiplier
+          // Human won - gets full pot + house bonus based on difficulty
           const multiplier = PONG_PAYOUT_CONSTANTS.AI_PAYOUT_MULTIPLIER[game.aiDifficulty];
-          payoutAmount = Math.floor(game.wager + game.wager * multiplier);
+          const fullPot = game.wager * 2; // Both wagers
+          const houseBonus = Math.floor(game.wager * (multiplier - 1)); // Difficulty bonus from house
+          payoutAmount = fullPot + houseBonus;
           console.log(
-            `💰 AI payout (${game.aiDifficulty}): ${game.wager} + (${game.wager} * ${multiplier}) = ${payoutAmount}`,
+            `💰 Human won AI match (${game.aiDifficulty}): pot ${fullPot} + house bonus ${houseBonus} = ${payoutAmount}`,
           );
         } else {
-          // AI won - no payout
-          payoutAmount = 0;
+          // AI won - AI gets the full pot (both wagers, no bonus)
+          payoutAmount = game.wager * 2;
+          console.log(`💰 AI won match: gets full pot (${game.wager} * 2) = ${payoutAmount}`);
         }
       } else {
         // PVP match: winner gets the full pot (2x stake total)
