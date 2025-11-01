@@ -151,6 +151,7 @@ export function usePongSocket(): PongSocketHook {
   const isConnectingRef = useRef(false);
   const inputSequenceRef = useRef(0);
   const authenticatedPlayerRef = useRef<Player | null>(null);
+  const serverTimeOffsetRef = useRef<number>(0); // Offset to add to Date.now() to get server time
 
   const connect = useCallback(() => {
     if (!user) {
@@ -210,6 +211,7 @@ export function usePongSocket(): PongSocketHook {
       setIsAuthenticated(false);
       setCurrentGame(null);
       authenticatedPlayerRef.current = null;
+      serverTimeOffsetRef.current = 0; // Reset time sync on disconnect
 
       // Auto-reconnect logic
       if (reason !== 'io client disconnect' && reconnectAttemptsRef.current < 5) {
@@ -636,11 +638,25 @@ export function usePongSocket(): PongSocketHook {
       }
     });
 
-    // ✅ RTT-based ping measurement (no clock skew issues)
+    // ✅ RTT-based ping measurement AND server time synchronization
     newSocket.on('ping_response', (data: { clientTimestamp: number; serverTimestamp: number }) => {
-      const rtt = Date.now() - data.clientTimestamp;
+      const now = Date.now();
+      const rtt = now - data.clientTimestamp;
       const oneWayPing = Math.floor(rtt / 2); // Half of round-trip time
       setLastPing(Math.max(0, oneWayPing));
+
+      // Calculate server time offset to synchronize timestamps
+      // Server time was measured at approximately clientTimestamp + rtt/2
+      const estimatedClientTimeAtServer = data.clientTimestamp + rtt / 2;
+      const clockOffset = data.serverTimestamp - estimatedClientTimeAtServer;
+      serverTimeOffsetRef.current = clockOffset;
+
+      // Log significant clock drift (>1 second difference)
+      if (Math.abs(clockOffset) > 1000) {
+        console.warn(
+          `🕐 Clock drift detected: ${(clockOffset / 1000).toFixed(1)}s (client ${clockOffset > 0 ? 'behind' : 'ahead of'} server)`,
+        );
+      }
     });
 
     newSocket.on('score_update', (data: ServerEvents['score_update']) => {
@@ -943,10 +959,11 @@ export function usePongSocket(): PongSocketHook {
         ...input,
         paddleY: newPaddleY, // Send client's authoritative paddle position
         seq: inputSequenceRef.current++,
-        timestamp: Date.now(),
+        timestamp: Date.now() + serverTimeOffsetRef.current, // Use server-synchronized time
       };
 
-      socket.emit('player_input', fullInput as ClientEvents['player_input']);
+      // Use volatile to prevent buffering stale inputs during brief disconnects
+      socket.volatile.emit('player_input', fullInput as ClientEvents['player_input']);
     },
     [socket, isAuthenticated, currentGame],
   );

@@ -62,11 +62,15 @@ export function usePongInput(): PongInputHook {
     updateInputRef.current = updateInput;
   }, [updateInput]);
 
-  // ✅ Continuous input sending for held keys (throttled for performance)
+  // ✅ Continuous input sending for held keys AND mouse drag (throttled for performance)
   useEffect(() => {
     const interval = setInterval(() => {
       const currentState = inputBufferRef.current;
-      if ((currentState.up || currentState.down) && sendInputRef.current) {
+      // Send input if keyboard keys are held OR mouse drag is active
+      const hasActiveInput =
+        currentState.up || currentState.down || currentState.mouseDragDelta !== undefined;
+
+      if (hasActiveInput && sendInputRef.current) {
         sendInputRef.current(currentState);
       }
     }, 10); // ✅ Send input at ~100fps (1000/10 = 100fps) - Good balance of responsiveness and performance
