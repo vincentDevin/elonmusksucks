@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { UserCircleIcon, TrophyIcon, FireIcon } from '@heroicons/react/24/outline';
 import type { UnifiedLeaderboardEntry as UnifiedEntry } from './types';
+import PongTierBadge from '../pong/PongTierBadge';
+import { UnifiedBadge } from '../common/UnifiedBadge';
+import { BADGE_TYPES } from '../../types/badges';
 
 interface LeaderboardEntryProps {
   entry: UnifiedEntry;
@@ -181,18 +184,39 @@ export function LeaderboardEntry({
                 )}
               </div>
 
-              {/* Badges - limit to 2 most important */}
+              {/* Badges - render with appropriate badge components */}
               {entry.badges && entry.badges.length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-3">
-                  {entry.badges.slice(0, 2).map((badge, idx) => (
-                    <span
-                      key={idx}
-                      className={`text-sm px-3 py-1 rounded-full font-medium ${badge.color}`}
-                    >
-                      {badge.icon && <span className="mr-1">{badge.icon}</span>}
-                      {badge.text}
-                    </span>
-                  ))}
+                  {entry.badges.map((badge, idx) => {
+                    // Render tier badges with PongTierBadge component
+                    if (badge.type === BADGE_TYPES.TIER && badge.tier) {
+                      return (
+                        <PongTierBadge
+                          key={idx}
+                          tier={badge.tier}
+                          eloRating={badge.elo}
+                          size={badge.size}
+                        />
+                      );
+                    }
+
+                    // Render all other badges with UnifiedBadge component
+                    // Add animations for rare/high-level badges
+                    const shouldAnimate = badge.type === BADGE_TYPES.HIGH_ROLLER;
+
+                    return (
+                      <UnifiedBadge
+                        key={idx}
+                        type={badge.type}
+                        text={badge.text}
+                        icon={badge.icon}
+                        size={badge.size}
+                        color={badge.color}
+                        description={badge.description}
+                        animated={shouldAnimate ? 'pulse' : 'none'}
+                      />
+                    );
+                  })}
                 </div>
               )}
 

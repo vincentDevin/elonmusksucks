@@ -1,71 +1,57 @@
+import { UnifiedBadge } from '../common/UnifiedBadge';
+import { BADGE_TYPES } from '../../types/badges';
+import type { BadgeSize } from '../../types/badges';
+
 interface PongTierBadgeProps {
   tier: string;
   eloRating?: number;
-  size?: 'sm' | 'md' | 'lg';
+  size?: BadgeSize;
   showElo?: boolean;
   className?: string;
 }
 
-const TIER_CONFIG = {
+export const TIER_CONFIG = {
   BRONZE: {
-    colors: 'bg-amber-900/20 text-black dark:text-amber-500 border-amber-600/30',
+    colors: 'bg-amber-900/20 text-amber-800 dark:text-amber-500 border-amber-600/30',
     icon: '🥉',
     description: 'Beginners',
     range: '400-999',
   },
   SILVER: {
-    colors: 'bg-slate-500/20 text-black dark:text-slate-300 border-slate-400/30',
+    colors: 'bg-slate-500/20 text-slate-700 dark:text-slate-300 border-slate-400/30',
     icon: '🥈',
     description: 'Casual players',
     range: '1000-1399',
   },
   GOLD: {
-    colors: 'bg-yellow-500/20 text-black dark:text-yellow-400 border-yellow-500/30',
+    colors: 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 border-yellow-500/30',
     icon: '🥇',
     description: 'Regular players',
     range: '1400-1799',
   },
   PLATINUM: {
-    colors: 'bg-cyan-500/20 text-black dark:text-cyan-400 border-cyan-500/30',
+    colors: 'bg-cyan-500/20 text-cyan-700 dark:text-cyan-400 border-cyan-500/30',
     icon: '💎',
     description: 'Skilled & profitable',
     range: '1800-2199',
   },
   DIAMOND: {
-    colors: 'bg-blue-500/20 text-black dark:text-blue-400 border-blue-500/30',
+    colors: 'bg-blue-500/20 text-blue-700 dark:text-blue-400 border-blue-500/30',
     icon: '💠',
     description: 'Elite players',
     range: '2200-2599',
   },
   MASTER: {
-    colors: 'bg-purple-500/20 text-black dark:text-purple-400 border-purple-500/30',
+    colors: 'bg-purple-500/20 text-purple-700 dark:text-purple-400 border-purple-500/30',
     icon: '👑',
     description: 'Top performers',
     range: '2600-2999',
   },
   GRANDMASTER: {
-    colors: 'bg-orange-500/20 text-black dark:text-orange-400 border-orange-500/30',
+    colors: 'bg-orange-500/20 text-orange-700 dark:text-orange-400 border-orange-500/30',
     icon: '⭐',
     description: 'Legendary status',
     range: '3000+',
-  },
-};
-
-const SIZE_CLASSES = {
-  sm: {
-    container: 'px-2 py-1 text-xs',
-    icon: 'text-sm',
-    text: 'font-medium',
-  },
-  md: {
-    container: 'px-3 py-1.5 text-sm',
-    icon: 'text-base',
-    text: 'font-semibold',
-  },
-  lg: {
-    container: 'px-4 py-2 text-base',
-    icon: 'text-lg',
-    text: 'font-bold',
   },
 };
 
@@ -77,22 +63,24 @@ export default function PongTierBadge({
   className = '',
 }: PongTierBadgeProps) {
   const tierConfig = TIER_CONFIG[tier as keyof typeof TIER_CONFIG] || TIER_CONFIG.SILVER;
-  const sizeConfig = SIZE_CLASSES[size];
+
+  const text = showElo && eloRating ? `${tier} (${eloRating})` : tier;
+  const description = `${tier} Tier (${tierConfig.range} Elo) - ${tierConfig.description}`;
+
+  // Determine animation based on tier rarity
+  const animation = tier === 'GRANDMASTER' ? 'shimmer' : tier === 'MASTER' ? 'pulse' : 'none';
 
   return (
-    <div
-      className={`
-        inline-flex items-center space-x-1.5 rounded-full border transition-all duration-200
-        ${tierConfig.colors}
-        ${sizeConfig.container}
-        ${className}
-      `}
-      title={`${tier} Tier (${tierConfig.range} Elo) - ${tierConfig.description}`}
-    >
-      <span className={sizeConfig.icon}>{tierConfig.icon}</span>
-      <span className={sizeConfig.text}>{tier}</span>
-      {showElo && eloRating && <span className="opacity-75">({eloRating})</span>}
-    </div>
+    <UnifiedBadge
+      type={BADGE_TYPES.TIER}
+      text={text}
+      icon={tierConfig.icon}
+      color={tierConfig.colors}
+      size={size}
+      description={description}
+      className={className}
+      animated={animation}
+    />
   );
 }
 
@@ -123,5 +111,3 @@ export const getTierProgress = (elo: number, tier: string): number => {
 
   return Math.min(100, ((elo - range.min) / (range.max - range.min)) * 100);
 };
-
-export { TIER_CONFIG };
