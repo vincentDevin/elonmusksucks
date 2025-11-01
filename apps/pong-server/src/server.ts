@@ -1819,7 +1819,8 @@ class GameManager {
         canSpectate:
           game.status === 'active' ||
           game.status === 'countdown' ||
-          game.status === 'waiting_for_ready',
+          game.status === 'waiting_for_ready' ||
+          game.status === 'lobby_negotiation',
       });
     }
 
@@ -2132,6 +2133,14 @@ export class PongGameServer {
     this.app.get('/health', (_req, res) => {
       res.json({ status: 'ok', timestamp: new Date().toISOString() });
     });
+
+    // Test endpoint to reset rate limiter (non-production only)
+    if (process.env.NODE_ENV !== 'production') {
+      this.app.post('/test/reset-rate-limiter', (_req, res) => {
+        this.rateLimiter.reset();
+        res.json({ status: 'ok', message: 'Rate limiter reset successfully' });
+      });
+    }
   }
 
   private setupSocketHandlers(): void {
@@ -2141,12 +2150,16 @@ export class PongGameServer {
       // Authentication
       socket.on('auth', async (data: unknown) => {
         // Rate limiting
-        if (!this.rateLimiter.checkLimit(socket.id, 'auth')) {
+        // In production: use IP address to prevent brute force across multiple connections
+        // In development/test: use socket ID to avoid localhost collision
+        const rateLimitKey =
+          process.env.NODE_ENV === 'production' ? socket.handshake.address || socket.id : socket.id;
+        if (!this.rateLimiter.checkLimit(rateLimitKey, 'auth')) {
           socket.emit('error', { code: 'RATE_LIMIT', message: 'Too many auth attempts' });
           securityLogger.log({
             type: 'rate_limit',
             socketId: socket.id,
-            details: { event: 'auth' },
+            details: { event: 'auth', rateLimitKey },
           });
           return;
         }
@@ -2237,6 +2250,12 @@ export class PongGameServer {
 
       // Join lobby
       socket.on('join_lobby', () => {
+        // Rate limiting
+        if (!this.rateLimiter.checkLimit(socket.id, 'join_lobby')) {
+          socket.emit('error', { code: 'RATE_LIMIT', message: 'Too many lobby join attempts' });
+          return;
+        }
+
         const player = this.auth.getPlayer(socket.id);
         if (!player) return;
 
@@ -2824,6 +2843,9 @@ export class PongGameServer {
 
         // Update wager negotiation
         if (game.wagerNegotiation) {
+          console.log(
+            `💰 ${player.name} (slot ${playerSlot}) proposing ${amount} MuskBucks for game ${gameId}. Previous acceptedBy: [${game.wagerNegotiation.acceptedBy}] → Clearing to []`,
+          );
           game.wagerNegotiation.currentOffer = amount;
           game.wagerNegotiation.proposedBy = playerSlot;
           game.wagerNegotiation.acceptedBy = []; // Reset acceptances
@@ -2943,14 +2965,19 @@ export class PongGameServer {
           }
 
           console.log(
-            `✅ ${player.name} accepted wager in game ${gameId}. Accepted by: ${game.wagerNegotiation.acceptedBy}`,
+            `✅ ${player.name} (slot ${playerSlot}) accepted wager in game ${gameId}. Accepted by: [${game.wagerNegotiation.acceptedBy}], current offer: ${game.wagerNegotiation.currentOffer}`,
           );
 
           // Check if BOTH players have accepted
           if (game.wagerNegotiation.acceptedBy.length === 2) {
+            console.log(`🔒 Both players accepted! Locking wager for game ${gameId}...`);
             // Lock wager and process transactions
             await this.lockWagerAndProceed(gameId, game);
           }
+        } else {
+          console.log(
+            `⚠️  ${player.name} (slot ${playerSlot}) tried to accept but already in acceptedBy: [${game.wagerNegotiation?.acceptedBy}]`,
+          );
         }
       });
 

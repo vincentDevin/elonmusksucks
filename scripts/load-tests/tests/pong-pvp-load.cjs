@@ -7,6 +7,8 @@ const {
   createMultipleConnections,
   createPVPMatch,
   joinMatch,
+  proposeWager,
+  acceptWager,
   setReady,
   simulatePlayerInput,
   waitForGameEnd,
@@ -20,6 +22,7 @@ const { saveResults } = require('../helpers/results.cjs');
  * Tests:
  * - Multiple concurrent PVP matches
  * - Match creation and joining
+ * - Wager negotiation (propose, accept, lock)
  * - Both players readying up
  * - Realistic player input from both sides
  * - Game completion and payout processing
@@ -197,7 +200,82 @@ async function runPVPLoadTest(options = {}) {
     console.log('⏳ Waiting for server to finalize all matches...');
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
-    // Step 4: Both players set ready for each match
+    // Step 4: Wager negotiation phase
+    console.log('💰 Starting wager negotiation for all matches...\n');
+
+    const wagerNegotiationResults = [];
+
+    for (const match of successfulMatches) {
+      try {
+        console.log(`  💰 Match ${match.matchIndex + 1}: Negotiating wager...`);
+
+        // Player 1 accepts the initial wager (100 MuskBucks)
+        const accept1Start = Date.now();
+        const accept1Result = await acceptWager(match.player1.socket, match.gameId);
+        const accept1Duration = Date.now() - accept1Start;
+        console.log(
+          `     ✅ ${match.player1.username} accepted (${accept1Duration}ms)`,
+        );
+
+        // Player 2 accepts the wager
+        const accept2Start = Date.now();
+        const accept2Result = await acceptWager(match.player2.socket, match.gameId);
+        const accept2Duration = Date.now() - accept2Start;
+        console.log(
+          `     ✅ ${match.player2.username} accepted (${accept2Duration}ms)`,
+        );
+
+        // Check if wager is locked
+        const isLocked = accept1Result.locked || accept2Result.locked;
+        console.log(
+          `     ${isLocked ? '🔒 Wager locked!' : '⚠️  Wager not locked yet'}`,
+        );
+
+        wagerNegotiationResults.push({
+          matchIndex: match.matchIndex,
+          success: true,
+          accept1Duration,
+          accept2Duration,
+          locked: isLocked,
+        });
+
+        console.log(`  ✅ Match ${match.matchIndex + 1} wager negotiation complete\n`);
+
+        // Small delay between matches to prevent server overload
+        await new Promise((resolve) => setTimeout(resolve, 300));
+      } catch (error) {
+        console.log(
+          `  ❌ Match ${match.matchIndex + 1} wager negotiation failed: ${error.message}\n`,
+        );
+        metrics.recordError(error);
+        wagerNegotiationResults.push({
+          matchIndex: match.matchIndex,
+          success: false,
+          error: error.message,
+        });
+      }
+    }
+
+    const successfulNegotiations = wagerNegotiationResults.filter((r) => r.success);
+    console.log(
+      `\n✅ ${successfulNegotiations.length}/${successfulMatches.length} wager negotiations completed\n`,
+    );
+
+    if (successfulNegotiations.length === 0) {
+      throw new Error('No wager negotiations completed successfully');
+    }
+
+    // Calculate negotiation metrics
+    const negotiationDurations = successfulNegotiations.flatMap((r) => [
+      r.accept1Duration,
+      r.accept2Duration,
+    ]);
+    const avgNegotiationLatency =
+      negotiationDurations.reduce((a, b) => a + b, 0) / negotiationDurations.length;
+
+    console.log(`📊 Avg wager negotiation latency: ${avgNegotiationLatency.toFixed(0)}ms\n`);
+
+    // Step 5: Both players set ready for each match
     console.log('⏳ Both players setting ready for all matches...\n');
 
     // Track countdown events
@@ -355,16 +433,20 @@ async function runPVPLoadTest(options = {}) {
       },
       summary: {
         matchesCreated: successfulMatches.length,
+        wagerNegotiationsCompleted: successfulNegotiations.length,
+        avgNegotiationLatency: avgNegotiationLatency.toFixed(0),
         matchesCompleted: completedGames,
         matchesFailed: failedGames,
         totalGameStateUpdates: totalGameStates,
         disconnections: disconnections.length,
         testDuration: Date.now() - startTime,
       },
+      wagerNegotiationResults,
       gameResults,
       metrics: report,
       success:
         completedGames >= successfulMatches.length * 0.8 && // At least 80% completion
+        successfulNegotiations.length >= successfulMatches.length * 0.95 && // At least 95% negotiation success
         disconnections.length === 0, // No unexpected disconnects
     };
 
@@ -375,11 +457,18 @@ async function runPVPLoadTest(options = {}) {
 
     if (results.success) {
       console.log('  ✅ EXCELLENT: PVP matches handled successfully!');
+      console.log(`     ${successfulNegotiations.length}/${successfulMatches.length} wager negotiations completed`);
+      console.log(`     Avg negotiation latency: ${avgNegotiationLatency.toFixed(0)}ms`);
       console.log(`     ${completedGames}/${successfulMatches.length} matches completed`);
       console.log(`     No unexpected disconnections`);
       console.log(`     ${totalGameStates} total game state updates delivered`);
     } else {
       console.log('  ⚠️  ISSUES DETECTED:');
+      if (successfulNegotiations.length < successfulMatches.length * 0.95) {
+        console.log(
+          `     - Low negotiation success rate: ${successfulNegotiations.length}/${successfulMatches.length}`,
+        );
+      }
       if (completedGames < successfulMatches.length * 0.8) {
         console.log(`     - Low completion rate: ${completedGames}/${successfulMatches.length}`);
       }

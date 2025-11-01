@@ -7,6 +7,7 @@ import { PongGamesList } from './PongGamesList';
 import { PongHeader } from './PongHeader';
 import { PongMatchCreatorModal } from './PongMatchCreatorModal';
 import PongLobbyScreen from './PongLobbyScreen';
+import GameRoomChat from './GameRoomChat';
 import { PONG_PHYSICS, REDIS_CHANNELS } from '@ems/types';
 import { PongClientPhysics } from '../../utils/pongClientPhysics';
 import { useAuth } from '../../contexts/AuthContext';
@@ -405,6 +406,14 @@ export function PongGame() {
                 </div>
               </div>
             )}
+
+            {/* Game Chat */}
+            <GameRoomChat
+              messages={spectatorGameState.chatMessages || []}
+              onSendMessage={(message) => sendChatMessage(spectatorGameState.gameId, message)}
+              gameId={spectatorGameState.gameId}
+              className="max-w-4xl mx-auto"
+            />
           </div>
         ) : spectatingGameId && !spectatorGameState ? (
           <div className="flex items-center justify-center py-12">
@@ -484,6 +493,14 @@ export function PongGame() {
                 </div>
               </div>
             )}
+
+            {/* Game Chat */}
+            <GameRoomChat
+              messages={currentGame.chatMessages || []}
+              onSendMessage={(message) => sendChatMessage(currentGame.gameId, message)}
+              gameId={currentGame.gameId}
+              className="max-w-4xl mx-auto"
+            />
           </div>
         ) : (
           /* Lobby */

@@ -177,6 +177,15 @@ export class SocketRateLimiter {
       console.log(`[RATE_LIMIT] Cleaned up ${keysToDelete.length} old entries`);
     }
   }
+
+  /**
+   * Reset all rate limit data (useful for testing)
+   */
+  reset(): void {
+    this.requests.clear();
+    this.violations.clear();
+    console.log('[RATE_LIMIT] All rate limit data has been reset');
+  }
 }
 
 /**
