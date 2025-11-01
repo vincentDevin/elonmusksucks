@@ -359,9 +359,9 @@ export class PongStatsService {
       loserStatsData,
     );
 
-    // 9.1. Process streak tracking and special achievements for human players
+    // 9.1. Process streak tracking and special achievements for all players (including AI)
     try {
-      if (winnerId && winnerId > 0) {
+      if (winnerId) {
         // Update pong win streak
         await streakManager.updateStreak(winnerId, 'pong_win', true, {
           matchId,
@@ -395,7 +395,7 @@ export class PongStatsService {
         });
       }
 
-      if (loserId && loserId > 0) {
+      if (loserId) {
         // Update pong loss streak (break win streak)
         await streakManager.updateStreak(loserId, 'pong_win', false, {
           matchId,
@@ -524,8 +524,8 @@ export class PongStatsService {
       }
     }
 
-    // 13. Emit achievement events for winner
-    if (winnerId && winnerId > 0) {
+    // 13. Emit achievement events for winner (including AI winners)
+    if (winnerId) {
       try {
         // Determine comeback and defensive win flags
         const comeback = loserScore && winnerScore && loserScore >= 4 && winnerScore === 5;
@@ -557,34 +557,41 @@ export class PongStatsService {
         };
 
         await eventBus.publish('pong:match:completed', achievementPayload);
-        console.log(`[PongStats] Achievement event emitted for winner ${winnerId}`);
+        console.log(
+          `[PongStats] Achievement event emitted for winner ${winnerId} (${winnerId < 0 ? 'AI' : 'human'})`,
+        );
 
-        // Check if this is an IMPOSSIBLE AI victory for activity feed
-        const aiDifficulty = isAIMatch
-          ? PongStatsService.getAIDifficultyFromId(loserId)
-          : undefined;
-        if (isAIMatch && aiDifficulty === 'IMPOSSIBLE') {
-          try {
-            const userService = new UserService();
-            const user = await userService.getPublicSocketUser(winnerId);
-            if (user) {
-              await unifiedActivityService.createPongImpossibleVictoryActivity(
-                {
-                  id: user.id,
-                  name: user.name,
-                  avatarUrl: user.avatarUrl || undefined,
-                },
-                {
-                  matchId,
-                  score: `${winnerScore || 5}-${loserScore || 0}`,
-                  wagerAmount,
-                  eloGained: calculations?.winnerEloChange?.totalChange,
-                },
+        // Check if this is an IMPOSSIBLE AI victory for activity feed (human winners only)
+        if (winnerId > 0) {
+          const aiDifficulty = isAIMatch
+            ? PongStatsService.getAIDifficultyFromId(loserId)
+            : undefined;
+          if (isAIMatch && aiDifficulty === 'IMPOSSIBLE') {
+            try {
+              const userService = new UserService();
+              const user = await userService.getPublicSocketUser(winnerId);
+              if (user) {
+                await unifiedActivityService.createPongImpossibleVictoryActivity(
+                  {
+                    id: user.id,
+                    name: user.name,
+                    avatarUrl: user.avatarUrl || undefined,
+                  },
+                  {
+                    matchId,
+                    score: `${winnerScore || 5}-${loserScore || 0}`,
+                    wagerAmount,
+                    eloGained: calculations?.winnerEloChange?.totalChange,
+                  },
+                );
+                console.log('[pongStats] ✅ IMPOSSIBLE AI victory activity created');
+              }
+            } catch (activityError) {
+              console.error(
+                '[pongStats] Error creating IMPOSSIBLE victory activity:',
+                activityError,
               );
-              console.log('[pongStats] ✅ IMPOSSIBLE AI victory activity created');
             }
-          } catch (activityError) {
-            console.error('[pongStats] Error creating IMPOSSIBLE victory activity:', activityError);
           }
         }
       } catch (error) {
@@ -592,8 +599,8 @@ export class PongStatsService {
       }
     }
 
-    // 14. Emit achievement events for loser (for loss tracking/shame achievements)
-    if (loserId && loserId > 0) {
+    // 14. Emit achievement events for loser (for loss tracking/shame achievements, including AI losers)
+    if (loserId) {
       try {
         // Detect ragequit: AI winner, short duration, low human score
         const ragequit =
@@ -630,14 +637,16 @@ export class PongStatsService {
         };
 
         await eventBus.publish('pong:match:lost', loserPayload);
-        console.log(`[PongStats] Achievement event emitted for loser ${loserId}`);
+        console.log(
+          `[PongStats] Achievement event emitted for loser ${loserId} (${loserId < 0 ? 'AI' : 'human'})`,
+        );
       } catch (error) {
         console.error(`[PongStats] Failed to emit achievement event for loser:`, error);
       }
     }
 
-    // 15. Emit ELO milestone events for winner
-    if (winnerId && winnerId > 0 && calculations?.winnerEloChange?.newRating) {
+    // 15. Emit ELO milestone events for winner (including AI winners)
+    if (winnerId && calculations?.winnerEloChange?.newRating) {
       try {
         const newElo = calculations.winnerEloChange.newRating;
         const oldElo = winnerStats?.eloRating || PongEloService.getDefaultElo();
@@ -661,7 +670,9 @@ export class PongStatsService {
             };
 
             await eventBus.publish('pong:elo:milestone', milestonePayload);
-            console.log(`[PongStats] ELO milestone ${milestone} achieved by user ${winnerId}`);
+            console.log(
+              `[PongStats] ELO milestone ${milestone} achieved by user ${winnerId} (${winnerId < 0 ? 'AI' : 'human'})`,
+            );
           }
         }
       } catch (error) {
@@ -813,21 +824,20 @@ export class PongStatsService {
       economyComponent: winnerEloChange.economyComponent,
     };
 
-    // Prepare socket events data - only for human players
+    // Prepare socket events data - for all players (including AI)
     const socketEvents = {
-      winnerElo:
-        winnerId && winnerId > 0 // Only emit for human winners
-          ? {
-              userId: winnerId,
-              oldElo: winnerElo,
-              newElo: winnerEloChange.newRating,
-              change: winnerEloChange.totalChange,
-              newTier: winnerEloChange.newTier,
-              matchId,
-            }
-          : undefined,
+      winnerElo: winnerId
+        ? {
+            userId: winnerId,
+            oldElo: winnerElo,
+            newElo: winnerEloChange.newRating,
+            change: winnerEloChange.totalChange,
+            newTier: winnerEloChange.newTier,
+            matchId,
+          }
+        : undefined,
       loserElo:
-        loserEloChange && loserId && loserId > 0 // Only emit for human losers
+        loserEloChange && loserId
           ? {
               userId: loserId,
               oldElo: loserElo,
@@ -839,7 +849,6 @@ export class PongStatsService {
           : undefined,
       winnerTierChange:
         winnerId &&
-        winnerId > 0 && // Only for human winners
         (winnerStats?.tier || PongEloService.getDefaultTier()) !== winnerEloChange.newTier
           ? {
               userId: winnerId,
@@ -851,7 +860,6 @@ export class PongStatsService {
       loserTierChange:
         loserEloChange &&
         loserId &&
-        loserId > 0 && // Only for human losers
         (loserStats?.tier || PongEloService.getDefaultTier()) !== loserEloChange.newTier
           ? {
               userId: loserId,

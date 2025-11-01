@@ -844,6 +844,9 @@ export function usePongSocket(): PongSocketHook {
   // Store latest input for client-side prediction
   const lastInputRef = useRef<{ up: boolean; down: boolean }>({ up: false, down: false });
 
+  // Track initial drag state for 1:1 mouse movement
+  const dragStateRef = useRef<{ initialPaddleY: number; initialDragDelta: number } | null>(null);
+
   const sendInput = useCallback(
     (input: Omit<PlayerInput, 'paddleY' | 'seq' | 'timestamp'>) => {
       if (!socket || !isAuthenticated || !currentGame) {
@@ -867,16 +870,53 @@ export function usePongSocket(): PongSocketHook {
         const userPlayer = currentGame.players[userPlayerSlot];
 
         if (userPlayer) {
-          const moveSpeed = PONG_PHYSICS.PADDLE_SPEED / PONG_PHYSICS.TICK_RATE;
           newPaddleY = userPlayer.paddleY;
 
-          if (input.up && !input.down) {
-            newPaddleY = Math.max(0, newPaddleY - moveSpeed);
-          } else if (input.down && !input.up) {
-            newPaddleY = Math.min(
-              PONG_PHYSICS.FIELD_HEIGHT - PONG_PHYSICS.PADDLE_HEIGHT,
-              newPaddleY + moveSpeed,
-            );
+          // Check if using mouse drag (1:1 movement)
+          if (input.mouseDragDelta !== undefined) {
+            // Get canvas for coordinate mapping
+            const canvas = document.querySelector('canvas');
+            if (canvas) {
+              const rect = canvas.getBoundingClientRect();
+
+              // Initialize drag state on first drag input
+              if (dragStateRef.current === null) {
+                dragStateRef.current = {
+                  initialPaddleY: userPlayer.paddleY,
+                  initialDragDelta: input.mouseDragDelta,
+                };
+              }
+
+              // Convert screen-space delta to game-space delta
+              const screenDeltaFromStart =
+                input.mouseDragDelta - dragStateRef.current.initialDragDelta;
+              const scaleY = PONG_PHYSICS.FIELD_HEIGHT / rect.height;
+              const gameDelta = screenDeltaFromStart * scaleY;
+
+              // Apply delta to initial paddle position for 1:1 tracking
+              newPaddleY = Math.max(
+                0,
+                Math.min(
+                  PONG_PHYSICS.FIELD_HEIGHT - PONG_PHYSICS.PADDLE_HEIGHT,
+                  dragStateRef.current.initialPaddleY + gameDelta,
+                ),
+              );
+            }
+          } else {
+            // Reset drag state when not dragging
+            dragStateRef.current = null;
+
+            // Fallback to keyboard-style up/down movement
+            const moveSpeed = PONG_PHYSICS.PADDLE_SPEED / PONG_PHYSICS.TICK_RATE;
+
+            if (input.up && !input.down) {
+              newPaddleY = Math.max(0, newPaddleY - moveSpeed);
+            } else if (input.down && !input.up) {
+              newPaddleY = Math.min(
+                PONG_PHYSICS.FIELD_HEIGHT - PONG_PHYSICS.PADDLE_HEIGHT,
+                newPaddleY + moveSpeed,
+              );
+            }
           }
 
           // Update local state immediately

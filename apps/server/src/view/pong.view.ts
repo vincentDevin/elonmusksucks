@@ -13,40 +13,58 @@ export const toUserPongStatsView = (stats: {
   userId: number;
   user?: { name: string };
   eloRating: number;
+  peakElo: number;
   tier: string;
-  gamesPlayed: number;
+  totalMatches: number;
   wins: number;
   losses: number;
   winRate: number;
   winStreak: number;
-  bestStreak: number;
+  bestWinStreak: number;
   perfectGames: number;
   comebacks: number;
   totalWagered: bigint;
   totalWon: bigint;
+  totalLost: bigint;
   profit: bigint;
   biggestWin: bigint;
-  averagePing: number;
+  biggestLoss: bigint;
+  avgPing: number;
+  avgGameDuration: number;
+  roi: number;
+  aiWins: number;
+  aiLosses: number;
+  hardestAiBeaten?: string;
+  riskTaker: boolean;
   createdAt: Date;
   updatedAt: Date;
 }): UserPongStatsView => ({
   userId: stats.userId,
   userName: stats.user?.name || 'Unknown Player',
   eloRating: stats.eloRating,
+  peakElo: stats.peakElo,
   tier: stats.tier,
-  gamesPlayed: stats.gamesPlayed,
+  totalMatches: stats.totalMatches,
   wins: stats.wins,
   losses: stats.losses,
   winRate: stats.winRate,
   winStreak: stats.winStreak,
-  bestStreak: stats.bestStreak,
+  bestWinStreak: stats.bestWinStreak,
   perfectGames: stats.perfectGames,
   comebacks: stats.comebacks,
   totalWagered: stats.totalWagered.toString(),
   totalWon: stats.totalWon.toString(),
+  totalLost: stats.totalLost.toString(),
   profit: stats.profit.toString(),
   biggestWin: stats.biggestWin.toString(),
-  averagePing: stats.averagePing,
+  biggestLoss: stats.biggestLoss.toString(),
+  avgPing: stats.avgPing,
+  avgGameDuration: stats.avgGameDuration,
+  roi: stats.roi,
+  aiWins: stats.aiWins,
+  aiLosses: stats.aiLosses,
+  hardestAiBeaten: stats.hardestAiBeaten,
+  riskTaker: stats.riskTaker,
   createdAt: stats.createdAt.toISOString(),
   updatedAt: stats.updatedAt.toISOString(),
 });

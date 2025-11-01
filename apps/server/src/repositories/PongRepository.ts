@@ -17,6 +17,13 @@ export class PongRepository implements IPongRepository {
   async findStatsByUserId(userId: number): Promise<PongStatsData | null> {
     const stats = await prisma.pongStats.findUnique({
       where: { userId },
+      include: {
+        user: {
+          select: {
+            name: true,
+          },
+        },
+      },
     });
     return stats ? this.mapPongStats(stats) : null;
   }

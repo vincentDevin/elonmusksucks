@@ -1349,9 +1349,10 @@ class GameManager {
     const gameCompleted = reason === 'completed';
 
     // Game "started" if both players were present and ready
-    // This includes: waiting_for_ready, countdown, active, paused
+    // This includes: lobby_negotiation (both joined), waiting_for_ready, countdown, active, paused
     // Excludes: waiting_for_opponent (only 1 player)
     const gameHadBothPlayers =
+      previousStatus === 'lobby_negotiation' ||
       previousStatus === 'waiting_for_ready' ||
       previousStatus === 'countdown' ||
       previousStatus === 'active' ||
@@ -1570,36 +1571,48 @@ class GameManager {
       (game.status === 'waiting_for_opponent' || game.status === 'lobby_negotiation') &&
       !game.isAI
     ) {
-      const playerSlot = game.players[0]?.id === playerId ? 0 : 1;
-      console.log(
-        `🔌 Player ${playerId} disconnected during ${game.status} - notifying other player`,
-      );
+      // Check if this is an empty lobby (only creator, no opponent yet)
+      const hasOpponent = game.players[0] && game.players[1];
 
-      // Notify other player (if present)
-      this.io.to(`game:${gameId}`).emit('player_disconnected', {
-        playerId,
-        playerSlot,
-        message: 'Opponent disconnected - waiting for reconnection...',
-      });
-
-      // Add system chat message
-      const player = game.players[playerSlot];
-      if (player) {
-        const disconnectMsg = this.chat?.addMessage(
-          gameId,
-          0,
-          'System',
-          `${player.name} disconnected`,
-          'spectator',
-          true,
+      if (!hasOpponent && game.status === 'waiting_for_opponent') {
+        // Empty lobby - clean it up immediately
+        console.log(
+          `🗑️ Cleaning up empty lobby ${gameId} - creator disconnected before opponent joined`,
         );
-        if (disconnectMsg) {
-          this.io.to(`game:${gameId}`).emit('game_chat_message', disconnectMsg);
-        }
-      }
+        // Fall through to immediate forfeit logic below
+      } else {
+        // Lobby has both players - keep it open for reconnection
+        const playerSlot = game.players[0]?.id === playerId ? 0 : 1;
+        console.log(
+          `🔌 Player ${playerId} disconnected during ${game.status} - notifying other player`,
+        );
 
-      // DON'T set a timer - lobby stays open until other player leaves or timeout
-      return;
+        // Notify other player (if present)
+        this.io.to(`game:${gameId}`).emit('player_disconnected', {
+          playerId,
+          playerSlot,
+          message: 'Opponent disconnected - waiting for reconnection...',
+        });
+
+        // Add system chat message
+        const player = game.players[playerSlot];
+        if (player) {
+          const disconnectMsg = this.chat?.addMessage(
+            gameId,
+            0,
+            'System',
+            `${player.name} disconnected`,
+            'spectator',
+            true,
+          );
+          if (disconnectMsg) {
+            this.io.to(`game:${gameId}`).emit('game_chat_message', disconnectMsg);
+          }
+        }
+
+        // DON'T set a timer - lobby stays open until other player leaves or timeout
+        return;
+      }
     }
 
     // ✅ RECONNECTION GRACE PERIOD: Don't immediately forfeit active games
@@ -1682,7 +1695,14 @@ class GameManager {
       console.log(`🏓 Both players ready in game ${gameId}, starting countdown`);
 
       // Process wager transaction now that both players are committed
-      if (game.wager > 0 && !game.isAI && game.players[0] && game.players[1]) {
+      // Guard: Only charge if not already charged (prevents duplicate charges)
+      if (
+        game.wager > 0 &&
+        !game.isAI &&
+        game.players[0] &&
+        game.players[1] &&
+        !game.wagerChargedAt
+      ) {
         const transaction = await this.db.processWagerTransaction(
           game.players[0].id,
           game.players[1].id,
@@ -1703,6 +1723,10 @@ class GameManager {
           this.endGame(game, 'wager_failed');
           return;
         }
+
+        // Mark wager as charged to prevent duplicate charges
+        game.wagerChargedAt = Date.now();
+
         console.log(
           `💸 Both players committed - wagers processed: ${game.wager} MB deducted from each`,
         );
@@ -2152,21 +2176,6 @@ export class PongGameServer {
 
       // Authentication
       socket.on('auth', async (data: unknown) => {
-        // Rate limiting
-        // In production: use IP address to prevent brute force across multiple connections
-        // In development/test: use socket ID to avoid localhost collision
-        const rateLimitKey =
-          process.env.NODE_ENV === 'production' ? socket.handshake.address || socket.id : socket.id;
-        if (!this.rateLimiter.checkLimit(rateLimitKey, 'auth')) {
-          socket.emit('error', { code: 'RATE_LIMIT', message: 'Too many auth attempts' });
-          securityLogger.log({
-            type: 'rate_limit',
-            socketId: socket.id,
-            details: { event: 'auth', rateLimitKey },
-          });
-          return;
-        }
-
         // Payload validation
         if (!validatePayload(data, 'auth')) {
           socket.emit('error', { code: 'INVALID_PAYLOAD', message: 'Invalid auth payload' });
@@ -2192,6 +2201,14 @@ export class PongGameServer {
         const player = await this.auth.authenticateSocket(socket.id, data.token);
         if (player) {
           console.log(`✅ Player ${player.name} (${player.id}) authenticated`);
+
+          // ✅ CRITICAL: Send auth_result FIRST before any other events
+          // Client needs player data in authenticatedPlayerRef before handling match_joined
+          socket.emit('auth_result', { success: true, player });
+
+          // Auto-join lobby room for PvP lobby updates
+          socket.join('lobby');
+          console.log(`🏓 Player ${player.name} auto-joined lobby room`);
 
           // ✅ RECONNECTION HANDLING: Check if player is reconnecting
           const wasReconnecting = this.game.handlePlayerReconnection(player.id);
@@ -2225,12 +2242,6 @@ export class PongGameServer {
               }
             }
           }
-
-          // Auto-join lobby room for PvP lobby updates
-          socket.join('lobby');
-          console.log(`🏓 Player ${player.name} auto-joined lobby room`);
-
-          socket.emit('auth_result', { success: true, player });
 
           // Track connected player in statistics (with socket ID to support multiple sockets per player)
           this.stats.addConnectedPlayer(player.id, socket.id);
@@ -2445,12 +2456,6 @@ export class PongGameServer {
 
       // Join match
       socket.on('join_match', async (data: unknown) => {
-        // Rate limiting
-        if (!this.rateLimiter.checkLimit(socket.id, 'join_match')) {
-          socket.emit('error', { code: 'RATE_LIMIT', message: 'Too many join attempts' });
-          return;
-        }
-
         // Payload validation
         if (!validatePayload(data, 'join_match')) {
           socket.emit('error', { code: 'INVALID_PAYLOAD', message: 'Invalid join_match payload' });
@@ -2576,10 +2581,18 @@ export class PongGameServer {
           chatMessages: this.chat.getMessages(existingGameId),
         });
 
-        // Start 2-minute negotiation timeout
-        setTimeout(() => {
-          this.handleNegotiationTimeout(existingGameId);
-        }, 120000); // 2 minutes
+        // Auto-accept wager for free play matches (wager 0)
+        // Skip negotiation phase entirely for better UX
+        if (lobby.wager === 0 && game.wagerNegotiation) {
+          console.log(`🎮 Free play match - auto-accepting wager for ${existingGameId}`);
+          game.wagerNegotiation.acceptedBy = [0, 1]; // Both players auto-accept
+          await this.lockWagerAndProceed(existingGameId, game);
+        } else {
+          // Start 2-minute negotiation timeout for wagered matches only
+          setTimeout(() => {
+            this.handleNegotiationTimeout(existingGameId);
+          }, 120000); // 2 minutes
+        }
 
         // Remove lobby from available list (mark as full)
         this.lobby.deleteLobby(data.matchId);
@@ -3073,8 +3086,8 @@ export class PongGameServer {
           socket.leave(`game:${spectatorGameId}`);
           this.game.removeSpectator(socket.id);
         } else {
-          // Regular player leaving
-          this.game.forfeitGame(player.id);
+          // Regular player leaving - force immediate cleanup
+          this.game.forfeitGame(player.id, true);
         }
 
         this.lobby.leaveLobby(player.id);
@@ -3264,47 +3277,14 @@ export class PongGameServer {
       return;
     }
 
-    // Process wager transaction
-    const transaction = await this.db.processWagerTransaction(
-      game.players[0].id,
-      game.players[1].id,
-      wager,
-    );
-
-    if (!transaction.success) {
-      console.error(`💸 Wager transaction failed for game ${gameId}: ${transaction.error}`);
-
-      this.io.to(`game:${gameId}`).emit('match_cancelled', {
-        reason: transaction.error || 'Wager transaction failed',
-      });
-
-      // Add system message
-      const errorMsg = this.chat.addMessage(
-        gameId,
-        0,
-        'System',
-        `Match cancelled - ${transaction.error}`,
-        'spectator',
-        true,
-      );
-      if (errorMsg) {
-        this.io.to(`game:${gameId}`).emit('game_chat_message', errorMsg);
-      }
-
-      // Clean up game
-      setTimeout(() => {
-        this.game.removeGame(gameId);
-        this.chat.clearGameChat(gameId);
-      }, 3000);
-
-      return;
-    }
-
     // Success - lock wager and proceed to waiting_for_ready
+    // NOTE: Balance is validated above, but NOT charged yet.
+    // Charging will happen when both players ready up (in handleReady).
+    // This prevents charging users who accept wager but don't ready up.
     if (game.wagerNegotiation) {
       game.wagerNegotiation.lockedIn = true;
     }
-    game.wagerChargedAt = Date.now();
+    game.wagerChargedAt = null; // Not charged yet - will be set when both ready
     game.status = 'waiting_for_ready';
     game.wager = wager; // Update final wager
 

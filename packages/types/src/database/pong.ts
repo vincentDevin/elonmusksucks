@@ -110,6 +110,7 @@ export interface PlayerInput {
   paddleY: number; // Client's authoritative paddle position
   seq: number; // Sequence number for input ordering
   timestamp: number;
+  mouseDragDelta?: number; // Optional: mouse drag delta for 1:1 paddle control
 }
 
 // ============================================================================

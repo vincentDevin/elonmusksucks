@@ -917,6 +917,7 @@ model PongMatch {
   activities UserActivity[]
 
   @@index([status, createdAt(sort: Desc)])
+  @@index([status, completedAt(sort: Desc)]) // For match history queries
   @@index([playerOneId, status])
   @@index([playerTwoId, status])
   @@index([winnerId, completedAt(sort: Desc)])
