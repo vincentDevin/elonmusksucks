@@ -1,6 +1,6 @@
 /**
  * Badge Type System
- * Defines types and configurations for unified badge components
+ * Comprehensive badge system with rarity tiers, animations, and advanced color schemes
  */
 
 export const BADGE_TYPES = {
@@ -17,60 +17,60 @@ export type BadgeType = (typeof BADGE_TYPES)[keyof typeof BADGE_TYPES];
 
 export type BadgeSize = 'sm' | 'md' | 'lg';
 
-export interface BadgeConfig {
-  color: string;
-  icon?: string;
-  description?: string;
+/**
+ * Badge Rarity System
+ * Determines visual complexity and animation intensity
+ */
+export const BADGE_RARITIES = {
+  COMMON: 'common',
+  UNCOMMON: 'uncommon',
+  RARE: 'rare',
+  EPIC: 'epic',
+  LEGENDARY: 'legendary',
+} as const;
+
+export type BadgeRarity = (typeof BADGE_RARITIES)[keyof typeof BADGE_RARITIES];
+
+/**
+ * Animation Types
+ * Each animation can be applied to specific badge layers
+ */
+export const BADGE_ANIMATIONS = {
+  NONE: 'none',
+  BORDER_GLOW: 'border-glow',
+  FLOAT: 'float',
+  LIGHT_SWEEP: 'light-sweep',
+} as const;
+
+export type BadgeAnimation = (typeof BADGE_ANIMATIONS)[keyof typeof BADGE_ANIMATIONS];
+
+export interface BadgeColorOverrides {
+  background?: string;
+  gradient?: string;
+  border?: string;
+  text?: string;
+  glow?: string;
+  shadow?: string;
+  lightSweep?: string;
 }
 
+/**
+ * Badge Data Interface
+ * Simplified interface for badge rendering - colors and animations are now handled by theme system
+ */
 export interface BadgeData {
   type: BadgeType;
   text: string;
   icon?: string;
-  color?: string;
   description?: string;
   size?: BadgeSize;
+  rarity?: BadgeRarity;
   // Tier-specific data (for TIER type)
   tier?: string;
   elo?: number;
+  customColors?: BadgeColorOverrides;
+  variant?: 'solid' | 'glass';
 }
-
-/**
- * Common badge configurations with PongTierBadge-inspired styling
- * Using theme-aware colors with semi-transparent backgrounds and high-contrast text
- */
-export const COMMON_BADGE_CONFIGS: Record<string, BadgeConfig> = {
-  [BADGE_TYPES.BOT]: {
-    color: 'bg-blue-500/20 text-blue-700 dark:text-blue-400 border-blue-500/30',
-    icon: '🤖',
-    description: 'AI Player',
-  },
-  [BADGE_TYPES.STREAK]: {
-    color: 'bg-orange-500/20 text-orange-700 dark:text-orange-400 border-orange-500/30',
-    icon: '🔥',
-    description: 'Current Win Streak',
-  },
-  [BADGE_TYPES.HIGH_ROLLER]: {
-    color: 'bg-red-500/20 text-red-700 dark:text-red-400 border-red-500/30',
-    icon: '🎲',
-    description: 'High Stakes Player',
-  },
-  [BADGE_TYPES.BAN_PERMANENT]: {
-    color: 'bg-red-600/20 text-red-800 dark:text-red-400 border-red-600/30',
-    icon: '🚫',
-    description: 'Permanently Banned',
-  },
-  [BADGE_TYPES.BAN_TEMPORARY]: {
-    color: 'bg-orange-600/20 text-orange-800 dark:text-orange-400 border-orange-600/30',
-    icon: '⏰',
-    description: 'Temporarily Banned',
-  },
-  [BADGE_TYPES.BAN_COUNT]: {
-    color: 'bg-gray-500/20 text-gray-700 dark:text-gray-400 border-gray-500/30',
-    icon: '📊',
-    description: 'Total Bans',
-  },
-};
 
 /**
  * Default size configuration per badge type

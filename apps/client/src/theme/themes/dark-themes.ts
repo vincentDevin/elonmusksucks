@@ -117,6 +117,7 @@ export const darkThemes: UnifiedTheme[] = [
         shame: { icon: '😱', color: 'red-400' },
       },
     },
+    // Badges will use category-based defaults (dark theme)
   },
 
   {

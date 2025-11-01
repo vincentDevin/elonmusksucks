@@ -1,6 +1,6 @@
 import { UnifiedBadge } from '../common/UnifiedBadge';
-import { BADGE_TYPES } from '../../types/badges';
-import type { BadgeSize } from '../../types/badges';
+import { BADGE_TYPES, BADGE_RARITIES, type BadgeSize, type BadgeRarity } from '../../types/badges';
+import { getTierTokens } from '../../theme/tokens/badge';
 
 interface PongTierBadgeProps {
   tier: string;
@@ -10,48 +10,55 @@ interface PongTierBadgeProps {
   className?: string;
 }
 
-export const TIER_CONFIG = {
+interface TierConfig {
+  icon: string;
+  description: string;
+  range: string;
+  rarity: BadgeRarity;
+}
+
+export const TIER_CONFIG: Record<string, TierConfig> = {
   BRONZE: {
-    colors: 'bg-amber-900/20 text-amber-800 dark:text-amber-500 border-amber-600/30',
     icon: '🥉',
     description: 'Beginners',
     range: '400-999',
+    rarity: BADGE_RARITIES.COMMON,
   },
   SILVER: {
-    colors: 'bg-slate-500/20 text-slate-700 dark:text-slate-300 border-slate-400/30',
     icon: '🥈',
     description: 'Casual players',
     range: '1000-1399',
+    rarity: BADGE_RARITIES.COMMON,
   },
   GOLD: {
-    colors: 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 border-yellow-500/30',
     icon: '🥇',
     description: 'Regular players',
     range: '1400-1799',
+    rarity: BADGE_RARITIES.UNCOMMON,
   },
   PLATINUM: {
-    colors: 'bg-cyan-500/20 text-cyan-700 dark:text-cyan-400 border-cyan-500/30',
     icon: '💎',
     description: 'Skilled & profitable',
     range: '1800-2199',
+    rarity: BADGE_RARITIES.RARE,
   },
   DIAMOND: {
-    colors: 'bg-blue-500/20 text-blue-700 dark:text-blue-400 border-blue-500/30',
     icon: '💠',
     description: 'Elite players',
     range: '2200-2599',
+    rarity: BADGE_RARITIES.EPIC,
   },
   MASTER: {
-    colors: 'bg-purple-500/20 text-purple-700 dark:text-purple-400 border-purple-500/30',
     icon: '👑',
     description: 'Top performers',
     range: '2600-2999',
+    rarity: BADGE_RARITIES.EPIC,
   },
   GRANDMASTER: {
-    colors: 'bg-orange-500/20 text-orange-700 dark:text-orange-400 border-orange-500/30',
     icon: '⭐',
     description: 'Legendary status',
     range: '3000+',
+    rarity: BADGE_RARITIES.LEGENDARY,
   },
 };
 
@@ -63,23 +70,32 @@ export default function PongTierBadge({
   className = '',
 }: PongTierBadgeProps) {
   const tierConfig = TIER_CONFIG[tier as keyof typeof TIER_CONFIG] || TIER_CONFIG.SILVER;
+  const tokens = getTierTokens(tier);
 
   const text = showElo && eloRating ? `${tier} (${eloRating})` : tier;
   const description = `${tier} Tier (${tierConfig.range} Elo) - ${tierConfig.description}`;
 
-  // Determine animation based on tier rarity
-  const animation = tier === 'GRANDMASTER' ? 'shimmer' : tier === 'MASTER' ? 'pulse' : 'none';
+  const customColors = {
+    background: tokens.background,
+    ...(tokens.gradient ? { gradient: tokens.gradient } : {}),
+    border: tokens.border,
+    text: tokens.text,
+    glow: tokens.glow,
+    shadow: tokens.shadow,
+    lightSweep: tokens.lightSweep,
+  };
 
   return (
     <UnifiedBadge
       type={BADGE_TYPES.TIER}
       text={text}
       icon={tierConfig.icon}
-      color={tierConfig.colors}
+      rarity={tierConfig.rarity}
       size={size}
       description={description}
-      className={className}
-      animated={animation}
+      className={`uppercase tracking-[0.12em] leading-tight whitespace-nowrap ${className}`}
+      customColors={customColors}
+      variant="glass"
     />
   );
 }

@@ -3,8 +3,9 @@ import { formatMuskBucks } from '../../utils/formatting';
 import type { PublicLeaderboardEntry, PongLeaderboardView } from '@ems/types';
 import type { ShameWallEntry } from '../../api/shameWall';
 import type { UnifiedLeaderboardEntry, LeaderboardHeaderStats } from './types';
-import { BADGE_TYPES } from '../../types/badges';
+import { BADGE_TYPES, BADGE_RARITIES } from '../../types/badges';
 import type { BadgeData } from '../../types/badges';
+import { getBadgeTypeTokens } from '../../theme/tokens/badge';
 
 // Helper to convert string/number to number
 const asNum = (v: string | number | bigint | undefined | null) => Number(v ?? 0);
@@ -69,6 +70,7 @@ export function transformBettingEntry(
         badges.push({
           type: BADGE_TYPES.BOT,
           text: 'BOT',
+          rarity: BADGE_RARITIES.COMMON,
         });
       }
 
@@ -77,6 +79,7 @@ export function transformBettingEntry(
         badges.push({
           type: BADGE_TYPES.STREAK,
           text: `${entry.currentStreak} streak`,
+          rarity: BADGE_RARITIES.UNCOMMON,
         });
       }
 
@@ -153,6 +156,7 @@ export function transformPongEntry(
     badges.push({
       type: BADGE_TYPES.BOT,
       text: 'BOT',
+      rarity: BADGE_RARITIES.COMMON,
     });
   }
 
@@ -171,6 +175,9 @@ export function transformPongEntry(
     badges.push({
       type: BADGE_TYPES.HIGH_ROLLER,
       text: 'High Roller',
+      rarity: BADGE_RARITIES.RARE,
+      customColors: getBadgeTypeTokens(BADGE_TYPES.HIGH_ROLLER),
+      variant: 'glass',
     });
   }
 
@@ -269,20 +276,28 @@ export function transformShameEntry(entry: ShameWallEntry): UnifiedLeaderboardEn
         color: entry.shameAchievements.length > 0 ? 'text-red-500' : undefined,
       },
     ],
-    badges: [
-      {
-        type: isPermanent ? BADGE_TYPES.BAN_PERMANENT : BADGE_TYPES.BAN_TEMPORARY,
+    badges: (() => {
+      const badges: BadgeData[] = [];
+
+      // Add ban type badge
+      const banType = isPermanent ? BADGE_TYPES.BAN_PERMANENT : BADGE_TYPES.BAN_TEMPORARY;
+      badges.push({
+        type: banType,
         text: isPermanent ? 'Permanent Ban' : 'Temporary Ban',
-      },
-      ...(banCount > 1
-        ? [
-            {
-              type: BADGE_TYPES.BAN_COUNT,
-              text: `${banCount} bans`,
-            } as BadgeData,
-          ]
-        : []),
-    ],
+        rarity: BADGE_RARITIES.COMMON,
+      });
+
+      // Add ban count badge if multiple bans
+      if (banCount > 1) {
+        badges.push({
+          type: BADGE_TYPES.BAN_COUNT,
+          text: `${banCount} bans`,
+          rarity: BADGE_RARITIES.COMMON,
+        });
+      }
+
+      return badges;
+    })(),
     rawData: entry,
   };
 }

@@ -201,9 +201,6 @@ export function LeaderboardEntry({
                     }
 
                     // Render all other badges with UnifiedBadge component
-                    // Add animations for rare/high-level badges
-                    const shouldAnimate = badge.type === BADGE_TYPES.HIGH_ROLLER;
-
                     return (
                       <UnifiedBadge
                         key={idx}
@@ -211,9 +208,10 @@ export function LeaderboardEntry({
                         text={badge.text}
                         icon={badge.icon}
                         size={badge.size}
-                        color={badge.color}
+                        rarity={badge.rarity}
                         description={badge.description}
-                        animated={shouldAnimate ? 'pulse' : 'none'}
+                        customColors={badge.customColors}
+                        variant={badge.variant}
                       />
                     );
                   })}

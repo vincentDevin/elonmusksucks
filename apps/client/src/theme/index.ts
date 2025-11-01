@@ -26,14 +26,12 @@ export {
   allThemes,
   lightThemes,
   darkThemes,
-  contrastThemes,
   getThemesByCategory,
   getThemeById,
   getDefaultThemeForCategory,
   themeCategories,
   DEFAULT_LIGHT_THEME,
   DEFAULT_DARK_THEME,
-  DEFAULT_CONTRAST_THEME,
 } from './themes';
 
 // Utilities

@@ -1,0 +1,102 @@
+/**
+ * Badge Animation System
+ * Focused, subtle motion set for modern badge styling
+ */
+
+/* ==========================================================================
+   KEYFRAMES
+   ========================================================================= */
+
+@keyframes badge-border-glow-cycle {
+  0%,
+  100% {
+    opacity: 0.45;
+    box-shadow: 0 0 2px var(--badge-glow-color, currentColor);
+  }
+  45% {
+    opacity: 0.8;
+    box-shadow: 0 0 14px var(--badge-glow-color, currentColor);
+  }
+}
+
+@keyframes badge-float-cycle {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2.5px);
+  }
+}
+
+@keyframes badge-light-sweep-cycle {
+  0% {
+    transform: translateX(-140%);
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.55;
+  }
+  100% {
+    transform: translateX(140%);
+    opacity: 0;
+  }
+}
+
+/* ==========================================================================
+   ANIMATION HELPERS
+   ========================================================================= */
+
+.badge-animation-border-glow {
+  position: relative;
+}
+
+.badge-animation-border-glow::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  pointer-events: none;
+  animation: badge-border-glow-cycle 5.5s ease-in-out infinite;
+}
+
+.badge-animation-float {
+  animation: badge-float-cycle 5.2s ease-in-out infinite;
+  will-change: transform;
+}
+
+.badge-animation-light-sweep {
+  position: relative;
+  overflow: hidden;
+}
+
+.badge-animation-light-sweep::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    120deg,
+    transparent 30%,
+    var(--badge-light-sweep, rgba(255, 255, 255, 0.28)) 50%,
+    transparent 70%
+  );
+  transform: translateX(-140%);
+  pointer-events: none;
+  animation: badge-light-sweep-cycle 9s ease-in-out infinite;
+}
+
+/* ==========================================================================
+   ACCESSIBILITY SUPPORT
+   ========================================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+  .badge-animation-border-glow::before,
+  .badge-animation-float,
+  .badge-animation-light-sweep::after {
+    animation: none !important;
+  }
+}

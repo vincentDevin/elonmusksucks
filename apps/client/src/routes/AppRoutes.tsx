@@ -20,6 +20,7 @@ const AuthLeaderboard = lazy(() => import('../pages/Leaderboard'));
 const Profile = lazy(() => import('../pages/Profile'));
 const AdminDashboard = lazy(() => import('../pages/AdminDashboard'));
 const Pong = lazy(() => import('../pages/Pong'));
+const BadgeTestLab = lazy(() => import('../pages/BadgeTestLab'));
 
 // Redirect to public site component
 const PublicSiteRedirect = () => {
@@ -155,6 +156,18 @@ export default function AppRoutes() {
             </MainLayout>
           }
         />
+        {env.DEV && (
+          <Route
+            path="/test"
+            element={
+              <MainLayout>
+                <Suspense fallback={<RouteFallback />}>
+                  <BadgeTestLab />
+                </Suspense>
+              </MainLayout>
+            }
+          />
+        )}
 
         {/* Admin-only route */}
         <Route

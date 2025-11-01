@@ -4,7 +4,8 @@ import api from '../../api/axios';
 import BaseCard from '../BaseCard';
 import { formatMuskBucks } from '../../utils/formatting';
 import { UnifiedBadge } from '../common/UnifiedBadge';
-import { BADGE_TYPES } from '../../types/badges';
+import { BADGE_TYPES, BADGE_RARITIES } from '../../types/badges';
+import { getBadgeTypeTokens } from '../../theme/tokens/badge';
 
 interface PongStatsCardProps {
   userId: number;
@@ -133,7 +134,13 @@ function PongStatsCardComponent({ userId, className = '', compact = false }: Pon
       {/* High Roller Badge */}
       {stats.riskTaker && (
         <div className="mb-4">
-          <UnifiedBadge type={BADGE_TYPES.HIGH_ROLLER} text="High Roller" animated="pulse" />
+          <UnifiedBadge
+            type={BADGE_TYPES.HIGH_ROLLER}
+            text="High Roller"
+            rarity={BADGE_RARITIES.RARE}
+            customColors={getBadgeTypeTokens(BADGE_TYPES.HIGH_ROLLER)}
+            variant="glass"
+          />
         </div>
       )}
 
