@@ -397,6 +397,224 @@ function simulatePlayerInput(socket, duration = 60000, inputsPerSecond = 60) {
   };
 }
 
+/**
+ * Propose wager amount during lobby negotiation
+ * @param {Socket} socket - Connected socket
+ * @param {string} gameId - Game ID
+ * @param {number} amount - Wager amount to propose
+ * @param {number} timeout - Timeout in ms
+ * @returns {Promise<{currentOffer, proposedBy, round, acceptedBy}>} Wager proposal result
+ */
+async function proposeWager(socket, gameId, amount, timeout = 5000) {
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      socket.off('wager_proposed');
+      socket.off('error');
+      reject(new Error('Propose wager timeout'));
+    }, timeout);
+
+    socket.once('wager_proposed', (data) => {
+      clearTimeout(timeoutId);
+      socket.off('error');
+      resolve(data);
+    });
+
+    socket.once('error', (error) => {
+      clearTimeout(timeoutId);
+      socket.off('wager_proposed');
+      reject(new Error(error.message || 'Propose wager failed'));
+    });
+
+    socket.emit('propose_wager', { gameId, amount });
+  });
+}
+
+/**
+ * Accept current wager offer
+ * @param {Socket} socket - Connected socket
+ * @param {string} gameId - Game ID
+ * @param {number} timeout - Timeout in ms
+ * @returns {Promise<{currentOffer, acceptedBy}>} Wager acceptance result
+ */
+async function acceptWager(socket, gameId, timeout = 5000) {
+  return new Promise((resolve, reject) => {
+    let resolved = false;
+    const timeoutId = setTimeout(() => {
+      if (resolved) return;
+      socket.off('wager_accepted');
+      socket.off('wager_locked');
+      socket.off('error');
+      reject(new Error('Accept wager timeout'));
+    }, timeout);
+
+    const cleanup = () => {
+      clearTimeout(timeoutId);
+      socket.off('wager_accepted');
+      socket.off('wager_locked');
+      socket.off('error');
+    };
+
+    // When both players accept, server emits wager_accepted then wager_locked immediately
+    // We need to handle this sequence properly
+    socket.once('wager_accepted', (data) => {
+      if (resolved) return;
+
+      // If both players have accepted, wait briefly for wager_locked event
+      if (data.acceptedBy && data.acceptedBy.length === 2) {
+        // Wait up to 200ms for wager_locked to arrive
+        const lockWaitTimeout = setTimeout(() => {
+          if (resolved) return;
+          resolved = true;
+          cleanup();
+          // This shouldn't happen, but resolve with locked: false if wager_locked never arrives
+          resolve({ ...data, locked: false });
+        }, 200);
+
+        // Listen for wager_locked (should arrive immediately)
+        const onLocked = (lockedData) => {
+          if (resolved) return;
+          resolved = true;
+          clearTimeout(lockWaitTimeout);
+          cleanup();
+          resolve({ ...lockedData, locked: true });
+        };
+        socket.once('wager_locked', onLocked);
+      } else {
+        // Only one player accepted, resolve immediately
+        resolved = true;
+        cleanup();
+        resolve({ ...data, locked: false });
+      }
+    });
+
+    // Handle the case where wager_locked arrives first (rare but possible)
+    socket.once('wager_locked', (data) => {
+      if (resolved) return;
+      resolved = true;
+      cleanup();
+      resolve({ ...data, locked: true });
+    });
+
+    socket.once('error', (error) => {
+      if (resolved) return;
+      resolved = true;
+      cleanup();
+      reject(new Error(error.message || 'Accept wager failed'));
+    });
+
+    socket.emit('accept_wager', { gameId });
+  });
+}
+
+/**
+ * Reject current wager offer
+ * @param {Socket} socket - Connected socket
+ * @param {string} gameId - Game ID
+ * @param {number} timeout - Timeout in ms
+ * @returns {Promise<void>} Resolves when rejection confirmed
+ */
+async function rejectWager(socket, gameId, timeout = 5000) {
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      socket.off('wager_rejected');
+      socket.off('error');
+      reject(new Error('Reject wager timeout'));
+    }, timeout);
+
+    socket.once('wager_rejected', () => {
+      clearTimeout(timeoutId);
+      socket.off('error');
+      resolve();
+    });
+
+    socket.once('error', (error) => {
+      clearTimeout(timeoutId);
+      socket.off('wager_rejected');
+      reject(new Error(error.message || 'Reject wager failed'));
+    });
+
+    socket.emit('reject_wager', { gameId });
+  });
+}
+
+/**
+ * Wait for wager to be locked (both players accepted)
+ * @param {Socket} socket - Connected socket
+ * @param {number} timeout - Timeout in ms
+ * @returns {Promise<{wager, pot}>} Wager lock result
+ */
+async function waitForWagerLocked(socket, timeout = 120000) {
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      socket.off('wager_locked');
+      socket.off('match_cancelled');
+      reject(new Error('Wager lock timeout'));
+    }, timeout);
+
+    socket.once('wager_locked', (data) => {
+      clearTimeout(timeoutId);
+      socket.off('match_cancelled');
+      resolve(data);
+    });
+
+    socket.once('match_cancelled', (data) => {
+      clearTimeout(timeoutId);
+      socket.off('wager_locked');
+      reject(new Error(data.reason || 'Match cancelled'));
+    });
+  });
+}
+
+/**
+ * Send chat message in game lobby/room
+ * @param {Socket} socket - Connected socket
+ * @param {string} gameId - Game ID
+ * @param {string} message - Chat message content
+ * @param {number} timeout - Timeout in ms
+ * @returns {Promise<void>} Resolves when message sent
+ */
+async function sendChatMessage(socket, gameId, message, timeout = 5000) {
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      socket.off('game_chat_message');
+      socket.off('error');
+      reject(new Error('Send chat message timeout'));
+    }, timeout);
+
+    // Wait for our message to be broadcast back
+    const messageHandler = (data) => {
+      // Check if this is our message (simplified check)
+      if (data.message === message) {
+        clearTimeout(timeoutId);
+        socket.off('game_chat_message', messageHandler);
+        socket.off('error');
+        resolve();
+      }
+    };
+
+    socket.on('game_chat_message', messageHandler);
+
+    socket.once('error', (error) => {
+      clearTimeout(timeoutId);
+      socket.off('game_chat_message', messageHandler);
+      reject(new Error(error.message || 'Send chat message failed'));
+    });
+
+    socket.emit('game_chat_message', { gameId, message });
+  });
+}
+
+/**
+ * Monitor chat messages
+ * @param {Socket} socket - Connected socket
+ * @param {Function} callback - Called with each chat message
+ * @returns {Function} Cleanup function
+ */
+function monitorChatMessages(socket, callback) {
+  socket.on('game_chat_message', callback);
+  return () => socket.off('game_chat_message', callback);
+}
+
 module.exports = {
   createPongConnection,
   createMultipleConnections,
@@ -414,5 +632,11 @@ module.exports = {
   disconnect,
   disconnectAll,
   simulatePlayerInput,
+  proposeWager,
+  acceptWager,
+  rejectWager,
+  waitForWagerLocked,
+  sendChatMessage,
+  monitorChatMessages,
   PONG_SERVER_URL,
 };

@@ -6,8 +6,12 @@ const { createTestUsers } = require('../helpers/auth.cjs');
 const {
   createMultipleConnections,
   createAIMatch,
+  createPVPMatch,
+  joinMatch,
   setReady,
   spectateMatch,
+  monitorChatMessages,
+  sendChatMessage,
   disconnectAll,
 } = require('../helpers/pong.cjs');
 const { PongMetricsCollector, trackSocketMetrics } = require('../helpers/pongMetrics.cjs');
@@ -17,6 +21,8 @@ const { saveResults } = require('../helpers/results.cjs');
  * Spectator load test
  * Tests:
  * - Multiple spectators joining active games
+ * - Spectators joining lobbies in negotiation phase
+ * - Spectator chat participation in lobbies
  * - Spectator-specific game state broadcasts
  * - Spectator room management
  * - Spectator join/leave latency
@@ -99,6 +105,114 @@ async function runSpectatorLoadTest(options = {}) {
 
     await new Promise((resolve) => setTimeout(resolve, 4000)); // Wait for countdowns
     console.log('✅ All games active\n');
+
+    // Step 4.5: Test lobby phase spectators (PVP lobbies in negotiation)
+    console.log('👀 Testing lobby phase spectators...\n');
+
+    // Create 2 PVP lobbies for negotiation phase testing
+    const lobbyTestUsers = await createTestUsers(6); // 2 lobbies × (2 players + 1 spectator)
+    const lobbyConnections = await createMultipleConnections(lobbyTestUsers);
+    const successfulLobbyConnections = lobbyConnections.filter((c) => c.success);
+
+    successfulLobbyConnections.forEach((conn) => {
+      allSockets.push(conn.socket);
+      const cleanup = trackSocketMetrics(conn.socket, metrics);
+      cleanupFunctions.push(cleanup);
+    });
+
+    if (successfulLobbyConnections.length >= 6) {
+      // Create 2 PVP lobbies
+      const lobby1Player1 = successfulLobbyConnections[0];
+      const lobby1Player2 = successfulLobbyConnections[1];
+      const lobby1Spectator = successfulLobbyConnections[2];
+      const lobby2Player1 = successfulLobbyConnections[3];
+      const lobby2Player2 = successfulLobbyConnections[4];
+      const lobby2Spectator = successfulLobbyConnections[5];
+
+      try {
+        // Lobby 1
+        console.log('  🎮 Creating lobby 1...');
+        const match1 = await createPVPMatch(lobby1Player1.socket, 50);
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
+        // Find lobby ID
+        let lobbyId1 = null;
+        const lobbyPromise1 = new Promise((resolve) => {
+          lobby1Player2.socket.once('lobby_state', (data) => {
+            const lobby = data.lobbies.find((l) => l.creatorId === lobby1Player1.player.id);
+            if (lobby) {
+              lobbyId1 = lobby.id;
+              resolve(lobby.id);
+            }
+          });
+          lobby1Player2.socket.emit('join_lobby');
+        });
+
+        await Promise.race([lobbyPromise1, new Promise((resolve) => setTimeout(resolve, 2000))]);
+
+        if (lobbyId1) {
+          await joinMatch(lobby1Player2.socket, lobbyId1);
+          console.log(`  ✅ Lobby 1 created: ${match1.gameId}`);
+
+          // Spectator joins lobby in negotiation phase
+          console.log('  👀 Spectator joining lobby 1 during negotiation...');
+          const spectateStart = Date.now();
+          await spectateMatch(lobby1Spectator.socket, match1.gameId);
+          const spectateDuration = Date.now() - spectateStart;
+          console.log(`  ✅ Spectator joined lobby 1 (${spectateDuration}ms)`);
+
+          // Test spectator chat in lobby
+          let chatMessagesReceived = 0;
+          const chatCleanup = monitorChatMessages(lobby1Spectator.socket, () => {
+            chatMessagesReceived++;
+          });
+
+          console.log('  💬 Spectator sending chat message...');
+          await sendChatMessage(lobby1Spectator.socket, match1.gameId, 'Test spectator message')
+            .catch((err) =>
+              console.log(`  ⚠️  Spectator chat failed: ${err.message}`),
+            );
+
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          console.log(`  💬 Spectator received ${chatMessagesReceived} chat messages\n`);
+          chatCleanup();
+        }
+
+        // Lobby 2 (simplified)
+        console.log('  🎮 Creating lobby 2...');
+        const match2 = await createPVPMatch(lobby2Player1.socket, 75);
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
+        let lobbyId2 = null;
+        const lobbyPromise2 = new Promise((resolve) => {
+          lobby2Player2.socket.once('lobby_state', (data) => {
+            const lobby = data.lobbies.find((l) => l.creatorId === lobby2Player1.player.id);
+            if (lobby) {
+              lobbyId2 = lobby.id;
+              resolve(lobby.id);
+            }
+          });
+          lobby2Player2.socket.emit('join_lobby');
+        });
+
+        await Promise.race([lobbyPromise2, new Promise((resolve) => setTimeout(resolve, 2000))]);
+
+        if (lobbyId2) {
+          await joinMatch(lobby2Player2.socket, lobbyId2);
+          console.log(`  ✅ Lobby 2 created: ${match2.gameId}`);
+
+          await spectateMatch(lobby2Spectator.socket, match2.gameId);
+          console.log(`  ✅ Spectator joined lobby 2\n`);
+        }
+
+        console.log('✅ Lobby phase spectator test complete\n');
+      } catch (error) {
+        console.log(`⚠️  Lobby spectator test error: ${error.message}\n`);
+        metrics.recordError(error);
+      }
+    } else {
+      console.log('⚠️  Not enough users for lobby spectator test, skipping\n');
+    }
 
     // Step 5: Add spectators to games
     console.log(`👀 Adding ${spectatorConnections.length} spectators to games...`);

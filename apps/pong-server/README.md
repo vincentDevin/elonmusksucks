@@ -28,6 +28,7 @@
 The **pong-server** is a dedicated Socket.IO game server running on port 5001, isolated from the main API server (port 5000) for optimal performance.
 
 **Key Features:**
+
 - **128fps game loop** - 7.8ms server tick for smooth gameplay
 - **Client-authoritative paddles** - Players control their own paddles with client-side prediction
 - **AI opponents** - 4 difficulty levels (EASY, MEDIUM, HARD, IMPOSSIBLE)
@@ -39,6 +40,7 @@ The **pong-server** is a dedicated Socket.IO game server running on port 5001, i
 - **Rate limiting** - Socket event throttling to prevent abuse
 
 **Why a Dedicated Server?**
+
 - **Isolation** - Game server crashes don't affect API server
 - **Performance** - Dedicated CPU/memory for game loop
 - **Scalability** - Can scale independently from API server
@@ -113,29 +115,35 @@ The **pong-server** is a dedicated Socket.IO game server running on port 5001, i
 ## Technology Stack
 
 ### Core Runtime
+
 - **Node.js ≥24.0.0** - Strict requirement
 - **TypeScript 5.8.4** - Type safety
 - **Express 5.1.0** - HTTP server (minimal, for health checks)
 
 ### Real-time Communication
+
 - **Socket.IO 4.8.1** - WebSocket server
 - **IORedis 5.4.1** - Redis client (future: multi-instance scaling)
 
 ### Backend Integration
+
 - **Axios 1.11.0** - HTTP client for API server communication
 - **jsonwebtoken 9.0.2** - JWT authentication
 - **Prisma Client 6.10.1** - Database access (minimal)
 
 ### Background Jobs
+
 - **BullMQ 5.36.3** - Payout job queue
 
 ### Security & Performance
+
 - **Helmet 7.1.0** - Security headers
 - **cors 2.8.5** - CORS configuration
 - **compression 1.7.5** - gzip compression
 - **prom-client 15.1.3** - Prometheus metrics
 
 ### Development Tools
+
 - **nodemon 3.1.10** - Hot reload
 - **ts-node 10.9.2** - TypeScript execution
 - **Jest 29.7.0** - Testing framework
@@ -196,8 +204,7 @@ function gameLoop(matchId: string, state: GameState) {
 
     // 4. Check scoring (ball out of bounds left/right)
     if (checkScoring(state)) {
-      if (state.leftPlayer.score >= WINNING_SCORE ||
-          state.rightPlayer.score >= WINNING_SCORE) {
+      if (state.leftPlayer.score >= WINNING_SCORE || state.rightPlayer.score >= WINNING_SCORE) {
         endMatch(matchId, state);
         clearInterval(intervalId);
         return;
@@ -206,7 +213,8 @@ function gameLoop(matchId: string, state: GameState) {
     }
 
     // 5. Update AI paddle (if applicable)
-    if (state.rightPlayer.id < 0) { // AI player
+    if (state.rightPlayer.id < 0) {
+      // AI player
       updateAIPaddle(state);
     }
 
@@ -226,16 +234,16 @@ function gameLoop(matchId: string, state: GameState) {
 interface GameState {
   // Ball state
   ball: {
-    x: number;          // X position (0 to FIELD_WIDTH)
-    y: number;          // Y position (0 to FIELD_HEIGHT)
-    dx: number;         // X velocity (pixels/tick)
-    dy: number;         // Y velocity (pixels/tick)
-    speed: number;      // Current speed multiplier
+    x: number; // X position (0 to FIELD_WIDTH)
+    y: number; // Y position (0 to FIELD_HEIGHT)
+    dx: number; // X velocity (pixels/tick)
+    dy: number; // Y velocity (pixels/tick)
+    speed: number; // Current speed multiplier
   };
 
   // Players
-  leftPlayer: Player;   // Left paddle (creator)
-  rightPlayer: Player;  // Right paddle (joiner or AI)
+  leftPlayer: Player; // Left paddle (creator)
+  rightPlayer: Player; // Right paddle (joiner or AI)
 
   // Match metadata
   matchType: 'pvp' | 'ai';
@@ -248,11 +256,11 @@ interface GameState {
 }
 
 interface Player {
-  id: number;           // User ID (negative for AI)
+  id: number; // User ID (negative for AI)
   name: string;
-  paddleY: number;      // Paddle Y position (0 to FIELD_HEIGHT - PADDLE_HEIGHT)
-  score: number;        // Current score (0-11, first to 11 wins)
-  ping: number;         // Latency (ms)
+  paddleY: number; // Paddle Y position (0 to FIELD_HEIGHT - PADDLE_HEIGHT)
+  score: number; // Current score (0-11, first to 11 wins)
+  ping: number; // Latency (ms)
   lastInputTime: number; // Timestamp of last input
 }
 ```
@@ -262,6 +270,7 @@ interface Player {
 ### State Updates
 
 **Ball Position Update:**
+
 ```typescript
 function updateBallPosition(state: GameState) {
   state.ball.x += state.ball.dx * state.ball.speed;
@@ -270,6 +279,7 @@ function updateBallPosition(state: GameState) {
 ```
 
 **Wall Collision (Top/Bottom):**
+
 ```typescript
 function checkWallCollisions(state: GameState) {
   const { ball } = state;
@@ -290,15 +300,18 @@ function checkWallCollisions(state: GameState) {
 ```
 
 **Paddle Collision:**
+
 ```typescript
 function checkPaddleCollisions(state: GameState) {
   const { ball, leftPlayer, rightPlayer } = state;
   const { BALL_SIZE, PADDLE_WIDTH, PADDLE_HEIGHT } = PONG_PHYSICS;
 
   // Left paddle collision
-  if (ball.x <= PADDLE_WIDTH &&
-      ball.y + BALL_SIZE >= leftPlayer.paddleY &&
-      ball.y <= leftPlayer.paddleY + PADDLE_HEIGHT) {
+  if (
+    ball.x <= PADDLE_WIDTH &&
+    ball.y + BALL_SIZE >= leftPlayer.paddleY &&
+    ball.y <= leftPlayer.paddleY + PADDLE_HEIGHT
+  ) {
     ball.x = PADDLE_WIDTH;
     ball.dx = -ball.dx; // Reverse X velocity
     ball.speed += 0.05; // Increase speed slightly
@@ -306,9 +319,11 @@ function checkPaddleCollisions(state: GameState) {
 
   // Right paddle collision
   const rightPaddleX = FIELD_WIDTH - PADDLE_WIDTH;
-  if (ball.x + BALL_SIZE >= rightPaddleX &&
-      ball.y + BALL_SIZE >= rightPlayer.paddleY &&
-      ball.y <= rightPlayer.paddleY + PADDLE_HEIGHT) {
+  if (
+    ball.x + BALL_SIZE >= rightPaddleX &&
+    ball.y + BALL_SIZE >= rightPlayer.paddleY &&
+    ball.y <= rightPlayer.paddleY + PADDLE_HEIGHT
+  ) {
     ball.x = rightPaddleX - BALL_SIZE;
     ball.dx = -ball.dx;
     ball.speed += 0.05;
@@ -317,6 +332,7 @@ function checkPaddleCollisions(state: GameState) {
 ```
 
 **Scoring:**
+
 ```typescript
 function checkScoring(state: GameState): boolean {
   const { ball } = state;
@@ -379,7 +395,7 @@ export const PONG_PHYSICS = {
 ```typescript
 function checkAABBCollision(
   box1: { x: number; y: number; width: number; height: number },
-  box2: { x: number; y: number; width: number; height: number }
+  box2: { x: number; y: number; width: number; height: number },
 ): boolean {
   return (
     box1.x < box2.x + box2.width &&
@@ -420,6 +436,7 @@ function calculateBallAngle(ball: Ball, paddle: Player): number {
 **Players control their own paddles** with client-side prediction.
 
 **Client-Side:**
+
 ```typescript
 // Client sends paddle position on every move
 function movePaddle(direction: 'up' | 'down') {
@@ -432,6 +449,7 @@ function movePaddle(direction: 'up' | 'down') {
 ```
 
 **Server-Side:**
+
 ```typescript
 // Server trusts client paddle position (no server-side validation)
 socket.on('paddle-move', (data) => {
@@ -446,6 +464,7 @@ socket.on('paddle-move', (data) => {
 ```
 
 **Benefits:**
+
 - ✅ Instant paddle response (no round-trip latency)
 - ✅ Smooth gameplay even with high ping
 - ❌ Requires client-side validation (prevent out-of-bounds)
@@ -457,6 +476,7 @@ socket.on('paddle-move', (data) => {
 **Ball position is calculated on the server only.**
 
 **Client-Side:**
+
 ```typescript
 // Client receives ball state from server
 socket.on('game-state', (state: GameState) => {
@@ -470,6 +490,7 @@ socket.on('game-state', (state: GameState) => {
 ```
 
 **Benefits:**
+
 - ✅ Consistent ball physics across all clients
 - ✅ No cheating (ball position controlled by server)
 - ❌ Slight visual lag for ball position (mitigated by 128fps)
@@ -480,27 +501,27 @@ socket.on('game-state', (state: GameState) => {
 
 #### **Client → Server**
 
-| Event | Payload | Description |
-|-------|---------|-------------|
-| `create-match` | `{ matchType, wager, aiDifficulty? }` | Create new match |
-| `join-match` | `{ matchId }` | Join existing match |
-| `paddle-move` | `{ paddleY }` | Update paddle position |
-| `player-ready` | `{ matchId }` | Signal ready to start |
-| `spectate-match` | `{ matchId }` | Start spectating |
-| `stop-spectate` | `{ matchId }` | Stop spectating |
+| Event            | Payload                               | Description            |
+| ---------------- | ------------------------------------- | ---------------------- |
+| `create-match`   | `{ matchType, wager, aiDifficulty? }` | Create new match       |
+| `join-match`     | `{ matchId }`                         | Join existing match    |
+| `paddle-move`    | `{ paddleY }`                         | Update paddle position |
+| `player-ready`   | `{ matchId }`                         | Signal ready to start  |
+| `spectate-match` | `{ matchId }`                         | Start spectating       |
+| `stop-spectate`  | `{ matchId }`                         | Stop spectating        |
 
 #### **Server → Client**
 
-| Event | Payload | Description |
-|-------|---------|-------------|
-| `match-created` | `{ match }` | Match created successfully |
-| `match-joined` | `{ match }` | Player joined match |
-| `game-state` | `{ state }` | Game state update (128fps) |
-| `countdown` | `{ seconds }` | Countdown before match starts |
-| `match-ended` | `{ result }` | Match finished |
-| `spectator-joined` | `{ matchId, count }` | New spectator joined |
-| `spectator-left` | `{ matchId, count }` | Spectator left |
-| `error` | `{ message }` | Error occurred |
+| Event              | Payload              | Description                   |
+| ------------------ | -------------------- | ----------------------------- |
+| `match-created`    | `{ match }`          | Match created successfully    |
+| `match-joined`     | `{ match }`          | Player joined match           |
+| `game-state`       | `{ state }`          | Game state update (128fps)    |
+| `countdown`        | `{ seconds }`        | Countdown before match starts |
+| `match-ended`      | `{ result }`         | Match finished                |
+| `spectator-joined` | `{ matchId, count }` | New spectator joined          |
+| `spectator-left`   | `{ matchId, count }` | Spectator left                |
+| `error`            | `{ message }`        | Error occurred                |
 
 ---
 
@@ -512,26 +533,26 @@ socket.on('game-state', (state: GameState) => {
 
 ```typescript
 export const AI_DIFFICULTIES: {
-    readonly EASY: {
-        reactionTime: 450;
-        accuracy: 0.45;
-        speed: 0.35;
-    };
-    readonly MEDIUM: {
-        reactionTime: 200;
-        accuracy: 0.82;
-        speed: 0.85;
-    };
-    readonly HARD: {
-        reactionTime: 120;
-        accuracy: 0.88;
-        speed: 0.92;
-    };
-    readonly IMPOSSIBLE: {
-        reactionTime: 80;
-        accuracy: 0.95;
-        speed: 1;
-    };
+  readonly EASY: {
+    reactionTime: 450;
+    accuracy: 0.45;
+    speed: 0.35;
+  };
+  readonly MEDIUM: {
+    reactionTime: 200;
+    accuracy: 0.82;
+    speed: 0.85;
+  };
+  readonly HARD: {
+    reactionTime: 120;
+    accuracy: 0.88;
+    speed: 0.92;
+  };
+  readonly IMPOSSIBLE: {
+    reactionTime: 80;
+    accuracy: 0.95;
+    speed: 1;
+  };
 };
 ```
 
@@ -560,7 +581,7 @@ function updateAIPaddle(state: GameState) {
     // Move down
     rightPlayer.paddleY = Math.min(
       PONG_PHYSICS.FIELD_HEIGHT - PONG_PHYSICS.PADDLE_HEIGHT,
-      rightPlayer.paddleY + difficulty.paddleSpeed
+      rightPlayer.paddleY + difficulty.paddleSpeed,
     );
   } else if (paddleCenter > targetY + 5) {
     // Move up
@@ -607,15 +628,16 @@ export const PONG_WAGER_LIMITS = {
 
   // AI max wagers (per difficulty)
   AI_MAX_WAGERS: {
-    EASY: null,       // No max (unlimited)
-    MEDIUM: 1000,     // 1000 MuskBucks max
-    HARD: 500,        // 500 MuskBucks max
-    IMPOSSIBLE: 100,  // 100 MuskBucks max (high risk)
+    EASY: null, // No max (unlimited)
+    MEDIUM: 1000, // 1000 MuskBucks max
+    HARD: 500, // 500 MuskBucks max
+    IMPOSSIBLE: 100, // 100 MuskBucks max (high risk)
   },
 };
 ```
 
 **Why different limits?**
+
 - EASY: High win rate for player → unlimited wager
 - IMPOSSIBLE: Low win rate for player → limited wager (protect balance)
 
@@ -624,6 +646,7 @@ export const PONG_WAGER_LIMITS = {
 ### Wager Flow
 
 **1. Match Creation:**
+
 ```typescript
 socket.on('create-match', async (data, callback) => {
   const { wager, matchType, aiDifficulty } = data;
@@ -647,13 +670,14 @@ socket.on('create-match', async (data, callback) => {
 ```
 
 **2. Match Start:**
+
 ```typescript
 async function startMatch(matchId: string, state: GameState) {
   // Process wager transaction (escrow funds)
   const result = await apiClient.processWagerTransaction(
     state.leftPlayer.id,
     state.rightPlayer.id,
-    state.wagerAmount
+    state.wagerAmount,
   );
 
   if (!result.success) {
@@ -668,15 +692,12 @@ async function startMatch(matchId: string, state: GameState) {
 ```
 
 **3. Match End:**
+
 ```typescript
 async function endMatch(matchId: string, state: GameState) {
-  const winner = state.leftPlayer.score >= WINNING_SCORE
-    ? state.leftPlayer
-    : state.rightPlayer;
+  const winner = state.leftPlayer.score >= WINNING_SCORE ? state.leftPlayer : state.rightPlayer;
 
-  const loser = winner === state.leftPlayer
-    ? state.rightPlayer
-    : state.leftPlayer;
+  const loser = winner === state.leftPlayer ? state.rightPlayer : state.leftPlayer;
 
   // Queue payout job (BullMQ)
   await pongPayoutQueue.add('process-payout', {
@@ -684,7 +705,7 @@ async function endMatch(matchId: string, state: GameState) {
     winnerId: winner.id,
     loserId: loser.id,
     wagerAmount: state.wagerAmount,
-    isAI: state.matchType === 'ai'
+    isAI: state.matchType === 'ai',
   });
 
   // Emit match result
@@ -692,8 +713,8 @@ async function endMatch(matchId: string, state: GameState) {
     winner: winner.id,
     finalScore: {
       left: state.leftPlayer.score,
-      right: state.rightPlayer.score
-    }
+      right: state.rightPlayer.score,
+    },
   });
 }
 ```
@@ -709,7 +730,7 @@ async function endMatch(matchId: string, state: GameState) {
 ```typescript
 function calculateEloChange(
   winnerRating: number,
-  loserRating: number
+  loserRating: number,
 ): { winnerDelta: number; loserDelta: number } {
   const K = 32; // K-factor
 
@@ -719,7 +740,7 @@ function calculateEloChange(
 
   // Actual scores
   const actualWinner = 1; // Winner always gets 1
-  const actualLoser = 0;  // Loser always gets 0
+  const actualLoser = 0; // Loser always gets 0
 
   // Rating changes
   const winnerDelta = Math.round(K * (actualWinner - expectedWinner));
@@ -730,6 +751,7 @@ function calculateEloChange(
 ```
 
 **Example:**
+
 - Player A (1200 ELO) beats Player B (1300 ELO)
 - Player A gains +18 ELO (upset victory)
 - Player B loses -18 ELO
@@ -746,6 +768,7 @@ function calculateEloChange(
 - **Beating IMPOSSIBLE AI:** +25 ELO
 
 **Losing to AI:**
+
 - **EASY/MEDIUM:** -10 ELO
 - **HARD:** -5 ELO
 - **IMPOSSIBLE:** -2 ELO (minimal penalty)
@@ -782,12 +805,13 @@ socket.on('spectate-match', (data, callback) => {
   // Broadcast spectator count
   io.to(matchId).emit('spectator-joined', {
     matchId,
-    count: spectators.get(matchId)!.size
+    count: spectators.get(matchId)!.size,
   });
 });
 ```
 
 **Benefits:**
+
 - Spectators receive same game-state updates as players
 - No performance impact (same broadcast)
 - Can chat with players (future feature)
@@ -826,16 +850,20 @@ io.use(async (socket, next) => {
 
 ```typescript
 const rateLimiter = new SocketRateLimiter({
-  windowMs: 1000,  // 1 second window
-  maxEvents: 10,   // 10 events per window
+  windowMs: 1000, // 1 second window
+  maxEvents: 10, // 10 events per window
 });
 
-socket.on('paddle-move', rateLimiter.check((data) => {
-  // Process paddle movement
-}));
+socket.on(
+  'paddle-move',
+  rateLimiter.check((data) => {
+    // Process paddle movement
+  }),
+);
 ```
 
 **Benefits:**
+
 - Prevents spam attacks
 - Protects game loop performance
 - Configurable per event type
@@ -847,14 +875,17 @@ socket.on('paddle-move', rateLimiter.check((data) => {
 **All incoming events are validated:**
 
 ```typescript
-socket.on('create-match', validatePayload(createMatchSchema, async (data, callback) => {
-  // data is validated and type-safe
-}));
+socket.on(
+  'create-match',
+  validatePayload(createMatchSchema, async (data, callback) => {
+    // data is validated and type-safe
+  }),
+);
 
 const createMatchSchema = {
   matchType: { type: 'string', enum: ['pvp', 'ai'] },
   wager: { type: 'number', min: 10 },
-  aiDifficulty: { type: 'string', enum: ['EASY', 'MEDIUM', 'HARD', 'IMPOSSIBLE'], optional: true }
+  aiDifficulty: { type: 'string', enum: ['EASY', 'MEDIUM', 'HARD', 'IMPOSSIBLE'], optional: true },
 };
 ```
 
@@ -914,16 +945,19 @@ npm -w apps/pong-server run start
 ### Development Workflow
 
 1. **Start Redis:**
+
    ```bash
    redis-server
    ```
 
 2. **Start API server** (required for authentication):
+
    ```bash
    npm -w apps/server run dev
    ```
 
 3. **Start pong server:**
+
    ```bash
    npm -w apps/pong-server run dev
    ```
@@ -1003,6 +1037,7 @@ fly deploy
 ### Metrics
 
 **Target Performance:**
+
 - **Game Loop:** 128fps (7.8ms per tick)
 - **Latency:** <50ms (player to server)
 - **Concurrent Matches:** 100+ (single instance)
@@ -1025,6 +1060,7 @@ fly deploy
 ### Issue: Game loop lag
 
 **Solution:**
+
 1. Check server CPU usage
 2. Reduce concurrent match count
 3. Increase server resources
@@ -1034,6 +1070,7 @@ fly deploy
 ### Issue: Players can't connect
 
 **Solution:**
+
 1. Check JWT secret matches API server
 2. Check port 5001 is accessible
 3. Check CORS origins include client URL
@@ -1043,6 +1080,7 @@ fly deploy
 ### Issue: Wager transactions fail
 
 **Solution:**
+
 1. Check API server is running
 2. Check GAME_SERVER_SECRET matches API server
 3. Check user has sufficient balance

@@ -66,6 +66,7 @@ export interface IPongRepository {
     payoutAmount: bigint,
     houseRake: bigint,
     idempotencyKey: string,
+    vsAI?: boolean,
   ): Promise<{
     matchId: string;
     winnerId: number;
@@ -75,22 +76,10 @@ export interface IPongRepository {
     loserLoss?: string;
     vsAI: boolean;
     timestamp: Date;
-  }>;
-
-  processPVEPayout(
-    matchId: string,
-    winnerId: number,
-    payoutAmount: bigint,
-    houseRake: bigint,
-    idempotencyKey: string,
-  ): Promise<{
-    matchId: string;
-    winnerId: number;
-    payout: string;
-    houseRake: string;
-    netPayout: string;
-    vsAI: boolean;
-    timestamp: Date;
+    winnerPreviousBalance: string;
+    winnerNewBalance: string;
+    loserPreviousBalance?: string;
+    loserNewBalance?: string;
   }>;
 
   findExistingPayout(

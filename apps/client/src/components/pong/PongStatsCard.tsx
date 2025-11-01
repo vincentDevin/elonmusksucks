@@ -3,6 +3,9 @@ import { TrophyIcon, CurrencyDollarIcon, FireIcon } from '@heroicons/react/24/ou
 import api from '../../api/axios';
 import BaseCard from '../BaseCard';
 import { formatMuskBucks } from '../../utils/formatting';
+import { UnifiedBadge } from '../common/UnifiedBadge';
+import { BADGE_TYPES, BADGE_RARITIES } from '../../types/badges';
+import { getBadgeTypeTokens } from '../../theme/tokens/badge';
 
 interface PongStatsCardProps {
   userId: number;
@@ -131,9 +134,13 @@ function PongStatsCardComponent({ userId, className = '', compact = false }: Pon
       {/* High Roller Badge */}
       {stats.riskTaker && (
         <div className="mb-4">
-          <span className="px-2 py-1 bg-warning/10 text-warning rounded-full text-xs font-medium">
-            🎲 High Roller
-          </span>
+          <UnifiedBadge
+            type={BADGE_TYPES.HIGH_ROLLER}
+            text="High Roller"
+            rarity={BADGE_RARITIES.RARE}
+            customColors={getBadgeTypeTokens(BADGE_TYPES.HIGH_ROLLER)}
+            variant="glass"
+          />
         </div>
       )}
 

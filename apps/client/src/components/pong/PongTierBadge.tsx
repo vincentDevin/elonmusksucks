@@ -1,71 +1,64 @@
+import { UnifiedBadge } from '../common/UnifiedBadge';
+import { BADGE_TYPES, BADGE_RARITIES, type BadgeSize, type BadgeRarity } from '../../types/badges';
+import { getTierTokens } from '../../theme/tokens/badge';
+
 interface PongTierBadgeProps {
   tier: string;
   eloRating?: number;
-  size?: 'sm' | 'md' | 'lg';
+  size?: BadgeSize;
   showElo?: boolean;
   className?: string;
 }
 
-const TIER_CONFIG = {
+interface TierConfig {
+  icon: string;
+  description: string;
+  range: string;
+  rarity: BadgeRarity;
+}
+
+export const TIER_CONFIG: Record<string, TierConfig> = {
   BRONZE: {
-    colors: 'bg-amber-900/20 text-black dark:text-amber-500 border-amber-600/30',
     icon: '🥉',
     description: 'Beginners',
     range: '400-999',
+    rarity: BADGE_RARITIES.COMMON,
   },
   SILVER: {
-    colors: 'bg-slate-500/20 text-black dark:text-slate-300 border-slate-400/30',
     icon: '🥈',
     description: 'Casual players',
     range: '1000-1399',
+    rarity: BADGE_RARITIES.COMMON,
   },
   GOLD: {
-    colors: 'bg-yellow-500/20 text-black dark:text-yellow-400 border-yellow-500/30',
     icon: '🥇',
     description: 'Regular players',
     range: '1400-1799',
+    rarity: BADGE_RARITIES.UNCOMMON,
   },
   PLATINUM: {
-    colors: 'bg-cyan-500/20 text-black dark:text-cyan-400 border-cyan-500/30',
     icon: '💎',
     description: 'Skilled & profitable',
     range: '1800-2199',
+    rarity: BADGE_RARITIES.RARE,
   },
   DIAMOND: {
-    colors: 'bg-blue-500/20 text-black dark:text-blue-400 border-blue-500/30',
     icon: '💠',
     description: 'Elite players',
     range: '2200-2599',
+    rarity: BADGE_RARITIES.EPIC,
   },
   MASTER: {
-    colors: 'bg-purple-500/20 text-black dark:text-purple-400 border-purple-500/30',
     icon: '👑',
     description: 'Top performers',
     range: '2600-2999',
+    rarity: BADGE_RARITIES.EPIC,
   },
   GRANDMASTER: {
-    colors: 'bg-orange-500/20 text-black dark:text-orange-400 border-orange-500/30',
     icon: '⭐',
     description: 'Legendary status',
     range: '3000+',
-  },
-};
-
-const SIZE_CLASSES = {
-  sm: {
-    container: 'px-2 py-1 text-xs',
-    icon: 'text-sm',
-    text: 'font-medium',
-  },
-  md: {
-    container: 'px-3 py-1.5 text-sm',
-    icon: 'text-base',
-    text: 'font-semibold',
-  },
-  lg: {
-    container: 'px-4 py-2 text-base',
-    icon: 'text-lg',
-    text: 'font-bold',
+    rarity: BADGE_RARITIES.LEGENDARY,
   },
 };
 
@@ -77,22 +70,33 @@ export default function PongTierBadge({
   className = '',
 }: PongTierBadgeProps) {
   const tierConfig = TIER_CONFIG[tier as keyof typeof TIER_CONFIG] || TIER_CONFIG.SILVER;
-  const sizeConfig = SIZE_CLASSES[size];
+  const tokens = getTierTokens(tier);
+
+  const text = showElo && eloRating ? `${tier} (${eloRating})` : tier;
+  const description = `${tier} Tier (${tierConfig.range} Elo) - ${tierConfig.description}`;
+
+  const customColors = {
+    background: tokens.background,
+    ...(tokens.gradient ? { gradient: tokens.gradient } : {}),
+    border: tokens.border,
+    text: tokens.text,
+    glow: tokens.glow,
+    shadow: tokens.shadow,
+    lightSweep: tokens.lightSweep,
+  };
 
   return (
-    <div
-      className={`
-        inline-flex items-center space-x-1.5 rounded-full border transition-all duration-200
-        ${tierConfig.colors}
-        ${sizeConfig.container}
-        ${className}
-      `}
-      title={`${tier} Tier (${tierConfig.range} Elo) - ${tierConfig.description}`}
-    >
-      <span className={sizeConfig.icon}>{tierConfig.icon}</span>
-      <span className={sizeConfig.text}>{tier}</span>
-      {showElo && eloRating && <span className="opacity-75">({eloRating})</span>}
-    </div>
+    <UnifiedBadge
+      type={BADGE_TYPES.TIER}
+      text={text}
+      icon={tierConfig.icon}
+      rarity={tierConfig.rarity}
+      size={size}
+      description={description}
+      className={`uppercase tracking-[0.12em] leading-tight whitespace-nowrap ${className}`}
+      customColors={customColors}
+      variant="glass"
+    />
   );
 }
 
@@ -123,5 +127,3 @@ export const getTierProgress = (elo: number, tier: string): number => {
 
   return Math.min(100, ((elo - range.min) / (range.max - range.min)) * 100);
 };
-
-export { TIER_CONFIG };

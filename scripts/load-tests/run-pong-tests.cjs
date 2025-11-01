@@ -10,6 +10,12 @@ const { runSpectatorLoadTest } = require('./tests/pong-spectator-load.cjs');
 const { runConnectionChaosTest } = require('./tests/pong-connection-chaos.cjs');
 const { runFullSystemLoadTest } = require('./tests/pong-full-system.cjs');
 const { runRateLimitTest } = require('./tests/pong-rate-limit.cjs');
+const { runPVPLoadTest } = require('./tests/pong-pvp-load.cjs');
+const { runWagerNegotiationLoadTest } = require('./tests/pong-wager-negotiation-load.cjs');
+const { runLobbyChatLoadTest } = require('./tests/pong-lobby-chat-load.cjs');
+const { runNegotiationTimeoutTest } = require('./tests/pong-negotiation-timeout.cjs');
+const { runWagerTransactionStressTest } = require('./tests/pong-wager-transaction-stress.cjs');
+const { runConcurrentNegotiationsTest } = require('./tests/pong-concurrent-negotiations.cjs');
 const { saveResults } = require('./helpers/results.cjs');
 
 const PONG_SERVER_URL = process.env.PONG_SERVER_URL || 'http://localhost:5001';
@@ -53,6 +59,12 @@ async function runAllPongTests(options = {}) {
       spectators: true,
       connectionChaos: true,
       rateLimit: true,
+      pvpLoad: true,
+      wagerNegotiation: true,
+      lobbyChat: true,
+      negotiationTimeout: true,
+      wagerTransactionStress: true,
+      concurrentNegotiations: true,
       fullSystem: true,
     },
   } = options;
@@ -330,6 +342,162 @@ async function runAllPongTests(options = {}) {
 
       results.summary.total++;
 
+      console.log('\nPress Enter to continue...');
+      await new Promise((resolve) => {
+        process.stdin.once('data', () => resolve());
+      });
+    }
+
+    // NEW TESTS FOR WAGER NEGOTIATION & LOBBY CHAT
+
+    // Test 7: PVP Load Test (with wager negotiation)
+    if (tests.pvpLoad) {
+      console.log('\n📋 Step 7: Running PVP Load Test (with wager negotiation)...\n');
+
+      try {
+        const pvpResult = await runPVPLoadTest(quick ? { numMatches: 5 } : { numMatches: 10 });
+
+        results.tests.push({
+          name: 'PVP Load Test',
+          status: pvpResult.success ? 'passed' : 'failed',
+          result: pvpResult,
+        });
+
+        results.summary[pvpResult.success ? 'passed' : 'failed']++;
+      } catch (error) {
+        console.error('❌ PVP load test failed:', error.message);
+        results.tests.push({ name: 'PVP Load Test', status: 'failed', error: error.message });
+        results.summary.failed++;
+      }
+
+      results.summary.total++;
+      console.log('\nPress Enter to continue...');
+      await new Promise((resolve) => { process.stdin.once('data', () => resolve()); });
+    }
+
+    // Test 8: Wager Negotiation Load Test
+    if (tests.wagerNegotiation) {
+      console.log('\n📋 Step 8: Running Wager Negotiation Load Test...\n');
+
+      try {
+        const wagerResult = await runWagerNegotiationLoadTest(quick ? { numLobbies: 10 } : { numLobbies: 20 });
+
+        results.tests.push({
+          name: 'Wager Negotiation Load Test',
+          status: wagerResult.success ? 'passed' : 'failed',
+          result: wagerResult,
+        });
+
+        results.summary[wagerResult.success ? 'passed' : 'failed']++;
+      } catch (error) {
+        console.error('❌ Wager negotiation test failed:', error.message);
+        results.tests.push({ name: 'Wager Negotiation Load Test', status: 'failed', error: error.message });
+        results.summary.failed++;
+      }
+
+      results.summary.total++;
+      console.log('\nPress Enter to continue...');
+      await new Promise((resolve) => { process.stdin.once('data', () => resolve()); });
+    }
+
+    // Test 9: Lobby Chat Load Test
+    if (tests.lobbyChat) {
+      console.log('\n📋 Step 9: Running Lobby Chat Load Test...\n');
+
+      try {
+        const chatResult = await runLobbyChatLoadTest(quick ? { numLobbies: 5, messagesPerLobby: 20 } : { numLobbies: 10, messagesPerLobby: 50 });
+
+        results.tests.push({
+          name: 'Lobby Chat Load Test',
+          status: chatResult.success ? 'passed' : 'failed',
+          result: chatResult,
+        });
+
+        results.summary[chatResult.success ? 'passed' : 'failed']++;
+      } catch (error) {
+        console.error('❌ Lobby chat test failed:', error.message);
+        results.tests.push({ name: 'Lobby Chat Load Test', status: 'failed', error: error.message });
+        results.summary.failed++;
+      }
+
+      results.summary.total++;
+      console.log('\nPress Enter to continue...');
+      await new Promise((resolve) => { process.stdin.once('data', () => resolve()); });
+    }
+
+    // Test 10: Negotiation Timeout Test
+    if (tests.negotiationTimeout) {
+      console.log('\n📋 Step 10: Running Negotiation Timeout Test...\n');
+      console.log('⚠️  This test takes 2+ minutes to complete...\n');
+
+      try {
+        const timeoutResult = await runNegotiationTimeoutTest(quick ? { numLobbies: 10, timeoutDuration: 65000 } : { numLobbies: 20, timeoutDuration: 125000 });
+
+        results.tests.push({
+          name: 'Negotiation Timeout Test',
+          status: timeoutResult.success ? 'passed' : 'failed',
+          result: timeoutResult,
+        });
+
+        results.summary[timeoutResult.success ? 'passed' : 'failed']++;
+      } catch (error) {
+        console.error('❌ Negotiation timeout test failed:', error.message);
+        results.tests.push({ name: 'Negotiation Timeout Test', status: 'failed', error: error.message });
+        results.summary.failed++;
+      }
+
+      results.summary.total++;
+      console.log('\nPress Enter to continue...');
+      await new Promise((resolve) => { process.stdin.once('data', () => resolve()); });
+    }
+
+    // Test 11: Wager Transaction Stress Test
+    if (tests.wagerTransactionStress) {
+      console.log('\n📋 Step 11: Running Wager Transaction Stress Test...\n');
+
+      try {
+        const transactionResult = await runWagerTransactionStressTest(quick ? { numConcurrent: 15 } : { numConcurrent: 30 });
+
+        results.tests.push({
+          name: 'Wager Transaction Stress Test',
+          status: transactionResult.success ? 'passed' : 'failed',
+          result: transactionResult,
+        });
+
+        results.summary[transactionResult.success ? 'passed' : 'failed']++;
+      } catch (error) {
+        console.error('❌ Wager transaction stress test failed:', error.message);
+        results.tests.push({ name: 'Wager Transaction Stress Test', status: 'failed', error: error.message });
+        results.summary.failed++;
+      }
+
+      results.summary.total++;
+      console.log('\nPress Enter to continue...');
+      await new Promise((resolve) => { process.stdin.once('data', () => resolve()); });
+    }
+
+    // Test 12: Concurrent Negotiations Test
+    if (tests.concurrentNegotiations) {
+      console.log('\n📋 Step 12: Running Concurrent Negotiations Test...\n');
+
+      try {
+        const concurrentResult = await runConcurrentNegotiationsTest(quick ? { numLobbies: 15 } : { numLobbies: 30 });
+
+        results.tests.push({
+          name: 'Concurrent Negotiations Test',
+          status: concurrentResult.success ? 'passed' : 'failed',
+          result: concurrentResult,
+        });
+
+        results.summary[concurrentResult.success ? 'passed' : 'failed']++;
+      } catch (error) {
+        console.error('❌ Concurrent negotiations test failed:', error.message);
+        results.tests.push({ name: 'Concurrent Negotiations Test', status: 'failed', error: error.message });
+        results.summary.failed++;
+      }
+
+      results.summary.total++;
+
       if (tests.fullSystem) {
         console.log('\nPress Enter to continue to final test (Full System)...');
         await new Promise((resolve) => {
@@ -338,7 +506,7 @@ async function runAllPongTests(options = {}) {
       }
     }
 
-    // Test 7: Full System Load Test (most intensive - run last)
+    // Test 13: Full System Load Test (most intensive - run last)
     if (tests.fullSystem) {
       console.log('\n📋 Step 7: Running Full System Load Test (FINAL)...\n');
       console.log('⚠️  This is the most intensive test - it will run for several minutes\n');
@@ -433,6 +601,12 @@ if (require.main === module) {
       spectators: !args.includes('--skip-spectators'),
       connectionChaos: !args.includes('--skip-connection-chaos'),
       rateLimit: !args.includes('--skip-rate-limit'),
+      pvpLoad: !args.includes('--skip-pvp-load'),
+      wagerNegotiation: !args.includes('--skip-wager-negotiation'),
+      lobbyChat: !args.includes('--skip-lobby-chat'),
+      negotiationTimeout: !args.includes('--skip-negotiation-timeout'),
+      wagerTransactionStress: !args.includes('--skip-wager-transaction-stress'),
+      concurrentNegotiations: !args.includes('--skip-concurrent-negotiations'),
       fullSystem: !args.includes('--skip-full-system'),
     },
   };

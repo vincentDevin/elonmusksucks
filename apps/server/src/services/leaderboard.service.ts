@@ -192,14 +192,15 @@ export class LeaderboardService {
 
     // If batch affects many users or global metrics, do full refresh
     const globalUpdates = batch.get(0) || [];
-    const userUpdates = Array.from(batch.keys()).filter((id) => id > 0);
+    const userUpdates = Array.from(batch.keys()).filter((id) => id !== 0); // Include AI players (negative IDs)
 
     if (globalUpdates.length > 0 || userUpdates.length > 10) {
       await this.enqueueRefresh({ batchData: Object.fromEntries(batch) });
     } else {
-      // Process individual user updates
+      // Process individual user updates (including AI players)
       for (const [userId, triggers] of batch) {
-        if (userId > 0) {
+        if (userId !== 0) {
+          // Include both human (positive) and AI (negative) userIds
           await this.eventQueue.add('batchUserUpdate', {
             userId,
             triggers,

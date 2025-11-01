@@ -1,11 +1,10 @@
 // apps/client/src/theme/themes/index.ts
 import { lightThemes } from './light-themes';
 import { darkThemes } from './dark-themes';
-import { contrastThemes } from './contrast-themes';
 import type { UnifiedTheme, ThemeCategory } from '../types';
 
 // Combine all themes
-export const allThemes: UnifiedTheme[] = [...lightThemes, ...darkThemes, ...contrastThemes];
+export const allThemes: UnifiedTheme[] = [...lightThemes, ...darkThemes];
 
 // Helper functions to filter themes by category
 export const getThemesByCategory = (category: ThemeCategory): UnifiedTheme[] => {
@@ -45,22 +44,14 @@ export const themeCategories = [
     icon: '🌙',
     count: darkThemes.length,
   },
-  {
-    id: 'high-contrast' as ThemeCategory,
-    name: 'High Contrast',
-    description: 'Accessibility themes with enhanced visibility',
-    icon: '♿',
-    count: contrastThemes.length,
-  },
 ];
 
 // Export individual theme collections
-export { lightThemes, darkThemes, contrastThemes };
+export { lightThemes, darkThemes };
 
 // Default themes
 export const DEFAULT_LIGHT_THEME = lightThemes[0]; // clean-professional
 export const DEFAULT_DARK_THEME = darkThemes[0]; // dark-professional
-export const DEFAULT_CONTRAST_THEME = contrastThemes[0]; // high-contrast
 
 // Map from old theme IDs to new theme IDs (for migration)
 export const themeIdMigrationMap: Record<string, string> = {

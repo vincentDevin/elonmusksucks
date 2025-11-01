@@ -36,6 +36,7 @@ The **client app** is the primary user-facing application for authenticated user
 - **Live leaderboards** with daily/weekly/all-time rankings
 
 **Key Differentiators:**
+
 - React 19 features (`useOptimistic`, `startTransition`, `use()`)
 - EventBusCore architecture for zero-overhead event handling
 - Hydration watermark pattern to prevent race conditions
@@ -90,22 +91,48 @@ The app uses a **strict provider hierarchy** to manage dependencies and re-rende
 
 ```tsx
 <BrowserRouter>
-  <SocketProvider>                    {/* 1. Socket connection */}
-    <EventBusCoreProvider>            {/* 2. Central event bus */}
-      <AuthProvider>                  {/* 3. Authentication */}
-        <EventBusMetricsProvider>     {/* 4. Metrics (isolated) */}
-          <UnifiedThemeProvider>      {/* 5. Theme management */}
-            <ActivityProvider>        {/* 6. Activity stream */}
-              <AchievementProvider>   {/* 7. Achievements */}
-                <ReactionProvider>    {/* 8. Post reactions */}
-                  <BookmarkProvider>  {/* 9. Bookmarks */}
-                    <PredictionProvider>     {/* 10. Predictions */}
-                      <ParlayProvider>       {/* 11. Parlays */}
-                        <ChatProvider>       {/* 12. Chat */}
-                          <NotificationProvider>  {/* 13. Notifications */}
-                            <HydrationMarker />   {/* Event queue release */}
-                            <EventHandlers />     {/* Global event routing */}
-                            <AppRoutes />         {/* React Router */}
+  <SocketProvider>
+    {' '}
+    {/* 1. Socket connection */}
+    <EventBusCoreProvider>
+      {' '}
+      {/* 2. Central event bus */}
+      <AuthProvider>
+        {' '}
+        {/* 3. Authentication */}
+        <EventBusMetricsProvider>
+          {' '}
+          {/* 4. Metrics (isolated) */}
+          <UnifiedThemeProvider>
+            {' '}
+            {/* 5. Theme management */}
+            <ActivityProvider>
+              {' '}
+              {/* 6. Activity stream */}
+              <AchievementProvider>
+                {' '}
+                {/* 7. Achievements */}
+                <ReactionProvider>
+                  {' '}
+                  {/* 8. Post reactions */}
+                  <BookmarkProvider>
+                    {' '}
+                    {/* 9. Bookmarks */}
+                    <PredictionProvider>
+                      {' '}
+                      {/* 10. Predictions */}
+                      <ParlayProvider>
+                        {' '}
+                        {/* 11. Parlays */}
+                        <ChatProvider>
+                          {' '}
+                          {/* 12. Chat */}
+                          <NotificationProvider>
+                            {' '}
+                            {/* 13. Notifications */}
+                            <HydrationMarker /> {/* Event queue release */}
+                            <EventHandlers /> {/* Global event routing */}
+                            <AppRoutes /> {/* React Router */}
                             <NotificationContainer />
                           </NotificationProvider>
                         </ChatProvider>
@@ -124,6 +151,7 @@ The app uses a **strict provider hierarchy** to manage dependencies and re-rende
 ```
 
 **Why this order?**
+
 1. **Socket** must exist before EventBus (EventBus subscribes to socket events)
 2. **EventBusCore** must exist before Auth (Auth emits events)
 3. **Auth** must exist before domain contexts (they depend on user state)
@@ -135,22 +163,26 @@ The app uses a **strict provider hierarchy** to manage dependencies and re-rende
 ## Technology Stack
 
 ### Core Framework
+
 - **React 19.1.0** - Latest React with concurrent features
 - **React Router 7.6.2** - Client-side routing with lazy loading
 - **TypeScript 5.8.3** - Strict type safety
 
 ### UI & Styling
+
 - **TailwindCSS 4.1.8** - Utility-first CSS with custom theme system
 - **@tailwindcss/vite 4.1.8** - Vite integration
 - **React Icons 5.5.0** - Icon library (Heroicons, FontAwesome, etc.)
 - **@heroicons/react 2.2.0** - Official Heroicons for React
 
 ### Real-time & Networking
+
 - **Socket.IO Client 4.8.1** - WebSocket communication with fallback
 - **Axios 1.9.0** - HTTP client with interceptors for auth
 - **IORedis** (server-side) - Redis pub/sub for multi-instance sync
 
 ### State Management
+
 - **React Context API** - 16 context providers for domain state
 - **EventBusCore** - Custom event bus with React 19 optimizations
 - **React 19 Features**:
@@ -159,22 +191,26 @@ The app uses a **strict provider hierarchy** to manage dependencies and re-rende
   - `use()` - Async resource loading
 
 ### UI Components & Interactions
+
 - **react-hot-toast 2.6.0** - Notification system
 - **react-image-crop 11.0.10** - Avatar cropping
 - **react-window 1.8.11** - Virtualized lists for performance
 
 ### Build Tools
+
 - **Vite 7.1.9** - Lightning-fast dev server and bundler
 - **@vitejs/plugin-react 5.0.4** - React Fast Refresh
 - **Terser 5.44.0** - Production minification
 
 ### Testing
+
 - **Vitest 3.2.4** - Vite-native test runner
 - **@testing-library/react 16.1.0** - React testing utilities
 - **@testing-library/user-event 14.5.2** - User interaction simulation
 - **jsdom 24.1.1** - DOM implementation for Node.js
 
 ### Code Quality
+
 - **ESLint 9.25.0** - Linting with React hooks plugin
 - **TypeScript ESLint 8.30.1** - TypeScript-specific rules
 - **Prettier** (inherited from root) - Code formatting
@@ -317,18 +353,22 @@ apps/client/
 ### Core Infrastructure Contexts
 
 #### 1. **SocketContext** (`contexts/SocketContext.tsx`)
+
 Provides singleton Socket.IO client instance.
 
 **Purpose:**
+
 - Manages single WebSocket connection to main server (port 5000)
 - Prevents duplicate connections across navigation
 
 **Key Features:**
+
 - Singleton pattern (one socket per user session)
 - Persists across navigation (no disconnect on route change)
 - Auto-reconnection with exponential backoff
 
 **Usage:**
+
 ```tsx
 import { useSocket } from '@/contexts/SocketContext';
 
@@ -342,14 +382,17 @@ socket.on('custom-event', handler);
 ---
 
 #### 2. **EventBusCoreContext** (`contexts/EventBusCoreContext.tsx`)
+
 Central event bus with React 19 optimizations. **Zero re-renders.**
 
 **Purpose:**
+
 - Type-safe event subscriptions with automatic cleanup
 - Priority-based event handling (`high`, `normal`, `low`)
 - Hydration watermark integration to prevent race conditions
 
 **Key Features:**
+
 - **Stable API** - No re-renders when events are emitted
 - **Automatic Priority Detection** - Based on channel name patterns
 - **React 19 Integration** - Uses `startTransition` for low-priority events
@@ -357,6 +400,7 @@ Central event bus with React 19 optimizations. **Zero re-renders.**
 - **Memory Leak Prevention** - Automatic cleanup on unmount
 
 **Architecture:**
+
 ```tsx
 EventBusCoreProvider
   ├─ Socket Listener (REDIS_CHANNELS.*)
@@ -366,6 +410,7 @@ EventBusCoreProvider
 ```
 
 **Usage:**
+
 ```tsx
 import { useEventBusCore } from '@/contexts/EventBusCoreContext';
 import { REDIS_CHANNELS } from '@ems/types';
@@ -382,7 +427,7 @@ useEffect(() => {
         updateBets(payload);
       });
     },
-    { priority: 'normal' }
+    { priority: 'normal' },
   );
 
   return unsubscribe; // Auto cleanup
@@ -390,6 +435,7 @@ useEffect(() => {
 ```
 
 **Best Practices:**
+
 ```tsx
 // ✅ CORRECT: Use EventBusCore for typed Redis channels
 const { subscribe } = useEventBusCore();
@@ -404,14 +450,17 @@ socket.on('bet:placed', handler);
 ---
 
 #### 3. **AuthContext** (`contexts/AuthContext.tsx`)
+
 Authentication state and JWT token management.
 
 **Purpose:**
+
 - Manages user authentication state
 - Handles JWT access/refresh token flow
 - Controls socket connection lifecycle
 
 **State:**
+
 ```tsx
 {
   user: User | null;
@@ -423,6 +472,7 @@ Authentication state and JWT token management.
 ```
 
 **Key Methods:**
+
 ```tsx
 login(email, password): Promise<void>
 register(email, password, username): Promise<void>
@@ -432,12 +482,14 @@ updateUser(updates: Partial<User>): void
 ```
 
 **Token Refresh Flow:**
+
 - Axios interceptor detects 401 responses
 - Attempts refresh token exchange
 - Retries original request with new access token
 - Logs out on refresh failure
 
 **Socket Connection Rules:**
+
 1. Socket connects **only when user authenticated**
 2. Socket disconnects **only on logout**
 3. **Never disconnect on token refresh** (causes duplicate connections)
@@ -447,15 +499,18 @@ updateUser(updates: Partial<User>): void
 ### Domain Contexts
 
 #### 4. **PredictionContext** (`contexts/PredictionContext.tsx`)
+
 Prediction market state and betting functionality.
 
 **State:**
+
 - Active predictions
 - User bets (single & parlay)
 - Market statistics
 - User balance
 
 **Key Features:**
+
 - Optimistic bet placement with rollback on failure
 - Real-time bet updates via EventBusCore
 - Prediction filtering & search
@@ -464,14 +519,17 @@ Prediction market state and betting functionality.
 ---
 
 #### 5. **ChatContext** (`contexts/ChatContext.tsx`)
+
 Global chat system state.
 
 **State:**
+
 - Chat messages (last 100)
 - Online users count
 - User typing indicators
 
 **Key Features:**
+
 - Real-time message updates
 - Rate limiting (1 message per 2 seconds)
 - Message history hydration
@@ -479,15 +537,18 @@ Global chat system state.
 ---
 
 #### 6. **TimelineContext** (`contexts/TimelineContext.tsx`)
+
 Article & feed management.
 
 **State:**
+
 - Timeline articles (RSS/Atom content)
 - User bookmarks
 - Article reactions
 - Trending content
 
 **Key Features:**
+
 - Infinite scroll pagination
 - Article filtering by tag
 - Bookmark sync across devices
@@ -496,14 +557,17 @@ Article & feed management.
 ---
 
 #### 7. **AchievementContext** (`contexts/AchievementContext.tsx`)
+
 Achievement system with real-time unlocks.
 
 **State:**
+
 - User achievements (77 total)
 - Achievement progress
 - Recent unlocks (last 24h)
 
 **Key Features:**
+
 - Real-time achievement celebrations
 - Progress tracking
 - Achievement categories
@@ -511,15 +575,18 @@ Achievement system with real-time unlocks.
 ---
 
 #### 8. **UserDataContext** (`contexts/UserDataContext.tsx`)
+
 User profile, stats, and analytics.
 
 **State:**
+
 - User profile data
 - Betting statistics
 - Pong game stats
 - Achievement progress
 
 **Key Features:**
+
 - Hydration on mount
 - Real-time stat updates
 - Profile editing
@@ -529,9 +596,11 @@ User profile, stats, and analytics.
 ### Utility Contexts
 
 #### 9. **ThemeContext** (`contexts/ThemeContext.tsx`)
+
 Theme management (dark/light mode).
 
 **Features:**
+
 - Theme persistence via localStorage
 - Flash prevention (applied before React hydration)
 - System theme detection
@@ -539,9 +608,11 @@ Theme management (dark/light mode).
 ---
 
 #### 10. **CacheContext** (`contexts/CacheContext.tsx`)
+
 Client-side data caching for API responses.
 
 **Features:**
+
 - In-memory cache with TTL
 - Cache invalidation strategies
 - Cache hit metrics
@@ -553,9 +624,11 @@ Client-side data caching for API responses.
 ### Event Subscription Hooks
 
 #### **useBettingEvents** (`hooks/useBettingEvents.ts`)
+
 Subscribe to betting-related events.
 
 **Events:**
+
 - `bet:placed` - New bet placed by any user
 - `bet:won` - User won a bet
 - `bet:lost` - User lost a bet
@@ -564,40 +637,46 @@ Subscribe to betting-related events.
 - `prediction:resolved` - Prediction resolved
 
 **Usage:**
+
 ```tsx
 useBettingEvents({
   onBetPlaced: (bet) => console.log('New bet:', bet),
   onPredictionResolved: (prediction) => {
     // Update local state
-  }
+  },
 });
 ```
 
 ---
 
 #### **useFinancialEvents** (`hooks/useFinancialEvents.ts`)
+
 Subscribe to balance and transaction events.
 
 **Events:**
+
 - `balance:updated` - User balance changed
 - `transaction:created` - New transaction recorded
 
 **Usage:**
+
 ```tsx
 useFinancialEvents({
   onBalanceUpdate: (newBalance) => {
     setBalance(newBalance);
     toast.success(`Balance updated: $${newBalance}`);
-  }
+  },
 });
 ```
 
 ---
 
 #### **usePongEvents** (`hooks/usePongEvents.ts`)
+
 Subscribe to Pong game events.
 
 **Events:**
+
 - `pong:match:created` - New match started
 - `pong:match:ended` - Match completed
 - `pong:elo:updated` - ELO rating changed
@@ -605,9 +684,11 @@ Subscribe to Pong game events.
 ---
 
 #### **useLeaderboardEvents** (`hooks/useLeaderboardEvents.ts`)
+
 Subscribe to leaderboard updates.
 
 **Events:**
+
 - `leaderboard:daily:updated`
 - `leaderboard:weekly:updated`
 - `leaderboard:all-time:updated`
@@ -617,26 +698,26 @@ Subscribe to leaderboard updates.
 ### Utility Hooks
 
 #### **useRoomLifecycle** (`hooks/useRoomLifecycle.ts`)
+
 Automatically join/leave Socket.IO rooms.
 
 **Purpose:**
+
 - Prevents room listener accumulation
 - Guarantees cleanup on unmount
 - Type-safe room names
 
 **Usage:**
+
 ```tsx
 const { user } = useAuth();
 
 // Auto join on mount, leave on unmount
-useRoomLifecycle([
-  `user:${user?.id}`,
-  'leaderboard:daily',
-  'predictions:active'
-].filter(Boolean));
+useRoomLifecycle([`user:${user?.id}`, 'leaderboard:daily', 'predictions:active'].filter(Boolean));
 ```
 
 **Pattern:**
+
 ```
 Component Mount  → emit('join-room', room)
 Component Unmount → emit('leave-room', room)
@@ -645,14 +726,17 @@ Component Unmount → emit('leave-room', room)
 ---
 
 #### **useOptimisticBetting** (`hooks/useOptimisticBetting.ts`)
+
 Optimistic UI updates for bet placement using React 19's `useOptimistic`.
 
 **Features:**
+
 - Instant UI feedback
 - Automatic rollback on error
 - Balance deduction preview
 
 **Usage:**
+
 ```tsx
 const { placeBet, optimisticBets } = useOptimisticBetting();
 
@@ -665,29 +749,28 @@ const handleBet = async () => {
 ---
 
 #### **useInfiniteScroll** (`hooks/useInfiniteScroll.ts`)
+
 Infinite scroll pagination with Intersection Observer.
 
 **Usage:**
+
 ```tsx
-const {
-  items,
-  loading,
-  hasMore,
-  observerRef
-} = useInfiniteScroll('/api/predictions', {
-  limit: 20
+const { items, loading, hasMore, observerRef } = useInfiniteScroll('/api/predictions', {
+  limit: 20,
 });
 
 // Attach ref to last item
-<div ref={observerRef}>Loading...</div>
+<div ref={observerRef}>Loading...</div>;
 ```
 
 ---
 
 #### **useDebounce** (`hooks/useDebounce.ts`)
+
 Debounce values for search inputs.
 
 **Usage:**
+
 ```tsx
 const [search, setSearch] = useState('');
 const debouncedSearch = useDebounce(search, 300);
@@ -706,6 +789,7 @@ useEffect(() => {
 **30+ Admin-only components** for platform management:
 
 #### **User Management**
+
 - `CompactUserList.tsx` - User table with search/filters
 - `UserDetailsModal.tsx` - Detailed user profile view
 - `BanUserModal.tsx` - Ban/suspend users
@@ -713,20 +797,24 @@ useEffect(() => {
 - `BannedUsersWall.tsx` - View banned users
 
 #### **Content Management**
+
 - `FeedsManager.tsx` - RSS feed CRUD operations
 - `OPMLManager.tsx` - Import/export OPML feed lists
 - `ContentOverview.tsx` - Article moderation queue
 
 #### **Prediction Management**
+
 - `PredictionDashboard.tsx` - All predictions overview
 - `PredictionTable.tsx` - Prediction management table
 - `ResolvePredictionModal.tsx` - Resolve market outcomes
 
 #### **Financial Monitoring**
+
 - `TransactionsTable.tsx` - All transactions with filters
 - `FinancialStatsOverview.tsx` - Revenue/volume metrics
 
 #### **Achievement Management**
+
 - `AdminAchievementDashboard.tsx` - Achievement overview
 - `AdminAchievementTable.tsx` - Achievement CRUD
 - `RuleBuilder.tsx` - Visual achievement rule editor
@@ -838,43 +926,52 @@ Server (Express)                     Client (React)
 **75+ Redis channels** organized by domain:
 
 #### **Betting Events** (15 channels)
+
 - `bet:placed`, `bet:won`, `bet:lost`
 - `parlay:placed`, `parlay:won`, `parlay:lost`
 - `prediction:created`, `prediction:updated`, `prediction:resolved`
 - `odds:updated`, `market:volume:updated`
 
 #### **Financial Events** (5 channels)
+
 - `balance:updated`, `transaction:created`
 - `payout:processed`, `refund:issued`
 
 #### **Pong Events** (12 channels)
+
 - `pong:match:created`, `pong:match:started`, `pong:match:ended`
 - `pong:elo:updated`, `pong:challenge:received`
 - `pong:spectators:updated`
 
 #### **Achievement Events** (8 channels)
+
 - `achievement:unlocked`, `achievement:progress`
 
 #### **Leaderboard Events** (9 channels)
+
 - `leaderboard:daily:updated`
 - `leaderboard:weekly:updated`
 - `leaderboard:all-time:updated`
 - `leaderboard:rank:changed`
 
 #### **Social Events** (10 channels)
+
 - `post:created`, `post:updated`, `post:deleted`
 - `reaction:added`, `reaction:removed`
 - `follow:new`, `follow:removed`
 
 #### **Chat Events** (5 channels)
+
 - `chat:message`, `chat:user:joined`, `chat:user:left`
 - `chat:typing`, `chat:message:deleted`
 
 #### **Timeline Events** (7 channels)
+
 - `article:new`, `article:trending`
 - `feed:updated`, `bookmark:added`
 
 #### **Admin Events** (4 channels)
+
 - `user:banned`, `user:unbanned`
 - `content:moderated`, `system:alert`
 
@@ -885,11 +982,13 @@ Server (Express)                     Client (React)
 Events are automatically prioritized based on channel patterns:
 
 #### **High Priority** (Immediate Updates)
+
 - Balance changes (`balance:*`)
 - Errors (`error:*`)
 - Pong game events (`pong:*`)
 
 **Handling:**
+
 ```tsx
 // High priority: Immediate state update
 if (priority === 'high') {
@@ -898,22 +997,26 @@ if (priority === 'high') {
 ```
 
 #### **Normal Priority** (Standard Updates)
+
 - Betting events
 - Predictions
 - Social interactions
 
 **Handling:**
+
 ```tsx
 // Normal priority: Standard state update
 handler(payload);
 ```
 
 #### **Low Priority** (Non-blocking Updates)
+
 - Analytics
 - Metrics
 - Leaderboard updates
 
 **Handling:**
+
 ```tsx
 // Low priority: Non-blocking with startTransition
 if (priority === 'low') {
@@ -939,7 +1042,7 @@ class HydrationWatermark {
 
   markReady() {
     this.isReady = true;
-    this.queue.forEach(event => this.processEvent(event));
+    this.queue.forEach((event) => this.processEvent(event));
     this.queue = [];
   }
 
@@ -964,6 +1067,7 @@ socket.on('redis:channel:*', (payload) => {
 ```
 
 **Benefits:**
+
 - ✅ No missed events during hydration
 - ✅ No duplicate state updates
 - ✅ Consistent event ordering
@@ -982,20 +1086,17 @@ export function useRoomLifecycle(rooms: string[]) {
   const socket = useSocket();
 
   useEffect(() => {
-    rooms.forEach(room => socket.emit('join-room', room));
+    rooms.forEach((room) => socket.emit('join-room', room));
 
     return () => {
-      rooms.forEach(room => socket.emit('leave-room', room));
+      rooms.forEach((room) => socket.emit('leave-room', room));
     };
   }, [rooms, socket]);
 }
 
 // Usage in components
 function PredictionPage({ predictionId }) {
-  useRoomLifecycle([
-    `prediction:${predictionId}`,
-    'leaderboard:daily'
-  ]);
+  useRoomLifecycle([`prediction:${predictionId}`, 'leaderboard:daily']);
 
   // Component automatically joins on mount, leaves on unmount
 }
@@ -1083,6 +1184,7 @@ useEffect(() => {
 ### Route Protection
 
 #### **PrivateRoute Component**
+
 Protects authenticated routes:
 
 ```tsx
@@ -1099,6 +1201,7 @@ function PrivateRoute() {
 ```
 
 #### **RequireAdmin Component**
+
 Protects admin-only routes:
 
 ```tsx
@@ -1127,6 +1230,7 @@ const Pong = lazy(() => import('../pages/Pong'));
 ```
 
 **Benefits:**
+
 - Faster initial page load (auth pages only)
 - Smaller initial bundle size
 - Better caching (routes cached independently)
@@ -1241,6 +1345,7 @@ function ThemeToggle() {
 ## State Management Patterns
 
 ### 1. **Local State (useState)**
+
 Use for component-specific state that doesn't need to be shared.
 
 ```tsx
@@ -1251,6 +1356,7 @@ const [inputValue, setInputValue] = useState('');
 ---
 
 ### 2. **Context State**
+
 Use for shared state across multiple components.
 
 ```tsx
@@ -1261,13 +1367,14 @@ const { predictions } = usePrediction();
 ---
 
 ### 3. **Optimistic Updates (useOptimistic)**
+
 Use for immediate UI feedback with server confirmation.
 
 ```tsx
-const [optimisticBets, addOptimisticBet] = useOptimistic(
-  bets,
-  (state, newBet) => [...state, newBet]
-);
+const [optimisticBets, addOptimisticBet] = useOptimistic(bets, (state, newBet) => [
+  ...state,
+  newBet,
+]);
 
 const placeBet = async (bet) => {
   addOptimisticBet(bet); // Immediate UI update
@@ -1283,6 +1390,7 @@ const placeBet = async (bet) => {
 ---
 
 ### 4. **Transitions (startTransition)**
+
 Use for non-blocking updates that don't need to be immediate.
 
 ```tsx
@@ -1294,6 +1402,7 @@ startTransition(() => {
 ---
 
 ### 5. **Event-Driven Updates (EventBusCore)**
+
 Use for real-time updates from server events.
 
 ```tsx
@@ -1359,9 +1468,11 @@ npm -w apps/client run test:ui
 ### Development Workflow
 
 1. **Start all services** (from root):
+
    ```bash
    npm run dev
    ```
+
    This starts:
    - Client app (port 3000)
    - Server (port 5000)
@@ -1378,9 +1489,11 @@ npm -w apps/client run test:ui
 ### Debugging
 
 #### **React DevTools**
+
 Install [React Developer Tools](https://react.dev/learn/react-developer-tools) browser extension.
 
 #### **Redux DevTools** (for EventBusCore monitoring)
+
 Not used, but EventBusCore provides built-in metrics:
 
 ```tsx
@@ -1391,6 +1504,7 @@ console.log('Handler count:', getHandlerCount());
 ```
 
 #### **Socket.IO Client Debugging**
+
 Enable debug mode in browser console:
 
 ```js
@@ -1398,6 +1512,7 @@ localStorage.debug = 'socket.io-client:*';
 ```
 
 #### **Performance Monitoring**
+
 Use React Profiler and Chrome DevTools:
 
 ```tsx
@@ -1405,7 +1520,7 @@ import { Profiler } from 'react';
 
 <Profiler id="MyComponent" onRender={onRenderCallback}>
   <MyComponent />
-</Profiler>
+</Profiler>;
 ```
 
 ---
@@ -1463,15 +1578,10 @@ describe('BettingModal', () => {
   it('should place bet on submit', async () => {
     const onBet = vi.fn();
 
-    render(
-      <BettingModal
-        prediction={{ id: 1, title: 'Test' }}
-        onBet={onBet}
-      />
-    );
+    render(<BettingModal prediction={{ id: 1, title: 'Test' }} onBet={onBet} />);
 
     fireEvent.change(screen.getByLabelText('Amount'), {
-      target: { value: '100' }
+      target: { value: '100' },
     });
 
     fireEvent.click(screen.getByText('Place Bet'));
@@ -1537,12 +1647,14 @@ export default defineConfig(({ mode }) => {
 ```
 
 **Manual Chunk Strategy:**
+
 - `react-vendor.js` - React core (~150KB)
 - `socket-vendor.js` - Socket.IO client (~100KB)
 - `ui-vendor.js` - UI libraries (~50KB)
 - `index.js` - App code (~200KB)
 
 **Benefits:**
+
 - Better caching (vendor chunks change rarely)
 - Parallel loading (multiple chunks)
 - Faster incremental builds
@@ -1643,6 +1755,7 @@ manualChunks: {
 ```
 
 **Result:**
+
 - Vendor chunks cached for weeks
 - App code changes don't invalidate vendor cache
 
@@ -1655,20 +1768,17 @@ manualChunks: {
 ```tsx
 import { FixedSizeList } from 'react-window';
 
-<FixedSizeList
-  height={600}
-  itemCount={1000}
-  itemSize={80}
->
+<FixedSizeList height={600} itemCount={1000} itemSize={80}>
   {({ index, style }) => (
     <div style={style}>
       <BetCard bet={bets[index]} />
     </div>
   )}
-</FixedSizeList>
+</FixedSizeList>;
 ```
 
 **Benefits:**
+
 - Render only visible items (~10-20)
 - Constant performance regardless of list size
 
@@ -1685,6 +1795,7 @@ startTransition(() => {
 ```
 
 **Result:**
+
 - Smooth scrolling during leaderboard updates
 - Input responsiveness maintained
 
@@ -1703,6 +1814,7 @@ useEffect(() => {
 ```
 
 **Result:**
+
 - 90% fewer API calls during typing
 - Better server performance
 
@@ -1713,12 +1825,7 @@ useEffect(() => {
 **Avatar images** use optimized formats:
 
 ```tsx
-<img
-  src={avatarUrl}
-  alt="Avatar"
-  loading="lazy"
-  decoding="async"
-/>
+<img src={avatarUrl} alt="Avatar" loading="lazy" decoding="async" />
 ```
 
 ---
@@ -1734,6 +1841,7 @@ const { subscribe } = useEventBusCore();
 ```
 
 **Result:**
+
 - 75+ events don't cause re-renders
 - Event handling <5ms average
 
@@ -1858,10 +1966,10 @@ if (priority === 'low') {
 
 ```tsx
 // ✅ CORRECT
-className="bg-surface text-content"
+className = 'bg-surface text-content';
 
 // ❌ WRONG
-className="bg-white text-gray-900"
+className = 'bg-white text-gray-900';
 ```
 
 ---
@@ -1888,6 +1996,7 @@ useEffect(() => {
 ### Issue: Socket not connecting
 
 **Solution:**
+
 1. Check server is running on port 5000
 2. Check Redis is running
 3. Check JWT token is valid
@@ -1898,6 +2007,7 @@ useEffect(() => {
 ### Issue: Events not received
 
 **Solution:**
+
 1. Check hydration watermark is set
 2. Check room is joined
 3. Check event channel name matches Redis channel
@@ -1908,6 +2018,7 @@ useEffect(() => {
 ### Issue: Memory leak warnings
 
 **Solution:**
+
 1. Check all event subscriptions return cleanup function
 2. Check rooms are left on unmount
 3. Use EventBusCore instead of direct socket.on()
@@ -1917,6 +2028,7 @@ useEffect(() => {
 ### Issue: Theme flash on load
 
 **Solution:**
+
 1. Check theme is applied in `main.tsx` before React renders
 2. Check localStorage key is correct (`theme` or `unified_theme_id`)
 

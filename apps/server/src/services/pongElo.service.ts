@@ -1,4 +1,5 @@
 import type { PongDifficulty } from '@prisma/client';
+import { ECONOMY_MODIFIER_BY_TIER } from '@ems/types';
 
 export interface EloChangeComponents {
   skillChange: number;
@@ -15,8 +16,10 @@ export interface EloCalculationInput {
   playerWon: boolean;
   wagerAmount: bigint;
   amountWon: bigint;
+  playerTier?: string; // Player's current tier for economy modifier scaling
+  opponentId?: number; // Opponent's userId for AI detection and Master rank restrictions
   isAiOpponent?: boolean;
-  isPerfectGame?: boolean; // 11-0 victory
+  isPerfectGame?: boolean; // Shutout victory (5-0)
 }
 
 export class PongEloService {
@@ -45,6 +48,8 @@ export class PongEloService {
       playerWon,
       wagerAmount,
       amountWon,
+      playerTier,
+      opponentId,
       isAiOpponent = false,
       isPerfectGame = false,
     } = input;
@@ -68,6 +73,16 @@ export class PongEloService {
 
       economyChange = this.K_FACTOR * wagerMultiplier * (profitRatio - 1);
 
+      // TIER-BASED ECONOMY MODIFIER: Scale economy component by player tier
+      // Higher tier players get reduced economy rewards to prevent bot farming
+      if (playerTier) {
+        const tierModifier =
+          ECONOMY_MODIFIER_BY_TIER[playerTier as keyof typeof ECONOMY_MODIFIER_BY_TIER];
+        if (tierModifier !== undefined) {
+          economyChange *= tierModifier;
+        }
+      }
+
       // Note: AI opponents give full economy rewards now to match user expectations
       // Previously reduced by 50% but this led to confusion when predictions didn't match results
       // isAiOpponent parameter is available for future differentiation if needed
@@ -89,7 +104,7 @@ export class PongEloService {
       bonusMultiplier += Math.min(eloGap / 1000, 0.5); // Up to 50% bonus
     }
 
-    // Perfection bonus: +10% for 11-0 victories
+    // Perfection bonus: +10% for shutout victories (5-0)
     if (isPerfectGame && playerWon) {
       bonusMultiplier += 0.1;
     }
@@ -104,7 +119,23 @@ export class PongEloService {
     economyChange *= bonusMultiplier;
 
     // COMBINED RATING CHANGE (50% skill + 50% economy)
-    const totalChange = Math.round(skillChange * 0.5 + economyChange * 0.5);
+    let totalChange = Math.round(skillChange * 0.5 + economyChange * 0.5);
+
+    // MASTER RANK AI RESTRICTIONS: Prevent elo farming
+    // Master+ players cannot gain elo from Easy/Medium/Hard AI
+    // Only IMPOSSIBLE AI can increase their elo (still lose elo if they lose)
+    const isMasterOrAbove = playerTier === 'MASTER' || playerTier === 'GRANDMASTER';
+    const isAIOpponent = opponentId !== undefined && opponentId < 0;
+
+    if (isMasterOrAbove && isAIOpponent && totalChange > 0) {
+      const aiDifficulty = this.getAIDifficultyFromId(opponentId);
+      if (aiDifficulty && aiDifficulty !== 'IMPOSSIBLE') {
+        // Block elo gain for Easy/Medium/Hard AI
+        totalChange = 0;
+      }
+      // IMPOSSIBLE AI passes through normally (totalChange remains as calculated)
+      // Elo loss (totalChange < 0) passes through for all AI difficulties
+    }
 
     // Apply Elo bounds
     const newRating = Math.max(this.MIN_ELO, Math.min(this.MAX_ELO, playerElo + totalChange));
@@ -148,6 +179,25 @@ export class PongEloService {
         return 2400;
       default:
         return 1200;
+    }
+  }
+
+  /**
+   * Get AI difficulty from userId
+   * AI players have negative IDs: -1 (EASY), -2 (MEDIUM), -3 (HARD), -4 (IMPOSSIBLE)
+   */
+  private static getAIDifficultyFromId(userId: number): PongDifficulty | null {
+    switch (userId) {
+      case -1:
+        return 'EASY';
+      case -2:
+        return 'MEDIUM';
+      case -3:
+        return 'HARD';
+      case -4:
+        return 'IMPOSSIBLE';
+      default:
+        return null;
     }
   }
 

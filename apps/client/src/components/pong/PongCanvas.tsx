@@ -18,6 +18,7 @@ interface GameState {
   status:
     | 'waiting'
     | 'waiting_for_opponent'
+    | 'lobby_negotiation'
     | 'waiting_for_ready'
     | 'countdown'
     | 'active'

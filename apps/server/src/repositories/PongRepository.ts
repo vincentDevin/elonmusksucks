@@ -17,6 +17,13 @@ export class PongRepository implements IPongRepository {
   async findStatsByUserId(userId: number): Promise<PongStatsData | null> {
     const stats = await prisma.pongStats.findUnique({
       where: { userId },
+      include: {
+        user: {
+          select: {
+            name: true,
+          },
+        },
+      },
     });
     return stats ? this.mapPongStats(stats) : null;
   }
@@ -578,6 +585,12 @@ export class PongRepository implements IPongRepository {
       // Update AI stats if AI was involved (AI has negative IDs)
       if (isAIMatch && actualWinnerId && actualWinnerId < 0) {
         // AI won - update AI's stats
+        console.log(`[PongRepo] AI ${actualWinnerId} WON - updating AI winner stats:`, {
+          hasWinnerStatsData: !!winnerStatsData,
+          newElo: winnerStatsData?.eloRating,
+          eloChange: winnerStatsData?.lastEloChange,
+        });
+
         const aiStats = await tx.pongStats.findUnique({
           where: { userId: actualWinnerId },
         });
@@ -587,9 +600,21 @@ export class PongRepository implements IPongRepository {
             where: { userId: actualWinnerId },
             data: winnerStatsData,
           });
+          console.log(`[PongRepo] Successfully updated AI ${actualWinnerId} winner stats`);
+        } else {
+          console.log(`[PongRepo] FAILED to update AI winner stats:`, {
+            aiStatsFound: !!aiStats,
+            hasWinnerStatsData: !!winnerStatsData,
+          });
         }
       } else if (isAIMatch && actualLoserId && actualLoserId < 0) {
         // AI lost - update AI's stats
+        console.log(`[PongRepo] AI ${actualLoserId} LOST - updating AI loser stats:`, {
+          hasLoserStatsData: !!loserStatsData,
+          newElo: loserStatsData?.eloRating,
+          eloChange: loserStatsData?.lastEloChange,
+        });
+
         const aiStats = await tx.pongStats.findUnique({
           where: { userId: actualLoserId },
         });
@@ -598,6 +623,12 @@ export class PongRepository implements IPongRepository {
           await tx.pongStats.update({
             where: { userId: actualLoserId },
             data: loserStatsData,
+          });
+          console.log(`[PongRepo] Successfully updated AI ${actualLoserId} loser stats`);
+        } else {
+          console.log(`[PongRepo] FAILED to update AI loser stats:`, {
+            aiStatsFound: !!aiStats,
+            hasLoserStatsData: !!loserStatsData,
           });
         }
       }
@@ -752,7 +783,16 @@ export class PongRepository implements IPongRepository {
   async findUserForAuth(userId: number) {
     return prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, name: true, muskBucks: true },
+      select: {
+        id: true,
+        name: true,
+        muskBucks: true,
+        pongStats: {
+          select: {
+            eloRating: true,
+          },
+        },
+      },
     });
   }
 
@@ -790,8 +830,8 @@ export class PongRepository implements IPongRepository {
         timestamp: new Date().toISOString(),
       });
 
-      // Deduct from player two if not AI
-      if (!isAI && playerTwoId) {
+      // Deduct from player two (AI or human)
+      if (playerTwoId) {
         // Get player two's balance before deduction
         const playerTwoBefore = await tx.user.findUnique({
           where: { id: playerTwoId },
@@ -805,21 +845,27 @@ export class PongRepository implements IPongRepository {
         });
 
         if (playerTwoUpdate.muskBucks < 0) {
-          throw new Error('Insufficient funds for player two');
+          throw new Error(`Insufficient funds for ${playerTwoId < 0 ? 'AI player' : 'player two'}`);
         }
 
-        // ✅ Emit balance update event for player two (wager deduction)
-        await eventBus.publish(REDIS_CHANNELS.BALANCE_UPDATE, {
-          userId: playerTwoId,
-          newBalance: Number(playerTwoUpdate.muskBucks),
-          previousBalance: Number(playerTwoBefore?.muskBucks || 0),
-          change: -wagerAmount,
-          reason: 'Pong match wager vs player',
-          timestamp: new Date().toISOString(),
-        });
+        console.log(
+          `[PongRepo] Deducted wager from ${playerTwoId < 0 ? 'AI' : 'human'} player ${playerTwoId}: ${playerTwoBefore?.muskBucks} -> ${playerTwoUpdate.muskBucks} (-${wagerAmount})`,
+        );
+
+        // ✅ Emit balance update event for player two (wager deduction) - only for humans
+        if (playerTwoId > 0) {
+          await eventBus.publish(REDIS_CHANNELS.BALANCE_UPDATE, {
+            userId: playerTwoId,
+            newBalance: Number(playerTwoUpdate.muskBucks),
+            previousBalance: Number(playerTwoBefore?.muskBucks || 0),
+            change: -wagerAmount,
+            reason: 'Pong match wager vs player',
+            timestamp: new Date().toISOString(),
+          });
+        }
       }
 
-      // Create transaction record
+      // Create transaction record for player one
       const transaction = await tx.transaction.create({
         data: {
           userId: playerOneId,
@@ -837,23 +883,35 @@ export class PongRepository implements IPongRepository {
         },
       });
 
-      if (!isAI && playerTwoId) {
+      // Create transaction record for player two (AI or human)
+      if (playerTwoId) {
+        // Get the actual balance we just updated
+        const playerTwoFinal = await tx.user.findUnique({
+          where: { id: playerTwoId },
+          select: { muskBucks: true },
+        });
+
         await tx.transaction.create({
           data: {
             userId: playerTwoId,
             type: 'DEBIT',
             subtype: 'PONG_WAGER',
             amount: BigInt(-wagerAmount),
-            balanceAfter: BigInt(0), // Will be updated with actual balance
-            description: 'Pong match wager vs player',
+            balanceAfter: playerTwoFinal?.muskBucks || BigInt(0),
+            description: `Pong match wager${isAI ? ' vs human' : ' vs player'}`,
             metadata: {
               wagerAmount,
-              isAI: false,
+              isAI,
               playerOneId,
-              matchType: 'PVP',
+              matchType: isAI ? 'PVE_AI' : 'PVP',
+              isAIPlayer: playerTwoId < 0,
             },
           },
         });
+
+        console.log(
+          `[PongRepo] Created transaction record for ${playerTwoId < 0 ? 'AI' : 'human'} player ${playerTwoId}`,
+        );
       }
 
       return { transactionId: transaction.id };
@@ -910,7 +968,8 @@ export class PongRepository implements IPongRepository {
   // Payout operations
 
   /**
-   * Process PVP payout (winner vs loser)
+   * Process payout for both PVP and PVE matches (unified)
+   * Handles AI players (negative IDs) and human players (positive IDs)
    */
   async processPVPPayout(
     matchId: string,
@@ -919,6 +978,7 @@ export class PongRepository implements IPongRepository {
     payoutAmount: bigint,
     houseRake: bigint,
     idempotencyKey: string,
+    vsAI: boolean = false,
   ): Promise<{
     matchId: string;
     winnerId: number;
@@ -936,7 +996,7 @@ export class PongRepository implements IPongRepository {
     const netPayout = payoutAmount - houseRake;
 
     return await this.executeInTransaction(async (tx) => {
-      // Get winner's balance before update
+      // Get winner's balance before update (AI or human)
       const winnerBefore = await tx.user.findUnique({
         where: { id: winnerId },
         select: { muskBucks: true },
@@ -962,12 +1022,16 @@ export class PongRepository implements IPongRepository {
         }
       }
 
-      // Credit winner with net payout
+      // Credit winner with net payout (AI or human)
       const updatedUser = await tx.user.update({
         where: { id: winnerId },
         data: { muskBucks: { increment: netPayout } },
         select: { muskBucks: true },
       });
+
+      console.log(
+        `[PongRepo] Credited ${winnerId < 0 ? 'AI' : 'human'} winner ${winnerId}: ${winnerPreviousBalance} -> ${updatedUser.muskBucks} (+${netPayout})`,
+      );
 
       // Create transaction record with idempotency key
       await tx.transaction.create({
@@ -977,15 +1041,17 @@ export class PongRepository implements IPongRepository {
           subtype: 'PONG_PAYOUT',
           amount: netPayout,
           balanceAfter: updatedUser.muskBucks,
-          description: 'Pong match payout (PVP victory)',
+          description: `Pong match payout (${vsAI ? 'PVE_AI' : 'PVP'} victory${winnerId < 0 ? ' - AI' : ''})`,
           metadata: {
-            matchType: 'PVP',
+            matchType: vsAI ? 'PVE_AI' : 'PVP',
             payout: payoutAmount.toString(),
             houseRake: houseRake.toString(),
             netPayout: netPayout.toString(),
             matchId,
             loserId,
-            vsAI: false,
+            vsAI,
+            isAIWinner: winnerId < 0,
+            isAILoser: loserId ? loserId < 0 : false,
           },
           relatedPongMatchId: matchId,
           idempotencyKey,
@@ -999,105 +1065,12 @@ export class PongRepository implements IPongRepository {
         houseRake: houseRake.toString(),
         netPayout: netPayout.toString(),
         loserLoss: loserId ? payoutAmount.toString() : undefined,
-        vsAI: false,
+        vsAI,
         timestamp: new Date(),
         winnerPreviousBalance: winnerPreviousBalance.toString(),
         winnerNewBalance: updatedUser.muskBucks.toString(),
         loserPreviousBalance: loserPreviousBalance?.toString(),
         loserNewBalance: loserNewBalance?.toString(),
-      };
-    });
-  }
-
-  /**
-   * Process PVE payout (winner vs AI)
-   */
-  async processPVEPayout(
-    matchId: string,
-    winnerId: number,
-    payoutAmount: bigint,
-    houseRake: bigint,
-    idempotencyKey: string,
-  ): Promise<{
-    matchId: string;
-    winnerId: number;
-    payout: string;
-    houseRake: string;
-    netPayout: string;
-    vsAI: boolean;
-    timestamp: Date;
-    winnerPreviousBalance: string;
-    winnerNewBalance: string;
-  }> {
-    // Only human players get payouts (AI wins don't trigger payouts)
-    if (winnerId < 0) {
-      return {
-        matchId,
-        winnerId,
-        payout: '0',
-        houseRake: '0',
-        netPayout: '0',
-        vsAI: true,
-        timestamp: new Date(),
-        winnerPreviousBalance: '0',
-        winnerNewBalance: '0',
-      };
-    }
-
-    const netPayout = payoutAmount - houseRake;
-
-    return await this.executeInTransaction(async (tx) => {
-      // Get user's current balance before update
-      const userBefore = await tx.user.findUnique({
-        where: { id: winnerId },
-        select: { muskBucks: true },
-      });
-
-      if (!userBefore) {
-        throw new Error(`User ${winnerId} not found for payout`);
-      }
-
-      const previousBalance = userBefore.muskBucks;
-
-      // Credit human winner with net payout
-      const updatedUser = await tx.user.update({
-        where: { id: winnerId },
-        data: { muskBucks: { increment: netPayout } },
-        select: { muskBucks: true },
-      });
-
-      // Create transaction record with idempotency key
-      await tx.transaction.create({
-        data: {
-          userId: winnerId,
-          type: 'CREDIT',
-          subtype: 'PONG_PAYOUT',
-          amount: netPayout,
-          balanceAfter: updatedUser.muskBucks,
-          description: 'Pong match payout (PVE_AI victory)',
-          metadata: {
-            matchType: 'PVE_AI',
-            payout: payoutAmount.toString(),
-            houseRake: houseRake.toString(),
-            netPayout: netPayout.toString(),
-            matchId,
-            vsAI: true,
-          },
-          relatedPongMatchId: matchId,
-          idempotencyKey,
-        },
-      });
-
-      return {
-        matchId,
-        winnerId,
-        payout: payoutAmount.toString(),
-        houseRake: houseRake.toString(),
-        netPayout: netPayout.toString(),
-        vsAI: true,
-        timestamp: new Date(),
-        winnerPreviousBalance: previousBalance.toString(),
-        winnerNewBalance: updatedUser.muskBucks.toString(),
       };
     });
   }

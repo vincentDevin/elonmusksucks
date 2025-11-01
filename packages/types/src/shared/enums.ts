@@ -144,6 +144,7 @@ export type ActivityPriority = (typeof ActivityPriority)[keyof typeof ActivityPr
 export type GameStatus =
   | 'waiting'
   | 'waiting_for_opponent'
+  | 'lobby_negotiation'
   | 'waiting_for_ready'
   | 'countdown'
   | 'active'
@@ -189,7 +190,7 @@ export const PONG_PHYSICS = {
   BALL_SPEED_INITIAL: 384,
   BALL_SPEED_INCREMENT: 32,
   WINNING_SCORE: 5,
-  TICK_RATE: 128,
+  TICK_RATE: 64, // Optimized from 128 for better CPU efficiency (industry standard)
   NETWORK_UPDATE_RATE: 60,
   ACTIVE_NETWORK_UPDATE_RATE: 120, // Higher update rate during active gameplay for smoother experience
 } as const;

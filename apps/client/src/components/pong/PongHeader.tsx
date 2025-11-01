@@ -248,18 +248,22 @@ export function PongHeader({
                     ? 'bg-warning/20 text-warning'
                     : currentGame?.status === 'ended'
                       ? 'bg-info/20 text-info'
-                      : currentGame?.status === 'waiting_for_opponent'
-                        ? 'bg-secondary/20 text-secondary'
-                        : currentGame?.status === 'waiting_for_ready'
-                          ? 'bg-accent/20 text-accent'
-                          : 'bg-muted/20 text-tertiary'
+                      : currentGame?.status === 'lobby_negotiation'
+                        ? 'bg-info/20 text-info'
+                        : currentGame?.status === 'waiting_for_opponent'
+                          ? 'bg-secondary/20 text-secondary'
+                          : currentGame?.status === 'waiting_for_ready'
+                            ? 'bg-accent/20 text-accent'
+                            : 'bg-muted/20 text-tertiary'
               }`}
             >
               {currentGame?.status === 'waiting_for_opponent'
                 ? 'WAITING FOR OPPONENT'
-                : currentGame?.status === 'waiting_for_ready'
-                  ? 'WAITING FOR READY'
-                  : (currentGame?.status || 'waiting').toUpperCase()}
+                : currentGame?.status === 'lobby_negotiation'
+                  ? '🤝 NEGOTIATING WAGER'
+                  : currentGame?.status === 'waiting_for_ready'
+                    ? 'WAITING FOR READY'
+                    : (currentGame?.status || 'waiting').toUpperCase()}
             </div>
 
             {onBackToLobby && (

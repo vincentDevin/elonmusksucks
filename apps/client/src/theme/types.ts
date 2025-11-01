@@ -116,6 +116,57 @@ export interface UnifiedTheme {
       };
     };
   };
+
+  // Badge-specific colors (leaderboard, stats, etc.)
+  // Optional - will use category-based defaults if not specified
+  badges?: {
+    rarities?: {
+      common?: {
+        background: string; // Badge background
+        gradient?: string; // Optional gradient background
+        border: string; // Border color
+        text: string; // Text color
+        glow: string; // Glow effect color
+      };
+      uncommon?: {
+        background: string;
+        gradient?: string;
+        border: string;
+        text: string;
+        glow: string;
+      };
+      rare?: {
+        background: string;
+        gradient?: string;
+        border: string;
+        text: string;
+        glow: string;
+      };
+      epic?: {
+        background: string;
+        gradient?: string;
+        border: string;
+        text: string;
+        glow: string;
+      };
+      legendary?: {
+        background: string;
+        gradient?: string;
+        border: string;
+        text: string;
+        glow: string;
+      };
+    };
+    // Badge type-specific colors
+    types?: {
+      bot?: { icon: string };
+      streak?: { icon: string };
+      highRoller?: { icon: string };
+      banPermanent?: { icon: string };
+      banTemporary?: { icon: string };
+      banCount?: { icon: string };
+    };
+  };
 }
 
 export interface ThemePreferences {

@@ -39,37 +39,28 @@ const pongPayoutWorker = new Worker<PongPayoutJobData>(
         return serializeBigInt(existingPayout);
       }
 
-      // 2. Process payout based on mode
-      let result: PongPayoutResult;
+      // 2. Process payout (same logic for both PVP and PVE now that AI uses User.muskBucks)
       const payoutBigInt = toBigInt(payout);
       const houseRakeBigInt = toBigInt(houseRake);
 
-      if (vsAI) {
-        result = await pongRepo.processPVEPayout(
-          matchId,
-          winnerId,
-          payoutBigInt,
-          houseRakeBigInt,
-          idempotencyKey,
-        );
-      } else {
-        result = await pongRepo.processPVPPayout(
-          matchId,
-          winnerId,
-          loserId,
-          payoutBigInt,
-          houseRakeBigInt,
-          idempotencyKey,
-        );
-      }
+      const result: PongPayoutResult = await pongRepo.processPVPPayout(
+        matchId,
+        winnerId, // Can be AI (< 0) or human (> 0)
+        loserId, // Can be AI (< 0) or human (> 0) or null
+        payoutBigInt,
+        houseRakeBigInt,
+        idempotencyKey,
+        vsAI, // Pass vsAI flag for metadata
+      );
 
       console.log(
-        `[pong-payout-worker] Successfully processed payout for match ${matchId}: ${result.netPayout} to user ${winnerId}`,
+        `[pong-payout-worker] Successfully processed payout for match ${matchId}: ${result.netPayout} to winner ${winnerId} (AI: ${winnerId < 0})`,
       );
 
       // 3. Emit balance update events for affected users
-      // Winner balance update
+      // Winner balance update (including AI winners for tracking)
       if (winnerId > 0) {
+        // Human winner - emit balance update event
         await eventBus.publish(REDIS_CHANNELS.BALANCE_UPDATE, {
           userId: winnerId,
           newBalance: Number(result.winnerNewBalance),
@@ -80,7 +71,12 @@ const pongPayoutWorker = new Worker<PongPayoutJobData>(
         });
 
         console.log(
-          `[pong-payout-worker] Emitted balance update for winner ${winnerId}: ${result.winnerPreviousBalance} -> ${result.winnerNewBalance}`,
+          `[pong-payout-worker] Emitted balance update for human winner ${winnerId}: ${result.winnerPreviousBalance} -> ${result.winnerNewBalance}`,
+        );
+      } else if (winnerId < 0) {
+        // AI winner - log the balance change (no socket event needed)
+        console.log(
+          `[pong-payout-worker] AI winner ${winnerId} balance updated: ${result.winnerPreviousBalance} -> ${result.winnerNewBalance} (+${result.netPayout})`,
         );
       }
 

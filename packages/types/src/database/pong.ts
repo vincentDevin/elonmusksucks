@@ -15,6 +15,8 @@ export interface Player {
   score: number;
   ping: number;
   lastInputTime: number;
+  elo: number;
+  balance: number; // Player's current MuskBucks balance
 }
 
 export interface Ball {
@@ -22,6 +24,28 @@ export interface Ball {
   y: number;
   vx: number;
   vy: number;
+}
+
+export interface WagerNegotiation {
+  currentOffer: number;
+  proposedBy: 0 | 1; // Which player made current offer
+  acceptedBy: Array<0 | 1>; // Who has accepted current offer (array for JSON serialization)
+  history: Array<{
+    amount: number;
+    proposedBy: 0 | 1;
+    timestamp: number;
+  }>;
+  roundCount: number; // Max 5 rounds
+  lockedIn: boolean;
+}
+
+export interface GameChatMessage {
+  userId: number;
+  username: string;
+  message: string;
+  timestamp: number;
+  isSystem: boolean;
+  userRole: 'player1' | 'player2' | 'spectator';
 }
 
 export interface GameState {
@@ -40,6 +64,12 @@ export interface GameState {
   };
   readyStates?: [boolean, boolean]; // Ready status for each player [player0, player1]
   startTime: number;
+  // New fields for lobby negotiation and chat
+  wagerNegotiation: WagerNegotiation | null;
+  chatMessages: GameChatMessage[];
+  lobbyCreatedAt: number;
+  negotiationStartedAt: number | null;
+  wagerChargedAt: number | null; // Track when wager was deducted
 }
 
 // ============================================================================
@@ -80,6 +110,7 @@ export interface PlayerInput {
   paddleY: number; // Client's authoritative paddle position
   seq: number; // Sequence number for input ordering
   timestamp: number;
+  mouseDragDelta?: number; // Optional: mouse drag delta for 1:1 paddle control
 }
 
 // ============================================================================

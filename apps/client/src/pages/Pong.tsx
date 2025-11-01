@@ -27,9 +27,5 @@ export default function Pong() {
     );
   }
 
-  return (
-    <PageContainer>
-      <PongGame />
-    </PageContainer>
-  );
+  return <PongGame />;
 }

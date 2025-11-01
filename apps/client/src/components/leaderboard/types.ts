@@ -1,6 +1,7 @@
 // Unified leaderboard types for consistent component architecture
 import type { PublicLeaderboardEntry, PongLeaderboardView } from '@ems/types';
 import type { ShameWallEntry } from '../../api/shameWall';
+import type { BadgeData } from '../../types/badges';
 
 export type LeaderboardVariant = 'betting' | 'pong' | 'shame';
 
@@ -21,11 +22,7 @@ export interface UnifiedLeaderboardEntry {
     highlight?: boolean;
     color?: string;
   }>;
-  badges?: Array<{
-    text: string;
-    color: string;
-    icon?: string;
-  }>;
+  badges?: BadgeData[];
   variant: LeaderboardVariant;
   rawData: PublicLeaderboardEntry | PongLeaderboardView | ShameWallEntry;
 }

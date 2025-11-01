@@ -21,7 +21,7 @@ const RATE_LIMITS: Record<string, RateLimitConfig> = {
 
   // Match management - prevent lobby spam
   create_match: { windowMs: 60000, maxRequests: 5 }, // 5 matches per minute
-  join_match: { windowMs: 10000, maxRequests: 10 }, // 10 joins per 10 seconds
+  // join_match: removed - no rate limiting on joins (authenticated sockets only)
   leave_match: { windowMs: 5000, maxRequests: 10 }, // 10 leaves per 5 seconds
 
   // Ready state - prevent rapid toggling
@@ -33,8 +33,8 @@ const RATE_LIMITS: Record<string, RateLimitConfig> = {
   // Lobby - prevent lobby state spam
   join_lobby: { windowMs: 5000, maxRequests: 20 }, // 20 lobby joins per 5 seconds
 
-  // Authentication - prevent auth spam
-  auth: { windowMs: 60000, maxRequests: 3 }, // 3 auth attempts per minute
+  // Authentication - removed (high latency/unstable connections cause legitimate reconnects)
+  // auth: { windowMs: 60000, maxRequests: 3 }, // removed to support cross-region testing
 };
 
 /**
@@ -176,6 +176,15 @@ export class SocketRateLimiter {
     if (keysToDelete.length > 0) {
       console.log(`[RATE_LIMIT] Cleaned up ${keysToDelete.length} old entries`);
     }
+  }
+
+  /**
+   * Reset all rate limit data (useful for testing)
+   */
+  reset(): void {
+    this.requests.clear();
+    this.violations.clear();
+    console.log('[RATE_LIMIT] All rate limit data has been reset');
   }
 }
 

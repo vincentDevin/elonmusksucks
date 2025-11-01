@@ -12,20 +12,29 @@ export interface UserPongStatsView {
   userId: number;
   userName: string;
   eloRating: number;
+  peakElo: number;
   tier: string;
-  gamesPlayed: number;
+  totalMatches: number;
   wins: number;
   losses: number;
   winRate: number;
   winStreak: number;
-  bestStreak: number;
+  bestWinStreak: number;
   perfectGames: number;
   comebacks: number;
   totalWagered: string; // BigInt → string
   totalWon: string; // BigInt → string
+  totalLost: string; // BigInt → string
   profit: string; // BigInt → string
   biggestWin: string; // BigInt → string
-  averagePing: number;
+  biggestLoss: string; // BigInt → string
+  avgPing: number;
+  avgGameDuration: number; // Average game duration in seconds
+  roi: number; // Return on investment percentage
+  aiWins: number;
+  aiLosses: number;
+  hardestAiBeaten?: string;
+  riskTaker: boolean;
   createdAt: string; // Date → ISO
   updatedAt: string; // Date → ISO
 }

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 interface InputState {
   up: boolean;
   down: boolean;
+  mouseDragDelta?: number; // Mouse drag delta in pixels for 1:1 paddle control
 }
 
 interface TouchPosition {
@@ -39,17 +40,19 @@ export function usePongInput(): PongInputHook {
     inputBufferRef.current = updatedState;
     setInputState(updatedState);
 
-    // Only send if state actually changed
+    // Only send if state actually changed (including mouseDragDelta)
     const stateChanged =
       lastSentStateRef.current.up !== updatedState.up ||
-      lastSentStateRef.current.down !== updatedState.down;
+      lastSentStateRef.current.down !== updatedState.down ||
+      lastSentStateRef.current.mouseDragDelta !== updatedState.mouseDragDelta;
 
     if (sendInputRef.current && stateChanged) {
       sendInputRef.current(updatedState);
       lastSentStateRef.current = { ...updatedState };
     }
 
-    const hasInput = updatedState.up || updatedState.down;
+    const hasInput =
+      updatedState.up || updatedState.down || updatedState.mouseDragDelta !== undefined;
     setIsInputActive(hasInput);
   }, []);
 
@@ -59,14 +62,18 @@ export function usePongInput(): PongInputHook {
     updateInputRef.current = updateInput;
   }, [updateInput]);
 
-  // ✅ Continuous input sending for held keys (throttled for performance)
+  // ✅ Continuous input sending for held keys AND mouse drag (throttled for performance)
   useEffect(() => {
     const interval = setInterval(() => {
       const currentState = inputBufferRef.current;
-      if ((currentState.up || currentState.down) && sendInputRef.current) {
+      // Send input if keyboard keys are held OR mouse drag is active
+      const hasActiveInput =
+        currentState.up || currentState.down || currentState.mouseDragDelta !== undefined;
+
+      if (hasActiveInput && sendInputRef.current) {
         sendInputRef.current(currentState);
       }
-    }, 10); // ✅ Send input at ~100fps (1000/10 = 100fps) - Good balance of responsiveness and performance
+    }, 16.67); // ✅ Send input at ~60fps (1000/16.67 = 60fps) - Optimized for client-side prediction architecture
 
     return () => clearInterval(interval);
   }, []);
@@ -132,10 +139,9 @@ export function usePongInput(): PongInputHook {
     const touch = event.touches[0];
     if (!touch) return;
 
-    touchPositionRef.current.currentY = touch.clientY;
-
-    const deltaY = touchPositionRef.current.currentY - touchPositionRef.current.startY;
-    const threshold = 10; // Minimum movement threshold
+    // Use velocity-based delta (from last position, not start position)
+    const deltaY = touch.clientY - touchPositionRef.current.currentY;
+    const threshold = 5; // Reduced threshold for better sensitivity
 
     if (Math.abs(deltaY) > threshold) {
       const up = deltaY < -threshold;
@@ -145,6 +151,9 @@ export function usePongInput(): PongInputHook {
     } else {
       updateInputRef.current({ up: false, down: false });
     }
+
+    // Update current position for next delta calculation
+    touchPositionRef.current.currentY = touch.clientY;
   }, []); // ✅ No dependencies - stable callback
 
   const handleTouchEnd = useCallback((event: TouchEvent) => {
@@ -154,25 +163,24 @@ export function usePongInput(): PongInputHook {
     updateInputRef.current({ up: false, down: false });
   }, []); // ✅ No dependencies - stable callback
 
-  // ✅ Stable mouse movement handler for precise control
+  // ✅ 1:1 mouse drag handler for direct paddle control
   const handleMouseMove = useCallback((event: MouseEvent) => {
     if (!touchPositionRef.current.isActive) return;
 
-    const deltaY = event.clientY - touchPositionRef.current.startY;
-    const threshold = 5; // Smaller threshold for mouse precision
+    // Calculate drag delta from initial mouse down position
+    // This gives us 1:1 movement - paddle moves exactly as mouse moves
+    const dragDelta = event.clientY - touchPositionRef.current.startY;
 
-    if (Math.abs(deltaY) > threshold) {
-      const up = deltaY < -threshold;
-      const down = deltaY > threshold;
-      updateInputRef.current({ up, down });
-    } else {
-      updateInputRef.current({ up: false, down: false });
-    }
+    // Send only the drag delta, don't touch keyboard state
+    updateInputRef.current({ mouseDragDelta: dragDelta });
+
+    // Update current position for reference
+    touchPositionRef.current.currentY = event.clientY;
   }, []); // ✅ No dependencies - stable callback
 
   const handleMouseDown = useCallback((event: MouseEvent) => {
     if (event.button === 0) {
-      // Left mouse button
+      // Left mouse button - start drag
       touchPositionRef.current = {
         startY: event.clientY,
         currentY: event.clientY,
@@ -183,7 +191,8 @@ export function usePongInput(): PongInputHook {
 
   const handleMouseUp = useCallback(() => {
     touchPositionRef.current.isActive = false;
-    updateInputRef.current({ up: false, down: false });
+    // Clear mouse drag delta when releasing mouse
+    updateInputRef.current({ mouseDragDelta: undefined });
   }, []); // ✅ No dependencies - stable callback
 
   // ✅ Auto-bind keyboard and mouse events (runs once, stable callbacks)

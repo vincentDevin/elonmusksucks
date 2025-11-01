@@ -246,10 +246,6 @@ export function PongMatchCreatorModal({
     },
   };
 
-  // Get current wager and risk level
-  const currentWager = variant === 'ai' ? aiWager : pvpWager;
-  const currentRiskLevel = getRiskLevel(currentWager);
-
   // Percentage buttons for quick wager selection
   const renderWagerButtons = (
     wager: number,
@@ -309,8 +305,8 @@ export function PongMatchCreatorModal({
       if (currentStep === 2) return '💰 Choose Wager';
       return '🏆 Confirm Match';
     } else {
-      if (currentStep === 1) return '💰 Set Match Stakes';
-      return '🏆 Confirm Lobby';
+      if (currentStep === 1) return '💰 Set Initial Offer';
+      return '🏆 Confirm PVP Lobby';
     }
   };
 
@@ -325,10 +321,20 @@ export function PongMatchCreatorModal({
         {/* Header */}
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold text-content">
-            {isAI ? 'Wager Amount' : 'Match Stakes'}
+            {isAI ? 'Wager Amount' : 'Opening Offer'}
           </h3>
           {isAI && <span className="text-sm text-tertiary">vs {aiPlayers[aiDifficulty].name}</span>}
         </div>
+
+        {/* PVP negotiation info */}
+        {!isAI && (
+          <div className="bg-info/10 border border-info/20 rounded p-2">
+            <div className="flex items-center text-xs text-info">
+              <span className="mr-1">💡</span>
+              This is your opening offer. You'll negotiate the final wager with your opponent.
+            </div>
+          </div>
+        )}
 
         {/* Balance */}
         <div className="flex items-center justify-between">
@@ -638,19 +644,22 @@ export function PongMatchCreatorModal({
                   <span className="ml-2 font-medium text-content">Player vs Player</span>
                 </div>
                 <div>
-                  <span className="text-tertiary">Entry Fee:</span>
+                  <span className="text-tertiary">Your Offer:</span>
                   <span className="ml-2 font-medium text-accent">{formatMuskBucks(pvpWager)}</span>
                 </div>
                 <div>
-                  <span className="text-tertiary">Total Pot:</span>
+                  <span className="text-tertiary">Potential Pot:</span>
                   <span className="ml-2 font-medium text-success">
                     {formatMuskBucks(pvpWager * 2)}
                   </span>
                 </div>
                 <div>
                   <span className="text-tertiary">Status:</span>
-                  <span className="ml-2 font-medium text-warning">Waiting for opponent</span>
+                  <span className="ml-2 font-medium text-warning">Awaiting negotiation</span>
                 </div>
+              </div>
+              <div className="mt-3 text-xs text-info bg-info/10 rounded p-2">
+                💡 The final wager will be agreed upon with your opponent through negotiation
               </div>
             </div>
 
